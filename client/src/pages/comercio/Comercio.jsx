@@ -96,10 +96,15 @@ export default function Comercio() {
 
     setRegistrando(true)
     try {
-      await api.post(`/comercio/${token}/ventas`, {
-        socioId: socio.id,
-        importeOriginal: parseFloat(importe),
-      })
+      // Ejecutar API y esperar mínimo 1.5 segundos para mostrar el spinner
+      const [response] = await Promise.all([
+        api.post(`/comercio/${token}/ventas`, {
+          socioId: socio.id,
+          importeOriginal: parseFloat(importe),
+        }),
+        new Promise(resolve => setTimeout(resolve, 1500))
+      ])
+      setRegistrando(false)
       setVentaExito(true)
       // Limpiar para nueva venta
       setTimeout(() => {
@@ -110,9 +115,8 @@ export default function Comercio() {
         setVentaExito(false)
       }, 3000)
     } catch (err) {
-      setError('Error al registrar la venta')
-    } finally {
       setRegistrando(false)
+      setError('Error al registrar la venta')
     }
   }
 
