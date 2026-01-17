@@ -181,9 +181,14 @@ export default function Comercio() {
       <main className="max-w-md mx-auto px-4 py-6">
         {/* Mensaje de exito */}
         {ventaExito && (
-          <Alert type="success" className="mb-6">
-            <p className="font-semibold">Venta registrada correctamente</p>
-          </Alert>
+          <div className="text-center py-8">
+            <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-green-700 mb-2">Venta Registrada</h2>
+            <p className="text-gray-600 mb-6">El descuento fue aplicado correctamente</p>
+            <Button onClick={nuevaBusqueda} className="w-full">
+              NUEVA VENTA
+            </Button>
+          </div>
         )}
 
         {/* Error general */}
@@ -193,37 +198,39 @@ export default function Comercio() {
           </Alert>
         )}
 
-        {/* Busqueda de socio */}
-        <section className="mb-6">
-          <form onSubmit={buscarSocio}>
-            <label className="block text-gray-700 text-sm font-semibold mb-2">
-              Buscar socio
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Nro. de socio o DNI"
-                className="input-field flex-1"
-                disabled={buscando}
-              />
-              <Button type="submit" loading={buscando} className="px-4">
-                Buscar
-              </Button>
-            </div>
-          </form>
-        </section>
+        {/* Busqueda de socio - ocultar cuando hay éxito */}
+        {!ventaExito && (
+          <>
+            <section className="mb-6">
+              <form onSubmit={buscarSocio}>
+                <label className="block text-gray-700 text-sm font-semibold mb-2">
+                  Buscar socio
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    placeholder="Nro. de socio o DNI"
+                    className="input-field flex-1"
+                    disabled={buscando}
+                  />
+                  <Button type="submit" loading={buscando} className="px-4">
+                    Buscar
+                  </Button>
+                </div>
+              </form>
+            </section>
 
-        {/* Error de busqueda */}
-        {socioError && (
-          <Alert type="error" className="mb-6">
-            {socioError}
-          </Alert>
-        )}
+            {/* Error de busqueda */}
+            {socioError && (
+              <Alert type="error" className="mb-6">
+                {socioError}
+              </Alert>
+            )}
 
-        {/* Resultado del socio */}
-        {socio && (
+            {/* Resultado del socio */}
+            {socio && (
           <>
             <section className="mb-6">
               {socio.esActivo ? (
@@ -320,6 +327,8 @@ export default function Comercio() {
                 </Button>
               </>
             )}
+          </>
+        )}
           </>
         )}
       </main>

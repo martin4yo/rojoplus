@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import { useModal } from '../../components/Modal'
 import api from '../../services/api'
 
 export default function AdminReportes() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reporte, setReporte] = useState(null)
+  const { showModal, ModalComponent } = useModal()
 
   const [filtros, setFiltros] = useState({
     desde: '',
@@ -63,7 +65,10 @@ export default function AdminReportes() {
       const token = localStorage.getItem('adminToken')
       window.open(`/api/admin/reportes/ventas/export?${params}&token=${token}`, '_blank')
     } catch (err) {
-      alert('Error al exportar')
+      showModal({
+        type: 'error',
+        message: 'Error al exportar el reporte',
+      })
     }
   }
 
@@ -207,6 +212,8 @@ export default function AdminReportes() {
           )}
         </>
       )}
+
+      {ModalComponent}
     </div>
   )
 }

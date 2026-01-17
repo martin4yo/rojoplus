@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import { useModal } from '../../components/Modal'
 import api from '../../services/api'
 
 export default function AdminComercios() {
@@ -9,6 +10,7 @@ export default function AdminComercios() {
   const [comercios, setComercios] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { showModal, ModalComponent } = useModal()
 
   const estadoFiltro = searchParams.get('estado') || ''
 
@@ -40,21 +42,45 @@ export default function AdminComercios() {
   async function aprobar(id) {
     try {
       await api.post(`/admin/comercios/${id}/aprobar`)
+      showModal({
+        type: 'success',
+        title: 'Comercio aprobado',
+        message: 'El comercio ha sido aprobado y recibirá un email con su link de acceso.',
+      })
       cargarComercios()
     } catch (err) {
-      alert('Error al aprobar comercio')
+      showModal({
+        type: 'error',
+        message: 'Error al aprobar comercio',
+      })
     }
   }
 
-  async function rechazar(id) {
-    const motivo = prompt('Motivo del rechazo:')
-    if (!motivo) return
-    try {
-      await api.post(`/admin/comercios/${id}/rechazar`, { motivo })
-      cargarComercios()
-    } catch (err) {
-      alert('Error al rechazar comercio')
-    }
+  function rechazar(id) {
+    showModal({
+      type: 'warning',
+      title: 'Rechazar comercio',
+      message: 'Ingrese el motivo del rechazo:',
+      prompt: true,
+      promptPlaceholder: 'Motivo del rechazo...',
+      confirmText: 'Rechazar',
+      onConfirm: async (motivo) => {
+        try {
+          await api.post(`/admin/comercios/${id}/rechazar`, { motivo })
+          showModal({
+            type: 'success',
+            title: 'Comercio rechazado',
+            message: 'El comercio ha sido rechazado.',
+          })
+          cargarComercios()
+        } catch (err) {
+          showModal({
+            type: 'error',
+            message: 'Error al rechazar comercio',
+          })
+        }
+      },
+    })
   }
 
   const estadoColor = {
@@ -174,6 +200,8 @@ export default function AdminComercios() {
           </table>
         </div>
       )}
+
+      {ModalComponent}
     </div>
   )
 }

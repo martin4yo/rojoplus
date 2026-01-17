@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
+import { useModal } from '../../components/Modal'
 import api from '../../services/api'
 
 export default function AdminComercioDetalle() {
@@ -13,6 +14,7 @@ export default function AdminComercioDetalle() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const { showModal, ModalComponent } = useModal()
 
   const [form, setForm] = useState({
     descuentoPct: '',
@@ -69,20 +71,43 @@ export default function AdminComercioDetalle() {
   async function reenviarLink() {
     try {
       await api.post(`/admin/comercios/${id}/reenviar-link`)
-      alert('Link reenviado correctamente')
+      showModal({
+        type: 'success',
+        title: 'Link reenviado',
+        message: 'El link de acceso ha sido enviado al email del comercio.',
+      })
     } catch (err) {
-      alert('Error al reenviar link')
+      showModal({
+        type: 'error',
+        message: 'Error al reenviar link',
+      })
     }
   }
 
-  async function desactivar() {
-    if (!confirm('¿Estás seguro de desactivar este comercio?')) return
-    try {
-      await api.post(`/admin/comercios/${id}/desactivar`)
-      cargarComercio()
-    } catch (err) {
-      alert('Error al desactivar comercio')
-    }
+  function desactivar() {
+    showModal({
+      type: 'warning',
+      title: 'Desactivar comercio',
+      message: '¿Estás seguro de desactivar este comercio? Ya no podrá registrar ventas.',
+      confirmText: 'Desactivar',
+      showCancel: true,
+      onConfirm: async () => {
+        try {
+          await api.post(`/admin/comercios/${id}/desactivar`)
+          showModal({
+            type: 'success',
+            title: 'Comercio desactivado',
+            message: 'El comercio ha sido desactivado.',
+          })
+          cargarComercio()
+        } catch (err) {
+          showModal({
+            type: 'error',
+            message: 'Error al desactivar comercio',
+          })
+        }
+      },
+    })
   }
 
   if (loading) {
@@ -249,6 +274,8 @@ export default function AdminComercioDetalle() {
           </div>
         </div>
       </div>
+
+      {ModalComponent}
     </div>
   )
 }

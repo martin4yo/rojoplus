@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import { useModal } from '../../components/Modal'
 import api from '../../services/api'
 
 export default function AdminSociosCargar() {
@@ -11,6 +12,7 @@ export default function AdminSociosCargar() {
   const [preview, setPreview] = useState(null)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState(null)
+  const { showModal, ModalComponent } = useModal()
 
   async function handleUpload(e) {
     e.preventDefault()
@@ -38,8 +40,12 @@ export default function AdminSociosCargar() {
 
     try {
       await api.post(`/admin/socios/upload/${preview.uploadId}/confirmar`)
-      alert('Socios cargados correctamente')
-      navigate('/admin/socios')
+      showModal({
+        type: 'success',
+        title: 'Carga exitosa',
+        message: 'Los socios han sido cargados correctamente.',
+        onConfirm: () => navigate('/admin/socios'),
+      })
     } catch (err) {
       setError(err.message || 'Error al confirmar la carga')
     } finally {
@@ -138,6 +144,8 @@ export default function AdminSociosCargar() {
           </>
         )}
       </div>
+
+      {ModalComponent}
     </div>
   )
 }
