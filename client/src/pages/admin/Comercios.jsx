@@ -1,0 +1,179 @@
+import { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Button } from '../../components/Button'
+import { Alert } from '../../components/Alert'
+import api from '../../services/api'
+
+export default function AdminComercios() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [comercios, setComercios] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const estadoFiltro = searchParams.get('estado') || ''
+
+  useEffect(() => {
+    cargarComercios()
+  }, [estadoFiltro])
+
+  async function cargarComercios() {
+    setLoading(true)
+    try {
+      const params = estadoFiltro ? `?estado=${estadoFiltro}` : ''
+      const data = await api.get(`/admin/comercios${params}`)
+      setComercios(data.comercios || [])
+    } catch (err) {
+      setError('Error al cargar comercios')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function filtrarPorEstado(estado) {
+    if (estado) {
+      setSearchParams({ estado })
+    } else {
+      setSearchParams({})
+    }
+  }
+
+  async function aprobar(id) {
+    try {
+      await api.post(`/admin/comercios/${id}/aprobar`)
+      cargarComercios()
+    } catch (err) {
+      alert('Error al aprobar comercio')
+    }
+  }
+
+  async function rechazar(id) {
+    const motivo = prompt('Motivo del rechazo:')
+    if (!motivo) return
+    try {
+      await api.post(`/admin/comercios/${id}/rechazar`, { motivo })
+      cargarComercios()
+    } catch (err) {
+      alert('Error al rechazar comercio')
+    }
+  }
+
+  const estadoColor = {
+    PENDIENTE: 'bg-yellow-100 text-yellow-800',
+    ACTIVO: 'bg-green-100 text-green-800',
+    RECHAZADO: 'bg-red-100 text-red-800',
+    INACTIVO: 'bg-gray-100 text-gray-800',
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Comercios</h1>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {['', 'PENDIENTE', 'ACTIVO', 'RECHAZADO', 'INACTIVO'].map((estado) => (
+          <button
+            key={estado}
+            onClick={() => filtrarPorEstado(estado)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              estadoFiltro === estado
+                ? 'bg-primary text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {estado || 'Todos'}
+          </button>
+        ))}
+      </div>
+
+      {error && <Alert type="error" className="mb-6">{error}</Alert>}
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      ) : comercios.length === 0 ? (
+        <div className="text-center text-gray-500 py-12">
+          No hay comercios para mostrar
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Comercio
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+                  Rubro
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Estado
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+                  Descuento
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {comercios.map((comercio) => (
+                <tr key={comercio.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <Link
+                      to={`/admin/comercios/${comercio.id}`}
+                      className="font-medium text-gray-800 hover:text-primary"
+                    >
+                      {comercio.nombre}
+                    </Link>
+                    <p className="text-sm text-gray-500">{comercio.email}</p>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 hidden md:table-cell">
+                    {comercio.rubro}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${estadoColor[comercio.estado]}`}>
+                      {comercio.estado}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 hidden md:table-cell">
+                    {comercio.descuentoPct}%
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {comercio.estado === 'PENDIENTE' && (
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => aprobar(comercio.id)}
+                          className="text-green-600 hover:text-green-800 font-medium text-sm"
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          onClick={() => rechazar(comercio.id)}
+                          className="text-red-600 hover:text-red-800 font-medium text-sm"
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    )}
+                    {comercio.estado !== 'PENDIENTE' && (
+                      <Link
+                        to={`/admin/comercios/${comercio.id}`}
+                        className="text-primary hover:text-primary-dark font-medium text-sm"
+                      >
+                        Ver detalle
+                      </Link>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}

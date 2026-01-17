@@ -1,0 +1,308 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { CheckCircle, XCircle, Star } from 'lucide-react'
+import { Button } from '../../components/Button'
+import { Input } from '../../components/Input'
+import { Alert } from '../../components/Alert'
+import api from '../../services/api'
+
+export default function Comercio() {
+  const { token } = useParams()
+  const navigate = useNavigate()
+
+  const [comercio, setComercio] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Busqueda de socio
+  const [busqueda, setBusqueda] = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [socio, setSocio] = useState(null)
+  const [socioError, setSocioError] = useState(null)
+
+  // Venta
+  const [importe, setImporte] = useState('')
+  const [descuento, setDescuento] = useState(null)
+  const [registrando, setRegistrando] = useState(false)
+  const [ventaExito, setVentaExito] = useState(false)
+
+  // Cargar datos del comercio
+  useEffect(() => {
+    async function cargarComercio() {
+      try {
+        const data = await api.get(`/comercio/${token}`)
+        setComercio(data)
+      } catch (err) {
+        navigate('/acceso-invalido')
+      } finally {
+        setLoading(false)
+      }
+    }
+    cargarComercio()
+  }, [token, navigate])
+
+  // Buscar socio
+  async function buscarSocio(e) {
+    e.preventDefault()
+    if (!busqueda.trim()) return
+
+    setBuscando(true)
+    setSocio(null)
+    setSocioError(null)
+    setImporte('')
+    setDescuento(null)
+    setVentaExito(false)
+
+    try {
+      const data = await api.get(`/comercio/${token}/socios/buscar?q=${encodeURIComponent(busqueda)}`)
+      if (data) {
+        setSocio(data)
+      } else {
+        setSocioError('No se encontro socio con ese numero o documento')
+      }
+    } catch (err) {
+      setSocioError('Error al buscar socio')
+    } finally {
+      setBuscando(false)
+    }
+  }
+
+  // Calcular descuento cuando cambia el importe
+  useEffect(() => {
+    if (!socio?.esActivo || !importe || isNaN(parseFloat(importe))) {
+      setDescuento(null)
+      return
+    }
+
+    async function calcular() {
+      try {
+        const data = await api.post(`/comercio/${token}/ventas/calcular`, {
+          socioId: socio.id,
+          importeOriginal: parseFloat(importe),
+        })
+        setDescuento(data)
+      } catch (err) {
+        console.error('Error calculando descuento:', err)
+      }
+    }
+
+    const timer = setTimeout(calcular, 300)
+    return () => clearTimeout(timer)
+  }, [importe, socio, token])
+
+  // Registrar venta
+  async function registrarVenta() {
+    if (!descuento) return
+
+    setRegistrando(true)
+    try {
+      await api.post(`/comercio/${token}/ventas`, {
+        socioId: socio.id,
+        importeOriginal: parseFloat(importe),
+      })
+      setVentaExito(true)
+      // Limpiar para nueva venta
+      setTimeout(() => {
+        setBusqueda('')
+        setSocio(null)
+        setImporte('')
+        setDescuento(null)
+        setVentaExito(false)
+      }, 3000)
+    } catch (err) {
+      setError('Error al registrar la venta')
+    } finally {
+      setRegistrando(false)
+    }
+  }
+
+  // Nueva busqueda
+  function nuevaBusqueda() {
+    setBusqueda('')
+    setSocio(null)
+    setSocioError(null)
+    setImporte('')
+    setDescuento(null)
+    setVentaExito(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-md mx-auto px-4 py-3">
+          <div className="flex items-center gap-3">
+            <img src="/images/logo.png" alt="Logo" className="h-14" />
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-primary font-bold text-lg whitespace-nowrap">Rojo Plus</span>
+                <span className="text-xs text-gray-400 italic whitespace-nowrap">Tu pasión tiene recompensas</span>
+              </div>
+              <span className="text-gray-700 font-semibold text-lg block">
+                {comercio?.nombre}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Contenido */}
+      <main className="max-w-md mx-auto px-4 py-6">
+        {/* Mensaje de exito */}
+        {ventaExito && (
+          <Alert type="success" className="mb-6">
+            <p className="font-semibold">Venta registrada correctamente</p>
+          </Alert>
+        )}
+
+        {/* Error general */}
+        {error && (
+          <Alert type="error" className="mb-6">
+            {error}
+          </Alert>
+        )}
+
+        {/* Busqueda de socio */}
+        <section className="mb-6">
+          <form onSubmit={buscarSocio}>
+            <label className="block text-gray-700 text-sm font-semibold mb-2">
+              Buscar socio
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Nro. de socio o DNI"
+                className="input-field flex-1"
+                disabled={buscando}
+              />
+              <Button type="submit" loading={buscando} className="px-4">
+                Buscar
+              </Button>
+            </div>
+          </form>
+        </section>
+
+        {/* Error de busqueda */}
+        {socioError && (
+          <Alert type="error" className="mb-6">
+            {socioError}
+          </Alert>
+        )}
+
+        {/* Resultado del socio */}
+        {socio && (
+          <>
+            <section className="mb-6">
+              {socio.esActivo ? (
+                <div className="card-success">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <span className="text-green-700 font-bold">SOCIO ACTIVO</span>
+                  </div>
+                  <p className="text-gray-800 font-semibold">{socio.apellidoNombre}</p>
+                  <p className="text-gray-500 text-sm">Socio #{socio.nroSocio}</p>
+                </div>
+              ) : (
+                <div className="card-error">
+                  <div className="flex items-center gap-2 mb-2">
+                    <XCircle className="w-5 h-5 text-red-600" />
+                    <span className="text-red-700 font-bold">SOCIO INACTIVO</span>
+                  </div>
+                  <p className="text-gray-800 font-semibold">{socio.apellidoNombre}</p>
+                  <p className="text-gray-500 text-sm">Socio #{socio.nroSocio}</p>
+                  <p className="text-red-600 text-sm mt-2">No aplica descuento</p>
+                  <Button
+                    variant="secondary"
+                    className="mt-4 w-full"
+                    onClick={nuevaBusqueda}
+                  >
+                    Nueva busqueda
+                  </Button>
+                </div>
+              )}
+            </section>
+
+            {/* Importe y descuento (solo si socio activo) */}
+            {socio.esActivo && (
+              <>
+                <section className="mb-6">
+                  <Input
+                    label="Importe de la venta"
+                    type="number"
+                    value={importe}
+                    onChange={(e) => setImporte(e.target.value)}
+                    placeholder="$ 0.00"
+                    min="0"
+                    step="0.01"
+                  />
+                </section>
+
+                {/* Calculo de descuento */}
+                {descuento && (
+                  <section className="mb-6">
+                    <div className="bg-gray-100 rounded-lg p-4">
+                      {descuento.aplicaAcumulacion && (
+                        <div className="bg-primary-light text-primary-dark rounded p-2 mb-3 text-center flex items-center justify-center gap-2">
+                          <Star className="w-4 h-4" />
+                          <div>
+                            <span className="font-semibold">DESCUENTO ESPECIAL</span>
+                            <br />
+                            <span className="text-sm">
+                              {descuento.comprasEnPeriodo + 1}a compra en {comercio?.acumPeriodoDias || 7} dias
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between text-gray-600 mb-1">
+                        <span>Descuento ({descuento.descuentoBasePct}%):</span>
+                        <span>$ {descuento.descuentoBaseMonto?.toLocaleString('es-AR')}</span>
+                      </div>
+
+                      {descuento.aplicaAcumulacion && (
+                        <div className="flex justify-between text-primary mb-1">
+                          <span>Descuento extra ({descuento.descuentoAcumPct}%):</span>
+                          <span>$ {descuento.descuentoAcumMonto?.toLocaleString('es-AR')}</span>
+                        </div>
+                      )}
+
+                      <div className="border-t border-gray-300 pt-2 mt-2">
+                        <div className="flex justify-between text-gray-800 font-bold text-lg">
+                          <span>TOTAL A COBRAR:</span>
+                          <span>$ {descuento.importeFinal?.toLocaleString('es-AR')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {/* Boton registrar */}
+                <Button
+                  className="w-full"
+                  onClick={registrarVenta}
+                  loading={registrando}
+                  disabled={!descuento || !importe}
+                >
+                  REGISTRAR VENTA
+                </Button>
+              </>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  )
+}

@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos base */
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Componentes reutilizables */
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-white px-6 py-3 rounded-lg font-semibold
+           hover:bg-primary-dark transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply border-2 border-primary text-primary px-6 py-3 rounded-lg font-semibold
+           hover:bg-primary hover:text-white transition-colors;
+  }
+
+  .btn-text {
+    @apply text-primary font-semibold hover:text-primary-dark hover:underline;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-800
+           placeholder-gray-400 focus:outline-none focus:border-primary
+           focus:ring-2 focus:ring-primary-light;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4;
+  }
+
+  .card-success {
+    @apply bg-green-50 border border-green-200 rounded-lg p-4;
+  }
+
+  .card-error {
+    @apply bg-red-50 border border-red-200 rounded-lg p-4;
+  }
+
+  .card-warning {
+    @apply bg-yellow-50 border border-yellow-200 rounded-lg p-4;
+  }
+}

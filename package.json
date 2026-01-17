@@ -1,0 +1,19 @@
+{
+  "name": "rojoplus",
+  "version": "1.0.0",
+  "description": "Sistema de fidelización - Club Sportivo Pilar",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "kill": "kill-servers.bat"
+  },
+  "keywords": ["rojoplus", "fidelizacion", "club"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

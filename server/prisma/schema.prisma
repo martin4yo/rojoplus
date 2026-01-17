@@ -1,0 +1,119 @@
+// RojoPlus - Schema Prisma
+// Club Sportivo Pilar - Sistema de Fidelizacion
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Socio {
+  id              Int       @id @default(autoincrement())
+  nroSocio        String    @unique @map("nro_socio")
+  documento       String?
+  apellidoNombre  String    @map("apellido_nombre")
+  estado          String
+  email           String?
+  celular         String?
+  fechaNacimiento DateTime? @map("fecha_nacimiento")
+  categoria       String?
+  tipoSocio       String?   @map("tipo_socio")
+  domicilio       String?
+  ciudad          String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  ventas Venta[]
+
+  @@index([documento])
+  @@index([estado])
+  @@map("socios")
+}
+
+model Comercio {
+  id                 Int       @id @default(autoincrement())
+  nombre             String
+  direccion          String
+  rubroId            Int       @map("rubro_id")
+  telefono           String
+  email              String    @unique
+  cuit               String
+  responsable        String
+  token              String?   @unique @default(uuid())
+  estado             String    @default("PENDIENTE")
+  plan               String    @default("BASICO") // BASICO, DESTACADO, PREMIUM
+  descuentoPct       Decimal   @default(10) @map("descuento_pct") @db.Decimal(5, 2)
+  acumulacionActiva  Boolean   @default(false) @map("acumulacion_activa")
+  acumComprasReq     Int?      @map("acum_compras_req")
+  acumPeriodoDias    Int?      @map("acum_periodo_dias")
+  acumDescuentoExtra Decimal?  @map("acum_descuento_extra") @db.Decimal(5, 2)
+  motivoRechazo      String?   @map("motivo_rechazo")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  approvedAt         DateTime? @map("approved_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  rubro  Rubro   @relation(fields: [rubroId], references: [id])
+  ventas Venta[]
+
+  @@index([estado])
+  @@index([plan])
+  @@map("comercios")
+}
+
+model Venta {
+  id                Int      @id @default(autoincrement())
+  comercioId        Int      @map("comercio_id")
+  socioId           Int      @map("socio_id")
+  fecha             DateTime @default(now())
+  importeOriginal   Decimal  @map("importe_original") @db.Decimal(12, 2)
+  importeFinal      Decimal  @map("importe_final") @db.Decimal(12, 2)
+  descuentoPct      Decimal  @map("descuento_pct") @db.Decimal(5, 2)
+  descuentoMonto    Decimal  @map("descuento_monto") @db.Decimal(12, 2)
+  aplicoAcumulacion Boolean  @default(false) @map("aplico_acumulacion")
+  descuentoAcumPct  Decimal? @map("descuento_acum_pct") @db.Decimal(5, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  comercio Comercio @relation(fields: [comercioId], references: [id])
+  socio    Socio    @relation(fields: [socioId], references: [id])
+
+  @@index([comercioId])
+  @@index([socioId])
+  @@index([fecha])
+  @@index([comercioId, socioId, fecha])
+  @@map("ventas")
+}
+
+model Rubro {
+  id     Int     @id @default(autoincrement())
+  nombre String
+  activo Boolean @default(true)
+  orden  Int     @default(0)
+
+  comercios Comercio[]
+
+  @@map("rubros")
+}
+
+model Admin {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  nombre       String
+  activo       Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastLogin    DateTime? @map("last_login")
+
+  @@map("admins")
+}
+
+model Configuracion {
+  clave       String   @id
+  valor       String
+  descripcion String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("configuracion")
+}

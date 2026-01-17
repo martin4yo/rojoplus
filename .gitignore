@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude
+.claude/
+
+# PDFs and source files
+*.pdf
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Prisma
+server/prisma/migrations/*
+!server/prisma/migrations/.gitkeep
