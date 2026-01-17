@@ -87,7 +87,7 @@ sudo su - sportivouser
 
 # Clonar repositorio
 cd /var/www
-git clone https://github.com/TU_USUARIO/rojoplus.git rojoplus
+git clone  https://github.com/martin4yo/rojoplus.git rojoplus
 cd rojoplus
 ```
 
@@ -146,16 +146,15 @@ chmod 600 /var/www/rojoplus/client/.env
 # Como sportivouser
 cd /var/www/rojoplus
 
-# Backend
+# Backend (no requiere build, es JavaScript puro)
 cd server
-npm ci --production=false
+npm ci
 npx prisma generate
 npx prisma db push
-npm run build
 
 # Frontend
 cd ../client
-npm ci --production=false
+npm ci
 npm run build
 ```
 
