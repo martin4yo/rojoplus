@@ -48,3 +48,22 @@ body {
     @apply bg-yellow-50 border border-yellow-200 rounded-lg p-4;
   }
 }
+
+/* Animación de latido para el logo */
+@keyframes heartbeat {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.15);
+  }
+  50% {
+    transform: scale(1);
+  }
+  75% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

@@ -157,6 +157,22 @@ export default function Comercio() {
         </div>
       </header>
 
+      {/* Overlay de procesamiento */}
+      {registrando && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 text-center shadow-2xl">
+            <img
+              src="/images/logo.png"
+              alt="Procesando"
+              className="h-24 mx-auto animate-pulse"
+              style={{ animation: 'heartbeat 1s ease-in-out infinite' }}
+            />
+            <p className="mt-4 text-lg font-semibold text-gray-700">Registrando venta...</p>
+            <p className="text-sm text-gray-500">Por favor espere</p>
+          </div>
+        </div>
+      )}
+
       {/* Contenido */}
       <main className="max-w-md mx-auto px-4 py-6">
         {/* Mensaje de exito */}
