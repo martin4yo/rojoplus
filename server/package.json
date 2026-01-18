@@ -4,6 +4,9 @@
   "description": "Backend API para RojoPlus - Sistema de fidelizacion Club Sportivo Pilar",
   "main": "src/index.js",
   "type": "module",
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
