@@ -20,11 +20,24 @@ router.get('/buscar', asyncHandler(async (req, res) => {
     },
     select: {
       tokenPortal: true,
+      estado: true,
     },
   })
 
-  if (!socio || !socio.tokenPortal) {
+  if (!socio) {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Verificar si está activo
+  const estadoUpper = socio.estado?.toUpperCase() || ''
+  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
+
+  if (!esActivo) {
+    throw new AppError('Tu membresia no esta activa. Regulariza tu situacion en el club para acceder a los beneficios.', 403, 'SOCIO_INACTIVO')
+  }
+
+  if (!socio.tokenPortal) {
+    throw new AppError('Error al obtener tu QR. Contacta al club.', 500, 'NO_TOKEN')
   }
 
   res.json({
