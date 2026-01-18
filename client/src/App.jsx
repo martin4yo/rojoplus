@@ -9,6 +9,10 @@ import RegistroExito from './pages/registro/RegistroExito'
 import Comercio from './pages/comercio/Comercio'
 import TokenInvalido from './pages/comercio/TokenInvalido'
 
+// Página del socio
+import SocioPortal from './pages/socio/SocioPortal'
+import AccesoSocio from './pages/socio/AccesoSocio'
+
 // Páginas admin
 import AdminLogin from './pages/admin/Login'
 import AdminDashboard from './pages/admin/Dashboard'
@@ -33,6 +37,10 @@ function App() {
       <Route path="/comercio/:token" element={<Comercio />} />
       <Route path="/c/:token" element={<Comercio />} />
       <Route path="/acceso-invalido" element={<TokenInvalido />} />
+
+      {/* Rutas del socio */}
+      <Route path="/mi-qr" element={<AccesoSocio />} />
+      <Route path="/s/:tokenPortal" element={<SocioPortal />} />
 
       {/* Rutas admin */}
       <Route path="/admin/login" element={<AdminLogin />} />

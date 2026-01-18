@@ -65,6 +65,44 @@ router.get('/:token/socios/buscar', asyncHandler(authComercio), asyncHandler(asy
   })
 }))
 
+// GET /api/comercio/:token/socios/buscar-qr - Buscar socio por token QR
+router.get('/:token/socios/buscar-qr', asyncHandler(authComercio), asyncHandler(async (req, res) => {
+  const { token: tokenSocio } = req.query
+
+  if (!tokenSocio) {
+    throw new AppError('Token de socio requerido', 400, 'VALIDATION_ERROR')
+  }
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal: tokenSocio },
+    select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      estado: true,
+    },
+  })
+
+  if (!socio) {
+    return res.json({ success: true, data: null })
+  }
+
+  // Determinar si está activo (ACTIVO o VIGENTE)
+  const estadoUpper = socio.estado?.toUpperCase() || ''
+  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
+
+  res.json({
+    success: true,
+    data: {
+      id: socio.id,
+      nroSocio: socio.nroSocio,
+      apellidoNombre: socio.apellidoNombre,
+      estado: socio.estado,
+      esActivo,
+    },
+  })
+}))
+
 // POST /api/comercio/:token/ventas/calcular - Calcular descuento (preview)
 router.post('/:token/ventas/calcular', asyncHandler(authComercio), asyncHandler(async (req, res) => {
   const { comercio } = req

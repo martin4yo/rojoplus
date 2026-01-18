@@ -332,6 +332,15 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
       orderBy: { nroSocio: 'asc' },
       skip: (page - 1) * limit,
       take: parseInt(limit),
+      select: {
+        id: true,
+        nroSocio: true,
+        documento: true,
+        apellidoNombre: true,
+        estado: true,
+        categoria: true,
+        tokenPortal: true,
+      },
     }),
     req.prisma.socio.count({ where }),
     req.prisma.socio.groupBy({ by: ['estado'], _count: true }),
@@ -352,6 +361,27 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
         estados: estados.map(e => e.estado).filter(Boolean).sort(),
         categorias: categorias.map(c => c.categoria).filter(Boolean).sort(),
       },
+    },
+  })
+}))
+
+// POST /api/admin/socios/:id/regenerar-token - Regenerar token de socio
+router.post('/socios/:id/regenerar-token', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const socio = await req.prisma.socio.update({
+    where: { id: parseInt(id) },
+    data: { tokenPortal: uuidv4() },
+    select: { id: true, nroSocio: true, tokenPortal: true },
+  })
+
+  res.json({
+    success: true,
+    data: {
+      id: socio.id,
+      nroSocio: socio.nroSocio,
+      tokenPortal: socio.tokenPortal,
+      mensaje: 'Token regenerado correctamente',
     },
   })
 }))

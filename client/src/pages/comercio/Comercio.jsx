@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { CheckCircle, XCircle, Star } from 'lucide-react'
+import { CheckCircle, XCircle, Star, QrCode } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
+import QrScanner from '../../components/QrScanner'
 import api from '../../services/api'
 
 export default function Comercio() {
@@ -25,6 +26,9 @@ export default function Comercio() {
   const [descuento, setDescuento] = useState(null)
   const [registrando, setRegistrando] = useState(false)
   const [ventaExito, setVentaExito] = useState(false)
+
+  // Scanner QR
+  const [scannerOpen, setScannerOpen] = useState(false)
 
   // Cargar datos del comercio
   useEffect(() => {
@@ -59,6 +63,30 @@ export default function Comercio() {
         setSocio(data)
       } else {
         setSocioError('No se encontro socio con ese numero o documento')
+      }
+    } catch (err) {
+      setSocioError('Error al buscar socio')
+    } finally {
+      setBuscando(false)
+    }
+  }
+
+  // Buscar socio por token QR
+  async function buscarSocioPorQR(tokenSocio) {
+    setBuscando(true)
+    setSocio(null)
+    setSocioError(null)
+    setImporte('')
+    setDescuento(null)
+    setVentaExito(false)
+
+    try {
+      const data = await api.get(`/comercio/${token}/socios/buscar-qr?token=${encodeURIComponent(tokenSocio)}`)
+      if (data) {
+        setSocio(data)
+        setBusqueda(data.nroSocio || '')
+      } else {
+        setSocioError('No se encontro socio con ese codigo QR')
       }
     } catch (err) {
       setSocioError('Error al buscar socio')
@@ -220,6 +248,14 @@ export default function Comercio() {
                   </Button>
                 </div>
               </form>
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="w-full mt-3 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-primary hover:text-primary transition"
+              >
+                <QrCode className="w-5 h-5" />
+                <span>Escanear QR del socio</span>
+              </button>
             </section>
 
             {/* Error de busqueda */}
@@ -332,6 +368,13 @@ export default function Comercio() {
           </>
         )}
       </main>
+
+      {/* Scanner QR */}
+      <QrScanner
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={buscarSocioPorQR}
+      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Upload } from 'lucide-react'
+import { Upload, QrCode, ExternalLink, RefreshCw, X, Copy, Check } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -15,6 +16,11 @@ export default function AdminSocios() {
   const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState(null)
   const [filtros, setFiltros] = useState({ estados: [], categorias: [] })
+
+  // Modal QR
+  const [qrModal, setQrModal] = useState(null)
+  const [regenerando, setRegenerando] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     cargarSocios()
@@ -57,6 +63,36 @@ export default function AdminSocios() {
       return 'bg-green-100 text-green-800'
     }
     return 'bg-red-100 text-red-800'
+  }
+
+  function getQrUrl(tokenPortal) {
+    // URL de produccion
+    return `https://sportivo.axiomacloud.com/s/${tokenPortal}`
+  }
+
+  async function regenerarToken(socio) {
+    if (!confirm(`¿Regenerar el token de ${socio.apellidoNombre}? El QR actual dejara de funcionar.`)) {
+      return
+    }
+
+    setRegenerando(true)
+    try {
+      const data = await api.post(`/admin/socios/${socio.id}/regenerar-token`)
+      // Actualizar en la lista
+      setSocios(socios.map(s => s.id === socio.id ? { ...s, tokenPortal: data.tokenPortal } : s))
+      // Actualizar modal
+      setQrModal({ ...socio, tokenPortal: data.tokenPortal })
+    } catch (err) {
+      setError('Error al regenerar token')
+    } finally {
+      setRegenerando(false)
+    }
+  }
+
+  function copiarLink(tokenPortal) {
+    navigator.clipboard.writeText(getQrUrl(tokenPortal))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -154,6 +190,9 @@ export default function AdminSocios() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
                     Categoria
                   </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    QR
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -175,6 +214,15 @@ export default function AdminSocios() {
                     </td>
                     <td className="px-6 py-4 text-gray-600 hidden md:table-cell">
                       {socio.categoria || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => setQrModal(socio)}
+                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
+                        title="Ver QR del socio"
+                      >
+                        <QrCode className="w-5 h-5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -205,6 +253,90 @@ export default function AdminSocios() {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal QR */}
+      {qrModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div>
+                <span className="font-semibold text-gray-800">QR del Socio</span>
+                <span className="text-gray-500 text-sm ml-2">#{qrModal.nroSocio}</span>
+              </div>
+              <button
+                onClick={() => setQrModal(null)}
+                className="p-1 rounded-full hover:bg-gray-100 transition"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6 text-center">
+              <p className="text-gray-800 font-semibold text-lg mb-1">{qrModal.apellidoNombre}</p>
+              <p className={`text-sm mb-4 ${getEstadoColor(qrModal.estado)} inline-block px-2 py-1 rounded-full`}>
+                {qrModal.estado}
+              </p>
+
+              {/* QR */}
+              <div className="inline-block bg-white p-4 rounded-lg border border-gray-200 mb-4">
+                <QRCodeSVG
+                  value={getQrUrl(qrModal.tokenPortal)}
+                  size={180}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+
+              {/* Link */}
+              <div className="mb-4">
+                <p className="text-gray-500 text-sm mb-2">Link del portal:</p>
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={getQrUrl(qrModal.tokenPortal)}
+                    className="flex-1 bg-transparent text-sm text-gray-600 outline-none truncate"
+                  />
+                  <button
+                    onClick={() => copiarLink(qrModal.tokenPortal)}
+                    className="p-2 rounded hover:bg-gray-200 transition"
+                    title="Copiar link"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-500" />}
+                  </button>
+                  <a
+                    href={getQrUrl(qrModal.tokenPortal)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded hover:bg-gray-200 transition"
+                    title="Abrir portal"
+                  >
+                    <ExternalLink className="w-4 h-4 text-gray-500" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Acciones */}
+              <div className="flex gap-2 justify-center">
+                <Button
+                  variant="secondary"
+                  onClick={() => regenerarToken(qrModal)}
+                  loading={regenerando}
+                  className="inline-flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Regenerar Token
+                </Button>
+              </div>
+              <p className="text-gray-400 text-xs mt-3">
+                Regenerar invalidara el QR actual del socio
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

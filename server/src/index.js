@@ -8,6 +8,7 @@ import rubrosRoutes from './routes/rubros.js'
 import comerciosRoutes from './routes/comercios.js'
 import comercioRoutes from './routes/comercio.js'
 import adminRoutes from './routes/admin.js'
+import socioRoutes from './routes/socio.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -35,6 +36,7 @@ app.use('/api/rubros', rubrosRoutes)
 app.use('/api/comercios', comerciosRoutes)
 app.use('/api/comercio', comercioRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/socio', socioRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
