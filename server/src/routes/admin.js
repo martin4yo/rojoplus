@@ -2684,6 +2684,43 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: periodo })
 }))
 
+// DELETE /api/admin/periodos/:id - Eliminar periodo (solo si no tiene pagos)
+router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const periodo = await req.prisma.periodoCuota.findUnique({
+    where: { id: parseInt(id) },
+  })
+
+  if (!periodo) {
+    throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
+  }
+
+  // Verificar si hay cuotas pagadas
+  const cuotasPagadas = await req.prisma.cuota.count({
+    where: {
+      periodoId: periodo.id,
+      estado: 'PAGADA',
+    },
+  })
+
+  if (cuotasPagadas > 0) {
+    throw new AppError('No se puede eliminar: hay cuotas pagadas en este periodo', 400, 'HAS_PAYMENTS')
+  }
+
+  // Eliminar cuotas pendientes del periodo
+  await req.prisma.cuota.deleteMany({
+    where: { periodoId: periodo.id },
+  })
+
+  // Eliminar el periodo
+  await req.prisma.periodoCuota.delete({
+    where: { id: periodo.id },
+  })
+
+  res.json({ success: true, message: 'Periodo eliminado correctamente' })
+}))
+
 // POST /api/admin/periodos/:id/generar - Generar cuotas para un periodo
 router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
@@ -2702,7 +2739,28 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   })
 
   if (cuotasExistentes > 0) {
-    throw new AppError('Este periodo ya tiene cuotas generadas', 400, 'ALREADY_GENERATED')
+    // Verificar si hay pagos asociados a estas cuotas
+    const cuotasPagadas = await req.prisma.cuota.count({
+      where: {
+        periodoId: periodo.id,
+        estado: 'PAGADA',
+      },
+    })
+
+    if (cuotasPagadas > 0) {
+      throw new AppError('No se puede regenerar: ya hay cuotas pagadas en este periodo', 400, 'HAS_PAYMENTS')
+    }
+
+    // Si no hay pagos, eliminar cuotas existentes para regenerar
+    await req.prisma.cuota.deleteMany({
+      where: { periodoId: periodo.id },
+    })
+
+    // Actualizar estado del periodo a PENDIENTE para regenerar
+    await req.prisma.periodoCuota.update({
+      where: { id: periodo.id },
+      data: { estado: 'PENDIENTE' },
+    })
   }
 
   // Obtener tipos de cuota

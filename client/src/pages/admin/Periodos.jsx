@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Plus, Play, CheckCircle, Clock, AlertCircle, DollarSign } from 'lucide-react'
+import { Calendar, Plus, Play, CheckCircle, Clock, AlertCircle, DollarSign, Trash2, RefreshCw } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { useModal } from '../../components/Modal'
@@ -28,6 +28,7 @@ export default function Periodos() {
   })
   const [creando, setCreando] = useState(false)
   const [generando, setGenerando] = useState(null)
+  const [eliminando, setEliminando] = useState(null)
 
   useEffect(() => {
     cargarPeriodos()
@@ -90,6 +91,32 @@ export default function Periodos() {
       setError(err.response?.data?.message || 'Error al generar cuotas')
     } finally {
       setGenerando(null)
+    }
+  }
+
+  function confirmarEliminarPeriodo(periodo) {
+    showModal({
+      type: 'warning',
+      title: 'Eliminar Periodo',
+      message: `¿Eliminar el periodo "${periodo.nombre}"? Se eliminarán todas las cuotas pendientes asociadas.`,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      onConfirm: () => eliminarPeriodo(periodo.id),
+    })
+  }
+
+  async function eliminarPeriodo(periodoId) {
+    setEliminando(periodoId)
+    setError(null)
+
+    try {
+      await api.delete(`/admin/periodos/${periodoId}`)
+      setSuccess('Periodo eliminado correctamente')
+      cargarPeriodos()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al eliminar periodo')
+    } finally {
+      setEliminando(null)
     }
   }
 
@@ -206,17 +233,45 @@ export default function Periodos() {
                     </Button>
                   )}
 
-                  {periodo.estado === 'GENERADO' && (
-                    <div className="flex gap-2">
+                  <div className="flex gap-2">
+                    {periodo.estado === 'GENERADO' && (
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`/admin/cuotas?periodoId=${periodo.id}`)}
+                        >
+                          Ver Cuotas
+                        </Button>
+                        {/* Regenerar solo si no hay pagos */}
+                        {periodo.cuotasPagadas === 0 && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => confirmarGenerarCuotas(periodo.id)}
+                            loading={generando === periodo.id}
+                            className="flex items-center gap-1"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            Regenerar
+                          </Button>
+                        )}
+                      </>
+                    )}
+                    {/* Eliminar solo si no hay pagos */}
+                    {periodo.cuotasPagadas === 0 && (
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => navigate(`/admin/cuotas?periodoId=${periodo.id}`)}
+                        onClick={() => confirmarEliminarPeriodo(periodo)}
+                        loading={eliminando === periodo.id}
+                        className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
-                        Ver Cuotas
+                        <Trash2 className="w-3 h-3" />
+                        Eliminar
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
 
