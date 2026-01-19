@@ -40,6 +40,11 @@ const api = {
     body: JSON.stringify(body),
   }),
 
+  put: (endpoint, body) => request(endpoint, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  }),
+
   delete: (endpoint) => request(endpoint, { method: 'DELETE' }),
 
   // Para upload de archivos
