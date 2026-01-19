@@ -209,25 +209,25 @@ export default function Periodos() {
                   {/* Stats en grid */}
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     <div className="bg-gray-50 rounded-lg p-2 text-center">
-                      <p className="text-lg font-bold text-gray-800">{periodo.totalCuotas}</p>
-                      <p className="text-xs text-gray-500">Cuotas</p>
-                      <p className="text-xs font-medium text-gray-600">
+                      <p className="text-lg font-bold text-gray-800">
                         ${periodo.montoTotal?.toLocaleString('es-AR')}
                       </p>
+                      <p className="text-xs text-gray-500">Total</p>
+                      <p className="text-xs font-medium text-gray-600">{periodo.totalCuotas} cuotas</p>
                     </div>
                     <div className="bg-green-50 rounded-lg p-2 text-center">
-                      <p className="text-lg font-bold text-green-600">{periodo.cuotasPagadas}</p>
-                      <p className="text-xs text-gray-500">Pagadas</p>
-                      <p className="text-xs font-medium text-green-600">
+                      <p className="text-lg font-bold text-green-600">
                         ${periodo.montoPagado?.toLocaleString('es-AR')}
                       </p>
+                      <p className="text-xs text-gray-500">Cobrado</p>
+                      <p className="text-xs font-medium text-green-600">{periodo.cuotasPagadas} cuotas</p>
                     </div>
                     <div className="bg-red-50 rounded-lg p-2 text-center">
-                      <p className="text-lg font-bold text-red-600">{periodo.cuotasPendientes}</p>
-                      <p className="text-xs text-gray-500">Pendientes</p>
-                      <p className="text-xs font-medium text-red-600">
+                      <p className="text-lg font-bold text-red-600">
                         ${periodo.montoPendiente?.toLocaleString('es-AR')}
                       </p>
+                      <p className="text-xs text-gray-500">Pendiente</p>
+                      <p className="text-xs font-medium text-red-600">{periodo.cuotasPendientes} cuotas</p>
                     </div>
                   </div>
 
