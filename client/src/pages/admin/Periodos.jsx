@@ -231,20 +231,36 @@ export default function Periodos() {
                     </div>
                   </div>
 
-                  {/* Barra de progreso */}
+                  {/* Indicadores de cobranza y mora */}
                   {periodo.totalCuotas > 0 && (
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-500">Cobranza</span>
-                        <span className="font-medium text-gray-700">
-                          {Math.round((periodo.cuotasPagadas / periodo.totalCuotas) * 100)}%
-                        </span>
+                    <div className="mb-3 flex gap-4">
+                      <div className="flex-1">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-500">Cobranza</span>
+                          <span className="font-medium text-green-600">
+                            {Math.round((periodo.cuotasPagadas / periodo.totalCuotas) * 100)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-green-500 h-2 rounded-full transition-all"
+                            style={{ width: `${(periodo.cuotasPagadas / periodo.totalCuotas) * 100}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-green-500 h-2 rounded-full transition-all"
-                          style={{ width: `${(periodo.cuotasPagadas / periodo.totalCuotas) * 100}%` }}
-                        />
+                      <div className="flex-1">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-500">Mora</span>
+                          <span className="font-medium text-red-600">
+                            {Math.round((periodo.cuotasVencidas / periodo.totalCuotas) * 100)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-red-500 h-2 rounded-full transition-all"
+                            style={{ width: `${(periodo.cuotasVencidas / periodo.totalCuotas) * 100}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}

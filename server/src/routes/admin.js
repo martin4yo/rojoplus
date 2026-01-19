@@ -2617,7 +2617,8 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
 
   // Agregar estadísticas de cada periodo
   const periodosConStats = await Promise.all(periodos.map(async (periodo) => {
-    const [statsTotal, statsPagadas, statsPendientes] = await Promise.all([
+    const ahora = new Date()
+    const [statsTotal, statsPagadas, statsPendientes, statsVencidas] = await Promise.all([
       req.prisma.cuota.aggregate({
         where: { periodoId: periodo.id },
         _sum: { montoTotal: true },
@@ -2633,6 +2634,15 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
         _sum: { montoTotal: true },
         _count: { _all: true },
       }),
+      req.prisma.cuota.aggregate({
+        where: {
+          periodoId: periodo.id,
+          estado: 'PENDIENTE',
+          fechaVencimiento: { lt: ahora },
+        },
+        _sum: { montoTotal: true },
+        _count: { _all: true },
+      }),
     ])
     return {
       ...periodo,
@@ -2642,6 +2652,8 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
       montoPagado: Number(statsPagadas._sum.montoTotal) || 0,
       cuotasPendientes: statsPendientes._count._all,
       montoPendiente: Number(statsPendientes._sum.montoTotal) || 0,
+      cuotasVencidas: statsVencidas._count._all,
+      montoVencido: Number(statsVencidas._sum.montoTotal) || 0,
     }
   }))
 
