@@ -33,7 +33,7 @@ export default function AdminLayout() {
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/comercios', label: 'Comercios', icon: Store },
     { path: '/admin/socios', label: 'Socios', icon: Users },
-    { path: '/admin/cuotas', label: 'Cuotas', icon: Receipt },
+    { path: '/admin/periodos', label: 'Cuotas', icon: Receipt },
     { path: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
     { path: '/admin/configuracion', label: 'Configuración', icon: Settings },
   ]

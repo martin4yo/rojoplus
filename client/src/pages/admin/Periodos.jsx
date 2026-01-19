@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Plus, Play, CheckCircle, Clock, AlertCircle, DollarSign, Trash2, RefreshCw } from 'lucide-react'
+import { Calendar, Plus, Play, CheckCircle, Clock, AlertCircle, DollarSign, Trash2, RefreshCw, Receipt } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { useModal } from '../../components/Modal'
@@ -178,130 +178,133 @@ export default function Periodos() {
       {success && <Alert type="success" className="mb-4" onClose={() => setSuccess(null)}>{success}</Alert>}
 
       {/* Listado de periodos */}
-      <div className="grid gap-4">
-        {periodos.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No hay periodos creados</p>
-            <p className="text-gray-400 text-sm mt-1">Crea un periodo para comenzar a generar cuotas</p>
-          </div>
-        ) : (
-          periodos.map(periodo => (
-            <div key={periodo.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                {/* Info del periodo */}
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-primary-light">
-                    <Calendar className="w-6 h-6 text-primary" />
+      {periodos.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center max-w-md">
+          <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">No hay periodos creados</p>
+          <p className="text-gray-400 text-sm mt-1">Crea un periodo para comenzar a generar cuotas</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {periodos.map(periodo => (
+            <div key={periodo.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              {/* Header con nombre y estado */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary-light">
+                    <Calendar className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-800">{periodo.nombre}</h3>
-                    <div className="flex flex-wrap items-center gap-3 mt-1">
-                      {getEstadoBadge(periodo.estado, periodo)}
-                      <span className="text-sm text-gray-500">
-                        Vence: {new Date(periodo.fechaVencimiento).toLocaleDateString('es-AR')}
-                      </span>
-                    </div>
+                    <h3 className="font-semibold text-gray-800">{periodo.nombre}</h3>
+                    <p className="text-xs text-gray-500">
+                      Vence: {new Date(periodo.fechaVencimiento).toLocaleDateString('es-AR')}
+                    </p>
                   </div>
                 </div>
-
-                {/* Stats y acciones */}
-                <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                  {periodo.estado === 'GENERADO' ? (
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <p className="text-2xl font-bold text-gray-800">{periodo.totalCuotas}</p>
-                        <p className="text-xs text-gray-500">Cuotas</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-green-600">{periodo.cuotasPagadas}</p>
-                        <p className="text-xs text-gray-500">Pagadas</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-red-600">{periodo.cuotasPendientes}</p>
-                        <p className="text-xs text-gray-500">Pendientes</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      onClick={() => confirmarGenerarCuotas(periodo.id)}
-                      loading={generando === periodo.id}
-                      className="flex items-center gap-2"
-                    >
-                      <Play className="w-4 h-4" />
-                      Generar Cuotas
-                    </Button>
-                  )}
-
-                  <div className="flex gap-2">
-                    {periodo.estado === 'GENERADO' && (
-                      <>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => navigate(`/admin/cuotas?periodoId=${periodo.id}`)}
-                        >
-                          Ver Cuotas
-                        </Button>
-                        {/* Regenerar solo si no hay pagos */}
-                        {periodo.cuotasPagadas === 0 && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => confirmarGenerarCuotas(periodo.id)}
-                            loading={generando === periodo.id}
-                            className="flex items-center gap-1"
-                          >
-                            <RefreshCw className="w-3 h-3" />
-                            Regenerar
-                          </Button>
-                        )}
-                      </>
-                    )}
-                    {/* Eliminar solo si no hay pagos */}
-                    {periodo.cuotasPagadas === 0 && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => confirmarEliminarPeriodo(periodo)}
-                        loading={eliminando === periodo.id}
-                        className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        Eliminar
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                {getEstadoBadge(periodo.estado, periodo)}
               </div>
 
-              {/* Barra de progreso */}
-              {periodo.estado === 'GENERADO' && periodo.totalCuotas > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">Cobranza</span>
-                    <span className="font-medium">
-                      {Math.round((periodo.cuotasPagadas / periodo.totalCuotas) * 100)}%
-                    </span>
+              {periodo.estado === 'GENERADO' ? (
+                <>
+                  {/* Stats en grid */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="bg-gray-50 rounded-lg p-2 text-center">
+                      <p className="text-lg font-bold text-gray-800">{periodo.totalCuotas}</p>
+                      <p className="text-xs text-gray-500">Cuotas</p>
+                      <p className="text-xs font-medium text-gray-600">
+                        ${periodo.montoTotal?.toLocaleString('es-AR')}
+                      </p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-2 text-center">
+                      <p className="text-lg font-bold text-green-600">{periodo.cuotasPagadas}</p>
+                      <p className="text-xs text-gray-500">Pagadas</p>
+                      <p className="text-xs font-medium text-green-600">
+                        ${periodo.montoPagado?.toLocaleString('es-AR')}
+                      </p>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-2 text-center">
+                      <p className="text-lg font-bold text-red-600">{periodo.cuotasPendientes}</p>
+                      <p className="text-xs text-gray-500">Pendientes</p>
+                      <p className="text-xs font-medium text-red-600">
+                        ${periodo.montoPendiente?.toLocaleString('es-AR')}
+                      </p>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-500 h-2 rounded-full transition-all"
-                      style={{ width: `${(periodo.cuotasPagadas / periodo.totalCuotas) * 100}%` }}
-                    />
+
+                  {/* Barra de progreso */}
+                  {periodo.totalCuotas > 0 && (
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-500">Cobranza</span>
+                        <span className="font-medium text-gray-700">
+                          {Math.round((periodo.cuotasPagadas / periodo.totalCuotas) * 100)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-full transition-all"
+                          style={{ width: `${(periodo.cuotasPagadas / periodo.totalCuotas) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botones de acción - solo iconos */}
+                  <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                    <button
+                      onClick={() => navigate(`/admin/cuotas?periodoId=${periodo.id}`)}
+                      className="p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition"
+                      title="Ver Cuotas"
+                    >
+                      <Receipt className="w-5 h-5" />
+                    </button>
+                    {periodo.cuotasPagadas === 0 && (
+                      <>
+                        <button
+                          onClick={() => confirmarGenerarCuotas(periodo.id)}
+                          disabled={generando === periodo.id}
+                          className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition disabled:opacity-50"
+                          title="Regenerar Cuotas"
+                        >
+                          <RefreshCw className={`w-5 h-5 ${generando === periodo.id ? 'animate-spin' : ''}`} />
+                        </button>
+                        <button
+                          onClick={() => confirmarEliminarPeriodo(periodo)}
+                          disabled={eliminando === periodo.id}
+                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition disabled:opacity-50"
+                          title="Eliminar Periodo"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
                   </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>$0</span>
-                    <span className="font-medium text-gray-700">
-                      Total: ${periodo.montoTotal?.toLocaleString('es-AR')}
-                    </span>
-                  </div>
+                </>
+              ) : (
+                /* Periodo pendiente - botón generar */
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => confirmarGenerarCuotas(periodo.id)}
+                    loading={generando === periodo.id}
+                    className="flex-1 flex items-center justify-center gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Generar Cuotas
+                  </Button>
+                  <button
+                    onClick={() => confirmarEliminarPeriodo(periodo)}
+                    disabled={eliminando === periodo.id}
+                    className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition disabled:opacity-50"
+                    title="Eliminar Periodo"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
               )}
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal crear periodo */}
       {showCrearModal && (
