@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Calendar, Plus, Play, CheckCircle, Clock, AlertCircle, DollarSign } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import { useModal } from '../../components/Modal'
 import api from '../../services/api'
 
 const MESES = [
@@ -12,13 +13,14 @@ const MESES = [
 
 export default function Periodos() {
   const navigate = useNavigate()
+  const { showModal, ModalComponent } = useModal()
   const [periodos, setPeriodos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
   // Modal crear periodo
-  const [showModal, setShowModal] = useState(false)
+  const [showCrearModal, setShowCrearModal] = useState(false)
   const [formData, setFormData] = useState({
     anio: new Date().getFullYear(),
     mes: new Date().getMonth() + 1,
@@ -51,7 +53,7 @@ export default function Periodos() {
     try {
       await api.post('/admin/periodos', formData)
       setSuccess('Periodo creado correctamente')
-      setShowModal(false)
+      setShowCrearModal(false)
       setFormData({
         anio: new Date().getFullYear(),
         mes: new Date().getMonth() + 1,
@@ -65,11 +67,18 @@ export default function Periodos() {
     }
   }
 
-  async function generarCuotas(periodoId) {
-    if (!confirm('¿Generar cuotas para este periodo? Esta accion no se puede deshacer.')) {
-      return
-    }
+  function confirmarGenerarCuotas(periodoId) {
+    showModal({
+      type: 'warning',
+      title: 'Generar Cuotas',
+      message: '¿Generar cuotas para este periodo? Esta acción no se puede deshacer.',
+      confirmText: 'Generar',
+      cancelText: 'Cancelar',
+      onConfirm: () => generarCuotas(periodoId),
+    })
+  }
 
+  async function generarCuotas(periodoId) {
     setGenerando(periodoId)
     setError(null)
 
@@ -132,7 +141,7 @@ export default function Periodos() {
           <h1 className="text-2xl font-bold text-gray-800">Periodos de Cuota</h1>
           <p className="text-gray-500 mt-1">Genera y administra las cuotas mensuales</p>
         </div>
-        <Button onClick={() => setShowModal(true)} className="flex items-center gap-2">
+        <Button onClick={() => setShowCrearModal(true)} className="flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Nuevo Periodo
         </Button>
@@ -188,7 +197,7 @@ export default function Periodos() {
                     </div>
                   ) : (
                     <Button
-                      onClick={() => generarCuotas(periodo.id)}
+                      onClick={() => confirmarGenerarCuotas(periodo.id)}
                       loading={generando === periodo.id}
                       className="flex items-center gap-2"
                     >
@@ -240,7 +249,7 @@ export default function Periodos() {
       </div>
 
       {/* Modal crear periodo */}
-      {showModal && (
+      {showCrearModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -294,7 +303,7 @@ export default function Periodos() {
                 <Button type="submit" loading={creando} className="flex-1">
                   Crear Periodo
                 </Button>
-                <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
+                <Button type="button" variant="secondary" onClick={() => setShowCrearModal(false)}>
                   Cancelar
                 </Button>
               </div>
@@ -302,6 +311,9 @@ export default function Periodos() {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmación */}
+      {ModalComponent}
     </div>
   )
 }

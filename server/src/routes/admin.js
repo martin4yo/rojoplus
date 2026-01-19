@@ -1421,6 +1421,14 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
     }
   }
 
+  // Obtener mapeo de tipos de socio (nombre -> id)
+  const tiposSocio = await req.prisma.tipoSocio.findMany()
+  const mapeoTipoSocio = {}
+  for (const tipo of tiposSocio) {
+    mapeoTipoSocio[tipo.nombre] = tipo.id
+    mapeoTipoSocio[tipo.codigo] = tipo.id
+  }
+
   // Crear categorías de socio que no existan
   for (const cat of categoriasUnicas) {
     const codigo = cat.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
@@ -1432,6 +1440,14 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
         data: { codigo, nombre: cat, color: 'blue' }
       })
     }
+  }
+
+  // Obtener mapeo de categorías de socio (nombre -> id)
+  const categoriasSocio = await req.prisma.categoriaSocio.findMany()
+  const mapeoCategoriaSocio = {}
+  for (const cat of categoriasSocio) {
+    mapeoCategoriaSocio[cat.nombre] = cat.id
+    mapeoCategoriaSocio[cat.codigo] = cat.id
   }
 
   // Crear estados de socio que no existan
@@ -1455,9 +1471,29 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
     }
   }
 
-  // Función para limpiar campos temporales (los que empiezan con _)
+  // Obtener mapeo de estados de socio (nombre -> id)
+  const estadosSocio = await req.prisma.estadoSocio.findMany()
+  const mapeoEstadoSocio = {}
+  for (const est of estadosSocio) {
+    mapeoEstadoSocio[est.nombre] = est.id
+    mapeoEstadoSocio[est.codigo] = est.id
+  }
+
+  // Función para limpiar campos temporales y agregar IDs de relación
   const limpiarCamposTemporales = (socio) => {
     const { _grupoFamiliar, _esTitular, _cobrador, id, ...datosLimpios } = socio
+
+    // Agregar IDs de relación basándose en los campos texto
+    if (socio.tipoSocio && mapeoTipoSocio[socio.tipoSocio]) {
+      datosLimpios.tipoSocioRelId = mapeoTipoSocio[socio.tipoSocio]
+    }
+    if (socio.categoria && mapeoCategoriaSocio[socio.categoria]) {
+      datosLimpios.categoriaSocioId = mapeoCategoriaSocio[socio.categoria]
+    }
+    if (socio.estado && mapeoEstadoSocio[socio.estado]) {
+      datosLimpios.estadoSocioId = mapeoEstadoSocio[socio.estado]
+    }
+
     return datosLimpios
   }
 
@@ -1528,6 +1564,10 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
         fotoUrl: datosLimpios.fotoUrl,
         // Observaciones
         observaciones: datosLimpios.observaciones,
+        // IDs de relación
+        tipoSocioRelId: datosLimpios.tipoSocioRelId,
+        categoriaSocioId: datosLimpios.categoriaSocioId,
+        estadoSocioId: datosLimpios.estadoSocioId,
       },
     })
   }
