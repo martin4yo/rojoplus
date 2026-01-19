@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Store, Dumbbell } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { useModal } from '../../components/Modal'
 import api from '../../services/api'
 
 export default function AdminReportes() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reporte, setReporte] = useState(null)
@@ -75,6 +78,22 @@ export default function AdminReportes() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Reportes</h1>
+
+      {/* Accesos rápidos a otros reportes */}
+      <div className="flex flex-wrap gap-4 mb-6">
+        <div
+          className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition"
+          onClick={() => navigate('/admin/reportes/actividades')}
+        >
+          <div className="p-3 rounded-lg bg-orange-100">
+            <Dumbbell className="w-5 h-5 text-orange-600" />
+          </div>
+          <div>
+            <p className="font-medium text-gray-800">Actividades</p>
+            <p className="text-xs text-gray-500">Ver inscriptos por actividad y categoría</p>
+          </div>
+        </div>
+      </div>
 
       {error && <Alert type="error" className="mb-6">{error}</Alert>}
 

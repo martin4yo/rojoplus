@@ -1,7 +1,12 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { PrismaClient } from '@prisma/client'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // Routes
 import rubrosRoutes from './routes/rubros.js'
@@ -21,9 +26,14 @@ const prisma = new PrismaClient()
 const PORT = process.env.PORT || 3001
 
 // Middlewares globales
-app.use(helmet())
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}))
 app.use(cors())
 app.use(express.json())
+
+// Servir archivos estáticos (fotos de socios)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 // Pasar prisma a las rutas
 app.use((req, res, next) => {

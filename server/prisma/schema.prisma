@@ -1,21 +1,3 @@
-// ============================================================================
-// ROJOPLUS - SCHEMA COMPLETO
-// Club Sportivo Pilar - Sistema de Gestión Integral
-// ============================================================================
-// Incluye:
-// - Gestión de Socios (con datos médicos para menores)
-// - Grupos Familiares
-// - Deportes y Categorías
-// - Sistema de Cuotas con Recargos
-// - Pagos y Cobranzas
-// - Débito Automático (generación e importación)
-// - Caja y Movimientos
-// - Conciliación Bancaria
-// - Portal de Socio con Links de Pago
-// - Comercios Adheridos (RojoPlus)
-// - Roles y Permisos
-// ============================================================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -25,345 +7,372 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================================================
-// SOCIOS Y PERSONAS
-// ============================================================================
+// ConceptoTesoreria - Conceptos para movimientos de caja (cuota social, actividades, etc)
+model ConceptoTesoreria {
+  id                  Int                   @id @default(autoincrement())
+  codigo              String                @unique
+  nombre              String
+  descripcion         String?
+  tipo                String                @default("INGRESO") // INGRESO, EGRESO
+  cuentaContableId    Int?                  @map("cuenta_contable_id")
+  activo              Boolean               @default(true)
+  orden               Int                   @default(0)
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+  cuentaContable      CuentaContable?       @relation(fields: [cuentaContableId], references: [id])
+  tiposSocio          TipoSocio[]
+  actividades         Actividad[]
+  categoriasActividad CategoriaActividad[]
+
+  @@map("conceptos_tesoreria")
+}
+
+model TipoSocio {
+  id                   Int                 @id @default(autoincrement())
+  codigo               String              @unique
+  nombre               String
+  descripcion          String?
+  cuotaMensual         Decimal?            @map("cuota_mensual") @db.Decimal(12, 2)
+  conceptoTesoreriaId  Int?                @map("concepto_tesoreria_id")
+  color                String?
+  orden                Int                 @default(0)
+  activo               Boolean             @default(true)
+  createdAt            DateTime            @default(now()) @map("created_at")
+  socios               Socio[]
+  conceptoTesoreria    ConceptoTesoreria?  @relation(fields: [conceptoTesoreriaId], references: [id])
+
+  @@map("tipos_socio")
+}
+
+model CategoriaSocio {
+  id                   Int      @id @default(autoincrement())
+  codigo               String   @unique
+  nombre               String
+  descripcion          String?
+  porcentajeDescuento  Decimal  @default(0) @map("porcentaje_descuento") @db.Decimal(5, 2)
+  color                String?
+  orden                Int      @default(0)
+  activo               Boolean  @default(true)
+  createdAt            DateTime @default(now()) @map("created_at")
+  socios               Socio[]
+
+  @@map("categorias_socio")
+}
+
+model EstadoSocio {
+  id                Int      @id @default(autoincrement())
+  codigo            String   @unique
+  nombre            String
+  descripcion       String?
+  color             String?
+  permiteDescuentos Boolean  @default(false) @map("permite_descuentos")
+  orden             Int      @default(0)
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  socios            Socio[]
+
+  @@map("estados_socio")
+}
 
 model Socio {
-  id                  Int       @id @default(autoincrement())
-
-  // --- Datos de identificación ---
-  nroSocio            String    @unique @map("nro_socio")
-  tipoDocumento       String    @default("DNI") @map("tipo_documento")
-  documento           String?
-  cuil                String?
-
-  // --- Datos personales ---
-  apellido            String?
-  nombre              String?
-  apellidoNombre      String    @map("apellido_nombre") // Mantener para compatibilidad
-  fechaNacimiento     DateTime? @map("fecha_nacimiento")
-  lugarNacimiento     String?   @map("lugar_nacimiento")
-  sexo                String?
-  nacionalidad        String?   @default("Argentina")
-  estadoCivil         String?   @map("estado_civil")
-  profesion           String?
-
-  // --- Foto ---
-  fotoUrl             String?   @map("foto_url")
-
-  // --- Contacto ---
-  email               String?
-  emailSecundario     String?   @map("email_secundario")
-  telefonoFijo        String?   @map("telefono_fijo")
-  celular             String?
-  celularSecundario   String?   @map("celular_secundario")
-
-  // --- Domicilio ---
-  domicilio           String?   // Dirección completa (legacy)
-  calle               String?
-  numero              String?
-  piso                String?
-  depto               String?
-  barrio              String?
-  codigoPostal        String?   @map("codigo_postal")
-  ciudad              String?
-  provincia           String?   @default("Buenos Aires")
-
-  // --- Datos del club ---
-  fechaAlta           DateTime? @map("fecha_alta")
-  fechaBaja           DateTime? @map("fecha_baja")
-  motivoBaja          String?   @map("motivo_baja")
-  estado              String    @default("ACTIVO")
-  categoria           String?
-  tipoSocio           String?   @map("tipo_socio")
-  zona                String?   // Zona geográfica para cobradores
-
-  // --- Registro estatutario ---
-  libro               String?
-  folio               String?
-  antiguedadEstatutaria Int?    @map("antiguedad_estatutaria")
-
-  // --- Para menores de edad ---
-  esMenor             Boolean   @default(false) @map("es_menor")
-  responsableId       Int?      @map("responsable_id")
-  parentescoResponsable String? @map("parentesco_responsable")
-
-  // --- Datos médicos ---
-  grupoSanguineo      String?   @map("grupo_sanguineo")
-  factorRh            String?   @map("factor_rh")
-  obraSocial          String?   @map("obra_social")
-  nroObraSocial       String?   @map("nro_obra_social")
-  alergias            String?
-  condicionesMedicas  String?   @map("condiciones_medicas")
-  medicamentos        String?
-  aptaFisicaVigente   Boolean   @default(false) @map("apta_fisica_vigente")
-  aptaFisicaVence     DateTime? @map("apta_fisica_vence")
-
-  // --- Contactos de emergencia ---
-  emergenciaNombre1   String?   @map("emergencia_nombre_1")
-  emergenciaTel1      String?   @map("emergencia_tel_1")
-  emergenciaParent1   String?   @map("emergencia_parentesco_1")
-  emergenciaNombre2   String?   @map("emergencia_nombre_2")
-  emergenciaTel2      String?   @map("emergencia_tel_2")
-  emergenciaParent2   String?   @map("emergencia_parentesco_2")
-
-  // --- Sistema RojoPlus (descuentos en comercios) ---
-  tokenPortal         String?   @unique @map("token_portal") @default(uuid())
-
-  // --- Grupo familiar ---
-  grupoFamiliarId     Int?      @map("grupo_familiar_id")
-  esTitularGrupo      Boolean   @default(false) @map("es_titular_grupo")
-  parentescoTitular   String?   @map("parentesco_titular") // Relación con el titular del grupo
-
-  // --- Configuración de cobranza ---
-  formaPagoPref       String?   @map("forma_pago_pref") // MOSTRADOR, DEBITO, COBRADOR
-  cobradorId          Int?      @map("cobrador_id")
-
-  // --- Datos bancarios para débito automático ---
-  debitoTipo          String?   @map("debito_tipo") // CBU, TARJETA
-  bancoDebito         String?   @map("banco_debito")
-  cbuDebito           String?   @map("cbu_debito")
-  aliasDebito         String?   @map("alias_debito")
-
-  // --- Datos de tarjeta ---
-  tarjetaMarca        String?   @map("tarjeta_marca") // VISA, MASTERCARD, etc.
-  tarjetaNumero       String?   @map("tarjeta_numero") // Número completo (encriptado en app)
-  tarjetaUltimos4     String?   @map("tarjeta_ultimos_4") // Para mostrar en UI
-  tarjetaVencimiento  String?   @map("tarjeta_vencimiento") // MM/YY
-  tarjetaCvv          String?   @map("tarjeta_cvv") // CVV (encriptado, solo si es necesario)
-  tarjetaToken        String?   @map("tarjeta_token") // Token del procesador (alternativa segura)
-  tarjetaTokenizador  String?   @map("tarjeta_tokenizador") // PRISMA, PAYWAY
-
-  titularCuenta       String?   @map("titular_cuenta")
-  enviaDebito         Boolean   @default(false) @map("envia_debito")
-  debitoVerificado    Boolean   @default(false) @map("debito_verificado") // Si el medio fue verificado
-
-  // --- Condición fiscal ---
-  condicionFiscal     String?   @map("condicion_fiscal")
-
-  // --- Observaciones ---
-  observaciones       String?
-  observacionesInternas String? @map("observaciones_internas")
-
-  // --- Auditoría ---
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-  creadoPor           Int?      @map("creado_por")
-  actualizadoPor      Int?      @map("actualizado_por")
-
-  // --- Relaciones ---
-  responsable         Socio?    @relation("ResponsableMenor", fields: [responsableId], references: [id])
-  menoresACargo       Socio[]   @relation("ResponsableMenor")
-  grupoFamiliar       GrupoFamiliar? @relation("MiembroGrupo", fields: [grupoFamiliarId], references: [id])
-  grupoFamiliarTitular GrupoFamiliar? @relation("TitularGrupo")
-  cobrador            Cobrador? @relation(fields: [cobradorId], references: [id])
-  inscripciones       Inscripcion[]
-  cuotas              Cuota[]
-  pagos               Pago[]
-  saldosFavor         SaldoFavor[]
-  ventas              Venta[]
-  autorizaciones      AutorizacionMenor[]
-  detallesDebito      DetalleDebito[]
-  detallesCobranza    DetalleCobranza[]
-  linksPago           LinkPago[]
+  id                    Int                 @id @default(autoincrement())
+  nroSocio              String              @unique @map("nro_socio")
+  documento             String?
+  apellidoNombre        String              @map("apellido_nombre")
+  estado                String              @default("ACTIVO")
+  email                 String?
+  celular               String?
+  fechaNacimiento       DateTime?           @map("fecha_nacimiento")
+  categoria             String?
+  tipoSocio             String?             @map("tipo_socio")
+  domicilio             String?
+  ciudad                String?
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+  tokenPortal           String?             @unique @default(uuid()) @map("token_portal")
+  actualizadoPor        Int?                @map("actualizado_por")
+  alergias              String?
+  aliasDebito           String?             @map("alias_debito")
+  antiguedadEstatutaria Int?                @map("antiguedad_estatutaria")
+  apellido              String?
+  aptaFisicaVence       DateTime?           @map("apta_fisica_vence")
+  aptaFisicaVigente     Boolean             @default(false) @map("apta_fisica_vigente")
+  bancoDebito           String?             @map("banco_debito")
+  barrio                String?
+  calle                 String?
+  cbuDebito             String?             @map("cbu_debito")
+  celularSecundario     String?             @map("celular_secundario")
+  cobradorId            Int?                @map("cobrador_id")
+  codigoPostal          String?             @map("codigo_postal")
+  condicionFiscal       String?             @map("condicion_fiscal")
+  condicionesMedicas    String?             @map("condiciones_medicas")
+  creadoPor             Int?                @map("creado_por")
+  cuil                  String?
+  debitoTipo            String?             @map("debito_tipo")
+  debitoVerificado      Boolean             @default(false) @map("debito_verificado")
+  depto                 String?
+  emailSecundario       String?             @map("email_secundario")
+  emergenciaNombre1     String?             @map("emergencia_nombre_1")
+  emergenciaNombre2     String?             @map("emergencia_nombre_2")
+  emergenciaParent1     String?             @map("emergencia_parentesco_1")
+  emergenciaParent2     String?             @map("emergencia_parentesco_2")
+  emergenciaTel1        String?             @map("emergencia_tel_1")
+  emergenciaTel2        String?             @map("emergencia_tel_2")
+  enviaDebito           Boolean             @default(false) @map("envia_debito")
+  esMenor               Boolean             @default(false) @map("es_menor")
+  estadoCivil           String?             @map("estado_civil")
+  factorRh              String?             @map("factor_rh")
+  fechaAlta             DateTime?           @map("fecha_alta")
+  fechaBaja             DateTime?           @map("fecha_baja")
+  folio                 String?
+  formaPagoPref         String?             @map("forma_pago_pref")
+  fotoUrl               String?             @map("foto_url")
+  grupoSanguineo        String?             @map("grupo_sanguineo")
+  libro                 String?
+  lugarNacimiento       String?             @map("lugar_nacimiento")
+  medicamentos          String?
+  motivoBaja            String?             @map("motivo_baja")
+  nacionalidad          String?             @default("Argentina")
+  nombre                String?
+  nroObraSocial         String?             @map("nro_obra_social")
+  numero                String?
+  obraSocial            String?             @map("obra_social")
+  observaciones         String?
+  observacionesInternas String?             @map("observaciones_internas")
+  parentescoResponsable String?             @map("parentesco_responsable")
+  parentescoTitular     String?             @map("parentesco_titular")
+  piso                  String?
+  profesion             String?
+  provincia             String?             @default("Buenos Aires")
+  responsableId         Int?                @map("responsable_id")
+  sexo                  String?
+  tarjetaCvv            String?             @map("tarjeta_cvv")
+  tarjetaMarca          String?             @map("tarjeta_marca")
+  tarjetaNumero         String?             @map("tarjeta_numero")
+  tarjetaToken          String?             @map("tarjeta_token")
+  tarjetaTokenizador    String?             @map("tarjeta_tokenizador")
+  tarjetaUltimos4       String?             @map("tarjeta_ultimos_4")
+  tarjetaVencimiento    String?             @map("tarjeta_vencimiento")
+  telefonoFijo          String?             @map("telefono_fijo")
+  tipoDocumento         String              @default("DNI") @map("tipo_documento")
+  titularCuenta         String?             @map("titular_cuenta")
+  zona                  String?
+  categoriaSocioId      Int?                @map("categoria_socio_id")
+  estadoSocioId         Int?                @map("estado_socio_id")
+  tipoSocioRelId        Int?                @map("tipo_socio_rel_id")
+  titularFamiliaId      Int?                @map("titular_familia_id")
+  autorizaciones        AutorizacionMenor[]
+  cuotas                Cuota[]
+  detallesCobranza      DetalleCobranza[]
+  documentos            DocumentoSocio[]
+  detallesDebito        DetalleDebito[]
+  inscripciones         Inscripcion[]
+  linksPago             LinkPago[]
+  pagos                 Pago[]
+  saldosFavor           SaldoFavor[]
+  categoriaSocioRel     CategoriaSocio?     @relation(fields: [categoriaSocioId], references: [id])
+  cobrador              Cobrador?           @relation(fields: [cobradorId], references: [id])
+  estadoSocioRel        EstadoSocio?        @relation(fields: [estadoSocioId], references: [id])
+  responsable           Socio?              @relation("ResponsableMenor", fields: [responsableId], references: [id])
+  menoresACargo         Socio[]             @relation("ResponsableMenor")
+  tipoSocioRel          TipoSocio?          @relation(fields: [tipoSocioRelId], references: [id])
+  titularFamilia        Socio?              @relation("MiembrosFamilia", fields: [titularFamiliaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  miembrosFamilia       Socio[]             @relation("MiembrosFamilia")
+  ventas                Venta[]
 
   @@index([documento])
   @@index([apellidoNombre])
   @@index([estado])
-  @@index([grupoFamiliarId])
+  @@index([estadoSocioId])
+  @@index([categoriaSocioId])
+  @@index([tipoSocioRelId])
   @@index([responsableId])
   @@index([cobradorId])
   @@index([zona])
+  @@index([titularFamiliaId], map: "idx_socios_titular_familia_id")
   @@map("socios")
 }
 
-// Autorizaciones especiales para menores
-model AutorizacionMenor {
+// Documentos del socio (aptos fisicos, estudios, certificados, etc.)
+model DocumentoSocio {
   id              Int       @id @default(autoincrement())
   socioId         Int       @map("socio_id")
-  tipo            String    // VIAJE, ACTIVIDAD_ESPECIAL, FOTOGRAFIA, SALIDA_SOLO
-  descripcion     String
-  otorgadaPor     String    @map("otorgada_por")
-  dniOtorgante    String?   @map("dni_otorgante")
-  fechaOtorgamiento DateTime @map("fecha_otorgamiento")
+  tipo            String    // APTO_FISICO, CERTIFICADO_ESTUDIOS, DNI, FICHA_MEDICA, OTRO
+  nombre          String
+  descripcion     String?
+  archivoUrl      String    @map("archivo_url")
+  archivoNombre   String    @map("archivo_nombre")
+  archivoTipo     String?   @map("archivo_tipo") // mime type
+  archivoSize     Int?      @map("archivo_size") // bytes
+  fechaEmision    DateTime? @map("fecha_emision")
   fechaVencimiento DateTime? @map("fecha_vencimiento")
-  documentoUrl    String?   @map("documento_url")
-  activa          Boolean   @default(true)
+  vigente         Boolean   @default(true)
+  observaciones   String?
+  creadoPor       Int?      @map("creado_por")
   createdAt       DateTime  @default(now()) @map("created_at")
-
+  updatedAt       DateTime  @updatedAt @map("updated_at")
   socio           Socio     @relation(fields: [socioId], references: [id])
+
+  @@index([socioId])
+  @@index([tipo])
+  @@index([fechaVencimiento])
+  @@map("documentos_socio")
+}
+
+model AutorizacionMenor {
+  id                Int       @id @default(autoincrement())
+  socioId           Int       @map("socio_id")
+  tipo              String
+  descripcion       String
+  otorgadaPor       String    @map("otorgada_por")
+  dniOtorgante      String?   @map("dni_otorgante")
+  fechaOtorgamiento DateTime  @map("fecha_otorgamiento")
+  fechaVencimiento  DateTime? @map("fecha_vencimiento")
+  documentoUrl      String?   @map("documento_url")
+  activa            Boolean   @default(true)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  socio             Socio     @relation(fields: [socioId], references: [id])
 
   @@map("autorizaciones_menores")
 }
 
-// Cobradores (para cobranza a domicilio)
 model Cobrador {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  nombre          String
-  telefono        String?
-  email           String?
-  zonas           String?   // Zonas que atiende
-  comisionPct     Decimal   @default(0) @map("comision_pct") @db.Decimal(5, 2)
-  activo          Boolean   @default(true)
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  socios          Socio[]
-  pagos           Pago[]
+  id          Int      @id @default(autoincrement())
+  codigo      String   @unique
+  nombre      String
+  telefono    String?
+  email       String?
+  zonas       String?
+  comisionPct Decimal  @default(0) @map("comision_pct") @db.Decimal(5, 2)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  pagos       Pago[]
+  socios      Socio[]
 
   @@map("cobradores")
 }
 
-// ============================================================================
-// GRUPOS FAMILIARES
-// ============================================================================
+// Actividad (padre) - ej: BASQUET, FUTBOL, TENIS
+model Actividad {
+  id                   Int                   @id @default(autoincrement())
+  codigo               String                @unique
+  nombre               String
+  descripcion          String?
+  requiereAptaFisica   Boolean               @default(true) @map("requiere_apta_fisica")
+  cuotaMensual         Decimal?              @map("cuota_mensual") @db.Decimal(12, 2)
+  conceptoTesoreriaId  Int?                  @map("concepto_tesoreria_id")
+  color                String?
+  activo               Boolean               @default(true)
+  orden                Int                   @default(0)
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  categorias           CategoriaActividad[]
+  conceptoTesoreria    ConceptoTesoreria?    @relation(fields: [conceptoTesoreriaId], references: [id])
 
-model GrupoFamiliar {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  nombre          String
-  titularId       Int       @unique @map("titular_id")
-
-  // Configuración de cuota familiar
-  cuotaSocialEspecial Decimal? @map("cuota_social_especial") @db.Decimal(12, 2)
-
-  activo          Boolean   @default(true)
-  observaciones   String?
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  titular         Socio     @relation("TitularGrupo", fields: [titularId], references: [id])
-  miembros        Socio[]   @relation("MiembroGrupo")
-  cuotas          Cuota[]
-  pagos           Pago[]
-  saldosFavor     SaldoFavor[]
-
-  @@map("grupos_familiares")
+  @@map("actividades")
 }
 
-// ============================================================================
-// DEPORTES, CATEGORÍAS E INSCRIPCIONES
-// ============================================================================
+// CategoriaActividad (hija) - ej: BASQUET CADETE, BASQUET PRE MINI
+model CategoriaActividad {
+  id                   Int                   @id @default(autoincrement())
+  actividadId          Int                   @map("actividad_id")
+  codigo               String                @unique
+  nombre               String
+  descripcion          String?
+  edadMinima           Int?                  @map("edad_minima")
+  edadMaxima           Int?                  @map("edad_maxima")
+  sexo                 String?
+  cuotaMensual         Decimal?              @map("cuota_mensual") @db.Decimal(12, 2)
+  conceptoTesoreriaId  Int?                  @map("concepto_tesoreria_id")
+  diasEntrenamiento    String?               @map("dias_entrenamiento")
+  horarioEntrenamiento String?               @map("horario_entrenamiento")
+  lugarEntrenamiento   String?               @map("lugar_entrenamiento")
+  cupoMaximo           Int?                  @map("cupo_maximo")
+  activo               Boolean               @default(true)
+  orden                Int                   @default(0)
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  actividad            Actividad             @relation(fields: [actividadId], references: [id])
+  inscripciones        Inscripcion[]
+  entrenadores         EntrenadorCategoria[]
+  cuotas               Cuota[]
+  conceptoTesoreria    ConceptoTesoreria?    @relation(fields: [conceptoTesoreriaId], references: [id])
 
-model Deporte {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  nombre          String
-  descripcion     String?
-  requiereAptaFisica Boolean @default(true) @map("requiere_apta_fisica")
-  activo          Boolean   @default(true)
-  orden           Int       @default(0)
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  categorias      Categoria[]
-
-  @@map("deportes")
-}
-
-model Categoria {
-  id              Int       @id @default(autoincrement())
-  deporteId       Int       @map("deporte_id")
-  codigo          String    @unique
-  nombre          String
-  descripcion     String?
-
-  // Restricciones de edad
-  edadMinima      Int?      @map("edad_minima")
-  edadMaxima      Int?      @map("edad_maxima")
-  sexo            String?
-
-  // Cuota mensual
-  cuotaMensual    Decimal   @map("cuota_mensual") @db.Decimal(12, 2)
-
-  // Horarios
-  diasEntrenamiento String?  @map("dias_entrenamiento")
-  horarioEntrenamiento String? @map("horario_entrenamiento")
-  lugarEntrenamiento String? @map("lugar_entrenamiento")
-
-  cupoMaximo      Int?      @map("cupo_maximo")
-
-  activo          Boolean   @default(true)
-  orden           Int       @default(0)
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  deporte         Deporte   @relation(fields: [deporteId], references: [id])
-  inscripciones   Inscripcion[]
-  entrenadores    EntrenadorCategoria[]
-  cuotas          Cuota[]
-
-  @@map("categorias")
+  @@index([actividadId])
+  @@map("categorias_actividad")
 }
 
 model Inscripcion {
-  id              Int       @id @default(autoincrement())
-  socioId         Int       @map("socio_id")
-  categoriaId     Int       @map("categoria_id")
+  id                   Int                @id @default(autoincrement())
+  socioId              Int                @map("socio_id")
+  categoriaActividadId Int                @map("categoria_actividad_id")
+  fechaInscripcion     DateTime           @default(now()) @map("fecha_inscripcion")
+  fechaInicio          DateTime           @map("fecha_inicio")
+  fechaFin             DateTime?          @map("fecha_fin")
+  motivoFin            String?            @map("motivo_fin")
+  exentoCuota          Boolean            @default(false) @map("exento_cuota")
+  motivoExencion       String?            @map("motivo_exencion")
+  becado               Boolean            @default(false)
+  federado             Boolean            @default(false)
+  porcentajeCuota      Decimal            @default(100) @map("porcentaje_cuota") @db.Decimal(5, 2)
+  autorizadoPor        String?            @map("autorizado_por")
+  fechaAutorizacion    DateTime?          @map("fecha_autorizacion")
+  estado               String             @default("ACTIVA")
+  observaciones        String?
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  categoriaActividad   CategoriaActividad @relation(fields: [categoriaActividadId], references: [id])
+  socio                Socio              @relation(fields: [socioId], references: [id])
 
-  fechaInscripcion DateTime @default(now()) @map("fecha_inscripcion")
-  fechaInicio     DateTime  @map("fecha_inicio")
-  fechaFin        DateTime? @map("fecha_fin")
-  motivoFin       String?   @map("motivo_fin")
-
-  // Configuración especial
-  exentoCuota     Boolean   @default(false) @map("exento_cuota")
-  motivoExencion  String?   @map("motivo_exencion")
-  becado          Boolean   @default(false)
-  federado        Boolean   @default(false)
-  porcentajeCuota Decimal   @default(100) @map("porcentaje_cuota") @db.Decimal(5, 2) // % del valor de cuota
-
-  // Para menores
-  autorizadoPor   String?   @map("autorizado_por")
-  fechaAutorizacion DateTime? @map("fecha_autorizacion")
-
-  estado          String    @default("ACTIVA")
-  observaciones   String?
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  socio           Socio     @relation(fields: [socioId], references: [id])
-  categoria       Categoria @relation(fields: [categoriaId], references: [id])
-
-  @@unique([socioId, categoriaId, fechaInicio])
+  @@unique([socioId, categoriaActividadId, fechaInicio])
   @@index([socioId])
-  @@index([categoriaId])
+  @@index([categoriaActividadId])
   @@index([estado])
   @@map("inscripciones")
 }
 
+// Entrenador (tabla principal)
+model Entrenador {
+  id          Int                   @id @default(autoincrement())
+  nombre      String
+  apellido    String?
+  documento   String?
+  telefono    String?
+  email       String?
+  socioId     Int?                  @map("socio_id")
+  especialidad String?
+  observaciones String?
+  activo      Boolean               @default(true)
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+  categorias  EntrenadorCategoria[]
+
+  @@map("entrenadores")
+}
+
+// Relacion Entrenador-Categoria (muchos a muchos)
 model EntrenadorCategoria {
-  id              Int       @id @default(autoincrement())
-  categoriaId     Int       @map("categoria_id")
-  tipo            String    // ENTRENADOR, DELEGADO, PREPARADOR_FISICO
+  id                   Int                @id @default(autoincrement())
+  entrenadorId         Int                @map("entrenador_id")
+  categoriaActividadId Int                @map("categoria_actividad_id")
+  rol                  String             @default("ENTRENADOR") // ENTRENADOR, ASISTENTE, PREPARADOR_FISICO
+  fechaDesde           DateTime           @default(now()) @map("fecha_desde")
+  fechaHasta           DateTime?          @map("fecha_hasta")
+  activo               Boolean            @default(true)
+  createdAt            DateTime           @default(now()) @map("created_at")
+  entrenador           Entrenador         @relation(fields: [entrenadorId], references: [id])
+  categoriaActividad   CategoriaActividad @relation(fields: [categoriaActividadId], references: [id])
 
-  // Datos del entrenador
-  nombre          String
-  telefono        String?
-  email           String?
-  socioId         Int?      @map("socio_id") // Si es socio
-
-  fechaDesde      DateTime  @map("fecha_desde")
-  fechaHasta      DateTime? @map("fecha_hasta")
-  activo          Boolean   @default(true)
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  categoria       Categoria @relation(fields: [categoriaId], references: [id])
-
+  @@unique([entrenadorId, categoriaActividadId])
   @@map("entrenadores_categorias")
 }
 
-// ============================================================================
-// SISTEMA DE CUOTAS
-// ============================================================================
-
 model TipoCuota {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique // SOCIAL, DEPORTIVA
+  id              Int                  @id @default(autoincrement())
+  codigo          String               @unique
   nombre          String
   descripcion     String?
-  activo          Boolean   @default(true)
-
+  activo          Boolean              @default(true)
   configuraciones ConfiguracionCuota[]
   cuotas          Cuota[]
 
@@ -371,172 +380,135 @@ model TipoCuota {
 }
 
 model ConfiguracionCuota {
-  id              Int       @id @default(autoincrement())
-  tipoCuotaId     Int       @map("tipo_cuota_id")
-  concepto        String
-  monto           Decimal   @db.Decimal(12, 2)
-  vigenciaDesde   DateTime  @map("vigencia_desde")
-  vigenciaHasta   DateTime? @map("vigencia_hasta")
-  activo          Boolean   @default(true)
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  tipoCuota       TipoCuota @relation(fields: [tipoCuotaId], references: [id])
+  id            Int       @id @default(autoincrement())
+  tipoCuotaId   Int       @map("tipo_cuota_id")
+  concepto      String
+  monto         Decimal   @db.Decimal(12, 2)
+  vigenciaDesde DateTime  @map("vigencia_desde")
+  vigenciaHasta DateTime? @map("vigencia_hasta")
+  activo        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  tipoCuota     TipoCuota @relation(fields: [tipoCuotaId], references: [id])
 
   @@map("configuracion_cuotas")
 }
 
 model ConfiguracionRecargo {
-  id                      Int       @id @default(autoincrement())
-  nombre                  String
-  diasDespuesVencimiento  Int       @map("dias_despues_vencimiento")
-  porcentaje              Decimal   @db.Decimal(5, 2)
-  acumulativo             Boolean   @default(true)
-  activo                  Boolean   @default(true)
-  vigenciaDesde           DateTime  @map("vigencia_desde")
-  vigenciaHasta           DateTime? @map("vigencia_hasta")
-  createdAt               DateTime  @default(now()) @map("created_at")
+  id                     Int       @id @default(autoincrement())
+  nombre                 String
+  diasDespuesVencimiento Int       @map("dias_despues_vencimiento")
+  porcentaje             Decimal   @db.Decimal(5, 2)
+  acumulativo            Boolean   @default(true)
+  activo                 Boolean   @default(true)
+  vigenciaDesde          DateTime  @map("vigencia_desde")
+  vigenciaHasta          DateTime? @map("vigencia_hasta")
+  createdAt              DateTime  @default(now()) @map("created_at")
 
   @@map("configuracion_recargos")
 }
 
 model PeriodoCuota {
-  id                  Int       @id @default(autoincrement())
-  anio                Int
-  mes                 Int
-  nombre              String
-  fechaGeneracion     DateTime? @map("fecha_generacion")
-  fechaVencimiento    DateTime  @map("fecha_vencimiento")
-  estado              String    @default("PENDIENTE")
-  generadoPor         Int?      @map("generado_por")
-  createdAt           DateTime  @default(now()) @map("created_at")
-
-  cuotas              Cuota[]
+  id               Int       @id @default(autoincrement())
+  anio             Int
+  mes              Int
+  nombre           String
+  fechaGeneracion  DateTime? @map("fecha_generacion")
+  fechaVencimiento DateTime  @map("fecha_vencimiento")
+  estado           String    @default("PENDIENTE")
+  generadoPor      Int?      @map("generado_por")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  cuotas           Cuota[]
 
   @@unique([anio, mes])
   @@map("periodos_cuota")
 }
 
 model Cuota {
-  id                  Int       @id @default(autoincrement())
-  periodoId           Int       @map("periodo_id")
-
-  // Puede ser de socio individual O grupo familiar
-  socioId             Int?      @map("socio_id")
-  grupoFamiliarId     Int?      @map("grupo_familiar_id")
-
-  tipoCuotaId         Int       @map("tipo_cuota_id")
-  categoriaId         Int?      @map("categoria_id") // Solo para cuotas deportivas
-
-  // Montos
-  montoOriginal       Decimal   @map("monto_original") @db.Decimal(12, 2)
-  montoRecargo        Decimal   @default(0) @map("monto_recargo") @db.Decimal(12, 2)
-  montoBonificacion   Decimal   @default(0) @map("monto_bonificacion") @db.Decimal(12, 2)
-  montoTotal          Decimal   @map("monto_total") @db.Decimal(12, 2)
-
-  // Estado y fechas
-  estado              String    @default("PENDIENTE")
-  fechaVencimiento    DateTime  @map("fecha_vencimiento")
-  fechaPago           DateTime? @map("fecha_pago")
-
-  pagoId              Int?      @map("pago_id")
-  motivoBonificacion  String?   @map("motivo_bonificacion")
-
-  // Para rastreo de débito
-  incluidoEnDebitoId  Int?      @map("incluido_en_debito_id")
-
-  observaciones       String?
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  periodo             PeriodoCuota   @relation(fields: [periodoId], references: [id])
-  socio               Socio?         @relation(fields: [socioId], references: [id])
-  grupoFamiliar       GrupoFamiliar? @relation(fields: [grupoFamiliarId], references: [id])
-  tipoCuota           TipoCuota      @relation(fields: [tipoCuotaId], references: [id])
-  categoria           Categoria?     @relation(fields: [categoriaId], references: [id])
-  pago                Pago?          @relation(fields: [pagoId], references: [id])
-  archivoDebito       ArchivoDebito? @relation(fields: [incluidoEnDebitoId], references: [id])
+  id                   Int                 @id @default(autoincrement())
+  periodoId            Int                 @map("periodo_id")
+  socioId              Int?                @map("socio_id")
+  grupo_familiar_id    Int?
+  tipoCuotaId          Int                 @map("tipo_cuota_id")
+  categoriaActividadId Int?                @map("categoria_actividad_id")
+  montoOriginal        Decimal             @map("monto_original") @db.Decimal(12, 2)
+  montoRecargo         Decimal             @default(0) @map("monto_recargo") @db.Decimal(12, 2)
+  montoBonificacion    Decimal             @default(0) @map("monto_bonificacion") @db.Decimal(12, 2)
+  montoTotal           Decimal             @map("monto_total") @db.Decimal(12, 2)
+  estado               String              @default("PENDIENTE")
+  fechaVencimiento     DateTime            @map("fecha_vencimiento")
+  fechaPago            DateTime?           @map("fecha_pago")
+  pagoId               Int?                @map("pago_id")
+  motivoBonificacion   String?             @map("motivo_bonificacion")
+  incluidoEnDebitoId   Int?                @map("incluido_en_debito_id")
+  observaciones        String?
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  categoriaActividad   CategoriaActividad? @relation(fields: [categoriaActividadId], references: [id])
+  archivoDebito        ArchivoDebito?      @relation(fields: [incluidoEnDebitoId], references: [id])
+  pago                 Pago?               @relation(fields: [pagoId], references: [id])
+  periodo              PeriodoCuota        @relation(fields: [periodoId], references: [id])
+  socio                Socio?              @relation(fields: [socioId], references: [id])
+  tipoCuota            TipoCuota           @relation(fields: [tipoCuotaId], references: [id])
 
   @@index([periodoId])
   @@index([socioId])
-  @@index([grupoFamiliarId])
   @@index([estado])
   @@index([fechaVencimiento])
+  @@index([grupo_familiar_id])
   @@map("cuotas")
 }
 
-// ============================================================================
-// PAGOS Y SALDOS
-// ============================================================================
-
 model MedioPago {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  nombre          String
-  tipo            String    @default("EFECTIVO") // EFECTIVO, BANCO, TARJETA, VIRTUAL, COBRADOR
+  id                 Int     @id @default(autoincrement())
+  codigo             String  @unique
+  nombre             String
+  tipo               String  @default("EFECTIVO")
   requiereDatosBanco Boolean @default(false) @map("requiere_datos_banco")
-  comisionPct     Decimal   @default(0) @map("comision_pct") @db.Decimal(5, 2)
-  activo          Boolean   @default(true)
-  orden           Int       @default(0)
-
-  pagos           Pago[]
+  comisionPct        Decimal @default(0) @map("comision_pct") @db.Decimal(5, 2)
+  activo             Boolean @default(true)
+  orden              Int     @default(0)
+  pagos              Pago[]
 
   @@map("medios_pago")
 }
 
 model Pago {
-  id                  Int       @id @default(autoincrement())
-  numero              String    @unique
-  fecha               DateTime  @default(now())
-
-  // Quién paga
-  socioId             Int       @map("socio_id")
-  grupoFamiliarId     Int?      @map("grupo_familiar_id")
-
-  // Montos
-  montoTotal          Decimal   @map("monto_total") @db.Decimal(12, 2)
-  montoRecibido       Decimal   @map("monto_recibido") @db.Decimal(12, 2)
-  montoACuenta        Decimal   @default(0) @map("monto_a_cuenta") @db.Decimal(12, 2)
-
-  // Medio de pago
-  medioPagoId         Int       @map("medio_pago_id")
-  cajaId              Int       @map("caja_id")
-  cobradorId          Int?      @map("cobrador_id")
-
-  // Datos de transferencia/cheque
-  bancoOrigen         String?   @map("banco_origen")
-  nroOperacion        String?   @map("nro_operacion")
-  fechaOperacion      DateTime? @map("fecha_operacion")
-
-  // Comprobante
-  comprobanteNro      String?   @map("comprobante_nro")
-  comprobanteTipo     String?   @map("comprobante_tipo")
-
-  // Estado
-  estado              String    @default("CONFIRMADO")
-  fechaAnulacion      DateTime? @map("fecha_anulacion")
-  motivoAnulacion     String?   @map("motivo_anulacion")
-  anuladoPor          Int?      @map("anulado_por")
-
-  // Origen del pago
-  origen              String    @default("MOSTRADOR") // MOSTRADOR, PORTAL, DEBITO_AUTO, COBRADOR
-  linkPagoId          Int?      @map("link_pago_id")
-  detalleCobranzaId   Int?      @map("detalle_cobranza_id")
-
-  observaciones       String?
-  registradoPor       Int       @map("registrado_por")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  socio               Socio          @relation(fields: [socioId], references: [id])
-  grupoFamiliar       GrupoFamiliar? @relation(fields: [grupoFamiliarId], references: [id])
-  medioPago           MedioPago      @relation(fields: [medioPagoId], references: [id])
-  caja                Caja           @relation(fields: [cajaId], references: [id])
-  cobrador            Cobrador?      @relation(fields: [cobradorId], references: [id])
-  linkPago            LinkPago?      @relation(fields: [linkPagoId], references: [id])
-  cuotas              Cuota[]
-  movimientos         MovimientoCaja[]
-  saldosGenerados     SaldoFavor[]   @relation("SaldoOrigen")
-  saldosAplicados     AplicacionSaldo[] @relation("SaldoAplicado")
+  id                Int               @id @default(autoincrement())
+  numero            String            @unique
+  fecha             DateTime          @default(now())
+  socioId           Int               @map("socio_id")
+  grupo_familiar_id Int?
+  montoTotal        Decimal           @map("monto_total") @db.Decimal(12, 2)
+  montoRecibido     Decimal           @map("monto_recibido") @db.Decimal(12, 2)
+  montoACuenta      Decimal           @default(0) @map("monto_a_cuenta") @db.Decimal(12, 2)
+  medioPagoId       Int               @map("medio_pago_id")
+  cajaId            Int               @map("caja_id")
+  cobradorId        Int?              @map("cobrador_id")
+  bancoOrigen       String?           @map("banco_origen")
+  nroOperacion      String?           @map("nro_operacion")
+  fechaOperacion    DateTime?         @map("fecha_operacion")
+  comprobanteNro    String?           @map("comprobante_nro")
+  comprobanteTipo   String?           @map("comprobante_tipo")
+  estado            String            @default("CONFIRMADO")
+  fechaAnulacion    DateTime?         @map("fecha_anulacion")
+  motivoAnulacion   String?           @map("motivo_anulacion")
+  anuladoPor        Int?              @map("anulado_por")
+  origen            String            @default("MOSTRADOR")
+  linkPagoId        Int?              @map("link_pago_id")
+  detalleCobranzaId Int?              @map("detalle_cobranza_id")
+  observaciones     String?
+  registradoPor     Int               @map("registrado_por")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  saldosAplicados   AplicacionSaldo[] @relation("SaldoAplicado")
+  cuotas            Cuota[]
+  movimientos       MovimientoCaja[]
+  caja              Caja              @relation(fields: [cajaId], references: [id])
+  cobrador          Cobrador?         @relation(fields: [cobradorId], references: [id])
+  linkPago          LinkPago?         @relation(fields: [linkPagoId], references: [id])
+  medioPago         MedioPago         @relation(fields: [medioPagoId], references: [id])
+  socio             Socio             @relation(fields: [socioId], references: [id])
+  saldosGenerados   SaldoFavor[]      @relation("SaldoOrigen")
 
   @@index([fecha])
   @@index([socioId])
@@ -546,147 +518,105 @@ model Pago {
 }
 
 model SaldoFavor {
-  id                  Int       @id @default(autoincrement())
-  socioId             Int?      @map("socio_id")
-  grupoFamiliarId     Int?      @map("grupo_familiar_id")
-
-  montoOriginal       Decimal   @map("monto_original") @db.Decimal(12, 2)
-  montoDisponible     Decimal   @map("monto_disponible") @db.Decimal(12, 2)
-
-  origen              String
-  pagoOrigenId        Int?      @map("pago_origen_id")
-
-  fecha               DateTime  @default(now())
-  observaciones       String?
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  socio               Socio?         @relation(fields: [socioId], references: [id])
-  grupoFamiliar       GrupoFamiliar? @relation(fields: [grupoFamiliarId], references: [id])
-  pagoOrigen          Pago?          @relation("SaldoOrigen", fields: [pagoOrigenId], references: [id])
-  aplicaciones        AplicacionSaldo[]
+  id                Int               @id @default(autoincrement())
+  socioId           Int?              @map("socio_id")
+  grupo_familiar_id Int?
+  montoOriginal     Decimal           @map("monto_original") @db.Decimal(12, 2)
+  montoDisponible   Decimal           @map("monto_disponible") @db.Decimal(12, 2)
+  origen            String
+  pagoOrigenId      Int?              @map("pago_origen_id")
+  fecha             DateTime          @default(now())
+  observaciones     String?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  aplicaciones      AplicacionSaldo[]
+  pagoOrigen        Pago?             @relation("SaldoOrigen", fields: [pagoOrigenId], references: [id])
+  socio             Socio?            @relation(fields: [socioId], references: [id])
 
   @@index([socioId])
-  @@index([grupoFamiliarId])
+  @@index([grupo_familiar_id])
   @@map("saldos_favor")
 }
 
 model AplicacionSaldo {
-  id              Int       @id @default(autoincrement())
-  saldoFavorId    Int       @map("saldo_favor_id")
-  pagoId          Int       @map("pago_id")
-  monto           Decimal   @db.Decimal(12, 2)
-  fecha           DateTime  @default(now())
-
-  saldoFavor      SaldoFavor @relation(fields: [saldoFavorId], references: [id])
-  pago            Pago       @relation("SaldoAplicado", fields: [pagoId], references: [id])
+  id           Int        @id @default(autoincrement())
+  saldoFavorId Int        @map("saldo_favor_id")
+  pagoId       Int        @map("pago_id")
+  monto        Decimal    @db.Decimal(12, 2)
+  fecha        DateTime   @default(now())
+  pago         Pago       @relation("SaldoAplicado", fields: [pagoId], references: [id])
+  saldoFavor   SaldoFavor @relation(fields: [saldoFavorId], references: [id])
 
   @@map("aplicaciones_saldo")
 }
 
-// ============================================================================
-// DÉBITO AUTOMÁTICO
-// ============================================================================
-
-// Configuración por plataforma de débito (Prisma, Payway, etc.)
 model ConfiguracionDebito {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique // PRISMA, PAYWAY, GALICIA, MACRO
-  nombre          String
-  tipo            String    // PROCESADOR, BANCO, TARJETA, BILLETERA
-  plataforma      String?   // PRISMA, PAYWAY, DEBITO_DIRECTO
-
-  // Formato del archivo de salida
-  formatoArchivo  String    @map("formato_archivo") // TXT, CSV, XLSX
-  separador       String?   @default(",")
-  encoding        String?   @default("UTF-8")
-
-  // Campos del registro (JSON con configuración de columnas)
-  configuracionCampos String? @map("configuracion_campos") @db.Text
-
-  // Cabecera y pie del archivo (algunos procesadores lo requieren)
-  templateCabecera String?  @map("template_cabecera") @db.Text
-  templatePie     String?   @map("template_pie") @db.Text
-
-  // Datos del club/comercio para el archivo
-  codigoEmpresa   String?   @map("codigo_empresa")
-  codigoComercio  String?   @map("codigo_comercio")
-  nombreEmpresa   String?   @map("nombre_empresa")
-  cuitEmpresa     String?   @map("cuit_empresa")
-
-  // Credenciales de API (si aplica)
-  apiUrl          String?   @map("api_url")
-  apiKey          String?   @map("api_key")
-  apiSecret       String?   @map("api_secret")
-  ambiente        String?   @default("PRODUCCION") // SANDBOX, PRODUCCION
-
-  activo          Boolean   @default(true)
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  archivos        ArchivoDebito[]
+  id                  Int             @id @default(autoincrement())
+  codigo              String          @unique
+  nombre              String
+  tipo                String
+  plataforma          String?
+  formatoArchivo      String          @map("formato_archivo")
+  separador           String?         @default(",")
+  encoding            String?         @default("UTF-8")
+  configuracionCampos String?         @map("configuracion_campos")
+  templateCabecera    String?         @map("template_cabecera")
+  templatePie         String?         @map("template_pie")
+  codigoEmpresa       String?         @map("codigo_empresa")
+  codigoComercio      String?         @map("codigo_comercio")
+  nombreEmpresa       String?         @map("nombre_empresa")
+  cuitEmpresa         String?         @map("cuit_empresa")
+  apiUrl              String?         @map("api_url")
+  apiKey              String?         @map("api_key")
+  apiSecret           String?         @map("api_secret")
+  ambiente            String?         @default("PRODUCCION")
+  activo              Boolean         @default(true)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  archivos            ArchivoDebito[]
 
   @@map("configuracion_debito")
 }
 
-// Archivo generado para enviar al banco
 model ArchivoDebito {
-  id              Int       @id @default(autoincrement())
-  configuracionId Int       @map("configuracion_id")
-
-  // Identificación
-  numero          String    @unique // DEB-2026-01-001
-  periodoAnio     Int       @map("periodo_anio")
-  periodoMes      Int       @map("periodo_mes")
-
-  // Fechas
-  fechaGeneracion DateTime  @default(now()) @map("fecha_generacion")
-  fechaEnvio      DateTime? @map("fecha_envio")
-  fechaProceso    DateTime? @map("fecha_proceso") // Fecha que procesará el banco
-
-  // Totales
-  cantidadRegistros Int     @map("cantidad_registros")
-  montoTotal      Decimal   @map("monto_total") @db.Decimal(12, 2)
-
-  // Archivo físico
-  nombreArchivo   String    @map("nombre_archivo")
-  rutaArchivo     String?   @map("ruta_archivo")
-
-  estado          String    @default("GENERADO") // GENERADO, ENVIADO, PROCESADO, CON_RECHAZOS
-  generadoPor     Int       @map("generado_por")
-  observaciones   String?
-
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  configuracion   ConfiguracionDebito @relation(fields: [configuracionId], references: [id])
-  detalles        DetalleDebito[]
-  cuotasIncluidas Cuota[]
-  cobranzas       ImportacionCobranza[]
+  id                Int                   @id @default(autoincrement())
+  configuracionId   Int                   @map("configuracion_id")
+  numero            String                @unique
+  periodoAnio       Int                   @map("periodo_anio")
+  periodoMes        Int                   @map("periodo_mes")
+  fechaGeneracion   DateTime              @default(now()) @map("fecha_generacion")
+  fechaEnvio        DateTime?             @map("fecha_envio")
+  fechaProceso      DateTime?             @map("fecha_proceso")
+  cantidadRegistros Int                   @map("cantidad_registros")
+  montoTotal        Decimal               @map("monto_total") @db.Decimal(12, 2)
+  nombreArchivo     String                @map("nombre_archivo")
+  rutaArchivo       String?               @map("ruta_archivo")
+  estado            String                @default("GENERADO")
+  generadoPor       Int                   @map("generado_por")
+  observaciones     String?
+  createdAt         DateTime              @default(now()) @map("created_at")
+  configuracion     ConfiguracionDebito   @relation(fields: [configuracionId], references: [id])
+  cuotasIncluidas   Cuota[]
+  detalles          DetalleDebito[]
+  cobranzas         ImportacionCobranza[]
 
   @@index([periodoAnio, periodoMes])
   @@index([estado])
   @@map("archivos_debito")
 }
 
-// Detalle de cada registro del archivo de débito
 model DetalleDebito {
-  id              Int       @id @default(autoincrement())
-  archivoId       Int       @map("archivo_id")
-  socioId         Int       @map("socio_id")
-
-  // Datos enviados
-  cbuEnviado      String    @map("cbu_enviado")
-  importeEnviado  Decimal   @map("importe_enviado") @db.Decimal(12, 2)
-  conceptoEnviado String?   @map("concepto_enviado")
-
-  // Resultado
-  estado          String    @default("PENDIENTE") // PENDIENTE, COBRADO, RECHAZADO
-  codigoRechazo   String?   @map("codigo_rechazo")
-  motivoRechazo   String?   @map("motivo_rechazo")
-  fechaProceso    DateTime? @map("fecha_proceso")
-
-  createdAt       DateTime  @default(now()) @map("created_at")
-
+  id              Int           @id @default(autoincrement())
+  archivoId       Int           @map("archivo_id")
+  socioId         Int           @map("socio_id")
+  cbuEnviado      String        @map("cbu_enviado")
+  importeEnviado  Decimal       @map("importe_enviado") @db.Decimal(12, 2)
+  conceptoEnviado String?       @map("concepto_enviado")
+  estado          String        @default("PENDIENTE")
+  codigoRechazo   String?       @map("codigo_rechazo")
+  motivoRechazo   String?       @map("motivo_rechazo")
+  fechaProceso    DateTime?     @map("fecha_proceso")
+  createdAt       DateTime      @default(now()) @map("created_at")
   archivo         ArchivoDebito @relation(fields: [archivoId], references: [id])
   socio           Socio         @relation(fields: [socioId], references: [id])
 
@@ -696,63 +626,43 @@ model DetalleDebito {
   @@map("detalles_debito")
 }
 
-// Importación de resultado de cobranza
 model ImportacionCobranza {
-  id              Int       @id @default(autoincrement())
-  archivoDebitoId Int?      @map("archivo_debito_id") // Relacionado al archivo original
-
-  // Identificación
-  numero          String    @unique // IMP-2026-01-001
-  tipo            String    // DEBITO_RESPUESTA, EXTRACTO_BANCO
-
-  // Archivo importado
-  nombreArchivo   String    @map("nombre_archivo")
-  rutaArchivo     String?   @map("ruta_archivo")
-
-  fechaImportacion DateTime @default(now()) @map("fecha_importacion")
-
-  // Totales
-  registrosTotales Int      @map("registros_totales")
-  registrosCobrados Int     @map("registros_cobrados")
-  registrosRechazados Int   @map("registros_rechazados")
-  montoCobrado    Decimal   @map("monto_cobrado") @db.Decimal(12, 2)
-
-  estado          String    @default("PROCESADO") // PROCESADO, CON_ERRORES
-  importadoPor    Int       @map("importado_por")
-  observaciones   String?
-
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  archivoDebito   ArchivoDebito? @relation(fields: [archivoDebitoId], references: [id])
-  detalles        DetalleCobranza[]
+  id                  Int               @id @default(autoincrement())
+  archivoDebitoId     Int?              @map("archivo_debito_id")
+  numero              String            @unique
+  tipo                String
+  nombreArchivo       String            @map("nombre_archivo")
+  rutaArchivo         String?           @map("ruta_archivo")
+  fechaImportacion    DateTime          @default(now()) @map("fecha_importacion")
+  registrosTotales    Int               @map("registros_totales")
+  registrosCobrados   Int               @map("registros_cobrados")
+  registrosRechazados Int               @map("registros_rechazados")
+  montoCobrado        Decimal           @map("monto_cobrado") @db.Decimal(12, 2)
+  estado              String            @default("PROCESADO")
+  importadoPor        Int               @map("importado_por")
+  observaciones       String?
+  createdAt           DateTime          @default(now()) @map("created_at")
+  detalles            DetalleCobranza[]
+  archivoDebito       ArchivoDebito?    @relation(fields: [archivoDebitoId], references: [id])
 
   @@map("importaciones_cobranza")
 }
 
-// Detalle de cada registro importado
 model DetalleCobranza {
-  id              Int       @id @default(autoincrement())
-  importacionId   Int       @map("importacion_id")
-
-  // Identificación del socio (puede venir por CBU, DNI, etc.)
-  socioId         Int?      @map("socio_id")
-  cbuRecibido     String?   @map("cbu_recibido")
-  dniRecibido     String?   @map("dni_recibido")
-
-  // Datos del movimiento
-  fecha           DateTime
-  importe         Decimal   @db.Decimal(12, 2)
-  concepto        String?
-
-  // Estado de procesamiento
-  estado          String    @default("PENDIENTE") // PENDIENTE, APLICADO, ERROR, IGNORADO
-  pagoGeneradoId  Int?      @map("pago_generado_id")
-  errorProceso    String?   @map("error_proceso")
-
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  importacion     ImportacionCobranza @relation(fields: [importacionId], references: [id])
-  socio           Socio?    @relation(fields: [socioId], references: [id])
+  id             Int                 @id @default(autoincrement())
+  importacionId  Int                 @map("importacion_id")
+  socioId        Int?                @map("socio_id")
+  cbuRecibido    String?             @map("cbu_recibido")
+  dniRecibido    String?             @map("dni_recibido")
+  fecha          DateTime
+  importe        Decimal             @db.Decimal(12, 2)
+  concepto       String?
+  estado         String              @default("PENDIENTE")
+  pagoGeneradoId Int?                @map("pago_generado_id")
+  errorProceso   String?             @map("error_proceso")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  importacion    ImportacionCobranza @relation(fields: [importacionId], references: [id])
+  socio          Socio?              @relation(fields: [socioId], references: [id])
 
   @@index([importacionId])
   @@index([socioId])
@@ -760,110 +670,91 @@ model DetalleCobranza {
   @@map("detalles_cobranza")
 }
 
-// ============================================================================
-// CAJA Y MOVIMIENTOS
-// ============================================================================
-
 model Caja {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  nombre          String
-  tipo            String    // EFECTIVO, CUENTA_BANCARIA, BILLETERA_VIRTUAL
-  descripcion     String?
-  saldoInicial    Decimal   @default(0) @map("saldo_inicial") @db.Decimal(12, 2)
-  saldoActual     Decimal   @default(0) @map("saldo_actual") @db.Decimal(12, 2)
-  activo          Boolean   @default(true)
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  cuentaBancaria  CuentaBancaria?
-  movimientos     MovimientoCaja[]
-  pagos           Pago[]
-  extractos       ExtractoBancario[]
+  id             Int                @id @default(autoincrement())
+  codigo         String             @unique
+  nombre         String
+  tipo           String
+  descripcion    String?
+  saldoInicial   Decimal            @default(0) @map("saldo_inicial") @db.Decimal(12, 2)
+  saldoActual    Decimal            @default(0) @map("saldo_actual") @db.Decimal(12, 2)
+  activo         Boolean            @default(true)
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  cuentaBancaria CuentaBancaria?
+  extractos      ExtractoBancario[]
+  movimientos    MovimientoCaja[]
+  pagos          Pago[]
 
   @@map("cajas")
 }
 
 model CuentaBancaria {
-  id              Int       @id @default(autoincrement())
-  cajaId          Int       @unique @map("caja_id")
-  banco           String
-  tipoCuenta      String    @map("tipo_cuenta")
-  moneda          String    @default("ARS")
-  numeroCuenta    String    @map("numero_cuenta")
-  cbu             String?
-  alias           String?
-  titular         String
-  cuit            String?
-  sucursal        String?
-
-  caja            Caja      @relation(fields: [cajaId], references: [id])
+  id           Int     @id @default(autoincrement())
+  cajaId       Int     @unique @map("caja_id")
+  banco        String
+  tipoCuenta   String  @map("tipo_cuenta")
+  moneda       String  @default("ARS")
+  numeroCuenta String  @map("numero_cuenta")
+  cbu          String?
+  alias        String?
+  titular      String
+  cuit         String?
+  sucursal     String?
+  caja         Caja    @relation(fields: [cajaId], references: [id])
 
   @@map("cuentas_bancarias")
 }
 
-// Plan de cuentas jerárquico
 model CuentaContable {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  nombre          String
-  tipo            String    // INGRESO, EGRESO
-  nivel           Int       @default(1)
-  padreId         Int?      @map("padre_id")
-  esImputable     Boolean   @default(true) @map("es_imputable")
-  activo          Boolean   @default(true)
-  orden           Int       @default(0)
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  padre           CuentaContable?  @relation("CuentaHijos", fields: [padreId], references: [id])
-  hijos           CuentaContable[] @relation("CuentaHijos")
-  movimientos     MovimientoCaja[]
+  id                  Int                  @id @default(autoincrement())
+  codigo              String               @unique
+  nombre              String
+  tipo                String
+  nivel               Int                  @default(1)
+  padreId             Int?                 @map("padre_id")
+  esImputable         Boolean              @default(true) @map("es_imputable")
+  activo              Boolean              @default(true)
+  orden               Int                  @default(0)
+  createdAt           DateTime             @default(now()) @map("created_at")
+  padre               CuentaContable?      @relation("CuentaHijos", fields: [padreId], references: [id])
+  hijos               CuentaContable[]     @relation("CuentaHijos")
+  movimientos         MovimientoCaja[]
+  conceptosTesoreria  ConceptoTesoreria[]
 
   @@map("cuentas_contables")
 }
 
 model MovimientoCaja {
-  id              Int       @id @default(autoincrement())
-  numero          String    @unique
-  cajaId          Int       @map("caja_id")
-  fecha           DateTime  @default(now())
-  fechaOperacion  DateTime? @map("fecha_operacion")
-
-  tipo            String    // INGRESO, EGRESO, TRANSFERENCIA_SALIDA, TRANSFERENCIA_ENTRADA
-  cuentaContableId Int      @map("cuenta_contable_id")
-
-  monto           Decimal   @db.Decimal(12, 2)
-
-  pagoId          Int?      @map("pago_id")
-
-  // Para transferencias entre cajas
-  cajaDestinoId   Int?      @map("caja_destino_id")
-  movimientoRelacionadoId Int? @map("movimiento_relacionado_id")
-
-  concepto        String
-  descripcion     String?
-  comprobanteNro  String?   @map("comprobante_nro")
-  comprobanteTipo String?   @map("comprobante_tipo")
-
-  // Estado
-  estado          String    @default("CONFIRMADO")
-  fechaAnulacion  DateTime? @map("fecha_anulacion")
-  motivoAnulacion String?   @map("motivo_anulacion")
-  anuladoPor      Int?      @map("anulado_por")
-
-  // Conciliación
-  conciliado      Boolean   @default(false)
-  conciliacionId  Int?      @map("conciliacion_id")
-
-  registradoPor   Int       @map("registrado_por")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  caja            Caja           @relation(fields: [cajaId], references: [id])
-  cuentaContable  CuentaContable @relation(fields: [cuentaContableId], references: [id])
-  pago            Pago?          @relation(fields: [pagoId], references: [id])
-  registrador     Admin          @relation(fields: [registradoPor], references: [id])
-  conciliacion    Conciliacion?  @relation(fields: [conciliacionId], references: [id])
+  id                      Int            @id @default(autoincrement())
+  numero                  String         @unique
+  cajaId                  Int            @map("caja_id")
+  fecha                   DateTime       @default(now())
+  fechaOperacion          DateTime?      @map("fecha_operacion")
+  tipo                    String
+  cuentaContableId        Int            @map("cuenta_contable_id")
+  monto                   Decimal        @db.Decimal(12, 2)
+  pagoId                  Int?           @map("pago_id")
+  cajaDestinoId           Int?           @map("caja_destino_id")
+  movimientoRelacionadoId Int?           @map("movimiento_relacionado_id")
+  concepto                String
+  descripcion             String?
+  comprobanteNro          String?        @map("comprobante_nro")
+  comprobanteTipo         String?        @map("comprobante_tipo")
+  estado                  String         @default("CONFIRMADO")
+  fechaAnulacion          DateTime?      @map("fecha_anulacion")
+  motivoAnulacion         String?        @map("motivo_anulacion")
+  anuladoPor              Int?           @map("anulado_por")
+  conciliado              Boolean        @default(false)
+  conciliacionId          Int?           @map("conciliacion_id")
+  registradoPor           Int            @map("registrado_por")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+  caja                    Caja           @relation(fields: [cajaId], references: [id])
+  conciliacion            Conciliacion?  @relation(fields: [conciliacionId], references: [id])
+  cuentaContable          CuentaContable @relation(fields: [cuentaContableId], references: [id])
+  pago                    Pago?          @relation(fields: [pagoId], references: [id])
+  registrador             Admin          @relation(fields: [registradoPor], references: [id])
 
   @@index([cajaId])
   @@index([fecha])
@@ -873,69 +764,47 @@ model MovimientoCaja {
   @@map("movimientos_caja")
 }
 
-// ============================================================================
-// CONCILIACIÓN BANCARIA
-// ============================================================================
-
-// Extracto bancario importado
 model ExtractoBancario {
-  id              Int       @id @default(autoincrement())
-  cajaId          Int       @map("caja_id")
-
-  // Identificación
-  numero          String    @unique // EXT-2026-01-001
-  periodoDesde    DateTime  @map("periodo_desde")
-  periodoHasta    DateTime  @map("periodo_hasta")
-
-  // Archivo importado
-  nombreArchivo   String?   @map("nombre_archivo")
-  formatoArchivo  String?   @map("formato_archivo") // OFX, CSV, XLSX
-
-  fechaImportacion DateTime @default(now()) @map("fecha_importacion")
-
-  // Totales
-  saldoInicial    Decimal   @map("saldo_inicial") @db.Decimal(12, 2)
-  saldoFinal      Decimal   @map("saldo_final") @db.Decimal(12, 2)
-  cantidadMovimientos Int   @map("cantidad_movimientos")
-
-  estado          String    @default("IMPORTADO") // IMPORTADO, EN_CONCILIACION, CONCILIADO
-  importadoPor    Int       @map("importado_por")
-  observaciones   String?
-
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  caja            Caja      @relation(fields: [cajaId], references: [id])
-  movimientos     MovimientoExtracto[]
-  conciliaciones  Conciliacion[]
+  id                  Int                  @id @default(autoincrement())
+  cajaId              Int                  @map("caja_id")
+  numero              String               @unique
+  periodoDesde        DateTime             @map("periodo_desde")
+  periodoHasta        DateTime             @map("periodo_hasta")
+  nombreArchivo       String?              @map("nombre_archivo")
+  formatoArchivo      String?              @map("formato_archivo")
+  fechaImportacion    DateTime             @default(now()) @map("fecha_importacion")
+  saldoInicial        Decimal              @map("saldo_inicial") @db.Decimal(12, 2)
+  saldoFinal          Decimal              @map("saldo_final") @db.Decimal(12, 2)
+  cantidadMovimientos Int                  @map("cantidad_movimientos")
+  estado              String               @default("IMPORTADO")
+  importadoPor        Int                  @map("importado_por")
+  observaciones       String?
+  createdAt           DateTime             @default(now()) @map("created_at")
+  conciliaciones      Conciliacion[]
+  caja                Caja                 @relation(fields: [cajaId], references: [id])
+  movimientos         MovimientoExtracto[]
 
   @@index([cajaId])
   @@index([periodoDesde, periodoHasta])
   @@map("extractos_bancarios")
 }
 
-// Movimientos del extracto
 model MovimientoExtracto {
-  id              Int       @id @default(autoincrement())
-  extractoId      Int       @map("extracto_id")
-
-  fecha           DateTime
-  fechaValor      DateTime? @map("fecha_valor")
-  concepto        String
-  descripcion     String?
-  referencia      String?   // Número de operación del banco
-
-  tipo            String    // CREDITO, DEBITO
-  importe         Decimal   @db.Decimal(12, 2)
-  saldo           Decimal?  @db.Decimal(12, 2)
-
-  // Conciliación
-  conciliado      Boolean   @default(false)
-  conciliacionId  Int?      @map("conciliacion_id")
-
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  extracto        ExtractoBancario @relation(fields: [extractoId], references: [id])
-  conciliacion    Conciliacion?    @relation(fields: [conciliacionId], references: [id])
+  id             Int              @id @default(autoincrement())
+  extractoId     Int              @map("extracto_id")
+  fecha          DateTime
+  fechaValor     DateTime?        @map("fecha_valor")
+  concepto       String
+  descripcion    String?
+  referencia     String?
+  tipo           String
+  importe        Decimal          @db.Decimal(12, 2)
+  saldo          Decimal?         @db.Decimal(12, 2)
+  conciliado     Boolean          @default(false)
+  conciliacionId Int?             @map("conciliacion_id")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  conciliacion   Conciliacion?    @relation(fields: [conciliacionId], references: [id])
+  extracto       ExtractoBancario @relation(fields: [extractoId], references: [id])
 
   @@index([extractoId])
   @@index([fecha])
@@ -943,70 +812,43 @@ model MovimientoExtracto {
   @@map("movimientos_extracto")
 }
 
-// Registro de conciliación
 model Conciliacion {
-  id              Int       @id @default(autoincrement())
-  extractoId      Int       @map("extracto_id")
-
-  fecha           DateTime  @default(now())
-  tipo            String    // AUTOMATICA, MANUAL
-
-  // Totales conciliados
-  movimientosConciliados Int @map("movimientos_conciliados")
-  montoConciliado Decimal   @map("monto_conciliado") @db.Decimal(12, 2)
-
-  realizadoPor    Int       @map("realizado_por")
-  observaciones   String?
-
-  createdAt       DateTime  @default(now()) @map("created_at")
-
-  extracto        ExtractoBancario   @relation(fields: [extractoId], references: [id])
-  movimientosExtracto MovimientoExtracto[]
-  movimientosCaja MovimientoCaja[]
+  id                     Int                  @id @default(autoincrement())
+  extractoId             Int                  @map("extracto_id")
+  fecha                  DateTime             @default(now())
+  tipo                   String
+  movimientosConciliados Int                  @map("movimientos_conciliados")
+  montoConciliado        Decimal              @map("monto_conciliado") @db.Decimal(12, 2)
+  realizadoPor           Int                  @map("realizado_por")
+  observaciones          String?
+  createdAt              DateTime             @default(now()) @map("created_at")
+  extracto               ExtractoBancario     @relation(fields: [extractoId], references: [id])
+  movimientosCaja        MovimientoCaja[]
+  movimientosExtracto    MovimientoExtracto[]
 
   @@map("conciliaciones")
 }
 
-// ============================================================================
-// PORTAL DE SOCIO - LINKS DE PAGO
-// ============================================================================
-
 model LinkPago {
   id              Int       @id @default(autoincrement())
   socioId         Int       @map("socio_id")
-
-  // Identificación
   codigo          String    @unique @default(uuid())
-
-  // Datos del pago
   concepto        String
   descripcion     String?
   montoTotal      Decimal   @map("monto_total") @db.Decimal(12, 2)
-
-  // Cuotas incluidas (JSON con IDs)
   cuotasIds       String?   @map("cuotas_ids")
-
-  // Plataforma de pago
-  plataforma      String    // MERCADOPAGO, MODO
-
-  // Datos de MercadoPago/MODO
+  plataforma      String
   externalId      String?   @map("external_id")
   preferenceId    String?   @map("preference_id")
-  initPoint       String?   @map("init_point") // URL de pago
-
-  // Estado
-  estado          String    @default("PENDIENTE") // PENDIENTE, PAGADO, EXPIRADO, CANCELADO
+  initPoint       String?   @map("init_point")
+  estado          String    @default("PENDIENTE")
   fechaExpiracion DateTime? @map("fecha_expiracion")
   fechaPago       DateTime? @map("fecha_pago")
-
-  // Respuesta del procesador
   paymentId       String?   @map("payment_id")
   paymentStatus   String?   @map("payment_status")
-  paymentDetail   String?   @map("payment_detail") @db.Text
-
+  paymentDetail   String?   @map("payment_detail")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
-
   socio           Socio     @relation(fields: [socioId], references: [id])
   pagos           Pago[]
 
@@ -1016,68 +858,56 @@ model LinkPago {
   @@map("links_pago")
 }
 
-// ============================================================================
-// SISTEMA DE USUARIOS Y PERMISOS
-// ============================================================================
-
 model Admin {
-  id              Int       @id @default(autoincrement())
-  email           String    @unique
-  passwordHash    String    @map("password_hash")
-  nombre          String
-  apellido        String?
-  telefono        String?
-  rolId           Int?      @map("rol_id")
-  activo          Boolean   @default(true)
-  createdAt       DateTime  @default(now()) @map("created_at")
-  lastLogin       DateTime? @map("last_login")
-
-  rol             Rol?      @relation(fields: [rolId], references: [id])
-  movimientos     MovimientoCaja[]
+  id           Int              @id @default(autoincrement())
+  email        String           @unique
+  passwordHash String           @map("password_hash")
+  nombre       String
+  activo       Boolean          @default(true)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  lastLogin    DateTime?        @map("last_login")
+  apellido     String?
+  rolId        Int?             @map("rol_id")
+  telefono     String?
+  rol          Rol?             @relation(fields: [rolId], references: [id])
+  movimientos  MovimientoCaja[]
 
   @@map("admins")
 }
 
 model Rol {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  nombre          String
-  descripcion     String?
-  esSuperAdmin    Boolean   @default(false) @map("es_super_admin")
-  activo          Boolean   @default(true)
-
-  permisos        PermisoRol[]
-  admins          Admin[]
+  id           Int          @id @default(autoincrement())
+  codigo       String       @unique
+  nombre       String
+  descripcion  String?
+  esSuperAdmin Boolean      @default(false) @map("es_super_admin")
+  activo       Boolean      @default(true)
+  admins       Admin[]
+  permisos     PermisoRol[]
 
   @@map("roles")
 }
 
 model Permiso {
-  id              Int       @id @default(autoincrement())
-  codigo          String    @unique
-  nombre          String
-  descripcion     String?
-  modulo          String
-
-  roles           PermisoRol[]
+  id          Int          @id @default(autoincrement())
+  codigo      String       @unique
+  nombre      String
+  descripcion String?
+  modulo      String
+  roles       PermisoRol[]
 
   @@map("permisos")
 }
 
 model PermisoRol {
-  rolId           Int       @map("rol_id")
-  permisoId       Int       @map("permiso_id")
-
-  rol             Rol       @relation(fields: [rolId], references: [id])
-  permiso         Permiso   @relation(fields: [permisoId], references: [id])
+  rolId     Int     @map("rol_id")
+  permisoId Int     @map("permiso_id")
+  permiso   Permiso @relation(fields: [permisoId], references: [id])
+  rol       Rol     @relation(fields: [rolId], references: [id])
 
   @@id([rolId, permisoId])
   @@map("permisos_roles")
 }
-
-// ============================================================================
-// SISTEMA DE COMERCIOS (RojoPlus - Fidelización)
-// ============================================================================
 
 model Comercio {
   id                 Int       @id @default(autoincrement())
@@ -1100,7 +930,6 @@ model Comercio {
   createdAt          DateTime  @default(now()) @map("created_at")
   approvedAt         DateTime? @map("approved_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
-
   rubro              Rubro     @relation(fields: [rubroId], references: [id])
   ventas             Venta[]
 
@@ -1110,12 +939,11 @@ model Comercio {
 }
 
 model Rubro {
-  id              Int       @id @default(autoincrement())
-  nombre          String
-  activo          Boolean   @default(true)
-  orden           Int       @default(0)
-
-  comercios       Comercio[]
+  id        Int        @id @default(autoincrement())
+  nombre    String
+  activo    Boolean    @default(true)
+  orden     Int        @default(0)
+  comercios Comercio[]
 
   @@map("rubros")
 }
@@ -1132,7 +960,6 @@ model Venta {
   aplicoAcumulacion Boolean  @default(false) @map("aplico_acumulacion")
   descuentoAcumPct  Decimal? @map("descuento_acum_pct") @db.Decimal(5, 2)
   createdAt         DateTime @default(now()) @map("created_at")
-
   comercio          Comercio @relation(fields: [comercioId], references: [id])
   socio             Socio    @relation(fields: [socioId], references: [id])
 
@@ -1143,37 +970,29 @@ model Venta {
   @@map("ventas")
 }
 
-// ============================================================================
-// CONFIGURACIÓN GENERAL
-// ============================================================================
-
 model Configuracion {
-  clave           String    @id
-  valor           String    @db.Text
-  tipo            String    @default("STRING") // STRING, NUMBER, BOOLEAN, JSON, IMAGE
-  descripcion     String?
-  modulo          String?   // GENERAL, BRANDING, CUOTAS, CAJA, PORTAL, DEBITO
-  editable        Boolean   @default(true)
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  clave       String   @id
+  valor       String
+  descripcion String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  editable    Boolean  @default(true)
+  modulo      String?
+  tipo        String   @default("STRING")
 
   @@map("configuracion")
 }
 
-// ============================================================================
-// AUDITORÍA
-// ============================================================================
-
 model AuditLog {
-  id              Int       @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   tabla           String
-  registroId      Int       @map("registro_id")
+  registroId      Int      @map("registro_id")
   accion          String
-  datosAnteriores Json?     @map("datos_anteriores")
-  datosNuevos     Json?     @map("datos_nuevos")
-  usuarioId       Int?      @map("usuario_id")
+  datosAnteriores Json?    @map("datos_anteriores")
+  datosNuevos     Json?    @map("datos_nuevos")
+  usuarioId       Int?     @map("usuario_id")
   ip              String?
-  userAgent       String?   @map("user_agent")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  userAgent       String?  @map("user_agent")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   @@index([tabla, registroId])
   @@index([usuarioId])
