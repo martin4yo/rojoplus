@@ -161,6 +161,7 @@ const configuracion = [
   { clave: 'CUOTA_SOCIAL_INDIVIDUAL', valor: '15000', tipo: 'NUMBER', modulo: 'CUOTAS', descripcion: 'Monto cuota social individual' },
   { clave: 'CUOTA_SOCIAL_FAMILIAR', valor: '20000', tipo: 'NUMBER', modulo: 'CUOTAS', descripcion: 'Monto cuota social familiar' },
   { clave: 'CUOTA_DIA_VENCIMIENTO', valor: '10', tipo: 'NUMBER', modulo: 'CUOTAS', descripcion: 'Día de vencimiento de cuotas' },
+  { clave: 'CUOTA_VENCE_MISMO_MES', valor: 'false', tipo: 'BOOLEAN', modulo: 'CUOTAS', descripcion: 'Si las cuotas vencen en el mismo mes del periodo (true) o en el siguiente (false)' },
 
   // Pagos Online
   { clave: 'PAGOS_MP_HABILITADO', valor: 'false', tipo: 'BOOLEAN', modulo: 'PORTAL', descripcion: 'MercadoPago habilitado' },
@@ -169,6 +170,10 @@ const configuracion = [
   // RojoPlus (comercios)
   { clave: 'DESCUENTO_DEFAULT', valor: '10', tipo: 'NUMBER', modulo: 'COMERCIOS', descripcion: 'Descuento sugerido para nuevos comercios' },
   { clave: 'SLOGAN_APP', valor: 'Rojo Plus convierte la pasión en consumo', tipo: 'STRING', modulo: 'COMERCIOS', descripcion: 'Slogan de RojoPlus' },
+
+  // Modo Demo
+  { clave: 'MODO_DEMO', valor: 'false', tipo: 'BOOLEAN', modulo: 'SISTEMA', descripcion: 'Modo demo activo' },
+  { clave: 'EMAIL_DEMO', valor: '', tipo: 'STRING', modulo: 'SISTEMA', descripcion: 'Email para recibir notificaciones en modo demo' },
 ];
 
 // ============================================================================

@@ -162,7 +162,7 @@ model Socio {
   tipoSocioRelId        Int?                @map("tipo_socio_rel_id")
   titularFamiliaId      Int?                @map("titular_familia_id")
   autorizaciones        AutorizacionMenor[]
-  cuotas                Cuota[]
+  cargos                Cargo[]
   detallesCobranza      DetalleCobranza[]
   documentos            DocumentoSocio[]
   detallesDebito        DetalleDebito[]
@@ -295,7 +295,7 @@ model CategoriaActividad {
   actividad            Actividad             @relation(fields: [actividadId], references: [id])
   inscripciones        Inscripcion[]
   entrenadores         EntrenadorCategoria[]
-  cuotas               Cuota[]
+  cargos               Cargo[]
   conceptoTesoreria    ConceptoTesoreria?    @relation(fields: [conceptoTesoreriaId], references: [id])
 
   @@index([actividadId])
@@ -367,47 +367,20 @@ model EntrenadorCategoria {
   @@map("entrenadores_categorias")
 }
 
-model TipoCuota {
-  id              Int                  @id @default(autoincrement())
-  codigo          String               @unique
-  nombre          String
-  descripcion     String?
-  activo          Boolean              @default(true)
-  configuraciones ConfiguracionCuota[]
-  cuotas          Cuota[]
-
-  @@map("tipos_cuota")
-}
-
-model ConfiguracionCuota {
-  id            Int       @id @default(autoincrement())
-  tipoCuotaId   Int       @map("tipo_cuota_id")
-  concepto      String
-  monto         Decimal   @db.Decimal(12, 2)
-  vigenciaDesde DateTime  @map("vigencia_desde")
-  vigenciaHasta DateTime? @map("vigencia_hasta")
-  activo        Boolean   @default(true)
-  createdAt     DateTime  @default(now()) @map("created_at")
-  tipoCuota     TipoCuota @relation(fields: [tipoCuotaId], references: [id])
-
-  @@map("configuracion_cuotas")
-}
-
 model ConfiguracionRecargo {
-  id                     Int       @id @default(autoincrement())
-  nombre                 String
-  diasDespuesVencimiento Int       @map("dias_despues_vencimiento")
-  porcentaje             Decimal   @db.Decimal(5, 2)
-  acumulativo            Boolean   @default(true)
-  activo                 Boolean   @default(true)
-  vigenciaDesde          DateTime  @map("vigencia_desde")
-  vigenciaHasta          DateTime? @map("vigencia_hasta")
-  createdAt              DateTime  @default(now()) @map("created_at")
+  id         Int      @id @default(autoincrement())
+  tipo       String   @default("FIJO") // FIJO o ACUMULATIVO
+  porcentaje Decimal  @db.Decimal(5, 2) // Porcentaje a aplicar
+  cadaDias   Int?     @map("cada_dias") // Solo para ACUMULATIVO: cada cuántos días
+  topeMaximo Decimal? @map("tope_maximo") @db.Decimal(5, 2) // Tope máximo para ACUMULATIVO
+  activo     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("configuracion_recargos")
 }
 
-model PeriodoCuota {
+model Periodo {
   id               Int       @id @default(autoincrement())
   anio             Int
   mes              Int
@@ -417,27 +390,34 @@ model PeriodoCuota {
   estado           String    @default("PENDIENTE")
   generadoPor      Int?      @map("generado_por")
   createdAt        DateTime  @default(now()) @map("created_at")
-  cuotas           Cuota[]
+  cargos           Cargo[]
 
   @@unique([anio, mes])
-  @@map("periodos_cuota")
+  @@map("periodos")
 }
 
-model Cuota {
+// Cargo - Modelo unificado para todos los cargos al socio/grupo familiar
+// Categorías: CUOTA_SOCIAL, CUOTA_ACTIVIDAD, CARNET, MOROSIDAD, NOTA_CREDITO, FINANCIACION
+model Cargo {
   id                   Int                 @id @default(autoincrement())
-  periodoId            Int                 @map("periodo_id")
+  periodoId            Int?                @map("periodo_id") // Nullable para cargos únicos sin periodo
   socioId              Int?                @map("socio_id")
-  grupo_familiar_id    Int?
-  tipoCuotaId          Int                 @map("tipo_cuota_id")
-  categoriaActividadId Int?                @map("categoria_actividad_id")
+  grupoFamiliarId      Int?                @map("grupo_familiar_id")
+  categoria            String              @default("CUOTA_SOCIAL") // CUOTA_SOCIAL, CUOTA_ACTIVIDAD, CARNET, MOROSIDAD, NOTA_CREDITO, FINANCIACION
+  tipoCuota            String?             @map("tipo_cuota") // GRUPO_FAMILIAR, SOCIO_UNICO (solo para CUOTA_SOCIAL)
+  categoriaActividadId Int?                @map("categoria_actividad_id") // Solo para categoria=CUOTA_ACTIVIDAD
+  descripcion          String?             // Descripción del cargo
   montoOriginal        Decimal             @map("monto_original") @db.Decimal(12, 2)
   montoRecargo         Decimal             @default(0) @map("monto_recargo") @db.Decimal(12, 2)
   montoBonificacion    Decimal             @default(0) @map("monto_bonificacion") @db.Decimal(12, 2)
   montoTotal           Decimal             @map("monto_total") @db.Decimal(12, 2)
-  estado               String              @default("PENDIENTE")
-  fechaVencimiento     DateTime            @map("fecha_vencimiento")
+  estado               String              @default("PENDIENTE") // PENDIENTE, PAGADO, ANULADO
+  fechaGeneracion      DateTime            @default(now()) @map("fecha_generacion")
+  fechaVencimiento     DateTime?           @map("fecha_vencimiento")
   fechaPago            DateTime?           @map("fecha_pago")
   pagoId               Int?                @map("pago_id")
+  cargoOrigenId        Int?                @map("cargo_origen_id") // Para MOROSIDAD/NOTA_CREDITO/FINANCIACION
+  origen               String              @default("MANUAL") // GENERACION_MASIVA, MANUAL, MOROSIDAD, FINANCIACION
   motivoBonificacion   String?             @map("motivo_bonificacion")
   incluidoEnDebitoId   Int?                @map("incluido_en_debito_id")
   observaciones        String?
@@ -446,16 +426,19 @@ model Cuota {
   categoriaActividad   CategoriaActividad? @relation(fields: [categoriaActividadId], references: [id])
   archivoDebito        ArchivoDebito?      @relation(fields: [incluidoEnDebitoId], references: [id])
   pago                 Pago?               @relation(fields: [pagoId], references: [id])
-  periodo              PeriodoCuota        @relation(fields: [periodoId], references: [id])
+  periodo              Periodo?            @relation(fields: [periodoId], references: [id])
   socio                Socio?              @relation(fields: [socioId], references: [id])
-  tipoCuota            TipoCuota           @relation(fields: [tipoCuotaId], references: [id])
+  cargoOrigen          Cargo?              @relation("CargosDerivados", fields: [cargoOrigenId], references: [id])
+  cargosDerivados      Cargo[]             @relation("CargosDerivados")
 
   @@index([periodoId])
   @@index([socioId])
+  @@index([grupoFamiliarId])
+  @@index([categoria])
   @@index([estado])
   @@index([fechaVencimiento])
-  @@index([grupo_familiar_id])
-  @@map("cuotas")
+  @@index([cargoOrigenId])
+  @@map("cargos")
 }
 
 model MedioPago {
@@ -501,7 +484,7 @@ model Pago {
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
   saldosAplicados   AplicacionSaldo[] @relation("SaldoAplicado")
-  cuotas            Cuota[]
+  cargos            Cargo[]
   movimientos       MovimientoCaja[]
   caja              Caja              @relation(fields: [cajaId], references: [id])
   cobrador          Cobrador?         @relation(fields: [cobradorId], references: [id])
@@ -596,7 +579,7 @@ model ArchivoDebito {
   observaciones     String?
   createdAt         DateTime              @default(now()) @map("created_at")
   configuracion     ConfiguracionDebito   @relation(fields: [configuracionId], references: [id])
-  cuotasIncluidas   Cuota[]
+  cargosIncluidos   Cargo[]
   detalles          DetalleDebito[]
   cobranzas         ImportacionCobranza[]
 
@@ -836,7 +819,7 @@ model LinkPago {
   concepto        String
   descripcion     String?
   montoTotal      Decimal   @map("monto_total") @db.Decimal(12, 2)
-  cuotasIds       String?   @map("cuotas_ids")
+  cargosIds       String?   @map("cargos_ids")
   plataforma      String
   externalId      String?   @map("external_id")
   preferenceId    String?   @map("preference_id")
@@ -918,6 +901,9 @@ model Comercio {
   email              String    @unique
   cuit               String
   responsable        String
+  logo               String?
+  latitud            Decimal?  @db.Decimal(10, 8)
+  longitud           Decimal?  @db.Decimal(11, 8)
   token              String?   @unique @default(uuid())
   estado             String    @default("PENDIENTE")
   plan               String    @default("BASICO")

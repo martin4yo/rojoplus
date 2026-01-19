@@ -12,6 +12,7 @@ import TokenInvalido from './pages/comercio/TokenInvalido'
 // Página del socio
 import SocioPortal from './pages/socio/SocioPortal'
 import AccesoSocio from './pages/socio/AccesoSocio'
+import ComerciosPublicos from './pages/public/Comercios'
 
 // Páginas admin
 import AdminLogin from './pages/admin/Login'
@@ -31,6 +32,9 @@ import AdminActividadForm from './pages/admin/ActividadForm'
 import AdminCategoriaActividadForm from './pages/admin/CategoriaActividadForm'
 import AdminReporteActividades from './pages/admin/ReporteActividades'
 import AdminReporteActividadDetalle from './pages/admin/ReporteActividadDetalle'
+import AdminReporteCuotas from './pages/admin/ReporteCuotas'
+import AdminReporteSocios from './pages/admin/ReporteSocios'
+import AdminReporteComercios from './pages/admin/ReporteComercios'
 import AdminEntrenadoresLista from './pages/admin/EntrenadoresLista'
 import AdminEntrenadorForm from './pages/admin/EntrenadorForm'
 import AdminPeriodos from './pages/admin/Periodos'
@@ -55,6 +59,7 @@ function App() {
       {/* Rutas del socio */}
       <Route path="/mi-qr" element={<AccesoSocio />} />
       <Route path="/s/:tokenPortal" element={<SocioPortal />} />
+      <Route path="/comercios" element={<ComerciosPublicos />} />
 
       {/* Rutas admin */}
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -70,6 +75,9 @@ function App() {
         <Route path="reportes" element={<AdminReportes />} />
         <Route path="reportes/actividades" element={<AdminReporteActividades />} />
         <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />
+        <Route path="reportes/cuotas" element={<AdminReporteCuotas />} />
+        <Route path="reportes/socios" element={<AdminReporteSocios />} />
+        <Route path="reportes/comercios" element={<AdminReporteComercios />} />
         <Route path="configuracion" element={<AdminTablasAuxiliares />} />
         <Route path="configuracion/:tabla" element={<AdminConfiguracionLista />} />
         <Route path="configuracion/:tabla/nuevo" element={<AdminConfiguracionForm />} />

@@ -1,4 +1,7 @@
 import nodemailer from 'nodemailer'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -11,6 +14,45 @@ const transporter = nodemailer.createTransport({
 })
 
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+// Verificar si está en modo demo y obtener el email de prueba
+async function getModoDemo() {
+  try {
+    const [modoDemo, emailDemo] = await Promise.all([
+      prisma.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
+      prisma.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
+    ])
+    return {
+      activo: modoDemo?.valor === 'true',
+      email: emailDemo?.valor || '',
+    }
+  } catch (error) {
+    console.error('Error obteniendo modo demo:', error.message)
+    return { activo: false, email: '' }
+  }
+}
+
+// Función helper para enviar email (maneja modo demo)
+async function enviarEmail({ to, subject, html }) {
+  const modoDemo = await getModoDemo()
+
+  let destinatario = to
+  let subjectFinal = subject
+
+  if (modoDemo.activo && modoDemo.email) {
+    // En modo demo, redirigir al email de prueba
+    destinatario = modoDemo.email
+    subjectFinal = `[DEMO - Para: ${to}] ${subject}`
+    console.log(`📧 MODO DEMO: Redirigiendo email de ${to} a ${modoDemo.email}`)
+  }
+
+  await transporter.sendMail({
+    from: `"Rojo Plus" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    to: destinatario,
+    subject: subjectFinal,
+    html,
+  })
+}
 
 export async function enviarEmailAprobacion(comercio) {
   const linkAcceso = `${frontendUrl}/comercio/${comercio.token}`
@@ -60,8 +102,7 @@ export async function enviarEmailAprobacion(comercio) {
     </div>
   `
 
-  await transporter.sendMail({
-    from: `"Rojo Plus" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+  await enviarEmail({
     to: comercio.email,
     subject: '¡Tu comercio fue aprobado! - Rojo Plus',
     html,
@@ -102,8 +143,7 @@ export async function enviarEmailRechazo(comercio, motivo) {
     </div>
   `
 
-  await transporter.sendMail({
-    from: `"Rojo Plus" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+  await enviarEmail({
     to: comercio.email,
     subject: 'Actualización de tu solicitud - Rojo Plus',
     html,
@@ -150,8 +190,7 @@ export async function enviarEmailLinkAcceso(comercio) {
     </div>
   `
 
-  await transporter.sendMail({
-    from: `"Rojo Plus" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+  await enviarEmail({
     to: comercio.email,
     subject: 'Tu link de acceso - Rojo Plus',
     html,
@@ -253,8 +292,7 @@ export async function enviarReciboPago(pago) {
   `
 
   try {
-    await transporter.sendMail({
-      from: `"Club Sportivo Pilar" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    await enviarEmail({
       to: pago.socio.email,
       subject: `Recibo de Pago #${pago.numero} - Club Sportivo Pilar`,
       html,

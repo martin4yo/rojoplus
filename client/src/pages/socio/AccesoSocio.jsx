@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search, QrCode, AlertCircle } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Search, QrCode, AlertCircle, Store } from 'lucide-react'
 import { Button } from '../../components/Button'
 import api from '../../services/api'
 
@@ -85,9 +85,9 @@ export default function AccesoSocio() {
             </div>
           )}
 
-          <Button type="submit" loading={buscando} className="w-full">
+          <Button type="submit" loading={buscando} className="w-full flex items-center justify-center">
             <Search className="w-5 h-5 mr-2" />
-            Ver mi QR
+            <span>Ver mi QR</span>
           </Button>
         </form>
 
@@ -99,6 +99,17 @@ export default function AccesoSocio() {
             <li>Guarda el link o descarga el QR en tu celular</li>
             <li>Presenta el QR en comercios adheridos para obtener descuentos</li>
           </ol>
+        </div>
+
+        {/* Link a comercios */}
+        <div className="mt-6 text-center">
+          <Link
+            to="/comercios"
+            className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
+          >
+            <Store className="w-5 h-5" />
+            Ver comercios adheridos
+          </Link>
         </div>
       </main>
 

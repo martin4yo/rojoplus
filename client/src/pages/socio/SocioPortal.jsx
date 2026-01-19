@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { Download, CheckCircle, XCircle } from 'lucide-react'
+import { Download, CheckCircle, XCircle, Store } from 'lucide-react'
 import { Button } from '../../components/Button'
 import api from '../../services/api'
 
@@ -151,11 +151,18 @@ export default function SocioPortal() {
                 }}
               />
             </div>
-            <div className="mt-4">
-              <Button onClick={descargarQR} className="inline-flex items-center gap-2">
+            <div className="mt-4 flex flex-col sm:flex-row gap-3 justify-center">
+              <Button onClick={descargarQR} className="inline-flex items-center justify-center gap-2">
                 <Download className="w-4 h-4" />
                 Descargar QR
               </Button>
+              <Link
+                to="/comercios"
+                className="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium"
+              >
+                <Store className="w-4 h-4" />
+                Ver comercios adheridos
+              </Link>
             </div>
           </div>
         </section>

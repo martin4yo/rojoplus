@@ -347,67 +347,104 @@ Base de datos: rojoplus
 - [x] **26.8** Envio automatico de recibo por email
 - [x] **26.9** Menu Cuotas en sidebar del admin
 - [x] **26.10** Endpoints de cuotas por socio y familia
-- [ ] **26.11** Reportes de cobranza global, por cuota social y por actividades
+- [x] **26.11** Reportes de cobranza global, por cuota social y por actividades
+- [x] **26.12** Configuracion de dia de vencimiento de cuotas
+- [x] **26.13** Switch para vencimiento en mismo mes o mes siguiente
+- [x] **26.14** Sistema de recargos por mora (fijo o acumulativo)
+- [x] **26.15** Calculo automatico de recargos al mostrar cuotas
+- [x] **26.16** Aplicacion de recargos al registrar pago
+- [x] **26.17** Planes de pago (financiacion de deuda)
+- [x] **26.18** Modal de generacion de plan con preview
+- [x] **26.19** Cuotas originales marcadas como FINANCIADA
+- [x] **26.20** Generacion de cuotas de FINANCIACION con vencimientos sucesivos
+- [x] **26.21** Filtros de periodo y estado en cobranza por socio
+- [x] **26.22** Enter en buscador selecciona primer resultado
+- [x] **26.23** Visualizacion de cuotas FINANCIACION con "Cuota X de N"
+- [x] **26.24** Badges de estado: PAGADA, PENDIENTE, VENCIDA, FINANCIADA, ANULADA
+- [x] **26.25** Cuotas de financiacion vinculadas a periodo segun fecha vencimiento
 
 ---
 
-## FASE 27: Entidades y Cuentas Corrientes
+## FASE 27: Comercios Publicos y Geolocalizacion
+> Mejoras en comercios adheridos para socios
+
+- [x] **27.1** Agregar campos logo, latitud, longitud al modelo Comercio
+- [x] **27.2** Modificar POST /comercios/registro para aceptar logo (base64) y coordenadas
+- [x] **27.3** Crear funcion guardarLogo para procesar imagenes base64
+- [x] **27.4** Crear endpoint GET /comercios (listado publico de comercios activos)
+- [x] **27.5** Implementar calculo de distancia con formula Haversine
+- [x] **27.6** Ordenar comercios por cercania cuando se envia ubicacion
+- [x] **27.7** Agregar upload de logo en formulario de registro de comercio
+- [x] **27.8** Agregar mapa interactivo (Leaflet) para seleccionar ubicacion
+- [x] **27.9** Instalar dependencias leaflet y react-leaflet
+- [x] **27.10** Configurar proxy de /uploads en Vite
+- [x] **27.11** Modificar pagina /mi-qr con link a comercios adheridos
+- [x] **27.12** Agregar boton "Ver comercios adheridos" en portal del socio
+- [x] **27.13** Crear pagina /comercios con lista de comercios
+- [x] **27.14** Implementar vista de lista y vista de mapa
+- [x] **27.15** Filtro por rubro en listado de comercios
+- [x] **27.16** Boton de geolocalizacion para ordenar por cercania
+- [x] **27.17** Mostrar distancia en metros/km cuando hay ubicacion
+
+---
+
+## FASE 28: Entidades y Cuentas Corrientes
 > Gestion de proveedores, personal y cuentas corrientes
 
-- [ ] **27.1** Crear modelo Entidad (tipo: PROVEEDOR, PERSONAL, OTRO)
-- [ ] **27.2** Crear modelo CuentaCorriente vinculado a Entidad
-- [ ] **27.3** Crear modelo MovimientoCuentaCorriente (FACTURA, CREDITO, PAGO)
-- [ ] **27.4** Endpoints CRUD de Entidades
-- [ ] **27.5** Endpoints de movimientos de cuenta corriente
-- [ ] **27.6** Endpoint de emision de pagos (egreso de caja)
-- [ ] **27.7** Pagina admin/entidades (listado con saldo)
-- [ ] **27.8** Ficha de entidad con cuenta corriente
-- [ ] **27.9** Registrar factura/credito en cuenta corriente
-- [ ] **27.10** Emitir pago desde cuenta corriente
-- [ ] **27.11** Reporte de cuentas corrientes (saldos, vencimientos)
+- [ ] **28.1** Crear modelo Entidad (tipo: PROVEEDOR, PERSONAL, OTRO)
+- [ ] **28.2** Crear modelo CuentaCorriente vinculado a Entidad
+- [ ] **28.3** Crear modelo MovimientoCuentaCorriente (FACTURA, CREDITO, PAGO)
+- [ ] **28.4** Endpoints CRUD de Entidades
+- [ ] **28.5** Endpoints de movimientos de cuenta corriente
+- [ ] **28.6** Endpoint de emision de pagos (egreso de caja)
+- [ ] **28.7** Pagina admin/entidades (listado con saldo)
+- [ ] **28.8** Ficha de entidad con cuenta corriente
+- [ ] **28.9** Registrar factura/credito en cuenta corriente
+- [ ] **28.10** Emitir pago desde cuenta corriente
+- [ ] **28.11** Reporte de cuentas corrientes (saldos, vencimientos)
 
 ---
 
-## FASE 28: Plan de Cuentas Contable
+## FASE 29: Plan de Cuentas Contable
 > Estructura contable para asociar a movimientos
 
-- [ ] **28.1** Disenar estructura de plan de cuentas (activo, pasivo, ingresos, egresos)
-- [ ] **28.2** Crear interfaz CRUD de cuentas contables (jerarquico)
-- [ ] **28.3** Asociar cuentas a ConceptoTesoreria
-- [ ] **28.4** Asociar cuentas a TipoSocio (cuota social)
-- [ ] **28.5** Asociar cuentas a Actividad/CategoriaActividad
-- [ ] **28.6** Asociar cuentas a tipos de movimiento de entidades
-- [ ] **28.7** Generar asientos automaticos en pagos y cobranzas
+- [ ] **29.1** Disenar estructura de plan de cuentas (activo, pasivo, ingresos, egresos)
+- [ ] **29.2** Crear interfaz CRUD de cuentas contables (jerarquico)
+- [ ] **29.3** Asociar cuentas a ConceptoTesoreria
+- [ ] **29.4** Asociar cuentas a TipoSocio (cuota social)
+- [ ] **29.5** Asociar cuentas a Actividad/CategoriaActividad
+- [ ] **29.6** Asociar cuentas a tipos de movimiento de entidades
+- [ ] **29.7** Generar asientos automaticos en pagos y cobranzas
 
 ---
 
-## FASE 29: Presupuesto Anual
+## FASE 30: Presupuesto Anual
 > Planificacion y control presupuestario
 
-- [ ] **29.1** Crear modelo Presupuesto (anio, estado)
-- [ ] **29.2** Crear modelo LineaPresupuesto (cuentaContableId, mes, montoPresupuestado)
-- [ ] **29.3** Pantalla de creacion de presupuesto anual
-- [ ] **29.4** Carga de montos por cuenta y mes
-- [ ] **29.5** Calculo automatico de ejecucion (real vs presupuestado)
-- [ ] **29.6** Dashboard de control presupuestario
-- [ ] **29.7** Alertas de desvios significativos
-- [ ] **29.8** Reporte comparativo mensual y acumulado
+- [ ] **30.1** Crear modelo Presupuesto (anio, estado)
+- [ ] **30.2** Crear modelo LineaPresupuesto (cuentaContableId, mes, montoPresupuestado)
+- [ ] **30.3** Pantalla de creacion de presupuesto anual
+- [ ] **30.4** Carga de montos por cuenta y mes
+- [ ] **30.5** Calculo automatico de ejecucion (real vs presupuestado)
+- [ ] **30.6** Dashboard de control presupuestario
+- [ ] **30.7** Alertas de desvios significativos
+- [ ] **30.8** Reporte comparativo mensual y acumulado
 
 ---
 
-## FASE 30: Control de Accesos
+## FASE 31: Control de Accesos
 > Sistema de control de acceso con molinetes
 
-- [ ] **30.1** Investigar dispositivos/lectores de molinetes compatibles
-- [ ] **30.2** Crear modelo DispositivoAcceso (tipo, ubicacion, ip, estado)
-- [ ] **30.3** Crear modelo RegistroAcceso (socioId, dispositivo, fecha, tipo: ENTRADA/SALIDA)
-- [ ] **30.4** Endpoint para recibir lecturas de dispositivos
-- [ ] **30.5** Validar estado de socio y cuotas al dia para permitir acceso
-- [ ] **30.6** Pantalla de configuracion de dispositivos
-- [ ] **30.7** Monitor en tiempo real de accesos
-- [ ] **30.8** Reporte de accesos por socio/periodo
-- [ ] **30.9** Alertas de accesos denegados
-- [ ] **30.10** Integracion con QR de socios como metodo de identificacion
+- [ ] **31.1** Investigar dispositivos/lectores de molinetes compatibles
+- [ ] **31.2** Crear modelo DispositivoAcceso (tipo, ubicacion, ip, estado)
+- [ ] **31.3** Crear modelo RegistroAcceso (socioId, dispositivo, fecha, tipo: ENTRADA/SALIDA)
+- [ ] **31.4** Endpoint para recibir lecturas de dispositivos
+- [ ] **31.5** Validar estado de socio y cuotas al dia para permitir acceso
+- [ ] **31.6** Pantalla de configuracion de dispositivos
+- [ ] **31.7** Monitor en tiempo real de accesos
+- [ ] **31.8** Reporte de accesos por socio/periodo
+- [ ] **31.9** Alertas de accesos denegados
+- [ ] **31.10** Integracion con QR de socios como metodo de identificacion
 
 ---
 
@@ -440,11 +477,12 @@ Base de datos: rojoplus
 | 23 | Reportes Actividades | ✅ Completado |
 | 24 | Tablas Auxiliares | ✅ Completado |
 | 25 | Cuotas Config Base | ✅ Completado |
-| 26 | Cuotas y Cobranza | 🔄 En Progreso |
-| 27 | Entidades y Cuentas Corrientes | ⏳ Pendiente |
-| 28 | Plan de Cuentas Contable | ⏳ Pendiente |
-| 29 | Presupuesto Anual | ⏳ Pendiente |
-| 30 | Control de Accesos | ⏳ Pendiente |
+| 26 | Cuotas y Cobranza | ✅ Completado |
+| 27 | Comercios Publicos y Geolocalizacion | ✅ Completado |
+| 28 | Entidades y Cuentas Corrientes | ⏳ Pendiente |
+| 29 | Plan de Cuentas Contable | ⏳ Pendiente |
+| 30 | Presupuesto Anual | ⏳ Pendiente |
+| 31 | Control de Accesos | ⏳ Pendiente |
 
 ---
 

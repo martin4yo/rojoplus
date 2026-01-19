@@ -19,6 +19,10 @@ export default function Periodos() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
+  // Configuración
+  const [diaVencimiento, setDiaVencimiento] = useState(10)
+  const [venceMismoMes, setVenceMismoMes] = useState(false)
+
   // Modal crear periodo
   const [showCrearModal, setShowCrearModal] = useState(false)
   const [formData, setFormData] = useState({
@@ -32,7 +36,23 @@ export default function Periodos() {
 
   useEffect(() => {
     cargarPeriodos()
+    cargarConfiguracion()
   }, [])
+
+  async function cargarConfiguracion() {
+    try {
+      const [configDia, configMes] = await Promise.all([
+        api.get('/admin/sistema/configuracion/CUOTA_DIA_VENCIMIENTO'),
+        api.get('/admin/sistema/configuracion/CUOTA_VENCE_MISMO_MES'),
+      ])
+      if (configDia?.valor) {
+        setDiaVencimiento(parseInt(configDia.valor))
+      }
+      setVenceMismoMes(configMes?.valor === 'true')
+    } catch (err) {
+      console.error('Error cargando configuración:', err)
+    }
+  }
 
   async function cargarPeriodos() {
     setLoading(true)
@@ -121,7 +141,8 @@ export default function Periodos() {
   }
 
   function getEstadoBadge(estado, periodo) {
-    if (estado === 'GENERADO') {
+    // Mostrar "Generado" si tiene cargos (independientemente del estado en BD)
+    if (estado === 'GENERADO' || periodo.totalCuotas > 0) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
           <CheckCircle className="w-3 h-3" />
@@ -137,20 +158,23 @@ export default function Periodos() {
     )
   }
 
-  // Calcular fecha de vencimiento por defecto (dia 10 del mes siguiente)
-  function calcularFechaVencimiento(anio, mes) {
-    const fecha = new Date(anio, mes, 10) // mes ya es 1-12, al usar como índice da el siguiente
+  // Calcular fecha de vencimiento por defecto
+  function calcularFechaVencimiento(anio, mes, dia, mismoMes) {
+    // Si vence en el mismo mes: mes-1 (porque mes es 1-12 y Date usa 0-11)
+    // Si vence en el mes siguiente: mes (que ya da el siguiente)
+    const mesVencimiento = mismoMes ? mes - 1 : mes
+    const fecha = new Date(anio, mesVencimiento, dia)
     return fecha.toISOString().split('T')[0]
   }
 
   useEffect(() => {
-    if (formData.anio && formData.mes) {
+    if (formData.anio && formData.mes && diaVencimiento) {
       setFormData(prev => ({
         ...prev,
-        fechaVencimiento: calcularFechaVencimiento(prev.anio, prev.mes)
+        fechaVencimiento: calcularFechaVencimiento(prev.anio, prev.mes, diaVencimiento, venceMismoMes)
       }))
     }
-  }, [formData.anio, formData.mes])
+  }, [formData.anio, formData.mes, diaVencimiento, venceMismoMes])
 
   if (loading) {
     return (
@@ -204,7 +228,7 @@ export default function Periodos() {
                 {getEstadoBadge(periodo.estado, periodo)}
               </div>
 
-              {periodo.estado === 'GENERADO' ? (
+              {periodo.totalCuotas > 0 ? (
                 <>
                   {/* Stats en grid */}
                   <div className="grid grid-cols-3 gap-2 mb-3">
