@@ -2931,12 +2931,14 @@ router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    data: cuotas,
-    pagination: {
-      page: parseInt(page),
-      limit,
-      total,
-      pages: Math.ceil(total / limit),
+    data: {
+      data: cuotas,
+      pagination: {
+        page: parseInt(page),
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
     },
   })
 }))
