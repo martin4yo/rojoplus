@@ -1,12 +1,17 @@
 import { useNavigate } from 'react-router-dom'
-import { Store, Dumbbell, Receipt, Users } from 'lucide-react'
+import { Store, Dumbbell, Receipt, Users, BarChart3 } from 'lucide-react'
 
 export default function AdminReportes() {
   const navigate = useNavigate()
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Reportes</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <BarChart3 className="w-6 h-6 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div
@@ -19,6 +24,19 @@ export default function AdminReportes() {
           <div className="text-center">
             <p className="font-semibold text-gray-800 text-lg">Cuotas</p>
             <p className="text-sm text-gray-500">Cobranza, mora y recaudación</p>
+          </div>
+        </div>
+
+        <div
+          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:shadow-md transition min-h-[160px]"
+          onClick={() => navigate('/admin/reportes/actividades')}
+        >
+          <div className="p-4 rounded-full bg-orange-100">
+            <Dumbbell className="w-8 h-8 text-orange-600" />
+          </div>
+          <div className="text-center">
+            <p className="font-semibold text-gray-800 text-lg">Actividades</p>
+            <p className="text-sm text-gray-500">Inscriptos por actividad</p>
           </div>
         </div>
 
@@ -45,19 +63,6 @@ export default function AdminReportes() {
           <div className="text-center">
             <p className="font-semibold text-gray-800 text-lg">Comercios</p>
             <p className="text-sm text-gray-500">Ventas y descuentos otorgados</p>
-          </div>
-        </div>
-
-        <div
-          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:shadow-md transition min-h-[160px]"
-          onClick={() => navigate('/admin/reportes/actividades')}
-        >
-          <div className="p-4 rounded-full bg-orange-100">
-            <Dumbbell className="w-8 h-8 text-orange-600" />
-          </div>
-          <div className="text-center">
-            <p className="font-semibold text-gray-800 text-lg">Actividades</p>
-            <p className="text-sm text-gray-500">Inscriptos por actividad</p>
           </div>
         </div>
       </div>

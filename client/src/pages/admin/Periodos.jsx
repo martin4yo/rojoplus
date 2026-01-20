@@ -19,6 +19,12 @@ export default function Periodos() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
+  // Filtro de periodo hasta (por defecto mes actual)
+  const [periodoHasta, setPeriodoHasta] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
+
   // Configuración
   const [diaVencimiento, setDiaVencimiento] = useState(10)
   const [venceMismoMes, setVenceMismoMes] = useState(false)
@@ -176,6 +182,36 @@ export default function Periodos() {
     }
   }, [formData.anio, formData.mes, diaVencimiento, venceMismoMes])
 
+  // Generar opciones para el select de periodo hasta
+  function generarOpcionesPeriodo() {
+    const opciones = []
+    const añoActual = new Date().getFullYear()
+    // Desde 2024 hasta el año actual + 1
+    for (let año = 2024; año <= añoActual + 1; año++) {
+      for (let mes = 1; mes <= 12; mes++) {
+        opciones.push({
+          value: `${año}-${String(mes).padStart(2, '0')}`,
+          label: `${MESES[mes - 1]} ${año}`
+        })
+      }
+    }
+    return opciones
+  }
+
+  // Filtrar periodos hasta el periodo seleccionado
+  const periodosFiltrados = periodos.filter(periodo => {
+    // Extraer año y mes del nombre del periodo (ej: "Enero 2026")
+    const partes = periodo.nombre.split(' ')
+    if (partes.length !== 2) return true
+    const mesNombre = partes[0]
+    const año = parseInt(partes[1])
+    const mes = MESES.indexOf(mesNombre) + 1
+    if (mes === 0 || isNaN(año)) return true
+
+    const periodoKey = `${año}-${String(mes).padStart(2, '0')}`
+    return periodoKey <= periodoHasta
+  })
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -188,9 +224,14 @@ export default function Periodos() {
     <div>
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Periodos de Cuota</h1>
-          <p className="text-gray-500 mt-1">Genera y administra las cuotas mensuales</p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Receipt className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Periodos de Cuota</h1>
+            <p className="text-gray-500 text-sm">Genera y administra las cuotas mensuales</p>
+          </div>
         </div>
         <Button onClick={() => setShowCrearModal(true)} className="flex items-center gap-2">
           <Plus className="w-4 h-4" />
@@ -198,11 +239,30 @@ export default function Periodos() {
         </Button>
       </div>
 
+      {/* Filtro de periodo */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-700">Mostrar hasta:</label>
+          <select
+            value={periodoHasta}
+            onChange={(e) => setPeriodoHasta(e.target.value)}
+            className="input-field w-48"
+          >
+            {generarOpcionesPeriodo().map(op => (
+              <option key={op.value} value={op.value}>{op.label}</option>
+            ))}
+          </select>
+          <span className="text-sm text-gray-500">
+            {periodosFiltrados.length} de {periodos.length} periodos
+          </span>
+        </div>
+      </div>
+
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
       {success && <Alert type="success" className="mb-4" onClose={() => setSuccess(null)}>{success}</Alert>}
 
       {/* Listado de periodos */}
-      {periodos.length === 0 ? (
+      {periodosFiltrados.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center max-w-md">
           <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500">No hay periodos creados</p>
@@ -210,7 +270,7 @@ export default function Periodos() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {periodos.map(periodo => (
+          {periodosFiltrados.map(periodo => (
             <div key={periodo.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               {/* Header con nombre y estado */}
               <div className="flex items-center justify-between mb-3">

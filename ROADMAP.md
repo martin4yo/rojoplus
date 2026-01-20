@@ -388,20 +388,112 @@ Base de datos: rojoplus
 
 ---
 
-## FASE 28: Entidades y Cuentas Corrientes
-> Gestion de proveedores, personal y cuentas corrientes
+## FASE 28: Ingresos, Egresos, Tesoreria y Stock
+> Sistema contable integrado con stock de merchandising
 
-- [ ] **28.1** Crear modelo Entidad (tipo: PROVEEDOR, PERSONAL, OTRO)
-- [ ] **28.2** Crear modelo CuentaCorriente vinculado a Entidad
-- [ ] **28.3** Crear modelo MovimientoCuentaCorriente (FACTURA, CREDITO, PAGO)
-- [ ] **28.4** Endpoints CRUD de Entidades
-- [ ] **28.5** Endpoints de movimientos de cuenta corriente
-- [ ] **28.6** Endpoint de emision de pagos (egreso de caja)
-- [ ] **28.7** Pagina admin/entidades (listado con saldo)
-- [ ] **28.8** Ficha de entidad con cuenta corriente
-- [ ] **28.9** Registrar factura/credito en cuenta corriente
-- [ ] **28.10** Emitir pago desde cuenta corriente
-- [ ] **28.11** Reporte de cuentas corrientes (saldos, vencimientos)
+### Modelos de Base de Datos
+- [x] **28.1** Crear modelo Concepto (preclasificacion contable con switches usaEnCompras/Ventas/Tesoreria)
+- [x] **28.2** Crear modelo Entidad (tipo: PROVEEDOR, CLIENTE, PERSONAL)
+- [x] **28.3** Crear modelo MovimientoContable (tabla unica para facturas, pagos, cobros)
+- [x] **28.4** Crear modelo ItemMovimiento (detalle de productos en facturas)
+- [x] **28.5** Crear modelo TransferenciaCaja
+- [x] **28.6** Crear modelo CategoriaProducto
+- [x] **28.7** Crear modelo Producto
+- [x] **28.8** Crear modelo ProductoVariante (stock por talle/color)
+- [x] **28.9** Crear modelo ProductoFoto (multiples fotos por producto)
+- [x] **28.10** Crear modelo MovimientoStock
+- [x] **28.11** Actualizar Caja con relaciones a MovimientoContable y TransferenciaCaja
+- [x] **28.12** Actualizar Socio con relacion a MovimientoContable (para ventas a socios)
+- [x] **28.13** Migrar ConceptoTesoreria a Concepto (unificado)
+
+### Backend - Entidades
+- [x] **28.14** Endpoints CRUD de Conceptos (server/src/routes/contabilidad.js)
+- [x] **28.15** Endpoints CRUD de Entidades con filtro por tipo
+- [x] **28.16** Endpoint de cuenta corriente por entidad
+
+### Backend - Tesoreria
+- [x] **28.17** CRUD de Cajas (server/src/routes/tesoreria.js)
+- [x] **28.18** Endpoint de Transferencias entre cajas
+- [x] **28.19** Modificar cobranza de cuotas para impactar MovimientoCaja
+
+### Backend - Stock
+- [x] **28.20** Endpoints CRUD de CategoriaProducto (server/src/routes/stock.js)
+- [x] **28.21** Endpoints CRUD de Producto con variantes y fotos
+- [x] **28.22** Endpoints de MovimientoStock (ingreso, egreso, ajuste)
+- [x] **28.23** Endpoint de alertas de stock bajo
+
+### Backend - Movimientos Contables
+- [x] **28.24** Endpoint crear MovimientoContable (server/src/routes/movimientosContables.js)
+- [x] **28.25** Logica de impacto en stock al crear factura con items
+- [x] **28.26** Logica de impacto en caja al registrar pago/cobro
+- [x] **28.27** Endpoint de anulacion de movimientos
+
+### Backend - Ordenes de Compra (Proveedores)
+- [ ] **28.28a** Crear modelo OrdenCompra y ItemOrdenCompra
+- [ ] **28.28b** Endpoints CRUD de OrdenCompra
+- [ ] **28.28c** Vincular OrdenCompra con Factura de Compra
+- [ ] **28.28d** Actualizar estado de OrdenCompra al recibir mercaderia
+
+### Backend - Pedidos (Clientes)
+- [ ] **28.28e** Crear modelo Pedido y ItemPedido
+- [ ] **28.28f** Endpoints CRUD de Pedido (para Clientes y Socios)
+- [ ] **28.28g** Vincular Pedido con Factura de Venta
+- [ ] **28.28h** Actualizar estado de Pedido al facturar
+
+### Backend - Liquidacion de Sueldos (Personal)
+- [ ] **28.28i** Crear modelo LiquidacionSueldo y ItemLiquidacion
+- [ ] **28.28j** Crear modelo ConceptoLiquidacion (HABER/DEDUCCION)
+- [ ] **28.28k** Endpoint de generacion de liquidacion mensual
+- [ ] **28.28l** Endpoint de agregar conceptos adicionales por empleado
+- [ ] **28.28m** Endpoint de pago de liquidacion (impacta caja)
+
+### Frontend - Menu y Navegacion
+- [x] **28.28** Menu expandible con submenus (Ingresos, Egresos, Tesoreria, Stock)
+- [x] **28.29** Agregar todas las rutas nuevas a App.jsx (con PlaceholderPage temporal)
+
+### Frontend - Entidades
+- [x] **28.30** Pagina /admin/egresos/proveedores (lista)
+- [x] **28.31** Pagina /admin/ingresos/clientes (lista)
+- [x] **28.32** Pagina /admin/egresos/personal (lista)
+- [x] **28.33** Formulario de Entidad (campos condicionales por tipo)
+- [x] **28.34** Ficha de entidad con cuenta corriente
+
+### Frontend - Tesoreria
+- [x] **28.35** Pagina /admin/tesoreria/cajas (lista)
+- [x] **28.36** Formulario de Caja
+- [x] **28.37** Pagina /admin/tesoreria/movimientos (lista de MovimientoCaja)
+- [x] **28.38** Pagina /admin/tesoreria/transferencias
+
+### Frontend - Stock
+- [x] **28.39** Pagina /admin/stock/productos (lista con stock total + vista dual Shop/Lista)
+- [x] **28.40** Formulario de Producto con variantes y fotos
+- [x] **28.41** Pagina /admin/stock/categorias
+- [x] **28.42** Pagina /admin/stock/movimientos
+- [x] **28.43** Pagina /admin/stock/alertas
+
+### Frontend - Facturas y Pagos
+- [ ] **28.44** Pagina /admin/egresos/facturas (facturas de compra)
+- [ ] **28.45** Formulario de factura de compra con items
+- [ ] **28.46** Pagina /admin/ingresos/facturas (facturas de venta)
+- [ ] **28.47** Formulario de factura de venta (a socio o cliente)
+- [ ] **28.48** Pagina /admin/egresos/ordenes-pago
+- [ ] **28.49** Pagina /admin/ingresos/recibos
+
+### Frontend - Ordenes de Compra (Proveedores)
+- [ ] **28.50** Pagina /admin/egresos/ordenes-compra (lista)
+- [ ] **28.51** Formulario de orden de compra con items
+- [ ] **28.52** Convertir orden de compra en factura de compra
+
+### Frontend - Pedidos (Clientes)
+- [ ] **28.53** Pagina /admin/ingresos/pedidos (lista)
+- [ ] **28.54** Formulario de pedido (cliente o socio)
+- [ ] **28.55** Convertir pedido en factura de venta
+
+### Frontend - Liquidacion de Sueldos (Personal)
+- [ ] **28.56** Pagina /admin/egresos/liquidaciones (lista por periodo)
+- [ ] **28.57** Formulario de generacion de liquidacion mensual
+- [ ] **28.58** UI para agregar conceptos (haberes/deducciones) por empleado
+- [ ] **28.59** Pantalla de pago de liquidacion (individual o masivo)
 
 ---
 
@@ -479,7 +571,7 @@ Base de datos: rojoplus
 | 25 | Cuotas Config Base | ✅ Completado |
 | 26 | Cuotas y Cobranza | ✅ Completado |
 | 27 | Comercios Publicos y Geolocalizacion | ✅ Completado |
-| 28 | Entidades y Cuentas Corrientes | ⏳ Pendiente |
+| 28 | Ingresos, Egresos, Tesoreria y Stock | 🔶 En progreso |
 | 29 | Plan de Cuentas Contable | ⏳ Pendiente |
 | 30 | Presupuesto Anual | ⏳ Pendiente |
 | 31 | Control de Accesos | ⏳ Pendiente |
@@ -504,4 +596,4 @@ npm run dev
 
 ---
 
-*Ultima actualizacion: Enero 2026*
+*Ultima actualizacion: 20 de Enero 2026*

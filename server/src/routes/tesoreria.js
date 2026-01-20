@@ -1,0 +1,669 @@
+import { Router } from 'express'
+import { PrismaClient } from '@prisma/client'
+import { authAdmin } from '../middleware/auth.js'
+import { asyncHandler, AppError } from '../middleware/errorHandler.js'
+
+const router = Router()
+const prisma = new PrismaClient()
+
+// Todas las rutas requieren autenticacion de admin
+router.use(authAdmin)
+
+// =============================================================================
+// CAJAS
+// =============================================================================
+
+// GET /api/admin/cajas - Listar cajas
+router.get('/cajas', asyncHandler(async (req, res) => {
+  const { activo } = req.query
+
+  const where = {}
+  if (activo !== undefined) where.activo = activo === 'true'
+
+  const cajas = await prisma.caja.findMany({
+    where,
+    orderBy: { nombre: 'asc' }
+  })
+
+  // Convertir Decimal a Number
+  const cajasFormateadas = cajas.map(c => ({
+    ...c,
+    saldoActual: Number(c.saldoActual)
+  }))
+
+  res.json({ success: true, data: cajasFormateadas })
+}))
+
+// GET /api/admin/cajas/:id - Detalle de caja
+router.get('/cajas/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const caja = await prisma.caja.findUnique({
+    where: { id: parseInt(id) }
+  })
+
+  if (!caja) {
+    throw new AppError('Caja no encontrada', 404)
+  }
+
+  res.json({
+    success: true,
+    data: {
+      ...caja,
+      saldoActual: Number(caja.saldoActual)
+    }
+  })
+}))
+
+// POST /api/admin/cajas - Crear caja
+router.post('/cajas', asyncHandler(async (req, res) => {
+  const { codigo, nombre, tipo, descripcion, saldoInicial } = req.body
+
+  if (!codigo || !nombre || !tipo) {
+    throw new AppError('Codigo, nombre y tipo son requeridos', 400)
+  }
+
+  if (!['EFECTIVO', 'BANCO', 'MERCADOPAGO', 'OTRO'].includes(tipo)) {
+    throw new AppError('Tipo debe ser EFECTIVO, BANCO, MERCADOPAGO u OTRO', 400)
+  }
+
+  const existente = await prisma.caja.findUnique({ where: { codigo } })
+  if (existente) {
+    throw new AppError('Ya existe una caja con ese codigo', 400)
+  }
+
+  const caja = await prisma.caja.create({
+    data: {
+      codigo,
+      nombre,
+      tipo,
+      descripcion,
+      saldoActual: saldoInicial ? parseFloat(saldoInicial) : 0
+    }
+  })
+
+  res.status(201).json({
+    success: true,
+    data: { ...caja, saldoActual: Number(caja.saldoActual) }
+  })
+}))
+
+// PUT /api/admin/cajas/:id - Actualizar caja
+router.put('/cajas/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { codigo, nombre, tipo, descripcion, activo } = req.body
+
+  const existente = await prisma.caja.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) {
+    throw new AppError('Caja no encontrada', 404)
+  }
+
+  // Verificar codigo unico si cambio
+  if (codigo && codigo !== existente.codigo) {
+    const duplicado = await prisma.caja.findUnique({ where: { codigo } })
+    if (duplicado) {
+      throw new AppError('Ya existe una caja con ese codigo', 400)
+    }
+  }
+
+  const caja = await prisma.caja.update({
+    where: { id: parseInt(id) },
+    data: {
+      codigo: codigo || existente.codigo,
+      nombre: nombre || existente.nombre,
+      tipo: tipo || existente.tipo,
+      descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
+      activo: activo !== undefined ? activo : existente.activo
+    }
+  })
+
+  res.json({
+    success: true,
+    data: { ...caja, saldoActual: Number(caja.saldoActual) }
+  })
+}))
+
+// =============================================================================
+// MOVIMIENTOS DE CAJA
+// =============================================================================
+
+// Generar numero de movimiento
+async function generarNumeroMovimiento() {
+  const anio = new Date().getFullYear()
+  const prefijo = `MV-${anio}-`
+
+  const ultimo = await prisma.movimientoCaja.findFirst({
+    where: { numero: { startsWith: prefijo } },
+    orderBy: { numero: 'desc' }
+  })
+
+  let siguiente = 1
+  if (ultimo) {
+    const partes = ultimo.numero.split('-')
+    const ultimoNum = parseInt(partes[partes.length - 1]) || 0
+    siguiente = ultimoNum + 1
+  }
+
+  return `${prefijo}${String(siguiente).padStart(5, '0')}`
+}
+
+// GET /api/admin/movimientos-caja - Listar movimientos
+router.get('/movimientos-caja', asyncHandler(async (req, res) => {
+  const { cajaId, tipo, desde, hasta, page = 1, limit = 50 } = req.query
+
+  const where = {}
+  if (cajaId) where.cajaId = parseInt(cajaId)
+  if (tipo) where.tipo = tipo
+
+  if (desde || hasta) {
+    where.fecha = {}
+    if (desde) where.fecha.gte = new Date(desde)
+    if (hasta) where.fecha.lte = new Date(hasta)
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit)
+
+  const [movimientos, total] = await Promise.all([
+    prisma.movimientoCaja.findMany({
+      where,
+      orderBy: { fecha: 'desc' },
+      skip,
+      take: parseInt(limit),
+      include: {
+        caja: { select: { id: true, codigo: true, nombre: true } },
+        medioPago: { select: { id: true, codigo: true, nombre: true } },
+        concepto: { select: { id: true, codigo: true, nombre: true, tipo: true } },
+        pago: {
+          select: {
+            id: true,
+            socio: { select: { id: true, nroSocio: true, apellidoNombre: true } }
+          }
+        }
+      }
+    }),
+    prisma.movimientoCaja.count({ where })
+  ])
+
+  const movimientosFormateados = movimientos.map(m => ({
+    ...m,
+    monto: Number(m.monto)
+  }))
+
+  res.json({
+    success: true,
+    data: movimientosFormateados,
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      pages: Math.ceil(total / parseInt(limit))
+    }
+  })
+}))
+
+// GET /api/admin/movimientos-caja/:id - Detalle
+router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const movimiento = await prisma.movimientoCaja.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      caja: true,
+      medioPago: true,
+      concepto: true,
+      pago: {
+        include: {
+          socio: { select: { id: true, nroSocio: true, apellidoNombre: true } }
+        }
+      }
+    }
+  })
+
+  if (!movimiento) {
+    throw new AppError('Movimiento no encontrado', 404)
+  }
+
+  res.json({
+    success: true,
+    data: { ...movimiento, monto: Number(movimiento.monto) }
+  })
+}))
+
+// POST /api/admin/movimientos-caja - Crear movimiento manual
+router.post('/movimientos-caja', asyncHandler(async (req, res) => {
+  const { cajaId, tipo, monto, medioPagoId, conceptoId, descripcion } = req.body
+
+  if (!cajaId || !tipo || !monto) {
+    throw new AppError('Caja, tipo y monto son requeridos', 400)
+  }
+
+  if (!['INGRESO', 'EGRESO'].includes(tipo)) {
+    throw new AppError('Tipo debe ser INGRESO o EGRESO', 400)
+  }
+
+  const caja = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+  if (!caja) {
+    throw new AppError('Caja no encontrada', 404)
+  }
+
+  if (!caja.activo) {
+    throw new AppError('La caja no esta activa', 400)
+  }
+
+  // Verificar saldo suficiente para egresos
+  const montoNum = parseFloat(monto)
+  if (tipo === 'EGRESO' && Number(caja.saldoActual) < montoNum) {
+    throw new AppError('Saldo insuficiente en la caja', 400)
+  }
+
+  // Crear movimiento y actualizar saldo en transaccion
+  const resultado = await prisma.$transaction(async (tx) => {
+    const numero = await generarNumeroMovimiento()
+
+    const movimiento = await tx.movimientoCaja.create({
+      data: {
+        numero,
+        cajaId: parseInt(cajaId),
+        fecha: new Date(),
+        tipo,
+        monto: montoNum,
+        medioPagoId: medioPagoId ? parseInt(medioPagoId) : null,
+        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        descripcion: descripcion || null,
+        registradoPor: req.admin.id
+      },
+      include: {
+        caja: { select: { id: true, codigo: true, nombre: true } },
+        medioPago: { select: { id: true, codigo: true, nombre: true } },
+        concepto: { select: { id: true, codigo: true, nombre: true, tipo: true } }
+      }
+    })
+
+    // Actualizar saldo de caja
+    const incremento = tipo === 'INGRESO' ? montoNum : -montoNum
+    await tx.caja.update({
+      where: { id: parseInt(cajaId) },
+      data: { saldoActual: { increment: incremento } }
+    })
+
+    return movimiento
+  })
+
+  res.status(201).json({
+    success: true,
+    data: { ...resultado, monto: Number(resultado.monto) }
+  })
+}))
+
+// POST /api/admin/movimientos-caja/:id/anular - Anular movimiento
+router.post('/movimientos-caja/:id/anular', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const movimiento = await prisma.movimientoCaja.findUnique({
+    where: { id: parseInt(id) },
+    include: { caja: true }
+  })
+
+  if (!movimiento) {
+    throw new AppError('Movimiento no encontrado', 404)
+  }
+
+  if (movimiento.anulado) {
+    throw new AppError('El movimiento ya esta anulado', 400)
+  }
+
+  // No permitir anular si esta vinculado a un pago
+  if (movimiento.pagoId) {
+    throw new AppError('No se puede anular un movimiento vinculado a un pago de cuota', 400)
+  }
+
+  // Anular y revertir saldo
+  await prisma.$transaction(async (tx) => {
+    await tx.movimientoCaja.update({
+      where: { id: parseInt(id) },
+      data: { anulado: true }
+    })
+
+    // Revertir el saldo
+    const incremento = movimiento.tipo === 'INGRESO'
+      ? -Number(movimiento.monto)
+      : Number(movimiento.monto)
+
+    await tx.caja.update({
+      where: { id: movimiento.cajaId },
+      data: { saldoActual: { increment: incremento } }
+    })
+  })
+
+  res.json({ success: true, message: 'Movimiento anulado correctamente' })
+}))
+
+// =============================================================================
+// TRANSFERENCIAS ENTRE CAJAS
+// =============================================================================
+
+// Generar numero de transferencia
+async function generarNumeroTransferencia() {
+  const anio = new Date().getFullYear()
+  const prefijo = `TC-${anio}-`
+
+  const ultimo = await prisma.transferenciaCaja.findFirst({
+    where: { numero: { startsWith: prefijo } },
+    orderBy: { numero: 'desc' }
+  })
+
+  let siguiente = 1
+  if (ultimo) {
+    const partes = ultimo.numero.split('-')
+    const ultimoNum = parseInt(partes[partes.length - 1]) || 0
+    siguiente = ultimoNum + 1
+  }
+
+  return `${prefijo}${String(siguiente).padStart(5, '0')}`
+}
+
+// GET /api/admin/transferencias - Listar transferencias
+router.get('/transferencias', asyncHandler(async (req, res) => {
+  const { desde, hasta, page = 1, limit = 50 } = req.query
+
+  const where = {}
+  if (desde || hasta) {
+    where.fecha = {}
+    if (desde) where.fecha.gte = new Date(desde)
+    if (hasta) where.fecha.lte = new Date(hasta)
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit)
+
+  const [transferencias, total] = await Promise.all([
+    prisma.transferenciaCaja.findMany({
+      where,
+      orderBy: { fecha: 'desc' },
+      skip,
+      take: parseInt(limit),
+      include: {
+        cajaOrigen: { select: { id: true, codigo: true, nombre: true } },
+        cajaDestino: { select: { id: true, codigo: true, nombre: true } },
+        concepto: { select: { id: true, codigo: true, nombre: true } }
+      }
+    }),
+    prisma.transferenciaCaja.count({ where })
+  ])
+
+  const transferenciasFormateadas = transferencias.map(t => ({
+    ...t,
+    monto: Number(t.monto)
+  }))
+
+  res.json({
+    success: true,
+    data: transferenciasFormateadas,
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      pages: Math.ceil(total / parseInt(limit))
+    }
+  })
+}))
+
+// GET /api/admin/transferencias/:id - Detalle
+router.get('/transferencias/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const transferencia = await prisma.transferenciaCaja.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      cajaOrigen: true,
+      cajaDestino: true,
+      concepto: { select: { id: true, codigo: true, nombre: true } }
+    }
+  })
+
+  if (!transferencia) {
+    throw new AppError('Transferencia no encontrada', 404)
+  }
+
+  res.json({
+    success: true,
+    data: { ...transferencia, monto: Number(transferencia.monto) }
+  })
+}))
+
+// POST /api/admin/transferencias - Crear transferencia
+router.post('/transferencias', asyncHandler(async (req, res) => {
+  const { cajaOrigenId, cajaDestinoId, monto, conceptoId, descripcion } = req.body
+
+  if (!cajaOrigenId || !cajaDestinoId || !monto) {
+    throw new AppError('Caja origen, caja destino y monto son requeridos', 400)
+  }
+
+  if (parseInt(cajaOrigenId) === parseInt(cajaDestinoId)) {
+    throw new AppError('La caja origen y destino deben ser diferentes', 400)
+  }
+
+  const montoNum = parseFloat(monto)
+  if (montoNum <= 0) {
+    throw new AppError('El monto debe ser mayor a cero', 400)
+  }
+
+  // Verificar cajas
+  const [cajaOrigen, cajaDestino] = await Promise.all([
+    prisma.caja.findUnique({ where: { id: parseInt(cajaOrigenId) } }),
+    prisma.caja.findUnique({ where: { id: parseInt(cajaDestinoId) } })
+  ])
+
+  if (!cajaOrigen) {
+    throw new AppError('Caja origen no encontrada', 404)
+  }
+  if (!cajaDestino) {
+    throw new AppError('Caja destino no encontrada', 404)
+  }
+  if (!cajaOrigen.activo) {
+    throw new AppError('La caja origen no esta activa', 400)
+  }
+  if (!cajaDestino.activo) {
+    throw new AppError('La caja destino no esta activa', 400)
+  }
+
+  // Verificar saldo suficiente
+  if (Number(cajaOrigen.saldoActual) < montoNum) {
+    throw new AppError('Saldo insuficiente en la caja origen', 400)
+  }
+
+  // Crear transferencia y movimientos en transaccion
+  const resultado = await prisma.$transaction(async (tx) => {
+    const numero = await generarNumeroTransferencia()
+    const numeroMovOrigen = await generarNumeroMovimiento()
+    const numeroMovDestino = `MV-${new Date().getFullYear()}-${String(parseInt(numeroMovOrigen.split('-')[2]) + 1).padStart(5, '0')}`
+
+    // Crear transferencia
+    const transferencia = await tx.transferenciaCaja.create({
+      data: {
+        numero,
+        cajaOrigenId: parseInt(cajaOrigenId),
+        cajaDestinoId: parseInt(cajaDestinoId),
+        fecha: new Date(),
+        monto: montoNum,
+        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        descripcion: descripcion || null,
+        estado: 'CONFIRMADO',
+        registradoPor: req.admin.id
+      },
+      include: {
+        cajaOrigen: { select: { id: true, codigo: true, nombre: true } },
+        cajaDestino: { select: { id: true, codigo: true, nombre: true } },
+        concepto: { select: { id: true, codigo: true, nombre: true } }
+      }
+    })
+
+    // Crear movimiento de egreso en caja origen
+    await tx.movimientoCaja.create({
+      data: {
+        numero: numeroMovOrigen,
+        cajaId: parseInt(cajaOrigenId),
+        fecha: new Date(),
+        tipo: 'EGRESO',
+        monto: montoNum,
+        descripcion: `Transferencia a ${cajaDestino.nombre} - ${numero}`,
+        registradoPor: req.admin.id
+      }
+    })
+
+    // Crear movimiento de ingreso en caja destino
+    await tx.movimientoCaja.create({
+      data: {
+        numero: numeroMovDestino,
+        cajaId: parseInt(cajaDestinoId),
+        fecha: new Date(),
+        tipo: 'INGRESO',
+        monto: montoNum,
+        descripcion: `Transferencia desde ${cajaOrigen.nombre} - ${numero}`,
+        registradoPor: req.admin.id
+      }
+    })
+
+    // Actualizar saldos
+    await tx.caja.update({
+      where: { id: parseInt(cajaOrigenId) },
+      data: { saldoActual: { decrement: montoNum } }
+    })
+
+    await tx.caja.update({
+      where: { id: parseInt(cajaDestinoId) },
+      data: { saldoActual: { increment: montoNum } }
+    })
+
+    return transferencia
+  })
+
+  res.status(201).json({
+    success: true,
+    data: { ...resultado, monto: Number(resultado.monto) }
+  })
+}))
+
+// POST /api/admin/transferencias/:id/anular - Anular transferencia
+router.post('/transferencias/:id/anular', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const transferencia = await prisma.transferenciaCaja.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      cajaOrigen: true,
+      cajaDestino: true
+    }
+  })
+
+  if (!transferencia) {
+    throw new AppError('Transferencia no encontrada', 404)
+  }
+
+  if (transferencia.estado === 'ANULADO') {
+    throw new AppError('La transferencia ya esta anulada', 400)
+  }
+
+  // Verificar que caja destino tenga saldo suficiente para revertir
+  const montoNum = Number(transferencia.monto)
+  if (Number(transferencia.cajaDestino.saldoActual) < montoNum) {
+    throw new AppError('Saldo insuficiente en caja destino para revertir la transferencia', 400)
+  }
+
+  // Anular y revertir saldos
+  await prisma.$transaction(async (tx) => {
+    await tx.transferenciaCaja.update({
+      where: { id: parseInt(id) },
+      data: { estado: 'ANULADO' }
+    })
+
+    // Revertir saldos
+    await tx.caja.update({
+      where: { id: transferencia.cajaOrigenId },
+      data: { saldoActual: { increment: montoNum } }
+    })
+
+    await tx.caja.update({
+      where: { id: transferencia.cajaDestinoId },
+      data: { saldoActual: { decrement: montoNum } }
+    })
+  })
+
+  res.json({ success: true, message: 'Transferencia anulada correctamente' })
+}))
+
+// =============================================================================
+// RESUMEN DE CAJA
+// =============================================================================
+
+// GET /api/admin/cajas/:id/resumen - Resumen de movimientos de una caja
+router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { desde, hasta } = req.query
+
+  const caja = await prisma.caja.findUnique({
+    where: { id: parseInt(id) }
+  })
+
+  if (!caja) {
+    throw new AppError('Caja no encontrada', 404)
+  }
+
+  const whereMovimientos = {
+    cajaId: parseInt(id),
+    anulado: false
+  }
+
+  if (desde || hasta) {
+    whereMovimientos.fecha = {}
+    if (desde) whereMovimientos.fecha.gte = new Date(desde)
+    if (hasta) whereMovimientos.fecha.lte = new Date(hasta)
+  }
+
+  // Obtener totales por tipo
+  const [ingresos, egresos] = await Promise.all([
+    prisma.movimientoCaja.aggregate({
+      where: { ...whereMovimientos, tipo: 'INGRESO' },
+      _sum: { monto: true },
+      _count: true
+    }),
+    prisma.movimientoCaja.aggregate({
+      where: { ...whereMovimientos, tipo: 'EGRESO' },
+      _sum: { monto: true },
+      _count: true
+    })
+  ])
+
+  // Ultimos movimientos
+  const ultimosMovimientos = await prisma.movimientoCaja.findMany({
+    where: whereMovimientos,
+    orderBy: { fecha: 'desc' },
+    take: 10,
+    include: {
+      medioPago: { select: { id: true, codigo: true, nombre: true } },
+      concepto: { select: { id: true, codigo: true, nombre: true } }
+    }
+  })
+
+  res.json({
+    success: true,
+    data: {
+      caja: { ...caja, saldoActual: Number(caja.saldoActual) },
+      periodo: { desde, hasta },
+      ingresos: {
+        total: Number(ingresos._sum.monto || 0),
+        cantidad: ingresos._count
+      },
+      egresos: {
+        total: Number(egresos._sum.monto || 0),
+        cantidad: egresos._count
+      },
+      saldoMovimientos: Number(ingresos._sum.monto || 0) - Number(egresos._sum.monto || 0),
+      ultimosMovimientos: ultimosMovimientos.map(m => ({
+        ...m,
+        monto: Number(m.monto)
+      }))
+    }
+  })
+}))
+
+export default router

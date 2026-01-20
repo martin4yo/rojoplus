@@ -13,7 +13,10 @@ model ConceptoTesoreria {
   codigo              String                @unique
   nombre              String
   descripcion         String?
-  tipo                String                @default("INGRESO") // INGRESO, EGRESO
+  tipo                String                @default("INGRESO") // INGRESO, EGRESO, AMBOS
+  usaEnTesoreria      Boolean               @default(true) @map("usa_en_tesoreria")
+  usaEnCompras        Boolean               @default(false) @map("usa_en_compras")
+  usaEnVentas         Boolean               @default(false) @map("usa_en_ventas")
   cuentaContableId    Int?                  @map("cuenta_contable_id")
   activo              Boolean               @default(true)
   orden               Int                   @default(0)
@@ -23,6 +26,8 @@ model ConceptoTesoreria {
   tiposSocio          TipoSocio[]
   actividades         Actividad[]
   categoriasActividad CategoriaActividad[]
+  productosCompra     Producto[]            @relation("ProductoConceptoCompra")
+  productosVenta      Producto[]            @relation("ProductoConceptoVenta")
 
   @@map("conceptos_tesoreria")
 }
@@ -333,19 +338,21 @@ model Inscripcion {
 
 // Entrenador (tabla principal)
 model Entrenador {
-  id          Int                   @id @default(autoincrement())
-  nombre      String
-  apellido    String?
-  documento   String?
-  telefono    String?
-  email       String?
-  socioId     Int?                  @map("socio_id")
-  especialidad String?
+  id            Int                   @id @default(autoincrement())
+  nombre        String
+  apellido      String?
+  documento     String?
+  telefono      String?
+  email         String?
+  socioId       Int?                  @map("socio_id")
+  entidadId     Int?                  @unique @map("entidad_id")
+  especialidad  String?
   observaciones String?
-  activo      Boolean               @default(true)
-  createdAt   DateTime              @default(now()) @map("created_at")
-  updatedAt   DateTime              @updatedAt @map("updated_at")
-  categorias  EntrenadorCategoria[]
+  activo        Boolean               @default(true)
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  categorias    EntrenadorCategoria[]
+  entidad       Entidad?              @relation(fields: [entidadId], references: [id])
 
   @@map("entrenadores")
 }
@@ -984,4 +991,197 @@ model AuditLog {
   @@index([usuarioId])
   @@index([createdAt])
   @@map("audit_log")
+}
+
+// =============================================================================
+// MODULO ENTIDADES (Proveedores, Clientes, Personal)
+// =============================================================================
+
+// Tabla de cargos para Personal (configurable)
+model CargoPersonal {
+  id          Int       @id @default(autoincrement())
+  codigo      String    @unique
+  nombre      String
+  descripcion String?
+  activo      Boolean   @default(true)
+  orden       Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  entidades   Entidad[]
+
+  @@map("cargos_personal")
+}
+
+model Entidad {
+  id              Int             @id @default(autoincrement())
+  codigo          String          @unique
+  tipo            String          // PROVEEDOR, CLIENTE, PERSONAL
+  razonSocial     String          @map("razon_social")
+  nombreFantasia  String?         @map("nombre_fantasia")
+  tipoDocumento   String          @default("CUIT") @map("tipo_documento")
+  documento       String?
+  email           String?
+  telefono        String?
+  direccion       String?
+  ciudad          String?
+  provincia       String?
+  codigoPostal    String?         @map("codigo_postal")
+  condicionIva    String?         @map("condicion_iva")
+  // Datos bancarios
+  banco           String?
+  cbu             String?
+  alias           String?
+  // Solo PERSONAL
+  legajo          String?
+  cargoPersonalId Int?            @map("cargo_personal_id")
+  fechaIngreso    DateTime?       @map("fecha_ingreso")
+  sueldoBasico    Decimal?        @map("sueldo_basico") @db.Decimal(12, 2)
+  // Común
+  observaciones   String?
+  activo          Boolean         @default(true)
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  cargoPersonal   CargoPersonal?  @relation(fields: [cargoPersonalId], references: [id])
+  ordenesCompra   OrdenCompra[]
+  entrenador      Entrenador?
+
+  @@index([tipo])
+  @@index([documento])
+  @@index([cargoPersonalId])
+  @@map("entidades")
+}
+
+// =============================================================================
+// MODULO ORDENES DE COMPRA
+// =============================================================================
+
+model OrdenCompra {
+  id              Int               @id @default(autoincrement())
+  numero          String            @unique
+  entidadId       Int               @map("entidad_id")
+  fecha           DateTime          @default(now())
+  fechaEntrega    DateTime?         @map("fecha_entrega")
+  estado          String            @default("PENDIENTE") // PENDIENTE, PARCIAL, RECIBIDA, CANCELADA
+  subtotal        Decimal           @default(0) @db.Decimal(12, 2)
+  iva             Decimal           @default(0) @db.Decimal(12, 2)
+  total           Decimal           @default(0) @db.Decimal(12, 2)
+  observaciones   String?
+  registradoPor   Int               @map("registrado_por")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  entidad         Entidad           @relation(fields: [entidadId], references: [id])
+  items           ItemOrdenCompra[]
+
+  @@index([entidadId])
+  @@index([estado])
+  @@index([fecha])
+  @@map("ordenes_compra")
+}
+
+model ItemOrdenCompra {
+  id                 Int              @id @default(autoincrement())
+  ordenCompraId      Int              @map("orden_compra_id")
+  productoVarianteId Int?             @map("producto_variante_id")
+  descripcion        String?
+  cantidad           Decimal          @db.Decimal(12, 2)
+  cantidadRecibida   Decimal          @default(0) @map("cantidad_recibida") @db.Decimal(12, 2)
+  precioUnitario     Decimal          @map("precio_unitario") @db.Decimal(12, 2)
+  subtotal           Decimal          @db.Decimal(12, 2)
+
+  ordenCompra        OrdenCompra      @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  productoVariante   ProductoVariante? @relation(fields: [productoVarianteId], references: [id])
+
+  @@index([ordenCompraId])
+  @@map("items_orden_compra")
+}
+
+// =============================================================================
+// MODULO STOCK
+// =============================================================================
+
+model CategoriaProducto {
+  id        Int        @id @default(autoincrement())
+  codigo    String     @unique
+  nombre    String
+  activo    Boolean    @default(true)
+  productos Producto[]
+
+  @@map("categorias_producto")
+}
+
+model Producto {
+  id               Int                @id @default(autoincrement())
+  codigo           String             @unique
+  nombre           String
+  descripcion      String?
+  categoriaId      Int?               @map("categoria_id")
+  precioCompra     Decimal?           @map("precio_compra") @db.Decimal(12, 2)
+  precioVenta      Decimal?           @map("precio_venta") @db.Decimal(12, 2)
+  conceptoCompraId Int?               @map("concepto_compra_id")
+  conceptoVentaId  Int?               @map("concepto_venta_id")
+  activo           Boolean            @default(true)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  categoria        CategoriaProducto? @relation(fields: [categoriaId], references: [id])
+  conceptoCompra   ConceptoTesoreria? @relation("ProductoConceptoCompra", fields: [conceptoCompraId], references: [id])
+  conceptoVenta    ConceptoTesoreria? @relation("ProductoConceptoVenta", fields: [conceptoVentaId], references: [id])
+  variantes        ProductoVariante[]
+  fotos            ProductoFoto[]
+
+  @@index([categoriaId])
+  @@index([conceptoCompraId])
+  @@index([conceptoVentaId])
+  @@map("productos")
+}
+
+model ProductoVariante {
+  id               Int               @id @default(autoincrement())
+  productoId       Int               @map("producto_id")
+  talle            String
+  color            String?
+  sku              String?           @unique
+  stockActual      Decimal           @default(0) @map("stock_actual") @db.Decimal(12, 2)
+  stockMinimo      Decimal           @default(0) @map("stock_minimo") @db.Decimal(12, 2)
+  activo           Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  producto         Producto          @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  movimientos      MovimientoStock[]
+  itemsOrdenCompra ItemOrdenCompra[]
+
+  @@unique([productoId, talle, color])
+  @@index([productoId])
+  @@map("producto_variantes")
+}
+
+model ProductoFoto {
+  id          Int      @id @default(autoincrement())
+  productoId  Int      @map("producto_id")
+  url         String
+  orden       Int      @default(0)
+  esPrincipal Boolean  @default(false) @map("es_principal")
+  createdAt   DateTime @default(now()) @map("created_at")
+  producto    Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@index([productoId])
+  @@map("producto_fotos")
+}
+
+model MovimientoStock {
+  id                 Int              @id @default(autoincrement())
+  productoVarianteId Int              @map("producto_variante_id")
+  fecha              DateTime         @default(now())
+  tipo               String
+  cantidad           Decimal          @db.Decimal(12, 2)
+  stockAnterior      Decimal          @map("stock_anterior") @db.Decimal(12, 2)
+  stockPosterior     Decimal          @map("stock_posterior") @db.Decimal(12, 2)
+  concepto           String?
+  registradoPor      Int              @map("registrado_por")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  productoVariante   ProductoVariante @relation(fields: [productoVarianteId], references: [id])
+
+  @@index([productoVarianteId])
+  @@index([fecha])
+  @@map("movimientos_stock")
 }

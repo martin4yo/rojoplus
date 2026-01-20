@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Users } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Users, Dumbbell } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -80,11 +80,16 @@ export default function ActividadesLista() {
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Actividades</h1>
-            <p className="text-gray-500 text-sm">
-              {actividades.length} actividades, {actividades.reduce((acc, a) => acc + (a.categorias?.length || 0), 0)} categorías
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-orange-100">
+              <Dumbbell className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">Actividades</h1>
+              <p className="text-gray-500 text-sm">
+                {actividades.length} actividades, {actividades.reduce((acc, a) => acc + (a.categorias?.length || 0), 0)} categorías
+              </p>
+            </div>
           </div>
         </div>
         <Button

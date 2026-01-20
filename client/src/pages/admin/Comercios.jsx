@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { Store } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { useModal } from '../../components/Modal'
@@ -93,7 +94,12 @@ export default function AdminComercios() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Comercios</h1>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Store className="w-6 h-6 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800">Comercios</h1>
+        </div>
       </div>
 
       {/* Filtros */}

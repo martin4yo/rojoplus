@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Edit2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, Trash2, Tag, Users, Activity, Wallet, Briefcase } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -19,7 +19,16 @@ const TITULOS = {
   'tipos-socio': 'Tipos de Socio',
   'categorias-socio': 'Categorías de Socio',
   'estados-socio': 'Estados de Socio',
-  'conceptos-tesoreria': 'Conceptos de Tesorería',
+  'conceptos-tesoreria': 'Conceptos',
+  'cargos-personal': 'Cargos de Personal',
+}
+
+const ICONOS = {
+  'tipos-socio': { icon: Tag, bgColor: 'bg-blue-100', color: 'text-blue-600' },
+  'categorias-socio': { icon: Users, bgColor: 'bg-purple-100', color: 'text-purple-600' },
+  'estados-socio': { icon: Activity, bgColor: 'bg-green-100', color: 'text-green-600' },
+  'conceptos-tesoreria': { icon: Wallet, bgColor: 'bg-emerald-100', color: 'text-emerald-600' },
+  'cargos-personal': { icon: Briefcase, bgColor: 'bg-rose-100', color: 'text-rose-600' },
 }
 
 export default function ConfiguracionLista() {
@@ -31,6 +40,8 @@ export default function ConfiguracionLista() {
   const [items, setItems] = useState([])
 
   const titulo = TITULOS[tabla] || 'Configuración'
+  const iconConfig = ICONOS[tabla] || { icon: Tag, bgColor: 'bg-gray-100', color: 'text-gray-600' }
+  const Icon = iconConfig.icon
 
   useEffect(() => {
     cargarDatos()
@@ -80,9 +91,14 @@ export default function ConfiguracionLista() {
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">{titulo}</h1>
-            <p className="text-gray-500 text-sm">{items.length} registros</p>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${iconConfig.bgColor}`}>
+              <Icon className={`w-6 h-6 ${iconConfig.color}`} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">{titulo}</h1>
+              <p className="text-gray-500 text-sm">{items.length} registros</p>
+            </div>
           </div>
         </div>
         <Button
@@ -113,9 +129,6 @@ export default function ConfiguracionLista() {
               )}
               {tabla === 'estados-socio' && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RojoPlus</th>
-              )}
-              {tabla === 'conceptos-tesoreria' && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
               )}
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orden</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
@@ -149,15 +162,6 @@ export default function ConfiguracionLista() {
                     ) : (
                       <span className="text-gray-400">No</span>
                     )}
-                  </td>
-                )}
-                {tabla === 'conceptos-tesoreria' && (
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      item.tipo === 'INGRESO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {item.tipo}
-                    </span>
                   </td>
                 )}
                 <td className="px-4 py-3 text-sm text-gray-600">{item.orden}</td>

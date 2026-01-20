@@ -149,7 +149,12 @@ export default function AdminSocios() {
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Socios</h1>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Users className="w-6 h-6 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800">Socios</h1>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => navigate('/admin/socios/nuevo')} className="flex items-center gap-2">
             <Plus className="w-4 h-4" />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, X, Dumbbell } from 'lucide-react'
+import { ArrowLeft, Save, Plus, X, Dumbbell, Building2, CreditCard, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -25,7 +25,26 @@ export default function EntrenadorForm() {
     especialidad: '',
     observaciones: '',
     activo: true,
+    // Datos de Personal (Entidad)
+    legajo: '',
+    cargoPersonalId: '',
+    fechaIngreso: '',
+    sueldoBasico: '',
+    direccion: '',
+    ciudad: '',
+    provincia: '',
+    codigoPostal: '',
+    banco: '',
+    cbu: '',
+    alias: '',
   })
+
+  // Cargos de personal (desde tabla configurable)
+  const [cargosPersonal, setCargosPersonal] = useState([])
+
+  // Control para mostrar/ocultar secciones
+  const [mostrarDatosPersonal, setMostrarDatosPersonal] = useState(false)
+  const [mostrarDatosBancarios, setMostrarDatosBancarios] = useState(false)
 
   // Categorías asignadas
   const [categoriasAsignadas, setCategoriasAsignadas] = useState([])
@@ -38,18 +57,22 @@ export default function EntrenadorForm() {
   const [agregandoCategoria, setAgregandoCategoria] = useState(false)
 
   useEffect(() => {
-    cargarActividades()
+    cargarDatosIniciales()
     if (isEditing) {
       cargarEntrenador()
     }
   }, [id])
 
-  async function cargarActividades() {
+  async function cargarDatosIniciales() {
     try {
-      const data = await api.get('/admin/actividades?activo=true')
-      setActividades(data)
+      const [actividadesData, cargosData] = await Promise.all([
+        api.get('/admin/actividades?activo=true'),
+        api.getFull('/admin/cargos-personal?activo=true').catch(() => ({ data: [] }))
+      ])
+      setActividades(actividadesData || [])
+      setCargosPersonal(cargosData?.data || [])
     } catch (err) {
-      console.error('Error cargando actividades:', err)
+      console.error('Error cargando datos iniciales:', err)
     }
   }
 
@@ -57,6 +80,7 @@ export default function EntrenadorForm() {
     setLoadingData(true)
     try {
       const data = await api.get(`/admin/entrenadores/${id}`)
+      const entidad = data.entidad || {}
       setForm({
         nombre: data.nombre || '',
         apellido: data.apellido || '',
@@ -66,8 +90,23 @@ export default function EntrenadorForm() {
         especialidad: data.especialidad || '',
         observaciones: data.observaciones || '',
         activo: data.activo,
+        // Datos de Personal (desde Entidad)
+        legajo: entidad.legajo || '',
+        cargoPersonalId: entidad.cargoPersonalId || '',
+        fechaIngreso: entidad.fechaIngreso ? entidad.fechaIngreso.split('T')[0] : '',
+        sueldoBasico: entidad.sueldoBasico || '',
+        direccion: entidad.direccion || '',
+        ciudad: entidad.ciudad || '',
+        provincia: entidad.provincia || '',
+        codigoPostal: entidad.codigoPostal || '',
+        banco: entidad.banco || '',
+        cbu: entidad.cbu || '',
+        alias: entidad.alias || '',
       })
       setCategoriasAsignadas(data.categorias?.filter(c => c.activo) || [])
+      // Expandir secciones si tienen datos
+      if (entidad.sueldoBasico || entidad.legajo) setMostrarDatosPersonal(true)
+      if (entidad.banco || entidad.cbu) setMostrarDatosBancarios(true)
     } catch (err) {
       setError('Error al cargar entrenador')
     } finally {
@@ -289,6 +328,180 @@ export default function EntrenadorForm() {
                     />
                     <span className="text-sm text-gray-700">Entrenador activo</span>
                   </label>
+                </div>
+              )}
+            </div>
+
+            {/* Seccion: Datos de Personal (colapsable) */}
+            <div className="border-t border-gray-200 pt-4 mt-4">
+              <button
+                type="button"
+                onClick={() => setMostrarDatosPersonal(!mostrarDatosPersonal)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-gray-500" />
+                  <span className="text-lg font-semibold text-gray-800">Datos de Personal</span>
+                </div>
+                {mostrarDatosPersonal ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
+              <p className="text-sm text-gray-500 mt-1 ml-7">Datos para liquidacion de sueldos</p>
+
+              {mostrarDatosPersonal && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Legajo</label>
+                    <input
+                      type="text"
+                      name="legajo"
+                      value={form.legajo}
+                      onChange={handleChange}
+                      placeholder="Ej: 001"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
+                    <select
+                      name="cargoPersonalId"
+                      value={form.cargoPersonalId}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="">Seleccionar cargo...</option>
+                      {cargosPersonal.map(cargo => (
+                        <option key={cargo.id} value={cargo.id}>{cargo.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Ingreso</label>
+                    <input
+                      type="date"
+                      name="fechaIngreso"
+                      value={form.fechaIngreso}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Sueldo Basico</label>
+                    <input
+                      type="number"
+                      name="sueldoBasico"
+                      value={form.sueldoBasico}
+                      onChange={handleChange}
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Direccion</label>
+                    <input
+                      type="text"
+                      name="direccion"
+                      value={form.direccion}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+                    <input
+                      type="text"
+                      name="ciudad"
+                      value={form.ciudad}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
+                    <input
+                      type="text"
+                      name="provincia"
+                      value={form.provincia}
+                      onChange={handleChange}
+                      placeholder="Ej: Buenos Aires"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Codigo Postal</label>
+                    <input
+                      type="text"
+                      name="codigoPostal"
+                      value={form.codigoPostal}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Seccion: Datos Bancarios (colapsable) */}
+            <div className="border-t border-gray-200 pt-4 mt-4">
+              <button
+                type="button"
+                onClick={() => setMostrarDatosBancarios(!mostrarDatosBancarios)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-gray-500" />
+                  <span className="text-lg font-semibold text-gray-800">Datos Bancarios</span>
+                </div>
+                {mostrarDatosBancarios ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
+              <p className="text-sm text-gray-500 mt-1 ml-7">Para transferencias de pago</p>
+
+              {mostrarDatosBancarios && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Banco</label>
+                    <input
+                      type="text"
+                      name="banco"
+                      value={form.banco}
+                      onChange={handleChange}
+                      placeholder="Ej: Banco Nacion"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Alias</label>
+                    <input
+                      type="text"
+                      name="alias"
+                      value={form.alias}
+                      onChange={handleChange}
+                      placeholder="Ej: nombre.apellido.mp"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">CBU</label>
+                    <input
+                      type="text"
+                      name="cbu"
+                      value={form.cbu}
+                      onChange={handleChange}
+                      maxLength={22}
+                      placeholder="22 digitos"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono"
+                    />
+                  </div>
                 </div>
               )}
             </div>

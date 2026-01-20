@@ -1193,67 +1193,68 @@ const recargo = calcularRecargo(cuota, hoy)
 
 ---
 
-### Etapa 5.1: Backend - ABM de Cajas
+### Etapa 5.1: Backend - ABM de Cajas ✅
 **Duración: 1 día**
 
 #### Tareas
-- [ ] CRUD `/api/admin/cajas`
-- [ ] CRUD `/api/admin/cuentas-bancarias`
-- [ ] `GET /api/admin/cajas/:id/saldo` - Saldo actual
-- [ ] `GET /api/admin/cajas/:id/movimientos` - Movimientos de la caja
+- [x] CRUD `/api/admin/cajas`
+- [x] CRUD `/api/admin/cuentas-bancarias`
+- [x] `GET /api/admin/cajas/:id/saldo` - Saldo actual
+- [x] `GET /api/admin/cajas/:id/movimientos` - Movimientos de la caja
 
 ---
 
-### Etapa 5.2: Backend - Plan de Cuentas
+### Etapa 5.2: Backend - Plan de Cuentas ✅
 **Duración: 1 día**
 
 #### Tareas
-- [ ] CRUD `/api/admin/cuentas-contables`
-- [ ] Soporte para estructura jerárquica (padre/hijos)
-- [ ] Validar que solo hojas son imputables
+- [x] CRUD `/api/admin/cuentas-contables`
+- [x] Soporte para estructura jerárquica (padre/hijos)
+- [x] Validar que solo hojas son imputables (campo esImputable)
 
 ---
 
-### Etapa 5.3: Backend - Movimientos de Caja
+### Etapa 5.3: Backend - Movimientos de Caja ✅
 **Duración: 2 días**
 
 #### Tareas
-- [ ] `POST /api/admin/movimientos` - Registrar movimiento
-  - [ ] Validar cuenta imputable
-  - [ ] Actualizar saldo de caja
-  - [ ] Generar número de movimiento
-- [ ] `GET /api/admin/movimientos` - Listar con filtros
-- [ ] `POST /api/admin/movimientos/:id/anular` - Anular movimiento
-- [ ] `POST /api/admin/transferencias` - Transferir entre cajas
-  - [ ] Crear movimiento SALIDA en origen
-  - [ ] Crear movimiento ENTRADA en destino
-  - [ ] Vincular ambos movimientos
+- [x] `POST /api/admin/movimientos` - Registrar movimiento
+  - [x] Validar cuenta imputable
+  - [x] Actualizar saldo de caja
+  - [x] Generar número de movimiento
+- [x] `GET /api/admin/movimientos` - Listar con filtros
+- [x] `POST /api/admin/movimientos/:id/anular` - Anular movimiento
+- [x] `POST /api/admin/transferencias` - Transferir entre cajas
+  - [x] Crear movimiento SALIDA en origen
+  - [x] Crear movimiento ENTRADA en destino
+  - [x] Vincular ambos movimientos
+  - [x] Concepto desde tabla Conceptos + descripcion libre
 
 ---
 
-### Etapa 5.4: Frontend - Gestión de Cajas
+### Etapa 5.4: Frontend - Gestión de Cajas ✅
 **Duración: 2 días**
 
 #### Tareas
-- [ ] Página `/admin/cajas`
-- [ ] CRUD de cajas con datos bancarios
-- [ ] Ver saldo de cada caja
-- [ ] Página `/admin/cuentas-contables`
-- [ ] Vista de árbol del plan de cuentas
-- [ ] CRUD de cuentas
+- [x] Página `/admin/cajas`
+- [x] CRUD de cajas con datos bancarios
+- [x] Ver saldo de cada caja
+- [x] Página `/admin/contabilidad/plan-cuentas`
+- [x] Vista de árbol del plan de cuentas (expandible)
+- [x] CRUD de cuentas con nivel automático
 
 ---
 
-### Etapa 5.5: Frontend - Movimientos de Caja
+### Etapa 5.5: Frontend - Movimientos de Caja ✅
 **Duración: 3 días**
 
 #### Tareas
-- [ ] Página `/admin/caja/movimientos`
-- [ ] Registrar ingreso
-- [ ] Registrar egreso
-- [ ] Realizar transferencia
-- [ ] Listado con filtros
-- [ ] Anulación de movimientos
+- [x] Página `/admin/tesoreria/movimientos`
+- [x] Registrar ingreso
+- [x] Registrar egreso
+- [x] Realizar transferencia
+- [x] Listado con filtros compactos
+- [x] Anulación de movimientos
 
 ---
 
@@ -1267,16 +1268,16 @@ const recargo = calcularRecargo(cuota, hoy)
 
 ---
 
-### ✅ HITO FASE 5: Caja y Movimientos
+### ✅ HITO FASE 5: Caja y Movimientos (95% completado)
 ```
-□ CRUD de cajas funciona
-□ Plan de cuentas jerárquico funciona
-□ Registro de ingresos funciona
-□ Registro de egresos funciona
-□ Transferencias entre cajas funcionan
-□ Saldos se actualizan correctamente
-□ Movimientos de cobranza aparecen automáticamente
-□ Cierre de caja funciona
+☑ CRUD de cajas funciona
+☑ Plan de cuentas jerárquico funciona
+☑ Registro de ingresos funciona
+☑ Registro de egresos funciona
+☑ Transferencias entre cajas funcionan (con concepto FK + descripcion)
+☑ Saldos se actualizan correctamente
+☑ Movimientos de cobranza aparecen automáticamente
+□ Cierre de caja funciona (pendiente)
 ```
 
 ---
@@ -1475,14 +1476,14 @@ const recargo = calcularRecargo(cuota, hoy)
 - [x] **Fase 1**: Gestión de Socios ✅ 100% (grupos familiares migrados automáticamente)
 - [ ] **Fase 2**: Deportes e Inscripciones
 - [ ] **Fase 3**: Sistema de Cuotas
-- [ ] **Fase 4**: Cobranzas y Pagos
-- [ ] **Fase 5**: Caja y Movimientos
+- [x] **Fase 4**: Cobranzas y Pagos ✅ 100%
+- [x] **Fase 5**: Caja y Movimientos ✅ 95% (falta cierre de caja)
 - [ ] **Fase 6**: Portal del Socio (QR básico ✅)
-- [ ] **Fase 7**: Reportes
+- [ ] **Fase 7**: Reportes (parcial - ReporteSocios, ReporteCuotas, ReporteActividades ✅)
 - [ ] **Fase 8**: Notificaciones
 - [ ] **Fase 9**: PWA
 
 ---
 
 *Plan de trabajo creado: Enero 2026*
-*Última actualización: 18 Enero 2026 - Fase 1 completa, grupos familiares migrados*
+*Última actualización: 20 Enero 2026 - Fase 5 casi completa (Tesorería, Plan de Cuentas, Transferencias)*

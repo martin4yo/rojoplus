@@ -1,6 +1,6 @@
 const API_URL = '/api'
 
-async function request(endpoint, options = {}) {
+async function request(endpoint, options = {}, returnFullResponse = false) {
   const url = `${API_URL}${endpoint}`
 
   const config = {
@@ -24,11 +24,14 @@ async function request(endpoint, options = {}) {
     throw new Error(data.error?.message || 'Error en la solicitud')
   }
 
-  return data.data
+  return returnFullResponse ? data : data.data
 }
 
 const api = {
   get: (endpoint) => request(endpoint, { method: 'GET' }),
+
+  // Devuelve la respuesta completa (con pagination, etc.)
+  getFull: (endpoint) => request(endpoint, { method: 'GET' }, true),
 
   post: (endpoint, body) => request(endpoint, {
     method: 'POST',
@@ -69,6 +72,27 @@ const api = {
       throw new Error(data.error?.message || 'Error en la solicitud')
     }
     return data.data
+  },
+
+  // Para enviar FormData generico (sin Content-Type para que el browser lo maneje)
+  postFormData: async (endpoint, formData) => {
+    const token = localStorage.getItem('adminToken')
+    const headers = {}
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Error en la solicitud')
+    }
+    return data
   },
 }
 

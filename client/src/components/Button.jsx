@@ -39,7 +39,9 @@ export function Button({
           Procesando...
         </span>
       ) : (
-        children
+        <span className="flex items-center justify-center">
+          {children}
+        </span>
       )}
     </button>
   )

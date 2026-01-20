@@ -1,9 +1,247 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Receipt, TrendingUp, TrendingDown, DollarSign, Calendar, ChevronDown, ChevronRight, Users, AlertCircle, Clock, Percent, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Receipt, TrendingUp, DollarSign, ChevronDown, ChevronRight, Users, AlertCircle, Clock, Percent, PieChart as PieChartIcon, ArrowLeftCircle } from 'lucide-react'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+
+// Colores para los gráficos
+const COLORES_COBRADO = ['#22c55e', '#16a34a', '#15803d', '#166534', '#14532d']
+const COLORES_PENDIENTE = ['#eab308', '#ca8a04', '#a16207', '#854d0e', '#713f12']
+
+// Tooltip personalizado
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload
+    return (
+      <div className="bg-white px-3 py-2 shadow-lg rounded-lg border border-gray-200">
+        <p className="font-medium text-gray-800">{data.nombre}</p>
+        <p className="text-sm text-gray-600">${data.valor?.toLocaleString('es-AR')}</p>
+      </div>
+    )
+  }
+  return null
+}
+
+// Componente de gráfico de torta compacto con leyenda
+function GraficoTorta({ datos, colores, titulo, total, onSliceClick }) {
+  if (!datos || datos.length === 0 || total === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+        <PieChartIcon className="w-8 h-8 mb-2" />
+        <p className="text-sm">Sin datos</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="w-36 h-36">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={datos}
+              cx="50%"
+              cy="50%"
+              innerRadius={28}
+              outerRadius={50}
+              paddingAngle={2}
+              dataKey="valor"
+              nameKey="nombre"
+              onClick={onSliceClick}
+              style={{ cursor: onSliceClick ? 'pointer' : 'default' }}
+            >
+              {datos.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={colores[index % colores.length]}
+                  className="hover:opacity-80 transition-opacity"
+                />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-xl font-bold text-gray-800 mt-1">${total.toLocaleString('es-AR')}</p>
+
+      {/* Leyenda compacta */}
+      <div className="mt-2 w-full space-y-0.5 max-h-24 overflow-y-auto">
+        {datos.map((item, i) => (
+          <div
+            key={i}
+            className={`flex items-center justify-between py-0.5 px-1 rounded text-xs ${onSliceClick ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+            onClick={() => onSliceClick && onSliceClick(item)}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: colores[i % colores.length] }}
+              />
+              <span className="text-gray-700 truncate">{item.nombre}</span>
+            </div>
+            <span className="text-gray-500 ml-1 flex-shrink-0">
+              {((item.valor / total) * 100).toFixed(0)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Componente contenedor de los gráficos de torta
+function GraficosTorta({ reporte, nivel, setNivel, actividadSeleccionada, setActividadSeleccionada }) {
+  if (!reporte?.categorias) return null
+
+  // Preparar datos según el nivel
+  let datosCobrado = []
+  let datosPendiente = []
+  let totalCobrado = 0
+  let totalPendiente = 0
+  let titulo = ''
+  let subtitulo = ''
+
+  if (nivel === 'categorias') {
+    // Nivel 1: Cuota Social vs Actividades
+    titulo = 'Distribución por Tipo'
+    subtitulo = 'Clic en una sección para ver detalle'
+
+    reporte.categorias.forEach(cat => {
+      if (cat.cobrado > 0) {
+        datosCobrado.push({ nombre: cat.nombre, valor: cat.cobrado, categoria: cat.categoria, data: cat })
+        totalCobrado += cat.cobrado
+      }
+      if (cat.pendiente > 0) {
+        datosPendiente.push({ nombre: cat.nombre, valor: cat.pendiente, categoria: cat.categoria, data: cat })
+        totalPendiente += cat.pendiente
+      }
+    })
+  } else if (nivel === 'actividades') {
+    // Nivel 2: Actividades individuales
+    const catActividades = reporte.categorias.find(c => c.categoria === 'CUOTA_ACTIVIDAD')
+    titulo = 'Actividades'
+    subtitulo = 'Clic en una actividad para ver categorías'
+
+    if (catActividades?.actividades) {
+      catActividades.actividades.forEach(act => {
+        if (act.cobrado > 0) {
+          datosCobrado.push({ nombre: act.nombre, valor: act.cobrado, id: act.id, data: act })
+          totalCobrado += act.cobrado
+        }
+        if (act.pendiente > 0) {
+          datosPendiente.push({ nombre: act.nombre, valor: act.pendiente, id: act.id, data: act })
+          totalPendiente += act.pendiente
+        }
+      })
+    }
+  } else if (nivel === 'categoriasActividad' && actividadSeleccionada) {
+    // Nivel 3: Categorías de una actividad
+    titulo = actividadSeleccionada.nombre
+    subtitulo = 'Categorías de la actividad'
+
+    if (actividadSeleccionada.categorias) {
+      actividadSeleccionada.categorias.forEach(cat => {
+        if (cat.cobrado > 0) {
+          datosCobrado.push({ nombre: cat.nombre, valor: cat.cobrado, id: cat.id })
+          totalCobrado += cat.cobrado
+        }
+        if (cat.pendiente > 0) {
+          datosPendiente.push({ nombre: cat.nombre, valor: cat.pendiente, id: cat.id })
+          totalPendiente += cat.pendiente
+        }
+      })
+    }
+  }
+
+  function handleClickCobrado(data) {
+    if (nivel === 'categorias' && data.categoria === 'CUOTA_ACTIVIDAD') {
+      setNivel('actividades')
+    } else if (nivel === 'actividades' && data.data?.categorias?.length > 0) {
+      setActividadSeleccionada(data.data)
+      setNivel('categoriasActividad')
+    }
+  }
+
+  function handleClickPendiente(data) {
+    if (nivel === 'categorias' && data.categoria === 'CUOTA_ACTIVIDAD') {
+      setNivel('actividades')
+    } else if (nivel === 'actividades' && data.data?.categorias?.length > 0) {
+      setActividadSeleccionada(data.data)
+      setNivel('categoriasActividad')
+    }
+  }
+
+  function handleVolver() {
+    if (nivel === 'categoriasActividad') {
+      setNivel('actividades')
+      setActividadSeleccionada(null)
+    } else if (nivel === 'actividades') {
+      setNivel('categorias')
+    }
+  }
+
+  return (
+    <div className="lg:w-64 flex-shrink-0 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        {nivel !== 'categorias' && (
+          <button
+            onClick={handleVolver}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition bg-white border border-gray-200"
+            title="Volver"
+          >
+            <ArrowLeftCircle className="w-4 h-4 text-gray-500" />
+          </button>
+        )}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">{titulo}</h3>
+          <p className="text-xs text-gray-500">{subtitulo}</p>
+        </div>
+      </div>
+
+      {/* Tarjeta Cobrado */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium text-green-600">Cobrado</p>
+          <div className="p-1 rounded bg-green-100">
+            <PieChartIcon className="w-3 h-3 text-green-600" />
+          </div>
+        </div>
+        <GraficoTorta
+          datos={datosCobrado}
+          colores={COLORES_COBRADO}
+          titulo="cobrado"
+          total={totalCobrado}
+          onSliceClick={nivel !== 'categoriasActividad' ? handleClickCobrado : null}
+        />
+      </div>
+
+      {/* Tarjeta Pendiente */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium text-yellow-600">Pendiente</p>
+          <div className="p-1 rounded bg-yellow-100">
+            <PieChartIcon className="w-3 h-3 text-yellow-600" />
+          </div>
+        </div>
+        <GraficoTorta
+          datos={datosPendiente}
+          colores={COLORES_PENDIENTE}
+          titulo="pendiente"
+          total={totalPendiente}
+          onSliceClick={nivel !== 'categoriasActividad' ? handleClickPendiente : null}
+        />
+      </div>
+
+      {nivel !== 'categoriasActividad' && (
+        <p className="text-xs text-gray-400 text-center">
+          Clic en el gráfico para ver detalle
+        </p>
+      )}
+    </div>
+  )
+}
 
 export default function ReporteCuotas() {
   const navigate = useNavigate()
@@ -11,7 +249,8 @@ export default function ReporteCuotas() {
   const [error, setError] = useState(null)
   const [reporte, setReporte] = useState(null)
   const [periodos, setPeriodos] = useState([])
-  const [periodoId, setPeriodoId] = useState('')
+  const [periodoId, setPeriodoId] = useState(null) // null = no cargado aún
+  const [periodosCargados, setPeriodosCargados] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState({})
   const [expandedActivities, setExpandedActivities] = useState({})
 
@@ -21,73 +260,49 @@ export default function ReporteCuotas() {
   const [loadingMorosos, setLoadingMorosos] = useState(false)
   const [morososFiltro, setMorososFiltro] = useState(null)
 
-  // Gráfico de evolución
-  const [evolucionData, setEvolucionData] = useState([])
-  const [loadingEvolucion, setLoadingEvolucion] = useState(false)
-  const [rangoFechas, setRangoFechas] = useState(() => {
-    const hoy = new Date()
-    const hace6Meses = new Date(hoy.getFullYear(), hoy.getMonth() - 5, 1)
-    return {
-      desde: hace6Meses.toISOString().split('T')[0],
-      hasta: hoy.toISOString().split('T')[0],
-    }
-  })
-
-  // Filtros del gráfico
-  const [filtroGrafico, setFiltroGrafico] = useState({
-    categoria: '',
-    actividadId: '',
-    categoriaActividadId: '',
-  })
-  const [actividades, setActividades] = useState([])
-  const [categoriasActividad, setCategoriasActividad] = useState([])
+  // Gráficos de torta - navegación
+  const [nivelGrafico, setNivelGrafico] = useState('categorias')
+  const [actividadGrafico, setActividadGrafico] = useState(null)
 
   useEffect(() => {
     cargarPeriodos()
-    cargarActividades()
   }, [])
 
   useEffect(() => {
-    cargarReporte()
-  }, [periodoId])
-
-  useEffect(() => {
-    cargarEvolucion()
-  }, [rangoFechas, filtroGrafico])
-
-  // Cargar categorías cuando cambia la actividad seleccionada
-  useEffect(() => {
-    if (filtroGrafico.actividadId) {
-      cargarCategoriasActividad(filtroGrafico.actividadId)
-    } else {
-      setCategoriasActividad([])
+    // Solo cargar reporte después de que los períodos estén cargados
+    if (periodosCargados) {
+      cargarReporte()
+      // Resetear el nivel del gráfico cuando cambia el período
+      setNivelGrafico('categorias')
+      setActividadGrafico(null)
     }
-  }, [filtroGrafico.actividadId])
+  }, [periodoId, periodosCargados])
 
   async function cargarPeriodos() {
     try {
       const data = await api.get('/admin/periodos')
       setPeriodos(data || [])
+
+      // Seleccionar el período actual por defecto
+      const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+      const hoy = new Date()
+      const mesActual = meses[hoy.getMonth()]
+      const añoActual = hoy.getFullYear()
+      const nombrePeriodoActual = `${mesActual} ${añoActual}`
+
+      const periodoActual = (data || []).find(p =>
+        p.estado === 'GENERADO' && p.nombre === nombrePeriodoActual
+      )
+      if (periodoActual) {
+        setPeriodoId(periodoActual.id.toString())
+      } else {
+        setPeriodoId('') // Sin período seleccionado
+      }
+      setPeriodosCargados(true)
     } catch (err) {
       console.error('Error cargando periodos:', err)
-    }
-  }
-
-  async function cargarActividades() {
-    try {
-      const data = await api.get('/admin/actividades')
-      setActividades(data || [])
-    } catch (err) {
-      console.error('Error cargando actividades:', err)
-    }
-  }
-
-  async function cargarCategoriasActividad(actividadId) {
-    try {
-      const data = await api.get(`/admin/actividades/${actividadId}`)
-      setCategoriasActividad(data?.categorias || [])
-    } catch (err) {
-      console.error('Error cargando categorías:', err)
+      setPeriodosCargados(true) // Marcar como cargados aunque haya error
     }
   }
 
@@ -102,41 +317,6 @@ export default function ReporteCuotas() {
     } finally {
       setLoading(false)
     }
-  }
-
-  async function cargarEvolucion() {
-    setLoadingEvolucion(true)
-    try {
-      const params = new URLSearchParams()
-      if (rangoFechas.desde) params.append('desde', rangoFechas.desde)
-      if (rangoFechas.hasta) params.append('hasta', rangoFechas.hasta)
-      if (filtroGrafico.categoria) params.append('categoria', filtroGrafico.categoria)
-      if (filtroGrafico.actividadId) params.append('actividadId', filtroGrafico.actividadId)
-      if (filtroGrafico.categoriaActividadId) params.append('categoriaActividadId', filtroGrafico.categoriaActividadId)
-
-      const data = await api.get(`/admin/reportes/cobranza/evolucion?${params}`)
-      setEvolucionData(data.evolucion || [])
-    } catch (err) {
-      console.error('Error cargando evolución:', err)
-    } finally {
-      setLoadingEvolucion(false)
-    }
-  }
-
-  function handleCategoriaChange(categoria) {
-    setFiltroGrafico({
-      categoria,
-      actividadId: '',
-      categoriaActividadId: '',
-    })
-  }
-
-  function handleActividadChange(actividadId) {
-    setFiltroGrafico(prev => ({
-      ...prev,
-      actividadId,
-      categoriaActividadId: '',
-    }))
   }
 
   async function verMorosos(filtro) {
@@ -176,9 +356,6 @@ export default function ReporteCuotas() {
 
   const kpis = reporte?.kpis || {}
 
-  // Formatear números para el tooltip del gráfico
-  const formatCurrency = (value) => `$${value.toLocaleString('es-AR')}`
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -208,7 +385,7 @@ export default function ReporteCuotas() {
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">Período:</label>
           <select
-            value={periodoId}
+            value={periodoId || ''}
             onChange={(e) => setPeriodoId(e.target.value)}
             className="input-field w-48"
           >
@@ -300,12 +477,23 @@ export default function ReporteCuotas() {
         </div>
       </div>
 
-      {/* Tabla jerárquica */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">Desglose por Categoría</h2>
-          <p className="text-sm text-gray-500">Clic en una fila para ver los morosos de ese concepto</p>
-        </div>
+      {/* Contenedor principal: Gráficos a la izquierda + Tabla a la derecha */}
+      <div className="flex flex-col lg:flex-row gap-4 mb-6">
+        {/* Gráficos de Distribución */}
+        <GraficosTorta
+          reporte={reporte}
+          nivel={nivelGrafico}
+          setNivel={setNivelGrafico}
+          actividadSeleccionada={actividadGrafico}
+          setActividadSeleccionada={setActividadGrafico}
+        />
+
+        {/* Tabla jerárquica */}
+        <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <h2 className="text-base font-semibold text-gray-800">Desglose por Categoría</h2>
+            <p className="text-xs text-gray-500">Clic en una fila para ver morosos</p>
+          </div>
 
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -488,177 +676,12 @@ export default function ReporteCuotas() {
           </table>
         </div>
 
-        {(!reporte?.categorias || reporte.categorias.length === 0) && (
-          <div className="p-8 text-center text-gray-500">
-            No hay datos de cobranza para mostrar
-          </div>
-        )}
-      </div>
-
-      {/* Gráfico de Evolución */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
-            <div className="flex items-center gap-3">
-              <BarChart3 className="w-5 h-5 text-gray-600" />
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">Evolución de Cobranza</h2>
-                <p className="text-sm text-gray-500">Comparativa generado vs cobrado por período</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">Desde:</label>
-                <input
-                  type="date"
-                  value={rangoFechas.desde}
-                  onChange={(e) => setRangoFechas(prev => ({ ...prev, desde: e.target.value }))}
-                  className="input-field text-sm"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">Hasta:</label>
-                <input
-                  type="date"
-                  value={rangoFechas.hasta}
-                  onChange={(e) => setRangoFechas(prev => ({ ...prev, hasta: e.target.value }))}
-                  className="input-field text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Filtros en cascada */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">Tipo:</label>
-              <select
-                value={filtroGrafico.categoria}
-                onChange={(e) => handleCategoriaChange(e.target.value)}
-                className="input-field text-sm"
-              >
-                <option value="">Todos</option>
-                <option value="CUOTA_SOCIAL">Cuota Social</option>
-                <option value="CUOTA_ACTIVIDAD">Actividades</option>
-                <option value="INSCRIPCION">Inscripciones</option>
-                <option value="FINANCIACION">Financiación</option>
-              </select>
-            </div>
-
-            {filtroGrafico.categoria === 'CUOTA_ACTIVIDAD' && (
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">Actividad:</label>
-                <select
-                  value={filtroGrafico.actividadId}
-                  onChange={(e) => handleActividadChange(e.target.value)}
-                  className="input-field text-sm"
-                >
-                  <option value="">Todas</option>
-                  {actividades.map(act => (
-                    <option key={act.id} value={act.id}>{act.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {filtroGrafico.actividadId && categoriasActividad.length > 0 && (
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">Categoría:</label>
-                <select
-                  value={filtroGrafico.categoriaActividadId}
-                  onChange={(e) => setFiltroGrafico(prev => ({ ...prev, categoriaActividadId: e.target.value }))}
-                  className="input-field text-sm"
-                >
-                  <option value="">Todas</option>
-                  {categoriasActividad.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {(filtroGrafico.categoria || filtroGrafico.actividadId || filtroGrafico.categoriaActividadId) && (
-              <button
-                onClick={() => setFiltroGrafico({ categoria: '', actividadId: '', categoriaActividadId: '' })}
-                className="text-sm text-primary hover:underline"
-              >
-                Limpiar filtros
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="p-6">
-          {loadingEvolucion ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-            </div>
-          ) : evolucionData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={evolucionData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis
-                  dataKey="nombre"
-                  tick={{ fontSize: 12, fill: '#6b7280' }}
-                  tickLine={{ stroke: '#e5e7eb' }}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: '#6b7280' }}
-                  tickLine={{ stroke: '#e5e7eb' }}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  formatter={(value, name) => [formatCurrency(value), name === 'generado' ? 'Generado' : 'Cobrado']}
-                  labelStyle={{ fontWeight: 'bold' }}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                />
-                <Legend
-                  formatter={(value) => value === 'generado' ? 'Generado' : 'Cobrado'}
-                  wrapperStyle={{ paddingTop: '20px' }}
-                />
-                <Line type="monotone" dataKey="generado" stroke="#6b7280" strokeWidth={2} dot={{ r: 4 }} name="generado" />
-                <Line type="monotone" dataKey="cobrado" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} name="cobrado" />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-              <BarChart3 className="w-12 h-12 mb-3 text-gray-300" />
-              <p>No hay datos para el rango seleccionado</p>
+          {(!reporte?.categorias || reporte.categorias.length === 0) && (
+            <div className="p-8 text-center text-gray-500">
+              No hay datos de cobranza para mostrar
             </div>
           )}
         </div>
-
-        {/* Resumen del gráfico */}
-        {evolucionData.length > 0 && (
-          <div className="px-6 pb-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">Total Generado</p>
-                <p className="text-lg font-bold text-gray-700">
-                  ${evolucionData.reduce((sum, d) => sum + d.generado, 0).toLocaleString('es-AR')}
-                </p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">Total Cobrado</p>
-                <p className="text-lg font-bold text-green-600">
-                  ${evolucionData.reduce((sum, d) => sum + d.cobrado, 0).toLocaleString('es-AR')}
-                </p>
-              </div>
-              <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">Promedio Mensual</p>
-                <p className="text-lg font-bold text-blue-600">
-                  ${Math.round(evolucionData.reduce((sum, d) => sum + d.cobrado, 0) / evolucionData.length).toLocaleString('es-AR')}
-                </p>
-              </div>
-              <div className="bg-yellow-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">% Cobro Promedio</p>
-                <p className="text-lg font-bold text-yellow-600">
-                  {Math.round(evolucionData.reduce((sum, d) => sum + d.porcentajeCobro, 0) / evolucionData.length)}%
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Modal de Morosos */}

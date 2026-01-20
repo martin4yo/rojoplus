@@ -1,0 +1,691 @@
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Save, Package, Plus, Trash2, Upload, Star, X, Image } from 'lucide-react'
+import { Button } from '../../../components/Button'
+import { Alert } from '../../../components/Alert'
+import api from '../../../services/api'
+
+const TALLES_DEFAULT = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'UNICO']
+
+export default function ProductoForm() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const isEditing = id && id !== 'nuevo'
+  const startInEditMode = searchParams.get('editar') === 'true'
+  const fileInputRef = useRef(null)
+
+  const [loading, setLoading] = useState(isEditing)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
+  const [editMode, setEditMode] = useState(!isEditing || startInEditMode)
+
+  // Data para selects
+  const [categorias, setCategorias] = useState([])
+  const [conceptos, setConceptos] = useState([])
+
+  // Form data
+  const [form, setForm] = useState({
+    codigo: '',
+    nombre: '',
+    descripcion: '',
+    categoriaId: '',
+    precioCompra: '',
+    precioVenta: '',
+    conceptoCompraId: '',
+    conceptoVentaId: '',
+    activo: true
+  })
+
+  // Variantes (talles)
+  const [variantes, setVariantes] = useState([])
+  const [nuevaVariante, setNuevaVariante] = useState({ talle: '', color: '', stockActual: 0, stockMinimo: 0 })
+
+  // Fotos
+  const [fotos, setFotos] = useState([])
+  const [uploadingFoto, setUploadingFoto] = useState(false)
+
+  useEffect(() => {
+    cargarDatosAuxiliares()
+    if (isEditing) {
+      cargarProducto()
+    }
+  }, [id])
+
+  async function cargarDatosAuxiliares() {
+    try {
+      const [catRes, concRes] = await Promise.all([
+        api.getFull('/admin/categorias-producto?activo=true'),
+        api.getFull('/admin/conceptos-tesoreria?activo=true')
+      ])
+      setCategorias(catRes.data || [])
+      setConceptos(concRes.data || [])
+    } catch (err) {
+      console.error('Error cargando datos auxiliares:', err)
+    }
+  }
+
+  async function cargarProducto() {
+    setLoading(true)
+    try {
+      const res = await api.getFull(`/admin/productos/${id}`)
+      const producto = res.data
+      setForm({
+        codigo: producto.codigo || '',
+        nombre: producto.nombre || '',
+        descripcion: producto.descripcion || '',
+        categoriaId: producto.categoriaId ? String(producto.categoriaId) : '',
+        precioCompra: producto.precioCompra || '',
+        precioVenta: producto.precioVenta || '',
+        conceptoCompraId: producto.conceptoCompraId ? String(producto.conceptoCompraId) : '',
+        conceptoVentaId: producto.conceptoVentaId ? String(producto.conceptoVentaId) : '',
+        activo: producto.activo !== false
+      })
+      setVariantes(producto.variantes || [])
+      setFotos(producto.fotos || [])
+    } catch (err) {
+      setError('Error al cargar producto')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(null)
+
+    if (!form.codigo || !form.nombre) {
+      setError('Codigo y nombre son requeridos')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const datos = {
+        codigo: form.codigo,
+        nombre: form.nombre,
+        descripcion: form.descripcion || null,
+        categoriaId: form.categoriaId ? parseInt(form.categoriaId) : null,
+        precioCompra: form.precioCompra ? parseFloat(form.precioCompra) : null,
+        precioVenta: form.precioVenta ? parseFloat(form.precioVenta) : null,
+        conceptoCompraId: form.conceptoCompraId ? parseInt(form.conceptoCompraId) : null,
+        conceptoVentaId: form.conceptoVentaId ? parseInt(form.conceptoVentaId) : null,
+        activo: form.activo
+      }
+
+      // Si es nuevo, incluir variantes iniciales
+      if (!isEditing && variantes.length > 0) {
+        datos.variantes = variantes.map(v => ({
+          talle: v.talle,
+          color: v.color || null,
+          stockActual: parseFloat(v.stockActual) || 0,
+          stockMinimo: parseFloat(v.stockMinimo) || 0
+        }))
+      }
+
+      if (isEditing) {
+        await api.put(`/admin/productos/${id}`, datos)
+        setSuccess('Producto actualizado correctamente')
+        setEditMode(false)
+      } else {
+        const res = await api.post('/admin/productos', datos)
+        setSuccess('Producto creado correctamente')
+        navigate(`/admin/stock/productos/${res.data.id}`)
+      }
+    } catch (err) {
+      setError(err.message || 'Error al guardar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Variantes
+  async function agregarVariante() {
+    if (!nuevaVariante.talle) {
+      setError('Seleccione un talle')
+      return
+    }
+
+    // Verificar duplicado
+    const existe = variantes.find(v =>
+      v.talle === nuevaVariante.talle && (v.color || '') === (nuevaVariante.color || '')
+    )
+    if (existe) {
+      setError('Ya existe una variante con ese talle y color')
+      return
+    }
+
+    if (isEditing) {
+      // Guardar en servidor
+      try {
+        const res = await api.post(`/admin/productos/${id}/variantes`, nuevaVariante)
+        setVariantes([...variantes, res.data])
+        setNuevaVariante({ talle: '', color: '', stockActual: 0, stockMinimo: 0 })
+        setSuccess('Variante agregada')
+      } catch (err) {
+        setError(err.message || 'Error al agregar variante')
+      }
+    } else {
+      // Solo agregar localmente
+      setVariantes([...variantes, { ...nuevaVariante, id: Date.now() }])
+      setNuevaVariante({ talle: '', color: '', stockActual: 0, stockMinimo: 0 })
+    }
+  }
+
+  async function eliminarVariante(variante) {
+    if (isEditing) {
+      if (!confirm('Eliminar esta variante?')) return
+      try {
+        await api.delete(`/admin/producto-variantes/${variante.id}`)
+        setVariantes(variantes.filter(v => v.id !== variante.id))
+        setSuccess('Variante eliminada')
+      } catch (err) {
+        setError(err.message || 'Error al eliminar variante')
+      }
+    } else {
+      setVariantes(variantes.filter(v => v.id !== variante.id))
+    }
+  }
+
+  // Fotos
+  async function handleFotoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!isEditing) {
+      setError('Guarde el producto primero para subir fotos')
+      return
+    }
+
+    setUploadingFoto(true)
+    try {
+      const formData = new FormData()
+      formData.append('foto', file)
+      const res = await api.postFormData(`/admin/productos/${id}/fotos`, formData)
+      setFotos([...fotos, res.data])
+      setSuccess('Foto subida correctamente')
+    } catch (err) {
+      setError(err.message || 'Error al subir foto')
+    } finally {
+      setUploadingFoto(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  async function marcarFotoPrincipal(fotoId) {
+    try {
+      await api.put(`/admin/producto-fotos/${fotoId}/principal`)
+      setFotos(fotos.map(f => ({ ...f, esPrincipal: f.id === fotoId })))
+      setSuccess('Foto marcada como principal')
+    } catch (err) {
+      setError(err.message || 'Error al marcar foto')
+    }
+  }
+
+  async function eliminarFoto(fotoId) {
+    if (!confirm('Eliminar esta foto?')) return
+    try {
+      await api.delete(`/admin/producto-fotos/${fotoId}`)
+      setFotos(fotos.filter(f => f.id !== fotoId))
+      setSuccess('Foto eliminada')
+    } catch (err) {
+      setError(err.message || 'Error al eliminar foto')
+    }
+  }
+
+  // Agregar talles rapidos
+  function agregarTallesRapido() {
+    const nuevos = TALLES_DEFAULT.filter(t => !variantes.find(v => v.talle === t))
+      .map(talle => ({
+        id: Date.now() + Math.random(),
+        talle,
+        color: '',
+        stockActual: 0,
+        stockMinimo: 0
+      }))
+    setVariantes([...variantes, ...nuevos])
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+
+  const conceptosCompra = conceptos.filter(c => c.tipo === 'EGRESO' || c.tipo === 'AMBOS')
+  const conceptosVenta = conceptos.filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS')
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <button
+          onClick={() => navigate('/admin/stock/productos')}
+          className="p-2 hover:bg-gray-100 rounded-lg"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        </button>
+        <div className="flex items-center gap-3 flex-1">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Package className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {isEditing ? (editMode ? 'Editar Producto' : form.nombre) : 'Nuevo Producto'}
+            </h1>
+            {isEditing && <p className="text-gray-500 text-sm">{form.codigo}</p>}
+          </div>
+        </div>
+        {isEditing && !editMode && (
+          <Button onClick={() => setEditMode(true)}>Editar</Button>
+        )}
+      </div>
+
+      {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
+      {success && <Alert type="success" className="mb-4" onClose={() => setSuccess(null)}>{success}</Alert>}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Columna izquierda - Form */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Datos basicos */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="font-semibold text-gray-800 mb-4">Datos del Producto</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Codigo *</label>
+                  <input
+                    type="text"
+                    value={form.codigo}
+                    onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })}
+                    className="input-field w-full font-mono"
+                    placeholder="Ej: REM-001"
+                    disabled={!editMode}
+                    required
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                  <input
+                    type="text"
+                    value={form.nombre}
+                    onChange={e => setForm({ ...form, nombre: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="Ej: Remera Oficial 2026"
+                    disabled={!editMode}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripcion</label>
+                <textarea
+                  value={form.descripcion}
+                  onChange={e => setForm({ ...form, descripcion: e.target.value })}
+                  className="input-field w-full"
+                  rows={2}
+                  placeholder="Descripcion opcional del producto..."
+                  disabled={!editMode}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                  <select
+                    value={form.categoriaId}
+                    onChange={e => setForm({ ...form, categoriaId: e.target.value })}
+                    className="input-field w-full"
+                    disabled={!editMode}
+                  >
+                    <option value="">Sin categoria</option>
+                    {categorias.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  {isEditing && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.activo}
+                        onChange={e => setForm({ ...form, activo: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-primary"
+                        disabled={!editMode}
+                      />
+                      <span className="text-sm text-gray-700">Producto activo</span>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Precios */}
+              <div className="pt-4 border-t">
+                <h3 className="font-medium text-gray-700 mb-3">Precios</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Precio Compra</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={form.precioCompra}
+                        onChange={e => setForm({ ...form, precioCompra: e.target.value })}
+                        className="input-field w-full pl-7"
+                        placeholder="0.00"
+                        disabled={!editMode}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Precio Venta</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={form.precioVenta}
+                        onChange={e => setForm({ ...form, precioVenta: e.target.value })}
+                        className="input-field w-full pl-7"
+                        placeholder="0.00"
+                        disabled={!editMode}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Conceptos Contables */}
+              <div className="pt-4 border-t">
+                <h3 className="font-medium text-gray-700 mb-3">Conceptos Contables</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Compra</label>
+                    <select
+                      value={form.conceptoCompraId}
+                      onChange={e => setForm({ ...form, conceptoCompraId: e.target.value })}
+                      className="input-field w-full"
+                      disabled={!editMode}
+                    >
+                      <option value="">Sin concepto</option>
+                      {conceptosCompra.map(c => (
+                        <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Para facturas de compra</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Venta</label>
+                    <select
+                      value={form.conceptoVentaId}
+                      onChange={e => setForm({ ...form, conceptoVentaId: e.target.value })}
+                      className="input-field w-full"
+                      disabled={!editMode}
+                    >
+                      <option value="">Sin concepto</option>
+                      {conceptosVenta.map(c => (
+                        <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Para facturas de venta</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones */}
+              {editMode && (
+                <div className="flex gap-3 pt-4 border-t">
+                  <Button type="submit" loading={saving}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Guardar
+                  </Button>
+                  {isEditing && (
+                    <Button type="button" variant="secondary" onClick={() => {
+                      setEditMode(false)
+                      cargarProducto()
+                    }}>
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Variantes / Talles */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-800">Variantes / Talles</h2>
+              {editMode && !isEditing && (
+                <Button variant="secondary" size="sm" onClick={agregarTallesRapido}>
+                  Agregar talles estandar
+                </Button>
+              )}
+            </div>
+
+            {/* Lista de variantes */}
+            {variantes.length > 0 ? (
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Talle</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Color</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">Stock</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">Minimo</th>
+                      {editMode && <th className="px-3 py-2"></th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {variantes.map((v, i) => (
+                      <tr key={v.id || i} className={v.stockActual <= v.stockMinimo ? 'bg-orange-50' : ''}>
+                        <td className="px-3 py-2 font-medium">{v.talle}</td>
+                        <td className="px-3 py-2 text-gray-600">{v.color || '-'}</td>
+                        <td className="px-3 py-2 text-right font-medium">{v.stockActual}</td>
+                        <td className="px-3 py-2 text-right text-gray-500">{v.stockMinimo}</td>
+                        {editMode && (
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => eliminarVariante(v)}
+                              className="p-1 text-red-500 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm mb-4">No hay variantes definidas</p>
+            )}
+
+            {/* Agregar variante */}
+            {editMode && (
+              <div className="border-t pt-4">
+                <p className="text-sm text-gray-600 mb-2">Agregar variante:</p>
+                <div className="flex flex-wrap gap-2 items-end">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Talle *</label>
+                    <select
+                      value={nuevaVariante.talle}
+                      onChange={e => setNuevaVariante({ ...nuevaVariante, talle: e.target.value })}
+                      className="input-field"
+                    >
+                      <option value="">Seleccionar</option>
+                      {TALLES_DEFAULT.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                      <option value="OTRO">Otro...</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Color</label>
+                    <input
+                      type="text"
+                      value={nuevaVariante.color}
+                      onChange={e => setNuevaVariante({ ...nuevaVariante, color: e.target.value })}
+                      className="input-field w-24"
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Stock</label>
+                    <input
+                      type="number"
+                      value={nuevaVariante.stockActual}
+                      onChange={e => setNuevaVariante({ ...nuevaVariante, stockActual: e.target.value })}
+                      className="input-field w-20"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Minimo</label>
+                    <input
+                      type="number"
+                      value={nuevaVariante.stockMinimo}
+                      onChange={e => setNuevaVariante({ ...nuevaVariante, stockMinimo: e.target.value })}
+                      className="input-field w-20"
+                      min="0"
+                    />
+                  </div>
+                  <Button type="button" size="sm" onClick={agregarVariante}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Columna derecha - Fotos */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="font-semibold text-gray-800 mb-4">Fotos</h2>
+
+            {/* Grid de fotos */}
+            {fotos.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {fotos.map(foto => (
+                  <div key={foto.id} className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100">
+                    <img
+                      src={foto.url}
+                      alt="Producto"
+                      className="w-full h-full object-cover"
+                    />
+                    {foto.esPrincipal && (
+                      <div className="absolute top-1 left-1 bg-yellow-500 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <Star className="w-3 h-3" /> Principal
+                      </div>
+                    )}
+                    {editMode && (
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                        {!foto.esPrincipal && (
+                          <button
+                            type="button"
+                            onClick={() => marcarFotoPrincipal(foto.id)}
+                            className="p-2 bg-white rounded-full text-yellow-600 hover:bg-yellow-50"
+                            title="Marcar como principal"
+                          >
+                            <Star className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => eliminarFoto(foto.id)}
+                          className="p-2 bg-white rounded-full text-red-600 hover:bg-red-50"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+                <Image className="w-16 h-16 text-gray-300" />
+              </div>
+            )}
+
+            {/* Upload */}
+            {isEditing && editMode && (
+              <div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFotoUpload}
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => fileInputRef.current?.click()}
+                  loading={uploadingFoto}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Subir Foto
+                </Button>
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  JPG, PNG o WebP. Max 5MB
+                </p>
+              </div>
+            )}
+
+            {!isEditing && (
+              <p className="text-sm text-gray-500 text-center">
+                Guarde el producto para poder agregar fotos
+              </p>
+            )}
+          </div>
+
+          {/* Resumen de stock */}
+          {isEditing && variantes.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="font-semibold text-gray-800 mb-4">Resumen de Stock</h2>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Stock Total:</span>
+                  <span className="font-bold">{variantes.reduce((s, v) => s + Number(v.stockActual), 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Variantes:</span>
+                  <span className="font-medium">{variantes.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Bajo minimo:</span>
+                  <span className={`font-medium ${variantes.filter(v => v.stockActual <= v.stockMinimo).length > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                    {variantes.filter(v => v.stockActual <= v.stockMinimo).length}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t">
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => navigate(`/admin/stock/movimientos?productoId=${id}`)}
+                >
+                  Ver Movimientos
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

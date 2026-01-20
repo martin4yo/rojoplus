@@ -19,7 +19,8 @@ const TITULOS = {
   'tipos-socio': 'Tipo de Socio',
   'categorias-socio': 'Categoría de Socio',
   'estados-socio': 'Estado de Socio',
-  'conceptos-tesoreria': 'Concepto de Tesorería',
+  'conceptos-tesoreria': 'Concepto',
+  'cargos-personal': 'Cargo de Personal',
 }
 
 export default function ConfiguracionForm() {
@@ -31,6 +32,7 @@ export default function ConfiguracionForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [conceptosTesoreria, setConceptosTesoreria] = useState([])
+  const [cuentasContables, setCuentasContables] = useState([])
 
   const titulo = TITULOS[tabla] || 'Registro'
 
@@ -50,11 +52,18 @@ export default function ConfiguracionForm() {
     permiteDescuentos: true,
     // conceptos-tesoreria
     tipo: 'INGRESO',
+    usaEnCompras: false,
+    usaEnVentas: false,
+    usaEnTesoreria: true,
+    cuentaContableId: '',
   })
 
   useEffect(() => {
     if (tabla === 'tipos-socio') {
       cargarConceptosTesoreria()
+    }
+    if (tabla === 'conceptos-tesoreria') {
+      cargarCuentasContables()
     }
     if (isEditing) {
       cargarDatos()
@@ -67,6 +76,15 @@ export default function ConfiguracionForm() {
       setConceptosTesoreria(data || [])
     } catch (err) {
       console.error('Error cargando conceptos:', err)
+    }
+  }
+
+  async function cargarCuentasContables() {
+    try {
+      const res = await api.getFull('/admin/cuentas-contables?flat=true&esImputable=true&activo=true')
+      setCuentasContables(res.data || [])
+    } catch (err) {
+      console.error('Error cargando cuentas contables:', err)
     }
   }
 
@@ -85,7 +103,12 @@ export default function ConfiguracionForm() {
         conceptoTesoreriaId: data.conceptoTesoreriaId || '',
         porcentajeDescuento: data.porcentajeDescuento || 0,
         permiteDescuentos: data.permiteDescuentos !== false,
+        // conceptos-tesoreria
         tipo: data.tipo || 'INGRESO',
+        usaEnCompras: data.usaEnCompras || false,
+        usaEnVentas: data.usaEnVentas || false,
+        usaEnTesoreria: data.usaEnTesoreria !== false,
+        cuentaContableId: data.cuentaContableId ? String(data.cuentaContableId) : '',
       })
     } catch (err) {
       setError('Error al cargar datos')
@@ -127,6 +150,10 @@ export default function ConfiguracionForm() {
 
       if (tabla === 'conceptos-tesoreria') {
         datos.tipo = form.tipo
+        datos.usaEnCompras = form.usaEnCompras
+        datos.usaEnVentas = form.usaEnVentas
+        datos.usaEnTesoreria = form.usaEnTesoreria
+        datos.cuentaContableId = form.cuentaContableId ? parseInt(form.cuentaContableId) : null
       }
 
       if (isEditing) {
@@ -239,7 +266,7 @@ export default function ConfiguracionForm() {
                     className="input-field w-full"
                   >
                     <option value="">Sin asignar</option>
-                    {conceptosTesoreria.filter(c => c.tipo === 'INGRESO').map(c => (
+                    {conceptosTesoreria.map(c => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </select>
@@ -286,33 +313,94 @@ export default function ConfiguracionForm() {
 
           {/* Campos específicos para conceptos-tesoreria */}
           {tabla === 'conceptos-tesoreria' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Concepto</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="tipo"
-                    value="INGRESO"
-                    checked={form.tipo === 'INGRESO'}
-                    onChange={e => setForm({ ...form, tipo: e.target.value })}
-                    className="text-green-600"
-                  />
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm">Ingreso</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="tipo"
-                    value="EGRESO"
-                    checked={form.tipo === 'EGRESO'}
-                    onChange={e => setForm({ ...form, tipo: e.target.value })}
-                    className="text-red-600"
-                  />
-                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-sm">Egreso</span>
-                </label>
+            <>
+              {/* Tipo de concepto */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
+                <div className="flex gap-2">
+                  {['INGRESO', 'EGRESO', 'AMBOS'].map(tipo => (
+                    <button
+                      key={tipo}
+                      type="button"
+                      onClick={() => setForm({ ...form, tipo, cuentaContableId: '' })}
+                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition ${
+                        form.tipo === tipo
+                          ? tipo === 'INGRESO'
+                            ? 'border-green-500 bg-green-50 text-green-700'
+                            : tipo === 'EGRESO'
+                            ? 'border-red-500 bg-red-50 text-red-700'
+                            : 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {tipo === 'INGRESO' ? 'Ingreso' : tipo === 'EGRESO' ? 'Egreso' : 'Ambos'}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+
+              {/* Usar en */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Usar en</label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.usaEnTesoreria}
+                      onChange={e => setForm({ ...form, usaEnTesoreria: e.target.checked })}
+                      className="rounded border-gray-300 text-primary"
+                    />
+                    <span className="text-sm text-gray-700">Tesorería</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.usaEnCompras}
+                      onChange={e => setForm({ ...form, usaEnCompras: e.target.checked })}
+                      className="rounded border-gray-300 text-primary"
+                    />
+                    <span className="text-sm text-gray-700">Compras</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.usaEnVentas}
+                      onChange={e => setForm({ ...form, usaEnVentas: e.target.checked })}
+                      className="rounded border-gray-300 text-primary"
+                    />
+                    <span className="text-sm text-gray-700">Ventas</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Cuenta Contable */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cuenta Contable (opcional)
+                </label>
+                <select
+                  value={form.cuentaContableId}
+                  onChange={e => setForm({ ...form, cuentaContableId: e.target.value })}
+                  className="input-field w-full"
+                >
+                  <option value="">Sin asignar</option>
+                  {cuentasContables
+                    .filter(c => {
+                      if (form.tipo === 'INGRESO') return c.tipo === 'INGRESO' || c.codigo.startsWith('4')
+                      if (form.tipo === 'EGRESO') return c.tipo === 'EGRESO' || c.codigo.startsWith('5')
+                      return true
+                    })
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.codigo} - {c.nombre}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Vincula a una cuenta del plan de cuentas para reportes contables
+                </p>
+              </div>
+            </>
           )}
 
           {/* Color del badge (no para conceptos-tesoreria) */}

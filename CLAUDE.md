@@ -54,14 +54,31 @@ RojoPlus/
 
 ## Estado Actual del Desarrollo
 
-### Fase 0: Base de Datos - EN PROGRESO
+### Completado
 
-- [x] Rama `feature/gestion-club` creada
-- [x] Schema completo diseñado (30+ modelos)
-- [x] Seeds iniciales creados y ejecutados
-- [x] Migracion aplicada en desarrollo
-- [ ] Regenerar Prisma Client (detener servidor primero)
-- [ ] Deploy a produccion
+- [x] Sistema base de gestion de socios
+- [x] Cuotas y recargos por mora
+- [x] Planes de pago (financiacion)
+- [x] Reportes de cobranza con KPIs
+- [x] Portal del socio con pagos online (MercadoPago/MODO)
+- [x] Sistema de caja y movimientos
+- [x] Actividades deportivas e inscripciones
+
+### Ultima Sesion (20 Enero 2026)
+
+- [x] ReporteCuotas: Layout optimizado (graficos izq, tabla der)
+- [x] ReporteActividades: Layout optimizado con tarjetas
+- [x] ReporteSocios: Filtro por estado, metricas avanzadas, selector de periodo
+- [x] Header: "El equipo de la ciudad"
+
+### Pendiente - Plan Modulos Financieros
+
+Ver plan detallado: `C:\Users\marti\.claude\plans\linear-cooking-gosling.md`
+
+1. **Ingresos**: Clientes, Facturas emitidas, Recibos de cobro
+2. **Egresos**: Proveedores, Personal, Facturas recibidas, Ordenes de pago
+3. **Tesoreria**: Cajas, Movimientos, Transferencias
+4. **Stock**: Productos con talles, fotos, control de inventario
 
 ### Modelos Principales del Schema
 
@@ -144,17 +161,19 @@ Admin: admin@rojoplus.com / admin123
 
 ## Proximos Pasos
 
-1. **Fase 1**: Completar CRUD de socios con nuevos campos
-2. **Fase 2**: ABM de deportes y sistema de inscripciones
-3. **Fase 3**: Generacion de cuotas y recargos
-4. **Fase 4**: Sistema de cobranza
-5. **Fase 5**: Caja y movimientos
-6. **Fase 5.5**: Debito automatico
-7. **Fase 5.6**: Conciliacion bancaria
-8. **Fase 6**: Portal de socio con pagos online
+### Prioridad Alta - Modulos Financieros
+1. **Fase 7**: Modulo de Entidades (Proveedores, Clientes, Personal)
+2. **Fase 8**: MovimientoContable unificado (facturas, pagos, cobros)
+3. **Fase 9**: Tesoreria avanzada (transferencias entre cajas)
+4. **Fase 10**: Stock con variantes/talles y fotos
 
-Ver `docs/12-PLAN-DE-TRABAJO.md` para el plan detallado.
+### Futuro
+- Debito automatico (Prisma/Payway)
+- Conciliacion bancaria
+- Reportes exportables PDF/Excel
+
+Ver plan completo en `docs/12-PLAN-DE-TRABAJO.md`
 
 ---
 
-*Ultima actualizacion: Enero 2026 - Fase 0 en progreso*
+*Ultima actualizacion: 20 Enero 2026*

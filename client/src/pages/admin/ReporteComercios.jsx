@@ -11,9 +11,13 @@ export default function ReporteComercios() {
   const [error, setError] = useState(null)
   const [comercios, setComercios] = useState([])
   const [reporte, setReporte] = useState(null)
-  const [filtros, setFiltros] = useState({
-    desde: '',
-    hasta: '',
+  const [filtros, setFiltros] = useState(() => {
+    const hoy = new Date()
+    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+    return {
+      desde: primerDiaMes.toISOString().split('T')[0],
+      hasta: hoy.toISOString().split('T')[0],
+    }
   })
 
   useEffect(() => {
@@ -23,9 +27,15 @@ export default function ReporteComercios() {
   async function cargarDatos() {
     setLoading(true)
     try {
+      // Calcular fechas del mes actual para la carga inicial
+      const hoy = new Date()
+      const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+      const desde = primerDiaMes.toISOString().split('T')[0]
+      const hasta = hoy.toISOString().split('T')[0]
+
       const [comerciosData, reporteData] = await Promise.all([
         api.get('/admin/comercios?estado=ACTIVO'),
-        api.get('/admin/reportes/ventas'),
+        api.get(`/admin/reportes/ventas?desde=${desde}&hasta=${hasta}`),
       ])
       setComercios(comerciosData.comercios || [])
       setReporte(reporteData)

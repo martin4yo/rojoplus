@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Users, Dumbbell, UserX, Receipt, Clock, TrendingUp, TrendingDown, Wallet, CreditCard, Banknote } from 'lucide-react'
+import { Users, Dumbbell, UserX, Receipt, Clock, TrendingUp, TrendingDown, Wallet, CreditCard, Banknote, LayoutDashboard } from 'lucide-react'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 
@@ -33,7 +33,12 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Dashboard</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <LayoutDashboard className="w-6 h-6 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+      </div>
 
       {/* Alerta de pendientes */}
       {stats?.comerciosPendientes > 0 && (
@@ -94,18 +99,9 @@ export default function AdminDashboard() {
 
       {/* Cobranza del período */}
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-700">
-            Cobranza {stats?.periodoActual?.nombre || 'Sin período'}
-          </h2>
-          <button
-            onClick={() => navigate('/admin/cuotas')}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-medium"
-          >
-            <Receipt className="w-4 h-4" />
-            Cobrar Cuota
-          </button>
-        </div>
+        <h2 className="text-lg font-semibold text-gray-700 mb-3">
+          Cobranza {stats?.periodoActual?.nombre || 'Sin período'}
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 min-h-[120px] flex items-center">
             <div className="flex items-center gap-4">
@@ -121,18 +117,27 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 min-h-[120px] flex items-center">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-yellow-100">
-                <Clock className="w-6 h-6 text-yellow-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 min-h-[120px]">
+            <div className="flex items-center justify-between h-full">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-yellow-100">
+                  <Clock className="w-6 h-6 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Pendiente</p>
+                  <p className="text-xl font-bold text-yellow-600">
+                    ${(stats?.cobranzaPeriodo?.pendiente || 0).toLocaleString('es-AR')}
+                  </p>
+                  <p className="text-xs text-gray-400">{stats?.cobranzaPeriodo?.cantPendiente || 0} cuotas</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-500">Pendiente</p>
-                <p className="text-xl font-bold text-yellow-600">
-                  ${(stats?.cobranzaPeriodo?.pendiente || 0).toLocaleString('es-AR')}
-                </p>
-                <p className="text-xs text-gray-400">{stats?.cobranzaPeriodo?.cantPendiente || 0} cuotas</p>
-              </div>
+              <button
+                onClick={() => navigate('/admin/cuotas')}
+                className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium"
+              >
+                <Receipt className="w-4 h-4" />
+                Cobrar
+              </button>
             </div>
           </div>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 min-h-[120px] flex items-center">

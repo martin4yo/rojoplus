@@ -1,8 +1,119 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Users, ChevronRight, Search, X, User } from 'lucide-react'
+import { ArrowLeft, Users, ChevronRight, Search, X, User, PieChart as PieChartIcon, ArrowLeftCircle } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+
+// Colores para el gráfico de torta
+const COLORES_TORTA = [
+  '#DC2626', '#EA580C', '#D97706', '#CA8A04', '#65A30D',
+  '#16A34A', '#059669', '#0D9488', '#0891B2', '#0284C7',
+  '#2563EB', '#4F46E5', '#7C3AED', '#9333EA', '#C026D3',
+]
+
+// Tooltip personalizado
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload
+    return (
+      <div className="bg-white px-3 py-2 shadow-lg rounded-lg border border-gray-200">
+        <p className="font-medium text-gray-800">{data.nombre}</p>
+        <p className="text-sm text-gray-600">{data.valor} inscriptos</p>
+      </div>
+    )
+  }
+  return null
+}
+
+// Componente de gráfico de torta compacto con leyenda lateral
+function GraficoTorta({ datos, onSliceClick, titulo, subtitulo, onVolver }) {
+  const total = datos.reduce((sum, d) => sum + d.valor, 0)
+  if (total === 0) return null
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 h-full">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {onVolver && (
+            <button
+              onClick={onVolver}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition bg-white border border-gray-200"
+              title="Volver a actividades"
+            >
+              <ArrowLeftCircle className="w-4 h-4 text-gray-500" />
+            </button>
+          )}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800">{titulo}</h3>
+            {subtitulo && <p className="text-xs text-gray-500">{subtitulo}</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center">
+        <div className="w-44 h-44">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={datos}
+                cx="50%"
+                cy="50%"
+                innerRadius={35}
+                outerRadius={60}
+                paddingAngle={2}
+                dataKey="valor"
+                nameKey="nombre"
+                onClick={(data) => onSliceClick && onSliceClick(data)}
+                style={{ cursor: onSliceClick ? 'pointer' : 'default' }}
+              >
+                {datos.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORES_TORTA[index % COLORES_TORTA.length]}
+                    className="hover:opacity-80 transition-opacity"
+                  />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <p className="text-2xl font-bold text-gray-800 mt-2">{total}</p>
+        <p className="text-xs text-gray-500">inscriptos</p>
+      </div>
+
+      {/* Leyenda compacta */}
+      <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
+        {datos.map((item, i) => (
+          <div
+            key={i}
+            className={`flex items-center justify-between py-1 px-2 rounded text-xs ${onSliceClick ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+            onClick={() => onSliceClick && onSliceClick(item)}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: COLORES_TORTA[i % COLORES_TORTA.length] }}
+              />
+              <span className="text-gray-700 truncate">{item.nombre}</span>
+            </div>
+            <span className="text-gray-500 ml-2 flex-shrink-0">
+              {item.valor} ({((item.valor / total) * 100).toFixed(0)}%)
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {onSliceClick && (
+        <p className="text-xs text-gray-400 text-center mt-2">
+          Clic para ver categorías
+        </p>
+      )}
+    </div>
+  )
+}
 
 export default function ReporteActividades() {
   const navigate = useNavigate()
@@ -10,6 +121,7 @@ export default function ReporteActividades() {
   const [error, setError] = useState(null)
   const [actividades, setActividades] = useState([])
   const [busqueda, setBusqueda] = useState('')
+  const [actividadSeleccionada, setActividadSeleccionada] = useState(null)
 
   useEffect(() => {
     cargarActividades()
@@ -185,46 +297,84 @@ export default function ReporteActividades() {
           )}
         </div>
       ) : (
-        /* Tarjetas de actividades (vista normal sin búsqueda) */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {actividades.map(actividad => (
-            <div
-              key={actividad.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer"
-              onClick={() => navigate(`/admin/reportes/actividades/${actividad.id}`)}
-            >
-              <div className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="p-3 rounded-xl bg-orange-100">
-                    <Users className="w-6 h-6 text-orange-600" />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <h3 className="text-lg font-semibold text-gray-800">{actividad.nombre}</h3>
-                  <div className="flex items-center gap-4 mt-2">
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">{actividad.totalInscriptos}</p>
-                      <p className="text-xs text-gray-500">inscriptos</p>
-                    </div>
-                    <div className="border-l pl-4">
-                      <p className="text-xl font-bold text-gray-600">{actividad.categorias?.length || 0}</p>
-                      <p className="text-xs text-gray-500">categorías</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium flex items-center justify-between">
-                <span>Ver detalle</span>
-                <ChevronRight className="w-4 h-4" />
-              </div>
-            </div>
-          ))}
-
-          {actividades.length === 0 && (
-            <div className="col-span-full bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-              No hay actividades configuradas
+        /* Vista normal: Gráfico a la izquierda + Tarjetas a la derecha */
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Gráfico de Torta - Columna izquierda */}
+          {actividades.length > 0 && (
+            <div className="lg:w-72 flex-shrink-0">
+              {actividadSeleccionada ? (
+                <GraficoTorta
+                  titulo={`Categorías de ${actividadSeleccionada.nombre}`}
+                  subtitulo="Distribución por categoría"
+                  datos={(actividadSeleccionada.categorias || []).map(cat => {
+                    const inscriptosCat = actividadSeleccionada.inscriptos?.filter(
+                      ins => ins.categoriaNombre === cat.nombre
+                    ).length || 0
+                    return {
+                      id: cat.id,
+                      nombre: cat.nombre,
+                      valor: inscriptosCat,
+                    }
+                  }).filter(d => d.valor > 0)}
+                  onVolver={() => setActividadSeleccionada(null)}
+                />
+              ) : (
+                <GraficoTorta
+                  titulo="Distribución por Actividad"
+                  subtitulo="Inscriptos por actividad"
+                  datos={actividades.map(a => ({
+                    id: a.id,
+                    nombre: a.nombre,
+                    valor: a.totalInscriptos || 0,
+                    actividad: a,
+                  })).filter(d => d.valor > 0)}
+                  onSliceClick={(slice) => setActividadSeleccionada(slice.actividad)}
+                />
+              )}
             </div>
           )}
+
+          {/* Tarjetas de actividades - Columna derecha */}
+          <div className="flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {actividades.map(actividad => (
+                <div
+                  key={actividad.id}
+                  className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer"
+                  onClick={() => navigate(`/admin/reportes/actividades/${actividad.id}`)}
+                >
+                  <div className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-orange-100">
+                        <Users className="w-5 h-5 text-orange-600" />
+                      </div>
+                      <h3 className="font-semibold text-gray-800">{actividad.nombre}</h3>
+                    </div>
+                    <div className="flex items-center gap-4 mt-3">
+                      <div>
+                        <p className="text-xl font-bold text-gray-900">{actividad.totalInscriptos}</p>
+                        <p className="text-xs text-gray-500">inscriptos</p>
+                      </div>
+                      <div className="border-l pl-4">
+                        <p className="text-lg font-bold text-gray-600">{actividad.categorias?.length || 0}</p>
+                        <p className="text-xs text-gray-500">categorías</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-4 py-2 bg-gray-50 border-t text-xs text-primary font-medium flex items-center justify-between">
+                    <span>Ver detalle</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {actividades.length === 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+                No hay actividades configuradas
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

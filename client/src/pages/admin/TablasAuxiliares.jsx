@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -17,7 +17,11 @@ export default function TablasAuxiliares() {
   const [estadosSocio, setEstadosSocio] = useState([])
   const [actividades, setActividades] = useState([])
   const [entrenadores, setEntrenadores] = useState([])
+  const [cargosPersonal, setCargosPersonal] = useState([])
   const [conceptosTesoreria, setConceptosTesoreria] = useState([])
+  const [cuentasContables, setCuentasContables] = useState([])
+  const [usuarios, setUsuarios] = useState([])
+  const [roles, setRoles] = useState([])
 
   // Modo Demo
   const [modoDemo, setModoDemo] = useState({ activo: false, email: '' })
@@ -42,20 +46,28 @@ export default function TablasAuxiliares() {
   async function cargarDatos() {
     setLoading(true)
     try {
-      const [tipos, categorias, estados, acts, entrens, conceptos] = await Promise.all([
+      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, cuentas, usrs, rols] = await Promise.all([
         api.get('/admin/tipos-socio'),
         api.get('/admin/categorias-socio'),
         api.get('/admin/estados-socio'),
         api.get('/admin/actividades'),
         api.get('/admin/entrenadores'),
+        api.getFull('/admin/cargos-personal').catch(() => ({ data: [] })),
         api.get('/admin/conceptos-tesoreria'),
+        api.getFull('/admin/cuentas-contables?flat=true').catch(() => ({ data: [] })),
+        api.get('/admin/usuarios').catch(() => ({ data: [] })),
+        api.get('/admin/roles').catch(() => ({ data: [] })),
       ])
       setTiposSocio(tipos || [])
       setCategoriasSocio(categorias || [])
       setEstadosSocio(estados || [])
       setActividades(acts || [])
       setEntrenadores(entrens || [])
+      setCargosPersonal(cargos?.data || [])
       setConceptosTesoreria(conceptos || [])
+      setCuentasContables(cuentas?.data || [])
+      setUsuarios(usrs?.data || usrs || [])
+      setRoles(rols?.data || rols || [])
     } catch (err) {
       setError('Error al cargar datos')
     } finally {
@@ -176,9 +188,14 @@ export default function TablasAuxiliares() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Configuración</h1>
-        <p className="text-gray-500 mt-1">Administra la configuración y tablas del sistema</p>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <Settings className="w-6 h-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Configuración</h1>
+          <p className="text-gray-500 text-sm">Administra la configuración y tablas del sistema</p>
+        </div>
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
@@ -211,6 +228,19 @@ export default function TablasAuxiliares() {
             <div className="flex items-center gap-2">
               <Table2 className="w-4 h-4" />
               Tablas del Sistema
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('usuarios')}
+            className={`pb-3 px-1 border-b-2 font-medium text-sm transition ${
+              activeTab === 'usuarios'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Usuarios y Roles
             </div>
           </button>
         </nav>
@@ -588,6 +618,38 @@ export default function TablasAuxiliares() {
                   Ver listado →
                 </div>
               </div>
+
+              {/* Cargos de Personal */}
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+                onClick={() => navigate('/admin/configuracion/cargos-personal')}
+              >
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="p-3 rounded-xl bg-rose-100">
+                      <Briefcase className="w-6 h-6 text-rose-600" />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/cargos-personal/nuevo') }}
+                      className="flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nuevo
+                    </Button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-base font-semibold text-gray-800">Cargos de Personal</h3>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{cargosPersonal.length}</p>
+                    <p className="text-xs text-gray-500">
+                      {cargosPersonal.filter(c => c.activo).length} activos
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+                  Ver listado →
+                </div>
+              </div>
             </div>
           </div>
 
@@ -626,9 +688,110 @@ export default function TablasAuxiliares() {
                   Ver listado →
                 </div>
               </div>
+
+              {/* Plan de Cuentas */}
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+                onClick={() => navigate('/admin/contabilidad/plan-cuentas')}
+              >
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="p-3 rounded-xl bg-indigo-100">
+                      <BookOpen className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); navigate('/admin/contabilidad/plan-cuentas/nuevo') }}
+                      className="flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nueva
+                    </Button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-base font-semibold text-gray-800">Plan de Cuentas</h3>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{cuentasContables.length}</p>
+                    <p className="text-xs text-gray-500">
+                      {cuentasContables.filter(c => c.activo).length} activas
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+                  Ver listado →
+                </div>
+              </div>
             </div>
           </div>
         </>
+      )}
+
+      {/* Tab: Usuarios y Roles */}
+      {activeTab === 'usuarios' && (
+        <div className="flex flex-wrap gap-6">
+          {/* Usuarios */}
+          <div
+            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+            onClick={() => navigate('/admin/configuracion/usuarios')}
+          >
+            <div className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="p-3 rounded-xl bg-blue-100">
+                  <User className="w-6 h-6 text-blue-600" />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/usuarios/nuevo') }}
+                  className="flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nuevo
+                </Button>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-base font-semibold text-gray-800">Usuarios</h3>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{usuarios.length}</p>
+                <p className="text-xs text-gray-500">
+                  {usuarios.filter(u => u.activo).length} activos
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+              Ver listado →
+            </div>
+          </div>
+
+          {/* Roles */}
+          <div
+            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+            onClick={() => navigate('/admin/configuracion/roles')}
+          >
+            <div className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="p-3 rounded-xl bg-purple-100">
+                  <Shield className="w-6 h-6 text-purple-600" />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/roles/nuevo') }}
+                  className="flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nuevo
+                </Button>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-base font-semibold text-gray-800">Roles</h3>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{roles.length}</p>
+                <p className="text-xs text-gray-500">
+                  {roles.filter(r => r.activo).length} activos
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+              Ver listado →
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

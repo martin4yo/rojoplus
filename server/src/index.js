@@ -14,6 +14,11 @@ import comerciosRoutes from './routes/comercios.js'
 import comercioRoutes from './routes/comercio.js'
 import adminRoutes from './routes/admin.js'
 import socioRoutes from './routes/socio.js'
+import contabilidadRoutes from './routes/contabilidad.js'
+import tesoreriaRoutes from './routes/tesoreria.js'
+import stockRoutes from './routes/stock.js'
+import movimientosContablesRoutes from './routes/movimientosContables.js'
+import usuariosRoutes from './routes/usuarios.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -46,6 +51,11 @@ app.use('/api/rubros', rubrosRoutes)
 app.use('/api/comercios', comerciosRoutes)
 app.use('/api/comercio', comercioRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/admin', contabilidadRoutes)
+app.use('/api/admin', tesoreriaRoutes)
+app.use('/api/admin', stockRoutes)
+app.use('/api/admin', movimientosContablesRoutes)
+app.use('/api/admin', usuariosRoutes)
 app.use('/api/socio', socioRoutes)
 
 // Health check

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Search, X, User, Phone, Mail, Dumbbell, Edit, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Search, X, User, Phone, Mail, Dumbbell, Edit, Trash2, UserCheck } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -67,9 +67,14 @@ export default function EntrenadoresLista() {
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Entrenadores</h1>
-            <p className="text-gray-500 text-sm">{entrenadores.length} entrenadores registrados</p>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-teal-100">
+              <UserCheck className="w-6 h-6 text-teal-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">Entrenadores</h1>
+              <p className="text-gray-500 text-sm">{entrenadores.length} entrenadores registrados</p>
+            </div>
           </div>
         </div>
         <Button onClick={() => navigate('/admin/entrenadores/nuevo')} className="flex items-center gap-2">
