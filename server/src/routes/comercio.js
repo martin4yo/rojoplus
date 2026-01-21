@@ -165,8 +165,8 @@ router.post('/:token/ventas', asyncHandler(authComercio), asyncHandler(async (re
   const { comercio } = req
   const { socioId, importeOriginal } = req.body
 
-  if (!socioId || !importeOriginal) {
-    throw new AppError('socioId e importeOriginal son requeridos', 400, 'VALIDATION_ERROR')
+  if (!socioId) {
+    throw new AppError('socioId es requerido', 400, 'VALIDATION_ERROR')
   }
 
   // Verificar que el socio existe y está activo
@@ -184,45 +184,52 @@ router.post('/:token/ventas', asyncHandler(authComercio), asyncHandler(async (re
     throw new AppError('El socio no está activo', 422, 'SOCIO_INACTIVO')
   }
 
-  // Calcular descuentos
-  const descuentoBasePct = Number(comercio.descuentoPct)
-  const descuentoBaseMonto = importeOriginal * (descuentoBasePct / 100)
-
+  // Si no hay importe, registrar venta sin descuentos
+  let descuentoBasePct = 0
+  let descuentoBaseMonto = 0
   let aplicoAcumulacion = false
   let descuentoAcumPct = null
   let descuentoAcumMonto = 0
+  let descuentoTotalMonto = 0
+  let importeFinal = null
 
-  if (comercio.acumulacionActiva && comercio.acumComprasReq && comercio.acumPeriodoDias) {
-    const fechaLimite = new Date()
-    fechaLimite.setDate(fechaLimite.getDate() - comercio.acumPeriodoDias)
+  if (importeOriginal) {
+    // Calcular descuentos solo si hay importe
+    descuentoBasePct = Number(comercio.descuentoPct)
+    descuentoBaseMonto = importeOriginal * (descuentoBasePct / 100)
 
-    const comprasEnPeriodo = await req.prisma.venta.count({
-      where: {
-        comercioId: comercio.id,
-        socioId,
-        fecha: { gte: fechaLimite },
-      },
-    })
+    if (comercio.acumulacionActiva && comercio.acumComprasReq && comercio.acumPeriodoDias) {
+      const fechaLimite = new Date()
+      fechaLimite.setDate(fechaLimite.getDate() - comercio.acumPeriodoDias)
 
-    if (comprasEnPeriodo >= comercio.acumComprasReq) {
-      aplicoAcumulacion = true
-      descuentoAcumPct = Number(comercio.acumDescuentoExtra) || 0
-      descuentoAcumMonto = importeOriginal * (descuentoAcumPct / 100)
+      const comprasEnPeriodo = await req.prisma.venta.count({
+        where: {
+          comercioId: comercio.id,
+          socioId,
+          fecha: { gte: fechaLimite },
+        },
+      })
+
+      if (comprasEnPeriodo >= comercio.acumComprasReq) {
+        aplicoAcumulacion = true
+        descuentoAcumPct = Number(comercio.acumDescuentoExtra) || 0
+        descuentoAcumMonto = importeOriginal * (descuentoAcumPct / 100)
+      }
     }
-  }
 
-  const descuentoTotalMonto = descuentoBaseMonto + descuentoAcumMonto
-  const importeFinal = importeOriginal - descuentoTotalMonto
+    descuentoTotalMonto = descuentoBaseMonto + descuentoAcumMonto
+    importeFinal = importeOriginal - descuentoTotalMonto
+  }
 
   // Crear venta
   const venta = await req.prisma.venta.create({
     data: {
-      comercioId: comercio.id,
-      socioId,
-      importeOriginal,
+      comercio: { connect: { id: comercio.id } },
+      socio: { connect: { id: socioId } },
+      importeOriginal: importeOriginal || null,
       importeFinal,
-      descuentoPct: descuentoBasePct,
-      descuentoMonto: descuentoTotalMonto,
+      descuentoPct: descuentoBasePct || null,
+      descuentoMonto: descuentoTotalMonto || null,
       aplicoAcumulacion,
       descuentoAcumPct,
     },
@@ -233,7 +240,7 @@ router.post('/:token/ventas', asyncHandler(authComercio), asyncHandler(async (re
     data: {
       id: venta.id,
       fecha: venta.fecha,
-      importeOriginal,
+      importeOriginal: importeOriginal || null,
       importeFinal,
       descuentoPct: descuentoBasePct,
       descuentoMonto: descuentoTotalMonto,

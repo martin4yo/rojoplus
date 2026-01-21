@@ -120,15 +120,16 @@ export default function Comercio() {
 
   // Registrar venta
   async function registrarVenta() {
-    if (!descuento) return
+    if (!socio?.esActivo) return
 
     setRegistrando(true)
     try {
       // Ejecutar API y esperar mínimo 1.5 segundos para mostrar el spinner
+      const importeNum = importe ? parseFloat(importe) : null
       const [response] = await Promise.all([
         api.post(`/comercio/${token}/ventas`, {
           socioId: socio.id,
-          importeOriginal: parseFloat(importe),
+          importeOriginal: importeNum,
         }),
         new Promise(resolve => setTimeout(resolve, 1500))
       ])
@@ -357,7 +358,6 @@ export default function Comercio() {
                   className="w-full"
                   onClick={registrarVenta}
                   loading={registrando}
-                  disabled={!descuento || !importe}
                 >
                   REGISTRAR VENTA
                 </Button>

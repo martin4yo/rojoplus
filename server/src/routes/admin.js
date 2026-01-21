@@ -1981,16 +1981,20 @@ router.get('/reportes/ventas', authAdmin, asyncHandler(async (req, res) => {
   const where = {}
 
   if (desde) {
-    where.fecha = { ...where.fecha, gte: new Date(desde) }
+    const desdeDate = new Date(desde + 'T00:00:00')
+    where.fecha = { ...where.fecha, gte: desdeDate }
   }
   if (hasta) {
-    const hastaDate = new Date(hasta)
-    hastaDate.setHours(23, 59, 59, 999)
+    const hastaDate = new Date(hasta + 'T23:59:59.999')
     where.fecha = { ...where.fecha, lte: hastaDate }
   }
   if (comercioId) {
     where.comercioId = parseInt(comercioId)
   }
+
+  // Debug: ver cuántas ventas hay en total
+  const totalVentas = await req.prisma.venta.count()
+  console.log('Total ventas en BD:', totalVentas, 'Filtro:', where)
 
   const [resumen, porComercio] = await Promise.all([
     req.prisma.venta.aggregate({
@@ -2006,7 +2010,11 @@ router.get('/reportes/ventas', authAdmin, asyncHandler(async (req, res) => {
       by: ['comercioId'],
       where,
       _count: true,
-      _sum: { importeFinal: true },
+      _sum: {
+        importeOriginal: true,
+        importeFinal: true,
+        descuentoMonto: true,
+      },
     }),
   ])
 
@@ -2031,7 +2039,9 @@ router.get('/reportes/ventas', authAdmin, asyncHandler(async (req, res) => {
         comercioId: p.comercioId,
         nombre: comercioMap.get(p.comercioId) || 'Desconocido',
         ventas: p._count,
+        montoOriginal: Number(p._sum.importeOriginal) || 0,
         monto: Number(p._sum.importeFinal) || 0,
+        descuentos: Number(p._sum.descuentoMonto) || 0,
       })),
     },
   })
