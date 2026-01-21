@@ -202,9 +202,9 @@ export default function MovimientosCajaLista() {
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <div>
-                          <p className="text-gray-800">{mov.concepto?.nombre || mov.descripcion || '-'}</p>
-                          {mov.medioPago && (
-                            <p className="text-xs text-gray-500">{mov.medioPago.nombre}</p>
+                          <p className="text-gray-800">{mov.concepto || mov.descripcion || '-'}</p>
+                          {mov.cuentaContable && (
+                            <p className="text-xs text-gray-500">{mov.cuentaContable.codigo} - {mov.cuentaContable.nombre}</p>
                           )}
                           {mov.pago?.socio && (
                             <p className="text-xs text-blue-600">

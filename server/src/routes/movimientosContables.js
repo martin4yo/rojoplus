@@ -2,6 +2,12 @@ import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
+import {
+  generarAsientoFacturaCompra,
+  generarAsientoFacturaVenta,
+  generarAsientoOrdenPago,
+  generarAsientoReciboCobro,
+} from '../services/asientosContables.js'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -211,6 +217,8 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
     subtotal, iva21, iva105, otrosImpuestos, montoTotal,
     cajaId, medioPago, nroOperacion,
     movimientoPadreId, conceptoId, observaciones,
+    ordenCompraId, // Vinculo opcional con Orden de Compra
+    pedidoId, // Vinculo opcional con Pedido (ventas)
     items
   } = req.body
 
@@ -294,6 +302,8 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
         tipo,
         entidadId: entidadId ? parseInt(entidadId) : null,
         socioId: socioId ? parseInt(socioId) : null,
+        ordenCompraId: ordenCompraId ? parseInt(ordenCompraId) : null,
+        pedidoId: pedidoId ? parseInt(pedidoId) : null,
         fecha: fecha ? new Date(fecha) : new Date(),
         fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : null,
         tipoComprobante,
@@ -317,6 +327,8 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
         items: items?.length ? {
           create: items.map(item => ({
             productoVarianteId: item.productoVarianteId ? parseInt(item.productoVarianteId) : null,
+            itemOrdenCompraId: item.itemOrdenCompraId ? parseInt(item.itemOrdenCompraId) : null,
+            itemPedidoId: item.itemPedidoId ? parseInt(item.itemPedidoId) : null,
             descripcion: item.descripcion,
             cantidad: parseFloat(item.cantidad),
             precioUnitario: parseFloat(item.precioUnitario),
@@ -327,11 +339,77 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
       include: {
         entidad: { select: { id: true, codigo: true, razonSocial: true } },
         socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+        ordenCompra: { select: { id: true, numero: true } },
         concepto: true,
         caja: true,
         items: true
       }
     })
+
+    // Actualizar cantidadFacturada en items de Orden de Compra
+    if (items?.length) {
+      for (const item of items) {
+        if (item.itemOrdenCompraId) {
+          await tx.itemOrdenCompra.update({
+            where: { id: parseInt(item.itemOrdenCompraId) },
+            data: {
+              cantidadFacturada: {
+                increment: parseFloat(item.cantidad)
+              }
+            }
+          })
+        }
+      }
+    }
+
+    // Actualizar cantidadFacturada en items de Pedido y estado del Pedido
+    if (items?.length && pedidoId) {
+      for (const item of items) {
+        if (item.itemPedidoId) {
+          await tx.itemPedido.update({
+            where: { id: parseInt(item.itemPedidoId) },
+            data: {
+              cantidadFacturada: {
+                increment: parseFloat(item.cantidad)
+              }
+            }
+          })
+        }
+      }
+
+      // Actualizar estado del pedido
+      const pedido = await tx.pedido.findUnique({
+        where: { id: parseInt(pedidoId) },
+        include: { items: true }
+      })
+
+      if (pedido) {
+        const todosFacturados = pedido.items.every(
+          i => Number(i.cantidadFacturada) + (
+            items.find(it => it.itemPedidoId === i.id)?.cantidad || 0
+          ) >= Number(i.cantidad)
+        )
+        const algunFacturado = pedido.items.some(
+          i => Number(i.cantidadFacturada) + (
+            items.find(it => it.itemPedidoId === i.id)?.cantidad || 0
+          ) > 0
+        )
+
+        let nuevoEstado = pedido.estado
+        if (todosFacturados) {
+          nuevoEstado = 'FACTURADO'
+        } else if (algunFacturado) {
+          nuevoEstado = 'PARCIAL'
+        }
+
+        if (nuevoEstado !== pedido.estado) {
+          await tx.pedido.update({
+            where: { id: parseInt(pedidoId) },
+            data: { estado: nuevoEstado }
+          })
+        }
+      }
+    }
 
     // Actualizar stock si hay items con productos
     if (items?.length) {
@@ -402,6 +480,61 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
 
     return movimiento
   })
+
+  // Generar asiento contable automático según el tipo de movimiento
+  try {
+    if (tipo === 'FACTURA_COMPRA') {
+      const concepto = resultado.concepto
+        ? await prisma.conceptoTesoreria.findUnique({
+            where: { id: resultado.concepto.id },
+            include: { cuentaContable: true }
+          })
+        : null
+      generarAsientoFacturaCompra(prisma, {
+        factura: resultado,
+        concepto,
+        registradoPor: req.admin.id,
+      }).catch(err => console.error('Error generando asiento factura compra:', err))
+    } else if (tipo === 'FACTURA_VENTA') {
+      const concepto = resultado.concepto
+        ? await prisma.conceptoTesoreria.findUnique({
+            where: { id: resultado.concepto.id },
+            include: { cuentaContable: true }
+          })
+        : null
+      generarAsientoFacturaVenta(prisma, {
+        factura: resultado,
+        concepto,
+        registradoPor: req.admin.id,
+      }).catch(err => console.error('Error generando asiento factura venta:', err))
+    } else if (tipo === 'ORDEN_PAGO') {
+      const caja = resultado.caja
+        ? await prisma.caja.findUnique({
+            where: { id: resultado.caja.id },
+            include: { cuentaContable: true }
+          })
+        : null
+      generarAsientoOrdenPago(prisma, {
+        ordenPago: resultado,
+        caja,
+        registradoPor: req.admin.id,
+      }).catch(err => console.error('Error generando asiento orden pago:', err))
+    } else if (tipo === 'RECIBO_COBRO') {
+      const caja = resultado.caja
+        ? await prisma.caja.findUnique({
+            where: { id: resultado.caja.id },
+            include: { cuentaContable: true }
+          })
+        : null
+      generarAsientoReciboCobro(prisma, {
+        recibo: resultado,
+        caja,
+        registradoPor: req.admin.id,
+      }).catch(err => console.error('Error generando asiento recibo cobro:', err))
+    }
+  } catch (err) {
+    console.error('Error generando asiento contable:', err)
+  }
 
   res.status(201).json({
     success: true,
@@ -738,6 +871,169 @@ router.get('/ordenes-pago', asyncHandler(async (req, res) => {
   })
 }))
 
+// POST /api/admin/ordenes-pago - Crear orden de pago (pagar facturas)
+router.post('/ordenes-pago', asyncHandler(async (req, res) => {
+  const {
+    entidadId, fecha, cajaId, medioPago, nroOperacion,
+    conceptoId, observaciones, montoTotal,
+    facturasCanceladas // [{ movimientoContableId, montoPagado }]
+  } = req.body
+
+  // Validaciones
+  if (!entidadId) {
+    throw new AppError('El proveedor es requerido', 400)
+  }
+  if (!cajaId) {
+    throw new AppError('La caja es requerida', 400)
+  }
+  if (!facturasCanceladas || facturasCanceladas.length === 0) {
+    throw new AppError('Debe seleccionar al menos una factura a pagar', 400)
+  }
+
+  // Verificar caja
+  const caja = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+  if (!caja) {
+    throw new AppError('Caja no encontrada', 404)
+  }
+  if (!caja.activo) {
+    throw new AppError('La caja no está activa', 400)
+  }
+
+  // Verificar saldo suficiente
+  const montoTotalNum = parseFloat(montoTotal)
+  if (montoTotalNum > Number(caja.saldoActual)) {
+    throw new AppError('Saldo insuficiente en caja', 400)
+  }
+
+  // Verificar facturas
+  for (const fc of facturasCanceladas) {
+    const factura = await prisma.movimientoContable.findUnique({
+      where: { id: parseInt(fc.movimientoContableId) }
+    })
+    if (!factura) {
+      throw new AppError(`Factura ${fc.movimientoContableId} no encontrada`, 404)
+    }
+    if (factura.tipo !== 'FACTURA_COMPRA') {
+      throw new AppError(`El movimiento ${factura.numero} no es una factura de compra`, 400)
+    }
+    if (fc.montoPagado > Number(factura.saldoPendiente)) {
+      throw new AppError(`El monto a pagar de ${factura.numero} supera el saldo pendiente`, 400)
+    }
+  }
+
+  // Crear orden de pago en transacción
+  const resultado = await prisma.$transaction(async (tx) => {
+    // Generar número
+    const anio = new Date().getFullYear()
+    const prefijo = `OP-${anio}-`
+    const ultimo = await tx.movimientoContable.findFirst({
+      where: { numero: { startsWith: prefijo } },
+      orderBy: { numero: 'desc' }
+    })
+    let siguiente = 1
+    if (ultimo) {
+      const partes = ultimo.numero.split('-')
+      siguiente = (parseInt(partes[partes.length - 1]) || 0) + 1
+    }
+    const numero = `${prefijo}${String(siguiente).padStart(5, '0')}`
+
+    // Crear movimiento contable de tipo ORDEN_PAGO
+    const ordenPago = await tx.movimientoContable.create({
+      data: {
+        numero,
+        tipo: 'ORDEN_PAGO',
+        entidadId: parseInt(entidadId),
+        fecha: fecha ? new Date(fecha) : new Date(),
+        montoTotal: montoTotalNum,
+        montoPagado: 0,
+        saldoPendiente: 0,
+        cajaId: parseInt(cajaId),
+        medioPago,
+        nroOperacion: nroOperacion || null,
+        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        observaciones: observaciones || null,
+        estado: 'CONFIRMADO',
+        registradoPor: req.admin.id
+      }
+    })
+
+    // Actualizar cada factura cancelada
+    for (const fc of facturasCanceladas) {
+      const factura = await tx.movimientoContable.findUnique({
+        where: { id: parseInt(fc.movimientoContableId) }
+      })
+
+      const nuevoMontoPagado = Number(factura.montoPagado) + fc.montoPagado
+      const nuevoSaldoPendiente = Number(factura.montoTotal) - nuevoMontoPagado
+      const nuevoEstado = nuevoSaldoPendiente <= 0 ? 'CONFIRMADO' : 'PENDIENTE'
+
+      await tx.movimientoContable.update({
+        where: { id: parseInt(fc.movimientoContableId) },
+        data: {
+          montoPagado: nuevoMontoPagado,
+          saldoPendiente: nuevoSaldoPendiente,
+          estado: nuevoEstado
+        }
+      })
+
+      // Crear relación con movimiento padre (la factura que se cancela)
+      // Nota: Para múltiples facturas, creamos items o usamos observaciones
+    }
+
+    // Crear movimiento de caja (EGRESO)
+    const prefijoMV = `MV-${anio}-`
+    const ultimoMV = await tx.movimientoCaja.findFirst({
+      where: { numero: { startsWith: prefijoMV } },
+      orderBy: { numero: 'desc' }
+    })
+    let siguienteMV = 1
+    if (ultimoMV) {
+      const partesMV = ultimoMV.numero.split('-')
+      siguienteMV = (parseInt(partesMV[partesMV.length - 1]) || 0) + 1
+    }
+    const numeroMV = `${prefijoMV}${String(siguienteMV).padStart(5, '0')}`
+
+    await tx.movimientoCaja.create({
+      data: {
+        numero: numeroMV,
+        cajaId: parseInt(cajaId),
+        fecha: fecha ? new Date(fecha) : new Date(),
+        tipo: 'EGRESO',
+        monto: montoTotalNum,
+        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        descripcion: `Orden de Pago ${numero}`,
+        movimientoContableId: ordenPago.id,
+        registradoPor: req.admin.id
+      }
+    })
+
+    // Actualizar saldo de caja
+    await tx.caja.update({
+      where: { id: parseInt(cajaId) },
+      data: { saldoActual: { decrement: montoTotalNum } }
+    })
+
+    return ordenPago
+  })
+
+  // Generar asiento contable automático para la orden de pago
+  const cajaConCuenta = await prisma.caja.findUnique({
+    where: { id: parseInt(cajaId) },
+    include: { cuentaContable: true }
+  })
+  generarAsientoOrdenPago(prisma, {
+    ordenPago: resultado,
+    caja: cajaConCuenta,
+    registradoPor: req.admin.id,
+  }).catch(err => console.error('Error generando asiento orden pago:', err))
+
+  res.status(201).json({
+    success: true,
+    data: resultado,
+    message: 'Orden de pago registrada correctamente'
+  })
+}))
+
 // GET /api/admin/recibos-cobro - Recibos de cobro
 router.get('/recibos-cobro', asyncHandler(async (req, res) => {
   const { entidadId, socioId, desde, hasta, page = 1, limit = 50 } = req.query
@@ -782,6 +1078,163 @@ router.get('/recibos-cobro', asyncHandler(async (req, res) => {
       total,
       pages: Math.ceil(total / parseInt(limit))
     }
+  })
+}))
+
+// POST /api/admin/recibos-cobro - Crear recibo de cobro (cobrar facturas de venta)
+router.post('/recibos-cobro', asyncHandler(async (req, res) => {
+  const {
+    entidadId, socioId, fecha, cajaId, medioPago, nroOperacion,
+    conceptoId, observaciones, montoTotal,
+    facturasCobradas // [{ movimientoContableId, montoCobrado }]
+  } = req.body
+
+  // Validaciones
+  if (!entidadId && !socioId) {
+    throw new AppError('Debe seleccionar un cliente o socio', 400)
+  }
+  if (!cajaId) {
+    throw new AppError('La caja es requerida', 400)
+  }
+  if (!facturasCobradas || facturasCobradas.length === 0) {
+    throw new AppError('Debe seleccionar al menos una factura a cobrar', 400)
+  }
+
+  // Verificar caja
+  const caja = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+  if (!caja) {
+    throw new AppError('Caja no encontrada', 404)
+  }
+  if (!caja.activo) {
+    throw new AppError('La caja no está activa', 400)
+  }
+
+  const montoTotalNum = parseFloat(montoTotal)
+
+  // Verificar facturas
+  for (const fc of facturasCobradas) {
+    const factura = await prisma.movimientoContable.findUnique({
+      where: { id: parseInt(fc.movimientoContableId) }
+    })
+    if (!factura) {
+      throw new AppError(`Factura ${fc.movimientoContableId} no encontrada`, 404)
+    }
+    if (factura.tipo !== 'FACTURA_VENTA') {
+      throw new AppError(`El movimiento ${factura.numero} no es una factura de venta`, 400)
+    }
+    if (fc.montoCobrado > Number(factura.saldoPendiente)) {
+      throw new AppError(`El monto a cobrar de ${factura.numero} supera el saldo pendiente`, 400)
+    }
+  }
+
+  // Crear recibo de cobro en transacción
+  const resultado = await prisma.$transaction(async (tx) => {
+    // Generar número
+    const anio = new Date().getFullYear()
+    const prefijo = `RC-${anio}-`
+    const ultimo = await tx.movimientoContable.findFirst({
+      where: { numero: { startsWith: prefijo } },
+      orderBy: { numero: 'desc' }
+    })
+    let siguiente = 1
+    if (ultimo) {
+      const partes = ultimo.numero.split('-')
+      siguiente = (parseInt(partes[partes.length - 1]) || 0) + 1
+    }
+    const numero = `${prefijo}${String(siguiente).padStart(5, '0')}`
+
+    // Crear movimiento contable de tipo RECIBO_COBRO
+    const reciboCobro = await tx.movimientoContable.create({
+      data: {
+        numero,
+        tipo: 'RECIBO_COBRO',
+        entidadId: entidadId ? parseInt(entidadId) : null,
+        socioId: socioId ? parseInt(socioId) : null,
+        fecha: fecha ? new Date(fecha) : new Date(),
+        montoTotal: montoTotalNum,
+        montoPagado: 0,
+        saldoPendiente: 0,
+        cajaId: parseInt(cajaId),
+        medioPago,
+        nroOperacion: nroOperacion || null,
+        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        observaciones: observaciones || null,
+        estado: 'CONFIRMADO',
+        registradoPor: req.admin.id
+      }
+    })
+
+    // Actualizar cada factura cobrada
+    for (const fc of facturasCobradas) {
+      const factura = await tx.movimientoContable.findUnique({
+        where: { id: parseInt(fc.movimientoContableId) }
+      })
+
+      const nuevoMontoPagado = Number(factura.montoPagado) + fc.montoCobrado
+      const nuevoSaldoPendiente = Number(factura.montoTotal) - nuevoMontoPagado
+      const nuevoEstado = nuevoSaldoPendiente <= 0 ? 'PAGADO' : 'PENDIENTE'
+
+      await tx.movimientoContable.update({
+        where: { id: parseInt(fc.movimientoContableId) },
+        data: {
+          montoPagado: nuevoMontoPagado,
+          saldoPendiente: Math.max(0, nuevoSaldoPendiente),
+          estado: nuevoEstado
+        }
+      })
+    }
+
+    // Crear movimiento de caja (INGRESO)
+    const prefijoMV = `MV-${anio}-`
+    const ultimoMV = await tx.movimientoCaja.findFirst({
+      where: { numero: { startsWith: prefijoMV } },
+      orderBy: { numero: 'desc' }
+    })
+    let siguienteMV = 1
+    if (ultimoMV) {
+      const partesMV = ultimoMV.numero.split('-')
+      siguienteMV = (parseInt(partesMV[partesMV.length - 1]) || 0) + 1
+    }
+    const numeroMV = `${prefijoMV}${String(siguienteMV).padStart(5, '0')}`
+
+    await tx.movimientoCaja.create({
+      data: {
+        numero: numeroMV,
+        cajaId: parseInt(cajaId),
+        fecha: fecha ? new Date(fecha) : new Date(),
+        tipo: 'INGRESO',
+        monto: montoTotalNum,
+        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        descripcion: `Recibo de Cobro ${numero}`,
+        movimientoContableId: reciboCobro.id,
+        registradoPor: req.admin.id
+      }
+    })
+
+    // Actualizar saldo de caja (incrementar por cobro)
+    await tx.caja.update({
+      where: { id: parseInt(cajaId) },
+      data: { saldoActual: { increment: montoTotalNum } }
+    })
+
+    return reciboCobro
+  })
+
+  // Generar asiento contable automático para el recibo de cobro
+  const cajaConCuenta = await prisma.caja.findUnique({
+    where: { id: parseInt(cajaId) },
+    include: { cuentaContable: true }
+  })
+  generarAsientoReciboCobro(prisma, {
+    recibo: resultado,
+    caja: cajaConCuenta,
+    registradoPor: req.admin.id,
+  }).catch(err => console.error('Error generando asiento recibo cobro:', err))
+
+  res.status(201).json({
+    success: true,
+    data: resultado,
+    message: 'Recibo de cobro registrado correctamente'
   })
 }))
 

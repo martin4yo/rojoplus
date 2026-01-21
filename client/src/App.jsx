@@ -64,6 +64,14 @@ import TransferenciaForm from './pages/admin/tesoreria/TransferenciaForm'
 // Contabilidad
 import PlanCuentasLista from './pages/admin/contabilidad/PlanCuentasLista'
 import CuentaContableForm from './pages/admin/contabilidad/CuentaContableForm'
+import AsientosLista from './pages/admin/contabilidad/AsientosLista'
+import AsientoForm from './pages/admin/contabilidad/AsientoForm'
+import AsientoDetalle from './pages/admin/contabilidad/AsientoDetalle'
+import LibroMayor from './pages/admin/contabilidad/LibroMayor'
+import PresupuestosLista from './pages/admin/contabilidad/PresupuestosLista'
+import PresupuestoEditor from './pages/admin/contabilidad/PresupuestoEditor'
+import PresupuestoEjecucion from './pages/admin/contabilidad/PresupuestoEjecucion'
+import PresupuestoVigente from './pages/admin/contabilidad/PresupuestoVigente'
 
 // Stock
 import ProductosLista from './pages/admin/stock/ProductosLista'
@@ -77,6 +85,45 @@ import AlertasStock from './pages/admin/stock/AlertasStock'
 import OrdenesCompraLista from './pages/admin/egresos/OrdenesCompraLista'
 import OrdenCompraForm from './pages/admin/egresos/OrdenCompraForm'
 import OrdenCompraDetalle from './pages/admin/egresos/OrdenCompraDetalle'
+
+// Egresos - Facturas de Compra
+import FacturasCompraLista from './pages/admin/egresos/FacturasCompraLista'
+import FacturaCompraForm from './pages/admin/egresos/FacturaCompraForm'
+import FacturaCompraDetalle from './pages/admin/egresos/FacturaCompraDetalle'
+
+// Egresos - Ordenes de Pago
+import OrdenesPagoLista from './pages/admin/egresos/OrdenesPagoLista'
+import OrdenPagoForm from './pages/admin/egresos/OrdenPagoForm'
+import OrdenPagoDetalle from './pages/admin/egresos/OrdenPagoDetalle'
+
+// Ingresos - Pedidos
+import PedidosLista from './pages/admin/ingresos/PedidosLista'
+import PedidoForm from './pages/admin/ingresos/PedidoForm'
+import PedidoDetalle from './pages/admin/ingresos/PedidoDetalle'
+
+// Ingresos - Facturas de Venta
+import FacturasVentaLista from './pages/admin/ingresos/FacturasVentaLista'
+import FacturaVentaForm from './pages/admin/ingresos/FacturaVentaForm'
+import FacturaVentaDetalle from './pages/admin/ingresos/FacturaVentaDetalle'
+
+// Ingresos - Recibos de Cobro
+import RecibosCobroLista from './pages/admin/ingresos/RecibosCobroLista'
+import ReciboCobroForm from './pages/admin/ingresos/ReciboCobroForm'
+import ReciboCobroDetalle from './pages/admin/ingresos/ReciboCobroDetalle'
+
+// Liquidaciones de Sueldos
+import LiquidacionesLista from './pages/admin/liquidaciones/LiquidacionesLista'
+import LiquidacionForm from './pages/admin/liquidaciones/LiquidacionForm'
+import LiquidacionDetalle from './pages/admin/liquidaciones/LiquidacionDetalle'
+import ConceptosLiquidacion from './pages/admin/liquidaciones/ConceptosLiquidacion'
+
+// Deportes
+import EspaciosLista from './pages/admin/deportes/EspaciosLista'
+import EspacioForm from './pages/admin/deportes/EspacioForm'
+import TiposEspacioConfig from './pages/admin/deportes/TiposEspacioConfig'
+import HorariosRecurrentes from './pages/admin/deportes/HorariosRecurrentes'
+import EntrenamientosCalendario from './pages/admin/deportes/EntrenamientosCalendario'
+import AsistenciaEntrenamiento from './pages/admin/deportes/AsistenciaEntrenamiento'
 
 // Layout admin
 import AdminLayout from './components/AdminLayout'
@@ -144,12 +191,16 @@ function App() {
         <Route path="ingresos/clientes/nuevo" element={<EntidadForm tipo="CLIENTE" />} />
         <Route path="ingresos/clientes/:id" element={<EntidadDetalle tipo="CLIENTE" />} />
         <Route path="ingresos/clientes/:id/editar" element={<EntidadForm tipo="CLIENTE" />} />
-        <Route path="ingresos/facturas" element={<PlaceholderPage title="Facturas Emitidas" description="Facturas de venta a clientes y socios" />} />
-        <Route path="ingresos/facturas/nueva" element={<PlaceholderPage title="Nueva Factura de Venta" />} />
-        <Route path="ingresos/facturas/:id" element={<PlaceholderPage title="Detalle de Factura" />} />
-        <Route path="ingresos/recibos" element={<PlaceholderPage title="Recibos de Cobro" description="Recibos de cobro emitidos" />} />
-        <Route path="ingresos/recibos/nuevo" element={<PlaceholderPage title="Nuevo Recibo de Cobro" />} />
-        <Route path="ingresos/recibos/:id" element={<PlaceholderPage title="Detalle de Recibo" />} />
+        <Route path="ingresos/pedidos" element={<PedidosLista />} />
+        <Route path="ingresos/pedidos/nuevo" element={<PedidoForm />} />
+        <Route path="ingresos/pedidos/:id" element={<PedidoDetalle />} />
+        <Route path="ingresos/pedidos/:id/editar" element={<PedidoForm />} />
+        <Route path="ingresos/facturas" element={<FacturasVentaLista />} />
+        <Route path="ingresos/facturas/nueva" element={<FacturaVentaForm />} />
+        <Route path="ingresos/facturas/:id" element={<FacturaVentaDetalle />} />
+        <Route path="ingresos/recibos" element={<RecibosCobroLista />} />
+        <Route path="ingresos/recibos/nuevo" element={<ReciboCobroForm />} />
+        <Route path="ingresos/recibos/:id" element={<ReciboCobroDetalle />} />
 
         {/* Egresos */}
         <Route path="egresos/proveedores" element={<EntidadesLista tipo="PROVEEDOR" />} />
@@ -165,12 +216,13 @@ function App() {
         <Route path="egresos/ordenes-compra/:id" element={<OrdenCompraDetalle />} />
         <Route path="egresos/ordenes-compra/:id/editar" element={<OrdenCompraForm />} />
         <Route path="egresos/ordenes-compra/:id/recibir" element={<OrdenCompraDetalle />} />
-        <Route path="egresos/facturas" element={<PlaceholderPage title="Facturas Recibidas" description="Facturas de compra a proveedores" />} />
-        <Route path="egresos/facturas/nueva" element={<PlaceholderPage title="Nueva Factura de Compra" />} />
-        <Route path="egresos/facturas/:id" element={<PlaceholderPage title="Detalle de Factura" />} />
-        <Route path="egresos/ordenes-pago" element={<PlaceholderPage title="Ordenes de Pago" description="Ordenes de pago a proveedores" />} />
-        <Route path="egresos/ordenes-pago/nueva" element={<PlaceholderPage title="Nueva Orden de Pago" />} />
-        <Route path="egresos/ordenes-pago/:id" element={<PlaceholderPage title="Detalle de Orden de Pago" />} />
+        <Route path="egresos/facturas" element={<FacturasCompraLista />} />
+        <Route path="egresos/facturas/nueva" element={<FacturaCompraForm />} />
+        <Route path="egresos/facturas/:id" element={<FacturaCompraDetalle />} />
+        <Route path="egresos/facturas/:id/pagar" element={<FacturaCompraDetalle />} />
+        <Route path="egresos/ordenes-pago" element={<OrdenesPagoLista />} />
+        <Route path="egresos/ordenes-pago/nueva" element={<OrdenPagoForm />} />
+        <Route path="egresos/ordenes-pago/:id" element={<OrdenPagoDetalle />} />
 
         {/* Tesoreria */}
         <Route path="tesoreria/cajas" element={<CajasLista />} />
@@ -186,6 +238,15 @@ function App() {
         <Route path="contabilidad/plan-cuentas" element={<PlanCuentasLista />} />
         <Route path="contabilidad/plan-cuentas/nuevo" element={<CuentaContableForm />} />
         <Route path="contabilidad/plan-cuentas/:id" element={<CuentaContableForm />} />
+        <Route path="contabilidad/asientos" element={<AsientosLista />} />
+        <Route path="contabilidad/asientos/nuevo" element={<AsientoForm />} />
+        <Route path="contabilidad/asientos/:id" element={<AsientoDetalle />} />
+        <Route path="contabilidad/asientos/:id/editar" element={<AsientoForm />} />
+        <Route path="contabilidad/libro-mayor" element={<LibroMayor />} />
+        <Route path="contabilidad/presupuestos" element={<PresupuestosLista />} />
+        <Route path="contabilidad/presupuestos/vigente" element={<PresupuestoVigente />} />
+        <Route path="contabilidad/presupuestos/:id" element={<PresupuestoEditor />} />
+        <Route path="contabilidad/presupuestos/:id/ejecucion" element={<PresupuestoEjecucion />} />
 
         {/* Stock */}
         <Route path="stock/productos" element={<ProductosLista />} />
@@ -195,6 +256,21 @@ function App() {
         <Route path="stock/movimientos" element={<MovimientosStockLista />} />
         <Route path="stock/movimientos/ajuste" element={<AjusteStockForm />} />
         <Route path="stock/alertas" element={<AlertasStock />} />
+
+        {/* Liquidaciones de Sueldos */}
+        <Route path="liquidaciones" element={<LiquidacionesLista />} />
+        <Route path="liquidaciones/nueva" element={<LiquidacionForm />} />
+        <Route path="liquidaciones/:id" element={<LiquidacionDetalle />} />
+        <Route path="liquidaciones/conceptos" element={<ConceptosLiquidacion />} />
+
+        {/* Deportes */}
+        <Route path="deportes/tipos-espacio" element={<TiposEspacioConfig />} />
+        <Route path="deportes/espacios" element={<EspaciosLista />} />
+        <Route path="deportes/espacios/nuevo" element={<EspacioForm />} />
+        <Route path="deportes/espacios/:id" element={<EspacioForm />} />
+        <Route path="deportes/horarios" element={<HorariosRecurrentes />} />
+        <Route path="deportes/entrenamientos" element={<EntrenamientosCalendario />} />
+        <Route path="deportes/asistencia/:id" element={<AsistenciaEntrenamiento />} />
       </Route>
     </Routes>
   )

@@ -1,5 +1,15 @@
 const API_URL = '/api'
 
+// Función para manejar token inválido
+function handleInvalidToken() {
+  localStorage.removeItem('adminToken')
+  localStorage.removeItem('adminData')
+  // Redirigir al login si estamos en una ruta de admin
+  if (window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login') {
+    window.location.href = '/admin/login'
+  }
+}
+
 async function request(endpoint, options = {}, returnFullResponse = false) {
   const url = `${API_URL}${endpoint}`
 
@@ -21,6 +31,10 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
   const data = await response.json()
 
   if (!response.ok) {
+    // Si el token es inválido o expiró, redirigir al login
+    if (response.status === 401) {
+      handleInvalidToken()
+    }
     throw new Error(data.error?.message || 'Error en la solicitud')
   }
 
@@ -69,6 +83,9 @@ const api = {
 
     const data = await response.json()
     if (!response.ok) {
+      if (response.status === 401) {
+        handleInvalidToken()
+      }
       throw new Error(data.error?.message || 'Error en la solicitud')
     }
     return data.data
@@ -90,6 +107,9 @@ const api = {
 
     const data = await response.json()
     if (!response.ok) {
+      if (response.status === 401) {
+        handleInvalidToken()
+      }
       throw new Error(data.error?.message || 'Error en la solicitud')
     }
     return data

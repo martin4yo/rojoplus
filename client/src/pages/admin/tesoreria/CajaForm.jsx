@@ -19,6 +19,7 @@ export default function CajaForm() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [cuentasContables, setCuentasContables] = useState([])
 
   const [form, setForm] = useState({
     codigo: '',
@@ -26,14 +27,30 @@ export default function CajaForm() {
     tipo: 'EFECTIVO',
     descripcion: '',
     saldoInicial: '',
+    cuentaContableId: '',
     activo: true
   })
 
   useEffect(() => {
+    cargarCuentasContables()
     if (isEditing) {
       cargarCaja()
     }
   }, [id])
+
+  async function cargarCuentasContables() {
+    try {
+      // Cargar cuentas de tipo ACTIVO que sean hojas (para cajas)
+      const response = await api.get('/admin/cuentas-contables', {
+        params: { tipo: 'ACTIVO', flat: true }
+      })
+      // Filtrar solo cuentas que no tienen hijos (cuentas de imputacion)
+      const cuentasHoja = (response.data || response).filter(c => !c.children || c.children.length === 0)
+      setCuentasContables(cuentasHoja)
+    } catch (err) {
+      console.error('Error cargando cuentas contables:', err)
+    }
+  }
 
   async function cargarCaja() {
     setLoading(true)
@@ -45,6 +62,7 @@ export default function CajaForm() {
         tipo: caja.tipo || 'EFECTIVO',
         descripcion: caja.descripcion || '',
         saldoInicial: '',
+        cuentaContableId: caja.cuentaContableId ? String(caja.cuentaContableId) : '',
         activo: caja.activo
       })
     } catch (err) {
@@ -78,6 +96,7 @@ export default function CajaForm() {
         nombre: form.nombre,
         tipo: form.tipo,
         descripcion: form.descripcion || null,
+        cuentaContableId: form.cuentaContableId ? parseInt(form.cuentaContableId) : null,
         activo: form.activo
       }
 
@@ -179,6 +198,27 @@ export default function CajaForm() {
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cuenta Contable
+              </label>
+              <select
+                name="cuentaContableId"
+                value={form.cuentaContableId}
+                onChange={handleChange}
+                className="input-field w-full"
+              >
+                <option value="">-- Sin cuenta contable --</option>
+                {cuentasContables.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.codigo} - {c.nombre}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Vincula esta caja a una cuenta del plan de cuentas para asientos automaticos
+              </p>
             </div>
             {!isEditing && (
               <div>

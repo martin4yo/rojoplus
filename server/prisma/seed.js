@@ -90,29 +90,129 @@ const permisos = [
 ];
 
 const cuentasContables = [
-  // Ingresos
+  // ============================================================================
+  // ACTIVO
+  // ============================================================================
+  { codigo: '1', nombre: 'ACTIVO', tipo: 'ACTIVO', nivel: 1, esImputable: false },
+
+  // 1.1 Activo Corriente
+  { codigo: '1.1', nombre: 'Activo Corriente', tipo: 'ACTIVO', nivel: 2, esImputable: false, padreCodigo: '1' },
+
+  // 1.1.1 Caja y Bancos
+  { codigo: '1.1.1', nombre: 'Caja y Bancos', tipo: 'ACTIVO', nivel: 3, esImputable: false, padreCodigo: '1.1' },
+  { codigo: '1.1.1.01', nombre: 'Caja Efectivo', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.1' },
+  { codigo: '1.1.1.02', nombre: 'Banco Cuenta Corriente', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.1' },
+  { codigo: '1.1.1.03', nombre: 'Banco Caja de Ahorro', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.1' },
+
+  // 1.1.2 Créditos
+  { codigo: '1.1.2', nombre: 'Créditos', tipo: 'ACTIVO', nivel: 3, esImputable: false, padreCodigo: '1.1' },
+  { codigo: '1.1.2.01', nombre: 'Clientes/Deudores', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.2' },
+  { codigo: '1.1.2.02', nombre: 'Deudores por Cuotas', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.2' },
+  { codigo: '1.1.2.03', nombre: 'Cheques a Depositar', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.2' },
+  { codigo: '1.1.2.04', nombre: 'Tarjetas Pendientes Conciliación', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.2' },
+
+  // 1.1.3 Créditos Fiscales
+  { codigo: '1.1.3', nombre: 'Créditos Fiscales', tipo: 'ACTIVO', nivel: 3, esImputable: false, padreCodigo: '1.1' },
+  { codigo: '1.1.3.01', nombre: 'IVA Crédito Fiscal 21%', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.3' },
+  { codigo: '1.1.3.02', nombre: 'IVA Crédito Fiscal 10.5%', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.3' },
+  { codigo: '1.1.3.03', nombre: 'IVA Crédito Fiscal 27%', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.3' },
+
+  // 1.1.4 Bienes de Cambio
+  { codigo: '1.1.4', nombre: 'Bienes de Cambio', tipo: 'ACTIVO', nivel: 3, esImputable: false, padreCodigo: '1.1' },
+  { codigo: '1.1.4.01', nombre: 'Mercaderías', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.1.4' },
+
+  // 1.2 Activo No Corriente
+  { codigo: '1.2', nombre: 'Activo No Corriente', tipo: 'ACTIVO', nivel: 2, esImputable: false, padreCodigo: '1' },
+  { codigo: '1.2.1', nombre: 'Bienes de Uso', tipo: 'ACTIVO', nivel: 3, esImputable: false, padreCodigo: '1.2' },
+  { codigo: '1.2.1.01', nombre: 'Muebles y Útiles', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.2.1' },
+  { codigo: '1.2.1.02', nombre: 'Equipos de Computación', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.2.1' },
+  { codigo: '1.2.1.03', nombre: 'Instalaciones', tipo: 'ACTIVO', nivel: 4, esImputable: true, padreCodigo: '1.2.1' },
+
+  // ============================================================================
+  // PASIVO
+  // ============================================================================
+  { codigo: '2', nombre: 'PASIVO', tipo: 'PASIVO', nivel: 1, esImputable: false },
+
+  // 2.1 Pasivo Corriente
+  { codigo: '2.1', nombre: 'Pasivo Corriente', tipo: 'PASIVO', nivel: 2, esImputable: false, padreCodigo: '2' },
+
+  // 2.1.1 Deudas Comerciales
+  { codigo: '2.1.1', nombre: 'Deudas Comerciales', tipo: 'PASIVO', nivel: 3, esImputable: false, padreCodigo: '2.1' },
+  { codigo: '2.1.1.01', nombre: 'Proveedores', tipo: 'PASIVO', nivel: 4, esImputable: true, padreCodigo: '2.1.1' },
+  { codigo: '2.1.1.02', nombre: 'Cheques Diferidos a Pagar', tipo: 'PASIVO', nivel: 4, esImputable: true, padreCodigo: '2.1.1' },
+
+  // 2.1.2 Deudas Fiscales
+  { codigo: '2.1.2', nombre: 'Deudas Fiscales', tipo: 'PASIVO', nivel: 3, esImputable: false, padreCodigo: '2.1' },
+  { codigo: '2.1.2.01', nombre: 'IVA Débito Fiscal 21%', tipo: 'PASIVO', nivel: 4, esImputable: true, padreCodigo: '2.1.2' },
+  { codigo: '2.1.2.02', nombre: 'IVA Débito Fiscal 10.5%', tipo: 'PASIVO', nivel: 4, esImputable: true, padreCodigo: '2.1.2' },
+  { codigo: '2.1.2.03', nombre: 'IVA Débito Fiscal 27%', tipo: 'PASIVO', nivel: 4, esImputable: true, padreCodigo: '2.1.2' },
+  { codigo: '2.1.2.04', nombre: 'Retenciones a Depositar', tipo: 'PASIVO', nivel: 4, esImputable: true, padreCodigo: '2.1.2' },
+
+  // 2.1.3 Deudas Sociales
+  { codigo: '2.1.3', nombre: 'Deudas Sociales', tipo: 'PASIVO', nivel: 3, esImputable: false, padreCodigo: '2.1' },
+  { codigo: '2.1.3.01', nombre: 'Sueldos a Pagar', tipo: 'PASIVO', nivel: 4, esImputable: true, padreCodigo: '2.1.3' },
+  { codigo: '2.1.3.02', nombre: 'Cargas Sociales a Pagar', tipo: 'PASIVO', nivel: 4, esImputable: true, padreCodigo: '2.1.3' },
+
+  // ============================================================================
+  // PATRIMONIO NETO
+  // ============================================================================
+  { codigo: '3', nombre: 'PATRIMONIO NETO', tipo: 'PATRIMONIO', nivel: 1, esImputable: false },
+  { codigo: '3.1', nombre: 'Capital', tipo: 'PATRIMONIO', nivel: 2, esImputable: false, padreCodigo: '3' },
+  { codigo: '3.1.01', nombre: 'Capital Social', tipo: 'PATRIMONIO', nivel: 3, esImputable: true, padreCodigo: '3.1' },
+  { codigo: '3.2', nombre: 'Resultados', tipo: 'PATRIMONIO', nivel: 2, esImputable: false, padreCodigo: '3' },
+  { codigo: '3.2.01', nombre: 'Resultados Acumulados', tipo: 'PATRIMONIO', nivel: 3, esImputable: true, padreCodigo: '3.2' },
+  { codigo: '3.2.02', nombre: 'Resultado del Ejercicio', tipo: 'PATRIMONIO', nivel: 3, esImputable: true, padreCodigo: '3.2' },
+
+  // ============================================================================
+  // INGRESOS (Resultados Positivos)
+  // ============================================================================
   { codigo: '4', nombre: 'INGRESOS', tipo: 'INGRESO', nivel: 1, esImputable: false },
+
   { codigo: '4.1', nombre: 'Ingresos por Cuotas', tipo: 'INGRESO', nivel: 2, esImputable: false, padreCodigo: '4' },
   { codigo: '4.1.01', nombre: 'Cuota Social', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.1' },
   { codigo: '4.1.02', nombre: 'Cuota Deportiva', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.1' },
-  { codigo: '4.2', nombre: 'Otros Ingresos', tipo: 'INGRESO', nivel: 2, esImputable: false, padreCodigo: '4' },
-  { codigo: '4.2.01', nombre: 'Eventos', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.2' },
-  { codigo: '4.2.02', nombre: 'Alquiler Instalaciones', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.2' },
-  { codigo: '4.2.99', nombre: 'Otros Ingresos', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.2' },
 
-  // Egresos
+  { codigo: '4.2', nombre: 'Ingresos por Ventas', tipo: 'INGRESO', nivel: 2, esImputable: false, padreCodigo: '4' },
+  { codigo: '4.2.01', nombre: 'Ventas de Mercadería', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.2' },
+  { codigo: '4.2.02', nombre: 'Ventas de Indumentaria', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.2' },
+
+  { codigo: '4.3', nombre: 'Otros Ingresos', tipo: 'INGRESO', nivel: 2, esImputable: false, padreCodigo: '4' },
+  { codigo: '4.3.01', nombre: 'Eventos', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.3' },
+  { codigo: '4.3.02', nombre: 'Alquiler Instalaciones', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.3' },
+  { codigo: '4.3.99', nombre: 'Otros Ingresos', tipo: 'INGRESO', nivel: 3, esImputable: true, padreCodigo: '4.3' },
+
+  // ============================================================================
+  // EGRESOS (Resultados Negativos)
+  // ============================================================================
   { codigo: '5', nombre: 'EGRESOS', tipo: 'EGRESO', nivel: 1, esImputable: false },
-  { codigo: '5.1', nombre: 'Gastos de Personal', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
-  { codigo: '5.1.01', nombre: 'Sueldos', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.1' },
-  { codigo: '5.1.02', nombre: 'Cargas Sociales', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.1' },
-  { codigo: '5.2', nombre: 'Gastos Operativos', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
-  { codigo: '5.2.01', nombre: 'Servicios (Luz, Gas, Agua)', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.2' },
-  { codigo: '5.2.02', nombre: 'Mantenimiento', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.2' },
-  { codigo: '5.2.03', nombre: 'Limpieza', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.2' },
-  { codigo: '5.3', nombre: 'Gastos Deportivos', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
-  { codigo: '5.3.01', nombre: 'Equipamiento', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.3' },
-  { codigo: '5.3.02', nombre: 'Indumentaria', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.3' },
-  { codigo: '5.3.03', nombre: 'Traslados', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.3' },
+
+  { codigo: '5.1', nombre: 'Costo de Mercadería Vendida', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
+  { codigo: '5.1.01', nombre: 'CMV Mercadería', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.1' },
+  { codigo: '5.1.02', nombre: 'CMV Indumentaria', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.1' },
+
+  { codigo: '5.2', nombre: 'Gastos de Personal', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
+  { codigo: '5.2.01', nombre: 'Sueldos', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.2' },
+  { codigo: '5.2.02', nombre: 'Cargas Sociales', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.2' },
+  { codigo: '5.2.03', nombre: 'Honorarios', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.2' },
+
+  { codigo: '5.3', nombre: 'Gastos Operativos', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
+  { codigo: '5.3.01', nombre: 'Servicios (Luz, Gas, Agua)', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.3' },
+  { codigo: '5.3.02', nombre: 'Mantenimiento', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.3' },
+  { codigo: '5.3.03', nombre: 'Limpieza', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.3' },
+  { codigo: '5.3.04', nombre: 'Seguros', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.3' },
+  { codigo: '5.3.05', nombre: 'Impuestos y Tasas', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.3' },
+
+  { codigo: '5.4', nombre: 'Gastos Deportivos', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
+  { codigo: '5.4.01', nombre: 'Equipamiento', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.4' },
+  { codigo: '5.4.02', nombre: 'Indumentaria Deportiva', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.4' },
+  { codigo: '5.4.03', nombre: 'Traslados', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.4' },
+  { codigo: '5.4.04', nombre: 'Arbitrajes', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.4' },
+
+  { codigo: '5.5', nombre: 'Gastos Administrativos', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
+  { codigo: '5.5.01', nombre: 'Papelería y Útiles', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.5' },
+  { codigo: '5.5.02', nombre: 'Gastos Bancarios', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.5' },
+  { codigo: '5.5.03', nombre: 'Comisiones Tarjetas', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.5' },
+
   { codigo: '5.9', nombre: 'Otros Egresos', tipo: 'EGRESO', nivel: 2, esImputable: false, padreCodigo: '5' },
   { codigo: '5.9.99', nombre: 'Gastos Varios', tipo: 'EGRESO', nivel: 3, esImputable: true, padreCodigo: '5.9' },
 ];

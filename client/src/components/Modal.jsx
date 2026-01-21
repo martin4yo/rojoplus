@@ -17,6 +17,7 @@ export function Modal({
   type = 'info',
   title,
   message,
+  children,
   confirmText = 'Aceptar',
   cancelText = 'Cancelar',
   onConfirm,
@@ -24,6 +25,7 @@ export function Modal({
   prompt = false,
   promptLabel = '',
   promptPlaceholder = '',
+  maxWidth = 'max-w-md',
 }) {
   const [promptValue, setPromptValue] = useState('')
 
@@ -61,13 +63,51 @@ export function Modal({
   }
 
   function handleKeyDown(e) {
-    if (e.key === 'Enter' && !prompt) {
-      handleConfirm()
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       handleCancel()
+    }
+    // Solo hacer Enter para confirm si NO hay children (no es un formulario)
+    if (e.key === 'Enter' && !prompt && !children) {
+      handleConfirm()
     }
   }
 
+  // Modo con children (formularios personalizados)
+  if (children) {
+    return (
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        onClick={handleCancel}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+      >
+        <div
+          className={`bg-white rounded-xl shadow-2xl ${maxWidth} w-full p-6 relative max-h-[90vh] overflow-y-auto`}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Close button */}
+          <button
+            onClick={handleCancel}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Title */}
+          {title && (
+            <h3 className="text-xl font-bold text-gray-800 mb-4 pr-8">
+              {title}
+            </h3>
+          )}
+
+          {/* Children content */}
+          {children}
+        </div>
+      </div>
+    )
+  }
+
+  // Modo alert/confirm/prompt original
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
@@ -76,7 +116,7 @@ export function Modal({
       tabIndex={0}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative"
+        className={`bg-white rounded-xl shadow-2xl ${maxWidth} w-full p-6 relative`}
         onClick={e => e.stopPropagation()}
       >
         {/* Close button */}

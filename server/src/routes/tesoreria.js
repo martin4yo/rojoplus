@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
+import { generarAsientoMovimientoCaja } from '../services/asientosContables.js'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -57,7 +58,7 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/cajas - Crear caja
 router.post('/cajas', asyncHandler(async (req, res) => {
-  const { codigo, nombre, tipo, descripcion, saldoInicial } = req.body
+  const { codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId } = req.body
 
   if (!codigo || !nombre || !tipo) {
     throw new AppError('Codigo, nombre y tipo son requeridos', 400)
@@ -78,7 +79,8 @@ router.post('/cajas', asyncHandler(async (req, res) => {
       nombre,
       tipo,
       descripcion,
-      saldoActual: saldoInicial ? parseFloat(saldoInicial) : 0
+      saldoActual: saldoInicial ? parseFloat(saldoInicial) : 0,
+      cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null
     }
   })
 
@@ -91,7 +93,7 @@ router.post('/cajas', asyncHandler(async (req, res) => {
 // PUT /api/admin/cajas/:id - Actualizar caja
 router.put('/cajas/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, tipo, descripcion, activo } = req.body
+  const { codigo, nombre, tipo, descripcion, activo, cuentaContableId } = req.body
 
   const existente = await prisma.caja.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
@@ -113,7 +115,10 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
       nombre: nombre || existente.nombre,
       tipo: tipo || existente.tipo,
       descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
-      activo: activo !== undefined ? activo : existente.activo
+      activo: activo !== undefined ? activo : existente.activo,
+      cuentaContableId: cuentaContableId !== undefined
+        ? (cuentaContableId ? parseInt(cuentaContableId) : null)
+        : existente.cuentaContableId
     }
   })
 
@@ -171,8 +176,7 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
       take: parseInt(limit),
       include: {
         caja: { select: { id: true, codigo: true, nombre: true } },
-        medioPago: { select: { id: true, codigo: true, nombre: true } },
-        concepto: { select: { id: true, codigo: true, nombre: true, tipo: true } },
+        cuentaContable: { select: { id: true, codigo: true, nombre: true } },
         pago: {
           select: {
             id: true,
@@ -209,8 +213,7 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
     where: { id: parseInt(id) },
     include: {
       caja: true,
-      medioPago: true,
-      concepto: true,
+      cuentaContable: true,
       pago: {
         include: {
           socio: { select: { id: true, nroSocio: true, apellidoNombre: true } }
@@ -231,23 +234,34 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/movimientos-caja - Crear movimiento manual
 router.post('/movimientos-caja', asyncHandler(async (req, res) => {
-  const { cajaId, tipo, monto, medioPagoId, conceptoId, descripcion } = req.body
+  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion } = req.body
 
-  if (!cajaId || !tipo || !monto) {
-    throw new AppError('Caja, tipo y monto son requeridos', 400)
+  if (!cajaId || !tipo || !monto || !cuentaContableId) {
+    throw new AppError('Caja, tipo, monto y cuenta contable son requeridos', 400)
   }
 
   if (!['INGRESO', 'EGRESO'].includes(tipo)) {
     throw new AppError('Tipo debe ser INGRESO o EGRESO', 400)
   }
 
-  const caja = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+  const caja = await prisma.caja.findUnique({
+    where: { id: parseInt(cajaId) },
+    include: { cuentaContable: true }
+  })
   if (!caja) {
     throw new AppError('Caja no encontrada', 404)
   }
 
   if (!caja.activo) {
     throw new AppError('La caja no esta activa', 400)
+  }
+
+  // Cargar cuenta contable
+  const cuentaContable = await prisma.cuentaContable.findUnique({
+    where: { id: parseInt(cuentaContableId) }
+  })
+  if (!cuentaContable) {
+    throw new AppError('Cuenta contable no encontrada', 404)
   }
 
   // Verificar saldo suficiente para egresos
@@ -267,15 +281,14 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
         fecha: new Date(),
         tipo,
         monto: montoNum,
-        medioPagoId: medioPagoId ? parseInt(medioPagoId) : null,
-        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        cuentaContableId: parseInt(cuentaContableId),
+        concepto: concepto || cuentaContable.nombre,
         descripcion: descripcion || null,
         registradoPor: req.admin.id
       },
       include: {
         caja: { select: { id: true, codigo: true, nombre: true } },
-        medioPago: { select: { id: true, codigo: true, nombre: true } },
-        concepto: { select: { id: true, codigo: true, nombre: true, tipo: true } }
+        cuentaContable: { select: { id: true, codigo: true, nombre: true } }
       }
     })
 
@@ -287,6 +300,16 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     })
 
     return movimiento
+  })
+
+  // Generar asiento contable automático (fuera de transacción)
+  generarAsientoMovimientoCaja(prisma, {
+    movimiento: resultado,
+    caja,
+    cuentaContable,
+    registradoPor: req.admin.id,
+  }).catch(err => {
+    console.error('Error generando asiento contable para movimiento caja:', err)
   })
 
   res.status(201).json({
@@ -383,8 +406,7 @@ router.get('/transferencias', asyncHandler(async (req, res) => {
       take: parseInt(limit),
       include: {
         cajaOrigen: { select: { id: true, codigo: true, nombre: true } },
-        cajaDestino: { select: { id: true, codigo: true, nombre: true } },
-        concepto: { select: { id: true, codigo: true, nombre: true } }
+        cajaDestino: { select: { id: true, codigo: true, nombre: true } }
       }
     }),
     prisma.transferenciaCaja.count({ where })
@@ -415,8 +437,7 @@ router.get('/transferencias/:id', asyncHandler(async (req, res) => {
     where: { id: parseInt(id) },
     include: {
       cajaOrigen: true,
-      cajaDestino: true,
-      concepto: { select: { id: true, codigo: true, nombre: true } }
+      cajaDestino: true
     }
   })
 
@@ -432,7 +453,7 @@ router.get('/transferencias/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/transferencias - Crear transferencia
 router.post('/transferencias', asyncHandler(async (req, res) => {
-  const { cajaOrigenId, cajaDestinoId, monto, conceptoId, descripcion } = req.body
+  const { cajaOrigenId, cajaDestinoId, monto, concepto, descripcion } = req.body
 
   if (!cajaOrigenId || !cajaDestinoId || !monto) {
     throw new AppError('Caja origen, caja destino y monto son requeridos', 400)
@@ -449,8 +470,8 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
 
   // Verificar cajas
   const [cajaOrigen, cajaDestino] = await Promise.all([
-    prisma.caja.findUnique({ where: { id: parseInt(cajaOrigenId) } }),
-    prisma.caja.findUnique({ where: { id: parseInt(cajaDestinoId) } })
+    prisma.caja.findUnique({ where: { id: parseInt(cajaOrigenId) }, include: { cuentaContable: true } }),
+    prisma.caja.findUnique({ where: { id: parseInt(cajaDestinoId) }, include: { cuentaContable: true } })
   ])
 
   if (!cajaOrigen) {
@@ -485,15 +506,14 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
         cajaDestinoId: parseInt(cajaDestinoId),
         fecha: new Date(),
         monto: montoNum,
-        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        concepto: concepto || 'Transferencia entre cajas',
         descripcion: descripcion || null,
         estado: 'CONFIRMADO',
         registradoPor: req.admin.id
       },
       include: {
         cajaOrigen: { select: { id: true, codigo: true, nombre: true } },
-        cajaDestino: { select: { id: true, codigo: true, nombre: true } },
-        concepto: { select: { id: true, codigo: true, nombre: true } }
+        cajaDestino: { select: { id: true, codigo: true, nombre: true } }
       }
     })
 
@@ -505,7 +525,10 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
         fecha: new Date(),
         tipo: 'EGRESO',
         monto: montoNum,
-        descripcion: `Transferencia a ${cajaDestino.nombre} - ${numero}`,
+        cuentaContableId: cajaDestino.cuentaContableId || cajaOrigen.cuentaContableId,
+        concepto: `Transferencia a ${cajaDestino.nombre}`,
+        descripcion: `${numero}`,
+        cajaDestinoId: parseInt(cajaDestinoId),
         registradoPor: req.admin.id
       }
     })
@@ -518,7 +541,9 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
         fecha: new Date(),
         tipo: 'INGRESO',
         monto: montoNum,
-        descripcion: `Transferencia desde ${cajaOrigen.nombre} - ${numero}`,
+        cuentaContableId: cajaOrigen.cuentaContableId || cajaDestino.cuentaContableId,
+        concepto: `Transferencia desde ${cajaOrigen.nombre}`,
+        descripcion: `${numero}`,
         registradoPor: req.admin.id
       }
     })
@@ -639,8 +664,7 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
     orderBy: { fecha: 'desc' },
     take: 10,
     include: {
-      medioPago: { select: { id: true, codigo: true, nombre: true } },
-      concepto: { select: { id: true, codigo: true, nombre: true } }
+      cuentaContable: { select: { id: true, codigo: true, nombre: true } }
     }
   })
 

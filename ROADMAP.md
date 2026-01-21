@@ -422,6 +422,15 @@ Base de datos: rojoplus
 - [x] **28.22** Endpoints de MovimientoStock (ingreso, egreso, ajuste)
 - [x] **28.23** Endpoint de alertas de stock bajo
 
+### Backend - Dashboard CashFlow
+- [x] **28.23a** Panel CashFlow profesional con KPIs (Liquidez, Cash Flow Neto, Índice Cobranza, Días Cobertura)
+- [x] **28.23b** Gráficos con recharts (BarChart evolución, PieChart composición, AreaChart tendencia)
+- [x] **28.23c** 4 Tabs: General, Flujo de Caja, Cobranza, Cuentas
+- [x] **28.23d** Tarjetas de saldo: Efectivo, Bancos, Tarjetas Pendientes Conciliación
+- [x] **28.23e** Modelo ECheq para cheques electrónicos (EMITIDO/RECIBIDO)
+- [x] **28.23f** Cards eCheqs Recibidos (En Cartera, Depositados) y eCheqs Emitidos (Pendientes débito)
+- [x] **28.23g** Layout 5 columnas en Flujo de Caja (responsive)
+
 ### Backend - Movimientos Contables
 - [x] **28.24** Endpoint crear MovimientoContable (server/src/routes/movimientosContables.js)
 - [x] **28.25** Logica de impacto en stock al crear factura con items
@@ -429,23 +438,24 @@ Base de datos: rojoplus
 - [x] **28.27** Endpoint de anulacion de movimientos
 
 ### Backend - Ordenes de Compra (Proveedores)
-- [ ] **28.28a** Crear modelo OrdenCompra y ItemOrdenCompra
-- [ ] **28.28b** Endpoints CRUD de OrdenCompra
-- [ ] **28.28c** Vincular OrdenCompra con Factura de Compra
-- [ ] **28.28d** Actualizar estado de OrdenCompra al recibir mercaderia
+- [x] **28.28a** Crear modelo OrdenCompra y ItemOrdenCompra
+- [x] **28.28b** Endpoints CRUD de OrdenCompra (server/src/routes/contabilidad.js)
+- [x] **28.28c** Endpoint recibir mercadería (actualiza stock)
+- [x] **28.28d** Endpoint cancelar orden de compra
 
 ### Backend - Pedidos (Clientes)
-- [ ] **28.28e** Crear modelo Pedido y ItemPedido
-- [ ] **28.28f** Endpoints CRUD de Pedido (para Clientes y Socios)
-- [ ] **28.28g** Vincular Pedido con Factura de Venta
-- [ ] **28.28h** Actualizar estado de Pedido al facturar
+- [x] **28.28e** Crear modelo Pedido y ItemPedido
+- [x] **28.28f** Endpoints CRUD de Pedido para Clientes y Socios
+- [x] **28.28g** Endpoint cancelar pedido
+- [x] **28.28h** Vincular Pedido con Factura de Venta
 
 ### Backend - Liquidacion de Sueldos (Personal)
-- [ ] **28.28i** Crear modelo LiquidacionSueldo y ItemLiquidacion
-- [ ] **28.28j** Crear modelo ConceptoLiquidacion (HABER/DEDUCCION)
-- [ ] **28.28k** Endpoint de generacion de liquidacion mensual
-- [ ] **28.28l** Endpoint de agregar conceptos adicionales por empleado
-- [ ] **28.28m** Endpoint de pago de liquidacion (impacta caja)
+- [x] **28.28i** Crear modelo LiquidacionSueldo y ItemLiquidacion
+- [x] **28.28j** Crear modelo ConceptoLiquidacion (HABER/DEDUCCION)
+- [x] **28.28k** Endpoint de generacion de liquidacion mensual
+- [x] **28.28l** Endpoint de agregar/editar items por empleado
+- [x] **28.28m** Endpoint de pago individual (impacta caja)
+- [x] **28.28n** Endpoint de pago masivo (pagar-todos)
 
 ### Frontend - Menu y Navegacion
 - [x] **28.28** Menu expandible con submenus (Ingresos, Egresos, Tesoreria, Stock)
@@ -472,41 +482,50 @@ Base de datos: rojoplus
 - [x] **28.43** Pagina /admin/stock/alertas
 
 ### Frontend - Facturas y Pagos
-- [ ] **28.44** Pagina /admin/egresos/facturas (facturas de compra)
-- [ ] **28.45** Formulario de factura de compra con items
-- [ ] **28.46** Pagina /admin/ingresos/facturas (facturas de venta)
-- [ ] **28.47** Formulario de factura de venta (a socio o cliente)
-- [ ] **28.48** Pagina /admin/egresos/ordenes-pago
-- [ ] **28.49** Pagina /admin/ingresos/recibos
+- [x] **28.44** Pagina /admin/egresos/facturas (FacturasCompraLista.jsx)
+- [x] **28.45** Formulario de factura de compra con items (FacturaCompraForm.jsx)
+- [x] **28.46** Pagina /admin/ingresos/facturas (FacturasVentaLista.jsx)
+- [x] **28.47** Formulario de factura de venta a socio o cliente (FacturaVentaForm.jsx)
+- [x] **28.48** Pagina /admin/egresos/ordenes-pago (OrdenesPagoLista.jsx)
+- [x] **28.49** Formulario de orden de pago (OrdenPagoForm.jsx)
 
 ### Frontend - Ordenes de Compra (Proveedores)
-- [ ] **28.50** Pagina /admin/egresos/ordenes-compra (lista)
-- [ ] **28.51** Formulario de orden de compra con items
-- [ ] **28.52** Convertir orden de compra en factura de compra
+- [x] **28.50** Pagina /admin/egresos/ordenes-compra (OrdenesCompraLista.jsx)
+- [x] **28.51** Formulario de orden de compra con items (OrdenCompraForm.jsx)
+- [x] **28.52** Detalle de orden de compra (OrdenCompraDetalle.jsx)
 
 ### Frontend - Pedidos (Clientes)
-- [ ] **28.53** Pagina /admin/ingresos/pedidos (lista)
-- [ ] **28.54** Formulario de pedido (cliente o socio)
-- [ ] **28.55** Convertir pedido en factura de venta
+- [x] **28.53** Pagina /admin/ingresos/pedidos (PedidosLista.jsx)
+- [x] **28.54** Formulario de pedido cliente o socio (PedidoForm.jsx)
+- [x] **28.55** Detalle de pedido (PedidoDetalle.jsx)
 
 ### Frontend - Liquidacion de Sueldos (Personal)
-- [ ] **28.56** Pagina /admin/egresos/liquidaciones (lista por periodo)
-- [ ] **28.57** Formulario de generacion de liquidacion mensual
-- [ ] **28.58** UI para agregar conceptos (haberes/deducciones) por empleado
-- [ ] **28.59** Pantalla de pago de liquidacion (individual o masivo)
+- [x] **28.56** Pagina /admin/egresos/liquidaciones (LiquidacionesLista.jsx)
+- [x] **28.57** Formulario de generacion de liquidacion mensual (LiquidacionForm.jsx)
+- [x] **28.58** Detalle con items por empleado (LiquidacionDetalle.jsx)
+- [x] **28.59** CRUD de conceptos de liquidación (ConceptosLiquidacion.jsx)
 
 ---
 
 ## FASE 29: Plan de Cuentas Contable
 > Estructura contable para asociar a movimientos
 
-- [ ] **29.1** Disenar estructura de plan de cuentas (activo, pasivo, ingresos, egresos)
-- [ ] **29.2** Crear interfaz CRUD de cuentas contables (jerarquico)
-- [ ] **29.3** Asociar cuentas a ConceptoTesoreria
-- [ ] **29.4** Asociar cuentas a TipoSocio (cuota social)
-- [ ] **29.5** Asociar cuentas a Actividad/CategoriaActividad
-- [ ] **29.6** Asociar cuentas a tipos de movimiento de entidades
-- [ ] **29.7** Generar asientos automaticos en pagos y cobranzas
+- [x] **29.1** Diseñar estructura de plan de cuentas (modelo CuentaContable con jerarquía)
+- [x] **29.2** CRUD de cuentas contables jerárquico (PlanCuentasLista.jsx + CuentaContableForm.jsx)
+- [x] **29.3** Asociar cuentas a ConceptoTesoreria (campo cuentaContableId)
+- [x] **29.4** Asociar cuentas a TipoSocio (via ConceptoTesoreria)
+- [x] **29.5** Asociar cuentas a Actividad/CategoriaActividad (via ConceptoTesoreria)
+- [x] **29.6** Selector de cuenta en modal de Concepto (ConceptoModal.jsx con flat=true)
+- [x] **29.7** Crear modelo Asiento y AsientoLinea (partida doble)
+- [x] **29.8** Endpoints CRUD de Asientos (asientos.js con rutas específicas antes de /:id)
+- [x] **29.9** Generar asientos automáticos en pagos y cobranzas
+- [x] **29.10** Libro Diario (AsientosLista.jsx + AsientoForm.jsx + AsientoDetalle.jsx)
+- [x] **29.11** Libro Mayor (LibroMayor.jsx - movimientos por cuenta con saldos)
+- [x] **29.12** Plan de Cuentas como Balance (columnas Debe, Haber, Saldo con totales al pie)
+- [x] **29.13** Indicador D/H según naturaleza de cuenta (Deudoras: ACTIVO/EGRESO, Acreedoras: PASIVO/PATRIMONIO/INGRESO)
+- [x] **29.14** Cuentas agrupadoras con importes en negrita
+- [x] **29.15** Saldos visibles en panel de cuentas del Libro Mayor
+- [x] **29.16** Usar Modal personalizado en lugar de alert/confirm estándar
 
 ---
 
@@ -537,6 +556,90 @@ Base de datos: rojoplus
 - [ ] **31.8** Reporte de accesos por socio/periodo
 - [ ] **31.9** Alertas de accesos denegados
 - [ ] **31.10** Integracion con QR de socios como metodo de identificacion
+
+---
+
+## FASE 32: Gestión Deportiva
+> Módulo de entrenamientos, asistencia, partidos y estadísticas (Fútbol, Básquet, Vóley)
+
+### Modelos Base (reutiliza Actividad/CategoriaActividad/Inscripcion/Entrenador existentes)
+
+### Etapa 32.1: Espacios Deportivos ✅
+- [x] **32.1.1** Crear modelo EspacioDeportivo (codigo, nombre, tipo, capacidad, cubierto, iluminacion)
+- [x] **32.1.2** Crear relación muchos-a-muchos EspacioDeportivo ↔ Actividad
+- [x] **32.1.3** Migración de base de datos
+- [x] **32.1.4** Endpoints CRUD de EspacioDeportivo (server/src/routes/deportes.js)
+- [x] **32.1.5** Página /admin/deportes/espacios (EspaciosLista.jsx)
+- [x] **32.1.6** Formulario de espacio (EspacioForm.jsx)
+- [x] **32.1.7** Seed con espacios iniciales (seed-deportes.js)
+- [x] **32.1.8** Crear modelo TipoEspacio (tabla configurable)
+- [x] **32.1.9** Página /admin/deportes/tipos-espacio (TiposEspacioConfig.jsx)
+- [x] **32.1.10** Crear modelo HorarioDisponibilidad (días y horarios por espacio)
+- [x] **32.1.11** UI de horarios en EspacioForm con guardado bulk
+
+### Etapa 32.2: Entrenamientos ✅
+- [x] **32.2.1** Crear modelo Entrenamiento (categoriaActividadId, espacioId, fecha, horaInicio, horaFin, estado)
+- [x] **32.2.2** Crear modelo HorarioRecurrente (templates de horarios semanales)
+- [x] **32.2.3** Endpoints CRUD de Entrenamiento
+- [x] **32.2.4** Endpoint generar entrenamientos desde template (semana/mes)
+- [x] **32.2.5** Endpoint cancelar entrenamiento
+- [x] **32.2.6** Página /admin/deportes/entrenamientos (calendario semanal/mensual)
+- [x] **32.2.7** Modal de creación/edición de entrenamiento
+- [x] **32.2.8** Modal de generación masiva desde horarios recurrentes
+- [x] **32.2.9** Página /admin/deportes/horarios (HorariosRecurrentes.jsx)
+- [x] **32.2.10** Validación de conflictos de espacio
+
+### Etapa 32.3: Asistencia
+- [ ] **32.3.1** Crear modelo Asistencia (entrenamientoId, socioId, estado, horaLlegada)
+- [ ] **32.3.2** Agregar relación Socio.asistencias
+- [ ] **32.3.3** Endpoint obtener lista de inscriptos para tomar asistencia
+- [ ] **32.3.4** Endpoint guardar asistencia masiva
+- [ ] **32.3.5** Página /admin/deportes/asistencia (TomaAsistencia.jsx)
+- [ ] **32.3.6** Lista de jugadores con estados: PRESENTE, AUSENTE, JUSTIFICADO, TARDE
+- [ ] **32.3.7** Acceso rápido desde calendario de entrenamientos
+- [ ] **32.3.8** Indicador visual de asistencia tomada/pendiente en calendario
+
+### Etapa 32.4: Partidos y Eventos
+- [ ] **32.4.1** Crear modelo Partido (categoriaActividadId, fecha, hora, rival, condicion, resultado)
+- [ ] **32.4.2** Crear modelo Convocatoria (partidoId, socioId, confirmado)
+- [ ] **32.4.3** Crear modelo EstadisticaPartido (goles, asistencias, tarjetas, minutos)
+- [ ] **32.4.4** Endpoints CRUD de Partido
+- [ ] **32.4.5** Endpoint crear convocatoria (lista de jugadores)
+- [ ] **32.4.6** Endpoint confirmar/rechazar convocatoria (jugador o padre)
+- [ ] **32.4.7** Endpoint cargar resultado y estadísticas
+- [ ] **32.4.8** Página /admin/deportes/partidos (PartidosLista.jsx - calendario)
+- [ ] **32.4.9** Formulario de partido (PartidoForm.jsx)
+- [ ] **32.4.10** Página de convocatoria (ConvocatoriaPartido.jsx)
+- [ ] **32.4.11** Página de carga de resultado (ResultadoPartido.jsx)
+
+### Etapa 32.5: Reportes y Estadísticas
+- [ ] **32.5.1** Endpoint reporte de asistencia por jugador (% asistencia)
+- [ ] **32.5.2** Endpoint reporte de asistencia por equipo/categoría
+- [ ] **32.5.3** Endpoint estadísticas de jugador (partidos, goles, etc.)
+- [ ] **32.5.4** Endpoint ranking (goleadores, asistencias por categoría)
+- [ ] **32.5.5** Página /admin/deportes/reportes/asistencia (ReporteAsistencia.jsx)
+- [ ] **32.5.6** Página /admin/deportes/reportes/estadisticas (EstadisticasJugador.jsx)
+- [ ] **32.5.7** Dashboard deportivo con resumen general
+- [ ] **32.5.8** Exportar reportes a Excel/PDF
+
+### Etapa 32.6: Notificaciones (Opcional)
+- [ ] **32.6.1** Crear modelo ConfiguracionNotificacion (socioId, tipo, activo)
+- [ ] **32.6.2** Crear modelo Notificacion (tipo, mensaje, destinatario, estado)
+- [ ] **32.6.3** Servicio de envío de notificaciones (email)
+- [ ] **32.6.4** Notificación automática: nuevo entrenamiento
+- [ ] **32.6.5** Notificación automática: cancelación de entrenamiento
+- [ ] **32.6.6** Notificación automática: convocatoria a partido
+- [ ] **32.6.7** Notificación automática: recordatorio 24h antes
+- [ ] **32.6.8** Panel de configuración de notificaciones por socio
+
+### Menú y Navegación
+- [ ] **32.7.1** Agregar submenu "Deportes" en AdminLayout
+- [ ] **32.7.2** Rutas: /admin/deportes/espacios
+- [ ] **32.7.3** Rutas: /admin/deportes/entrenamientos
+- [ ] **32.7.4** Rutas: /admin/deportes/horarios
+- [ ] **32.7.5** Rutas: /admin/deportes/asistencia
+- [ ] **32.7.6** Rutas: /admin/deportes/partidos
+- [ ] **32.7.7** Rutas: /admin/deportes/reportes
 
 ---
 
@@ -571,10 +674,11 @@ Base de datos: rojoplus
 | 25 | Cuotas Config Base | ✅ Completado |
 | 26 | Cuotas y Cobranza | ✅ Completado |
 | 27 | Comercios Publicos y Geolocalizacion | ✅ Completado |
-| 28 | Ingresos, Egresos, Tesoreria y Stock | 🔶 En progreso |
-| 29 | Plan de Cuentas Contable | ⏳ Pendiente |
+| 28 | Ingresos, Egresos, Tesoreria y Stock | ✅ Completado |
+| 29 | Plan de Cuentas Contable | ✅ Completado |
 | 30 | Presupuesto Anual | ⏳ Pendiente |
 | 31 | Control de Accesos | ⏳ Pendiente |
+| 32 | Gestión Deportiva | 🔄 En Progreso |
 
 ---
 
@@ -596,4 +700,4 @@ npm run dev
 
 ---
 
-*Ultima actualizacion: 20 de Enero 2026*
+*Ultima actualizacion: 21 de Enero 2026 - FASE 32 Gestión Deportiva*

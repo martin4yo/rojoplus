@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2 } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -36,11 +36,21 @@ export default function TablasAuxiliares() {
   const [recargo, setRecargo] = useState({ tipo: 'FIJO', porcentaje: '10', cadaDias: '15', topeMaximo: '' })
   const [guardandoRecargo, setGuardandoRecargo] = useState(false)
 
+  // Configuración fiscal
+  const [configFiscal, setConfigFiscal] = useState({
+    cuit: '',
+    condicionIva: 'INSCRIPTO',
+    razonSocial: '',
+    domicilioFiscal: ''
+  })
+  const [guardandoFiscal, setGuardandoFiscal] = useState(false)
+
   useEffect(() => {
     cargarDatos()
     cargarModoDemo()
     cargarConfiguracion()
     cargarRecargo()
+    cargarConfigFiscal()
   }, [])
 
   async function cargarDatos() {
@@ -167,6 +177,63 @@ export default function TablasAuxiliares() {
       setError(err.message || 'Error al guardar configuración de recargos')
     } finally {
       setGuardandoRecargo(false)
+    }
+  }
+
+  async function cargarConfigFiscal() {
+    try {
+      const [cuit, condicionIva, razonSocial, domicilioFiscal] = await Promise.all([
+        api.get('/admin/sistema/configuracion/FISCAL_CUIT').catch(() => null),
+        api.get('/admin/sistema/configuracion/FISCAL_CONDICION_IVA').catch(() => null),
+        api.get('/admin/sistema/configuracion/FISCAL_RAZON_SOCIAL').catch(() => null),
+        api.get('/admin/sistema/configuracion/FISCAL_DOMICILIO').catch(() => null),
+      ])
+      setConfigFiscal({
+        cuit: cuit?.valor || '',
+        condicionIva: condicionIva?.valor || 'INSCRIPTO',
+        razonSocial: razonSocial?.valor || '',
+        domicilioFiscal: domicilioFiscal?.valor || ''
+      })
+    } catch (err) {
+      console.error('Error cargando configuración fiscal:', err)
+    }
+  }
+
+  async function guardarConfigFiscal() {
+    setGuardandoFiscal(true)
+    setError(null)
+    try {
+      await Promise.all([
+        api.put('/admin/sistema/configuracion/FISCAL_CUIT', {
+          valor: configFiscal.cuit,
+          tipo: 'STRING',
+          modulo: 'FACTURACION',
+          descripcion: 'CUIT del emisor'
+        }),
+        api.put('/admin/sistema/configuracion/FISCAL_CONDICION_IVA', {
+          valor: configFiscal.condicionIva,
+          tipo: 'STRING',
+          modulo: 'FACTURACION',
+          descripcion: 'Condición de IVA del emisor'
+        }),
+        api.put('/admin/sistema/configuracion/FISCAL_RAZON_SOCIAL', {
+          valor: configFiscal.razonSocial,
+          tipo: 'STRING',
+          modulo: 'FACTURACION',
+          descripcion: 'Razón social del emisor'
+        }),
+        api.put('/admin/sistema/configuracion/FISCAL_DOMICILIO', {
+          valor: configFiscal.domicilioFiscal,
+          tipo: 'STRING',
+          modulo: 'FACTURACION',
+          descripcion: 'Domicilio fiscal del emisor'
+        }),
+      ])
+      setSuccess('Configuración fiscal actualizada')
+    } catch (err) {
+      setError(err.message || 'Error al guardar configuración fiscal')
+    } finally {
+      setGuardandoFiscal(false)
     }
   }
 
@@ -509,6 +576,95 @@ export default function TablasAuxiliares() {
                 )}
               </button>
             )}
+          </div>
+
+          {/* Configuración Fiscal */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[500px] relative min-h-[380px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-green-100">
+                <Building2 className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Configuración Fiscal</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Datos fiscales para facturación
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      CUIT
+                    </label>
+                    <input
+                      type="text"
+                      value={configFiscal.cuit}
+                      onChange={(e) => setConfigFiscal({ ...configFiscal, cuit: e.target.value })}
+                      placeholder="XX-XXXXXXXX-X"
+                      className="input-field w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Condición de IVA
+                    </label>
+                    <select
+                      value={configFiscal.condicionIva}
+                      onChange={(e) => setConfigFiscal({ ...configFiscal, condicionIva: e.target.value })}
+                      className="input-field w-full"
+                    >
+                      <option value="INSCRIPTO">Responsable Inscripto</option>
+                      <option value="MONOTRIBUTISTA">Monotributista</option>
+                      <option value="EXENTO">Exento</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {configFiscal.condicionIva === 'INSCRIPTO' && 'Emite Facturas A (a inscriptos) y B (a otros). Discrimina IVA.'}
+                      {configFiscal.condicionIva === 'MONOTRIBUTISTA' && 'Emite Facturas C para todos. No discrimina IVA.'}
+                      {configFiscal.condicionIva === 'EXENTO' && 'Emite Facturas B para todos. No discrimina IVA.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Razón Social
+                    </label>
+                    <input
+                      type="text"
+                      value={configFiscal.razonSocial}
+                      onChange={(e) => setConfigFiscal({ ...configFiscal, razonSocial: e.target.value })}
+                      placeholder="Club Sportivo Pilar"
+                      className="input-field w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Domicilio Fiscal
+                    </label>
+                    <input
+                      type="text"
+                      value={configFiscal.domicilioFiscal}
+                      onChange={(e) => setConfigFiscal({ ...configFiscal, domicilioFiscal: e.target.value })}
+                      placeholder="Av. Principal 123, Pilar"
+                      className="input-field w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Botón guardar fijo abajo a la derecha */}
+            <button
+              onClick={guardarConfigFiscal}
+              disabled={guardandoFiscal}
+              className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+              title="Guardar"
+            >
+              {guardandoFiscal ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save className="w-5 h-5" />
+              )}
+            </button>
           </div>
         </div>
       )}

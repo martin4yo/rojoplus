@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus } from 'lucide-react'
+import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, X } from 'lucide-react'
 import { Button } from '../../../components/Button'
-import ConceptoModal from '../../../components/ConceptoModal'
 import api from '../../../services/api'
 
 export default function MovimientoCajaForm() {
@@ -12,18 +11,19 @@ export default function MovimientoCajaForm() {
   const tipoParam = searchParams.get('tipo')
 
   const [cajas, setCajas] = useState([])
-  const [mediosPago, setMediosPago] = useState([])
+  const [cuentasContables, setCuentasContables] = useState([])
   const [conceptos, setConceptos] = useState([])
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [showConceptoModal, setShowConceptoModal] = useState(false)
 
   const [form, setForm] = useState({
     cajaId: cajaIdParam || '',
     tipo: tipoParam || 'INGRESO',
     monto: '',
-    medioPagoId: '',
     conceptoId: '',
+    cuentaContableId: '',
+    concepto: '',
     descripcion: ''
   })
 
@@ -31,38 +31,97 @@ export default function MovimientoCajaForm() {
     cargarDatos()
   }, [])
 
+  // Estado para el modal de nuevo concepto
+  const [showConceptoModal, setShowConceptoModal] = useState(false)
+  const [nuevoConcepto, setNuevoConcepto] = useState({
+    codigo: '',
+    nombre: '',
+    tipo: 'INGRESO',
+    cuentaContableId: ''
+  })
+  const [savingConcepto, setSavingConcepto] = useState(false)
+
   async function cargarDatos() {
     try {
-      const [cajasRes, mediosRes, conceptosRes] = await Promise.all([
+      setLoading(true)
+      const [cajasRes, cuentasRes, conceptosRes] = await Promise.all([
         api.getFull('/admin/cajas?activo=true'),
-        api.getFull('/admin/medios-pago'),
-        api.getFull('/admin/conceptos?usaEnTesoreria=true&activo=true')
+        api.getFull('/admin/cuentas-contables?flat=true'),
+        api.getFull('/admin/conceptos-tesoreria')
       ])
       setCajas(cajasRes.data || [])
-      setMediosPago(mediosRes.data || [])
+      // Filtrar solo cuentas imputables
+      setCuentasContables((cuentasRes.data || []).filter(c => c.esImputable))
       setConceptos(conceptosRes.data || [])
     } catch (err) {
       console.error('Error cargando datos:', err)
+      setError('Error al cargar datos')
+    } finally {
+      setLoading(false)
     }
   }
 
   function handleChange(e) {
     const { name, value } = e.target
     setForm(prev => ({ ...prev, [name]: value }))
+
+    // Si se selecciona un concepto, auto-rellenar la cuenta contable asociada
+    if (name === 'conceptoId' && value) {
+      const concepto = conceptos.find(c => c.id === parseInt(value))
+      if (concepto) {
+        setForm(prev => ({
+          ...prev,
+          concepto: concepto.nombre,
+          cuentaContableId: concepto.cuentaContableId ? String(concepto.cuentaContableId) : prev.cuentaContableId
+        }))
+      }
+    }
   }
 
-  function handleConceptoCreated(nuevoConcepto) {
-    // Agregar el nuevo concepto a la lista y seleccionarlo
-    setConceptos(prev => [...prev, nuevoConcepto])
-    setForm(prev => ({ ...prev, conceptoId: String(nuevoConcepto.id) }))
+  async function handleCrearConcepto() {
+    if (!nuevoConcepto.codigo || !nuevoConcepto.nombre || !nuevoConcepto.cuentaContableId) {
+      setError('Código, nombre y cuenta contable son requeridos para el concepto')
+      return
+    }
+
+    setSavingConcepto(true)
+    try {
+      const res = await api.post('/admin/conceptos-tesoreria', {
+        codigo: nuevoConcepto.codigo,
+        nombre: nuevoConcepto.nombre,
+        tipo: nuevoConcepto.tipo,
+        cuentaContableId: parseInt(nuevoConcepto.cuentaContableId)
+      })
+
+      // Agregar el nuevo concepto a la lista
+      const conceptoCreado = res
+      setConceptos(prev => [...prev, conceptoCreado])
+
+      // Seleccionar el nuevo concepto
+      setForm(prev => ({
+        ...prev,
+        conceptoId: String(conceptoCreado.id),
+        concepto: conceptoCreado.nombre,
+        cuentaContableId: String(conceptoCreado.cuentaContableId)
+      }))
+
+      // Cerrar modal y resetear
+      setShowConceptoModal(false)
+      setNuevoConcepto({ codigo: '', nombre: '', tipo: 'INGRESO', cuentaContableId: '' })
+      setError(null)
+    } catch (err) {
+      setError(err.message || 'Error al crear concepto')
+    } finally {
+      setSavingConcepto(false)
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
 
-    if (!form.cajaId || !form.monto || !form.conceptoId) {
-      setError('Caja, monto y concepto son requeridos')
+    if (!form.cajaId || !form.monto || !form.conceptoId || !form.cuentaContableId) {
+      setError('Caja, monto, concepto y cuenta contable son requeridos')
       return
     }
 
@@ -78,8 +137,8 @@ export default function MovimientoCajaForm() {
         cajaId: parseInt(form.cajaId),
         tipo: form.tipo,
         monto: montoNum,
-        medioPagoId: form.medioPagoId ? parseInt(form.medioPagoId) : null,
-        conceptoId: parseInt(form.conceptoId),
+        cuentaContableId: parseInt(form.cuentaContableId),
+        concepto: form.concepto || null,
         descripcion: form.descripcion || null
       })
 
@@ -97,6 +156,14 @@ export default function MovimientoCajaForm() {
   }
 
   const cajaSeleccionada = cajas.find(c => c.id === parseInt(form.cajaId))
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -196,22 +263,6 @@ export default function MovimientoCajaForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Medio de Pago
-              </label>
-              <select
-                name="medioPagoId"
-                value={form.medioPagoId}
-                onChange={handleChange}
-                className="input-field w-full"
-              >
-                <option value="">Seleccionar...</option>
-                {mediosPago.map(mp => (
-                  <option key={mp.id} value={mp.id}>{mp.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Concepto *
               </label>
               <div className="flex gap-2">
@@ -226,22 +277,51 @@ export default function MovimientoCajaForm() {
                   {conceptos
                     .filter(c => c.tipo === form.tipo || c.tipo === 'AMBOS')
                     .map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.codigo} - {c.nombre}
+                      </option>
                     ))}
                 </select>
                 <button
                   type="button"
-                  onClick={() => setShowConceptoModal(true)}
-                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition flex items-center gap-1"
+                  onClick={() => {
+                    setNuevoConcepto(prev => ({ ...prev, tipo: form.tipo }))
+                    setShowConceptoModal(true)
+                  }}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600"
                   title="Crear nuevo concepto"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
                 </button>
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cuenta Contable *
+              </label>
+              <select
+                name="cuentaContableId"
+                value={form.cuentaContableId}
+                onChange={handleChange}
+                className="input-field w-full"
+                required
+              >
+                <option value="">Seleccionar cuenta...</option>
+                {cuentasContables.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.codigo} - {c.nombre}
+                  </option>
+                ))}
+              </select>
+              {form.conceptoId && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Auto-seleccionada desde el concepto
+                </p>
+              )}
+            </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripcion
+                Descripción adicional
               </label>
               <textarea
                 name="descripcion"
@@ -249,7 +329,7 @@ export default function MovimientoCajaForm() {
                 onChange={handleChange}
                 className="input-field w-full"
                 rows={2}
-                placeholder="Descripcion del movimiento..."
+                placeholder="Detalles adicionales..."
               />
             </div>
           </div>
@@ -258,14 +338,14 @@ export default function MovimientoCajaForm() {
           {form.cajaId && form.monto && (
             <div className={`mt-6 p-4 rounded-lg ${form.tipo === 'INGRESO' ? 'bg-green-50' : 'bg-red-50'}`}>
               <p className="text-sm text-gray-600 mb-1">
-                {form.tipo === 'INGRESO' ? 'Se sumara' : 'Se restara'} de <strong>{cajaSeleccionada?.nombre}</strong>:
+                {form.tipo === 'INGRESO' ? 'Se sumará' : 'Se restará'} de <strong>{cajaSeleccionada?.nombre}</strong>:
               </p>
               <p className={`text-2xl font-bold ${form.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
                 {form.tipo === 'INGRESO' ? '+' : '-'}${parseFloat(form.monto || 0).toLocaleString()}
               </p>
               {cajaSeleccionada && form.tipo === 'EGRESO' && parseFloat(form.monto) > cajaSeleccionada.saldoActual && (
                 <p className="text-sm text-red-600 mt-2">
-                  ⚠️ El monto excede el saldo disponible (${cajaSeleccionada.saldoActual.toLocaleString()})
+                  El monto excede el saldo disponible (${cajaSeleccionada.saldoActual.toLocaleString()})
                 </p>
               )}
             </div>
@@ -284,13 +364,90 @@ export default function MovimientoCajaForm() {
         </div>
       </form>
 
-      {/* Modal para crear concepto */}
-      <ConceptoModal
-        isOpen={showConceptoModal}
-        onClose={() => setShowConceptoModal(false)}
-        onCreated={handleConceptoCreated}
-        tipoDefault={form.tipo}
-      />
+      {/* Modal Crear Concepto */}
+      {showConceptoModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Nuevo Concepto</h3>
+              <button
+                onClick={() => setShowConceptoModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código *
+                </label>
+                <input
+                  type="text"
+                  value={nuevoConcepto.codigo}
+                  onChange={(e) => setNuevoConcepto(prev => ({ ...prev, codigo: e.target.value.toUpperCase() }))}
+                  className="input-field w-full"
+                  placeholder="Ej: ALQUILER, VENTA_MERCH"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre *
+                </label>
+                <input
+                  type="text"
+                  value={nuevoConcepto.nombre}
+                  onChange={(e) => setNuevoConcepto(prev => ({ ...prev, nombre: e.target.value }))}
+                  className="input-field w-full"
+                  placeholder="Descripción del concepto"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo
+                </label>
+                <select
+                  value={nuevoConcepto.tipo}
+                  onChange={(e) => setNuevoConcepto(prev => ({ ...prev, tipo: e.target.value }))}
+                  className="input-field w-full"
+                >
+                  <option value="INGRESO">Ingreso</option>
+                  <option value="EGRESO">Egreso</option>
+                  <option value="AMBOS">Ambos</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cuenta Contable *
+                </label>
+                <select
+                  value={nuevoConcepto.cuentaContableId}
+                  onChange={(e) => setNuevoConcepto(prev => ({ ...prev, cuentaContableId: e.target.value }))}
+                  className="input-field w-full"
+                >
+                  <option value="">Seleccionar cuenta...</option>
+                  {cuentasContables.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.codigo} - {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="secondary" onClick={() => setShowConceptoModal(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCrearConcepto} loading={savingConcepto}>
+                <Plus className="w-4 h-4 mr-2" />
+                Crear Concepto
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

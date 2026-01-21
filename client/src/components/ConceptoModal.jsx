@@ -37,7 +37,8 @@ export default function ConceptoModal({ isOpen, onClose, onCreated, tipoDefault 
 
   async function cargarCuentasContables() {
     try {
-      const res = await api.getFull('/admin/cuentas-contables?esImputable=true&activo=true')
+      // Usar flat=true para obtener lista plana en lugar de árbol jerárquico
+      const res = await api.getFull('/admin/cuentas-contables?esImputable=true&activo=true&flat=true')
       setCuentasContables(res.data || [])
     } catch (err) {
       console.error('Error cargando cuentas contables:', err)

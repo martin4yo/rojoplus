@@ -19,6 +19,10 @@ import tesoreriaRoutes from './routes/tesoreria.js'
 import stockRoutes from './routes/stock.js'
 import movimientosContablesRoutes from './routes/movimientosContables.js'
 import usuariosRoutes from './routes/usuarios.js'
+import liquidacionesRoutes from './routes/liquidaciones.js'
+import asientosRoutes from './routes/asientos.js'
+import deportesRoutes from './routes/deportes.js'
+import presupuestoRoutes from './routes/presupuesto.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -56,6 +60,10 @@ app.use('/api/admin', tesoreriaRoutes)
 app.use('/api/admin', stockRoutes)
 app.use('/api/admin', movimientosContablesRoutes)
 app.use('/api/admin', usuariosRoutes)
+app.use('/api/admin', liquidacionesRoutes)
+app.use('/api/admin/asientos', asientosRoutes)
+app.use('/api/admin', deportesRoutes)
+app.use('/api/admin', presupuestoRoutes)
 app.use('/api/socio', socioRoutes)
 
 // Health check

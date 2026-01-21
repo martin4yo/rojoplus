@@ -980,6 +980,386 @@ router.delete('/ordenes-compra/:id', asyncHandler(async (req, res) => {
 }))
 
 // =============================================================================
+// PEDIDOS (VENTAS)
+// =============================================================================
+
+// GET /api/admin/pedidos - Listar pedidos
+router.get('/pedidos', asyncHandler(async (req, res) => {
+  const { estado, entidadId, socioId, desde, hasta, busqueda, page = 1, limit = 50 } = req.query
+
+  const where = {}
+  if (estado) where.estado = estado
+  if (entidadId) where.entidadId = parseInt(entidadId)
+  if (socioId) where.socioId = parseInt(socioId)
+  if (desde || hasta) {
+    where.fecha = {}
+    if (desde) where.fecha.gte = new Date(desde)
+    if (hasta) where.fecha.lte = new Date(hasta)
+  }
+  if (busqueda) {
+    where.OR = [
+      { numero: { contains: busqueda, mode: 'insensitive' } },
+      { entidad: { razonSocial: { contains: busqueda, mode: 'insensitive' } } },
+      { socio: { apellidoNombre: { contains: busqueda, mode: 'insensitive' } } },
+      { observaciones: { contains: busqueda, mode: 'insensitive' } }
+    ]
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit)
+
+  const [pedidos, total] = await Promise.all([
+    prisma.pedido.findMany({
+      where,
+      orderBy: { fecha: 'desc' },
+      skip,
+      take: parseInt(limit),
+      include: {
+        entidad: {
+          select: { id: true, codigo: true, razonSocial: true, nombreFantasia: true }
+        },
+        socio: {
+          select: { id: true, nroSocio: true, apellidoNombre: true }
+        },
+        items: {
+          include: {
+            productoVariante: {
+              include: {
+                producto: { select: { codigo: true, nombre: true } }
+              }
+            }
+          }
+        }
+      }
+    }),
+    prisma.pedido.count({ where })
+  ])
+
+  res.json({
+    success: true,
+    data: pedidos.map(p => ({
+      ...p,
+      subtotal: Number(p.subtotal),
+      iva21: Number(p.iva21),
+      iva105: Number(p.iva105),
+      total: Number(p.total),
+      items: p.items.map(i => ({
+        ...i,
+        cantidad: Number(i.cantidad),
+        cantidadFacturada: Number(i.cantidadFacturada),
+        precioUnitario: Number(i.precioUnitario),
+        subtotal: Number(i.subtotal)
+      }))
+    })),
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      pages: Math.ceil(total / parseInt(limit))
+    }
+  })
+}))
+
+// GET /api/admin/pedidos/:id - Detalle de pedido
+router.get('/pedidos/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const pedido = await prisma.pedido.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      entidad: true,
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true, email: true, celular: true } },
+      items: {
+        include: {
+          productoVariante: {
+            include: {
+              producto: {
+                include: {
+                  categoria: { select: { nombre: true } },
+                  fotos: { where: { esPrincipal: true }, take: 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+
+  if (!pedido) {
+    throw new AppError('Pedido no encontrado', 404)
+  }
+
+  res.json({
+    success: true,
+    data: {
+      ...pedido,
+      subtotal: Number(pedido.subtotal),
+      iva21: Number(pedido.iva21),
+      iva105: Number(pedido.iva105),
+      total: Number(pedido.total),
+      items: pedido.items.map(i => ({
+        ...i,
+        cantidad: Number(i.cantidad),
+        cantidadFacturada: Number(i.cantidadFacturada),
+        precioUnitario: Number(i.precioUnitario),
+        subtotal: Number(i.subtotal)
+      }))
+    }
+  })
+}))
+
+// POST /api/admin/pedidos - Crear pedido
+router.post('/pedidos', asyncHandler(async (req, res) => {
+  const { entidadId, socioId, fechaEntrega, observaciones, items } = req.body
+
+  if (!entidadId && !socioId) {
+    throw new AppError('Debe especificar un cliente o socio', 400)
+  }
+
+  if (!items || items.length === 0) {
+    throw new AppError('El pedido debe tener al menos un item', 400)
+  }
+
+  // Verificar entidad si se proporciona
+  if (entidadId) {
+    const entidad = await prisma.entidad.findUnique({ where: { id: parseInt(entidadId) } })
+    if (!entidad) {
+      throw new AppError('Cliente no encontrado', 404)
+    }
+    if (entidad.tipo !== 'CLIENTE') {
+      throw new AppError('La entidad seleccionada no es un cliente', 400)
+    }
+  }
+
+  // Verificar socio si se proporciona
+  if (socioId) {
+    const socio = await prisma.socio.findUnique({ where: { id: parseInt(socioId) } })
+    if (!socio) {
+      throw new AppError('Socio no encontrado', 404)
+    }
+  }
+
+  // Generar numero de pedido
+  const anio = new Date().getFullYear()
+  const ultimoPedido = await prisma.pedido.findFirst({
+    where: { numero: { startsWith: `PED-${anio}-` } },
+    orderBy: { numero: 'desc' }
+  })
+  let siguiente = 1
+  if (ultimoPedido) {
+    const partes = ultimoPedido.numero.split('-')
+    siguiente = parseInt(partes[2]) + 1
+  }
+  const numero = `PED-${anio}-${String(siguiente).padStart(5, '0')}`
+
+  // Calcular totales
+  let subtotal = 0
+  let iva21 = 0
+  let iva105 = 0
+
+  const itemsData = items.map(item => {
+    const cantidad = parseFloat(item.cantidad)
+    const precio = parseFloat(item.precioUnitario)
+    const itemSubtotal = cantidad * precio
+    subtotal += itemSubtotal
+
+    // Asumir IVA 21% por defecto
+    const tasaIva = item.iva || 21
+    if (tasaIva === 21) {
+      iva21 += itemSubtotal * 0.21
+    } else if (tasaIva === 10.5) {
+      iva105 += itemSubtotal * 0.105
+    }
+
+    return {
+      productoVarianteId: item.productoVarianteId ? parseInt(item.productoVarianteId) : null,
+      descripcion: item.descripcion || null,
+      cantidad,
+      precioUnitario: precio,
+      subtotal: itemSubtotal
+    }
+  })
+
+  const total = subtotal + iva21 + iva105
+
+  const pedido = await prisma.pedido.create({
+    data: {
+      numero,
+      entidadId: entidadId ? parseInt(entidadId) : null,
+      socioId: socioId ? parseInt(socioId) : null,
+      fechaEntrega: fechaEntrega ? new Date(fechaEntrega) : null,
+      subtotal,
+      iva21,
+      iva105,
+      total,
+      observaciones: observaciones || null,
+      registradoPor: req.admin.id,
+      items: {
+        create: itemsData
+      }
+    },
+    include: {
+      entidad: { select: { razonSocial: true } },
+      socio: { select: { nroSocio: true, apellidoNombre: true } },
+      items: true
+    }
+  })
+
+  res.status(201).json({
+    success: true,
+    data: {
+      ...pedido,
+      subtotal: Number(pedido.subtotal),
+      iva21: Number(pedido.iva21),
+      iva105: Number(pedido.iva105),
+      total: Number(pedido.total)
+    },
+    message: 'Pedido creado correctamente'
+  })
+}))
+
+// PUT /api/admin/pedidos/:id - Actualizar pedido
+router.put('/pedidos/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { fechaEntrega, observaciones, items } = req.body
+
+  const pedido = await prisma.pedido.findUnique({
+    where: { id: parseInt(id) },
+    include: { items: true }
+  })
+
+  if (!pedido) {
+    throw new AppError('Pedido no encontrado', 404)
+  }
+
+  if (pedido.estado !== 'PENDIENTE') {
+    throw new AppError('Solo se pueden editar pedidos en estado PENDIENTE', 400)
+  }
+
+  let updateData = {
+    fechaEntrega: fechaEntrega ? new Date(fechaEntrega) : pedido.fechaEntrega,
+    observaciones: observaciones !== undefined ? observaciones : pedido.observaciones
+  }
+
+  if (items && items.length > 0) {
+    // Eliminar items anteriores
+    await prisma.itemPedido.deleteMany({
+      where: { pedidoId: parseInt(id) }
+    })
+
+    // Calcular nuevos totales
+    let subtotal = 0
+    let iva21 = 0
+    let iva105 = 0
+
+    const itemsData = items.map(item => {
+      const cantidad = parseFloat(item.cantidad)
+      const precio = parseFloat(item.precioUnitario)
+      const itemSubtotal = cantidad * precio
+      subtotal += itemSubtotal
+
+      const tasaIva = item.iva || 21
+      if (tasaIva === 21) {
+        iva21 += itemSubtotal * 0.21
+      } else if (tasaIva === 10.5) {
+        iva105 += itemSubtotal * 0.105
+      }
+
+      return {
+        pedidoId: parseInt(id),
+        productoVarianteId: item.productoVarianteId ? parseInt(item.productoVarianteId) : null,
+        descripcion: item.descripcion || null,
+        cantidad,
+        precioUnitario: precio,
+        subtotal: itemSubtotal
+      }
+    })
+
+    await prisma.itemPedido.createMany({ data: itemsData })
+
+    updateData.subtotal = subtotal
+    updateData.iva21 = iva21
+    updateData.iva105 = iva105
+    updateData.total = subtotal + iva21 + iva105
+  }
+
+  const pedidoActualizado = await prisma.pedido.update({
+    where: { id: parseInt(id) },
+    data: updateData,
+    include: {
+      entidad: { select: { razonSocial: true } },
+      socio: { select: { nroSocio: true, apellidoNombre: true } },
+      items: true
+    }
+  })
+
+  res.json({
+    success: true,
+    data: pedidoActualizado,
+    message: 'Pedido actualizado correctamente'
+  })
+}))
+
+// PUT /api/admin/pedidos/:id/cancelar - Cancelar pedido
+router.put('/pedidos/:id/cancelar', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const pedido = await prisma.pedido.findUnique({
+    where: { id: parseInt(id) },
+    include: { items: true }
+  })
+
+  if (!pedido) {
+    throw new AppError('Pedido no encontrado', 404)
+  }
+
+  // Solo cancelar si no tiene items facturados
+  const tieneFacturado = pedido.items.some(i => Number(i.cantidadFacturada) > 0)
+  if (tieneFacturado) {
+    throw new AppError('No se puede cancelar un pedido con items facturados', 400)
+  }
+
+  const pedidoCancelado = await prisma.pedido.update({
+    where: { id: parseInt(id) },
+    data: { estado: 'CANCELADO' },
+    include: {
+      entidad: { select: { razonSocial: true } },
+      socio: { select: { apellidoNombre: true } },
+      items: true
+    }
+  })
+
+  res.json({ success: true, data: pedidoCancelado })
+}))
+
+// DELETE /api/admin/pedidos/:id - Eliminar pedido
+router.delete('/pedidos/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const pedido = await prisma.pedido.findUnique({
+    where: { id: parseInt(id) },
+    include: { items: true }
+  })
+
+  if (!pedido) {
+    throw new AppError('Pedido no encontrado', 404)
+  }
+
+  if (pedido.estado !== 'PENDIENTE') {
+    throw new AppError('Solo se pueden eliminar pedidos en estado PENDIENTE', 400)
+  }
+
+  const tieneFacturado = pedido.items.some(i => Number(i.cantidadFacturada) > 0)
+  if (tieneFacturado) {
+    throw new AppError('No se puede eliminar un pedido con items facturados', 400)
+  }
+
+  await prisma.pedido.delete({ where: { id: parseInt(id) } })
+
+  res.json({ success: true, message: 'Pedido eliminado correctamente' })
+}))
+
+// =============================================================================
 // PROXIMO NUMERO
 // =============================================================================
 

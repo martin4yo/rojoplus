@@ -3,7 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
-  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart
+  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList
 } from 'lucide-react'
 
 export default function AdminLayout() {
@@ -11,6 +11,7 @@ export default function AdminLayout() {
   const location = useLocation()
   const [admin, setAdmin] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState([])
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function AdminLayout() {
       label: 'Ingresos', icon: TrendingUp,
       submenu: [
         { path: '/admin/ingresos/clientes', label: 'Clientes', icon: UserCheck },
+        { path: '/admin/ingresos/pedidos', label: 'Pedidos', icon: ShoppingCart },
         { path: '/admin/ingresos/facturas', label: 'Facturas Emitidas', icon: FileText },
         { path: '/admin/ingresos/recibos', label: 'Recibos de Cobro', icon: FileCheck },
       ]
@@ -75,6 +77,13 @@ export default function AdminLayout() {
         { path: '/admin/egresos/ordenes-compra', label: 'Ordenes de Compra', icon: ShoppingCart },
         { path: '/admin/egresos/facturas', label: 'Facturas Recibidas', icon: FileText },
         { path: '/admin/egresos/ordenes-pago', label: 'Ordenes de Pago', icon: CreditCard },
+      ]
+    },
+    {
+      label: 'Sueldos', icon: DollarSign,
+      submenu: [
+        { path: '/admin/liquidaciones', label: 'Liquidaciones', icon: FileText },
+        { path: '/admin/liquidaciones/conceptos', label: 'Conceptos', icon: Settings },
       ]
     },
     {
@@ -94,6 +103,24 @@ export default function AdminLayout() {
         { path: '/admin/stock/alertas', label: 'Alertas Stock', icon: AlertTriangle },
       ]
     },
+    {
+      label: 'Contabilidad', icon: Calculator,
+      submenu: [
+        { path: '/admin/contabilidad/plan-cuentas', label: 'Plan de Cuentas', icon: BookOpen },
+        { path: '/admin/contabilidad/asientos', label: 'Libro Diario', icon: FileText },
+        { path: '/admin/contabilidad/libro-mayor', label: 'Libro Mayor', icon: BookOpen },
+        { path: '/admin/contabilidad/presupuestos', label: 'Presupuestos', icon: BarChart3 },
+      ]
+    },
+    {
+      label: 'Deportes', icon: Trophy,
+      submenu: [
+        { path: '/admin/deportes/entrenamientos', label: 'Entrenamientos', icon: Calendar },
+        { path: '/admin/deportes/horarios', label: 'Horarios', icon: ClipboardList },
+        { path: '/admin/deportes/espacios', label: 'Espacios', icon: MapPin },
+        { path: '/admin/deportes/tipos-espacio', label: 'Tipos de Espacio', icon: Settings },
+      ]
+    },
     { path: '/admin/comercios', label: 'Comercios', icon: Store },
     { path: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
     { path: '/admin/configuracion', label: 'Configuracion', icon: Settings },
@@ -103,11 +130,37 @@ export default function AdminLayout() {
     if (path === '/admin') {
       return location.pathname === '/admin'
     }
-    return location.pathname.startsWith(path)
+    const currentPath = location.pathname
+    // Coincidencia exacta
+    if (currentPath === path) {
+      return true
+    }
+    // Para rutas hijas (ej: /admin/liquidaciones/123 o /admin/liquidaciones/nueva)
+    // pero NO para rutas hermanas (ej: /admin/liquidaciones/conceptos cuando path es /admin/liquidaciones)
+    if (currentPath.startsWith(path + '/')) {
+      const nextSegment = currentPath.slice(path.length + 1).split('/')[0]
+      // Si el siguiente segmento es un numero (ID) o una accion conocida, es ruta hija
+      if (/^\d+$/.test(nextSegment) || ['nueva', 'nuevo', 'editar', 'pagar', 'recibir'].includes(nextSegment)) {
+        return true
+      }
+      // Si no, podria ser una ruta hermana del menu (como /conceptos)
+      return false
+    }
+    return false
   }
 
   function isSubmenuActive(submenu) {
-    return submenu.some(item => location.pathname.startsWith(item.path))
+    return submenu.some(item => {
+      const currentPath = location.pathname
+      if (currentPath === item.path) return true
+      if (currentPath.startsWith(item.path + '/')) {
+        const nextSegment = currentPath.slice(item.path.length + 1).split('/')[0]
+        if (/^\d+$/.test(nextSegment) || ['nueva', 'nuevo', 'editar', 'pagar', 'recibir'].includes(nextSegment)) {
+          return true
+        }
+      }
+      return false
+    })
   }
 
   return (
@@ -123,19 +176,32 @@ export default function AdminLayout() {
       {/* Sidebar */}
       <aside className={`
         fixed md:static inset-y-0 left-0 z-50
-        w-72 bg-gray-800 shadow-lg flex flex-col h-screen
-        transform transition-transform duration-300 ease-in-out
+        ${sidebarCollapsed ? 'md:w-20' : 'md:w-72'} w-72
+        bg-gray-800 shadow-lg flex flex-col h-screen
+        transform transition-all duration-300 ease-in-out
         ${menuOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-        <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-white flex items-center justify-between">
-          <Link to="/admin" className="flex items-center gap-3">
+        <div className={`flex-shrink-0 p-4 border-b border-gray-200 bg-white flex items-center ${sidebarCollapsed ? 'md:justify-center' : 'justify-between'}`}>
+          <Link to="/admin" className={`flex items-center gap-3 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
             <img src="/images/logo.png" alt="Logo" className="h-14" />
             <div>
               <span className="font-bold text-primary text-lg whitespace-nowrap">Sportivo Pilar</span>
               <p className="text-xs text-gray-500">Admin</p>
             </div>
           </Link>
+          {/* Logo pequeño cuando está colapsado */}
+          <Link to="/admin" className={`hidden ${sidebarCollapsed ? 'md:block' : 'md:hidden'}`}>
+            <img src="/images/logo.png" alt="Logo" className="h-10" />
+          </Link>
+          {/* Botón hamburguesa para colapsar (desktop) */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className={`hidden md:flex p-2 text-gray-500 hover:bg-gray-100 rounded-lg ${sidebarCollapsed ? 'absolute top-4 right-2' : ''}`}
+            title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           {/* Botón cerrar en móvil */}
           <button
             onClick={() => setMenuOpen(false)}
@@ -154,26 +220,30 @@ export default function AdminLayout() {
               const hasActiveChild = isSubmenuActive(item.submenu)
 
               return (
-                <div key={item.label} className="mb-1">
+                <div key={item.label} className="mb-1 relative group">
                   <button
-                    onClick={() => toggleSubmenu(item.label)}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
+                    onClick={() => !sidebarCollapsed && toggleSubmenu(item.label)}
+                    className={`w-full flex items-center ${sidebarCollapsed ? 'md:justify-center' : 'justify-between'} px-4 py-3 rounded-lg transition-colors ${
                       hasActiveChild
                         ? 'bg-primary text-white'
                         : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                     }`}
+                    title={sidebarCollapsed ? item.label : ''}
                   >
                     <div className="flex items-center gap-3">
-                      <Icon className="w-5 h-5" />
-                      <span>{item.label}</span>
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
                     </div>
-                    {isExpanded ? (
-                      <ChevronDown className="w-4 h-4" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4" />
+                    {!sidebarCollapsed && (
+                      isExpanded ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )
                     )}
                   </button>
-                  {isExpanded && (
+                  {/* Submenu expandido normal */}
+                  {isExpanded && !sidebarCollapsed && (
                     <div className="ml-4 mt-1 border-l-2 border-gray-600 pl-2">
                       {item.submenu.map((subItem) => {
                         const SubIcon = subItem.icon
@@ -182,6 +252,31 @@ export default function AdminLayout() {
                             key={subItem.path}
                             to={subItem.path}
                             className={`flex items-center gap-3 px-4 py-2 rounded-lg mb-1 text-sm transition-colors ${
+                              isActive(subItem.path)
+                                ? 'bg-primary text-white'
+                                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                            }`}
+                          >
+                            <SubIcon className="w-4 h-4" />
+                            <span>{subItem.label}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {/* Tooltip/Popup submenu cuando está colapsado */}
+                  {sidebarCollapsed && (
+                    <div className="hidden md:group-hover:block absolute left-full top-0 ml-2 bg-gray-800 rounded-lg shadow-lg py-2 min-w-[200px] z-50">
+                      <div className="px-4 py-2 text-sm font-medium text-gray-300 border-b border-gray-700">
+                        {item.label}
+                      </div>
+                      {item.submenu.map((subItem) => {
+                        const SubIcon = subItem.icon
+                        return (
+                          <Link
+                            key={subItem.path}
+                            to={subItem.path}
+                            className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
                               isActive(subItem.path)
                                 ? 'bg-primary text-white'
                                 : 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -203,14 +298,21 @@ export default function AdminLayout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${sidebarCollapsed ? 'md:justify-center' : ''} ${
                   isActive(item.path)
                     ? 'bg-primary text-white'
                     : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                }`}
+                } relative group`}
+                title={sidebarCollapsed ? item.label : ''}
               >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
+                {/* Tooltip cuando está colapsado */}
+                {sidebarCollapsed && (
+                  <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
+                    <span className="text-sm text-white">{item.label}</span>
+                  </div>
+                )}
               </Link>
             )
           })}
