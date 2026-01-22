@@ -7,6 +7,7 @@ import RegistroExito from './pages/registro/RegistroExito'
 
 // Página del comerciante
 import Comercio from './pages/comercio/Comercio'
+import ComercioEditar from './pages/comercio/ComercioEditar'
 import TokenInvalido from './pages/comercio/TokenInvalido'
 
 // Página del socio
@@ -138,7 +139,9 @@ function App() {
 
       {/* Ruta del comerciante */}
       <Route path="/comercio/:token" element={<Comercio />} />
+      <Route path="/comercio/:token/editar" element={<ComercioEditar />} />
       <Route path="/c/:token" element={<Comercio />} />
+      <Route path="/c/:token/editar" element={<ComercioEditar />} />
       <Route path="/acceso-invalido" element={<TokenInvalido />} />
 
       {/* Rutas del socio */}

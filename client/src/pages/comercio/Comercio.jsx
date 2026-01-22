@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { CheckCircle, XCircle, Star, QrCode } from 'lucide-react'
+import { CheckCircle, XCircle, Star, QrCode, Settings } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
@@ -175,17 +175,26 @@ export default function Comercio() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-md mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <img src="/images/logo.png" alt="Logo" className="h-14" />
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-primary font-bold text-lg whitespace-nowrap">Rojo Plus</span>
-                <span className="text-xs text-gray-400 italic whitespace-nowrap">Tu pasión tiene recompensas</span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img src="/images/logo.png" alt="Logo" className="h-14" />
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-primary font-bold text-lg whitespace-nowrap">Rojo Plus</span>
+                  <span className="text-xs text-gray-400 italic whitespace-nowrap">Tu pasión tiene recompensas</span>
+                </div>
+                <span className="text-gray-700 font-semibold text-lg block">
+                  {comercio?.nombre}
+                </span>
               </div>
-              <span className="text-gray-700 font-semibold text-lg block">
-                {comercio?.nombre}
-              </span>
             </div>
+            <button
+              onClick={() => navigate(`/comercio/${token}/editar`)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition"
+              title="Editar datos del comercio"
+            >
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
         </div>
       </header>

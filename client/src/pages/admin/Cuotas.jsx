@@ -37,8 +37,10 @@ export default function Cuotas() {
   // Seleccion para pago
   const [seleccionadas, setSeleccionadas] = useState([])
   const [mediosPago, setMediosPago] = useState([])
+  const [cajas, setCajas] = useState([])
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [medioPagoId, setMedioPagoId] = useState('')
+  const [cajaId, setCajaId] = useState('')
   const [registrandoPago, setRegistrandoPago] = useState(false)
   const [success, setSuccess] = useState(null)
 
@@ -72,6 +74,16 @@ export default function Cuotas() {
       cargarCuotas()
     }
   }, [periodoId, estado, page, modoCobranza])
+
+  // Detectar si se debe abrir cobranza automáticamente
+  useEffect(() => {
+    const cobrarSocioId = searchParams.get('cobrarSocioId')
+    if (cobrarSocioId && !modoCobranza) {
+      seleccionarSocioParaCobranza({ id: parseInt(cobrarSocioId) })
+      // Limpiar el parámetro de la URL
+      setSearchParams({})
+    }
+  }, [searchParams, modoCobranza])
 
   // Buscar socios con debounce
   useEffect(() => {
@@ -109,16 +121,21 @@ export default function Cuotas() {
 
   async function cargarDatosIniciales() {
     try {
-      const [periodosData, mediosData, categoriasData] = await Promise.all([
+      const [periodosData, mediosData, categoriasData, cajasData] = await Promise.all([
         api.get('/admin/periodos'),
         api.get('/admin/medios-pago'),
         api.get('/admin/categorias-cargo'),
+        api.get('/admin/cajas'),
       ])
       setPeriodos(periodosData || [])
       setMediosPago(mediosData || [])
       setCategoriasCargo(categoriasData || [])
+      setCajas(cajasData || [])
       if (mediosData?.length > 0) {
         setMedioPagoId(mediosData[0].id.toString())
+      }
+      if (cajasData?.length > 0) {
+        setCajaId(cajasData[0].id.toString())
       }
     } catch (err) {
       console.error('Error cargando datos iniciales:', err)
@@ -315,7 +332,7 @@ export default function Cuotas() {
   }
 
   async function registrarPago() {
-    if (seleccionadas.length === 0 || !medioPagoId) return
+    if (seleccionadas.length === 0 || !medioPagoId || !cajaId) return
 
     // Obtener el titular o socio principal para el pago
     const socioIdPago = cobranzaData?.titular?.id || cobranzaData?.sociosPorCobrar?.[0]?.socio?.id
@@ -333,6 +350,7 @@ export default function Cuotas() {
         socioId: socioIdPago,
         cuotaIds: seleccionadas,
         medioPagoId: parseInt(medioPagoId),
+        cajaId: parseInt(cajaId),
       })
       setSuccess(`Pago registrado correctamente. Recibo #${result.numero}`)
       setSeleccionadas([])
@@ -423,6 +441,14 @@ export default function Cuotas() {
               </p>
             )}
           </div>
+          <Button
+            onClick={() => setShowPagoModal(true)}
+            disabled={seleccionadas.length === 0}
+            className="flex items-center gap-2"
+          >
+            <DollarSign className="w-4 h-4" />
+            Cobrar
+          </Button>
         </div>
 
         {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
@@ -625,6 +651,22 @@ export default function Cuotas() {
                   >
                     {mediosPago.map(mp => (
                       <option key={mp.id} value={mp.id}>{mp.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Caja</label>
+                  <select
+                    value={cajaId}
+                    onChange={e => setCajaId(e.target.value)}
+                    className="input-field w-full"
+                    required
+                  >
+                    {cajas.map(caja => (
+                      <option key={caja.id} value={caja.id}>
+                        {caja.nombre} {caja.tipo ? `(${caja.tipo})` : ''}
+                      </option>
                     ))}
                   </select>
                 </div>

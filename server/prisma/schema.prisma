@@ -1070,35 +1070,51 @@ model PermisoRol {
 }
 
 model Comercio {
-  id                 Int       @id @default(autoincrement())
-  nombre             String
-  direccion          String
-  rubroId            Int       @map("rubro_id")
-  telefono           String
-  email              String    @unique
-  cuit               String
-  responsable        String
-  logo               String?
-  latitud            Decimal?  @db.Decimal(10, 8)
-  longitud           Decimal?  @db.Decimal(11, 8)
-  token              String?   @unique @default(uuid())
-  estado             String    @default("PENDIENTE")
-  plan               String    @default("BASICO")
-  descuentoPct       Decimal   @default(10) @map("descuento_pct") @db.Decimal(5, 2)
-  acumulacionActiva  Boolean   @default(false) @map("acumulacion_activa")
-  acumComprasReq     Int?      @map("acum_compras_req")
-  acumPeriodoDias    Int?      @map("acum_periodo_dias")
-  acumDescuentoExtra Decimal?  @map("acum_descuento_extra") @db.Decimal(5, 2)
-  motivoRechazo      String?   @map("motivo_rechazo")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  approvedAt         DateTime? @map("approved_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-  rubro              Rubro     @relation(fields: [rubroId], references: [id])
-  ventas             Venta[]
+  id                      Int                  @id @default(autoincrement())
+  nombre                  String
+  direccion               String
+  rubroId                 Int                  @map("rubro_id")
+  telefono                String
+  email                   String               @unique
+  cuit                    String
+  responsable             String
+  logo                    String?
+  latitud                 Decimal?             @db.Decimal(10, 8)
+  longitud                Decimal?             @db.Decimal(11, 8)
+  token                   String?              @unique @default(uuid())
+  estado                  String               @default("PENDIENTE")
+  plan                    String               @default("BASICO")
+  descuentoDisponibleId   Int?                 @map("descuento_disponible_id")
+  descuentoPct            Decimal              @default(10) @map("descuento_pct") @db.Decimal(5, 2)
+  diasAplicacion          Json?                @map("dias_aplicacion")
+  acumulacionActiva       Boolean              @default(false) @map("acumulacion_activa")
+  acumComprasReq          Int?                 @map("acum_compras_req")
+  acumPeriodoDias         Int?                 @map("acum_periodo_dias")
+  acumDescuentoExtra      Decimal?             @map("acum_descuento_extra") @db.Decimal(5, 2)
+  motivoRechazo           String?              @map("motivo_rechazo")
+  createdAt               DateTime             @default(now()) @map("created_at")
+  approvedAt              DateTime?            @map("approved_at")
+  updatedAt               DateTime             @updatedAt @map("updated_at")
+  rubro                   Rubro                @relation(fields: [rubroId], references: [id])
+  descuentoDisponible     DescuentoDisponible? @relation(fields: [descuentoDisponibleId], references: [id])
+  ventas                  Venta[]
 
   @@index([estado])
   @@index([plan])
   @@map("comercios")
+}
+
+model DescuentoDisponible {
+  id          Int        @id @default(autoincrement())
+  nombre      String
+  porcentaje  Decimal    @db.Decimal(5, 2)
+  descripcion String?
+  activo      Boolean    @default(true)
+  orden       Int        @default(0)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  comercios   Comercio[]
+
+  @@map("descuentos_disponibles")
 }
 
 model Rubro {

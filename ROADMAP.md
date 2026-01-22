@@ -532,14 +532,14 @@ Base de datos: rojoplus
 ## FASE 30: Presupuesto Anual
 > Planificacion y control presupuestario
 
-- [ ] **30.1** Crear modelo Presupuesto (anio, estado)
-- [ ] **30.2** Crear modelo LineaPresupuesto (cuentaContableId, mes, montoPresupuestado)
-- [ ] **30.3** Pantalla de creacion de presupuesto anual
-- [ ] **30.4** Carga de montos por cuenta y mes
-- [ ] **30.5** Calculo automatico de ejecucion (real vs presupuestado)
-- [ ] **30.6** Dashboard de control presupuestario
-- [ ] **30.7** Alertas de desvios significativos
-- [ ] **30.8** Reporte comparativo mensual y acumulado
+- [x] **30.1** Crear modelo Presupuesto (anio, estado)
+- [x] **30.2** Crear modelo LineaPresupuesto (cuentaContableId, mes, montoPresupuestado)
+- [x] **30.3** Pantalla de creacion de presupuesto anual
+- [x] **30.4** Carga de montos por cuenta y mes
+- [x] **30.5** Calculo automatico de ejecucion (real vs presupuestado)
+- [x] **30.6** Dashboard de control presupuestario
+- [x] **30.7** Alertas de desvios significativos
+- [x] **30.8** Reporte comparativo mensual y acumulado
 
 ---
 
@@ -559,87 +559,132 @@ Base de datos: rojoplus
 
 ---
 
-## FASE 32: Gestión Deportiva
+## FASE 32: Centros de Costos
+> Análisis de rentabilidad por área/actividad
+
+### Concepto
+Sistema de centros de costos para análisis multidimensional de ingresos y egresos por área, actividad o departamento del club (ej: Fútbol, Natación, Bar, Eventos, Administración).
+
+### Objetivos
+- **Análisis de Rentabilidad**: Conocer qué áreas/actividades generan más ingresos y cuáles generan más costos
+- **Trazabilidad Contable**: Además de la cuenta contable, cada movimiento se asigna a un centro de costo
+- **Reportes Gerenciales**: Balance y Estado de Resultados por centro de costo
+- **Presupuesto por Centro**: Planificación y control presupuestario discriminado
+
+### Implementación
+
+#### Backend - Modelo y Lógica
+- [ ] **32.1** Crear modelo CentroCosto (codigo, nombre, descripcion, tipo: OPERATIVO/ADMINISTRATIVO, activo)
+- [ ] **32.2** Agregar centroCostoId a MovimientoCaja (nullable)
+- [ ] **32.3** Agregar centroCostoId a MovimientoContable (nullable)
+- [ ] **32.4** Agregar centroCostoId a AsientoLinea (nullable)
+- [ ] **32.5** Vincular Actividad con CentroCosto (actividades deportivas = centros operativos)
+- [ ] **32.6** Endpoints CRUD de CentroCosto
+- [ ] **32.7** Endpoint de reporte por centro de costo (ingresos, egresos, resultado)
+- [ ] **32.8** Modificar lógica de cobranza de cuotas para asignar centro según actividad
+- [ ] **32.9** Agregar centro de costo en generación de asientos automáticos
+
+#### Frontend - UI y Reportes
+- [ ] **32.10** Página /admin/configuracion/centros-costo (CentrosCostoLista.jsx)
+- [ ] **32.11** Formulario de centro de costo (CentroCostoForm.jsx)
+- [ ] **32.12** Selector de centro de costo en formularios de movimientos
+- [ ] **32.13** Selector opcional en MovimientoCaja y OrdenPago
+- [ ] **32.14** Reporte Estado de Resultados por Centro de Costo
+- [ ] **32.15** Reporte Balance por Centro de Costo
+- [ ] **32.16** Dashboard con KPIs por centro (top ingresos, top egresos)
+- [ ] **32.17** Gráfico comparativo de centros (barras, pie)
+- [ ] **32.18** Exportar reportes a Excel con filtro de centro
+
+#### Casos de Uso
+- Cuota de Fútbol → Centro "Fútbol"
+- Cuota de Natación → Centro "Natación"
+- Gasto de luz del club → Centro "Administración"
+- Venta de merchandising → Centro "Comercial"
+- Sueldo de entrenador de básquet → Centro "Básquet"
+
+---
+
+## FASE 33: Gestión Deportiva
 > Módulo de entrenamientos, asistencia, partidos y estadísticas (Fútbol, Básquet, Vóley)
 
 ### Modelos Base (reutiliza Actividad/CategoriaActividad/Inscripcion/Entrenador existentes)
 
-### Etapa 32.1: Espacios Deportivos ✅
-- [x] **32.1.1** Crear modelo EspacioDeportivo (codigo, nombre, tipo, capacidad, cubierto, iluminacion)
-- [x] **32.1.2** Crear relación muchos-a-muchos EspacioDeportivo ↔ Actividad
-- [x] **32.1.3** Migración de base de datos
-- [x] **32.1.4** Endpoints CRUD de EspacioDeportivo (server/src/routes/deportes.js)
-- [x] **32.1.5** Página /admin/deportes/espacios (EspaciosLista.jsx)
-- [x] **32.1.6** Formulario de espacio (EspacioForm.jsx)
-- [x] **32.1.7** Seed con espacios iniciales (seed-deportes.js)
-- [x] **32.1.8** Crear modelo TipoEspacio (tabla configurable)
-- [x] **32.1.9** Página /admin/deportes/tipos-espacio (TiposEspacioConfig.jsx)
-- [x] **32.1.10** Crear modelo HorarioDisponibilidad (días y horarios por espacio)
-- [x] **32.1.11** UI de horarios en EspacioForm con guardado bulk
+### Etapa 33.1: Espacios Deportivos ✅
+- [x] **33.1.1** Crear modelo EspacioDeportivo (codigo, nombre, tipo, capacidad, cubierto, iluminacion)
+- [x] **33.1.2** Crear relación muchos-a-muchos EspacioDeportivo ↔ Actividad
+- [x] **33.1.3** Migración de base de datos
+- [x] **33.1.4** Endpoints CRUD de EspacioDeportivo (server/src/routes/deportes.js)
+- [x] **33.1.5** Página /admin/deportes/espacios (EspaciosLista.jsx)
+- [x] **33.1.6** Formulario de espacio (EspacioForm.jsx)
+- [x] **33.1.7** Seed con espacios iniciales (seed-deportes.js)
+- [x] **33.1.8** Crear modelo TipoEspacio (tabla configurable)
+- [x] **33.1.9** Página /admin/deportes/tipos-espacio (TiposEspacioConfig.jsx)
+- [x] **33.1.10** Crear modelo HorarioDisponibilidad (días y horarios por espacio)
+- [x] **33.1.11** UI de horarios en EspacioForm con guardado bulk
 
-### Etapa 32.2: Entrenamientos ✅
-- [x] **32.2.1** Crear modelo Entrenamiento (categoriaActividadId, espacioId, fecha, horaInicio, horaFin, estado)
-- [x] **32.2.2** Crear modelo HorarioRecurrente (templates de horarios semanales)
-- [x] **32.2.3** Endpoints CRUD de Entrenamiento
-- [x] **32.2.4** Endpoint generar entrenamientos desde template (semana/mes)
-- [x] **32.2.5** Endpoint cancelar entrenamiento
-- [x] **32.2.6** Página /admin/deportes/entrenamientos (calendario semanal/mensual)
-- [x] **32.2.7** Modal de creación/edición de entrenamiento
-- [x] **32.2.8** Modal de generación masiva desde horarios recurrentes
-- [x] **32.2.9** Página /admin/deportes/horarios (HorariosRecurrentes.jsx)
-- [x] **32.2.10** Validación de conflictos de espacio
+### Etapa 33.2: Entrenamientos ✅
+- [x] **33.2.1** Crear modelo Entrenamiento (categoriaActividadId, espacioId, fecha, horaInicio, horaFin, estado)
+- [x] **33.2.2** Crear modelo HorarioRecurrente (templates de horarios semanales)
+- [x] **33.2.3** Endpoints CRUD de Entrenamiento
+- [x] **33.2.4** Endpoint generar entrenamientos desde template (semana/mes)
+- [x] **33.2.5** Endpoint cancelar entrenamiento
+- [x] **33.2.6** Página /admin/deportes/entrenamientos (calendario semanal/mensual)
+- [x] **33.2.7** Modal de creación/edición de entrenamiento
+- [x] **33.2.8** Modal de generación masiva desde horarios recurrentes
+- [x] **33.2.9** Página /admin/deportes/horarios (HorariosRecurrentes.jsx)
+- [x] **33.2.10** Validación de conflictos de espacio
 
-### Etapa 32.3: Asistencia
-- [ ] **32.3.1** Crear modelo Asistencia (entrenamientoId, socioId, estado, horaLlegada)
-- [ ] **32.3.2** Agregar relación Socio.asistencias
-- [ ] **32.3.3** Endpoint obtener lista de inscriptos para tomar asistencia
-- [ ] **32.3.4** Endpoint guardar asistencia masiva
-- [ ] **32.3.5** Página /admin/deportes/asistencia (TomaAsistencia.jsx)
-- [ ] **32.3.6** Lista de jugadores con estados: PRESENTE, AUSENTE, JUSTIFICADO, TARDE
-- [ ] **32.3.7** Acceso rápido desde calendario de entrenamientos
-- [ ] **32.3.8** Indicador visual de asistencia tomada/pendiente en calendario
+### Etapa 33.3: Asistencia ✅
+- [x] **33.3.1** Crear modelo Asistencia (entrenamientoId, socioId, estado, horaLlegada)
+- [x] **33.3.2** Agregar relación Socio.asistencias
+- [x] **33.3.3** Endpoint obtener lista de inscriptos para tomar asistencia
+- [x] **33.3.4** Endpoint guardar asistencia masiva
+- [x] **33.3.5** Página /admin/deportes/asistencia (TomaAsistencia.jsx)
+- [x] **33.3.6** Lista de jugadores con estados: PRESENTE, AUSENTE, JUSTIFICADO, TARDE
+- [x] **33.3.7** Acceso rápido desde calendario de entrenamientos
+- [x] **33.3.8** Indicador visual de asistencia tomada/pendiente en calendario
 
-### Etapa 32.4: Partidos y Eventos
-- [ ] **32.4.1** Crear modelo Partido (categoriaActividadId, fecha, hora, rival, condicion, resultado)
-- [ ] **32.4.2** Crear modelo Convocatoria (partidoId, socioId, confirmado)
-- [ ] **32.4.3** Crear modelo EstadisticaPartido (goles, asistencias, tarjetas, minutos)
-- [ ] **32.4.4** Endpoints CRUD de Partido
-- [ ] **32.4.5** Endpoint crear convocatoria (lista de jugadores)
-- [ ] **32.4.6** Endpoint confirmar/rechazar convocatoria (jugador o padre)
-- [ ] **32.4.7** Endpoint cargar resultado y estadísticas
-- [ ] **32.4.8** Página /admin/deportes/partidos (PartidosLista.jsx - calendario)
-- [ ] **32.4.9** Formulario de partido (PartidoForm.jsx)
-- [ ] **32.4.10** Página de convocatoria (ConvocatoriaPartido.jsx)
-- [ ] **32.4.11** Página de carga de resultado (ResultadoPartido.jsx)
+### Etapa 33.4: Partidos y Eventos
+- [ ] **33.4.1** Crear modelo Partido (categoriaActividadId, fecha, hora, rival, condicion, resultado)
+- [ ] **33.4.2** Crear modelo Convocatoria (partidoId, socioId, confirmado)
+- [ ] **33.4.3** Crear modelo EstadisticaPartido (goles, asistencias, tarjetas, minutos)
+- [ ] **33.4.4** Endpoints CRUD de Partido
+- [ ] **33.4.5** Endpoint crear convocatoria (lista de jugadores)
+- [ ] **33.4.6** Endpoint confirmar/rechazar convocatoria (jugador o padre)
+- [ ] **33.4.7** Endpoint cargar resultado y estadísticas
+- [ ] **33.4.8** Página /admin/deportes/partidos (PartidosLista.jsx - calendario)
+- [ ] **33.4.9** Formulario de partido (PartidoForm.jsx)
+- [ ] **33.4.10** Página de convocatoria (ConvocatoriaPartido.jsx)
+- [ ] **33.4.11** Página de carga de resultado (ResultadoPartido.jsx)
 
-### Etapa 32.5: Reportes y Estadísticas
-- [ ] **32.5.1** Endpoint reporte de asistencia por jugador (% asistencia)
-- [ ] **32.5.2** Endpoint reporte de asistencia por equipo/categoría
-- [ ] **32.5.3** Endpoint estadísticas de jugador (partidos, goles, etc.)
-- [ ] **32.5.4** Endpoint ranking (goleadores, asistencias por categoría)
-- [ ] **32.5.5** Página /admin/deportes/reportes/asistencia (ReporteAsistencia.jsx)
-- [ ] **32.5.6** Página /admin/deportes/reportes/estadisticas (EstadisticasJugador.jsx)
-- [ ] **32.5.7** Dashboard deportivo con resumen general
-- [ ] **32.5.8** Exportar reportes a Excel/PDF
+### Etapa 33.5: Reportes y Estadísticas
+- [ ] **33.5.1** Endpoint reporte de asistencia por jugador (% asistencia)
+- [ ] **33.5.2** Endpoint reporte de asistencia por equipo/categoría
+- [ ] **33.5.3** Endpoint estadísticas de jugador (partidos, goles, etc.)
+- [ ] **33.5.4** Endpoint ranking (goleadores, asistencias por categoría)
+- [ ] **33.5.5** Página /admin/deportes/reportes/asistencia (ReporteAsistencia.jsx)
+- [ ] **33.5.6** Página /admin/deportes/reportes/estadisticas (EstadisticasJugador.jsx)
+- [ ] **33.5.7** Dashboard deportivo con resumen general
+- [ ] **33.5.8** Exportar reportes a Excel/PDF
 
-### Etapa 32.6: Notificaciones (Opcional)
-- [ ] **32.6.1** Crear modelo ConfiguracionNotificacion (socioId, tipo, activo)
-- [ ] **32.6.2** Crear modelo Notificacion (tipo, mensaje, destinatario, estado)
-- [ ] **32.6.3** Servicio de envío de notificaciones (email)
-- [ ] **32.6.4** Notificación automática: nuevo entrenamiento
-- [ ] **32.6.5** Notificación automática: cancelación de entrenamiento
-- [ ] **32.6.6** Notificación automática: convocatoria a partido
-- [ ] **32.6.7** Notificación automática: recordatorio 24h antes
-- [ ] **32.6.8** Panel de configuración de notificaciones por socio
+### Etapa 33.6: Notificaciones (Opcional)
+- [ ] **33.6.1** Crear modelo ConfiguracionNotificacion (socioId, tipo, activo)
+- [ ] **33.6.2** Crear modelo Notificacion (tipo, mensaje, destinatario, estado)
+- [ ] **33.6.3** Servicio de envío de notificaciones (email)
+- [ ] **33.6.4** Notificación automática: nuevo entrenamiento
+- [ ] **33.6.5** Notificación automática: cancelación de entrenamiento
+- [ ] **33.6.6** Notificación automática: convocatoria a partido
+- [ ] **33.6.7** Notificación automática: recordatorio 24h antes
+- [ ] **33.6.8** Panel de configuración de notificaciones por socio
 
 ### Menú y Navegación
-- [ ] **32.7.1** Agregar submenu "Deportes" en AdminLayout
-- [ ] **32.7.2** Rutas: /admin/deportes/espacios
-- [ ] **32.7.3** Rutas: /admin/deportes/entrenamientos
-- [ ] **32.7.4** Rutas: /admin/deportes/horarios
-- [ ] **32.7.5** Rutas: /admin/deportes/asistencia
-- [ ] **32.7.6** Rutas: /admin/deportes/partidos
-- [ ] **32.7.7** Rutas: /admin/deportes/reportes
+- [ ] **33.7.1** Agregar submenu "Deportes" en AdminLayout
+- [ ] **33.7.2** Rutas: /admin/deportes/espacios
+- [ ] **33.7.3** Rutas: /admin/deportes/entrenamientos
+- [ ] **33.7.4** Rutas: /admin/deportes/horarios
+- [ ] **33.7.5** Rutas: /admin/deportes/asistencia
+- [ ] **33.7.6** Rutas: /admin/deportes/partidos
+- [ ] **33.7.7** Rutas: /admin/deportes/reportes
 
 ---
 
@@ -676,9 +721,10 @@ Base de datos: rojoplus
 | 27 | Comercios Publicos y Geolocalizacion | ✅ Completado |
 | 28 | Ingresos, Egresos, Tesoreria y Stock | ✅ Completado |
 | 29 | Plan de Cuentas Contable | ✅ Completado |
-| 30 | Presupuesto Anual | ⏳ Pendiente |
+| 30 | Presupuesto Anual | ✅ Completado |
 | 31 | Control de Accesos | ⏳ Pendiente |
-| 32 | Gestión Deportiva | 🔄 En Progreso |
+| 32 | Centros de Costos | ⏳ Pendiente |
+| 33 | Gestión Deportiva | 🔄 En Progreso |
 
 ---
 
@@ -700,4 +746,4 @@ npm run dev
 
 ---
 
-*Ultima actualizacion: 21 de Enero 2026 - FASE 32 Gestión Deportiva*
+*Ultima actualizacion: 22 de Enero 2026 - FASE 30 Presupuesto ✅ + FASE 33.3 Asistencia ✅ + FASE 32 Centros de Costos (ROADMAP)*

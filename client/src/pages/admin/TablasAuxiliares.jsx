@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2 } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -19,6 +19,8 @@ export default function TablasAuxiliares() {
   const [entrenadores, setEntrenadores] = useState([])
   const [cargosPersonal, setCargosPersonal] = useState([])
   const [conceptosTesoreria, setConceptosTesoreria] = useState([])
+  const [descuentosDisponibles, setDescuentosDisponibles] = useState([])
+  const [rubros, setRubros] = useState([])
   const [cuentasContables, setCuentasContables] = useState([])
   const [usuarios, setUsuarios] = useState([])
   const [roles, setRoles] = useState([])
@@ -31,6 +33,10 @@ export default function TablasAuxiliares() {
   const [diaVencimiento, setDiaVencimiento] = useState('10')
   const [venceMismomes, setVenceMismoMes] = useState(false)
   const [guardandoVencimiento, setGuardandoVencimiento] = useState(false)
+
+  // Configuración de tesorería
+  const [conceptoCobranzaCuotas, setConceptoCobranzaCuotas] = useState('')
+  const [guardandoConceptoCobranza, setGuardandoConceptoCobranza] = useState(false)
 
   // Configuración de recargos
   const [recargo, setRecargo] = useState({ tipo: 'FIJO', porcentaje: '10', cadaDias: '15', topeMaximo: '' })
@@ -56,7 +62,7 @@ export default function TablasAuxiliares() {
   async function cargarDatos() {
     setLoading(true)
     try {
-      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, cuentas, usrs, rols] = await Promise.all([
+      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, descuentos, rubrosData, cuentas, usrs, rols] = await Promise.all([
         api.get('/admin/tipos-socio'),
         api.get('/admin/categorias-socio'),
         api.get('/admin/estados-socio'),
@@ -64,6 +70,8 @@ export default function TablasAuxiliares() {
         api.get('/admin/entrenadores'),
         api.getFull('/admin/cargos-personal').catch(() => ({ data: [] })),
         api.get('/admin/conceptos-tesoreria'),
+        api.get('/admin/descuentos-disponibles').catch(() => ({ data: [] })),
+        api.get('/admin/rubros').catch(() => ({ data: [] })),
         api.getFull('/admin/cuentas-contables?flat=true').catch(() => ({ data: [] })),
         api.get('/admin/usuarios').catch(() => ({ data: [] })),
         api.get('/admin/roles').catch(() => ({ data: [] })),
@@ -75,6 +83,8 @@ export default function TablasAuxiliares() {
       setEntrenadores(entrens || [])
       setCargosPersonal(cargos?.data || [])
       setConceptosTesoreria(conceptos || [])
+      setDescuentosDisponibles(descuentos?.data || descuentos || [])
+      setRubros(rubrosData?.data || rubrosData || [])
       setCuentasContables(cuentas?.data || [])
       setUsuarios(usrs?.data || usrs || [])
       setRoles(rols?.data || rols || [])
@@ -96,12 +106,14 @@ export default function TablasAuxiliares() {
 
   async function cargarConfiguracion() {
     try {
-      const [configDia, configMes] = await Promise.all([
+      const [configDia, configMes, configConcepto] = await Promise.all([
         api.get('/admin/sistema/configuracion/CUOTA_DIA_VENCIMIENTO'),
         api.get('/admin/sistema/configuracion/CUOTA_VENCE_MISMO_MES'),
+        api.get('/admin/sistema/configuracion/CONCEPTO_COBRANZA_CUOTAS'),
       ])
       setDiaVencimiento(configDia?.valor || '10')
       setVenceMismoMes(configMes?.valor === 'true')
+      setConceptoCobranzaCuotas(configConcepto?.valor || '')
     } catch (err) {
       console.error('Error cargando configuración:', err)
     }
@@ -143,6 +155,24 @@ export default function TablasAuxiliares() {
       setError('Error al guardar configuración de vencimiento')
     } finally {
       setGuardandoVencimiento(false)
+    }
+  }
+
+  async function guardarConceptoCobranza() {
+    setGuardandoConceptoCobranza(true)
+    setError(null)
+    try {
+      await api.put('/admin/sistema/configuracion/CONCEPTO_COBRANZA_CUOTAS', {
+        valor: conceptoCobranzaCuotas,
+        tipo: 'NUMBER',
+        modulo: 'TESORERIA',
+        descripcion: 'ID del concepto de tesorería para cobranza de cuotas'
+      })
+      setSuccess('Concepto de cobranza actualizado')
+    } catch (err) {
+      setError('Error al guardar concepto de cobranza')
+    } finally {
+      setGuardandoConceptoCobranza(false)
     }
   }
 
@@ -393,6 +423,58 @@ export default function TablasAuxiliares() {
             </button>
           </div>
 
+          {/* Concepto de Cobranza de Cuotas */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[200px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-emerald-100">
+                <Wallet className="w-6 h-6 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Concepto de Cobranza</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Concepto de tesorería para registrar cobranzas de cuotas
+                </p>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Concepto de tesorería
+                  </label>
+                  <select
+                    value={conceptoCobranzaCuotas}
+                    onChange={(e) => setConceptoCobranzaCuotas(e.target.value)}
+                    className="input-field w-full"
+                  >
+                    <option value="">Seleccionar concepto...</option>
+                    {conceptosTesoreria
+                      .filter(c => c.activo && c.tipo === 'INGRESO')
+                      .map(concepto => (
+                        <option key={concepto.id} value={concepto.id}>
+                          {concepto.codigo} - {concepto.nombre}
+                        </option>
+                      ))
+                    }
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Este concepto se usará para registrar todos los movimientos de caja por cobranza de cuotas
+                  </p>
+                </div>
+              </div>
+            </div>
+            {/* Botón guardar fijo abajo a la derecha */}
+            <button
+              onClick={guardarConceptoCobranza}
+              disabled={guardandoConceptoCobranza || !conceptoCobranzaCuotas}
+              className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+              title="Guardar"
+            >
+              {guardandoConceptoCobranza ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
           {/* Configuración de Recargos por Mora */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[320px]">
             <div className="flex items-start gap-4">
@@ -579,7 +661,7 @@ export default function TablasAuxiliares() {
           </div>
 
           {/* Configuración Fiscal */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[500px] relative min-h-[380px]">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[750px] relative min-h-[450px]">
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-xl bg-green-100">
                 <Building2 className="w-6 h-6 text-green-600" />
@@ -591,33 +673,38 @@ export default function TablasAuxiliares() {
                 </p>
 
                 <div className="mt-4 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      CUIT
-                    </label>
-                    <input
-                      type="text"
-                      value={configFiscal.cuit}
-                      onChange={(e) => setConfigFiscal({ ...configFiscal, cuit: e.target.value })}
-                      placeholder="XX-XXXXXXXX-X"
-                      className="input-field w-full"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        CUIT
+                      </label>
+                      <input
+                        type="text"
+                        value={configFiscal.cuit}
+                        onChange={(e) => setConfigFiscal({ ...configFiscal, cuit: e.target.value })}
+                        placeholder="XX-XXXXXXXX-X"
+                        className="input-field w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Condición de IVA
+                      </label>
+                      <select
+                        value={configFiscal.condicionIva}
+                        onChange={(e) => setConfigFiscal({ ...configFiscal, condicionIva: e.target.value })}
+                        className="input-field w-full"
+                      >
+                        <option value="INSCRIPTO">Responsable Inscripto</option>
+                        <option value="MONOTRIBUTISTA">Monotributista</option>
+                        <option value="EXENTO">Exento</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Condición de IVA
-                    </label>
-                    <select
-                      value={configFiscal.condicionIva}
-                      onChange={(e) => setConfigFiscal({ ...configFiscal, condicionIva: e.target.value })}
-                      className="input-field w-full"
-                    >
-                      <option value="INSCRIPTO">Responsable Inscripto</option>
-                      <option value="MONOTRIBUTISTA">Monotributista</option>
-                      <option value="EXENTO">Exento</option>
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500">
                       {configFiscal.condicionIva === 'INSCRIPTO' && 'Emite Facturas A (a inscriptos) y B (a otros). Discrimina IVA.'}
                       {configFiscal.condicionIva === 'MONOTRIBUTISTA' && 'Emite Facturas C para todos. No discrimina IVA.'}
                       {configFiscal.condicionIva === 'EXENTO' && 'Emite Facturas B para todos. No discrimina IVA.'}
@@ -799,6 +886,76 @@ export default function TablasAuxiliares() {
                     <p className="text-2xl font-bold text-gray-900 mt-1">{cargosPersonal.length}</p>
                     <p className="text-xs text-gray-500">
                       {cargosPersonal.filter(c => c.activo).length} activos
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+                  Ver listado →
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sección: Beneficios */}
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-700 mb-4">Beneficios</h2>
+            <div className="flex flex-wrap gap-6">
+              {/* Rubros */}
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+                onClick={() => navigate('/admin/configuracion/rubros')}
+              >
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="p-3 rounded-xl bg-cyan-100">
+                      <Store className="w-6 h-6 text-cyan-600" />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/rubros/nuevo') }}
+                      className="flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nuevo
+                    </Button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-base font-semibold text-gray-800">Rubros</h3>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{rubros.length}</p>
+                    <p className="text-xs text-gray-500">
+                      {rubros.filter(r => r.activo).length} activos
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+                  Ver listado →
+                </div>
+              </div>
+
+              {/* Descuentos Disponibles */}
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+                onClick={() => navigate('/admin/configuracion/descuentos-disponibles')}
+              >
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="p-3 rounded-xl bg-amber-100">
+                      <Percent className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/descuentos-disponibles/nuevo') }}
+                      className="flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nuevo
+                    </Button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-base font-semibold text-gray-800">Descuentos Disponibles</h3>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{descuentosDisponibles.length}</p>
+                    <p className="text-xs text-gray-500">
+                      {descuentosDisponibles.filter(d => d.activo).length} activos
                     </p>
                   </div>
                 </div>

@@ -312,6 +312,10 @@ export default function SocioDetalle() {
             <QrCode className="w-4 h-4" />
             QR
           </Button>
+          <Button variant="secondary" onClick={() => navigate(`/admin/cuotas?cobrarSocioId=${id}`)} className="flex items-center gap-2">
+            <DollarSign className="w-4 h-4" />
+            Cobrar
+          </Button>
           <Button onClick={() => navigate(`/admin/socios/${id}/editar`)} className="flex items-center gap-2">
             <Edit className="w-4 h-4" />
             Editar

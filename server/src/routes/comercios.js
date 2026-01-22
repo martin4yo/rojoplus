@@ -61,16 +61,21 @@ async function verificarCaptcha(token) {
 
 // POST /api/comercios/registro - Registrar nuevo comercio
 router.post('/registro', asyncHandler(async (req, res) => {
-  const { nombre, direccion, rubroId, telefono, email, cuit, responsable, captchaToken, logo, latitud, longitud } = req.body
+  const {
+    nombre, direccion, rubroId, telefono, email, cuit, responsable,
+    captchaToken, logo, latitud, longitud, descuentoDisponibleId, diasAplicacion
+  } = req.body
 
-  // Validar captcha primero
-  if (!captchaToken) {
-    throw new AppError('El captcha es requerido', 400, 'CAPTCHA_REQUIRED')
-  }
+  // Validar captcha solo en producción
+  if (process.env.NODE_ENV === 'production') {
+    if (!captchaToken) {
+      throw new AppError('El captcha es requerido', 400, 'CAPTCHA_REQUIRED')
+    }
 
-  const captchaValido = await verificarCaptcha(captchaToken)
-  if (!captchaValido) {
-    throw new AppError('Captcha inválido. Por favor, intentá nuevamente.', 400, 'CAPTCHA_INVALID')
+    const captchaValido = await verificarCaptcha(captchaToken)
+    if (!captchaValido) {
+      throw new AppError('Captcha inválido. Por favor, intentá nuevamente.', 400, 'CAPTCHA_INVALID')
+    }
   }
 
   // Validaciones básicas
@@ -87,11 +92,21 @@ router.post('/registro', asyncHandler(async (req, res) => {
     throw new AppError('Ya existe un comercio con ese email', 409, 'EMAIL_EXISTS')
   }
 
-  // Obtener descuento default
-  const config = await req.prisma.configuracion.findUnique({
-    where: { clave: 'descuento_default' },
-  })
-  const descuentoDefault = config ? parseFloat(config.valor) : 10
+  // Obtener descuento del descuento disponible seleccionado, o default
+  let descuentoPct = 10
+  if (descuentoDisponibleId) {
+    const descuentoDisponible = await req.prisma.descuentoDisponible.findUnique({
+      where: { id: parseInt(descuentoDisponibleId) },
+    })
+    if (descuentoDisponible) {
+      descuentoPct = descuentoDisponible.porcentaje
+    }
+  } else {
+    const config = await req.prisma.configuracion.findUnique({
+      where: { clave: 'descuento_default' },
+    })
+    if (config) descuentoPct = parseFloat(config.valor)
+  }
 
   // Crear comercio (sin logo primero para tener el ID)
   const comercio = await req.prisma.comercio.create({
@@ -104,7 +119,9 @@ router.post('/registro', asyncHandler(async (req, res) => {
       cuit,
       responsable,
       estado: 'PENDIENTE',
-      descuentoPct: descuentoDefault,
+      descuentoDisponibleId: descuentoDisponibleId ? parseInt(descuentoDisponibleId) : null,
+      descuentoPct,
+      diasAplicacion: diasAplicacion || null,
       latitud: latitud ? parseFloat(latitud) : null,
       longitud: longitud ? parseFloat(longitud) : null,
     },
@@ -197,5 +214,138 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return Math.round(R * c * 10) / 10 // Redondear a 1 decimal
 }
+
+// GET /api/comercios/descuentos-disponibles - Obtener lista de descuentos disponibles (público)
+router.get('/descuentos-disponibles', asyncHandler(async (req, res) => {
+  const descuentos = await req.prisma.descuentoDisponible.findMany({
+    where: { activo: true },
+    orderBy: { orden: 'asc' },
+    select: {
+      id: true,
+      nombre: true,
+      porcentaje: true,
+      descripcion: true,
+    },
+  })
+
+  res.json({
+    success: true,
+    data: descuentos,
+  })
+}))
+
+// PUT /api/comercios/:token/actualizar - Actualizar datos del comercio desde su portal
+router.put('/:token/actualizar', asyncHandler(async (req, res) => {
+  const { token } = req.params
+  const {
+    nombre, direccion, rubroId, telefono, email, cuit, responsable,
+    logo, latitud, longitud, descuentoDisponibleId, diasAplicacion
+  } = req.body
+
+  // Buscar comercio por token
+  const comercio = await req.prisma.comercio.findUnique({
+    where: { token },
+  })
+
+  if (!comercio) {
+    throw new AppError('Comercio no encontrado', 404, 'NOT_FOUND')
+  }
+
+  // Validaciones básicas
+  if (!nombre || !direccion || !rubroId || !telefono || !email || !cuit || !responsable) {
+    throw new AppError('Todos los campos son obligatorios', 400, 'VALIDATION_ERROR')
+  }
+
+  // Verificar que el email no exista en otro comercio
+  if (email !== comercio.email) {
+    const existente = await req.prisma.comercio.findUnique({
+      where: { email },
+    })
+    if (existente) {
+      throw new AppError('Ya existe un comercio con ese email', 409, 'EMAIL_EXISTS')
+    }
+  }
+
+  // Obtener porcentaje del descuento disponible si cambió
+  let descuentoPct = comercio.descuentoPct
+  if (descuentoDisponibleId !== undefined && descuentoDisponibleId !== comercio.descuentoDisponibleId) {
+    if (descuentoDisponibleId) {
+      const descuentoDisponible = await req.prisma.descuentoDisponible.findUnique({
+        where: { id: parseInt(descuentoDisponibleId) },
+      })
+      if (descuentoDisponible) {
+        descuentoPct = descuentoDisponible.porcentaje
+      }
+    }
+  }
+
+  // Guardar logo si se envió uno nuevo
+  let logoUrl = comercio.logo
+  if (logo && logo.startsWith('data:image')) {
+    const nuevoLogo = guardarLogo(logo, comercio.id)
+    if (nuevoLogo) {
+      // Eliminar logo anterior si existe
+      if (logoUrl && logoUrl.startsWith('/uploads')) {
+        try {
+          const oldFilePath = path.join(__dirname, '../../', logoUrl)
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath)
+          }
+        } catch (error) {
+          console.error('Error eliminando logo anterior:', error)
+        }
+      }
+      logoUrl = nuevoLogo
+    }
+  }
+
+  // Actualizar comercio
+  const comercioActualizado = await req.prisma.comercio.update({
+    where: { id: comercio.id },
+    data: {
+      nombre,
+      direccion,
+      rubroId: parseInt(rubroId),
+      telefono,
+      email,
+      cuit,
+      responsable,
+      logo: logoUrl,
+      latitud: latitud ? parseFloat(latitud) : null,
+      longitud: longitud ? parseFloat(longitud) : null,
+      descuentoDisponibleId: descuentoDisponibleId ? parseInt(descuentoDisponibleId) : null,
+      descuentoPct,
+      diasAplicacion: diasAplicacion || null,
+    },
+    include: {
+      rubro: true,
+      descuentoDisponible: true,
+    },
+  })
+
+  res.json({
+    success: true,
+    data: {
+      mensaje: 'Datos actualizados correctamente',
+      comercio: {
+        id: comercioActualizado.id,
+        nombre: comercioActualizado.nombre,
+        direccion: comercioActualizado.direccion,
+        rubroId: comercioActualizado.rubroId,
+        rubro: comercioActualizado.rubro?.nombre,
+        telefono: comercioActualizado.telefono,
+        email: comercioActualizado.email,
+        cuit: comercioActualizado.cuit,
+        responsable: comercioActualizado.responsable,
+        logo: comercioActualizado.logo,
+        latitud: comercioActualizado.latitud,
+        longitud: comercioActualizado.longitud,
+        descuentoDisponibleId: comercioActualizado.descuentoDisponibleId,
+        descuentoPct: Number(comercioActualizado.descuentoPct),
+        diasAplicacion: comercioActualizado.diasAplicacion,
+      },
+    },
+  })
+}))
 
 export default router

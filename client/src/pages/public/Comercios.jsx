@@ -39,6 +39,37 @@ const userIcon = new L.Icon({
 // Coordenadas de Pilar, Buenos Aires
 const PILAR_COORDS = [-34.4587, -58.9142]
 
+// Función para formatear teléfono para WhatsApp
+function formatearTelefonoWhatsApp(telefono) {
+  if (!telefono) return ''
+
+  // Eliminar todos los caracteres no numéricos
+  let numeros = telefono.replace(/\D/g, '')
+
+  // Si ya tiene código de país, retornar
+  if (numeros.startsWith('549')) {
+    return numeros
+  }
+
+  // Si empieza con 54, agregar 9
+  if (numeros.startsWith('54')) {
+    return '549' + numeros.substring(2)
+  }
+
+  // Si empieza con 15, quitar el 15 y agregar 549
+  if (numeros.startsWith('15')) {
+    return '549' + numeros.substring(2)
+  }
+
+  // Si empieza con 0, quitar el 0 y agregar 549
+  if (numeros.startsWith('0')) {
+    return '549' + numeros.substring(1)
+  }
+
+  // Sino, agregar 549 al principio
+  return '549' + numeros
+}
+
 export default function ComerciosPublicos() {
   const [comercios, setComercios] = useState([])
   const [rubros, setRubros] = useState([])
@@ -255,7 +286,9 @@ export default function ComerciosPublicos() {
                         <p className="text-sm text-gray-600 flex items-center gap-1">
                           <Phone className="w-4 h-4 flex-shrink-0" />
                           <a
-                            href={`tel:${comercio.telefono}`}
+                            href={`https://wa.me/${formatearTelefonoWhatsApp(comercio.telefono)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-primary hover:underline"
                           >
                             {comercio.telefono}
@@ -306,7 +339,12 @@ export default function ComerciosPublicos() {
                       <p className="text-green-600">{comercio.descuentoPct}% descuento</p>
                       <p className="text-gray-600">{comercio.direccion}</p>
                       {comercio.telefono && (
-                        <a href={`tel:${comercio.telefono}`} className="text-primary">
+                        <a
+                          href={`https://wa.me/${formatearTelefonoWhatsApp(comercio.telefono)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary"
+                        >
                           {comercio.telefono}
                         </a>
                       )}

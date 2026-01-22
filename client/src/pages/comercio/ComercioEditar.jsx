@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import ReCAPTCHA from 'react-google-recaptcha'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -8,7 +7,7 @@ import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
-import { Upload, MapPin, X, ChevronLeft, ChevronRight, Check } from 'lucide-react'
+import { Upload, MapPin, X, ChevronLeft, ChevronRight, Check, ArrowLeft } from 'lucide-react'
 
 // Fix para el icono de Leaflet
 delete L.Icon.Default.prototype._getIconUrl
@@ -17,9 +16,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
-
-// Clave pública de reCAPTCHA (v2 checkbox)
-const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' // Clave de prueba de Google
 
 // Coordenadas de Pilar, Buenos Aires
 const PILAR_COORDS = [-34.4587, -58.9142]
@@ -44,18 +40,19 @@ const DIAS = [
   { value: 'DOM', label: 'Domingo' },
 ]
 
-export default function Registro() {
+export default function ComercioEditar() {
+  const { token } = useParams()
   const navigate = useNavigate()
-  const recaptchaRef = useRef(null)
   const fileInputRef = useRef(null)
 
   // Estado del wizard
   const [paso, setPaso] = useState(1)
   const [rubros, setRubros] = useState([])
   const [descuentosDisponibles, setDescuentosDisponibles] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [captchaToken, setCaptchaToken] = useState(null)
+  const [success, setSuccess] = useState(null)
 
   // Paso 1: Datos básicos
   const [form, setForm] = useState({
@@ -71,39 +68,69 @@ export default function Registro() {
   // Paso 2: Logo y ubicación
   const [logoPreview, setLogoPreview] = useState(null)
   const [logoBase64, setLogoBase64] = useState(null)
+  const [logoChanged, setLogoChanged] = useState(false)
   const [ubicacion, setUbicacion] = useState(null)
 
   // Paso 3: Descuento y días
   const [descuentoSeleccionado, setDescuentoSeleccionado] = useState('')
   const [diasSeleccionados, setDiasSeleccionados] = useState([])
 
-  // Cargar rubros y descuentos
+  // Cargar datos del comercio y listas
   useEffect(() => {
     async function cargarDatos() {
       try {
-        const [rubrosData, descuentosData] = await Promise.all([
+        const [comercioData, rubrosData, descuentosData] = await Promise.all([
+          api.get(`/comercio/${token}`),
           api.get('/rubros'),
           api.get('/comercios/descuentos-disponibles'),
         ])
+
+        // Cargar datos del formulario
+        setForm({
+          nombre: comercioData.nombre || '',
+          direccion: comercioData.direccion || '',
+          rubroId: comercioData.rubroId?.toString() || '',
+          telefono: comercioData.telefono || '',
+          email: comercioData.email || '',
+          cuit: comercioData.cuit || '',
+          responsable: comercioData.responsable || '',
+        })
+
+        // Cargar logo si existe
+        if (comercioData.logo) {
+          // Usar ruta relativa para que Vite maneje el proxy automáticamente
+          setLogoPreview(comercioData.logo)
+        }
+
+        // Cargar ubicación si existe
+        if (comercioData.latitud && comercioData.longitud) {
+          setUbicacion([parseFloat(comercioData.latitud), parseFloat(comercioData.longitud)])
+        }
+
+        // Cargar descuento seleccionado
+        if (comercioData.descuentoDisponibleId) {
+          setDescuentoSeleccionado(comercioData.descuentoDisponibleId)
+        }
+
+        // Cargar días seleccionados
+        if (comercioData.diasAplicacion && Array.isArray(comercioData.diasAplicacion)) {
+          setDiasSeleccionados(comercioData.diasAplicacion)
+        }
+
         setRubros(rubrosData || [])
         setDescuentosDisponibles(descuentosData || [])
       } catch (err) {
-        console.error('Error cargando datos:', err)
+        setError('Error al cargar datos del comercio')
+        console.error(err)
+      } finally {
+        setLoading(false)
       }
     }
     cargarDatos()
-  }, [])
+  }, [token])
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  function handleCaptchaChange(token) {
-    setCaptchaToken(token)
-  }
-
-  function handleCaptchaExpired() {
-    setCaptchaToken(null)
   }
 
   function handleLogoChange(e) {
@@ -127,6 +154,7 @@ export default function Registro() {
     reader.onloadend = () => {
       setLogoPreview(reader.result)
       setLogoBase64(reader.result)
+      setLogoChanged(true)
     }
     reader.readAsDataURL(file)
   }
@@ -134,6 +162,7 @@ export default function Registro() {
   function removeLogo() {
     setLogoPreview(null)
     setLogoBase64(null)
+    setLogoChanged(true)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -158,49 +187,60 @@ export default function Registro() {
 
   function siguientePaso() {
     if (paso === 1 && !validarPaso1()) return
-    if (paso === 3) return // No hay paso 4
+    if (paso === 3) return
     setPaso(paso + 1)
     setError(null)
+    setSuccess(null)
   }
 
   function pasoAnterior() {
     if (paso === 1) return
     setPaso(paso - 1)
     setError(null)
+    setSuccess(null)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
-
-    // Validar captcha solo en producción
-    if (!import.meta.env.DEV && !captchaToken) {
-      setError('Por favor, completá el captcha para verificar que no sos un robot.')
-      return
-    }
-
-    setLoading(true)
+    setSaving(true)
 
     try {
-      await api.post('/comercios/registro', {
+      const payload = {
         ...form,
         rubroId: parseInt(form.rubroId),
-        captchaToken,
-        logo: logoBase64,
         latitud: ubicacion ? ubicacion[0] : null,
         longitud: ubicacion ? ubicacion[1] : null,
         descuentoDisponibleId: descuentoSeleccionado ? parseInt(descuentoSeleccionado) : null,
         diasAplicacion: diasSeleccionados.length > 0 ? diasSeleccionados : null,
-      })
-      navigate('/registro/exito')
+      }
+
+      // Solo enviar logo si cambió
+      if (logoChanged) {
+        payload.logo = logoBase64
+      }
+
+      await api.put(`/comercios/${token}/actualizar`, payload)
+      setSuccess('Datos actualizados correctamente')
+      setTimeout(() => {
+        navigate(`/c/${token}`)
+      }, 2000)
     } catch (err) {
-      setError(err.message || 'Error al enviar la solicitud')
-      // Resetear captcha en caso de error
-      recaptchaRef.current?.reset()
-      setCaptchaToken(null)
+      setError(err.message || 'Error al actualizar los datos')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-600">Cargando datos...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -208,29 +248,26 @@ export default function Registro() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-lg mx-auto px-4 py-4">
-          <Link to="/" className="flex items-center gap-3">
-            <img src="/images/logo.png" alt="Logo" className="h-10" />
-            <div>
-              <h1 className="font-bold text-gray-800">Rojo Plus</h1>
-              <p className="text-xs text-gray-500">Club Sportivo Pilar</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(`/c/${token}`)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div className="flex items-center gap-3">
+              <img src="/images/logo.png" alt="Logo" className="h-10" />
+              <div>
+                <h1 className="font-bold text-gray-800">Editar Datos</h1>
+                <p className="text-xs text-gray-500">Actualiza la informacion de tu comercio</p>
+              </div>
             </div>
-          </Link>
+          </div>
         </div>
       </header>
 
       {/* Contenido */}
       <main className="max-w-lg mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Adherí tu comercio
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Completá los datos para sumarte al programa de beneficios.
-          <br />
-          <span className="text-primary font-medium">
-            Rojo Plus no es un gasto, es una herramienta para vender más.
-          </span>
-        </p>
-
         {/* Stepper */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
@@ -265,8 +302,14 @@ export default function Registro() {
         </div>
 
         {error && (
-          <Alert type="error" className="mb-6">
+          <Alert type="error" className="mb-6" onClose={() => setError(null)}>
             {error}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert type="success" className="mb-6">
+            {success}
           </Alert>
         )}
 
@@ -358,7 +401,7 @@ export default function Registro() {
               {/* Logo del comercio */}
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-semibold mb-2">
-                  Logo del comercio (opcional)
+                  Logo del comercio
                 </label>
                 <div className="flex items-center gap-4">
                   {logoPreview ? (
@@ -393,9 +436,18 @@ export default function Registro() {
                     onChange={handleLogoChange}
                     className="hidden"
                   />
-                  <p className="text-xs text-gray-500">
-                    Formato JPG, PNG o GIF. Máx 2MB.
-                  </p>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">
+                      Formato JPG, PNG o GIF. Máx 2MB.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {logoPreview ? 'Cambiar logo' : 'Subir logo'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -404,15 +456,15 @@ export default function Registro() {
                 <label className="block text-gray-700 text-sm font-semibold mb-2">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    Ubicación en el mapa (opcional)
+                    Ubicación en el mapa
                   </div>
                 </label>
                 <p className="text-xs text-gray-500 mb-2">
-                  Hacé click en el mapa para marcar la ubicación de tu comercio
+                  Hacé click en el mapa para actualizar la ubicación de tu comercio
                 </p>
                 <div className="h-64 rounded-lg overflow-hidden border border-gray-300">
                   <MapContainer
-                    center={PILAR_COORDS}
+                    center={ubicacion || PILAR_COORDS}
                     zoom={14}
                     style={{ height: '100%', width: '100%' }}
                   >
@@ -426,7 +478,7 @@ export default function Registro() {
                 {ubicacion && (
                   <div className="flex items-center justify-between mt-2">
                     <p className="text-xs text-green-600">
-                      ✓ Ubicación seleccionada
+                      ✓ Ubicación configurada
                     </p>
                     <button
                       type="button"
@@ -447,7 +499,7 @@ export default function Registro() {
               {/* Selección de descuento */}
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-semibold mb-2">
-                  Descuento a ofrecer *
+                  Descuento a ofrecer
                 </label>
                 <p className="text-xs text-gray-500 mb-3">
                   Seleccioná el porcentaje de descuento que ofrecerás a los socios
@@ -505,36 +557,6 @@ export default function Registro() {
                   </button>
                 )}
               </div>
-
-              {/* Aviso importante sobre aprobación */}
-              <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 my-6">
-                <p className="text-amber-800 text-center font-medium">
-                  ⚠️ Tu solicitud requiere aprobación del Club
-                </p>
-                <p className="text-amber-700 text-sm text-center mt-1">
-                  Una vez enviada, será revisada por la administración.
-                  <br />
-                  Recibirás un email con tu link de acceso cuando sea aprobada.
-                </p>
-              </div>
-
-              {/* reCAPTCHA */}
-              <div className="my-6">
-                <div className="flex justify-center">
-                  <ReCAPTCHA
-                    ref={recaptchaRef}
-                    sitekey={RECAPTCHA_SITE_KEY}
-                    onChange={handleCaptchaChange}
-                    onExpired={handleCaptchaExpired}
-                    hl="es"
-                  />
-                </div>
-                {import.meta.env.DEV && (
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    Modo desarrollo: el captcha es opcional
-                  </p>
-                )}
-              </div>
             </div>
           )}
 
@@ -564,10 +586,9 @@ export default function Registro() {
               <Button
                 type="submit"
                 className="flex-1"
-                loading={loading}
-                disabled={!captchaToken}
+                loading={saving}
               >
-                ENVIAR SOLICITUD
+                GUARDAR CAMBIOS
               </Button>
             )}
           </div>

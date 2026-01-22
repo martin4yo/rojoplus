@@ -21,6 +21,8 @@ const TITULOS = {
   'estados-socio': 'Estado de Socio',
   'conceptos-tesoreria': 'Concepto',
   'cargos-personal': 'Cargo de Personal',
+  'descuentos-disponibles': 'Descuento Disponible',
+  'rubros': 'Rubro',
 }
 
 export default function ConfiguracionForm() {
@@ -56,6 +58,8 @@ export default function ConfiguracionForm() {
     usaEnVentas: false,
     usaEnTesoreria: true,
     cuentaContableId: '',
+    // descuentos-disponibles
+    porcentaje: '',
   })
 
   useEffect(() => {
@@ -156,6 +160,17 @@ export default function ConfiguracionForm() {
         datos.cuentaContableId = form.cuentaContableId ? parseInt(form.cuentaContableId) : null
       }
 
+      if (tabla === 'descuentos-disponibles') {
+        datos.porcentaje = parseFloat(form.porcentaje)
+        delete datos.codigo // No usa código
+        delete datos.color // No usa color
+      }
+
+      if (tabla === 'rubros') {
+        delete datos.codigo // No usa código
+        delete datos.color // No usa color
+      }
+
       if (isEditing) {
         await api.put(`/admin/${tabla}/${id}`, datos)
       } else {
@@ -201,17 +216,19 @@ export default function ConfiguracionForm() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Código</label>
-              <input
-                type="text"
-                value={form.codigo}
-                onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })}
-                className="input-field w-full"
-                required
-              />
-            </div>
-            <div>
+            {tabla !== 'descuentos-disponibles' && tabla !== 'rubros' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Código</label>
+                <input
+                  type="text"
+                  value={form.codigo}
+                  onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })}
+                  className="input-field w-full"
+                  required
+                />
+              </div>
+            )}
+            <div className={tabla === 'descuentos-disponibles' || tabla === 'rubros' ? 'col-span-2' : ''}>
               <label className="block text-sm font-medium text-gray-700 mb-1">Orden</label>
               <input
                 type="number"
@@ -403,8 +420,29 @@ export default function ConfiguracionForm() {
             </>
           )}
 
-          {/* Color del badge (no para conceptos-tesoreria) */}
-          {tabla !== 'conceptos-tesoreria' && (
+          {/* Campos específicos para descuentos-disponibles */}
+          {tabla === 'descuentos-disponibles' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Porcentaje (%)</label>
+              <input
+                type="number"
+                value={form.porcentaje}
+                onChange={e => setForm({ ...form, porcentaje: e.target.value })}
+                className="input-field w-full"
+                step="0.01"
+                min="0"
+                max="100"
+                required
+                placeholder="Ej: 10"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Porcentaje de descuento que se aplicará (0 a 100)
+              </p>
+            </div>
+          )}
+
+          {/* Color del badge (no para conceptos-tesoreria, descuentos-disponibles ni rubros) */}
+          {tabla !== 'conceptos-tesoreria' && tabla !== 'descuentos-disponibles' && tabla !== 'rubros' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Color del Badge</label>
               <div className="flex flex-wrap gap-2">

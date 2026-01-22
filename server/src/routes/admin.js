@@ -3139,6 +3139,176 @@ router.delete('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => 
   res.json({ success: true, data: { mensaje: 'Estado de socio eliminado' } })
 }))
 
+// ==================== DESCUENTOS DISPONIBLES ====================
+
+// GET /api/admin/descuentos-disponibles
+router.get('/descuentos-disponibles', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
+  const descuentos = await req.prisma.descuentoDisponible.findMany({
+    where,
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({ success: true, data: descuentos })
+}))
+
+// GET /api/admin/descuentos-disponibles/:id
+router.get('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req, res) => {
+  const descuento = await req.prisma.descuentoDisponible.findUnique({
+    where: { id: parseInt(req.params.id) },
+  })
+  if (!descuento) throw new AppError('Descuento no encontrado', 404, 'NOT_FOUND')
+  res.json({ success: true, data: descuento })
+}))
+
+// POST /api/admin/descuentos-disponibles
+router.post('/descuentos-disponibles', authAdmin, asyncHandler(async (req, res) => {
+  const { nombre, porcentaje, descripcion, orden } = req.body
+
+  if (!nombre || porcentaje === undefined) {
+    throw new AppError('Nombre y porcentaje son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  if (porcentaje < 0 || porcentaje > 100) {
+    throw new AppError('El porcentaje debe estar entre 0 y 100', 400, 'VALIDATION_ERROR')
+  }
+
+  const descuento = await req.prisma.descuentoDisponible.create({
+    data: {
+      nombre,
+      porcentaje: parseFloat(porcentaje),
+      descripcion,
+      orden: orden || 0,
+    },
+  })
+
+  res.status(201).json({ success: true, data: descuento })
+}))
+
+// PUT /api/admin/descuentos-disponibles/:id
+router.put('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { nombre, porcentaje, descripcion, orden, activo } = req.body
+
+  const existente = await req.prisma.descuentoDisponible.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Descuento no encontrado', 404, 'NOT_FOUND')
+
+  if (porcentaje !== undefined && (porcentaje < 0 || porcentaje > 100)) {
+    throw new AppError('El porcentaje debe estar entre 0 y 100', 400, 'VALIDATION_ERROR')
+  }
+
+  const descuento = await req.prisma.descuentoDisponible.update({
+    where: { id: parseInt(id) },
+    data: {
+      nombre: nombre ?? existente.nombre,
+      porcentaje: porcentaje !== undefined ? parseFloat(porcentaje) : existente.porcentaje,
+      descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
+      orden: orden !== undefined ? orden : existente.orden,
+      activo: activo !== undefined ? activo : existente.activo,
+    },
+  })
+
+  res.json({ success: true, data: descuento })
+}))
+
+// DELETE /api/admin/descuentos-disponibles/:id
+router.delete('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Verificar si hay comercios usando este descuento
+  const comerciosConDescuento = await req.prisma.comercio.count({
+    where: { descuentoDisponibleId: parseInt(id) },
+  })
+
+  if (comerciosConDescuento > 0) {
+    throw new AppError(`No se puede eliminar, hay ${comerciosConDescuento} comercio(s) con este descuento`, 400, 'HAS_RELATIONS')
+  }
+
+  await req.prisma.descuentoDisponible.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Descuento eliminado' } })
+}))
+
+// ==================== RUBROS ====================
+
+// GET /api/admin/rubros
+router.get('/rubros', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
+  const rubros = await req.prisma.rubro.findMany({
+    where,
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({ success: true, data: rubros })
+}))
+
+// GET /api/admin/rubros/:id
+router.get('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
+  const rubro = await req.prisma.rubro.findUnique({
+    where: { id: parseInt(req.params.id) },
+  })
+  if (!rubro) throw new AppError('Rubro no encontrado', 404, 'NOT_FOUND')
+  res.json({ success: true, data: rubro })
+}))
+
+// POST /api/admin/rubros
+router.post('/rubros', authAdmin, asyncHandler(async (req, res) => {
+  const { nombre, orden } = req.body
+
+  if (!nombre) {
+    throw new AppError('El nombre es requerido', 400, 'VALIDATION_ERROR')
+  }
+
+  const rubro = await req.prisma.rubro.create({
+    data: {
+      nombre,
+      orden: orden || 0,
+    },
+  })
+
+  res.status(201).json({ success: true, data: rubro })
+}))
+
+// PUT /api/admin/rubros/:id
+router.put('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { nombre, orden, activo } = req.body
+
+  const existente = await req.prisma.rubro.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Rubro no encontrado', 404, 'NOT_FOUND')
+
+  const rubro = await req.prisma.rubro.update({
+    where: { id: parseInt(id) },
+    data: {
+      nombre: nombre ?? existente.nombre,
+      orden: orden !== undefined ? orden : existente.orden,
+      activo: activo !== undefined ? activo : existente.activo,
+    },
+  })
+
+  res.json({ success: true, data: rubro })
+}))
+
+// DELETE /api/admin/rubros/:id
+router.delete('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Verificar si hay comercios usando este rubro
+  const comerciosConRubro = await req.prisma.comercio.count({
+    where: { rubroId: parseInt(id) },
+  })
+
+  if (comerciosConRubro > 0) {
+    throw new AppError(`No se puede eliminar, hay ${comerciosConRubro} comercio(s) con este rubro`, 400, 'HAS_RELATIONS')
+  }
+
+  await req.prisma.rubro.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Rubro eliminado' } })
+}))
+
 // ==================== CONCEPTOS DE TESORERIA ====================
 
 // GET /api/admin/conceptos-tesoreria
@@ -3922,10 +4092,10 @@ router.get('/pagos/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/pagos - Registrar pago
 router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
-  const { socioId, cuotaIds, medioPagoId, montoRecibido, observaciones } = req.body
+  const { socioId, cuotaIds, medioPagoId, cajaId, montoRecibido, observaciones } = req.body
 
-  if (!socioId || !cuotaIds || !cuotaIds.length || !medioPagoId) {
-    throw new AppError('socioId, cuotaIds y medioPagoId son requeridos', 400, 'VALIDATION_ERROR')
+  if (!socioId || !cuotaIds || !cuotaIds.length || !medioPagoId || !cajaId) {
+    throw new AppError('socioId, cuotaIds, medioPagoId y cajaId son requeridos', 400, 'VALIDATION_ERROR')
   }
 
   // Obtener cuotas a pagar (fuera de transacción para validar)
@@ -3934,6 +4104,14 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       id: { in: cuotaIds.map(id => parseInt(id)) },
       estado: 'PENDIENTE',
     },
+    include: {
+      categoriaActividad: {
+        include: {
+          actividad: true,
+          conceptoTesoreria: true,
+        }
+      }
+    }
   })
 
   if (cuotasRaw.length !== cuotaIds.length) {
@@ -3955,15 +4133,22 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   const montoTotal = montoBase + totalRecargo
   const montoRecibidoNum = parseFloat(montoRecibido) || montoTotal
 
-  // Obtener caja por defecto (primera activa)
-  const caja = await req.prisma.caja.findFirst({
-    where: { activo: true },
-    orderBy: { id: 'asc' },
+  // Obtener caja seleccionada
+  const caja = await req.prisma.caja.findUnique({
+    where: { id: parseInt(cajaId) },
     include: { cuentaContable: true },
   })
 
   if (!caja) {
-    throw new AppError('No hay caja activa configurada', 500, 'NO_CAJA')
+    throw new AppError('La caja seleccionada no existe', 400, 'CAJA_NO_ENCONTRADA')
+  }
+
+  if (!caja.activo) {
+    throw new AppError('La caja seleccionada está inactiva', 400, 'CAJA_INACTIVA')
+  }
+
+  if (!caja.cuentaContableId) {
+    throw new AppError('La caja seleccionada no tiene una cuenta contable configurada. Por favor, configurá la cuenta contable en Tesorería > Cajas.', 400, 'CAJA_SIN_CUENTA_CONTABLE')
   }
 
   // Todo dentro de una transacción
@@ -4016,6 +4201,55 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       data: { saldoActual: { increment: montoTotal } },
     })
 
+    // Determinar el concepto de tesorería según el tipo de cargo
+    let conceptoCobranza = null
+
+    // Si hay cuotas de actividad, intentar usar el concepto específico de la actividad
+    const cuotasActividad = cuotas.filter(c => c.categoria === 'CUOTA_ACTIVIDAD' && c.categoriaActividad)
+    if (cuotasActividad.length > 0) {
+      const categoriaActividad = cuotasActividad[0].categoriaActividad
+      if (categoriaActividad?.conceptoTesoreriaId) {
+        conceptoCobranza = await tx.conceptoTesoreria.findUnique({
+          where: { id: categoriaActividad.conceptoTesoreriaId }
+        })
+      }
+    }
+
+    // Si no se encontró concepto específico, usar el fallback de configuración
+    if (!conceptoCobranza) {
+      const configConcepto = await tx.configuracion.findUnique({
+        where: { clave: 'CONCEPTO_COBRANZA_CUOTAS' }
+      })
+
+      if (!configConcepto || !configConcepto.valor) {
+        throw new AppError(
+          'No se configuró el concepto de tesorería para cobranza de cuotas. Por favor, configuralo en Configuración > Configuración General.',
+          400,
+          'CONCEPTO_NO_CONFIGURADO'
+        )
+      }
+
+      conceptoCobranza = await tx.conceptoTesoreria.findUnique({
+        where: { id: parseInt(configConcepto.valor) }
+      })
+    }
+
+    if (!conceptoCobranza) {
+      throw new AppError(
+        'No se pudo determinar el concepto de tesorería para esta cobranza. Por favor, configurá los conceptos en Configuración.',
+        400,
+        'CONCEPTO_NO_ENCONTRADO'
+      )
+    }
+
+    if (!conceptoCobranza.activo) {
+      throw new AppError(
+        'El concepto de tesorería para esta cobranza está inactivo. Por favor, activalo o configurá otro.',
+        400,
+        'CONCEPTO_INACTIVO'
+      )
+    }
+
     // Crear MovimientoCaja para tracking de tesoreria
     const anioMov = new Date().getFullYear()
     const prefijoMov = `MV-${anioMov}-`
@@ -4034,8 +4268,10 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       data: {
         numero: numeroMov,
         cajaId: caja.id,
+        cuentaContableId: caja.cuentaContableId,
         fecha: new Date(),
         tipo: 'INGRESO',
+        concepto: conceptoCobranza.nombre,
         monto: montoTotal,
         descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
         pagoId: pago.id,

@@ -25,6 +25,15 @@ const rubros = [
   { nombre: 'Otros', orden: 99 },
 ];
 
+const descuentosDisponibles = [
+  { nombre: '5% - Descuento Básico', porcentaje: 5, descripcion: 'Descuento inicial para comercios adheridos', orden: 1 },
+  { nombre: '10% - Descuento Estándar', porcentaje: 10, descripcion: 'Descuento estándar más utilizado', orden: 2 },
+  { nombre: '15% - Descuento Plus', porcentaje: 15, descripcion: 'Descuento intermedio atractivo', orden: 3 },
+  { nombre: '20% - Descuento Premium', porcentaje: 20, descripcion: 'Descuento destacado para socios', orden: 4 },
+  { nombre: '25% - Descuento Especial', porcentaje: 25, descripcion: 'Descuento promocional excepcional', orden: 5 },
+  { nombre: '30% - Descuento VIP', porcentaje: 30, descripcion: 'Máximo descuento disponible', orden: 6 },
+];
+
 const tiposCuota = [
   { codigo: 'SOCIAL', nombre: 'Cuota Social', descripcion: 'Cuota de membresía del club' },
   { codigo: 'DEPORTIVA', nombre: 'Cuota Deportiva', descripcion: 'Cuota por actividad deportiva' },
@@ -87,6 +96,21 @@ const permisos = [
   // Sistema
   { codigo: 'USUARIOS_GESTIONAR', nombre: 'Gestionar Usuarios', modulo: 'SISTEMA' },
   { codigo: 'COMERCIOS_GESTIONAR', nombre: 'Gestionar Comercios', modulo: 'SISTEMA' },
+];
+
+const conceptosTesoreria = [
+  // Ingresos
+  { codigo: 'COB-CUO', nombre: 'Cobranza de Cuotas', descripcion: 'Cobro de cuotas sociales y deportivas', tipo: 'INGRESO', orden: 1 },
+  { codigo: 'COB-ACT', nombre: 'Cobranza Actividades', descripcion: 'Cobro de actividades y eventos especiales', tipo: 'INGRESO', orden: 2 },
+  { codigo: 'DON', nombre: 'Donaciones', descripcion: 'Donaciones recibidas', tipo: 'INGRESO', orden: 3 },
+  { codigo: 'OTR-ING', nombre: 'Otros Ingresos', descripcion: 'Otros ingresos varios', tipo: 'INGRESO', orden: 4 },
+
+  // Egresos
+  { codigo: 'SUE', nombre: 'Sueldos y Jornales', descripcion: 'Pago de sueldos al personal', tipo: 'EGRESO', orden: 5 },
+  { codigo: 'SERV', nombre: 'Servicios', descripcion: 'Pago de servicios (luz, agua, gas, internet)', tipo: 'EGRESO', orden: 6 },
+  { codigo: 'MAN', nombre: 'Mantenimiento', descripcion: 'Gastos de mantenimiento e infraestructura', tipo: 'EGRESO', orden: 7 },
+  { codigo: 'COM', nombre: 'Compras', descripcion: 'Compra de insumos y materiales', tipo: 'EGRESO', orden: 8 },
+  { codigo: 'OTR-EGR', nombre: 'Otros Egresos', descripcion: 'Otros egresos varios', tipo: 'EGRESO', orden: 9 },
 ];
 
 const cuentasContables = [
@@ -263,6 +287,9 @@ const configuracion = [
   { clave: 'CUOTA_DIA_VENCIMIENTO', valor: '10', tipo: 'NUMBER', modulo: 'CUOTAS', descripcion: 'Día de vencimiento de cuotas' },
   { clave: 'CUOTA_VENCE_MISMO_MES', valor: 'false', tipo: 'BOOLEAN', modulo: 'CUOTAS', descripcion: 'Si las cuotas vencen en el mismo mes del periodo (true) o en el siguiente (false)' },
 
+  // Tesorería
+  { clave: 'CONCEPTO_COBRANZA_CUOTAS', valor: '', tipo: 'NUMBER', modulo: 'TESORERIA', descripcion: 'ID del concepto de tesorería para cobranza de cuotas' },
+
   // Pagos Online
   { clave: 'PAGOS_MP_HABILITADO', valor: 'false', tipo: 'BOOLEAN', modulo: 'PORTAL', descripcion: 'MercadoPago habilitado' },
   { clave: 'PAGOS_MODO_HABILITADO', valor: 'false', tipo: 'BOOLEAN', modulo: 'PORTAL', descripcion: 'MODO habilitado' },
@@ -294,16 +321,27 @@ async function main() {
   }
   console.log(`   ✓ ${rubros.length} rubros creados`);
 
-  // Tipos de Cuota
-  console.log('💰 Creando tipos de cuota...');
-  for (const tipo of tiposCuota) {
-    await prisma.tipoCuota.upsert({
-      where: { codigo: tipo.codigo },
-      update: tipo,
-      create: tipo,
+  // Descuentos Disponibles
+  console.log('💰 Creando descuentos disponibles...');
+  for (const descuento of descuentosDisponibles) {
+    await prisma.descuentoDisponible.upsert({
+      where: { id: descuento.orden },
+      update: descuento,
+      create: descuento,
     });
   }
-  console.log(`   ✓ ${tiposCuota.length} tipos de cuota creados`);
+  console.log(`   ✓ ${descuentosDisponibles.length} descuentos disponibles creados`);
+
+  // Tipos de Cuota (comentado - modelo no existe aún)
+  // console.log('💰 Creando tipos de cuota...');
+  // for (const tipo of tiposCuota) {
+  //   await prisma.tipoCuota.upsert({
+  //     where: { codigo: tipo.codigo },
+  //     update: tipo,
+  //     create: tipo,
+  //   });
+  // }
+  // console.log(`   ✓ ${tiposCuota.length} tipos de cuota creados`);
 
   // Medios de Pago
   console.log('💳 Creando medios de pago...');
@@ -316,16 +354,40 @@ async function main() {
   }
   console.log(`   ✓ ${mediosPago.length} medios de pago creados`);
 
-  // Deportes
-  console.log('⚽ Creando deportes...');
-  for (const deporte of deportes) {
-    await prisma.deporte.upsert({
-      where: { codigo: deporte.codigo },
-      update: deporte,
-      create: deporte,
+  // Deportes (comentado - ahora se llama Actividad)
+  // console.log('⚽ Creando deportes...');
+  // for (const deporte of deportes) {
+  //   await prisma.deporte.upsert({
+  //     where: { codigo: deporte.codigo },
+  //     update: deporte,
+  //     create: deporte,
+  //   });
+  // }
+  // console.log(`   ✓ ${deportes.length} deportes creados`);
+
+  // Conceptos de Tesorería
+  console.log('💰 Creando conceptos de tesorería...');
+  for (const concepto of conceptosTesoreria) {
+    await prisma.conceptoTesoreria.upsert({
+      where: { codigo: concepto.codigo },
+      update: concepto,
+      create: concepto,
     });
   }
-  console.log(`   ✓ ${deportes.length} deportes creados`);
+  console.log(`   ✓ ${conceptosTesoreria.length} conceptos de tesorería creados`);
+
+  // Obtener el ID del concepto de cobranza de cuotas para guardarlo en configuración
+  const conceptoCobranzaCuotas = await prisma.conceptoTesoreria.findUnique({
+    where: { codigo: 'COB-CUO' }
+  });
+
+  if (conceptoCobranzaCuotas) {
+    // Actualizar la configuración con el ID del concepto
+    const configIndex = configuracion.findIndex(c => c.clave === 'CONCEPTO_COBRANZA_CUOTAS');
+    if (configIndex !== -1) {
+      configuracion[configIndex].valor = String(conceptoCobranzaCuotas.id);
+    }
+  }
 
   // Roles
   console.log('👥 Creando roles...');

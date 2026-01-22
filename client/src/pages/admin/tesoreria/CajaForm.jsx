@@ -40,13 +40,9 @@ export default function CajaForm() {
 
   async function cargarCuentasContables() {
     try {
-      // Cargar cuentas de tipo ACTIVO que sean hojas (para cajas)
-      const response = await api.get('/admin/cuentas-contables', {
-        params: { tipo: 'ACTIVO', flat: true }
-      })
-      // Filtrar solo cuentas que no tienen hijos (cuentas de imputacion)
-      const cuentasHoja = (response.data || response).filter(c => !c.children || c.children.length === 0)
-      setCuentasContables(cuentasHoja)
+      // Cargar solo cuentas de tipo ACTIVO que sean imputables (de último nivel)
+      const response = await api.getFull('/admin/cuentas-contables?tipo=ACTIVO&esImputable=true&flat=true')
+      setCuentasContables(response.data || [])
     } catch (err) {
       console.error('Error cargando cuentas contables:', err)
     }

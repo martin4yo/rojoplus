@@ -11,6 +11,7 @@ export default function AdminComercios() {
   const [comercios, setComercios] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [procesando, setProcesando] = useState({}) // { id: true/false }
   const { showModal, ModalComponent } = useModal()
 
   const estadoFiltro = searchParams.get('estado') || ''
@@ -41,6 +42,7 @@ export default function AdminComercios() {
   }
 
   async function aprobar(id) {
+    setProcesando(prev => ({ ...prev, [id]: true }))
     try {
       await api.post(`/admin/comercios/${id}/aprobar`)
       showModal({
@@ -54,6 +56,8 @@ export default function AdminComercios() {
         type: 'error',
         message: 'Error al aprobar comercio',
       })
+    } finally {
+      setProcesando(prev => ({ ...prev, [id]: false }))
     }
   }
 
@@ -66,6 +70,7 @@ export default function AdminComercios() {
       promptPlaceholder: 'Motivo del rechazo...',
       confirmText: 'Rechazar',
       onConfirm: async (motivo) => {
+        setProcesando(prev => ({ ...prev, [id]: true }))
         try {
           await api.post(`/admin/comercios/${id}/rechazar`, { motivo })
           showModal({
@@ -79,6 +84,8 @@ export default function AdminComercios() {
             type: 'error',
             message: 'Error al rechazar comercio',
           })
+        } finally {
+          setProcesando(prev => ({ ...prev, [id]: false }))
         }
       },
     })
@@ -176,16 +183,25 @@ export default function AdminComercios() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {comercio.estado === 'PENDIENTE' && (
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-2 justify-end items-center">
                         <button
                           onClick={() => aprobar(comercio.id)}
-                          className="text-green-600 hover:text-green-800 font-medium text-sm"
+                          disabled={procesando[comercio.id]}
+                          className="text-green-600 hover:text-green-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                         >
-                          Aprobar
+                          {procesando[comercio.id] ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                              <span>Aprobando...</span>
+                            </>
+                          ) : (
+                            'Aprobar'
+                          )}
                         </button>
                         <button
                           onClick={() => rechazar(comercio.id)}
-                          className="text-red-600 hover:text-red-800 font-medium text-sm"
+                          disabled={procesando[comercio.id]}
+                          className="text-red-600 hover:text-red-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Rechazar
                         </button>

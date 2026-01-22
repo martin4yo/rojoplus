@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Edit2, Trash2, Tag, Users, Activity, Wallet, Briefcase } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, Trash2, Tag, Users, Activity, Wallet, Briefcase, Percent } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -21,6 +21,8 @@ const TITULOS = {
   'estados-socio': 'Estados de Socio',
   'conceptos-tesoreria': 'Conceptos',
   'cargos-personal': 'Cargos de Personal',
+  'descuentos-disponibles': 'Descuentos Disponibles',
+  'rubros': 'Rubros',
 }
 
 const ICONOS = {
@@ -29,6 +31,8 @@ const ICONOS = {
   'estados-socio': { icon: Activity, bgColor: 'bg-green-100', color: 'text-green-600' },
   'conceptos-tesoreria': { icon: Wallet, bgColor: 'bg-emerald-100', color: 'text-emerald-600' },
   'cargos-personal': { icon: Briefcase, bgColor: 'bg-rose-100', color: 'text-rose-600' },
+  'descuentos-disponibles': { icon: Percent, bgColor: 'bg-amber-100', color: 'text-amber-600' },
+  'rubros': { icon: Tag, bgColor: 'bg-cyan-100', color: 'text-cyan-600' },
 }
 
 export default function ConfiguracionLista() {
@@ -127,6 +131,9 @@ export default function ConfiguracionLista() {
               {tabla === 'categorias-socio' && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Descuento</th>
               )}
+              {tabla === 'descuentos-disponibles' && (
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Porcentaje</th>
+              )}
               {tabla === 'estados-socio' && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RojoPlus</th>
               )}
@@ -138,11 +145,17 @@ export default function ConfiguracionLista() {
           <tbody className="divide-y divide-gray-200">
             {items.map(item => (
               <tr key={item.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-mono text-gray-600">{item.codigo}</td>
+                <td className="px-4 py-3 text-sm font-mono text-gray-600">
+                  {tabla === 'descuentos-disponibles' ? `#${item.id}` : tabla === 'rubros' ? `#${item.id}` : item.codigo}
+                </td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 text-sm rounded-full ${COLORES[item.color] || COLORES.gray}`}>
-                    {item.nombre}
-                  </span>
+                  {tabla === 'rubros' || tabla === 'descuentos-disponibles' ? (
+                    <span className="text-sm font-medium text-gray-800">{item.nombre}</span>
+                  ) : (
+                    <span className={`px-2 py-1 text-sm rounded-full ${COLORES[item.color] || COLORES.gray}`}>
+                      {item.nombre}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">{item.descripcion || '-'}</td>
                 {tabla === 'tipos-socio' && (
@@ -153,6 +166,11 @@ export default function ConfiguracionLista() {
                 {tabla === 'categorias-socio' && (
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {item.porcentajeDescuento > 0 ? `${item.porcentajeDescuento}%` : '-'}
+                  </td>
+                )}
+                {tabla === 'descuentos-disponibles' && (
+                  <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                    {item.porcentaje}%
                   </td>
                 )}
                 {tabla === 'estados-socio' && (
