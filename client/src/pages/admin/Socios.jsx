@@ -38,7 +38,7 @@ export default function AdminSocios() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [busqueda, setBusqueda] = useState('')
-  const [estado, setEstado] = useState('')
+  const [estado, setEstado] = useState('VIGENTE')
   const [categoria, setCategoria] = useState('')
   const [tipoSocio, setTipoSocio] = useState('')
   const [zona, setZona] = useState('')
