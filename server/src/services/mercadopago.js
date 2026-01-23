@@ -26,37 +26,58 @@ export async function crearPreferenciaPago(data) {
   try {
     const preference = new Preference(client)
 
-    const result = await preference.create({
-      body: {
-        items: [
-          {
-            title: data.title,
-            description: data.description || '',
-            quantity: data.quantity || 1,
-            unit_price: Number(data.amount),
-            currency_id: 'ARS',
-          },
-        ],
-        payer: {
-          name: data.payer?.name || '',
-          surname: '',
-          email: data.payer?.email || '',
+    // Validar URLs requeridos
+    if (!data.successUrl || !data.failureUrl || !data.pendingUrl) {
+      throw new Error(`URLs requeridos: success=${data.successUrl}, failure=${data.failureUrl}, pending=${data.pendingUrl}`)
+    }
+
+    const preferenceBody = {
+      items: [
+        {
+          title: data.title,
+          description: data.description || '',
+          quantity: data.quantity || 1,
+          unit_price: Number(data.amount),
+          currency_id: 'ARS',
         },
-        external_reference: data.externalReference,
-        notification_url: data.notificationUrl,
-        back_urls: {
-          success: data.successUrl,
-          failure: data.failureUrl,
-          pending: data.pendingUrl,
-        },
-        auto_return: 'approved', // Redirigir automáticamente si fue aprobado
-        statement_descriptor: 'CLUB SPORTIVO PILAR',
-        payment_methods: {
-          excluded_payment_methods: [],
-          excluded_payment_types: [],
-          installments: 1, // Solo pago en 1 cuota por defecto
-        },
+      ],
+      payer: {
+        name: data.payer?.name || '',
+        surname: '',
+        email: data.payer?.email || '',
       },
+      external_reference: data.externalReference,
+      back_urls: {
+        success: data.successUrl,
+        failure: data.failureUrl,
+        pending: data.pendingUrl,
+      },
+      // auto_return: 'approved', // Solo funciona con URLs públicas (no localhost)
+      statement_descriptor: 'CLUB SPORTIVO PILAR',
+      payment_methods: {
+        excluded_payment_methods: [],
+        excluded_payment_types: [],
+        installments: 1, // Solo pago en 1 cuota por defecto
+      },
+    }
+
+    // Solo agregar notification_url si NO es localhost (para desarrollo sin ngrok)
+    if (data.notificationUrl && !data.notificationUrl.includes('localhost')) {
+      preferenceBody.notification_url = data.notificationUrl
+      console.log('✅ Webhook habilitado:', data.notificationUrl)
+    } else {
+      console.log('⚠️  Webhook deshabilitado (localhost). En producción se habilitará automáticamente.')
+    }
+
+    console.log('🔷 Creando preferencia MercadoPago:', JSON.stringify(preferenceBody, null, 2))
+
+    const result = await preference.create({
+      body: preferenceBody,
+    })
+
+    console.log('✅ Preferencia creada exitosamente:', {
+      id: result.id,
+      init_point: result.init_point
     })
 
     return {

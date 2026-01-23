@@ -9,6 +9,7 @@ import {
   CurrencyDollarIcon,
 } from '@heroicons/react/24/outline'
 import { Smartphone } from 'lucide-react'
+import { useModal } from '../../../components/Modal'
 
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [cuotas, setCuotas] = useState([])
@@ -16,6 +17,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('pendientes') // 'pendientes' | 'historial'
   const [procesandoPago, setProcesandoPago] = useState(false)
+  const { showModal, ModalComponent } = useModal()
 
   useEffect(() => {
     cargarDatos()
@@ -48,14 +50,23 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
         metodoPago: metodo, // 'MERCADOPAGO' | 'MODO'
       })
 
-      if (response.data?.linkPago) {
-        // Redirigir al link de pago
-        window.location.href = response.data.linkPago
+      console.log('📦 Respuesta (cuota individual):', response)
+
+      if (response?.linkPago) {
+        console.log('✅ Redirigiendo a MercadoPago:', response.linkPago)
+        window.location.href = response.linkPago
       } else {
-        alert('Error generando link de pago')
+        console.error('❌ No hay linkPago en la respuesta')
+        showModal({
+          type: 'error',
+          message: 'Error generando link de pago. Por favor intenta nuevamente.'
+        })
       }
     } catch (err) {
-      alert('Error: ' + err.message)
+      showModal({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Error al procesar el pago'
+      })
     } finally {
       setProcesandoPago(false)
     }
@@ -72,13 +83,23 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
         metodoPago: metodo,
       })
 
-      if (response.data?.linkPago) {
-        window.location.href = response.data.linkPago
+      console.log('📦 Respuesta completa:', response)
+
+      if (response?.linkPago) {
+        console.log('✅ Redirigiendo a MercadoPago:', response.linkPago)
+        window.location.href = response.linkPago
       } else {
-        alert('Error generando link de pago')
+        console.error('❌ No hay linkPago en la respuesta')
+        showModal({
+          type: 'error',
+          message: 'Error generando link de pago. Por favor intenta nuevamente.'
+        })
       }
     } catch (err) {
-      alert('Error: ' + err.message)
+      showModal({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Error al procesar el pago'
+      })
     } finally {
       setProcesandoPago(false)
     }
@@ -308,6 +329,8 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
           )}
         </div>
       )}
+
+      {ModalComponent}
     </div>
   )
 }

@@ -25,11 +25,11 @@ export default function DashboardSocio({ socio, tokenPortal, onNavigate }) {
       setLoading(true)
       const [cuenta, eventos] = await Promise.all([
         api.get(`/socio/${tokenPortal}/estado-cuenta`).catch(() => null),
-        api.get(`/socio/${tokenPortal}/proximos-eventos`).catch(() => ({ data: [] })),
+        api.get(`/socio/${tokenPortal}/proximos-eventos`).catch(() => []),
       ])
 
-      setEstadoCuenta(cuenta?.data || null)
-      setProximosEventos(eventos.data || [])
+      setEstadoCuenta(cuenta || null)
+      setProximosEventos(Array.isArray(eventos) ? eventos : [])
     } catch (err) {
       console.error('Error cargando dashboard:', err)
     } finally {

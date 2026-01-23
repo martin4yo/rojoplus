@@ -614,6 +614,100 @@ router.post('/:tokenPortal/inscripciones/:id/baja', asyncHandler(async (req, res
 }))
 
 // ==============================================================================
+// DASHBOARD
+// ==============================================================================
+
+// GET /api/socio/:tokenPortal/estado-cuenta - Obtener resumen de estado de cuenta
+router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal },
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Contar cuotas pendientes
+  const cuotasPendientes = await req.prisma.cargo.count({
+    where: {
+      socioId: socio.id,
+      estado: {
+        in: ['PENDIENTE', 'VENCIDO'],
+      },
+    },
+  })
+
+  // Calcular monto total pendiente
+  const cargos = await req.prisma.cargo.findMany({
+    where: {
+      socioId: socio.id,
+      estado: {
+        in: ['PENDIENTE', 'VENCIDO'],
+      },
+    },
+  })
+
+  const montoPendiente = cargos.reduce((sum, c) => sum + parseFloat(c.montoTotal), 0)
+
+  // Contar actividades activas
+  const actividadesActivas = await req.prisma.inscripcion.count({
+    where: {
+      socioId: socio.id,
+      estado: 'ACTIVA',
+    },
+  })
+
+  res.json({
+    success: true,
+    data: {
+      cuotasPendientes,
+      montoPendiente,
+      actividadesActivas,
+    },
+  })
+}))
+
+// GET /api/socio/:tokenPortal/proximos-eventos - Obtener próximos entrenamientos/eventos
+router.get('/:tokenPortal/proximos-eventos', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal },
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Obtener inscripciones activas del socio
+  const inscripciones = await req.prisma.inscripcion.findMany({
+    where: {
+      socioId: socio.id,
+      estado: 'ACTIVA',
+    },
+    include: {
+      categoriaActividad: {
+        include: {
+          actividad: true,
+        },
+      },
+    },
+  })
+
+  // TODO: Cuando se implemente el sistema de eventos/horarios de entrenamientos,
+  // aquí se devolverá la información real de los próximos eventos
+  // Por ahora devolvemos array vacío
+  const eventos = []
+
+  res.json({
+    success: true,
+    data: eventos,
+  })
+}))
+
+// ==============================================================================
 // PAGOS Y CUOTAS
 // ==============================================================================
 
@@ -754,6 +848,9 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
         in: ['PENDIENTE', 'VENCIDO'],
       },
     },
+    include: {
+      periodo: true,
+    },
   })
 
   if (!cargo) {
@@ -781,9 +878,11 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
     // Integración con MercadoPago
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
+    const periodo = cargo.periodo ? `${cargo.periodo.nombre}/${cargo.periodo.anio}` : ''
+
     const preferencia = await crearPreferenciaPago({
       title: cargo.descripcion || cargo.categoria,
-      description: `Cuota ${cargo.periodo}/${cargo.anio}`,
+      description: periodo ? `Cuota ${periodo}` : (cargo.descripcion || cargo.categoria),
       amount: parseFloat(cargo.montoTotal),
       quantity: 1,
       externalReference: linkPago.id.toString(),
@@ -792,9 +891,9 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
         name: socio.apellidoNombre,
       },
       notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago`,
-      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito`,
-      failureUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=error`,
-      pendingUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=pendiente`,
+      successUrl: `${baseUrl}/s/${tokenPortal}?pago=exito`,
+      failureUrl: `${baseUrl}/s/${tokenPortal}?pago=error`,
+      pendingUrl: `${baseUrl}/s/${tokenPortal}?pago=pendiente`,
     })
 
     initPoint = preferencia.init_point
@@ -845,6 +944,14 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
         in: ['PENDIENTE', 'VENCIDO'],
       },
     },
+    include: {
+      periodo: true,
+      categoriaActividad: {
+        include: {
+          actividad: true,
+        },
+      },
+    },
   })
 
   if (cargos.length === 0) {
@@ -876,7 +983,10 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
 
     const preferencia = await crearPreferenciaPago({
       title: `Pago de ${cargos.length} cuota(s)`,
-      description: cargos.map(c => `${c.descripcion || c.categoria} (${c.periodo}/${c.anio})`).join(', '),
+      description: cargos.map(c => {
+        const periodo = c.periodo ? `${c.periodo.nombre}/${c.periodo.anio}` : ''
+        return `${c.descripcion || c.categoria}${periodo ? ' (' + periodo + ')' : ''}`
+      }).join(', '),
       amount: montoTotal,
       quantity: 1,
       externalReference: linkPago.id.toString(),
@@ -885,12 +995,13 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
         name: socio.apellidoNombre,
       },
       notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago`,
-      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito`,
-      failureUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=error`,
-      pendingUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=pendiente`,
+      successUrl: `${baseUrl}/s/${tokenPortal}?pago=exito`,
+      failureUrl: `${baseUrl}/s/${tokenPortal}?pago=error`,
+      pendingUrl: `${baseUrl}/s/${tokenPortal}?pago=pendiente`,
     })
 
     initPoint = preferencia.init_point
+    console.log('💳 Link de pago generado:', initPoint)
   } else if (metodoPago === 'MODO') {
     // TODO: Integrar con MODO cuando esté disponible
     initPoint = `https://ejemplo.com/modo/pagar`
@@ -900,6 +1011,12 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
   await req.prisma.linkPago.update({
     where: { id: linkPago.id },
     data: { initPoint },
+  })
+
+  console.log('✅ Respuesta enviada al cliente:', {
+    linkPago: initPoint,
+    linkPagoId: linkPago.id,
+    montoTotal: montoTotal.toString()
   })
 
   res.json({

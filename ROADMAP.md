@@ -625,8 +625,8 @@ Portal responsive y mobile-first donde el socio puede gestionar toda su informac
 - [x] **34.1** Endpoint POST /socio/enviar-link-acceso (Magic Link por email/DNI)
 - [x] **34.2** Servicio de generación de tokens temporales (24hs)
 - [x] **34.3** Endpoint GET /socio/validar-token/:token + GET /socio/:token (validar y obtener datos del socio)
-- [ ] **34.4** Endpoint GET /socio/:token/estado-cuenta (resumen de cuotas y actividades) - *Datos disponibles en Dashboard*
-- [ ] **34.5** Endpoint GET /socio/:token/proximos-eventos (entrenamientos, partidos) - *Requiere FASE 33*
+- [x] **34.4** Endpoint GET /socio/:token/estado-cuenta (resumen de cuotas y actividades)
+- [x] **34.5** Endpoint GET /socio/:token/proximos-eventos (entrenamientos, partidos) - *Devuelve array vacío, se llenará con FASE 33*
 - [x] **34.6** Endpoint GET /socio/:token/inscripciones (actividades del socio)
 - [x] **34.7** Endpoint GET /socio/:token/actividades-disponibles
 - [x] **34.8** Endpoint POST /socio/:token/inscripciones (inscribirse en actividad)
@@ -650,8 +650,8 @@ Portal responsive y mobile-first donde el socio puede gestionar toda su informac
 - [x] **34.24** Sección MisActividadesSocio.jsx (tabs: mis actividades / disponibles)
 - [x] **34.25** Sección MensajesSocio.jsx (chat estilo WhatsApp con entrenadores)
 - [x] **34.26** Sección PagosSocio.jsx (cuotas pendientes, pago MercadoPago/MODO, historial)
-- [ ] **34.27** Integración con API endpoints
-- [ ] **34.28** Manejo de estados de carga (skeleton loaders)
+- [x] **34.27** Integración con API endpoints (pagos, estado cuenta, actividades)
+- [x] **34.28** Modals personalizados para confirmaciones y errores (reemplaza alert/confirm)
 - [ ] **34.29** Toast notifications para feedback
 - [ ] **34.30** Responsive design testing (mobile, tablet, desktop)
 - [x] **34.31** Rutas en App.jsx (/login-socio, /portal-socio/:token)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import api from '../../services/api'
 import {
   HomeIcon,
@@ -18,6 +18,7 @@ import {
   CreditCardIcon as CreditCardIconSolid,
   TagIcon as TagIconSolid,
 } from '@heroicons/react/24/solid'
+import { useModal } from '../../components/Modal'
 
 // Componentes de secciones
 import DashboardSocio from './sections/DashboardSocio'
@@ -29,6 +30,8 @@ import BeneficiosSocio from './sections/BeneficiosSocio'
 
 export default function PortalSocioNuevo() {
   const { tokenPortal } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { showModal, ModalComponent } = useModal()
   const [activeTab, setActiveTab] = useState('inicio')
   const [socio, setSocio] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -39,6 +42,40 @@ export default function PortalSocioNuevo() {
   useEffect(() => {
     cargarDatosSocio()
   }, [tokenPortal])
+
+  // Detectar respuesta de MercadoPago
+  useEffect(() => {
+    const pagoStatus = searchParams.get('pago')
+    if (pagoStatus) {
+      // Limpiar el query param
+      setSearchParams({})
+
+      // Mostrar mensaje según el resultado
+      if (pagoStatus === 'exito') {
+        showModal({
+          type: 'success',
+          title: 'Pago exitoso',
+          message: 'Tu pago ha sido procesado correctamente. En breve se verá reflejado en tu cuenta.',
+          onConfirm: () => {
+            setActiveTab('pagos')
+            cargarDatosSocio() // Recargar datos
+          }
+        })
+      } else if (pagoStatus === 'error') {
+        showModal({
+          type: 'error',
+          title: 'Pago fallido',
+          message: 'Hubo un problema al procesar tu pago. Por favor intenta nuevamente.'
+        })
+      } else if (pagoStatus === 'pendiente') {
+        showModal({
+          type: 'warning',
+          title: 'Pago pendiente',
+          message: 'Tu pago está siendo procesado. Te notificaremos cuando se confirme.'
+        })
+      }
+    }
+  }, [searchParams])
 
   const cargarDatosSocio = async () => {
     try {
@@ -197,6 +234,8 @@ export default function PortalSocioNuevo() {
           </div>
         </div>
       </nav>
+
+      {ModalComponent}
     </div>
   )
 }
