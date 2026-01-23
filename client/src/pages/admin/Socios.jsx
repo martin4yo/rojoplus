@@ -354,9 +354,9 @@ export default function AdminSocios() {
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <div className="flex justify-center gap-1">
-                          {socio.grupoFamiliarId && (
+                          {(socio.titularFamiliaId || socio.miembrosFamilia?.length > 0) && (
                             <span
-                              title={socio.esTitularGrupo ? 'Titular de grupo familiar' : 'Miembro de grupo familiar'}
+                              title={socio.titularFamiliaId ? 'Miembro de grupo familiar' : 'Titular de grupo familiar'}
                               className="p-1 rounded bg-purple-100 text-purple-600"
                             >
                               <Users className="w-4 h-4" />

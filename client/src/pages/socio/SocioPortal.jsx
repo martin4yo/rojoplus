@@ -151,16 +151,16 @@ export default function SocioPortal() {
                 }}
               />
             </div>
-            <div className="mt-4 flex flex-col sm:flex-row gap-3 justify-center">
-              <Button onClick={descargarQR} className="inline-flex items-center justify-center gap-2">
-                <Download className="w-4 h-4" />
+            <div className="mt-4 flex flex-col gap-3">
+              <Button onClick={descargarQR} className="inline-flex items-center justify-center gap-6">
+                <Download className="w-5 h-5" />
                 Descargar QR
               </Button>
               <Link
                 to="/comercios"
-                className="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium"
+                className="btn-secondary inline-flex items-center justify-center gap-6 px-4 py-2 rounded-lg font-medium"
               >
-                <Store className="w-4 h-4" />
+                <Store className="w-5 h-5" />
                 Ver comercios adheridos
               </Link>
             </div>

@@ -215,6 +215,19 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
   return Math.round(R * c * 10) / 10 // Redondear a 1 decimal
 }
 
+// GET /api/comercios/rubros - Obtener lista de rubros (público)
+router.get('/rubros', asyncHandler(async (req, res) => {
+  const rubros = await req.prisma.rubro.findMany({
+    where: { activo: true },
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({
+    success: true,
+    data: rubros,
+  })
+}))
+
 // GET /api/comercios/descuentos-disponibles - Obtener lista de descuentos disponibles (público)
 router.get('/descuentos-disponibles', asyncHandler(async (req, res) => {
   const descuentos = await req.prisma.descuentoDisponible.findMany({

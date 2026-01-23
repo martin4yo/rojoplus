@@ -9,8 +9,9 @@ import {
   ExclamationTriangleIcon,
   QrCodeIcon,
 } from '@heroicons/react/24/outline'
+import { Calendar, Clock, MapPin } from 'lucide-react'
 
-export default function DashboardSocio({ socio, tokenPortal }) {
+export default function DashboardSocio({ socio, tokenPortal, onNavigate }) {
   const [estadoCuenta, setEstadoCuenta] = useState(null)
   const [proximosEventos, setProximosEventos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -118,7 +119,10 @@ export default function DashboardSocio({ socio, tokenPortal }) {
           </div>
           <h3 className="text-sm font-medium text-gray-600 mb-1">Mi Código QR</h3>
           <p className="text-sm text-gray-500 mb-3">Para descuentos en comercios</p>
-          <button className="text-purple-600 font-semibold text-sm hover:text-purple-700 transition-colors">
+          <button
+            onClick={() => onNavigate?.('perfil')}
+            className="text-purple-600 font-semibold text-sm hover:text-purple-700 transition-colors"
+          >
             Ver mi QR →
           </button>
         </div>
@@ -141,9 +145,18 @@ export default function DashboardSocio({ socio, tokenPortal }) {
                     <h4 className="font-medium text-gray-900">{evento.actividad}</h4>
                     <p className="text-sm text-gray-600 mt-1">{evento.descripcion}</p>
                     <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                      <span>📅 {evento.fecha}</span>
-                      <span>🕐 {evento.hora}</span>
-                      <span>📍 {evento.lugar}</span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {evento.fecha}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {evento.hora}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {evento.lugar}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -157,32 +170,44 @@ export default function DashboardSocio({ socio, tokenPortal }) {
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Accesos Rápidos</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => onNavigate?.('pagos')}
+            className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <div className="bg-red-100 rounded-full p-3 mb-2">
               <CreditCardIcon className="h-6 w-6 text-red-600" />
             </div>
             <span className="text-sm font-medium text-gray-700">Pagar Cuota</span>
           </button>
 
-          <button className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => onNavigate?.('actividades')}
+            className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <div className="bg-blue-100 rounded-full p-3 mb-2">
               <TrophyIcon className="h-6 w-6 text-blue-600" />
             </div>
             <span className="text-sm font-medium text-gray-700">Inscribirme</span>
           </button>
 
-          <button className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => onNavigate?.('beneficios')}
+            className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <div className="bg-green-100 rounded-full p-3 mb-2">
               <CalendarIcon className="h-6 w-6 text-green-600" />
             </div>
-            <span className="text-sm font-medium text-gray-700">Horarios</span>
+            <span className="text-sm font-medium text-gray-700">Beneficios</span>
           </button>
 
-          <button className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => onNavigate?.('perfil')}
+            className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <div className="bg-purple-100 rounded-full p-3 mb-2">
               <UserGroupIcon className="h-6 w-6 text-purple-600" />
             </div>
-            <span className="text-sm font-medium text-gray-700">Mi Grupo</span>
+            <span className="text-sm font-medium text-gray-700">Mi Perfil</span>
           </button>
         </div>
       </div>
@@ -197,7 +222,10 @@ export default function DashboardSocio({ socio, tokenPortal }) {
               <p className="text-sm text-orange-700 mt-1">
                 Evita recargos pagando antes del vencimiento
               </p>
-              <button className="mt-2 text-sm font-semibold text-orange-600 hover:text-orange-700">
+              <button
+                onClick={() => onNavigate?.('pagos')}
+                className="mt-2 text-sm font-semibold text-orange-600 hover:text-orange-700"
+              >
                 Pagar ahora →
               </button>
             </div>

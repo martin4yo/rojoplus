@@ -8,6 +8,7 @@ import {
   ChatBubbleLeftRightIcon,
   CreditCardIcon,
   XMarkIcon,
+  TagIcon,
 } from '@heroicons/react/24/outline'
 import {
   HomeIcon as HomeIconSolid,
@@ -15,6 +16,7 @@ import {
   TrophyIcon as TrophyIconSolid,
   ChatBubbleLeftRightIcon as ChatIconSolid,
   CreditCardIcon as CreditCardIconSolid,
+  TagIcon as TagIconSolid,
 } from '@heroicons/react/24/solid'
 
 // Componentes de secciones
@@ -23,6 +25,7 @@ import MiPerfilSocio from './sections/MiPerfilSocio'
 import MisActividadesSocio from './sections/MisActividadesSocio'
 import MensajesSocio from './sections/MensajesSocio'
 import PagosSocio from './sections/PagosSocio'
+import BeneficiosSocio from './sections/BeneficiosSocio'
 
 export default function PortalSocioNuevo() {
   const { tokenPortal } = useParams()
@@ -70,10 +73,10 @@ export default function PortalSocioNuevo() {
       badge: null,
     },
     {
-      id: 'perfil',
-      label: 'Perfil',
-      icon: UserIcon,
-      iconSolid: UserIconSolid,
+      id: 'beneficios',
+      label: 'Beneficios',
+      icon: TagIcon,
+      iconSolid: TagIconSolid,
       badge: null,
     },
     {
@@ -84,24 +87,24 @@ export default function PortalSocioNuevo() {
       badge: null,
     },
     {
-      id: 'mensajes',
-      label: 'Mensajes',
-      icon: ChatBubbleLeftRightIcon,
-      iconSolid: ChatIconSolid,
-      badge: mensajesNoLeidos > 0 ? mensajesNoLeidos : null,
-    },
-    {
       id: 'pagos',
       label: 'Pagos',
       icon: CreditCardIcon,
       iconSolid: CreditCardIconSolid,
       badge: cuotasPendientes > 0 ? cuotasPendientes : null,
     },
+    {
+      id: 'perfil',
+      label: 'Perfil',
+      icon: UserIcon,
+      iconSolid: UserIconSolid,
+      badge: null,
+    },
   ]
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando tu información...</p>
@@ -112,7 +115,7 @@ export default function PortalSocioNuevo() {
 
   if (error || !socio) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <XMarkIcon className="h-10 w-10 text-red-600" />
@@ -127,7 +130,7 @@ export default function PortalSocioNuevo() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 pb-20">
       {/* Header */}
       <header className="bg-gradient-to-r from-red-600 to-red-700 shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -149,11 +152,11 @@ export default function PortalSocioNuevo() {
 
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {activeTab === 'inicio' && <DashboardSocio socio={socio} tokenPortal={tokenPortal} />}
-        {activeTab === 'perfil' && <MiPerfilSocio socio={socio} tokenPortal={tokenPortal} onUpdate={cargarDatosSocio} />}
+        {activeTab === 'inicio' && <DashboardSocio socio={socio} tokenPortal={tokenPortal} onNavigate={setActiveTab} />}
+        {activeTab === 'beneficios' && <BeneficiosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'actividades' && <MisActividadesSocio socio={socio} tokenPortal={tokenPortal} />}
-        {activeTab === 'mensajes' && <MensajesSocio socio={socio} tokenPortal={tokenPortal} onMensajesLeidos={() => setMensajesNoLeidos(0)} />}
         {activeTab === 'pagos' && <PagosSocio socio={socio} tokenPortal={tokenPortal} onPagoRealizado={cargarDatosSocio} />}
+        {activeTab === 'perfil' && <MiPerfilSocio socio={socio} tokenPortal={tokenPortal} onUpdate={cargarDatosSocio} />}
       </main>
 
       {/* Bottom Navigation */}

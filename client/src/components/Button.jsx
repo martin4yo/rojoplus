@@ -19,7 +19,7 @@ export function Button({
       {...props}
     >
       {loading ? (
-        <span className="flex items-center justify-center gap-2">
+        <>
           <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
@@ -37,11 +37,9 @@ export function Button({
             />
           </svg>
           Procesando...
-        </span>
+        </>
       ) : (
-        <span className="flex items-center justify-center">
-          {children}
-        </span>
+        children
       )}
     </button>
   )

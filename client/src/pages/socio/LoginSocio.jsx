@@ -7,6 +7,7 @@ import {
   CheckCircleIcon,
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline'
+import { Lightbulb, Smartphone } from 'lucide-react'
 
 /**
  * Login del Socio con Magic Link
@@ -80,9 +81,15 @@ export default function LoginSocio() {
             </div>
           </div>
 
-          <div className="text-sm text-gray-500 space-y-2">
-            <p>💡 Guarda el email para futuros accesos</p>
-            <p>📱 Puedes acceder desde tu celular o computadora</p>
+          <div className="text-sm text-gray-600 space-y-2">
+            <p className="flex items-center justify-center gap-2">
+              <Lightbulb className="w-4 h-4 text-yellow-600" />
+              Guarda el email para futuros accesos
+            </p>
+            <p className="flex items-center justify-center gap-2">
+              <Smartphone className="w-4 h-4 text-blue-600" />
+              Puedes acceder desde tu celular o computadora
+            </p>
           </div>
 
           <button

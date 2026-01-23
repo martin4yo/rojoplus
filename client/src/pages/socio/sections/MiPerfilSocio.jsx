@@ -10,11 +10,21 @@ import {
   ArrowDownTrayIcon,
   PencilIcon,
   UserGroupIcon,
+  XMarkIcon,
+  CheckIcon,
 } from '@heroicons/react/24/outline'
+import api from '../../../services/api'
 
 export default function MiPerfilSocio({ socio, tokenPortal, onUpdate }) {
   const qrRef = useRef(null)
   const [mostrarQR, setMostrarQR] = useState(false)
+  const [modoEdicion, setModoEdicion] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [datosEditados, setDatosEditados] = useState({
+    email: socio.email || '',
+    celular: socio.celular || '',
+    domicilio: socio.domicilio || '',
+  })
 
   const qrUrl = `${window.location.origin}/s/${tokenPortal}`
 
@@ -55,81 +65,161 @@ export default function MiPerfilSocio({ socio, tokenPortal, onUpdate }) {
     return edad
   }
 
-  const datosPersonales = [
-    {
-      icon: UserIcon,
-      label: 'Nombre completo',
-      value: socio.apellidoNombre,
-    },
-    {
-      icon: CalendarIcon,
-      label: 'Fecha de nacimiento',
-      value: socio.fechaNacimiento
-        ? new Date(socio.fechaNacimiento).toLocaleDateString('es-AR') +
-          ` (${calcularEdad(socio.fechaNacimiento)} años)`
-        : 'No especificada',
-    },
-    {
-      icon: EnvelopeIcon,
-      label: 'Email',
-      value: socio.email || 'No especificado',
-    },
-    {
-      icon: PhoneIcon,
-      label: 'Celular',
-      value: socio.celular || 'No especificado',
-    },
-    {
-      icon: HomeIcon,
-      label: 'Domicilio',
-      value: socio.domicilio || 'No especificado',
-    },
-  ]
+  const handleGuardar = async () => {
+    try {
+      setGuardando(true)
+      await api.put(`/socio/${tokenPortal}/perfil`, datosEditados)
+      setModoEdicion(false)
+      onUpdate?.()
+    } catch (err) {
+      console.error('Error actualizando datos:', err)
+      alert('Error al guardar los cambios. Por favor, intenta nuevamente.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const handleCancelar = () => {
+    setDatosEditados({
+      email: socio.email || '',
+      celular: socio.celular || '',
+      domicilio: socio.domicilio || '',
+    })
+    setModoEdicion(false)
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header de perfil */}
-      <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg p-8 text-white">
-        <div className="flex items-center space-x-4">
-          <div className="bg-white bg-opacity-20 rounded-full p-4">
-            <UserIcon className="h-12 w-12" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold">{socio.apellidoNombre}</h2>
-            <p className="text-red-100 mt-1">Socio N° {socio.nroSocio}</p>
-            <div className="flex items-center space-x-4 mt-2">
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-white bg-opacity-20 text-sm">
-                {socio.tipoSocio || 'Socio'}
-              </span>
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-white bg-opacity-20 text-sm">
-                {socio.estado || 'Activo'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Datos personales */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">Datos Personales</h3>
-          <button className="flex items-center space-x-2 text-red-600 hover:text-red-700 transition-colors">
-            <PencilIcon className="h-4 w-4" />
-            <span className="text-sm font-medium">Editar</span>
-          </button>
+          {!modoEdicion ? (
+            <button
+              onClick={() => setModoEdicion(true)}
+              className="flex items-center space-x-2 text-red-600 hover:text-red-700 transition-colors"
+            >
+              <PencilIcon className="h-4 w-4" />
+              <span className="text-sm font-medium">Editar</span>
+            </button>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleCancelar}
+                className="flex items-center space-x-1 px-3 py-1.5 text-gray-600 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100"
+              >
+                <XMarkIcon className="h-4 w-4" />
+                <span className="text-sm font-medium">Cancelar</span>
+              </button>
+              <button
+                onClick={handleGuardar}
+                disabled={guardando}
+                className="flex items-center space-x-1 px-3 py-1.5 bg-red-600 text-white hover:bg-red-700 transition-colors rounded-lg disabled:opacity-50"
+              >
+                <CheckIcon className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  {guardando ? 'Guardando...' : 'Guardar'}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
         <div className="divide-y divide-gray-200">
-          {datosPersonales.map((dato, index) => (
-            <div key={index} className="px-6 py-4 flex items-start space-x-4">
-              <div className="bg-gray-100 rounded-lg p-2">
-                <dato.icon className="h-5 w-5 text-gray-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-500">{dato.label}</p>
-                <p className="mt-1 text-base text-gray-900">{dato.value}</p>
-              </div>
+          {/* Nombre completo - No editable */}
+          <div className="px-6 py-4 flex items-start space-x-4">
+            <div className="bg-gray-100 rounded-lg p-2">
+              <UserIcon className="h-5 w-5 text-gray-600" />
             </div>
-          ))}
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-500">Nombre completo</p>
+              <p className="mt-1 text-base text-gray-900">{socio.apellidoNombre}</p>
+            </div>
+          </div>
+
+          {/* Fecha de nacimiento - No editable */}
+          <div className="px-6 py-4 flex items-start space-x-4">
+            <div className="bg-gray-100 rounded-lg p-2">
+              <CalendarIcon className="h-5 w-5 text-gray-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-500">Fecha de nacimiento</p>
+              <p className="mt-1 text-base text-gray-900">
+                {socio.fechaNacimiento
+                  ? new Date(socio.fechaNacimiento).toLocaleDateString('es-AR') +
+                    ` (${calcularEdad(socio.fechaNacimiento)} años)`
+                  : 'No especificada'}
+              </p>
+            </div>
+          </div>
+
+          {/* Email - Editable */}
+          <div className="px-6 py-4 flex items-start space-x-4">
+            <div className="bg-gray-100 rounded-lg p-2">
+              <EnvelopeIcon className="h-5 w-5 text-gray-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-500">Email</p>
+              {modoEdicion ? (
+                <input
+                  type="email"
+                  value={datosEditados.email}
+                  onChange={(e) =>
+                    setDatosEditados({ ...datosEditados, email: e.target.value })
+                  }
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="tu-email@ejemplo.com"
+                />
+              ) : (
+                <p className="mt-1 text-base text-gray-900">{socio.email || 'No especificado'}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Celular - Editable */}
+          <div className="px-6 py-4 flex items-start space-x-4">
+            <div className="bg-gray-100 rounded-lg p-2">
+              <PhoneIcon className="h-5 w-5 text-gray-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-500">Celular</p>
+              {modoEdicion ? (
+                <input
+                  type="tel"
+                  value={datosEditados.celular}
+                  onChange={(e) =>
+                    setDatosEditados({ ...datosEditados, celular: e.target.value })
+                  }
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="11 1234 5678"
+                />
+              ) : (
+                <p className="mt-1 text-base text-gray-900">{socio.celular || 'No especificado'}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Domicilio - Editable */}
+          <div className="px-6 py-4 flex items-start space-x-4">
+            <div className="bg-gray-100 rounded-lg p-2">
+              <HomeIcon className="h-5 w-5 text-gray-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-500">Domicilio</p>
+              {modoEdicion ? (
+                <input
+                  type="text"
+                  value={datosEditados.domicilio}
+                  onChange={(e) =>
+                    setDatosEditados({ ...datosEditados, domicilio: e.target.value })
+                  }
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Calle 123, Pilar"
+                />
+              ) : (
+                <p className="mt-1 text-base text-gray-900">{socio.domicilio || 'No especificado'}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

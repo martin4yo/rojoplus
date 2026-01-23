@@ -146,7 +146,7 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
       tipoSocio: true,
       tokenPortal: true,
       tokenPortalExpira: true,
-      grupoFamiliarId: true,
+      titularFamiliaId: true,
     },
   })
 
@@ -181,7 +181,7 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
       tipoSocio: socio.tipoSocio,
       tokenPortal: socio.tokenPortal,
       esActivo,
-      grupoFamiliarId: socio.grupoFamiliarId,
+      titularFamiliaId: socio.titularFamiliaId,
     },
   })
 }))
@@ -211,11 +211,14 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
       categoria: true,
       tipoSocio: true,
       tokenPortal: true,
-      grupoFamiliarId: true,
-      grupoFamiliar: {
+      titularFamiliaId: true,
+      titularFamilia: {
         select: {
           id: true,
-          integrantes: {
+          nroSocio: true,
+          apellidoNombre: true,
+          documento: true,
+          miembrosFamilia: {
             select: {
               id: true,
               nroSocio: true,
@@ -228,6 +231,20 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
                 contains: 'ACTIV',
               },
             },
+          },
+        },
+      },
+      miembrosFamilia: {
+        select: {
+          id: true,
+          nroSocio: true,
+          apellidoNombre: true,
+          documento: true,
+          fechaNacimiento: true,
+        },
+        where: {
+          estado: {
+            contains: 'ACTIV',
           },
         },
       },
@@ -246,9 +263,17 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
     data: {
       ...socio,
       esActivo,
-      grupoFamiliar: socio.grupoFamiliar ? {
-        id: socio.grupoFamiliar.id,
-        integrantes: socio.grupoFamiliar.integrantes,
+      grupoFamiliar: socio.titularFamiliaId ? {
+        titular: socio.titularFamilia,
+        integrantes: socio.titularFamilia?.miembrosFamilia || [],
+      } : socio.miembrosFamilia.length > 0 ? {
+        titular: {
+          id: socio.id,
+          nroSocio: socio.nroSocio,
+          apellidoNombre: socio.apellidoNombre,
+          documento: socio.documento,
+        },
+        integrantes: socio.miembrosFamilia,
       } : null,
     },
   })
@@ -335,7 +360,7 @@ router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
                   id: true,
                   nombre: true,
                   email: true,
-                  celular: true,
+                  telefono: true,
                 },
               },
             },
@@ -397,7 +422,7 @@ router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res
   // Obtener categorías disponibles (no inscriptas, activas, con cupos)
   const categoriasDisponibles = await req.prisma.categoriaActividad.findMany({
     where: {
-      activa: true,
+      activo: true,
       id: {
         notIn: categoriasInscriptas,
       },
