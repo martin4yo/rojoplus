@@ -13,6 +13,8 @@ import TokenInvalido from './pages/comercio/TokenInvalido'
 // Página del socio
 import SocioPortal from './pages/socio/SocioPortal'
 import AccesoSocio from './pages/socio/AccesoSocio'
+import LoginSocio from './pages/socio/LoginSocio'
+import PortalSocioNuevo from './pages/socio/PortalSocioNuevo'
 import ComerciosPublicos from './pages/public/Comercios'
 
 // Páginas admin
@@ -149,6 +151,8 @@ function App() {
       {/* Rutas del socio */}
       <Route path="/mi-qr" element={<AccesoSocio />} />
       <Route path="/s/:tokenPortal" element={<SocioPortal />} />
+      <Route path="/login-socio" element={<LoginSocio />} />
+      <Route path="/portal-socio/:tokenPortal" element={<PortalSocioNuevo />} />
       <Route path="/comercios" element={<ComerciosPublicos />} />
 
       {/* Rutas admin */}

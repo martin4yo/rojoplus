@@ -654,7 +654,7 @@ Portal responsive y mobile-first donde el socio puede gestionar toda su informac
 - [ ] **34.28** Manejo de estados de carga (skeleton loaders)
 - [ ] **34.29** Toast notifications para feedback
 - [ ] **34.30** Responsive design testing (mobile, tablet, desktop)
-- [ ] **34.31** Rutas en App.jsx
+- [x] **34.31** Rutas en App.jsx (/login-socio, /portal-socio/:token)
 
 #### Características de UX
 - **Bottom Navigation**: Navegación táctil optimizada para móviles
