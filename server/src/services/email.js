@@ -305,6 +305,74 @@ export async function enviarReciboPago(pago) {
   }
 }
 
+// Enviar Magic Link al socio para acceso al portal
+export async function enviarMagicLinkSocio(socio, token) {
+  const linkAcceso = `${frontendUrl}/portal-socio/${token}`
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #DC2626; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Club Sportivo Pilar</h1>
+        <p style="color: white; margin: 5px 0 0 0;">Portal del Socio</p>
+      </div>
+
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hola ${socio.apellidoNombre}</h2>
+
+        <p style="color: #4b5563; line-height: 1.6;">
+          Recibiste este email porque solicitaste acceso al <strong>Portal del Socio</strong>.
+        </p>
+
+        <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+          <p style="color: #991b1b; margin: 0 0 15px 0; font-weight: bold;">Hacé clic para acceder:</p>
+          <a href="${linkAcceso}" style="display: inline-block; background-color: #DC2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Acceder al Portal
+          </a>
+          <p style="color: #6b7280; font-size: 12px; margin: 15px 0 0 0;">
+            O copiá este link: <br><span style="word-break: break-all;">${linkAcceso}</span>
+          </p>
+        </div>
+
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+          <p style="color: #1e40af; margin: 0; font-size: 14px;">
+            <strong>🔒 Seguridad:</strong><br>
+            • Este link es válido por 24 horas<br>
+            • Solo funciona desde el dispositivo donde lo abras<br>
+            • Si no solicitaste este acceso, ignorá este email
+          </p>
+        </div>
+
+        <p style="color: #4b5563; line-height: 1.6;">
+          <strong>Desde el Portal del Socio podés:</strong>
+        </p>
+        <ul style="color: #4b5563; line-height: 1.8;">
+          <li>Ver y actualizar tu información personal</li>
+          <li>Consultar tus actividades e inscribirte en nuevas</li>
+          <li>Comunicarte con tus entrenadores</li>
+          <li>Pagar tus cuotas online</li>
+          <li>Acceder a tu QR de socio</li>
+        </ul>
+
+        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">
+          💡 <strong>Tip:</strong> Guardá este email para futuros accesos al portal
+        </p>
+      </div>
+
+      <div style="background-color: #1f2937; padding: 20px; text-align: center;">
+        <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+          Club Sportivo Pilar - "El Rojo de la Avenida"
+        </p>
+      </div>
+    </div>
+  `
+
+  await enviarEmail({
+    to: socio.email,
+    subject: 'Tu link de acceso al Portal del Socio',
+    html,
+  })
+}
+
 // Verificar conexión SMTP al iniciar
 export async function verificarConexionSMTP() {
   try {

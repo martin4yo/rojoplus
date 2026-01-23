@@ -606,6 +606,73 @@ Sistema de centros de costos para análisis multidimensional de ingresos y egres
 
 ---
 
+## FASE 34: Portal del Socio Completo
+> Portal moderno y completo para autogestión del socio
+
+### Concepto
+Portal responsive y mobile-first donde el socio puede gestionar toda su información, ver y pagar cuotas, inscribirse en actividades, ver horarios, comunicarse con entrenadores y acceder a su QR para descuentos.
+
+### Objetivos
+- **Autogestión Total**: El socio maneja su información sin depender del club
+- **Acceso Seguro**: Sistema Magic Link (sin contraseñas)
+- **Pagos Online**: Integración con MercadoPago y MODO
+- **Comunicación Directa**: Chat con entrenadores de sus actividades
+- **UX Moderna**: Diseño mobile-first con mejores prácticas 2026
+
+### Implementación
+
+#### Backend - API y Autenticación
+- [x] **34.1** Endpoint POST /socio/enviar-link-acceso (Magic Link por email/DNI)
+- [x] **34.2** Servicio de generación de tokens temporales (24hs)
+- [x] **34.3** Endpoint GET /socio/validar-token/:token + GET /socio/:token (validar y obtener datos del socio)
+- [ ] **34.4** Endpoint GET /socio/:token/estado-cuenta (resumen de cuotas y actividades) - *Datos disponibles en Dashboard*
+- [ ] **34.5** Endpoint GET /socio/:token/proximos-eventos (entrenamientos, partidos) - *Requiere FASE 33*
+- [x] **34.6** Endpoint GET /socio/:token/inscripciones (actividades del socio)
+- [x] **34.7** Endpoint GET /socio/:token/actividades-disponibles
+- [x] **34.8** Endpoint POST /socio/:token/inscripciones (inscribirse en actividad)
+- [x] **34.9** Endpoint POST /socio/:token/inscripciones/:id/baja
+- [x] **34.10** Endpoint GET /socio/:token/cuotas/pendientes
+- [x] **34.11** Endpoint POST /socio/:token/cuotas/:id/generar-link-pago (MercadoPago/MODO)
+- [x] **34.12** Endpoint POST /socio/:token/cuotas/pagar-multiples
+- [x] **34.13** Endpoint GET /socio/:token/pagos/historial
+- [ ] **34.14** Endpoint GET /socio/:token/conversaciones (con entrenadores) - *Requiere modelo Conversacion*
+- [ ] **34.15** Endpoint GET /socio/:token/conversaciones/:id/mensajes - *Requiere modelo Mensaje*
+- [ ] **34.16** Endpoint POST /socio/:token/conversaciones/:id/mensajes - *Requiere modelo Mensaje*
+- [x] **34.17** Endpoint PUT /socio/:token/perfil (actualizar datos personales)
+- [x] **34.18** Servicio de emails para Magic Link (enviarMagicLinkSocio)
+
+#### Frontend - UI/UX Moderno
+- [x] **34.19** Componente LoginSocio.jsx con Magic Link (email/DNI)
+- [x] **34.20** Componente PortalSocioNuevo.jsx (layout con bottom navigation)
+- [x] **34.21** Sección DashboardSocio.jsx (resumen con cards, KPIs)
+- [x] **34.22** Sección MiPerfilSocio.jsx (datos, grupo familiar, QR)
+- [x] **34.23** Componente reutilizable QRSocio.jsx (con logo integrado)
+- [x] **34.24** Sección MisActividadesSocio.jsx (tabs: mis actividades / disponibles)
+- [x] **34.25** Sección MensajesSocio.jsx (chat estilo WhatsApp con entrenadores)
+- [x] **34.26** Sección PagosSocio.jsx (cuotas pendientes, pago MercadoPago/MODO, historial)
+- [ ] **34.27** Integración con API endpoints
+- [ ] **34.28** Manejo de estados de carga (skeleton loaders)
+- [ ] **34.29** Toast notifications para feedback
+- [ ] **34.30** Responsive design testing (mobile, tablet, desktop)
+- [ ] **34.31** Rutas en App.jsx
+
+#### Características de UX
+- **Bottom Navigation**: Navegación táctil optimizada para móviles
+- **Badges Dinámicos**: Notificaciones visuales (mensajes no leídos, cuotas pendientes)
+- **Cards con Elevation**: Diseño material con sombras sutiles
+- **Skeleton Loaders**: Feedback visual durante cargas
+- **Acciones Rápidas**: Dashboard con accesos directos
+- **Color Coding**: Estados visuales (verde=OK, rojo=vencido, amarillo=pendiente)
+- **Micro-interacciones**: Feedback táctil en botones
+
+#### Seguridad
+- **Magic Link**: Token único temporal (24hs) sin contraseñas
+- **Validación por Email**: Solo el email registrado recibe el acceso
+- **Tokens Únicos**: Un token por dispositivo/sesión
+- **Expiración Automática**: Links vencen automáticamente
+
+---
+
 ## FASE 33: Gestión Deportiva
 > Módulo de entrenamientos, asistencia, partidos y estadísticas (Fútbol, Básquet, Vóley)
 

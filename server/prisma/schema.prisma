@@ -101,6 +101,7 @@ model Socio {
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
   tokenPortal           String?             @unique @default(uuid()) @map("token_portal")
+  tokenPortalExpira     DateTime?           @map("token_portal_expira")
   actualizadoPor        Int?                @map("actualizado_por")
   alergias              String?
   aliasDebito           String?             @map("alias_debito")
