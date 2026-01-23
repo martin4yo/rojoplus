@@ -736,24 +736,99 @@ Portal responsive y mobile-first donde el socio puede gestionar toda su informac
 - [ ] **33.5.7** Dashboard deportivo con resumen general
 - [ ] **33.5.8** Exportar reportes a Excel/PDF
 
-### Etapa 33.6: Notificaciones (Opcional)
-- [ ] **33.6.1** Crear modelo ConfiguracionNotificacion (socioId, tipo, activo)
-- [ ] **33.6.2** Crear modelo Notificacion (tipo, mensaje, destinatario, estado)
-- [ ] **33.6.3** Servicio de envío de notificaciones (email)
-- [ ] **33.6.4** Notificación automática: nuevo entrenamiento
-- [ ] **33.6.5** Notificación automática: cancelación de entrenamiento
-- [ ] **33.6.6** Notificación automática: convocatoria a partido
-- [ ] **33.6.7** Notificación automática: recordatorio 24h antes
-- [ ] **33.6.8** Panel de configuración de notificaciones por socio
+### Etapa 33.6: Pasaje de Categoría Automático
+> Sistema inteligente para reasignación de jugadores según edad
+
+**Concepto:**
+Sistema semi-automático que identifica jugadores que deben cambiar de categoría según su edad, permite previsualizar los cambios, hacer excepciones y mantener trazabilidad completa.
+
+**Reglas de Negocio:**
+- Cada CategoriaActividad tiene edadMinima y edadMaxima
+- Los jugadores se evalúan según su edad al momento del proceso
+- Se permiten excepciones documentadas (ej: jugador avanzado juega en categoría superior)
+- Se mantiene historial completo de cambios
+- Los padres/jugadores son notificados automáticamente
+
+**Implementación:**
+
+#### Backend - Modelo y Lógica
+- [ ] **33.6.1** Crear modelo PasajeCategoria (temporada, fechaEjecucion, estado, ejecutadoPor)
+- [ ] **33.6.2** Crear modelo DetallePasaje (pasajeCategoriaId, socioId, categoriaOrigenId, categoriaDestinoId, motivoExcepcion, aprobado)
+- [ ] **33.6.3** Agregar campo permiteExcepcion a CategoriaActividad
+- [ ] **33.6.4** Endpoint POST /deportes/pasaje-categoria/calcular (calcula cambios sugeridos según edad)
+- [ ] **33.6.5** Lógica: Obtener inscripciones activas y calcular edad de cada jugador
+- [ ] **33.6.6** Lógica: Identificar jugadores fuera de rango (edad < edadMinima o > edadMaxima)
+- [ ] **33.6.7** Lógica: Sugerir categoría destino según edad del jugador
+- [ ] **33.6.8** Endpoint GET /deportes/pasaje-categoria/:id/preview (previsualización de cambios)
+- [ ] **33.6.9** Endpoint PUT /deportes/pasaje-categoria/:id/excepcion (marcar excepción individual)
+- [ ] **33.6.10** Endpoint POST /deportes/pasaje-categoria/:id/ejecutar (aplicar cambios aprobados)
+- [ ] **33.6.11** Lógica de ejecución: Finalizar inscripción actual (fechaBaja = hoy)
+- [ ] **33.6.12** Lógica de ejecución: Crear nueva inscripción en categoría destino
+- [ ] **33.6.13** Registrar auditoría completa en DetallePasaje
+- [ ] **33.6.14** Endpoint GET /deportes/pasaje-categoria/historial (ver procesos ejecutados)
+
+#### Frontend - UI de Gestión
+- [ ] **33.6.15** Página /admin/deportes/pasaje-categoria (PasajeCategoriaLista.jsx)
+- [ ] **33.6.16** Botón "Calcular Pasajes" con selector de actividad
+- [ ] **33.6.17** Modal de preview con tabla de cambios sugeridos
+- [ ] **33.6.18** Columnas: Jugador, Edad, Categoría Actual, Categoría Sugerida, Acción
+- [ ] **33.6.19** Checkbox por jugador para aprobar/rechazar cambio
+- [ ] **33.6.20** Input de motivo para excepciones (opcional)
+- [ ] **33.6.21** Resumen: Total jugadores, Aprobados, Excepciones
+- [ ] **33.6.22** Botón "Ejecutar Pasajes" (requiere confirmación)
+- [ ] **33.6.23** Vista de historial con detalle de cada proceso ejecutado
+- [ ] **33.6.24** Filtros: Por actividad, por temporada, por estado
+- [ ] **33.6.25** Exportar reporte de pasajes a Excel/PDF
+
+#### Casos de Uso
+**Ejemplo: Fútbol Infantil**
+- Sub-9: edad 7-9 años
+- Sub-11: edad 10-11 años
+- Sub-13: edad 12-13 años
+
+**Escenario 1: Pasaje Normal**
+- Juan (10 años) está en Sub-9
+- Sistema detecta: edad > edadMaxima (9)
+- Sugiere: Pasar a Sub-11
+- Admin aprueba → Se ejecuta automáticamente
+
+**Escenario 2: Excepción por Nivel**
+- Pedro (11 años) está en Sub-11
+- Sistema sugiere: Pasar a Sub-13
+- Entrenador rechaza: "Aún no está preparado"
+- Marca excepción con motivo → Permanece en Sub-11
+
+**Escenario 3: Jugador Adelantado**
+- María (8 años) juega en Sub-11 (excepción pre-existente)
+- Sistema NO la marca para cambio (tiene excepción activa)
+
+#### Mejoras Futuras
+- [ ] **33.6.26** Proceso programado (cron) para sugerir pasajes al inicio de temporada
+- [ ] **33.6.27** Notificación automática a padres cuando su hijo cambia de categoría
+- [ ] **33.6.28** Dashboard de seguimiento: jugadores próximos a pasar de categoría
+- [ ] **33.6.29** Reglas avanzadas: Considerar nivel/rendimiento además de edad
+- [ ] **33.6.30** Integración con sistema de evaluaciones de entrenadores
+
+### Etapa 33.7: Notificaciones (Opcional)
+- [ ] **33.7.1** Crear modelo ConfiguracionNotificacion (socioId, tipo, activo)
+- [ ] **33.7.2** Crear modelo Notificacion (tipo, mensaje, destinatario, estado)
+- [ ] **33.7.3** Servicio de envío de notificaciones (email)
+- [ ] **33.7.4** Notificación automática: nuevo entrenamiento
+- [ ] **33.7.5** Notificación automática: cancelación de entrenamiento
+- [ ] **33.7.6** Notificación automática: convocatoria a partido
+- [ ] **33.7.7** Notificación automática: recordatorio 24h antes
+- [ ] **33.7.8** Notificación automática: pasaje de categoría
+- [ ] **33.7.9** Panel de configuración de notificaciones por socio
 
 ### Menú y Navegación
-- [ ] **33.7.1** Agregar submenu "Deportes" en AdminLayout
-- [ ] **33.7.2** Rutas: /admin/deportes/espacios
-- [ ] **33.7.3** Rutas: /admin/deportes/entrenamientos
-- [ ] **33.7.4** Rutas: /admin/deportes/horarios
-- [ ] **33.7.5** Rutas: /admin/deportes/asistencia
-- [ ] **33.7.6** Rutas: /admin/deportes/partidos
-- [ ] **33.7.7** Rutas: /admin/deportes/reportes
+- [ ] **33.8.1** Agregar submenu "Deportes" en AdminLayout
+- [ ] **33.8.2** Rutas: /admin/deportes/espacios
+- [ ] **33.8.3** Rutas: /admin/deportes/entrenamientos
+- [ ] **33.8.4** Rutas: /admin/deportes/horarios
+- [ ] **33.8.5** Rutas: /admin/deportes/asistencia
+- [ ] **33.8.6** Rutas: /admin/deportes/pasaje-categoria
+- [ ] **33.8.7** Rutas: /admin/deportes/partidos
+- [ ] **33.8.8** Rutas: /admin/deportes/reportes
 
 ---
 
