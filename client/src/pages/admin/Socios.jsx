@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Upload, QrCode, ExternalLink, RefreshCw, X, Copy, Check,
-  Plus, Eye, Edit, Users, CreditCard, Search, Filter, ChevronDown
+  Plus, Eye, Edit, Users, CreditCard, Search, Filter, ChevronDown, DollarSign
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '../../components/Button'
@@ -366,6 +366,15 @@ export default function AdminSocios() {
                             <span title="Debito automatico activo" className="p-1 rounded bg-green-100 text-green-600">
                               <CreditCard className="w-4 h-4" />
                             </span>
+                          )}
+                          {socio.tieneDeuda && (
+                            <button
+                              onClick={() => navigate(`/admin/cuotas?cobrarSocioId=${socio.id}`)}
+                              title="Cobrar cuotas pendientes"
+                              className="p-1 rounded bg-orange-100 text-orange-600 hover:bg-orange-200 transition"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                            </button>
                           )}
                         </div>
                       </td>

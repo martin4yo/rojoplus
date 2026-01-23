@@ -102,15 +102,35 @@ const conceptosTesoreria = [
   // Ingresos
   { codigo: 'COB-CUO', nombre: 'Cobranza de Cuotas', descripcion: 'Cobro de cuotas sociales y deportivas', tipo: 'INGRESO', orden: 1 },
   { codigo: 'COB-ACT', nombre: 'Cobranza Actividades', descripcion: 'Cobro de actividades y eventos especiales', tipo: 'INGRESO', orden: 2 },
-  { codigo: 'DON', nombre: 'Donaciones', descripcion: 'Donaciones recibidas', tipo: 'INGRESO', orden: 3 },
-  { codigo: 'OTR-ING', nombre: 'Otros Ingresos', descripcion: 'Otros ingresos varios', tipo: 'INGRESO', orden: 4 },
+  { codigo: 'ING-MORA', nombre: 'Ingresos por Mora', descripcion: 'Recargos e intereses por mora en cuotas', tipo: 'INGRESO', orden: 3 },
+  { codigo: 'DON', nombre: 'Donaciones', descripcion: 'Donaciones recibidas', tipo: 'INGRESO', orden: 4 },
+  { codigo: 'OTR-ING', nombre: 'Otros Ingresos', descripcion: 'Otros ingresos varios', tipo: 'INGRESO', orden: 5 },
 
   // Egresos
-  { codigo: 'SUE', nombre: 'Sueldos y Jornales', descripcion: 'Pago de sueldos al personal', tipo: 'EGRESO', orden: 5 },
-  { codigo: 'SERV', nombre: 'Servicios', descripcion: 'Pago de servicios (luz, agua, gas, internet)', tipo: 'EGRESO', orden: 6 },
-  { codigo: 'MAN', nombre: 'Mantenimiento', descripcion: 'Gastos de mantenimiento e infraestructura', tipo: 'EGRESO', orden: 7 },
-  { codigo: 'COM', nombre: 'Compras', descripcion: 'Compra de insumos y materiales', tipo: 'EGRESO', orden: 8 },
-  { codigo: 'OTR-EGR', nombre: 'Otros Egresos', descripcion: 'Otros egresos varios', tipo: 'EGRESO', orden: 9 },
+  { codigo: 'SUE', nombre: 'Sueldos y Jornales', descripcion: 'Pago de sueldos al personal', tipo: 'EGRESO', orden: 6 },
+  { codigo: 'SERV', nombre: 'Servicios', descripcion: 'Pago de servicios (luz, agua, gas, internet)', tipo: 'EGRESO', orden: 7 },
+  { codigo: 'MAN', nombre: 'Mantenimiento', descripcion: 'Gastos de mantenimiento e infraestructura', tipo: 'EGRESO', orden: 8 },
+  { codigo: 'COM', nombre: 'Compras', descripcion: 'Compra de insumos y materiales', tipo: 'EGRESO', orden: 9 },
+  { codigo: 'OTR-EGR', nombre: 'Otros Egresos', descripcion: 'Otros egresos varios', tipo: 'EGRESO', orden: 10 },
+];
+
+const centrosCosto = [
+  // Centros Operativos (por actividad/deporte)
+  { codigo: 'FUT', nombre: 'Fútbol', descripcion: 'Centro de costos de actividades de fútbol', tipo: 'OPERATIVO', orden: 1 },
+  { codigo: 'BAS', nombre: 'Básquet', descripcion: 'Centro de costos de actividades de básquet', tipo: 'OPERATIVO', orden: 2 },
+  { codigo: 'VOL', nombre: 'Vóley', descripcion: 'Centro de costos de actividades de vóley', tipo: 'OPERATIVO', orden: 3 },
+  { codigo: 'NAT', nombre: 'Natación', descripcion: 'Centro de costos de actividades de natación', tipo: 'OPERATIVO', orden: 4 },
+  { codigo: 'HOC', nombre: 'Hockey', descripcion: 'Centro de costos de actividades de hockey', tipo: 'OPERATIVO', orden: 5 },
+  { codigo: 'TEN', nombre: 'Tenis', descripcion: 'Centro de costos de actividades de tenis', tipo: 'OPERATIVO', orden: 6 },
+  { codigo: 'PAD', nombre: 'Paddle', descripcion: 'Centro de costos de actividades de paddle', tipo: 'OPERATIVO', orden: 7 },
+  { codigo: 'GIM', nombre: 'Gimnasia', descripcion: 'Centro de costos de actividades de gimnasia', tipo: 'OPERATIVO', orden: 8 },
+
+  // Centros Administrativos
+  { codigo: 'ADM', nombre: 'Administración', descripcion: 'Gastos administrativos generales del club', tipo: 'ADMINISTRATIVO', orden: 10 },
+  { codigo: 'BAR', nombre: 'Bar', descripcion: 'Ingresos y egresos del bar del club', tipo: 'OPERATIVO', orden: 11 },
+  { codigo: 'EVE', nombre: 'Eventos', descripcion: 'Eventos sociales y recreativos', tipo: 'OPERATIVO', orden: 12 },
+  { codigo: 'MER', nombre: 'Merchandising', descripcion: 'Venta de productos y merchandising', tipo: 'OPERATIVO', orden: 13 },
+  { codigo: 'MAN', nombre: 'Mantenimiento', descripcion: 'Mantenimiento de instalaciones', tipo: 'ADMINISTRATIVO', orden: 14 },
 ];
 
 const cuentasContables = [
@@ -289,6 +309,7 @@ const configuracion = [
 
   // Tesorería
   { clave: 'CONCEPTO_COBRANZA_CUOTAS', valor: '', tipo: 'NUMBER', modulo: 'TESORERIA', descripcion: 'ID del concepto de tesorería para cobranza de cuotas' },
+  { clave: 'CONCEPTO_MORA', valor: '', tipo: 'NUMBER', modulo: 'TESORERIA', descripcion: 'ID del concepto de tesorería para ingresos por mora' },
 
   // Pagos Online
   { clave: 'PAGOS_MP_HABILITADO', valor: 'false', tipo: 'BOOLEAN', modulo: 'PORTAL', descripcion: 'MercadoPago habilitado' },
@@ -389,6 +410,19 @@ async function main() {
     }
   }
 
+  // Obtener el ID del concepto de mora para guardarlo en configuración
+  const conceptoMora = await prisma.conceptoTesoreria.findUnique({
+    where: { codigo: 'ING-MORA' }
+  });
+
+  if (conceptoMora) {
+    // Actualizar la configuración con el ID del concepto
+    const configIndex = configuracion.findIndex(c => c.clave === 'CONCEPTO_MORA');
+    if (configIndex !== -1) {
+      configuracion[configIndex].valor = String(conceptoMora.id);
+    }
+  }
+
   // Roles
   console.log('👥 Creando roles...');
   for (const rol of roles) {
@@ -444,6 +478,17 @@ async function main() {
     });
   }
   console.log(`   ✓ ${cuentasContables.length} cuentas contables creadas`);
+
+  // Centros de Costo
+  console.log('🎯 Creando centros de costo...');
+  for (const centro of centrosCosto) {
+    await prisma.centroCosto.upsert({
+      where: { codigo: centro.codigo },
+      update: centro,
+      create: centro,
+    });
+  }
+  console.log(`   ✓ ${centrosCosto.length} centros de costo creados`);
 
   // Configuración de Débito
   console.log('🏦 Creando configuración de débito...');

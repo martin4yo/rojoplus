@@ -574,26 +574,28 @@ Sistema de centros de costos para análisis multidimensional de ingresos y egres
 ### Implementación
 
 #### Backend - Modelo y Lógica
-- [ ] **32.1** Crear modelo CentroCosto (codigo, nombre, descripcion, tipo: OPERATIVO/ADMINISTRATIVO, activo)
-- [ ] **32.2** Agregar centroCostoId a MovimientoCaja (nullable)
-- [ ] **32.3** Agregar centroCostoId a MovimientoContable (nullable)
-- [ ] **32.4** Agregar centroCostoId a AsientoLinea (nullable)
-- [ ] **32.5** Vincular Actividad con CentroCosto (actividades deportivas = centros operativos)
-- [ ] **32.6** Endpoints CRUD de CentroCosto
-- [ ] **32.7** Endpoint de reporte por centro de costo (ingresos, egresos, resultado)
-- [ ] **32.8** Modificar lógica de cobranza de cuotas para asignar centro según actividad
-- [ ] **32.9** Agregar centro de costo en generación de asientos automáticos
+- [x] **32.1** Crear modelo CentroCosto (codigo, nombre, descripcion, tipo: OPERATIVO/ADMINISTRATIVO, activo)
+- [x] **32.2** Agregar centroCostoId a MovimientoCaja (nullable)
+- [x] **32.3** Agregar centroCostoId a MovimientoContable (nullable)
+- [x] **32.4** Agregar centroCostoId a AsientoLinea (nullable)
+- [x] **32.5** Agregar centroCostoId a ItemMovimiento (permite múltiples centros en un mismo comprobante)
+- [x] **32.6** Vincular Actividad con CentroCosto (actividades deportivas = centros operativos)
+- [x] **32.7** Endpoints CRUD de CentroCosto
+- [x] **32.8** Endpoint de reporte por centro de costo (ingresos, egresos, resultado)
+- [x] **32.9** Endpoint de reporte comparativo de todos los centros
+- [x] **32.10** Modificar lógica de cobranza de cuotas para asignar centro según actividad
+- [x] **32.11** Agregar centro de costo en generación de asientos automáticos (todas las operaciones)
+- [x] **32.12** Agregar centroCostoId a ItemMovimiento (permite múltiples centros por comprobante)
 
 #### Frontend - UI y Reportes
-- [ ] **32.10** Página /admin/configuracion/centros-costo (CentrosCostoLista.jsx)
-- [ ] **32.11** Formulario de centro de costo (CentroCostoForm.jsx)
-- [ ] **32.12** Selector de centro de costo en formularios de movimientos
-- [ ] **32.13** Selector opcional en MovimientoCaja y OrdenPago
-- [ ] **32.14** Reporte Estado de Resultados por Centro de Costo
-- [ ] **32.15** Reporte Balance por Centro de Costo
-- [ ] **32.16** Dashboard con KPIs por centro (top ingresos, top egresos)
-- [ ] **32.17** Gráfico comparativo de centros (barras, pie)
-- [ ] **32.18** Exportar reportes a Excel con filtro de centro
+- [x] **32.13** Página /admin/configuracion/centros-costo (CentrosCostoLista.jsx)
+- [x] **32.14** Formulario de centro de costo (CentroCostoForm.jsx)
+- [x] **32.15** Componente selector CentroCostoSelector.jsx (reutilizable)
+- [x] **32.16** Reporte Estado de Resultados por Centro de Costo con filtros de fecha
+- [x] **32.17** Dashboard con KPIs por centro (top 5 ingresos, top 5 egresos)
+- [x] **32.18** Tabla detallada con % de participación por centro
+- [x] **32.19** Rutas agregadas en App.jsx
+- [ ] **32.20** Agregar selector en formularios (MovimientoCaja, Facturas, Items, OrdenPago)
 
 #### Casos de Uso
 - Cuota de Fútbol → Centro "Fútbol"
@@ -746,4 +748,4 @@ npm run dev
 
 ---
 
-*Ultima actualizacion: 22 de Enero 2026 - FASE 30 Presupuesto ✅ + FASE 33.3 Asistencia ✅ + FASE 32 Centros de Costos (ROADMAP)*
+*Ultima actualizacion: 22 de Enero 2026 - FASE 30 Presupuesto ✅ + FASE 33.3 Asistencia ✅ + FASE 32 Centros de Costos ✅*

@@ -9,22 +9,24 @@ datasource db {
 
 // ConceptoTesoreria - Conceptos para movimientos de caja (cuota social, actividades, etc)
 model ConceptoTesoreria {
-  id                  Int                   @id @default(autoincrement())
-  codigo              String                @unique
-  nombre              String
-  descripcion         String?
-  tipo                String                @default("INGRESO") // INGRESO, EGRESO, AMBOS
-  usaEnTesoreria      Boolean               @default(true) @map("usa_en_tesoreria")
-  usaEnCompras        Boolean               @default(false) @map("usa_en_compras")
-  usaEnVentas         Boolean               @default(false) @map("usa_en_ventas")
-  cuentaContableId    Int?                  @map("cuenta_contable_id")
-  activo              Boolean               @default(true)
-  orden               Int                   @default(0)
-  createdAt           DateTime              @default(now()) @map("created_at")
-  updatedAt           DateTime              @updatedAt @map("updated_at")
+  id                   Int                   @id @default(autoincrement())
+  codigo               String                @unique
+  nombre               String
+  descripcion          String?
+  tipo                 String                @default("INGRESO") // INGRESO, EGRESO, AMBOS
+  usaEnTesoreria       Boolean               @default(true) @map("usa_en_tesoreria")
+  usaEnCompras         Boolean               @default(false) @map("usa_en_compras")
+  usaEnVentas          Boolean               @default(false) @map("usa_en_ventas")
+  cuentaContableId     Int?                  @map("cuenta_contable_id")
+  activo               Boolean               @default(true)
+  orden                Int                   @default(0)
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
   cuentaContable       CuentaContable?       @relation(fields: [cuentaContableId], references: [id])
-  tiposSocio           TipoSocio[]
-  actividades          Actividad[]
+  tiposSocio           TipoSocio[]           @relation("TipoSocioConcepto")
+  tiposSocioMora       TipoSocio[]           @relation("TipoSocioConceptoMora")
+  actividades          Actividad[]           @relation("ActividadConcepto")
+  actividadesMora      Actividad[]           @relation("ActividadConceptoMora")
   categoriasActividad  CategoriaActividad[]
   productosCompra      Producto[]            @relation("ProductoConceptoCompra")
   productosVenta       Producto[]            @relation("ProductoConceptoVenta")
@@ -41,12 +43,14 @@ model TipoSocio {
   descripcion          String?
   cuotaMensual         Decimal?            @map("cuota_mensual") @db.Decimal(12, 2)
   conceptoTesoreriaId  Int?                @map("concepto_tesoreria_id")
+  conceptoMoraId       Int?                @map("concepto_mora_id")
   color                String?
   orden                Int                 @default(0)
   activo               Boolean             @default(true)
   createdAt            DateTime            @default(now()) @map("created_at")
   socios               Socio[]
-  conceptoTesoreria    ConceptoTesoreria?  @relation(fields: [conceptoTesoreriaId], references: [id])
+  conceptoTesoreria    ConceptoTesoreria?  @relation("TipoSocioConcepto", fields: [conceptoTesoreriaId], references: [id])
+  conceptoMora         ConceptoTesoreria?  @relation("TipoSocioConceptoMora", fields: [conceptoMoraId], references: [id])
 
   @@map("tipos_socio")
 }
@@ -274,13 +278,17 @@ model Actividad {
   requiereAptaFisica   Boolean               @default(true) @map("requiere_apta_fisica")
   cuotaMensual         Decimal?              @map("cuota_mensual") @db.Decimal(12, 2)
   conceptoTesoreriaId  Int?                  @map("concepto_tesoreria_id")
+  conceptoMoraId       Int?                  @map("concepto_mora_id")
+  centroCostoId        Int?                  @map("centro_costo_id")
   color                String?
   activo               Boolean               @default(true)
   orden                Int                   @default(0)
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
   categorias           CategoriaActividad[]
-  conceptoTesoreria    ConceptoTesoreria?    @relation(fields: [conceptoTesoreriaId], references: [id])
+  conceptoTesoreria    ConceptoTesoreria?    @relation("ActividadConcepto", fields: [conceptoTesoreriaId], references: [id])
+  conceptoMora         ConceptoTesoreria?    @relation("ActividadConceptoMora", fields: [conceptoMoraId], references: [id])
+  centroCosto          CentroCosto?          @relation(fields: [centroCostoId], references: [id])
   espacios             EspacioDeportivo[]
 
   @@map("actividades")
@@ -771,6 +779,7 @@ model AsientoLinea {
   id                Int             @id @default(autoincrement())
   asientoId         Int             @map("asiento_id")
   cuentaContableId  Int             @map("cuenta_contable_id")
+  centroCostoId     Int?            @map("centro_costo_id")
   descripcion       String?         // Descripción opcional de la línea
   debe              Decimal         @default(0) @db.Decimal(12, 2)
   haber             Decimal         @default(0) @db.Decimal(12, 2)
@@ -779,9 +788,11 @@ model AsientoLinea {
   // Relaciones
   asiento           Asiento         @relation(fields: [asientoId], references: [id], onDelete: Cascade)
   cuentaContable    CuentaContable  @relation(fields: [cuentaContableId], references: [id])
+  centroCosto       CentroCosto?    @relation(fields: [centroCostoId], references: [id])
 
   @@index([asientoId])
   @@index([cuentaContableId])
+  @@index([centroCostoId])
   @@map("asiento_lineas")
 }
 
@@ -793,6 +804,7 @@ model MovimientoCaja {
   fechaOperacion          DateTime?      @map("fecha_operacion")
   tipo                    String
   cuentaContableId        Int            @map("cuenta_contable_id")
+  centroCostoId           Int?           @map("centro_costo_id")
   monto                   Decimal        @db.Decimal(12, 2)
   pagoId                  Int?           @map("pago_id")
   cajaDestinoId           Int?           @map("caja_destino_id")
@@ -815,6 +827,7 @@ model MovimientoCaja {
   caja                    Caja           @relation(fields: [cajaId], references: [id])
   conciliacion            Conciliacion?  @relation(fields: [conciliacionId], references: [id])
   cuentaContable          CuentaContable @relation(fields: [cuentaContableId], references: [id])
+  centroCosto             CentroCosto?   @relation(fields: [centroCostoId], references: [id])
   pago                    Pago?          @relation(fields: [pagoId], references: [id])
   registrador             Admin          @relation(fields: [registradoPor], references: [id])
   movimientoContable      MovimientoContable? @relation(fields: [movimientoContableId], references: [id])
@@ -824,6 +837,7 @@ model MovimientoCaja {
   @@index([fecha])
   @@index([tipo])
   @@index([cuentaContableId])
+  @@index([centroCostoId])
   @@index([conciliado])
   @@index([movimientoContableId])
   @@map("movimientos_caja")
@@ -1483,6 +1497,7 @@ model MovimientoContable {
 
   // Clasificacion contable
   conceptoId        Int?      @map("concepto_id")
+  centroCostoId     Int?      @map("centro_costo_id")
   observaciones     String?
   estado            String    @default("PENDIENTE") // PENDIENTE, PAGADO, ANULADO, CONFIRMADO
   registradoPor     Int       @map("registrado_por")
@@ -1494,6 +1509,7 @@ model MovimientoContable {
   pedido            Pedido?            @relation(fields: [pedidoId], references: [id])
   caja              Caja?              @relation(fields: [cajaId], references: [id])
   concepto          ConceptoTesoreria? @relation(fields: [conceptoId], references: [id])
+  centroCosto       CentroCosto?       @relation(fields: [centroCostoId], references: [id])
   movimientoPadre   MovimientoContable?  @relation("MovimientoHijos", fields: [movimientoPadreId], references: [id])
   movimientosHijos  MovimientoContable[] @relation("MovimientoHijos")
   items             ItemMovimiento[]
@@ -1505,6 +1521,7 @@ model MovimientoContable {
   @@index([socioId])
   @@index([ordenCompraId])
   @@index([pedidoId])
+  @@index([centroCostoId])
   @@index([estado])
   @@index([fecha])
   @@map("movimientos_contables")
@@ -1516,6 +1533,7 @@ model ItemMovimiento {
   productoVarianteId   Int?               @map("producto_variante_id")
   itemOrdenCompraId    Int?               @map("item_orden_compra_id") // Vinculo a item de OC
   itemPedidoId         Int?               @map("item_pedido_id") // Vinculo a item de Pedido
+  centroCostoId        Int?               @map("centro_costo_id") // Centro de costo del ítem
   descripcion          String?
   cantidad             Decimal            @db.Decimal(12, 2)
   precioUnitario       Decimal            @map("precio_unitario") @db.Decimal(12, 2)
@@ -1524,9 +1542,11 @@ model ItemMovimiento {
   movimientoContable   MovimientoContable @relation(fields: [movimientoContableId], references: [id], onDelete: Cascade)
   productoVariante     ProductoVariante?  @relation(fields: [productoVarianteId], references: [id])
   itemPedido           ItemPedido?        @relation(fields: [itemPedidoId], references: [id])
+  centroCosto          CentroCosto?       @relation(fields: [centroCostoId], references: [id])
 
   @@index([movimientoContableId])
   @@index([productoVarianteId])
+  @@index([centroCostoId])
   @@map("items_movimiento")
 }
 
@@ -1832,4 +1852,26 @@ model LineaPresupuesto {
   @@index([cuentaContableId])
   @@index([conceptoId])
   @@map("lineas_presupuesto")
+}
+
+// Centro de Costo - Para análisis multidimensional por área/actividad
+model CentroCosto {
+  id                    Int                   @id @default(autoincrement())
+  codigo                String                @unique
+  nombre                String
+  descripcion           String?
+  tipo                  String                @default("OPERATIVO") // OPERATIVO, ADMINISTRATIVO
+  activo                Boolean               @default(true)
+  orden                 Int                   @default(0)
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  // Relaciones
+  actividades           Actividad[]
+  movimientosCaja       MovimientoCaja[]
+  movimientosContables  MovimientoContable[]
+  asientoLineas         AsientoLinea[]
+  itemsMovimiento       ItemMovimiento[]
+
+  @@map("centros_costo")
 }

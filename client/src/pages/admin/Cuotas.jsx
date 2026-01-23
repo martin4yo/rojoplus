@@ -43,6 +43,8 @@ export default function Cuotas() {
   const [cajaId, setCajaId] = useState('')
   const [registrandoPago, setRegistrandoPago] = useState(false)
   const [success, setSuccess] = useState(null)
+  const [showPagoExitosoModal, setShowPagoExitosoModal] = useState(false)
+  const [numeroRecibo, setNumeroRecibo] = useState(null)
 
   // Edicion de cargo
   const [showEditModal, setShowEditModal] = useState(false)
@@ -352,19 +354,32 @@ export default function Cuotas() {
         medioPagoId: parseInt(medioPagoId),
         cajaId: parseInt(cajaId),
       })
-      setSuccess(`Pago registrado correctamente. Recibo #${result.numero}`)
+      setNumeroRecibo(result.numero)
       setSeleccionadas([])
       setShowPagoModal(false)
-      // Recargar datos de cobranza
+      setShowPagoExitosoModal(true)
+    } catch (err) {
+      setError(err.message || 'Error al registrar pago')
+    } finally {
+      setRegistrandoPago(false)
+    }
+  }
+
+  function cerrarModalPagoExitoso() {
+    setShowPagoExitosoModal(false)
+    setNumeroRecibo(null)
+
+    // Si vino desde otra página (con cobrarSocioId), volver atrás
+    const cobrarSocioId = searchParams.get('cobrarSocioId')
+    if (cobrarSocioId) {
+      navigate(-1) // Volver a la página anterior
+    } else {
+      // Si no, recargar datos de cobranza o salir
       if (cobranzaData?.sociosPorCobrar?.[0]?.socio?.id) {
         seleccionarSocioParaCobranza({ id: cobranzaData.sociosPorCobrar[0].socio.id })
       } else {
         salirModoCobranza()
       }
-    } catch (err) {
-      setError(err.message || 'Error al registrar pago')
-    } finally {
-      setRegistrandoPago(false)
     }
   }
 
@@ -688,6 +703,37 @@ export default function Cuotas() {
                     Cancelar
                   </Button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de pago exitoso */}
+        {showPagoExitosoModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+              <div className="px-6 py-6 text-center">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                  <CheckCircle className="h-10 w-10 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Cobranza Registrada!</h2>
+                <p className="text-gray-600 mb-4">
+                  El pago se registró correctamente
+                </p>
+                {numeroRecibo && (
+                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                    <p className="text-sm text-gray-600 mb-1">Número de Recibo</p>
+                    <p className="text-3xl font-bold text-primary">#{numeroRecibo}</p>
+                  </div>
+                )}
+              </div>
+              <div className="px-6 pb-6">
+                <Button
+                  onClick={cerrarModalPagoExitoso}
+                  className="w-full flex items-center justify-center gap-2"
+                >
+                  Continuar
+                </Button>
               </div>
             </div>
           </div>

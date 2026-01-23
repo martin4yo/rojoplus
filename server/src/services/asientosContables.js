@@ -30,6 +30,7 @@ const CUENTAS = {
   CUOTA_SOCIAL: '4.1.01',
   CUOTA_DEPORTIVA: '4.1.02',
   VENTAS_MERCADERIA: '4.2.01',
+  INGRESOS_MORA: '4.2.02', // Ingresos financieros por recargos
   OTROS_INGRESOS: '4.3.99',
 
   // Egresos
@@ -79,10 +80,11 @@ async function getCuentaId(prisma, codigo) {
  * @param {string} datos.tipoOrigen - Tipo de documento origen (PAGO, COBRANZA, FACTURA_COMPRA, etc.)
  * @param {number} datos.origenId - ID del documento origen
  * @param {number} datos.registradoPor - ID del admin que registra
- * @param {Array} datos.lineas - Líneas del asiento [{cuentaCodigo, debe, haber, descripcion}]
+ * @param {number} datos.centroCostoId - ID del centro de costo (opcional)
+ * @param {Array} datos.lineas - Líneas del asiento [{cuentaCodigo, debe, haber, descripcion, centroCostoId}]
  */
 async function crearAsiento(prisma, datos) {
-  const { concepto, fecha, tipoOrigen, origenId, registradoPor, lineas } = datos
+  const { concepto, fecha, tipoOrigen, origenId, registradoPor, centroCostoId, lineas } = datos
 
   // Validar que el asiento esté balanceado
   const totalDebe = lineas.reduce((sum, l) => sum + (l.debe || 0), 0)
@@ -106,6 +108,8 @@ async function crearAsiento(prisma, datos) {
       descripcion: linea.descripcion || null,
       debe: linea.debe || 0,
       haber: linea.haber || 0,
+      // Usar centro de costo de la línea o el del asiento
+      centroCostoId: linea.centroCostoId || centroCostoId || null,
       orden: index + 1,
     }))
   )
@@ -134,11 +138,16 @@ async function crearAsiento(prisma, datos) {
  * Genera asiento para pago de cuota de socio
  *
  * Asiento:
- *   D: Caja (cuenta de la caja usada)  $monto
- *   H: Ingresos por Cuotas             $monto
+ *   D: Caja (cuenta de la caja usada)      $montoTotal
+ *   H: Ingresos por Cuotas                 $montoBase
+ *   H: Ingresos por Mora                   $montoMora (si > 0)
+ *
+ * Centro de Costo:
+ *   - Si es cuota DEPORTIVA: usar centro de costo de la actividad
+ *   - Si es cuota SOCIAL: usar centro de costo Administración (ADM)
  */
 async function generarAsientoPagoCuota(prisma, datos) {
-  const { pago, caja, registradoPor } = datos
+  const { pago, caja, cargos, registradoPor } = datos
 
   try {
     // Obtener código de cuenta de la caja (si tiene) o usar CAJA_EFECTIVO por defecto
@@ -149,16 +158,72 @@ async function generarAsientoPagoCuota(prisma, datos) {
       cuentaCajaCodigo = CUENTAS.BANCO_CC
     }
 
+    // Determinar centro de costo según las cuotas pagadas
+    // Obtener las cuotas con sus categorías de actividad para determinar el centro
+    const cuotasConActividad = await Promise.all(
+      cargos.map(async cargo => {
+        const cuota = await prisma.cuota.findUnique({
+          where: { id: cargo.cuotaId },
+          include: {
+            categoriaActividad: {
+              include: {
+                actividad: {
+                  include: { centroCosto: true },
+                },
+              },
+            },
+          },
+        })
+        return cuota
+      })
+    )
+
+    // Determinar centro de costo:
+    // - Si todas las cuotas son DEPORTIVAS de la misma actividad, usar ese centro
+    // - Si hay mix o solo SOCIAL, usar Administración
+    let centroCostoId = null
+    const cuotasDeportivas = cuotasConActividad.filter(c => c?.tipo === 'DEPORTIVA')
+
+    if (cuotasDeportivas.length > 0 && cuotasDeportivas.every(c => c.categoriaActividad?.actividad?.centroCostoId)) {
+      // Usar el centro de la primera actividad (si todas son iguales, será el mismo)
+      centroCostoId = cuotasDeportivas[0].categoriaActividad.actividad.centroCostoId
+    } else {
+      // Usar Administración (ADM)
+      const centroAdm = await prisma.centroCosto.findUnique({
+        where: { codigo: 'ADM' },
+      })
+      centroCostoId = centroAdm?.id || null
+    }
+
+    // Calcular montos base y recargos
+    const montoTotal = Number(pago.montoTotal)
+    const montoRecargo = cargos.reduce((sum, cargo) => sum + Number(cargo.montoRecargo || 0), 0)
+    const montoBase = montoTotal - montoRecargo
+
+    // Líneas del asiento
+    const lineas = [
+      // DEBE: Caja con el total
+      { cuentaCodigo: cuentaCajaCodigo, debe: montoTotal, haber: 0 },
+    ]
+
+    // HABER: Ingresos por cuotas (monto base)
+    if (montoBase > 0) {
+      lineas.push({ cuentaCodigo: CUENTAS.CUOTA_SOCIAL, debe: 0, haber: montoBase })
+    }
+
+    // HABER: Ingresos por mora (recargos)
+    if (montoRecargo > 0) {
+      lineas.push({ cuentaCodigo: CUENTAS.INGRESOS_MORA, debe: 0, haber: montoRecargo })
+    }
+
     const asiento = await crearAsiento(prisma, {
-      concepto: `Cobranza cuota socio #${pago.socio?.nroSocio || pago.socioId}`,
+      concepto: `Cobranza cuota socio #${pago.socio?.nroSocio || pago.socioId}${montoRecargo > 0 ? ' (inc. mora)' : ''}`,
       fecha: pago.fecha,
       tipoOrigen: 'PAGO_CUOTA',
       origenId: pago.id,
       registradoPor,
-      lineas: [
-        { cuentaCodigo: cuentaCajaCodigo, debe: Number(pago.montoTotal), haber: 0 },
-        { cuentaCodigo: CUENTAS.CUOTA_SOCIAL, debe: 0, haber: Number(pago.montoTotal) },
-      ],
+      centroCostoId,
+      lineas,
     })
 
     console.log(`[AsientoContable] Creado asiento ${asiento.numero} para pago cuota ${pago.numero}`)
@@ -218,6 +283,7 @@ async function generarAsientoMovimientoCaja(prisma, datos) {
       tipoOrigen: 'MOV_CAJA',
       origenId: movimiento.id,
       registradoPor,
+      centroCostoId: movimiento.centroCostoId || null, // Usar centro de costo del movimiento
       lineas,
     })
 
@@ -299,6 +365,7 @@ async function generarAsientoFacturaCompra(prisma, datos) {
       tipoOrigen: 'FACTURA_COMPRA',
       origenId: factura.id,
       registradoPor,
+      centroCostoId: factura.centroCostoId || null, // Usar centro de costo de la factura
       lineas,
     })
 
@@ -382,6 +449,7 @@ async function generarAsientoFacturaVenta(prisma, datos) {
       tipoOrigen: 'FACTURA_VENTA',
       origenId: factura.id,
       registradoPor,
+      centroCostoId: factura.centroCostoId || null, // Usar centro de costo de la factura
       lineas,
     })
 
@@ -421,6 +489,7 @@ async function generarAsientoOrdenPago(prisma, datos) {
       tipoOrigen: 'ORDEN_PAGO',
       origenId: ordenPago.id,
       registradoPor,
+      centroCostoId: ordenPago.centroCostoId || null, // Usar centro de costo de la orden
       lineas: [
         { cuentaCodigo: CUENTAS.PROVEEDORES, debe: monto, haber: 0, descripcion: 'Cancelación deuda' },
         { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto, descripcion: `OP ${ordenPago.numero}` },
@@ -465,6 +534,7 @@ async function generarAsientoReciboCobro(prisma, datos) {
       tipoOrigen: 'RECIBO_COBRO',
       origenId: recibo.id,
       registradoPor,
+      centroCostoId: recibo.centroCostoId || null, // Usar centro de costo del recibo
       lineas: [
         { cuentaCodigo: cuentaCajaCodigo, debe: monto, haber: 0, descripcion: `Recibo ${recibo.numero}` },
         { cuentaCodigo: CUENTAS.CLIENTES, debe: 0, haber: monto, descripcion: 'Cobro deuda' },

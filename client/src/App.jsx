@@ -36,6 +36,7 @@ import AdminReporteActividadDetalle from './pages/admin/ReporteActividadDetalle'
 import AdminReporteCuotas from './pages/admin/ReporteCuotas'
 import AdminReporteSocios from './pages/admin/ReporteSocios'
 import AdminReporteComercios from './pages/admin/ReporteComercios'
+import AdminReporteCentrosCosto from './pages/admin/ReporteCentrosCosto'
 import AdminEntrenadoresLista from './pages/admin/EntrenadoresLista'
 import AdminEntrenadorForm from './pages/admin/EntrenadorForm'
 import AdminPeriodos from './pages/admin/Periodos'
@@ -65,6 +66,7 @@ import TransferenciaForm from './pages/admin/tesoreria/TransferenciaForm'
 // Contabilidad
 import PlanCuentasLista from './pages/admin/contabilidad/PlanCuentasLista'
 import CuentaContableForm from './pages/admin/contabilidad/CuentaContableForm'
+import CentrosCostoLista from './pages/admin/configuracion/CentrosCostoLista'
 import AsientosLista from './pages/admin/contabilidad/AsientosLista'
 import AsientoForm from './pages/admin/contabilidad/AsientoForm'
 import AsientoDetalle from './pages/admin/contabilidad/AsientoDetalle'
@@ -166,7 +168,9 @@ function App() {
         <Route path="reportes/cuotas" element={<AdminReporteCuotas />} />
         <Route path="reportes/socios" element={<AdminReporteSocios />} />
         <Route path="reportes/comercios" element={<AdminReporteComercios />} />
+        <Route path="reportes/centros-costo" element={<AdminReporteCentrosCosto />} />
         <Route path="configuracion" element={<AdminTablasAuxiliares />} />
+        <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
         <Route path="configuracion/:tabla" element={<AdminConfiguracionLista />} />
         <Route path="configuracion/:tabla/nuevo" element={<AdminConfiguracionForm />} />
         <Route path="configuracion/:tabla/:id" element={<AdminConfiguracionForm />} />
