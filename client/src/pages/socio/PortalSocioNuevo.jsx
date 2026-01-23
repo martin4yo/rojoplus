@@ -40,21 +40,22 @@ export default function PortalSocioNuevo() {
   const cargarDatosSocio = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/socio/${tokenPortal}`)
-      setSocio(response.data)
+      // api.get ya retorna data.data, así que response es directamente el objeto socio
+      const socioData = await api.get(`/socio/${tokenPortal}`)
+      setSocio(socioData)
 
       // Cargar datos adicionales en paralelo
-      const [mensajes, cuotas] = await Promise.all([
-        api.get(`/socio/${tokenPortal}/mensajes/no-leidos`).catch(() => ({ data: { count: 0 } })),
-        api.get(`/socio/${tokenPortal}/cuotas/pendientes`).catch(() => ({ data: { count: 0 } })),
+      const [cuotas] = await Promise.all([
+        api.get(`/socio/${tokenPortal}/cuotas/pendientes`).catch(() => []),
       ])
 
-      setMensajesNoLeidos(mensajes.data?.count || 0)
-      setCuotasPendientes(cuotas.data?.count || 0)
+      setMensajesNoLeidos(0) // TODO: implementar cuando esté el endpoint de mensajes
+      setCuotasPendientes(Array.isArray(cuotas) ? cuotas.length : 0)
 
       setError(null)
     } catch (err) {
-      setError(err.message || 'No se pudo cargar la información')
+      console.error('Error cargando datos del socio:', err)
+      setError(err.message || 'No se pudo cargar la información. Verifica que el link sea válido.')
     } finally {
       setLoading(false)
     }

@@ -138,7 +138,7 @@ export default function LoginSocio() {
         </div>
 
         {/* Panel derecho - Formulario */}
-        <div className="p-8 md:p-12 bg-gray-50">
+        <div className="p-8 md:p-12 bg-gray-100">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Acceder al Portal</h2>
 
           {error && (
