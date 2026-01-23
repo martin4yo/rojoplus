@@ -25,12 +25,12 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
     try {
       setLoading(true)
       const [cuotasResp, historialResp] = await Promise.all([
-        api.get(`/socio/${tokenPortal}/cuotas/pendientes`).catch(() => ({ data: [] })),
-        api.get(`/socio/${tokenPortal}/pagos/historial`).catch(() => ({ data: [] })),
+        api.get(`/socio/${tokenPortal}/cuotas/pendientes`).catch(() => []),
+        api.get(`/socio/${tokenPortal}/pagos/historial`).catch(() => []),
       ])
 
-      setCuotas(cuotasResp.data || [])
-      setHistorial(historialResp.data || [])
+      setCuotas(cuotasResp || [])
+      setHistorial(historialResp || [])
     } catch (err) {
       console.error('Error cargando datos de pagos:', err)
     } finally {
