@@ -146,7 +146,6 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
       tipoSocio: true,
       tokenPortal: true,
       tokenPortalExpira: true,
-      esTitular: true,
       grupoFamiliarId: true,
     },
   })
@@ -182,7 +181,6 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
       tipoSocio: socio.tipoSocio,
       tokenPortal: socio.tokenPortal,
       esActivo,
-      esTitular: socio.esTitular,
       grupoFamiliarId: socio.grupoFamiliarId,
     },
   })
@@ -213,7 +211,6 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
       categoria: true,
       tipoSocio: true,
       tokenPortal: true,
-      esTitular: true,
       grupoFamiliarId: true,
       grupoFamiliar: {
         select: {

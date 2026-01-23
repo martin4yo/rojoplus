@@ -138,7 +138,7 @@ export default function LoginSocio() {
         </div>
 
         {/* Panel derecho - Formulario */}
-        <div className="p-8 md:p-12">
+        <div className="p-8 md:p-12 bg-gray-50">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Acceder al Portal</h2>
 
           {error && (
@@ -156,7 +156,7 @@ export default function LoginSocio() {
                 className={`p-4 rounded-lg border-2 transition-all ${
                   metodo === 'email'
                     ? 'border-red-600 bg-red-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
               >
                 <EnvelopeIcon className={`h-8 w-8 mx-auto mb-2 ${metodo === 'email' ? 'text-red-600' : 'text-gray-400'}`} />
@@ -171,7 +171,7 @@ export default function LoginSocio() {
                 className={`p-4 rounded-lg border-2 transition-all ${
                   metodo === 'dni'
                     ? 'border-red-600 bg-red-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
               >
                 <IdentificationIcon className={`h-8 w-8 mx-auto mb-2 ${metodo === 'dni' ? 'text-red-600' : 'text-gray-400'}`} />
@@ -192,7 +192,7 @@ export default function LoginSocio() {
                 onChange={(e) => setValor(e.target.value)}
                 placeholder={metodo === 'email' ? 'socio@ejemplo.com' : '12345678'}
                 required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                className="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
               />
               <p className="mt-2 text-xs text-gray-500">
                 {metodo === 'email'
