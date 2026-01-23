@@ -8,6 +8,7 @@ import {
   DocumentTextIcon,
   CurrencyDollarIcon,
 } from '@heroicons/react/24/outline'
+import { Smartphone } from 'lucide-react'
 
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [cuotas, setCuotas] = useState([])
@@ -202,16 +203,18 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                     <button
                       onClick={() => pagarVarias(cuotas.map((c) => c.id), 'MERCADOPAGO')}
                       disabled={procesandoPago}
-                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                     >
-                      💳 Pagar con MercadoPago
+                      <CreditCardIcon className="w-5 h-5" />
+                      Pagar con MercadoPago
                     </button>
                     <button
                       onClick={() => pagarVarias(cuotas.map((c) => c.id), 'MODO')}
                       disabled={procesandoPago}
-                      className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
                     >
-                      📱 Pagar con MODO
+                      <Smartphone className="w-5 h-5" />
+                      Pagar con MODO
                     </button>
                   </div>
                 </div>
@@ -251,16 +254,18 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                         <button
                           onClick={() => pagarCuota(cuota.id, 'MERCADOPAGO')}
                           disabled={procesandoPago}
-                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                         >
-                          💳 MercadoPago
+                          <CreditCardIcon className="w-4 h-4" />
+                          MercadoPago
                         </button>
                         <button
                           onClick={() => pagarCuota(cuota.id, 'MODO')}
                           disabled={procesandoPago}
-                          className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
                         >
-                          📱 MODO
+                          <Smartphone className="w-4 h-4" />
+                          MODO
                         </button>
                       </div>
                     </div>

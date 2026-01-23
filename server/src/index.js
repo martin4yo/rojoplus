@@ -14,6 +14,7 @@ import comerciosRoutes from './routes/comercios.js'
 import comercioRoutes from './routes/comercio.js'
 import adminRoutes from './routes/admin.js'
 import socioRoutes from './routes/socio.js'
+import pagosRoutes from './routes/pagos.js'
 import contabilidadRoutes from './routes/contabilidad.js'
 import tesoreriaRoutes from './routes/tesoreria.js'
 import stockRoutes from './routes/stock.js'
@@ -65,6 +66,7 @@ app.use('/api/admin/asientos', asientosRoutes)
 app.use('/api/admin', deportesRoutes)
 app.use('/api/admin', presupuestoRoutes)
 app.use('/api/socio', socioRoutes)
+app.use('/api/pagos', pagosRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

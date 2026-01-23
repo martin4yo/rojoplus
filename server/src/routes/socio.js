@@ -2,6 +2,7 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
+import { crearPreferenciaPago } from '../services/mercadopago.js'
 
 const router = Router()
 
@@ -759,8 +760,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
     throw new AppError('Cuota no encontrada', 404, 'CUOTA_NOT_FOUND')
   }
 
-  // TODO: Integrar con MercadoPago o MODO para generar link real
-  // Por ahora retornamos un link de ejemplo
+  // Crear registro de link de pago
   const linkPago = await req.prisma.linkPago.create({
     data: {
       socioId: socio.id,
@@ -770,15 +770,49 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
       cargosIds: JSON.stringify([cargo.id]),
       plataforma: metodoPago,
       estado: 'PENDIENTE',
-      initPoint: `https://ejemplo.com/pagar/${metodoPago.toLowerCase()}`, // Mock URL
+      initPoint: '', // Se actualiza después
       fechaExpiracion: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
     },
+  })
+
+  let initPoint = ''
+
+  if (metodoPago === 'MERCADOPAGO') {
+    // Integración con MercadoPago
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+    const preferencia = await crearPreferenciaPago({
+      title: cargo.descripcion || cargo.categoria,
+      description: `Cuota ${cargo.periodo}/${cargo.anio}`,
+      amount: parseFloat(cargo.montoTotal),
+      quantity: 1,
+      externalReference: linkPago.id.toString(),
+      payer: {
+        email: socio.email || 'socio@sportivo.com.ar',
+        name: socio.apellidoNombre,
+      },
+      notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago`,
+      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito`,
+      failureUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=error`,
+      pendingUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=pendiente`,
+    })
+
+    initPoint = preferencia.init_point
+  } else if (metodoPago === 'MODO') {
+    // TODO: Integrar con MODO cuando esté disponible
+    initPoint = `https://ejemplo.com/modo/pagar`
+  }
+
+  // Actualizar link de pago con el init_point
+  await req.prisma.linkPago.update({
+    where: { id: linkPago.id },
+    data: { initPoint },
   })
 
   res.json({
     success: true,
     data: {
-      linkPago: linkPago.initPoint,
+      linkPago: initPoint,
       linkPagoId: linkPago.id,
     },
   })
@@ -819,7 +853,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
 
   const montoTotal = cargos.reduce((sum, c) => sum + parseFloat(c.montoTotal), 0)
 
-  // TODO: Integrar con MercadoPago o MODO para generar link real
+  // Crear registro de link de pago
   const linkPago = await req.prisma.linkPago.create({
     data: {
       socioId: socio.id,
@@ -829,15 +863,49 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
       cargosIds: JSON.stringify(cargos.map(c => c.id)),
       plataforma: metodoPago,
       estado: 'PENDIENTE',
-      initPoint: `https://ejemplo.com/pagar/${metodoPago.toLowerCase()}`, // Mock URL
+      initPoint: '', // Se actualiza después
       fechaExpiracion: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
     },
+  })
+
+  let initPoint = ''
+
+  if (metodoPago === 'MERCADOPAGO') {
+    // Integración con MercadoPago
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+    const preferencia = await crearPreferenciaPago({
+      title: `Pago de ${cargos.length} cuota(s)`,
+      description: cargos.map(c => `${c.descripcion || c.categoria} (${c.periodo}/${c.anio})`).join(', '),
+      amount: montoTotal,
+      quantity: 1,
+      externalReference: linkPago.id.toString(),
+      payer: {
+        email: socio.email || 'socio@sportivo.com.ar',
+        name: socio.apellidoNombre,
+      },
+      notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago`,
+      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito`,
+      failureUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=error`,
+      pendingUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=pendiente`,
+    })
+
+    initPoint = preferencia.init_point
+  } else if (metodoPago === 'MODO') {
+    // TODO: Integrar con MODO cuando esté disponible
+    initPoint = `https://ejemplo.com/modo/pagar`
+  }
+
+  // Actualizar link de pago con el init_point
+  await req.prisma.linkPago.update({
+    where: { id: linkPago.id },
+    data: { initPoint },
   })
 
   res.json({
     success: true,
     data: {
-      linkPago: linkPago.initPoint,
+      linkPago: initPoint,
       linkPagoId: linkPago.id,
       montoTotal,
     },

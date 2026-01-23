@@ -1,0 +1,92 @@
+import { MercadoPagoConfig, Preference } from 'mercadopago'
+
+// Configuración de MercadoPago
+const client = new MercadoPagoConfig({
+  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
+})
+
+/**
+ * Crear preferencia de pago en MercadoPago
+ * @param {Object} data - Datos del pago
+ * @param {string} data.title - Título del pago
+ * @param {string} data.description - Descripción del pago
+ * @param {number} data.amount - Monto total
+ * @param {number} data.quantity - Cantidad (default: 1)
+ * @param {string} data.externalReference - Referencia externa (linkPagoId)
+ * @param {Object} data.payer - Datos del pagador
+ * @param {string} data.payer.email - Email del pagador
+ * @param {string} data.payer.name - Nombre del pagador
+ * @param {string} data.notificationUrl - URL de notificaciones (webhook)
+ * @param {string} data.successUrl - URL de éxito
+ * @param {string} data.failureUrl - URL de fallo
+ * @param {string} data.pendingUrl - URL de pendiente
+ * @returns {Promise<Object>} Preferencia creada con init_point
+ */
+export async function crearPreferenciaPago(data) {
+  try {
+    const preference = new Preference(client)
+
+    const result = await preference.create({
+      body: {
+        items: [
+          {
+            title: data.title,
+            description: data.description || '',
+            quantity: data.quantity || 1,
+            unit_price: Number(data.amount),
+            currency_id: 'ARS',
+          },
+        ],
+        payer: {
+          name: data.payer?.name || '',
+          surname: '',
+          email: data.payer?.email || '',
+        },
+        external_reference: data.externalReference,
+        notification_url: data.notificationUrl,
+        back_urls: {
+          success: data.successUrl,
+          failure: data.failureUrl,
+          pending: data.pendingUrl,
+        },
+        auto_return: 'approved', // Redirigir automáticamente si fue aprobado
+        statement_descriptor: 'CLUB SPORTIVO PILAR',
+        payment_methods: {
+          excluded_payment_methods: [],
+          excluded_payment_types: [],
+          installments: 1, // Solo pago en 1 cuota por defecto
+        },
+      },
+    })
+
+    return {
+      id: result.id,
+      init_point: result.init_point,
+      sandbox_init_point: result.sandbox_init_point,
+    }
+  } catch (error) {
+    console.error('Error creando preferencia MercadoPago:', error)
+    throw new Error('Error al generar link de pago con MercadoPago')
+  }
+}
+
+/**
+ * Obtener información de un pago
+ * @param {string} paymentId - ID del pago en MercadoPago
+ * @returns {Promise<Object>} Información del pago
+ */
+export async function obtenerPago(paymentId) {
+  try {
+    const { Payment } = await import('mercadopago')
+    const payment = new Payment(client)
+    return await payment.get({ id: paymentId })
+  } catch (error) {
+    console.error('Error obteniendo pago MercadoPago:', error)
+    throw new Error('Error al obtener información del pago')
+  }
+}
+
+export default {
+  crearPreferenciaPago,
+  obtenerPago,
+}
