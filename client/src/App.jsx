@@ -30,6 +30,9 @@ import AdminReportes from './pages/admin/Reportes'
 import AdminTablasAuxiliares from './pages/admin/TablasAuxiliares'
 import AdminConfiguracionLista from './pages/admin/ConfiguracionLista'
 import AdminConfiguracionForm from './pages/admin/ConfiguracionForm'
+import AdminConfiguracionPagos from './pages/admin/ConfiguracionPagos'
+import EmailTemplates from './pages/admin/templates/EmailTemplates'
+import PdfTemplates from './pages/admin/templates/PdfTemplates'
 import AdminActividadesLista from './pages/admin/ActividadesLista'
 import AdminActividadForm from './pages/admin/ActividadForm'
 import AdminCategoriaActividadForm from './pages/admin/CategoriaActividadForm'
@@ -174,7 +177,10 @@ function App() {
         <Route path="reportes/comercios" element={<AdminReporteComercios />} />
         <Route path="reportes/centros-costo" element={<AdminReporteCentrosCosto />} />
         <Route path="configuracion" element={<AdminTablasAuxiliares />} />
+        <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
         <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
+        <Route path="configuracion/templates/email" element={<EmailTemplates />} />
+        <Route path="configuracion/templates/pdf" element={<PdfTemplates />} />
         <Route path="configuracion/:tabla" element={<AdminConfiguracionLista />} />
         <Route path="configuracion/:tabla/nuevo" element={<AdminConfiguracionForm />} />
         <Route path="configuracion/:tabla/:id" element={<AdminConfiguracionForm />} />

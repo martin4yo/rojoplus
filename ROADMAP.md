@@ -106,14 +106,23 @@ Base de datos: rojoplus
 
 ---
 
-## FASE 9: Backend - Servicio de Email
-> Envio de notificaciones
+## FASE 9: Sistema de Templates y Notificaciones
+> Sistema completo de templates editables desde UI (Email y PDF)
 
-- [ ] **9.1** Configurar Nodemailer con Gmail
-- [ ] **9.2** Crear template email: solicitud recibida
-- [ ] **9.3** Crear template email: comercio aprobado (con link)
-- [ ] **9.4** Crear template email: comercio rechazado
-- [ ] **9.5** Crear template email: notificacion a admin
+- [x] **9.1** Configurar Nodemailer con Gmail
+- [x] **9.2** Crear modelos EmailTemplate y PdfTemplate en BD
+- [x] **9.3** Servicio de generación de PDFs con Puppeteer
+- [x] **9.4** Servicio de envío de emails con templates de BD
+- [x] **9.5** Endpoints CRUD de templates (email y PDF)
+- [x] **9.6** Página admin de edición de templates de email
+- [x] **9.7** Página admin de edición de templates de PDF
+- [x] **9.8** Preview de templates y envío de emails de prueba
+- [x] **9.9** Descarga de PDFs de prueba
+- [x] **9.10** Sistema de variables dinámicas con Handlebars
+- [x] **9.11** Templates predeterminados (COMPROBANTE_PAGO, PAGO_CONFIRMADO, PAGO_RECHAZADO, RECIBO, FACTURA)
+- [x] **9.12** Menú jerárquico de Configuración con submenu
+- [x] **9.13** Ajuste de paleta de colores (blue para email, gray para PDF)
+- [x] **9.14** Limpieza de navegación redundante en ConfiguracionPagos
 
 ---
 
@@ -844,7 +853,7 @@ Sistema semi-automático que identifica jugadores que deben cambiar de categorí
 | 6 | Socios | ✅ Completado |
 | 7 | Ventas | ✅ Completado |
 | 8 | Reportes | 🔶 Parcial |
-| 9 | Email | ⏳ Pendiente |
+| 9 | Templates y Notificaciones | ✅ Completado |
 | 10 | Frontend Base | ✅ Completado |
 | 11 | Registro Comercio | ✅ Completado |
 | 12 | Pantalla Comerciante | ✅ Completado |
@@ -890,4 +899,4 @@ npm run dev
 
 ---
 
-*Ultima actualizacion: 22 de Enero 2026 - FASE 30 Presupuesto ✅ + FASE 33.3 Asistencia ✅ + FASE 32 Centros de Costos ✅*
+*Ultima actualizacion: 24 de Enero 2026 - FASE 9 Templates y Notificaciones ✅ (Sistema completo de templates editables con UI, PDFs con Puppeteer, emails con Handlebars)*

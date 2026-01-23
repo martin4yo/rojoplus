@@ -1029,4 +1029,127 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
   })
 }))
 
+// ==============================================================================
+// CONFIGURACIÓN DE PAGOS (CBU, Alias, Teléfono)
+// ==============================================================================
+
+// GET /api/socio/:token/config-pagos
+router.get('/:token/config-pagos', asyncHandler(async (req, res) => {
+  const { token } = req.params
+
+  // Validar socio
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal: token },
+    select: { id: true },
+  })
+
+  if (!socio) {
+    throw new AppError('Token inválido', 404, 'INVALID_TOKEN')
+  }
+
+  // Obtener configuración de pagos
+  const configs = await req.prisma.configuracion.findMany({
+    where: {
+      clave: {
+        in: ['PAGO_CBU', 'PAGO_ALIAS', 'PAGO_TELEFONO', 'PAGO_TITULAR'],
+      },
+    },
+  })
+
+  const configMap = {}
+  configs.forEach((c) => {
+    configMap[c.clave] = c.valor
+  })
+
+  res.json({
+    success: true,
+    data: {
+      cbu: configMap.PAGO_CBU || '',
+      alias: configMap.PAGO_ALIAS || '',
+      telefono: configMap.PAGO_TELEFONO || '',
+      titular: configMap.PAGO_TITULAR || '',
+    },
+  })
+}))
+
+// ==============================================================================
+// INFORMAR PAGO MANUAL (transferencia)
+// ==============================================================================
+
+import fs from 'fs/promises'
+import path from 'path'
+
+// POST /api/socio/:token/informar-pago
+router.post('/:token/informar-pago', asyncHandler(async (req, res) => {
+  const { token } = req.params
+  const { cuotasIds, monto, comprobante, comprobanteOriginal, observaciones } = req.body
+
+  // Validar socio
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal: token },
+    select: { id: true, nroSocio: true, apellidoNombre: true },
+  })
+
+  if (!socio) {
+    throw new AppError('Token inválido', 404, 'INVALID_TOKEN')
+  }
+
+  // Validar que cuotasIds sea un array válido
+  if (!Array.isArray(cuotasIds) || cuotasIds.length === 0) {
+    throw new AppError('Debe seleccionar al menos una cuota', 400, 'VALIDATION_ERROR')
+  }
+
+  // Validar monto
+  if (!monto || parseFloat(monto) <= 0) {
+    throw new AppError('Monto inválido', 400, 'VALIDATION_ERROR')
+  }
+
+  let comprobanteUrl = null
+
+  // Guardar comprobante si existe
+  if (comprobante) {
+    try {
+      // Crear directorio si no existe
+      const uploadDir = path.join(process.cwd(), 'uploads', 'comprobantes')
+      await fs.mkdir(uploadDir, { recursive: true })
+
+      // Generar nombre único para el archivo
+      const timestamp = Date.now()
+      const randomStr = crypto.randomBytes(8).toString('hex')
+      const ext = path.extname(comprobanteOriginal || '.jpg')
+      const filename = `pago-${socio.nroSocio}-${timestamp}-${randomStr}${ext}`
+      const filepath = path.join(uploadDir, filename)
+
+      // Decodificar base64 y guardar
+      const base64Data = comprobante.replace(/^data:image\/\w+;base64,/, '')
+      await fs.writeFile(filepath, base64Data, 'base64')
+
+      comprobanteUrl = `/uploads/comprobantes/${filename}`
+    } catch (error) {
+      console.error('Error guardando comprobante:', error)
+      throw new AppError('Error al guardar el comprobante', 500, 'FILE_ERROR')
+    }
+  }
+
+  // Crear registro de pago informado
+  const pagoInformado = await req.prisma.pagoInformado.create({
+    data: {
+      socioId: socio.id,
+      cuotasIds: JSON.stringify(cuotasIds),
+      monto: parseFloat(monto),
+      metodoPago: 'TRANSFERENCIA',
+      comprobante: comprobanteUrl,
+      comprobanteOriginal,
+      observaciones,
+      estado: 'PENDIENTE',
+    },
+  })
+
+  res.json({
+    success: true,
+    message: 'Pago informado correctamente. Será procesado en breve.',
+    pagoInformadoId: pagoInformado.id,
+  })
+}))
+
 export default router

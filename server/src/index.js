@@ -25,6 +25,7 @@ import liquidacionesRoutes from './routes/liquidaciones.js'
 import asientosRoutes from './routes/asientos.js'
 import deportesRoutes from './routes/deportes.js'
 import presupuestoRoutes from './routes/presupuesto.js'
+import templatesRoutes from './routes/templates.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -41,7 +42,8 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }))
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ limit: '10mb', extended: true }))
 
 // Servir archivos estáticos (fotos de socios)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
@@ -66,6 +68,7 @@ app.use('/api/admin', liquidacionesRoutes)
 app.use('/api/admin/asientos', asientosRoutes)
 app.use('/api/admin', deportesRoutes)
 app.use('/api/admin', presupuestoRoutes)
+app.use('/api/admin/templates', templatesRoutes)
 app.use('/api/socio', socioRoutes)
 app.use('/api/pagos', pagosRoutes)
 

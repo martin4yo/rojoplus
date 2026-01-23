@@ -3,8 +3,9 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
-  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList
+  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders
 } from 'lucide-react'
+import api from '../services/api'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
@@ -13,6 +14,7 @@ export default function AdminLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState([])
+  const [pagosPendientesCount, setPagosPendientesCount] = useState(0)
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken')
@@ -41,6 +43,28 @@ export default function AdminLayout() {
       }
     })
   }, [location.pathname])
+
+  // Cargar contador de pagos pendientes
+  useEffect(() => {
+    async function cargarContador() {
+      try {
+        const data = await api.getFull('/admin/pagos-informados/count')
+        setPagosPendientesCount(data?.count || 0)
+      } catch (err) {
+        // Silenciar error si el endpoint no existe aún
+        setPagosPendientesCount(0)
+      }
+    }
+
+    // Solo cargar si hay admin autenticado
+    const token = localStorage.getItem('adminToken')
+    if (token) {
+      cargarContador()
+      // Recargar cada 30 segundos
+      const interval = setInterval(cargarContador, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [admin])
 
   function handleLogout() {
     localStorage.removeItem('adminToken')
@@ -123,7 +147,15 @@ export default function AdminLayout() {
     },
     { path: '/admin/comercios', label: 'Comercios', icon: Store },
     { path: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
-    { path: '/admin/configuracion', label: 'Configuracion', icon: Settings },
+    {
+      label: 'Configuracion', icon: Settings,
+      submenu: [
+        { path: '/admin/configuracion', label: 'General', icon: Sliders },
+        { path: '/admin/configuracion/pagos', label: 'Datos Bancarios', icon: CreditCard },
+        { path: '/admin/configuracion/templates/email', label: 'Templates Email', icon: Mail },
+        { path: '/admin/configuracion/templates/pdf', label: 'Templates PDF', icon: FileText },
+      ]
+    },
   ]
 
   function isActive(path) {
@@ -307,10 +339,23 @@ export default function AdminLayout() {
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
+                {/* Badge de pagos pendientes en Cuotas */}
+                {item.label === 'Cuotas' && pagosPendientesCount > 0 && !sidebarCollapsed && (
+                  <span className="ml-auto px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full">
+                    {pagosPendientesCount}
+                  </span>
+                )}
                 {/* Tooltip cuando está colapsado */}
                 {sidebarCollapsed && (
                   <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
-                    <span className="text-sm text-white">{item.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-white">{item.label}</span>
+                      {item.label === 'Cuotas' && pagosPendientesCount > 0 && (
+                        <span className="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full">
+                          {pagosPendientesCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
               </Link>

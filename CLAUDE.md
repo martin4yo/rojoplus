@@ -19,6 +19,8 @@ Este archivo contiene el contexto necesario para retomar el desarrollo del proye
 - **Backend**: Node.js + Express + Prisma
 - **Base de datos**: PostgreSQL
 - **Email**: Nodemailer con Gmail
+- **Templates**: Handlebars (variables dinámicas) + Juice (inline CSS)
+- **PDFs**: Puppeteer (generación desde HTML)
 - **QR**: qrcode.react (generacion) + @yudiel/react-qr-scanner (escaneo)
 - **Pagos**: MercadoPago + MODO
 
@@ -63,13 +65,43 @@ RojoPlus/
 - [x] Portal del socio con pagos online (MercadoPago/MODO)
 - [x] Sistema de caja y movimientos
 - [x] Actividades deportivas e inscripciones
+- [x] Sistema de templates editables (Email y PDF)
 
-### Ultima Sesion (20 Enero 2026)
+### Ultima Sesion (24 Enero 2026)
 
-- [x] ReporteCuotas: Layout optimizado (graficos izq, tabla der)
-- [x] ReporteActividades: Layout optimizado con tarjetas
-- [x] ReporteSocios: Filtro por estado, metricas avanzadas, selector de periodo
-- [x] Header: "El equipo de la ciudad"
+**Sistema de Templates y Notificaciones - Parte 2:**
+- [x] Corrección de paleta de colores en templates (blue para email, gray para PDF)
+- [x] Restructuración del menú Configuración con submenu jerárquico
+- [x] Acceso directo a Templates Email y Templates PDF desde sidebar
+- [x] Limpieza de navegación redundante en ConfiguracionPagos
+- [x] Removida card duplicada de Datos Bancarios en página General
+- [x] Removidos botones "Volver" y "Cancelar" de páginas de configuración
+- [x] Mejoras de UX: guardar sin auto-navegación
+
+### Sesion Anterior (24 Enero 2026 - Parte 1)
+
+**Sistema de Templates y Notificaciones:**
+- [x] Modelos EmailTemplate y PdfTemplate en base de datos
+- [x] Servicio de generación de PDFs con Puppeteer
+- [x] Servicio de envío de emails con Handlebars
+- [x] Endpoints CRUD para templates (email y PDF)
+- [x] Página admin para editar templates de email
+- [x] Página admin para editar templates de PDF
+- [x] Preview de templates y envío de pruebas
+- [x] Templates predeterminados (COMPROBANTE_PAGO, PAGO_CONFIRMADO, PAGO_RECHAZADO, RECIBO, FACTURA)
+- [x] Sistema de variables dinámicas
+
+### Sesion (23 Enero 2026)
+
+- [x] Sistema de configuración de datos bancarios (CBU, Alias, Teléfono, Titular)
+- [x] Portal del Socio: Rediseño completo de opciones de pago (compacto)
+- [x] Logos de medios de pago (MP.png, MODO.webp)
+- [x] Switch para transferencia con datos bancarios
+- [x] Botones independientes para copiar CBU y Alias
+- [x] Formulario de informar pago con upload de comprobante (10MB)
+- [x] MercadoPago: Campos para conciliación (nroOperacion, fechaOperacion, linkPagoId)
+- [x] Backend: Límite de payload aumentado a 10MB
+- [x] Corrección de colores (MODO verde, Transferencia naranja)
 
 ### Pendiente - Plan Modulos Financieros
 
@@ -93,6 +125,7 @@ Ver plan detallado: `C:\Users\marti\.claude\plans\linear-cooking-gosling.md`
 | Conciliacion | ExtractoBancario, MovimientoExtracto, Conciliacion |
 | Usuarios | Admin, Rol, Permiso, PermisoRol |
 | Comercios | Comercio, Rubro, Venta |
+| Templates | EmailTemplate, PdfTemplate |
 | Sistema | Configuracion, AuditLog |
 
 ## Funcionalidades del Sistema
@@ -121,6 +154,9 @@ Ver plan detallado: `C:\Users\marti\.claude\plans\linear-cooking-gosling.md`
 | `/s/{tokenPortal}` | Portal del socio |
 | `/c/{token}` | Portal del comerciante |
 | `/admin` | Panel de administracion |
+| `/admin/configuracion/templates/email` | Editor de templates de email |
+| `/admin/configuracion/templates/pdf` | Editor de templates de PDF |
+| `/admin/configuracion/pagos` | Configuración de datos bancarios |
 | `/registro` | Registro de comercios |
 
 ## Comandos Utiles
@@ -153,6 +189,19 @@ Los colores y logo del club son configurables desde BD:
 | COLOR_FONDO | #F9FAFB |
 | CLUB_LOGO_URL | /images/logo.png |
 
+## Configuracion de Pagos
+
+Los datos bancarios del club son configurables desde el panel admin:
+
+| Clave | Descripción | Ejemplo |
+|-------|-------------|---------|
+| PAGO_TITULAR | Titular de la cuenta | Club Sportivo Pilar |
+| PAGO_CBU | CBU (22 dígitos) | 22388274837883888438 |
+| PAGO_ALIAS | Alias bancario | sportivo.pilar |
+| PAGO_TELEFONO | WhatsApp para comprobantes | +54 9 230 4346897 |
+
+**Configurar desde:** `/admin/configuracion/pagos`
+
 ## Credenciales de Desarrollo
 
 ```
@@ -176,4 +225,4 @@ Ver plan completo en `docs/12-PLAN-DE-TRABAJO.md`
 
 ---
 
-*Ultima actualizacion: 20 Enero 2026*
+*Ultima actualizacion: 24 Enero 2026*

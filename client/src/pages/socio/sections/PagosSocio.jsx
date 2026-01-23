@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../../../services/api'
 import {
   CreditCardIcon,
@@ -7,8 +7,13 @@ import {
   ExclamationTriangleIcon,
   DocumentTextIcon,
   CurrencyDollarIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
+  PhoneIcon,
+  BanknotesIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline'
-import { Smartphone } from 'lucide-react'
+// import { Smartphone } from 'lucide-react' // MODO temporalmente oculto
 import { useModal } from '../../../components/Modal'
 
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
@@ -17,10 +22,20 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('pendientes') // 'pendientes' | 'historial'
   const [procesandoPago, setProcesandoPago] = useState(false)
+  const [configPagos, setConfigPagos] = useState(null)
+  const [copiadoAlias, setCopiadoAlias] = useState(false)
+  const [copiadoCBU, setCopiadoCBU] = useState(false)
+  const [mostrarInformarPago, setMostrarInformarPago] = useState(false)
+  const [modoTransferencia, setModoTransferencia] = useState(false)
+  const [comprobante, setComprobante] = useState(null)
+  const [comprobantePreview, setComprobantePreview] = useState(null)
+  const [enviandoPago, setEnviandoPago] = useState(false)
+  const fileInputRef = useRef(null)
   const { showModal, ModalComponent } = useModal()
 
   useEffect(() => {
     cargarDatos()
+    cargarConfigPagos()
   }, [tokenPortal])
 
   const cargarDatos = async () => {
@@ -37,6 +52,105 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
       console.error('Error cargando datos de pagos:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const cargarConfigPagos = async () => {
+    try {
+      const config = await api.get(`/socio/${tokenPortal}/config-pagos`)
+      setConfigPagos(config)
+    } catch (err) {
+      console.error('Error cargando config de pagos:', err)
+    }
+  }
+
+  const copiarAlPortapapeles = async (texto, tipo) => {
+    try {
+      await navigator.clipboard.writeText(texto)
+      if (tipo === 'alias') {
+        setCopiadoAlias(true)
+        setTimeout(() => setCopiadoAlias(false), 2000)
+      } else if (tipo === 'cbu') {
+        setCopiadoCBU(true)
+        setTimeout(() => setCopiadoCBU(false), 2000)
+      }
+    } catch (err) {
+      console.error('Error copiando al portapapeles:', err)
+    }
+  }
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Validar tipo de archivo
+    if (!file.type.startsWith('image/')) {
+      showModal({
+        type: 'error',
+        message: 'Solo se permiten imágenes (JPG, PNG, etc.)',
+      })
+      return
+    }
+
+    // Validar tamaño (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showModal({
+        type: 'error',
+        message: 'El archivo es muy grande. Máximo 5MB.',
+      })
+      return
+    }
+
+    // Leer archivo como base64
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setComprobante(reader.result)
+      setComprobantePreview(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const informarPago = async () => {
+    if (!comprobante) {
+      showModal({
+        type: 'error',
+        message: 'Debes cargar el comprobante de pago',
+      })
+      return
+    }
+
+    try {
+      setEnviandoPago(true)
+
+      const cuotasIds = cuotas.map((c) => c.id)
+
+      await api.post(`/socio/${tokenPortal}/informar-pago`, {
+        cuotasIds,
+        monto: totalPendiente,
+        comprobante,
+        comprobanteOriginal: fileInputRef.current?.files[0]?.name || 'comprobante.jpg',
+        observaciones: 'Pago informado desde el portal del socio',
+      })
+
+      showModal({
+        type: 'success',
+        message: '¡Pago informado correctamente! Será procesado en breve.',
+      })
+
+      // Limpiar formulario
+      setMostrarInformarPago(false)
+      setComprobante(null)
+      setComprobantePreview(null)
+
+      // Recargar datos
+      await cargarDatos()
+    } catch (err) {
+      showModal({
+        type: 'error',
+        message: err.response?.data?.message || 'Error al informar el pago',
+      })
+    } finally {
+      setEnviandoPago(false)
     }
   }
 
@@ -213,32 +327,192 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
             </div>
           ) : (
             <>
-              {/* Pagar todas */}
-              {cuotas.length > 1 && (
-                <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4">
-                  <h4 className="font-semibold text-blue-900 mb-2">Pagar todas las cuotas</h4>
-                  <p className="text-sm text-blue-700 mb-4">
-                    Total: {formatMonto(totalPendiente)}
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={() => pagarVarias(cuotas.map((c) => c.id), 'MERCADOPAGO')}
-                      disabled={procesandoPago}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                    >
-                      <CreditCardIcon className="w-5 h-5" />
-                      Pagar con MercadoPago
-                    </button>
-                    <button
-                      onClick={() => pagarVarias(cuotas.map((c) => c.id), 'MODO')}
-                      disabled={procesandoPago}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-                    >
-                      <Smartphone className="w-5 h-5" />
-                      Pagar con MODO
-                    </button>
+              {/* Opciones de pago - Compacto */}
+              {cuotas.length > 0 && (
+                <>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Opciones de pago</h3>
+                      <span className="text-sm font-medium text-gray-600">Total: {formatMonto(totalPendiente)}</span>
+                    </div>
+
+                    {!modoTransferencia ? (
+                      <>
+                        {/* Botones de pago online */}
+                        <div className="flex flex-wrap gap-3 mb-4">
+                          <button
+                            onClick={() => pagarVarias(cuotas.map((c) => c.id), 'MERCADOPAGO')}
+                            disabled={procesandoPago}
+                            className="px-6 py-3 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
+                            title="Pagar con MercadoPago"
+                          >
+                            <img
+                              src="/images/MP.png"
+                              alt="MercadoPago"
+                              className="h-8"
+                            />
+                          </button>
+                          <button
+                            disabled
+                            className="px-6 py-3 bg-white rounded-lg cursor-not-allowed opacity-60 shadow-lg border-b-4 border-gray-300 border border-gray-200"
+                            title="MODO - Próximamente"
+                          >
+                            <img
+                              src="/images/MODO.webp"
+                              alt="MODO"
+                              className="h-8"
+                            />
+                          </button>
+                        </div>
+
+                        {/* Switch para transferencia */}
+                        {configPagos && (
+                          <div className="pt-4 border-t border-gray-200">
+                            <button
+                              onClick={() => setModoTransferencia(true)}
+                              className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 hover:bg-orange-100 border-2 border-orange-300 rounded-lg transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <BanknotesIcon className="w-5 h-5 text-orange-600" />
+                                <span className="font-semibold text-orange-900">Pagar por transferencia</span>
+                              </div>
+                              <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {/* Vista de transferencia */}
+                        <div className="space-y-4">
+                          <button
+                            onClick={() => {
+                              setModoTransferencia(false)
+                              setMostrarInformarPago(false)
+                            }}
+                            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            <span className="text-sm font-medium">Volver a opciones de pago</span>
+                          </button>
+
+                          {/* Datos bancarios */}
+                          <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4">
+                            <h4 className="font-bold text-orange-900 mb-3 flex items-center gap-2">
+                              <BanknotesIcon className="w-5 h-5" />
+                              Datos para transferencia
+                            </h4>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="text-xs font-medium text-orange-700 uppercase block mb-1">Alias</label>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-lg font-semibold text-orange-900 flex-1">{configPagos.alias}</p>
+                                  <button
+                                    onClick={() => copiarAlPortapapeles(configPagos.alias, 'alias')}
+                                    className="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                                    title="Copiar alias"
+                                  >
+                                    {copiadoAlias ? (
+                                      <CheckIcon className="w-5 h-5" />
+                                    ) : (
+                                      <ClipboardDocumentIcon className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-orange-700 uppercase block mb-1">CBU</label>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-mono text-orange-900 flex-1">{configPagos.cbu}</p>
+                                  <button
+                                    onClick={() => copiarAlPortapapeles(configPagos.cbu, 'cbu')}
+                                    className="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                                    title="Copiar CBU"
+                                  >
+                                    {copiadoCBU ? (
+                                      <CheckIcon className="w-5 h-5" />
+                                    ) : (
+                                      <ClipboardDocumentIcon className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Botón informar pago */}
+                          <button
+                            onClick={() => setMostrarInformarPago(!mostrarInformarPago)}
+                            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all font-semibold shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-orange-800"
+                          >
+                            <ArrowUpTrayIcon className="w-5 h-5" />
+                            {mostrarInformarPago ? 'Ocultar formulario' : 'Informar pago realizado'}
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
+
+                  {/* Formulario informar pago */}
+                  {mostrarInformarPago && modoTransferencia && configPagos && (
+                    <div className="bg-white border-2 border-orange-500 rounded-lg p-6 shadow-lg">
+                      <h4 className="font-bold text-gray-900 mb-4">Subir comprobante de transferencia</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Comprobante de pago *
+                          </label>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="hidden"
+                          />
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-orange-500 transition-colors flex items-center justify-center gap-2 text-gray-600 hover:text-orange-600"
+                          >
+                            <ArrowUpTrayIcon className="w-5 h-5" />
+                            {comprobante ? 'Cambiar comprobante' : 'Seleccionar archivo'}
+                          </button>
+                          {comprobantePreview && (
+                            <div className="mt-3">
+                              <img
+                                src={comprobantePreview}
+                                alt="Preview"
+                                className="w-full max-h-64 object-contain rounded-lg border"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={informarPago}
+                            disabled={enviandoPago || !comprobante}
+                            className="flex-1 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 font-semibold"
+                          >
+                            {enviandoPago ? 'Enviando...' : 'Confirmar pago'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setMostrarInformarPago(false)
+                              setComprobante(null)
+                              setComprobantePreview(null)
+                            }}
+                            className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Lista de cuotas */}
@@ -275,18 +549,25 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                         <button
                           onClick={() => pagarCuota(cuota.id, 'MERCADOPAGO')}
                           disabled={procesandoPago}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          className="px-4 py-2 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
+                          title="Pagar con MercadoPago"
                         >
-                          <CreditCardIcon className="w-4 h-4" />
-                          MercadoPago
+                          <img
+                            src="/images/MP.png"
+                            alt="MercadoPago"
+                            className="h-6"
+                          />
                         </button>
                         <button
-                          onClick={() => pagarCuota(cuota.id, 'MODO')}
-                          disabled={procesandoPago}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                          disabled
+                          className="px-4 py-2 bg-white rounded-lg cursor-not-allowed opacity-60 shadow-lg border-b-4 border-gray-300 border border-gray-200"
+                          title="MODO - Próximamente"
                         >
-                          <Smartphone className="w-4 h-4" />
-                          MODO
+                          <img
+                            src="/images/MODO.webp"
+                            alt="MODO"
+                            className="h-6"
+                          />
                         </button>
                       </div>
                     </div>

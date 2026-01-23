@@ -67,6 +67,16 @@ export default function Cuotas() {
   // Plan de pagos
   const [showPlanPagosModal, setShowPlanPagosModal] = useState(false)
 
+  // Pagos informados (A conciliar)
+  const [pagosInformados, setPagosInformados] = useState([])
+  const [showComprobanteModal, setShowComprobanteModal] = useState(false)
+  const [comprobanteUrl, setComprobanteUrl] = useState(null)
+  const [showConfirmarModal, setShowConfirmarModal] = useState(false)
+  const [showRechazarModal, setShowRechazarModal] = useState(false)
+  const [pagoSeleccionado, setPagoSeleccionado] = useState(null)
+  const [motivoRechazo, setMotivoRechazo] = useState('')
+  const [procesandoConciliacion, setProcesandoConciliacion] = useState(false)
+
   useEffect(() => {
     cargarDatosIniciales()
   }, [])
@@ -235,16 +245,30 @@ export default function Cuotas() {
   async function cargarCuotas() {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (periodoId) params.append('periodoId', periodoId)
-      if (estado) params.append('estado', estado)
-      params.append('page', page.toString())
+      // Si el estado es "A_CONCILIAR", cargar pagos informados
+      if (estado === 'A_CONCILIAR') {
+        const params = new URLSearchParams()
+        params.append('estado', 'PENDIENTE')
+        params.append('page', page.toString())
 
-      const data = await api.get(`/admin/cuotas?${params}`)
-      setCuotas(data.data || [])
-      setPagination(data.pagination)
+        const data = await api.get(`/admin/pagos-informados?${params}`)
+        setPagosInformados(data.data || [])
+        setPagination(data.pagination)
+        setCuotas([]) // Limpiar cuotas normales
+      } else {
+        // Cargar cuotas normales
+        const params = new URLSearchParams()
+        if (periodoId) params.append('periodoId', periodoId)
+        if (estado) params.append('estado', estado)
+        params.append('page', page.toString())
+
+        const data = await api.get(`/admin/cuotas?${params}`)
+        setCuotas(data.data || [])
+        setPagination(data.pagination)
+        setPagosInformados([]) // Limpiar pagos informados
+      }
     } catch (err) {
-      setError('Error al cargar cuotas')
+      setError('Error al cargar datos')
     } finally {
       setLoading(false)
     }
@@ -380,6 +404,77 @@ export default function Cuotas() {
       } else {
         salirModoCobranza()
       }
+    }
+  }
+
+  // Funciones para pagos informados (conciliación)
+  function verComprobante(url) {
+    setComprobanteUrl(url)
+    setShowComprobanteModal(true)
+  }
+
+  function abrirModalConfirmar(pago) {
+    setPagoSeleccionado(pago)
+    setShowConfirmarModal(true)
+  }
+
+  function abrirModalRechazar(pago) {
+    setPagoSeleccionado(pago)
+    setMotivoRechazo('')
+    setShowRechazarModal(true)
+  }
+
+  async function confirmarPago() {
+    if (!cajaId || !medioPagoId) {
+      setError('Debes seleccionar caja y medio de pago')
+      return
+    }
+
+    setProcesandoConciliacion(true)
+    setError(null)
+
+    try {
+      await api.post(`/admin/pagos-informados/${pagoSeleccionado.id}/confirmar`, {
+        cajaId: parseInt(cajaId),
+        medioPagoId: parseInt(medioPagoId),
+      })
+
+      setSuccess('Pago confirmado correctamente')
+      setShowConfirmarModal(false)
+      setPagoSeleccionado(null)
+      setCajaId('')
+      setMedioPagoId('')
+      cargarCuotas()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al confirmar pago')
+    } finally {
+      setProcesandoConciliacion(false)
+    }
+  }
+
+  async function rechazarPago() {
+    if (!motivoRechazo.trim()) {
+      setError('Debes indicar el motivo del rechazo')
+      return
+    }
+
+    setProcesandoConciliacion(true)
+    setError(null)
+
+    try {
+      await api.post(`/admin/pagos-informados/${pagoSeleccionado.id}/rechazar`, {
+        motivo: motivoRechazo,
+      })
+
+      setSuccess('Pago rechazado correctamente')
+      setShowRechazarModal(false)
+      setPagoSeleccionado(null)
+      setMotivoRechazo('')
+      cargarCuotas()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al rechazar pago')
+    } finally {
+      setProcesandoConciliacion(false)
     }
   }
 
@@ -885,6 +980,7 @@ export default function Cuotas() {
               <option value="">Todos</option>
               <option value="PENDIENTE">Pendientes</option>
               <option value="PAGADO">Pagados</option>
+              <option value="A_CONCILIAR">A conciliar</option>
             </select>
           </div>
           <div className="flex items-end">
@@ -898,11 +994,101 @@ export default function Cuotas() {
         </div>
       </div>
 
-      {/* Tabla de cuotas */}
+      {/* Tabla de cuotas o pagos informados */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
         </div>
+      ) : estado === 'A_CONCILIAR' ? (
+        /* Vista de pagos informados */
+        pagosInformados.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-4" />
+            <p className="text-gray-500">No hay pagos pendientes de conciliar</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {pagosInformados.map(pago => (
+              <div key={pago.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">{pago.socio.apellidoNombre}</h3>
+                      <span className="text-sm text-gray-500">#{pago.socio.nroSocio}</span>
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
+                        PENDIENTE
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Informado: {new Date(pago.fechaInformado).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${Number(pago.monto).toLocaleString('es-AR')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Cuotas incluidas */}
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Cuotas incluidas:</h4>
+                  <div className="space-y-1">
+                    {pago.cuotas.map((cuota, idx) => (
+                      <div key={cuota.id} className="flex justify-between text-sm">
+                        <span className="text-gray-600">
+                          {formatCategoria(cuota.categoria)}
+                          {cuota.periodo && ` - ${cuota.periodo.nombre} ${cuota.periodo.anio}`}
+                          {cuota.categoriaActividad && ` - ${cuota.categoriaActividad.actividad.nombre}`}
+                        </span>
+                        <span className="font-medium text-gray-900">
+                          ${Number(cuota.montoTotal).toLocaleString('es-AR')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Comprobante y acciones */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex gap-2">
+                    {pago.comprobante && (
+                      <button
+                        onClick={() => verComprobante(pago.comprobante)}
+                        className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg transition flex items-center gap-2"
+                      >
+                        <Receipt className="w-4 h-4" />
+                        Ver comprobante
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => abrirModalRechazar(pago)}
+                      className="px-4 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg transition flex items-center gap-2"
+                    >
+                      <X className="w-4 h-4" />
+                      Rechazar
+                    </button>
+                    <button
+                      onClick={() => abrirModalConfirmar(pago)}
+                      className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition flex items-center gap-2"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Confirmar pago
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : cuotas.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
           <Receipt className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -1132,6 +1318,159 @@ export default function Cuotas() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ver comprobante */}
+      {showComprobanteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-800">Comprobante de Pago</h2>
+              <button
+                onClick={() => setShowComprobanteModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <img
+                src={comprobanteUrl}
+                alt="Comprobante"
+                className="w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar pago */}
+      {showConfirmarModal && pagoSeleccionado && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-800">Confirmar Pago</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {pagoSeleccionado.socio.apellidoNombre} - ${Number(pagoSeleccionado.monto).toLocaleString('es-AR')}
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Caja *</label>
+                <select
+                  value={cajaId}
+                  onChange={e => setCajaId(e.target.value)}
+                  className="input-field w-full"
+                  required
+                >
+                  <option value="">Seleccionar caja</option>
+                  {cajas.map(c => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago *</label>
+                <select
+                  value={medioPagoId}
+                  onChange={e => setMedioPagoId(e.target.value)}
+                  className="input-field w-full"
+                  required
+                >
+                  <option value="">Seleccionar medio de pago</option>
+                  {mediosPago.map(m => (
+                    <option key={m.id} value={m.id}>{m.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                <p className="text-sm text-blue-800">
+                  <strong>Importante:</strong> Al confirmar, se registrará el pago, se marcarán las cuotas como pagadas y se creará el movimiento en caja.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  onClick={confirmarPago}
+                  loading={procesandoConciliacion}
+                  className="flex-1"
+                  disabled={!cajaId || !medioPagoId}
+                >
+                  Confirmar
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowConfirmarModal(false)
+                    setPagoSeleccionado(null)
+                    setCajaId('')
+                    setMedioPagoId('')
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal rechazar pago */}
+      {showRechazarModal && pagoSeleccionado && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-800">Rechazar Pago</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {pagoSeleccionado.socio.apellidoNombre} - ${Number(pagoSeleccionado.monto).toLocaleString('es-AR')}
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo del rechazo *</label>
+                <textarea
+                  value={motivoRechazo}
+                  onChange={e => setMotivoRechazo(e.target.value)}
+                  className="input-field w-full"
+                  rows="4"
+                  placeholder="Explica por qué se rechaza este pago..."
+                  required
+                ></textarea>
+              </div>
+
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                <p className="text-sm text-red-800">
+                  <strong>Atención:</strong> El socio será notificado del rechazo y el comprobante quedará registrado.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  onClick={rechazarPago}
+                  loading={procesandoConciliacion}
+                  variant="danger"
+                  className="flex-1"
+                  disabled={!motivoRechazo.trim()}
+                >
+                  Rechazar
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowRechazarModal(false)
+                    setPagoSeleccionado(null)
+                    setMotivoRechazo('')
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

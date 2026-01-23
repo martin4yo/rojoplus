@@ -89,7 +89,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
             },
           })
 
-          // Crear el pago
+          // Crear el pago con datos de MercadoPago para conciliación
           const pago = await req.prisma.pago.create({
             data: {
               socioId: linkPago.socioId,
@@ -97,7 +97,10 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
               monto: parseFloat(payment.transaction_amount),
               metodoPago: 'MERCADOPAGO',
               comprobante: `MP-${payment.id}`,
-              observaciones: `Pago online via ${linkPago.plataforma}`,
+              nroOperacion: payment.id.toString(), // ID de MP para conciliación
+              fechaOperacion: payment.date_approved ? new Date(payment.date_approved) : new Date(),
+              linkPagoId: linkPago.id, // Referencia al LinkPago
+              observaciones: `Pago online via ${linkPago.plataforma} - Método: ${payment.payment_method_id || 'N/A'}`,
             },
           })
 
