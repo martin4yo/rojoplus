@@ -6414,8 +6414,9 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
   proximoNumero++
 
   // PASO 2: Inscribir al titular en sus actividades
-  if (solicitud.actividadInscripcion && solicitud.actividadInscripcion !== 'Socio sin actividad') {
-    await inscribirEnActividades(nuevoSocio.id, solicitud.actividadInscripcion, edadTitular)
+  const actividadesTitular = JSON.parse(solicitud.actividadesSeleccionadas || '[]')
+  if (actividadesTitular.length > 0) {
+    await inscribirEnActividades(nuevoSocio.id, actividadesTitular, edadTitular)
   }
 
   // PASO 3: Crear socios familiares y establecer relación

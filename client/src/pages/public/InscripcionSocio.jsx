@@ -16,7 +16,7 @@ export default function InscripcionSocio() {
     localidad: '',
     telefono: '',
     email: '',
-    actividadInscripcion: '',
+    actividadesSeleccionadas: [], // Cambiado a array para múltiples actividades
     tieneEnfermedades: 'No',
     detalleEnfermedades: '',
     tutorApellidos: '',
@@ -58,6 +58,27 @@ export default function InscripcionSocio() {
       ...prev,
       [name]: value
     }))
+  }
+
+  const handleActividadChange = (actividad) => {
+    setFormData(prev => {
+      const actividades = prev.actividadesSeleccionadas
+      const index = actividades.indexOf(actividad)
+
+      if (index > -1) {
+        // Si ya está seleccionada, la removemos
+        return {
+          ...prev,
+          actividadesSeleccionadas: actividades.filter(a => a !== actividad)
+        }
+      } else {
+        // Si no está seleccionada, la agregamos
+        return {
+          ...prev,
+          actividadesSeleccionadas: [...actividades, actividad]
+        }
+      }
+    })
   }
 
   const handleSubmit = async (e) => {
@@ -278,26 +299,32 @@ export default function InscripcionSocio() {
               </div>
             </div>
 
-            {/* Actividad */}
+            {/* Actividades */}
             <div className="border-b border-gray-200 pb-6">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Actividad</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Actividades</h2>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Actividad en la que te inscribís <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Seleccioná las actividades en las que querés inscribirte
                 </label>
-                <select
-                  name="actividadInscripcion"
-                  value={formData.actividadInscripcion}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                >
-                  <option value="">Selecciona una actividad...</option>
-                  {actividades.map(act => (
-                    <option key={act} value={act}>{act}</option>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {actividades.map(actividad => (
+                    <label key={actividad} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.actividadesSeleccionadas.includes(actividad)}
+                        onChange={() => handleActividadChange(actividad)}
+                        className="mr-3 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                      />
+                      <span className="text-sm text-gray-900">{actividad}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
+                {formData.actividadesSeleccionadas.length > 0 && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    {formData.actividadesSeleccionadas.length} actividad(es) seleccionada(s)
+                  </p>
+                )}
               </div>
             </div>
 

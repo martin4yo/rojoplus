@@ -1998,7 +1998,7 @@ model SolicitudSocio {
   localidad               String
   telefono                String
   email                   String
-  actividadInscripcion    String    @map("actividad_inscripcion") // Basquet, Futbol 11, etc.
+  actividadesSeleccionadas String   @default("[]") @map("actividades_seleccionadas") @db.Text // JSON array: ["Basquet", "Futbol 11"]
 
   // Datos de salud
   tieneEnfermedades       Boolean   @default(false) @map("tiene_enfermedades")

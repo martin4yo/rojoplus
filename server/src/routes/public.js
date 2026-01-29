@@ -26,7 +26,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
     localidad,
     telefono,
     email,
-    actividadInscripcion,
+    actividadesSeleccionadas,
     tieneEnfermedades,
     detalleEnfermedades,
     tutorApellidos,
@@ -38,7 +38,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
   // Validaciones básicas
   if (!apellidos || !nombres || !documento || !fechaNacimiento ||
       !direccionCalle || !direccionNumero || !localidad || !telefono ||
-      !email || !actividadInscripcion) {
+      !email) {
     throw new AppError('Todos los campos obligatorios deben ser completados', 400)
   }
 
@@ -94,7 +94,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
       localidad,
       telefono,
       email,
-      actividadInscripcion,
+      actividadesSeleccionadas: JSON.stringify(actividadesSeleccionadas || []),
       tieneEnfermedades: tieneEnfermedades === 'Si' || tieneEnfermedades === true,
       detalleEnfermedades: tieneEnfermedades === 'Si' ? detalleEnfermedades : null,
       tutorApellidos: esMenor ? tutorApellidos : null,
@@ -111,11 +111,15 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
 
+    const actividadesTexto = Array.isArray(actividadesSeleccionadas) && actividadesSeleccionadas.length > 0
+      ? actividadesSeleccionadas.join(', ')
+      : 'Ninguna'
+
     await enviarEmailConTemplate('SOLICITUD_RECIBIDA', email, {
       nombreCompleto: `${nombres} ${apellidos}`,
       clubNombre,
       numeroSolicitud: solicitud.id,
-      actividadInscripcion
+      actividadesSeleccionadas: actividadesTexto
     })
   } catch (emailError) {
     console.error('Error enviando email de confirmación:', emailError)
