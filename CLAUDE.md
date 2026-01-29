@@ -998,18 +998,32 @@ client/src/pages/admin/ConciliacionBancaria.jsx
 
 ---
 
-### ❌ PENDIENTES - PRIORIDAD BAJA
+### ❌ PENDIENTES - PRIORIDAD ALTA
 
-#### **4. Cierre de Caja Diario**
+#### **1. Cierre de Caja Diario** 🔴 PRIORITARIO
 
 - [ ] Resumen diario de movimientos
-- [ ] Comparar saldo sistema vs saldo real
+- [ ] Comparar saldo sistema vs saldo real (arqueo)
 - [ ] Registro de diferencias (faltantes/sobrantes)
 - [ ] Reporte de cierre de caja PDF
+- [ ] Firmas digitales de responsables
+- [ ] Histórico de cierres
+
+**Archivos a crear:**
+```javascript
+server/src/routes/cierreCaja.js            // Endpoints
+client/src/pages/admin/CierreCaja.jsx      // Interfaz de cierre
+```
+
+**Impacto:** Control diario de efectivo, auditoría interna, detección de faltantes
+
+**Estimación:** 3 semanas
 
 ---
 
-#### **5. Reportes Avanzados**
+### ❌ PENDIENTES - PRIORIDAD MEDIA
+
+#### **2. Reportes Avanzados**
 
 **✅ Ya implementados:**
 - Reporte de Socios
@@ -1027,7 +1041,9 @@ client/src/pages/admin/ConciliacionBancaria.jsx
 
 ---
 
-#### **6. PWA y Mejoras Mobile**
+### ❌ PENDIENTES - PRIORIDAD BAJA
+
+#### **3. PWA y Mejoras Mobile**
 
 - [ ] Convertir portal del socio en PWA instalable
 - [ ] Funcionalidad offline (datos cacheados)
@@ -1098,14 +1114,30 @@ client/src/pages/admin/ConciliacionBancaria.jsx
    - ✅ Exportar plantel a Excel (11 columnas)
    - **Impacto:** Core del negocio del club ✅ LOGRADO
 
+### **🔴 Corto Plazo - PRIORIDAD 2 (Próximas 2-3 semanas)** ⭐ URGENTE
+
+7. **Cierre de Caja Diario** 💰 🔴 PRIORITARIO
+   - [ ] Resumen diario de movimientos por caja
+   - [ ] Comparar saldo sistema vs saldo real (arqueo de efectivo)
+   - [ ] Registro de diferencias (faltantes/sobrantes)
+   - [ ] Reporte de cierre en PDF con detalle
+   - [ ] Firmas digitales de responsables
+   - [ ] Histórico de cierres de caja
+   - [ ] Dashboard de estado de cajas
+   - **Archivos a crear:**
+     - `server/src/routes/cierreCaja.js`
+     - `client/src/pages/admin/CierreCaja.jsx`
+   - **Impacto:** ⭐ Control diario de efectivo, auditoría interna, detección inmediata de faltantes
+   - **Estimación:** 3 semanas
+
 ### **🟡 Mediano Plazo - PRIORIDAD 3 (4-8 semanas)**
 
-7. **Débito Automático**
+8. **Débito Automático**
    - Prisma y/o Payway
    - **Impacto:** Automatización de cobranza
    - **Doc:** `docs/13-DEBITO-AUTOMATICO.md`
 
-8. **Conciliación Bancaria**
+9. **Conciliación Bancaria**
    - Importación extractos
    - Conciliación automática/manual
    - **Impacto:** Control financiero
@@ -1113,21 +1145,16 @@ client/src/pages/admin/ConciliacionBancaria.jsx
 
 ### **⏳ Largo Plazo - PRIORIDAD 4 (3-6 meses)**
 
-9. **App Móvil Nativa para Socios** ⭐⭐ ESTRATÉGICO
-   - React Native (iOS + Android)
-   - MVP: Carnet QR, Cuenta corriente, Pagos, Actividades
-   - Chat grupal por equipo + comunicación club
-   - Reservas de instalaciones
-   - Newsfeed y comunidad
-   - **Inversión:** USD $64,000 - 7.5 meses
-   - **Impacto:** Experiencia del socio de clase mundial
-   - **Doc:** `docs/19-APP-MOVIL-SOCIOS.md` + `.html`
-   - **Estado:** Especificada y documentada, esperando aprobación directivos
-
-10. **Cierre de Caja Diario**
-    - Resumen diario de movimientos
-    - Arqueo de efectivo
-    - Registro de diferencias
+10. **App Móvil Nativa para Socios** ⭐⭐ ESTRATÉGICO
+    - React Native (iOS + Android)
+    - MVP: Carnet QR, Cuenta corriente, Pagos, Actividades
+    - Chat grupal por equipo + comunicación club
+    - Reservas de instalaciones
+    - Newsfeed y comunidad
+    - **Inversión:** USD $64,000 - 7.5 meses
+    - **Impacto:** Experiencia del socio de clase mundial
+    - **Doc:** `docs/19-APP-MOVIL-SOCIOS.md` + `.html`
+    - **Estado:** Especificada y documentada, esperando aprobación directivos
 
 11. **Reportes Avanzados**
     - Dashboard ejecutivo con KPIs
