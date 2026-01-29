@@ -113,11 +113,49 @@ edb9e9f - docs: Agregar especificación completa de App Móvil
 4. 🟡 **Notificaciones Automáticas** - Templates listos, falta cron jobs
 5. 🟢 **App Móvil** - Completamente documentada y lista para aprobación
 
-**Próxima sesión:**
-- Esperar feedback de directivos sobre App Móvil
-- Si aprueban: iniciar preparación técnica (Firebase, mockups)
-- Si no: continuar con Sistema de Inscripciones o Formulario Alta Socios
-- Recopilar campos del Google Forms para implementar formulario público
+**Prioridades establecidas para próximas sesiones:**
+
+**🔴 PRIORIDAD 1 (Opción C - Iniciar primero):**
+1. **Asientos Contables Automáticos**
+   - Agregar cuentaContableId a modelo Caja
+   - Crear servicio `asientosContables.js`
+   - Integrar en pagos de cuotas
+   - Integrar en movimientos de caja
+   - Integrar en facturas compra/venta
+   - Ver plan detallado: `C:\Users\marti\.claude\plans\linear-cooking-gosling.md`
+
+2. **Notificaciones Automáticas Programadas**
+   - Crear modelo NotificacionLog en schema
+   - Implementar cron jobs (node-cron)
+   - Email cuota próxima a vencer (5 días antes)
+   - Email cuota vencida (día vencimiento)
+   - Email recordatorio morosidad (cada 15 días)
+   - Email confirmación de inscripción
+   - Centro de preferencias del socio (opt-in/opt-out)
+
+3. **Completar Portal del Socio**
+   - Cuenta corriente completa con historial
+   - Descarga de comprobantes históricos
+   - Actualizar datos personales
+   - Ver todas las actividades inscriptas
+
+**🟡 PRIORIDAD 2 (Opción B - Después de Opción C):**
+1. **Completar Sistema de Inscripciones** (70% → 100%)
+   - CRUD completo de inscripciones (endpoints + página)
+   - Validaciones de edad y cupos
+   - Vista de plantel por categoría
+   - Asignación de entrenadores
+   - Exportar plantel a Excel
+
+2. **Formulario Público Alta Socios**
+   - **PENDIENTE:** Recopilar campos del Google Forms del club
+   - Crear página pública `/inscripcion-socio`
+   - Modelo SolicitudSocio en BD
+   - Workflow de aprobación/rechazo desde admin
+   - Emails automáticos (bienvenida/rechazo)
+
+**⏳ LARGO PLAZO (Opción A - Esperar aprobación directivos):**
+- App Móvil (especificada y documentada, esperando decisión)
 
 ---
 
@@ -490,53 +528,66 @@ client/src/pages/admin/ConciliacionBancaria.jsx
 
 ---
 
-## ROADMAP DETALLADO - Orden Sugerido
+## ROADMAP DETALLADO - Orden de Ejecución
 
-### **Corto Plazo (Próximas 2-4 semanas)**
+### **🔴 Corto Plazo - PRIORIDAD 1 (Próximas 2-4 semanas)**
 
-1. **Completar Sistema de Inscripciones** ⭐ CRÍTICO
-   - CRUD de inscripciones
-   - Validaciones (edad, cupos)
-   - Vista de plantel
-   - Asignación de entrenadores
-   - **Impacto:** Core del negocio del club
-
-2. **Formulario Público Alta Socios** ⭐ CRÍTICO
-   - Recopilar campos del Google Forms
-   - Implementar formulario público
-   - Workflow de aprobación
-   - **Impacto:** Automatización de altas
-
-3. **Asientos Contables Automáticos** ⭐ ALTA
+1. **Asientos Contables Automáticos** ⭐⭐ ALTA
    - Migración: agregar cuentaContableId a Caja
    - Crear servicio asientosContables.js
-   - Integrar en endpoints de pagos/movimientos
-   - **Impacto:** Control contable automático
+   - Integrar en pagos de cuotas
+   - Integrar en movimientos de caja
+   - Integrar en facturas compra/venta
+   - **Impacto:** Control contable automático completo
+   - **Plan:** `C:\Users\marti\.claude\plans\linear-cooking-gosling.md`
 
-4. **Notificaciones Automáticas** ⭐ ALTA
-   - Cron jobs para envíos programados
-   - Emails de vencimientos
-   - Log de notificaciones
-   - **Impacto:** Mejora cobranza y experiencia del socio
+2. **Notificaciones Automáticas Programadas** ⭐⭐ ALTA
+   - Modelo NotificacionLog en schema
+   - Cron jobs para envíos programados (node-cron)
+   - Email cuota próxima a vencer (5 días antes)
+   - Email cuota vencida + morosidad
+   - Email confirmación inscripción
+   - Centro de preferencias (opt-in/opt-out)
+   - **Impacto:** +25% mejora cobranza, reducción morosidad
 
-### **Mediano Plazo (1-2 meses)**
+3. **Completar Portal del Socio** ⭐ ALTA
+   - Cuenta corriente completa con historial
+   - Descarga de comprobantes históricos (PDF)
+   - Actualizar datos personales del socio
+   - Ver todas las actividades inscriptas
+   - **Impacto:** Autogestión completa del socio
 
-5. **Completar Portal del Socio**
-   - Cuenta corriente completa
-   - Descarga de comprobantes
-   - Actualización de datos
-   - **Impacto:** Autogestión del socio
+### **🟡 Mediano Plazo - PRIORIDAD 2 (4-8 semanas)**
+
+4. **Completar Sistema de Inscripciones** ⭐ CRÍTICO
+   - CRUD completo de inscripciones
+   - Validaciones (edad, cupos)
+   - Vista de plantel por categoría
+   - Asignación de entrenadores
+   - Exportar plantel a Excel
+   - **Impacto:** Core del negocio del club
+
+5. **Formulario Público Alta Socios** ⭐ CRÍTICO
+   - Recopilar campos del Google Forms del club
+   - Implementar formulario público `/inscripcion-socio`
+   - Modelo SolicitudSocio + workflow aprobación
+   - Emails automáticos (bienvenida/rechazo)
+   - **Impacto:** Automatización completa de altas
+
+### **🟢 Mediano/Largo Plazo - PRIORIDAD 3 (2-3 meses)**
 
 6. **Débito Automático**
    - Prisma y/o Payway
    - **Impacto:** Automatización de cobranza
+   - **Doc:** `docs/13-DEBITO-AUTOMATICO.md`
 
 7. **Conciliación Bancaria**
    - Importación extractos
    - Conciliación automática/manual
    - **Impacto:** Control financiero
+   - **Doc:** `docs/14-CONCILIACION-BANCARIA.md`
 
-### **Largo Plazo (3-6 meses)**
+### **⏳ Largo Plazo - PRIORIDAD 4 (3-6 meses)**
 
 8. **App Móvil Nativa para Socios** ⭐⭐ ESTRATÉGICO
    - React Native (iOS + Android)
@@ -544,11 +595,20 @@ client/src/pages/admin/ConciliacionBancaria.jsx
    - Chat grupal por equipo + comunicación club
    - Reservas de instalaciones
    - Newsfeed y comunidad
+   - **Inversión:** USD $64,000 - 7.5 meses
    - **Impacto:** Experiencia del socio de clase mundial
-   - **Documentación:** `docs/19-APP-MOVIL-SOCIOS.md`
+   - **Doc:** `docs/19-APP-MOVIL-SOCIOS.md` + `.html`
+   - **Estado:** Especificada y documentada, esperando aprobación directivos
 
-9. Cierre de Caja Diario
-10. Reportes Avanzados
+9. **Cierre de Caja Diario**
+   - Resumen diario de movimientos
+   - Arqueo de efectivo
+   - Registro de diferencias
+
+10. **Reportes Avanzados**
+    - Dashboard ejecutivo con KPIs
+    - Reportes de morosidad
+    - Proyecciones de cobranza
 
 ---
 
