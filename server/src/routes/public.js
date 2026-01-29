@@ -6,7 +6,7 @@
  */
 
 import express from 'express'
-import { asyncHandler, AppError } from '../utils/errors.js'
+import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarEmailConTemplate } from '../services/notificacionService.js'
 
 const router = express.Router()
