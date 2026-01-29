@@ -6466,7 +6466,7 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
     sociosCreados.push(socioFamiliar)
   }
 
-  // PASO 4: Generar cuotas del mes actual para todos los socios creados
+  // PASO 4: Generar cuotas del mes actual
   const hoy = new Date()
   const mesActual = hoy.getMonth() + 1
   const anioActual = hoy.getFullYear()
@@ -6482,7 +6482,28 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
   const cuotasGeneradas = []
 
   if (periodoActual) {
-    // Generar cuotas para cada socio creado
+    const tipoSocio = await req.prisma.tipoSocio.findUnique({
+      where: { id: parseInt(tipoSocioId) }
+    })
+
+    // GENERAR CUOTA SOCIAL: Solo para el titular (cubre a toda la familia)
+    if (tipoSocio && tipoSocio.cuotaMensual && parseFloat(tipoSocio.cuotaMensual) > 0) {
+      const cargoSocial = await req.prisma.cargo.create({
+        data: {
+          socioId: nuevoSocio.id, // Solo el titular
+          periodoId: periodoActual.id,
+          descripcion: `Cuota Social ${periodoActual.mes}/${periodoActual.anio}`,
+          montoOriginal: tipoSocio.cuotaMensual,
+          montoTotal: tipoSocio.cuotaMensual,
+          fechaVencimiento: periodoActual.fechaVencimiento,
+          estado: 'PENDIENTE',
+          tipoCargoId: tipoSocio.conceptoTesoreriaId
+        }
+      })
+      cuotasGeneradas.push(cargoSocial)
+    }
+
+    // GENERAR CUOTAS DE ACTIVIDADES: Para cada integrante (titular + familiares)
     for (const socio of sociosCreados) {
       // Obtener inscripciones activas del socio
       const inscripciones = await req.prisma.inscripcion.findMany({
@@ -6499,28 +6520,7 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
         }
       })
 
-      // Generar cargo por cuota social
-      const tipoSocio = await req.prisma.tipoSocio.findUnique({
-        where: { id: parseInt(tipoSocioId) }
-      })
-
-      if (tipoSocio && tipoSocio.cuotaMensual) {
-        const cargoSocial = await req.prisma.cargo.create({
-          data: {
-            socioId: socio.id,
-            periodoId: periodoActual.id,
-            descripcion: `Cuota Social ${periodoActual.mes}/${periodoActual.anio}`,
-            montoOriginal: tipoSocio.cuotaMensual,
-            montoTotal: tipoSocio.cuotaMensual,
-            fechaVencimiento: periodoActual.fechaVencimiento,
-            estado: 'PENDIENTE',
-            tipoCargoId: tipoSocio.conceptoTesoreriaId
-          }
-        })
-        cuotasGeneradas.push(cargoSocial)
-      }
-
-      // Generar cargos por actividades
+      // Generar cargo por cada actividad
       for (const insc of inscripciones) {
         const categoria = insc.categoriaActividad
         if (categoria.cuotaMensual && parseFloat(categoria.cuotaMensual) > 0) {
@@ -6534,7 +6534,7 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
                 socioId: socio.id,
                 periodoId: periodoActual.id,
                 categoriaActividadId: categoria.id,
-                descripcion: `${categoria.nombre} - ${periodoActual.mes}/${periodoActual.anio}`,
+                descripcion: `${categoria.nombre} - ${socio.apellidoNombre} - ${periodoActual.mes}/${periodoActual.anio}`,
                 montoOriginal: montoCuota,
                 montoTotal: montoCuota,
                 fechaVencimiento: periodoActual.fechaVencimiento,

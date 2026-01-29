@@ -114,6 +114,19 @@ const conceptosTesoreria = [
   { codigo: 'OTR-EGR', nombre: 'Otros Egresos', descripcion: 'Otros egresos varios', tipo: 'EGRESO', orden: 10 },
 ];
 
+const tiposSocio = [
+  { codigo: 'ACTIVO', nombre: 'Socio Activo', descripcion: 'Socio activo mayor de edad', cuotaMensual: 15000, color: '#10B981', orden: 1 },
+  { codigo: 'CADETE', nombre: 'Socio Cadete', descripcion: 'Socio menor de 18 años', cuotaMensual: 8000, color: '#3B82F6', orden: 2 },
+  { codigo: 'VITALICIO', nombre: 'Socio Vitalicio', descripcion: 'Socio con cuota vitalicia (sin cuota mensual)', cuotaMensual: 0, color: '#F59E0B', orden: 3 },
+  { codigo: 'ADHERENTE', nombre: 'Socio Adherente', descripcion: 'Socio adherente sin actividades', cuotaMensual: 5000, color: '#6B7280', orden: 4 },
+];
+
+const categoriasSocio = [
+  { codigo: 'A', nombre: 'Categoría A', descripcion: 'Socio fundador o histórico', porcentajeDescuento: 20, color: '#EF4444', orden: 1 },
+  { codigo: 'B', nombre: 'Categoría B', descripcion: 'Socio estándar', porcentajeDescuento: 10, color: '#3B82F6', orden: 2 },
+  { codigo: 'C', nombre: 'Categoría C', descripcion: 'Socio nuevo', porcentajeDescuento: 0, color: '#6B7280', orden: 3 },
+];
+
 const centrosCosto = [
   // Centros Operativos (por actividad/deporte)
   { codigo: 'FUT', nombre: 'Fútbol', descripcion: 'Centro de costos de actividades de fútbol', tipo: 'OPERATIVO', orden: 1 },
@@ -422,6 +435,36 @@ async function main() {
       configuracion[configIndex].valor = String(conceptoMora.id);
     }
   }
+
+  // Tipos de Socio
+  console.log('👤 Creando tipos de socio...');
+  for (const tipo of tiposSocio) {
+    await prisma.tipoSocio.upsert({
+      where: { codigo: tipo.codigo },
+      update: {
+        ...tipo,
+        conceptoTesoreriaId: conceptoCobranzaCuotas?.id,
+        conceptoMoraId: conceptoMora?.id
+      },
+      create: {
+        ...tipo,
+        conceptoTesoreriaId: conceptoCobranzaCuotas?.id,
+        conceptoMoraId: conceptoMora?.id
+      },
+    });
+  }
+  console.log(`   ✓ ${tiposSocio.length} tipos de socio creados`);
+
+  // Categorías de Socio
+  console.log('🏷️  Creando categorías de socio...');
+  for (const categoria of categoriasSocio) {
+    await prisma.categoriaSocio.upsert({
+      where: { codigo: categoria.codigo },
+      update: categoria,
+      create: categoria,
+    });
+  }
+  console.log(`   ✓ ${categoriasSocio.length} categorías de socio creadas`);
 
   // Roles
   console.log('👥 Creando roles...');
