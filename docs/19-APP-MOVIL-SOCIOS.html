@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Móvil RojoPlus - Propuesta para Directivos</title>
+    <style>
+        :root {
+            --rojo-primary: #DC2626;
+            --rojo-dark: #991B1B;
+            --rojo-light: #FEE2E2;
+            --gray-dark: #1F2937;
+            --gray-medium: #6B7280;
+            --gray-light: #F9FAFB;
+            --white: #FFFFFF;
+            --success: #059669;
+            --warning: #D97706;
+            --info: #2563EB;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-dark);
+            background: var(--gray-light);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--rojo-primary) 0%, var(--rojo-dark) 100%);
+            color: var(--white);
+            padding: 3rem 2rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.95;
+            margin-bottom: 1rem;
+        }
+
+        .header .club-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Navigation */
+        .nav {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 1rem;
+            z-index: 100;
+        }
+
+        .nav h3 {
+            color: var(--rojo-primary);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .nav ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .nav a {
+            color: var(--gray-medium);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s;
+            display: block;
+            font-size: 0.95rem;
+        }
+
+        .nav a:hover {
+            background: var(--rojo-light);
+            color: var(--rojo-primary);
+            transform: translateX(5px);
+        }
+
+        /* Sections */
+        .section {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .section h2 {
+            color: var(--rojo-primary);
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 3px solid var(--rojo-light);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section h3 {
+            color: var(--gray-dark);
+            font-size: 1.5rem;
+            margin: 1.5rem 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section h4 {
+            color: var(--gray-dark);
+            font-size: 1.2rem;
+            margin: 1rem 0 0.75rem 0;
+            font-weight: 600;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, var(--rojo-light) 0%, var(--white) 100%);
+            border-left: 5px solid var(--rojo-primary);
+        }
+
+        .hero-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .hero-text h2 {
+            border: none;
+            padding: 0;
+        }
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-box {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid var(--rojo-light);
+        }
+
+        .stat-box .number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--rojo-primary);
+        }
+
+        .stat-box .label {
+            font-size: 0.9rem;
+            color: var(--gray-medium);
+            margin-top: 0.25rem;
+        }
+
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .feature-card {
+            background: var(--gray-light);
+            padding: 1.5rem;
+            border-radius: 10px;
+            border-left: 4px solid var(--rojo-primary);
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+        }
+
+        .feature-card h4 {
+            color: var(--rojo-primary);
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+        }
+
+        .feature-card ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .feature-card li {
+            padding: 0.4rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            font-size: 0.95rem;
+        }
+
+        .feature-card li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+
+        thead {
+            background: var(--rojo-primary);
+            color: var(--white);
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        tbody tr:hover {
+            background: var(--rojo-light);
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 3rem;
+            margin: 2rem 0;
+        }
+
+        .timeline:before {
+            content: "";
+            position: absolute;
+            left: 0.75rem;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--rojo-light);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: var(--gray-light);
+            border-radius: 8px;
+        }
+
+        .timeline-item:before {
+            content: "";
+            position: absolute;
+            left: -2.25rem;
+            top: 1.5rem;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: var(--rojo-primary);
+            border: 3px solid var(--white);
+        }
+
+        .timeline-item h4 {
+            color: var(--rojo-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-item .duration {
+            color: var(--gray-medium);
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+        }
+
+        /* Price Box */
+        .price-box {
+            background: linear-gradient(135deg, var(--rojo-primary) 0%, var(--rojo-dark) 100%);
+            color: var(--white);
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .price-box .amount {
+            font-size: 3rem;
+            font-weight: 700;
+            margin: 1rem 0;
+        }
+
+        .price-box .label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .price-box .details {
+            margin-top: 1rem;
+            font-size: 0.95rem;
+            opacity: 0.85;
+        }
+
+        /* Alert Boxes */
+        .alert {
+            padding: 1.25rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: #D1FAE5;
+            border-color: var(--success);
+            color: #065F46;
+        }
+
+        .alert-info {
+            background: #DBEAFE;
+            border-color: var(--info);
+            color: #1E40AF;
+        }
+
+        .alert-warning {
+            background: #FEF3C7;
+            border-color: var(--warning);
+            color: #92400E;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--rojo-primary);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--rojo-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--gray-dark);
+            color: var(--white);
+        }
+
+        .btn-secondary:hover {
+            background: #111827;
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .badge-success {
+            background: #D1FAE5;
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: #FEF3C7;
+            color: var(--warning);
+        }
+
+        .badge-info {
+            background: #DBEAFE;
+            color: var(--info);
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--gray-dark);
+            color: var(--white);
+            padding: 2rem;
+            text-align: center;
+            margin-top: 3rem;
+        }
+
+        .footer p {
+            margin: 0.5rem 0;
+            opacity: 0.9;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero-content {
+                grid-template-columns: 1fr;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav ul {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .nav {
+                display: none;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>📱 App Móvil RojoPlus</h1>
+        <div class="subtitle">Propuesta de Aplicación Nativa para Socios</div>
+        <div class="club-name">Club Sportivo Pilar - "El Rojo de la Avenida"</div>
+    </div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav">
+            <h3>📑 Índice de Contenidos</h3>
+            <ul>
+                <li><a href="#resumen">Resumen Ejecutivo</a></li>
+                <li><a href="#mercado">Análisis de Mercado</a></li>
+                <li><a href="#funcionalidades">Funcionalidades</a></li>
+                <li><a href="#tecnologia">Tecnología</a></li>
+                <li><a href="#implementacion">Plan de Implementación</a></li>
+                <li><a href="#costos">Inversión y Costos</a></li>
+                <li><a href="#beneficios">Beneficios Esperados</a></li>
+                <li><a href="#metricas">Métricas de Éxito</a></li>
+            </ul>
+        </div>
+
+        <!-- Hero Section -->
+        <section class="section hero" id="resumen">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h2>🎯 Resumen Ejecutivo</h2>
+                    <p style="font-size: 1.1rem; line-height: 1.8; margin-top: 1rem;">
+                        Desarrollo de una <strong>aplicación móvil nativa</strong> (iOS + Android) para socios del Club Sportivo Pilar que centralice toda la experiencia del socio: gestión de membresía, comunicación, actividades deportivas, pagos, reservas y comunidad.
+                    </p>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-box">
+                        <div class="number">634</div>
+                        <div class="label">Socios Activos</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number">60%</div>
+                        <div class="label">Objetivo Descargas</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number">7.5</div>
+                        <div class="label">Meses Desarrollo</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number">+30%</div>
+                        <div class="label">Mejora Cobranza</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Objetivos -->
+        <section class="section">
+            <h2>🎯 Objetivos Principales</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>🚀 Mejorar Experiencia</h4>
+                    <p>Acceso móvil completo a todos los servicios del club desde cualquier lugar.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>📈 Aumentar Engagement</h4>
+                    <p>Comunicación bidireccional y constante con socios y equipos.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>⚡ Reducir Tareas Admin</h4>
+                    <p>Autogestión del socio, ahorro de hasta 80% en tiempo administrativo.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>👥 Fomentar Comunidad</h4>
+                    <p>Funciones sociales, eventos y gamificación para aumentar pertenencia.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>💰 Incrementar Cobranza</h4>
+                    <p>Pagos integrados y fáciles, aumento esperado del 30% en cobranza.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>🏆 Diferenciación</h4>
+                    <p>Posicionar al club como líder tecnológico vs competencia.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Análisis de Mercado -->
+        <section class="section" id="mercado">
+            <h2>🔍 Análisis de Mercado</h2>
+            <h3>Apps de Referencia Analizadas</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>App/Plataforma</th>
+                        <th>Tipo</th>
+                        <th>Características Destacadas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Boca Socios</strong></td>
+                        <td>Club argentino</td>
+                        <td>Ticketing, pagos, beneficios, carnet digital (323K socios)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TeamSnap</strong></td>
+                        <td>Gestión equipos</td>
+                        <td>Chat grupal, scheduling, calendario sincronizado</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Spond</strong></td>
+                        <td>Gestión equipos</td>
+                        <td>100% gratuito, pagos integrados, notificaciones push</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Crossbar</strong></td>
+                        <td>Gestión clubes</td>
+                        <td>Reservas instalaciones, comunicación, performance</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Heja</strong></td>
+                        <td>Comunicación</td>
+                        <td>Chat en tiempo real, fotos/videos, read receipts</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SportMember</strong></td>
+                        <td>Gestión club</td>
+                        <td>Sistema de reservas, cobros automatizados</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="alert alert-info">
+                <strong>💡 Insight:</strong> Las apps más exitosas combinan 3 elementos clave: <strong>pagos fáciles</strong>, <strong>comunicación en tiempo real</strong> y <strong>carnet digital</strong>.
+            </div>
+        </section>
+
+        <!-- Funcionalidades -->
+        <section class="section" id="funcionalidades">
+            <h2>🎯 Funcionalidades Propuestas</h2>
+            <p style="font-size: 1.1rem; margin-bottom: 2rem;">La app estará organizada en <strong>10 módulos principales</strong>:</p>
+
+            <h3>📱 MÓDULO 1: Identificación y Membresía</h3>
+            <div class="feature-card">
+                <h4>Carnet Digital Inteligente</h4>
+                <ul>
+                    <li>QR dinámico para acceso a instalaciones y descuentos</li>
+                    <li>Integración con Apple Wallet / Google Pay</li>
+                    <li>Modo offline (QR siempre disponible sin conexión)</li>
+                    <li>Estado de membresía en tiempo real (ACTIVO/MOROSO)</li>
+                    <li>Foto del socio y datos de identificación</li>
+                </ul>
+            </div>
+
+            <h3>💰 MÓDULO 2: Pagos y Finanzas</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>Gestión de Cuotas</h4>
+                    <ul>
+                        <li>Cuenta corriente completa</li>
+                        <li>Recargos calculados en tiempo real</li>
+                        <li>Saldo a favor disponible</li>
+                        <li>Alertas de vencimiento (5 días antes)</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h4>Pagos Online</h4>
+                    <ul>
+                        <li>MercadoPago integrado</li>
+                        <li>MODO integrado</li>
+                        <li>Tarjeta guardada (segura)</li>
+                        <li>Débito automático</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h4>Comprobantes</h4>
+                    <ul>
+                        <li>Descarga de recibos PDF</li>
+                        <li>Historial completo</li>
+                        <li>Compartir por WhatsApp/Email</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>⚽ MÓDULO 3: Actividades Deportivas</h3>
+            <div class="feature-card">
+                <h4>Mis Actividades</h4>
+                <ul>
+                    <li>Lista de actividades inscriptas (fútbol, básquet, natación, etc.)</li>
+                    <li>Horarios y ubicación de entrenamientos</li>
+                    <li>Entrenadores asignados con foto y contacto</li>
+                    <li>Compañeros de equipo (plantel)</li>
+                    <li>Calendario unificado sincronizado con Google Calendar</li>
+                    <li>Inscripción online a nuevas actividades</li>
+                </ul>
+            </div>
+
+            <h3>💬 MÓDULO 4: Comunicación</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>Chat Grupal por Equipo</h4>
+                    <ul>
+                        <li>Chat jugadores + entrenador</li>
+                        <li>Envío de fotos/videos</li>
+                        <li>Read receipts</li>
+                        <li>Notificaciones push</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h4>Mensajería Directa</h4>
+                    <ul>
+                        <li>Chat 1-a-1 con entrenadores</li>
+                        <li>Chat con administración</li>
+                        <li>Respuestas rápidas</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h4>Comunicados del Club</h4>
+                    <ul>
+                        <li>Newsfeed con noticias</li>
+                        <li>Push notifications</li>
+                        <li>Eventos y cambios</li>
+                        <li>Galería de fotos</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>📅 MÓDULO 5: Reservas de Instalaciones</h3>
+            <div class="feature-card">
+                <h4>Sistema de Reservas</h4>
+                <ul>
+                    <li>Reserva de canchas (fútbol, tenis, paddle, básquet)</li>
+                    <li>Reserva de pileta (carriles, horarios)</li>
+                    <li>Reserva de quincho/salón para eventos</li>
+                    <li>Disponibilidad en tiempo real</li>
+                    <li>Check-in con QR al llegar</li>
+                    <li>Cancelación hasta X horas antes</li>
+                </ul>
+            </div>
+
+            <h3>🎁 MÓDULO 6: Beneficios y Descuentos</h3>
+            <div class="feature-card">
+                <h4>Comercios Adheridos</h4>
+                <ul>
+                    <li>Mapa de comercios cercanos con GPS</li>
+                    <li>Lista por rubro y ubicación</li>
+                    <li>Mostrar QR para aplicar descuento</li>
+                    <li>Historial de descuentos usados</li>
+                    <li>Promociones especiales del club</li>
+                </ul>
+            </div>
+
+            <h3>👥 MÓDULO 7: Social y Comunidad</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>Feed Social</h4>
+                    <ul>
+                        <li>Timeline con actividades</li>
+                        <li>Fotos y videos de eventos</li>
+                        <li>Reacciones y comentarios</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h4>Eventos del Club</h4>
+                    <ul>
+                        <li>Calendario de eventos</li>
+                        <li>Confirmación asistencia (RSVP)</li>
+                        <li>Compra de entradas</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h4>Gamificación</h4>
+                    <ul>
+                        <li>Badges de asistencia</li>
+                        <li>Años de socio</li>
+                        <li>Participación torneos</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>🚪 MÓDULO 8: Asistencia y Accesos</h3>
+            <div class="feature-card">
+                <h4>Control de Acceso</h4>
+                <ul>
+                    <li>QR/código de barras para molinetes</li>
+                    <li>Registro automático de ingresos</li>
+                    <li>Check-in a entrenamientos</li>
+                    <li>Historial de visitas al club</li>
+                    <li>Autorización de menores (padres autorizan ingreso)</li>
+                    <li>Códigos temporales para invitados</li>
+                </ul>
+            </div>
+
+            <h3>🔔 MÓDULO 9: Notificaciones Push</h3>
+            <div class="feature-card">
+                <h4>6 Categorías Personalizables</h4>
+                <ul>
+                    <li>⚽ <strong>Deportivas:</strong> Recordatorios de entrenamiento, cambios de horario</li>
+                    <li>💰 <strong>Financieras:</strong> Vencimiento de cuota, pago confirmado</li>
+                    <li>📢 <strong>Comunicados:</strong> Avisos del club, eventos, noticias</li>
+                    <li>💬 <strong>Chat:</strong> Mensajes nuevos, menciones</li>
+                    <li>📅 <strong>Reservas:</strong> Confirmación, recordatorio, cancelación</li>
+                    <li>🎯 <strong>Actividades:</strong> Nueva actividad, cambio de entrenador</li>
+                </ul>
+            </div>
+
+            <h3>🆘 MÓDULO 10: Soporte y Ayuda</h3>
+            <div class="feature-card">
+                <h4>Centro de Ayuda</h4>
+                <ul>
+                    <li>FAQ (preguntas frecuentes)</li>
+                    <li>Tutoriales en video</li>
+                    <li>Chat en vivo con secretaría (horario laboral)</li>
+                    <li>Bot automático fuera de horario</li>
+                    <li>Reporte de problemas</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Tecnología -->
+        <section class="section" id="tecnologia">
+            <h2>🏗️ Arquitectura Técnica</h2>
+
+            <h3>Stack Tecnológico Recomendado</h3>
+            <div class="alert alert-success">
+                <strong>✅ Opción Recomendada: React Native + Expo</strong>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>✅ Ventajas</h4>
+                    <ul>
+                        <li>Un solo código para iOS + Android</li>
+                        <li>Equipo ya conoce React (mismo del web)</li>
+                        <li>Desarrollo rápido con hot reload</li>
+                        <li>Expo Go para testing instantáneo</li>
+                        <li>Gran ecosistema de librerías</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h4>🛠️ Backend</h4>
+                    <ul>
+                        <li>API REST ya existente (Node.js + Express)</li>
+                        <li>WebSockets (Socket.io) para chat en tiempo real</li>
+                        <li>Firebase Cloud Messaging (push notifications)</li>
+                        <li>Redis para cache de chat</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <h4>☁️ Servicios</h4>
+                    <ul>
+                        <li>Firebase (push, analytics)</li>
+                        <li>MercadoPago SDK (pagos)</li>
+                        <li>Google Maps (ubicación)</li>
+                        <li>Cloudinary (imágenes)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>📱 Funcionalidades Nativas Móviles</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sensor/Hardware</th>
+                        <th>Uso en la App</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>📷 Cámara</td>
+                        <td>Escaneo QR, fotos de perfil, subir comprobantes</td>
+                    </tr>
+                    <tr>
+                        <td>📍 GPS</td>
+                        <td>Mapa de comercios, check-in por ubicación</td>
+                    </tr>
+                    <tr>
+                        <td>👆 Biometría</td>
+                        <td>Face ID / Touch ID para login seguro</td>
+                    </tr>
+                    <tr>
+                        <td>🔔 Push Notifications</td>
+                        <td>Alertas en tiempo real</td>
+                    </tr>
+                    <tr>
+                        <td>📅 Calendario</td>
+                        <td>Sincronización con calendario del teléfono</td>
+                    </tr>
+                    <tr>
+                        <td>📤 Compartir</td>
+                        <td>Share nativo a redes sociales</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Plan de Implementación -->
+        <section class="section" id="implementacion">
+            <h2>🚀 Plan de Implementación</h2>
+            <p style="font-size: 1.1rem; margin-bottom: 2rem;">Desarrollo propuesto en <strong>5 fases incrementales</strong> de 7.5 meses totales:</p>
+
+            <div class="timeline">
+                <div class="timeline-item">
+                    <h4>Fase 1: MVP (Minimum Viable Product)</h4>
+                    <div class="duration">⏱️ Duración: 2 meses | 320 horas</div>
+                    <p><strong>Funcionalidades Críticas:</strong></p>
+                    <ul style="margin-top: 0.5rem;">
+                        <li>Login con DNI/email + contraseña</li>
+                        <li>Carnet digital con QR</li>
+                        <li>Cuenta corriente (ver cuotas)</li>
+                        <li>Pago online (MercadoPago)</li>
+                        <li>Mis actividades deportivas</li>
+                        <li>Calendario básico</li>
+                        <li>Notificaciones push básicas</li>
+                        <li>Perfil del socio</li>
+                    </ul>
+                    <div class="badge badge-success">Prioridad Alta</div>
+                </div>
+
+                <div class="timeline-item">
+                    <h4>Fase 2: Comunicación</h4>
+                    <div class="duration">⏱️ Duración: 1 mes | 160 horas</div>
+                    <ul>
+                        <li>Chat grupal por equipo</li>
+                        <li>Chat con entrenadores</li>
+                        <li>Newsfeed de comunicados</li>
+                        <li>Galería de fotos</li>
+                    </ul>
+                    <div class="badge badge-info">Prioridad Media</div>
+                </div>
+
+                <div class="timeline-item">
+                    <h4>Fase 3: Reservas</h4>
+                    <div class="duration">⏱️ Duración: 1 mes | 160 horas</div>
+                    <ul>
+                        <li>Reserva de canchas</li>
+                        <li>Reserva de instalaciones</li>
+                        <li>Check-in con QR</li>
+                        <li>Cancelación de reservas</li>
+                    </ul>
+                    <div class="badge badge-info">Prioridad Media</div>
+                </div>
+
+                <div class="timeline-item">
+                    <h4>Fase 4: Social</h4>
+                    <div class="duration">⏱️ Duración: 1.5 meses | 200 horas</div>
+                    <ul>
+                        <li>Feed social del club</li>
+                        <li>Eventos y RSVP</li>
+                        <li>Gamificación (badges)</li>
+                        <li>Compartir en redes</li>
+                    </ul>
+                    <div class="badge badge-warning">Mejora Continua</div>
+                </div>
+
+                <div class="timeline-item">
+                    <h4>Fase 5: Avanzado</h4>
+                    <div class="duration">⏱️ Duración: 2 meses | 240 horas</div>
+                    <ul>
+                        <li>Asistencia automática</li>
+                        <li>Modo offline completo</li>
+                        <li>Débito automático</li>
+                        <li>Integración con wearables (Apple Watch / Wear OS)</li>
+                    </ul>
+                    <div class="badge badge-warning">Largo Plazo</div>
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                <strong>🎯 Total del Proyecto:</strong> 1,240 horas de desarrollo + 160 horas de testing y diseño = <strong>1,400 horas totales</strong>
+            </div>
+        </section>
+
+        <!-- Costos -->
+        <section class="section" id="costos">
+            <h2>💰 Estimación de Inversión</h2>
+
+            <h3>Desarrollo del Proyecto</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Concepto</th>
+                        <th>Horas</th>
+                        <th>Inversión (USD)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Fase 1: MVP</strong></td>
+                        <td>320h</td>
+                        <td>$16,000</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fase 2: Comunicación</strong></td>
+                        <td>160h</td>
+                        <td>$8,000</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fase 3: Reservas</strong></td>
+                        <td>160h</td>
+                        <td>$8,000</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fase 4: Social</strong></td>
+                        <td>200h</td>
+                        <td>$10,000</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fase 5: Avanzado</strong></td>
+                        <td>240h</td>
+                        <td>$12,000</td>
+                    </tr>
+                    <tr>
+                        <td>Testing y QA</td>
+                        <td>80h</td>
+                        <td>$4,000</td>
+                    </tr>
+                    <tr>
+                        <td>Diseño UI/UX</td>
+                        <td>80h</td>
+                        <td>$6,000</td>
+                    </tr>
+                    <tr style="background: var(--rojo-light); font-weight: bold;">
+                        <td>TOTAL</td>
+                        <td>1,240h</td>
+                        <td>$64,000</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p style="font-size: 0.9rem; color: var(--gray-medium); margin-top: 0.5rem;">
+                * Estimación basada en $50/hora developer senior
+            </p>
+
+            <div class="price-box">
+                <div class="label">Inversión Total del Proyecto</div>
+                <div class="amount">USD $64,000</div>
+                <div class="details">Desarrollo completo de las 5 fases + Testing + Diseño</div>
+            </div>
+
+            <h3>Costos Recurrentes (Mensuales)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Servicio</th>
+                        <th>Costo Mensual</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Firebase (push, analytics)</td>
+                        <td>$50 - $200</td>
+                    </tr>
+                    <tr>
+                        <td>Cloud Storage (AWS S3)</td>
+                        <td>$20 - $100</td>
+                    </tr>
+                    <tr>
+                        <td>Redis Cloud</td>
+                        <td>$10 - $50</td>
+                    </tr>
+                    <tr>
+                        <td>App Store Developer</td>
+                        <td>$8 ($99/año)</td>
+                    </tr>
+                    <tr style="background: var(--rojo-light); font-weight: bold;">
+                        <td>TOTAL</td>
+                        <td>~$100 - $400/mes</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="alert alert-success">
+                <strong>💡 Punto Clave:</strong> Los costos recurrentes son muy accesibles y escalables según el uso real de la aplicación.
+            </div>
+        </section>
+
+        <!-- Beneficios -->
+        <section class="section" id="beneficios">
+            <h2>✨ Beneficios Esperados</h2>
+
+            <h3>🏛️ Para el Club</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>⬇️ Reducción de Costos</h4>
+                    <p><strong>-80% tiempo administrativo</strong></p>
+                    <p>Menos llamadas, emails y gestiones manuales. Autogestión del socio.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>⬆️ Mejor Cobranza</h4>
+                    <p><strong>+30% en cobranza</strong></p>
+                    <p>Pagos más fáciles y rápidos aumentan significativamente la tasa de cobro.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>📊 Datos y Analytics</h4>
+                    <p><strong>Decisiones basadas en datos</strong></p>
+                    <p>Conocer comportamiento de socios, actividades más populares, etc.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>🏆 Diferenciación</h4>
+                    <p><strong>Ventaja competitiva</strong></p>
+                    <p>Posicionar al club como líder tecnológico en la zona.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>📢 Canal Directo</h4>
+                    <p><strong>Comunicación efectiva</strong></p>
+                    <p>Push notifications llegan a todos los socios instantáneamente.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>📈 Mayor Engagement</h4>
+                    <p><strong>Uso activo del club</strong></p>
+                    <p>Socios más involucrados participan en más actividades.</p>
+                </div>
+            </div>
+
+            <h3>👤 Para los Socios</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>📱 Conveniencia</h4>
+                    <p>Todo en un solo lugar, disponible 24/7 desde el celular.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>⚡ Información Real-Time</h4>
+                    <p>Horarios, cambios, eventos actualizados al instante.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>👥 Comunidad</h4>
+                    <p>Conexión con otros socios, compañeros de equipo y entrenadores.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>⏱️ Ahorro de Tiempo</h4>
+                    <p>Gestiones desde el celular sin necesidad de ir al club.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>🎯 Experiencia Moderna</h4>
+                    <p>Interfaz ágil y actualizada, como las apps que usan diariamente.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>💰 Pago Fácil</h4>
+                    <p>Múltiples opciones de pago integradas y seguras.</p>
+                </div>
+            </div>
+
+            <h3>🏃 Para Entrenadores</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>💬 Comunicación Directa</h4>
+                    <p>Chat grupal con todo el equipo, avisos instantáneos.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>✅ Asistencia Automática</h4>
+                    <p>Check-in automático de jugadores, sin listas manuales.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>📸 Compartir Material</h4>
+                    <p>Fotos, videos, tácticas compartidos fácilmente con el grupo.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>⏱️ Menos Admin</h4>
+                    <p>Enfocarse en entrenar, no en tareas administrativas.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Métricas de Éxito -->
+        <section class="section" id="metricas">
+            <h2>📊 Métricas de Éxito</h2>
+            <p style="font-size: 1.1rem; margin-bottom: 2rem;">KPIs a medir durante el <strong>primer año</strong> de la aplicación:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Métrica</th>
+                        <th>Objetivo Año 1</th>
+                        <th>Impacto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Descargas de la App</strong></td>
+                        <td>60% de socios activos (380 de 634)</td>
+                        <td>Adopción exitosa</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MAU (Monthly Active Users)</strong></td>
+                        <td>40% de descargas (150 usuarios)</td>
+                        <td>Uso constante</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Retención 30 días</strong></td>
+                        <td>>50%</td>
+                        <td>App valiosa</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pagos desde app</strong></td>
+                        <td>30% del total de cobranza</td>
+                        <td>Canal preferido</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Tiempo promedio en app</strong></td>
+                        <td>>5 minutos por sesión</td>
+                        <td>Engagement alto</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NPS (Net Promoter Score)</strong></td>
+                        <td>>40</td>
+                        <td>Recomendación positiva</td>
+                    </tr>
+                    <tr>
+                        <td><strong>App Store Rating</strong></td>
+                        <td>>4.5 estrellas</td>
+                        <td>Satisfacción alta</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="alert alert-success">
+                <strong>🎯 Meta Principal:</strong> Convertir la app en el <strong>canal principal de interacción</strong> entre socios y club en el primer año.
+            </div>
+        </section>
+
+        <!-- Próximos Pasos -->
+        <section class="section">
+            <h2>✅ Próximos Pasos Inmediatos</h2>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>1️⃣ Validación con Stakeholders</h4>
+                    <ul>
+                        <li>Presentar propuesta a directivos del club</li>
+                        <li>Encuestar a 50 socios sobre funcionalidades deseadas</li>
+                        <li>Entrevistar a entrenadores y coordinadores</li>
+                        <li>Definir presupuesto disponible</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4>2️⃣ Decisiones Técnicas</h4>
+                    <ul>
+                        <li>Confirmar React Native como stack tecnológico</li>
+                        <li>Definir proveedor de push notifications</li>
+                        <li>Configurar entorno de desarrollo</li>
+                        <li>Crear mockups de pantallas principales</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4>3️⃣ Preparación Backend</h4>
+                    <ul>
+                        <li>Auditar API REST existente</li>
+                        <li>Crear endpoints faltantes para móvil</li>
+                        <li>Implementar WebSockets para chat</li>
+                        <li>Configurar Firebase project</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <h4>4️⃣ Inicio del MVP</h4>
+                    <ul>
+                        <li>Priorizar funcionalidades para MVP</li>
+                        <li>Crear user stories detalladas</li>
+                        <li>Estimar tiempos realistas</li>
+                        <li>Planificar sprints de desarrollo</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action -->
+        <section class="section" style="background: linear-gradient(135deg, var(--rojo-light) 0%, var(--white) 100%); border-left: 5px solid var(--rojo-primary);">
+            <h2>🚀 ¿Listo para Revolucionar la Experiencia del Socio?</h2>
+            <p style="font-size: 1.2rem; line-height: 1.8; margin: 1.5rem 0;">
+                La <strong>App Móvil RojoPlus</strong> posicionará al Club Sportivo Pilar como un club <strong>moderno, innovador y centrado en sus socios</strong>.
+            </p>
+            <p style="font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem;">
+                Con una inversión de <strong>USD $64,000</strong> y <strong>7.5 meses de desarrollo</strong>, podemos entregar una aplicación de clase mundial que:
+            </p>
+            <ul style="font-size: 1.05rem; line-height: 2; margin-left: 2rem; margin-bottom: 2rem;">
+                <li>Mejorará la <strong>experiencia de 634 socios activos</strong></li>
+                <li>Aumentará la <strong>cobranza en un 30%</strong></li>
+                <li>Reducirá <strong>80% del tiempo administrativo</strong></li>
+                <li>Diferenciará al club de la <strong>competencia</strong></li>
+            </ul>
+
+            <div style="text-align: center; margin-top: 2rem;">
+                <a href="#resumen" class="btn btn-primary" style="margin-right: 1rem;">📱 Revisar Propuesta</a>
+                <a href="mailto:info@clubsportivopilar.com" class="btn btn-secondary">✉️ Contactar para Más Info</a>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p><strong>📱 App Móvil RojoPlus</strong></p>
+        <p>Club Sportivo Pilar - "El Rojo de la Avenida"</p>
+        <p>Documento generado: 29 de Enero de 2026</p>
+        <p style="margin-top: 1rem; opacity: 0.7;">Versión 1.0 - Propuesta para Directivos</p>
+    </div>
+
+    <script>
+        // Smooth scroll para los links de navegación
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Highlight del section activo en el nav
+        const sections = document.querySelectorAll('.section[id]');
+        const navLinks = document.querySelectorAll('.nav a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (pageYOffset >= sectionTop - 200) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.style.fontWeight = '400';
+                link.style.background = 'transparent';
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.style.fontWeight = '600';
+                    link.style.background = 'var(--rojo-light)';
+                    link.style.color = 'var(--rojo-primary)';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
