@@ -173,6 +173,12 @@ model Socio {
   estadoSocioId         Int?                 @map("estado_socio_id")
   tipoSocioRelId        Int?                 @map("tipo_socio_rel_id")
   titularFamiliaId      Int?                 @map("titular_familia_id")
+  // Preferencias de notificaciones
+  notificarCuotaProxVenc Boolean             @default(true) @map("notificar_cuota_prox_venc") // Email 5 días antes
+  notificarCuotaVencida  Boolean             @default(true) @map("notificar_cuota_vencida") // Email día vencimiento
+  notificarMorosidad     Boolean             @default(true) @map("notificar_morosidad") // Email cada 15 días
+  notificarInscripcion   Boolean             @default(true) @map("notificar_inscripcion") // Confirmación de inscripción
+  notificarNoticias      Boolean             @default(true) @map("notificar_noticias") // Noticias del club
   autorizaciones        AutorizacionMenor[]
   cargos                Cargo[]
   detallesCobranza      DetalleCobranza[]
@@ -198,6 +204,7 @@ model Socio {
   convocatorias         Convocatoria[]
   estadisticasPartido   EstadisticaPartido[]
   pagosInformados       PagoInformado[]
+  notificaciones        NotificacionLog[]
 
   @@index([documento])
   @@index([apellidoNombre])
@@ -459,6 +466,7 @@ model Cargo {
   socio                Socio?              @relation(fields: [socioId], references: [id])
   cargoOrigen          Cargo?              @relation("CargosDerivados", fields: [cargoOrigenId], references: [id])
   cargosDerivados      Cargo[]             @relation("CargosDerivados")
+  notificaciones       NotificacionLog[]
 
   @@index([periodoId])
   @@index([socioId])
@@ -1942,4 +1950,34 @@ model PdfTemplate {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("pdf_templates")
+}
+
+// Log de notificaciones enviadas o programadas
+model NotificacionLog {
+  id           Int       @id @default(autoincrement())
+  tipo         String    // EMAIL, SMS, WHATSAPP, PUSH
+  eventType    String    // CUOTA_PROX_VENCER, CUOTA_VENCIDA, MOROSIDAD, INSCRIPCION_CONFIRMADA, BIENVENIDA, NOTICIA
+  destinatario String    // Email, teléfono o device token
+  socioId      Int?      @map("socio_id")
+  cargoId      Int?      @map("cargo_id") // Referencia a la cuota si aplica
+  asunto       String?   // Asunto del email
+  cuerpo       String?   @db.Text // Cuerpo del mensaje
+  enviado      Boolean   @default(false)
+  fechaEnvio   DateTime? @map("fecha_envio")
+  fechaProgramado DateTime? @map("fecha_programado") // Cuándo se debe enviar
+  intentos     Int       @default(0) // Número de intentos de envío
+  error        String?   @db.Text // Mensaje de error si falló
+  metadata     String?   @db.Text // JSON con info adicional
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  socio        Socio?    @relation(fields: [socioId], references: [id])
+  cargo        Cargo?    @relation(fields: [cargoId], references: [id])
+
+  @@index([socioId])
+  @@index([cargoId])
+  @@index([eventType])
+  @@index([enviado])
+  @@index([fechaProgramado])
+  @@map("notificaciones_log")
 }

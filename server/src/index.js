@@ -29,6 +29,7 @@ import templatesRoutes from './routes/templates.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
+import { iniciarCronJobs, detenerCronJobs } from './jobs/notificaciones.js'
 
 // Middlewares
 import { errorHandler } from './middleware/errorHandler.js'
@@ -90,10 +91,16 @@ app.listen(PORT, async () => {
 
   // Verificar conexión SMTP
   await verificarConexionSMTP()
+
+  // Iniciar sistema de notificaciones automáticas
+  iniciarCronJobs()
 })
 
 // Cerrar conexión de Prisma al salir
 process.on('SIGINT', async () => {
+  console.log('\n👋 Cerrando servidor...')
+  detenerCronJobs()
   await prisma.$disconnect()
+  console.log('✅ Servidor cerrado correctamente\n')
   process.exit()
 })
