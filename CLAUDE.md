@@ -59,7 +59,197 @@ RojoPlus/
 
 ## Estado Actual del Desarrollo
 
-### 📅 ÚLTIMA SESIÓN (29 Enero 2026 - Noche - Continuación)
+### 📅 ÚLTIMA SESIÓN (30 Enero 2026)
+
+**Tema: Grupos Familiares en Solicitudes + Múltiples Actividades + Tipos de Socio**
+
+**Trabajo realizado:**
+
+1. ✅ **Sistema de Grupos Familiares en Solicitudes**
+   - Modelo `FamiliarSolicitud` agregado al schema (12 campos)
+   - Endpoint para agregar familiares a una solicitud existente
+   - Endpoint para listar y eliminar familiares
+   - Página `/inscripcion-socio/:id/familiares` para gestión de familia
+   - Flujo: Formulario principal → Agregar familiares → Finalizar
+   - Al aprobar: se crean todos los socios (titular + familia) con relaciones
+   - Números de socio secuenciales para toda la familia
+   - Cada familiar puede seleccionar sus propias actividades
+
+2. ✅ **Múltiples Actividades por Persona**
+   - Cambio de `actividadInscripcion` (string) a `actividadesSeleccionadas` (JSON array)
+   - Formulario principal con checkboxes en lugar de select
+   - Formulario de familiares con checkboxes para múltiples actividades
+   - Titular y familiares pueden elegir 0 o más actividades
+   - Al aprobar: se inscribe automáticamente en todas las actividades seleccionadas
+
+3. ✅ **Tipos y Categorías de Socio**
+   - Agregados al seed: 4 tipos de socio (Activo $15k, Cadete $8k, Vitalicio $0, Adherente $5k)
+   - Agregadas al seed: 3 categorías (A: 20% desc, B: 10% desc, C: 0% desc)
+   - Selects poblados en modal de aprobación
+   - Vinculados a conceptos de tesorería
+
+4. ✅ **Lógica de Cuotas Corregida (BREAKING CHANGE)**
+   - **ANTES:** Se generaba cuota social para cada integrante
+   - **AHORA:** Se genera UNA cuota social para el titular (cubre toda la familia)
+   - Cuotas de actividades: una por cada actividad de cada integrante
+   - Todo se cobra junto al titular mediante LinkPago
+
+5. ✅ **Mejoras de UI/UX**
+   - Logo del club agregado a InscripcionSocio.jsx
+   - Logo del club agregado a AgregarFamiliares.jsx
+   - Diseño consistente en todo el flujo
+
+6. ✅ **Corrección de Email de Bienvenida**
+   - Variables corregidas para coincidir con template BIENVENIDA
+   - Eliminadas variables incorrectas que causaban "$" inesperados
+   - Email limpio solo con datos de bienvenida (sin importes)
+
+7. ✅ **Configuración de Entorno**
+   - VITE_API_URL configurada para desarrollo local
+   - Variable apuntando a http://localhost:3001/api
+
+**Backend:**
+
+**Nuevos modelos:**
+```prisma
+model FamiliarSolicitud {
+  id                      Int            @id @default(autoincrement())
+  solicitudSocioId        Int
+  apellidos               String
+  nombres                 String
+  documento               String
+  fechaNacimiento         DateTime
+  parentesco              String         // CONYUGE, HIJO
+  actividadesSeleccionadas String        @default("[]") @db.Text // JSON array
+  socioCreado             Int?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  solicitud               SolicitudSocio @relation(...)
+  socioCreatedRel         Socio?         @relation(...)
+}
+```
+
+**SolicitudSocio modificado:**
+- `actividadInscripcion` → `actividadesSeleccionadas` (JSON array)
+- Relación `familiares` con FamiliarSolicitud
+
+**Nuevos endpoints públicos:**
+- POST `/api/public/solicitud-socio/:id/familiar` - Agregar familiar
+- GET `/api/public/solicitud-socio/:id/familiares` - Listar familiares
+- DELETE `/api/public/solicitud-socio/:id/familiar/:familiarId` - Eliminar familiar
+- POST `/api/public/solicitud-socio/:id/verificar` - Verificar acceso por documento
+
+**Endpoint de aprobación rediseñado (admin.js líneas 6310-6624):**
+```javascript
+// PASO 1: Crear socio titular con número secuencial
+// PASO 2: Inscribir titular en sus actividades (parsear JSON array)
+// PASO 3: Crear socios familiares con relación titularFamiliaId
+//         Inscribir cada familiar en sus actividades
+// PASO 4: Generar cuotas:
+//         - UNA cuota social (solo titular)
+//         - Cuotas de actividades (todos los integrantes)
+// PASO 5: Crear LinkPago con todas las cuotas
+// PASO 6: Actualizar solicitud a APROBADA
+// PASO 7: Enviar email de bienvenida (variables corregidas)
+```
+
+**Seeds actualizados:**
+```javascript
+const tiposSocio = [
+  { codigo: 'ACTIVO', nombre: 'Socio Activo', cuotaMensual: 15000 },
+  { codigo: 'CADETE', nombre: 'Socio Cadete', cuotaMensual: 8000 },
+  { codigo: 'VITALICIO', nombre: 'Socio Vitalicio', cuotaMensual: 0 },
+  { codigo: 'ADHERENTE', nombre: 'Socio Adherente', cuotaMensual: 5000 },
+]
+
+const categoriasSocio = [
+  { codigo: 'A', nombre: 'Categoría A', porcentajeDescuento: 20 },
+  { codigo: 'B', nombre: 'Categoría B', porcentajeDescuento: 10 },
+  { codigo: 'C', nombre: 'Categoría C', porcentajeDescuento: 0 },
+]
+```
+
+**Frontend:**
+
+**Nueva página:** `client/src/pages/public/AgregarFamiliares.jsx` (462 líneas)
+- Logo del club en header
+- Mensaje de confirmación de solicitud enviada
+- Listado de familiares agregados
+- Formulario para agregar familiar:
+  - Datos personales (apellidos, nombres, documento, fecha nacimiento)
+  - Select de parentesco (CONYUGE/HIJO)
+  - Grid de checkboxes para múltiples actividades
+- Botones: "Agregar Familiar", "Continuar sin Familiares", "Finalizar y Enviar"
+- Validaciones y manejo de errores con react-hot-toast
+
+**Página modificada:** `client/src/pages/public/InscripcionSocio.jsx`
+- Logo del club agregado en header
+- Cambio de select único a grid de checkboxes para actividades
+- Permite seleccionar múltiples actividades
+- Contador de actividades seleccionadas
+- Redirección automática a página de familiares después de enviar
+
+**App.jsx modificado:**
+- Importado y agregado `<Toaster />` de react-hot-toast
+- Nueva ruta: `/inscripcion-socio/:solicitudId/familiares`
+
+**Archivos modificados:**
+```
+server/prisma/schema.prisma                       # +27 líneas (FamiliarSolicitud + cambio a array)
+server/prisma/seed.js                             # +61 líneas (tipos y categorías)
+server/src/routes/public.js                       # NUEVO (337 líneas con 4 endpoints)
+server/src/routes/admin.js                        # Modificado (endpoint aprobación rediseñado)
+server/src/index.js                               # +2 líneas (registrar rutas públicas)
+client/src/pages/public/InscripcionSocio.jsx     # Modificado (checkboxes + logo)
+client/src/pages/public/AgregarFamiliares.jsx    # NUEVO (462 líneas)
+client/src/App.jsx                                # +4 líneas (Toaster + ruta)
+client/package.json                               # +1 dep (react-hot-toast)
+client/.env                                       # VITE_API_URL configurada
+```
+
+**Commits realizados:**
+```
+f2b9e68 - fix: Corregir import de errorHandler en public.js
+d6d1491 - fix: Remover import no usado en notificacionService
+b398f9f - feat: Completar integración de react-hot-toast
+a464dcb - feat: Agregar logo a formularios de inscripción
+c41df32 - feat: Agregar tipos y categorías de socio + corregir lógica de cuotas
+5b9d133 - feat: Permitir selección de múltiples actividades en formulario
+affd965 - fix: Corregir variables de email de bienvenida
+```
+
+**Decisiones técnicas importantes:**
+
+1. **Grupos familiares:** Los familiares son socios independientes vinculados al titular mediante `titularFamiliaId`. Esto permite:
+   - Gestión individual de cada integrante
+   - Inscripciones diferenciadas en actividades
+   - Reportes por persona
+   - Flexibilidad para cambios futuros
+
+2. **Cuota social única:** Solo el titular paga cuota social que cubre a toda la familia. Esto es más justo y refleja la práctica común de clubes.
+
+3. **Múltiples actividades:** Almacenadas como JSON array en lugar de normalizar en tabla. Trade-off aceptable porque:
+   - Simplifica el formulario público
+   - No requiere autenticación compleja
+   - Se convierte en Inscripciones normalizadas al aprobar
+
+4. **Flujo de dos pasos:** Permite completar formulario principal rápido y luego agregar familia opcionalmente, mejorando la experiencia.
+
+**Estado actualizado:**
+- ✅ **Formulario Público Alta Socios** - 100% COMPLETO (con familiares y múltiples actividades)
+- ✅ **Tipos y Categorías de Socio** - 100% COMPLETO
+- ✅ **Lógica de Cuotas** - 100% COMPLETO (corregida para grupos familiares)
+
+**Próximas prioridades según ROADMAP:**
+1. 🔴 **Completar Sistema de Inscripciones (70% → 100%)** - SIGUIENTE
+2. 🟡 Débito Automático
+3. 🟡 Conciliación Bancaria
+4. ⏳ App Móvil (esperando aprobación directivos)
+
+---
+
+### 📅 SESIÓN ANTERIOR (29 Enero 2026 - Noche - Continuación)
 
 **Tema: Sistema Completo de Solicitudes de Alta de Socios**
 
@@ -521,46 +711,87 @@ POST   /api/admin/categorias-actividad/:id/entrenadores  # Asignar entrenador
 
 ---
 
+### ✅ COMPLETADO - SISTEMA DE ALTAS DE SOCIOS
+
+#### **✅ 1. Formulario Público de Alta de Nuevos Socios - 100% COMPLETO**
+
+Sistema completo implementado con soporte para grupos familiares y múltiples actividades.
+
+**✅ Implementado:**
+- [x] Página pública `/inscripcion-socio` (sin login) con logo del club
+- [x] Página `/inscripcion-socio/:id/familiares` para agregar familia
+- [x] Formulario con todos los campos del Google Forms del club (16 campos)
+- [x] Soporte para múltiples actividades (checkboxes en lugar de select)
+- [x] Agregar familiares (cónyuge/hijos) con sus propias actividades
+- [x] Modelo `SolicitudSocio` completo en BD (20+ campos)
+- [x] Modelo `FamiliarSolicitud` en BD (12 campos)
+- [x] Envío de solicitud con estado PENDIENTE
+- [x] Admin recibe notificación por email de nueva solicitud
+- [x] Admin aprueba/rechaza desde panel `/admin/solicitudes`
+- [x] Al aprobar: crea socio titular + todos los familiares con números secuenciales
+- [x] Al aprobar: inscribe automáticamente en actividades seleccionadas (con validación de edad)
+- [x] Al aprobar: genera cuotas (1 social + N actividades) y LinkPago
+- [x] Al aprobar: envía email de bienvenida
+- [x] Al rechazar: envía email con motivo
+- [x] 3 templates de email (SOLICITUD_RECIBIDA, NOTIF_NUEVA_SOLICITUD, SOLICITUD_RECHAZADA)
+- [x] Tipos de socio agregados al seed (4 tipos con cuotas)
+- [x] Categorías de socio agregadas al seed (3 categorías con descuentos)
+- [x] Validación de edad para detección automática de menores
+- [x] Datos del tutor requeridos para menores de 18 años
+- [x] Integración con react-hot-toast para notificaciones
+
+**Archivos creados:**
+```javascript
+server/prisma/schema.prisma                       // +70 líneas (2 modelos)
+server/src/routes/public.js                       // NUEVO (337 líneas)
+client/src/pages/public/InscripcionSocio.jsx     // NUEVO (439 líneas)
+client/src/pages/public/AgregarFamiliares.jsx    // NUEVO (462 líneas)
+client/src/pages/admin/Solicitudes.jsx           // NUEVO (758 líneas)
+server/prisma/seeds/emailTemplatesSolicitudes.js // NUEVO (360 líneas)
+```
+
+**Lógica especial implementada:**
+- **Grupos familiares:** Todos los miembros se crean como socios vinculados al titular
+- **Cuota social única:** Solo el titular paga cuota social (cubre toda la familia)
+- **Cuotas de actividades:** Cada integrante paga por sus actividades
+- **LinkPago unificado:** Todo se cobra junto al titular
+
+---
+
 ### ❌ PENDIENTES - PRIORIDAD ALTA
 
-#### **1. Formulario Público de Alta de Nuevos Socios**
+#### **1. Completar Sistema de Inscripciones (70% → 100%)** 🔴 SIGUIENTE
 
-Actualmente los socios se dan de alta manualmente desde el panel admin. Falta crear un formulario público (tipo Google Forms) donde la gente se pueda anotar.
+El modelo existe y funciona para aprobación de solicitudes, pero falta el CRUD completo desde admin.
 
-**❌ Pendiente:**
-- [ ] Página pública `/inscripcion-socio` (sin login)
-- [ ] Formulario con campos del Google Forms del club
-- [ ] Envío de solicitud con estado PENDIENTE_APROBACION
-- [ ] Admin recibe notificación de nueva solicitud
-- [ ] Admin aprueba/rechaza desde panel
-- [ ] Al aprobar: crear socio, asignar número, enviar email bienvenida
-- [ ] Al rechazar: enviar email con motivo
+**✅ Ya implementado:**
+- Modelo `Inscripcion` en BD
+- Relaciones completas
+- Se usa en generación de cuotas
+- Se muestra en detalle del socio
+- Funciona campo `exentoCuota` y `porcentajeCuota`
 
-**Archivos a crear:**
+**❌ Falta implementar:**
+- [ ] CRUD independiente de inscripciones (endpoints + página)
+- [ ] Página "Inscripciones" con listado y filtros
+- [ ] Modal/formulario para inscribir socio en actividad
+- [ ] Validación de edad (edadMinima, edadMaxima de categoría)
+- [ ] Validación de cupos máximos
+- [ ] Asignación de entrenadores a categorías
+- [ ] Vista de "Plantel" por categoría (lista de inscriptos)
+- [ ] Exportar plantel a Excel
+- [ ] Histórico de inscripciones (mostrar inactivas)
+- [ ] Dar de baja de actividad con motivo
+
+**Endpoints a crear:**
 ```javascript
-client/src/pages/public/InscripcionSocio.jsx
-server/src/routes/public.js  // POST /api/public/solicitud-socio
+GET    /api/admin/inscripciones                   // Listar con filtros
+POST   /api/admin/inscripciones                   // Crear (validar edad, cupo)
+PUT    /api/admin/inscripciones/:id               // Actualizar
+DELETE /api/admin/inscripciones/:id               // Dar de baja
+GET    /api/admin/categorias-actividad/:id/plantel  // Ver inscriptos
+POST   /api/admin/categorias-actividad/:id/entrenadores  // Asignar entrenador
 ```
-
-**Modelo a agregar:**
-```prisma
-model SolicitudSocio {
-  id              Int      @id @default(autoincrement())
-  nombre          String
-  apellido        String
-  dni             String
-  email           String
-  telefono        String
-  // ... otros campos del formulario
-  estado          String   @default("PENDIENTE") // PENDIENTE, APROBADA, RECHAZADA
-  motivoRechazo   String?
-  fechaSolicitud  DateTime @default(now())
-  fechaRespuesta  DateTime?
-  socioCreado     Int?     // ID del socio creado al aprobar
-}
-```
-
-**NOTA:** El usuario tiene un formulario de Google Forms con estos datos. Está pendiente pasarlo para implementar exactamente los mismos campos.
 
 ---
 
@@ -682,24 +913,38 @@ client/src/pages/admin/ConciliacionBancaria.jsx
    - ✅ Ver todas las actividades inscriptas
    - **Impacto:** Autogestión completa del socio ✅ LOGRADO
 
-### **🟡 Mediano Plazo - PRIORIDAD 2 (4-8 semanas)**
+### **🔴 Corto Plazo - PRIORIDAD 2 (Próximas semanas)**
 
-4. **Completar Sistema de Inscripciones** ⭐ CRÍTICO
+4. ✅ **Formulario Público Alta Socios** ⭐ CRÍTICO - **COMPLETADO**
+   - ✅ Formulario público `/inscripcion-socio` + `/familiares`
+   - ✅ Modelo SolicitudSocio + FamiliarSolicitud
+   - ✅ Workflow completo de aprobación/rechazo
+   - ✅ Emails automáticos (bienvenida/rechazo/notificación)
+   - ✅ Grupos familiares con números secuenciales
+   - ✅ Múltiples actividades por persona
+   - ✅ Tipos y categorías de socio
+   - ✅ Lógica de cuotas corregida (1 social + N actividades)
+   - **Impacto:** Automatización completa de altas ✅ LOGRADO
+
+5. ✅ **Tipos y Categorías de Socio** ⭐ ALTA - **COMPLETADO**
+   - ✅ 4 Tipos de socio en seed (con cuotas mensuales)
+   - ✅ 3 Categorías en seed (con descuentos)
+   - ✅ Vinculados a conceptos de tesorería
+   - ✅ Selects poblados en aprobación de solicitudes
+   - **Impacto:** Clasificación correcta de socios ✅ LOGRADO
+
+### **🟡 Mediano Plazo - PRIORIDAD 3 (4-8 semanas)**
+
+6. **Completar Sistema de Inscripciones** ⭐ CRÍTICO - 🔴 **SIGUIENTE**
    - CRUD completo de inscripciones
    - Validaciones (edad, cupos)
    - Vista de plantel por categoría
    - Asignación de entrenadores
    - Exportar plantel a Excel
    - **Impacto:** Core del negocio del club
+   - **Estado:** 70% completo (falta CRUD desde admin)
 
-5. **Formulario Público Alta Socios** ⭐ CRÍTICO
-   - Recopilar campos del Google Forms del club
-   - Implementar formulario público `/inscripcion-socio`
-   - Modelo SolicitudSocio + workflow aprobación
-   - Emails automáticos (bienvenida/rechazo)
-   - **Impacto:** Automatización completa de altas
-
-### **🟢 Mediano/Largo Plazo - PRIORIDAD 3 (2-3 meses)**
+### **🟢 Mediano/Largo Plazo - PRIORIDAD 4 (2-3 meses)**
 
 6. **Débito Automático**
    - Prisma y/o Payway
