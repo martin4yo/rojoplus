@@ -27,6 +27,7 @@ import deportesRoutes from './routes/deportes.js'
 import presupuestoRoutes from './routes/presupuesto.js'
 import templatesRoutes from './routes/templates.js'
 import publicRoutes from './routes/public.js'
+import cierreCajaRoutes from './routes/cierreCaja.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -71,6 +72,7 @@ app.use('/api/admin/asientos', asientosRoutes)
 app.use('/api/admin', deportesRoutes)
 app.use('/api/admin', presupuestoRoutes)
 app.use('/api/admin/templates', templatesRoutes)
+app.use('/api/admin/cierres-caja', cierreCajaRoutes)
 app.use('/api/socio', socioRoutes)
 app.use('/api/pagos', pagosRoutes)
 app.use('/api/public', publicRoutes)

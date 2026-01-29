@@ -33,6 +33,7 @@ import AdminReportes from './pages/admin/Reportes'
 import AdminTablasAuxiliares from './pages/admin/TablasAuxiliares'
 import AdminSolicitudes from './pages/admin/Solicitudes'
 import AdminInscripciones from './pages/admin/Inscripciones'
+import AdminCierreCaja from './pages/admin/CierreCaja'
 import AdminConfiguracionLista from './pages/admin/ConfiguracionLista'
 import AdminConfiguracionForm from './pages/admin/ConfiguracionForm'
 import AdminConfiguracionPagos from './pages/admin/ConfiguracionPagos'
@@ -180,6 +181,7 @@ function App() {
         <Route path="socios/:id/editar" element={<AdminSocioForm />} />
         <Route path="solicitudes" element={<AdminSolicitudes />} />
         <Route path="inscripciones" element={<AdminInscripciones />} />
+        <Route path="cierres-caja" element={<AdminCierreCaja />} />
         <Route path="reportes" element={<AdminReportes />} />
         <Route path="reportes/actividades" element={<AdminReporteActividades />} />
         <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />

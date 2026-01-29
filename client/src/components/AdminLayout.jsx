@@ -116,6 +116,7 @@ export default function AdminLayout() {
       label: 'Tesoreria', icon: Wallet,
       submenu: [
         { path: '/admin/tesoreria/cajas', label: 'Cajas', icon: Wallet },
+        { path: '/admin/cierres-caja', label: 'Cierre de Caja', icon: ClipboardList },
         { path: '/admin/tesoreria/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
         { path: '/admin/tesoreria/transferencias', label: 'Transferencias', icon: ArrowLeftRight },
       ]

@@ -712,6 +712,7 @@ model Caja {
   movimientosContables MovimientoContable[]
   echeqsOrigen         ECheq[]              @relation("ECheqCajaOrigen") // eCheqs emitidos desde este banco
   echeqsDestino        ECheq[]              @relation("ECheqCajaDestino") // eCheqs recibidos a depositar aquí
+  cierres              CierreCaja[]
 
   @@index([cuentaContableId])
   @@map("cajas")
@@ -1052,13 +1053,15 @@ model Admin {
   apellido            String?
   rolId               Int?             @map("rol_id")
   telefono            String?
-  rol                 Rol?             @relation(fields: [rolId], references: [id])
-  movimientos         MovimientoCaja[]
-  echeqs              ECheq[]
-  asientosRegistrados Asiento[]        @relation("AsientoRegistrador")
-  asientosAnulados    Asiento[]        @relation("AsientoAnulador")
-  pagosInformados     PagoInformado[]
-  solicitudesProcesadas SolicitudSocio[]
+  rol                     Rol?             @relation(fields: [rolId], references: [id])
+  movimientos             MovimientoCaja[]
+  echeqs                  ECheq[]
+  asientosRegistrados     Asiento[]        @relation("AsientoRegistrador")
+  asientosAnulados        Asiento[]        @relation("AsientoAnulador")
+  pagosInformados         PagoInformado[]
+  solicitudesProcesadas   SolicitudSocio[]
+  cierresCerrados         CierreCaja[]     @relation("CierreCajaCerradoPor")
+  cierresFirmados         CierreCaja[]     @relation("CierreCajaFirmadoPor")
 
   @@map("admins")
 }
@@ -2055,4 +2058,43 @@ model FamiliarSolicitud {
   @@index([solicitudSocioId])
   @@index([documento])
   @@map("familiares_solicitud")
+}
+
+// Cierre de caja diario - Control de efectivo y arqueo
+model CierreCaja {
+  id                     Int       @id @default(autoincrement())
+  cajaId                 Int       @map("caja_id")
+  fecha                  DateTime  @default(now()) // Fecha del cierre (día que se está cerrando)
+
+  // Saldos y diferencias
+  saldoSistema           Decimal   @map("saldo_sistema") @db.Decimal(12, 2)  // Saldo según sistema
+  saldoReal              Decimal   @map("saldo_real") @db.Decimal(12, 2)     // Saldo real contado
+  diferencia             Decimal   @map("diferencia") @db.Decimal(12, 2)     // Diferencia (puede ser + o -)
+
+  // Resumen de movimientos del día
+  totalIngresos          Decimal   @map("total_ingresos") @db.Decimal(12, 2)
+  totalEgresos           Decimal   @map("total_egresos") @db.Decimal(12, 2)
+  cantidadMovimientos    Int       @map("cantidad_movimientos")
+
+  // Observaciones y notas
+  observaciones          String?   @db.Text
+
+  // Auditoría
+  cerradoPor             Int       @map("cerrado_por")      // Admin que hizo el cierre
+  firmadoPor             Int?      @map("firmado_por")      // Admin que firmó/aprobó
+  fechaCierre            DateTime  @default(now()) @map("fecha_cierre")
+  fechaFirma             DateTime? @map("fecha_firma")
+
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  caja                   Caja      @relation(fields: [cajaId], references: [id])
+  adminCerrado           Admin     @relation("CierreCajaCerradoPor", fields: [cerradoPor], references: [id])
+  adminFirmado           Admin?    @relation("CierreCajaFirmadoPor", fields: [firmadoPor], references: [id])
+
+  @@index([cajaId])
+  @@index([fecha])
+  @@index([cerradoPor])
+  @@map("cierres_caja")
 }
