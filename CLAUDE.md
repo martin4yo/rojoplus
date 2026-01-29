@@ -59,7 +59,140 @@ RojoPlus/
 
 ## Estado Actual del Desarrollo
 
-### 📅 ÚLTIMA SESIÓN (29 Enero 2026 - Noche)
+### 📅 ÚLTIMA SESIÓN (29 Enero 2026 - Noche - Continuación)
+
+**Tema: Sistema Completo de Solicitudes de Alta de Socios**
+
+**Trabajo realizado:**
+1. ✅ **Implementado Sistema Completo de Solicitudes de Alta de Socios desde Formulario Público**
+   - Basado en Google Forms del club (16 campos)
+   - Workflow completo: Solicitud → Revisión → Aprobación/Rechazo → Notificación
+   - Integración completa con sistema de socios existente
+
+**Backend:**
+- **Modelo `SolicitudSocio` agregado al schema:**
+  - Todos los campos del formulario (datos personales, dirección, actividad)
+  - Datos del tutor (para menores de 18 años)
+  - Condiciones de salud
+  - Estados: PENDIENTE, APROBADA, RECHAZADA
+  - Auditoría completa (fechas, quien procesó, observaciones)
+  - Relaciones con Admin y Socio creado
+
+- **Rutas públicas (sin autenticación):**
+  - POST `/api/public/solicitud-socio` - Recibir nueva solicitud
+  - Validaciones: email, documento único, campos requeridos
+  - Detección automática de menores (< 18 años requiere tutor)
+  - Envío de email de confirmación al solicitante
+  - Notificación a todos los administradores activos
+
+- **Rutas de administración:**
+  - GET `/api/admin/solicitudes` - Listar con filtros (estado, búsqueda, fechas, paginación)
+  - GET `/api/admin/solicitudes/:id` - Ver detalle completo
+  - PUT `/api/admin/solicitudes/:id/aprobar` - Aprobar y crear socio
+  - PUT `/api/admin/solicitudes/:id/rechazar` - Rechazar con motivo
+  - GET `/api/admin/solicitudes-stats` - Estadísticas (pendientes, aprobadas, rechazadas, del mes)
+
+- **Lógica de Aprobación:**
+  - Genera número de socio automáticamente (próximo disponible)
+  - Crea socio completo con todos los datos
+  - Asigna tipo y categoría de socio seleccionados por admin
+  - Si indicó actividad: busca e inscribe automáticamente en categoría apropiada para su edad
+  - Envía email de bienvenida con número de socio y acceso al portal
+  - Vincula solicitud con socio creado
+
+- **Lógica de Rechazo:**
+  - Requiere especificar motivo del rechazo
+  - Envía email al solicitante explicando el motivo
+  - Incluye contacto del club para consultas
+
+- **3 Templates de Email creados:**
+  - `SOLICITUD_RECIBIDA` - Confirmación al solicitante
+  - `NOTIF_NUEVA_SOLICITUD` - Alerta a administradores
+  - `SOLICITUD_RECHAZADA` - Notificación de rechazo con motivo
+  - Todos con diseño HTML responsive y paleta del club
+
+- **Servicio de notificaciones:**
+  - Exportada función `enviarEmailConTemplate` en notificacionService
+  - Usada en public.js y admin.js para envíos
+
+**Frontend:**
+- **Página pública `/inscripcion-socio`:**
+  - Formulario completo con todos los campos del Google Forms
+  - Validación de edad en tiempo real
+  - Campos condicionales:
+    - Si tiene enfermedades → textarea para detalles
+    - Si es menor de 18 años → datos del tutor (4 campos requeridos)
+  - Select de actividades (10 opciones del club)
+  - Validación de email con regex
+  - Página de éxito con número de solicitud
+  - Diseño responsive con gradiente rojo/gris del club
+  - Estados de loading y manejo de errores
+
+- **Página admin `/admin/solicitudes`:**
+  - 5 KPI cards: Total, Pendientes, Aprobadas, Rechazadas, Del Mes
+  - Filtros múltiples: estado, búsqueda (nombre/DNI/email), rango de fechas
+  - Tabla con 8 columnas: ID, Solicitante, DNI, Email, Actividad, Fecha, Estado, Acciones
+  - Badges de estado con colores (amarillo/verde/rojo)
+  - Acciones disponibles según estado:
+    - PENDIENTE → Ver / Aprobar / Rechazar
+    - APROBADA/RECHAZADA → Ver (solo lectura)
+
+- **Modal de Detalle:**
+  - Visualiza todos los datos de la solicitud
+  - Grid responsive de 2 columnas
+  - Secciones: Datos personales, Domicilio, Actividad, Salud, Tutor
+  - Si está procesada: muestra estado, fecha, quien procesó, socio creado o motivo rechazo
+  - Botones de acción (aprobar/rechazar) si está pendiente
+
+- **Modal de Aprobación:**
+  - Select de Tipo de Socio (requerido)
+  - Select de Categoría de Socio (opcional)
+  - Textarea de observaciones internas
+  - Al confirmar: crea socio y envía email de bienvenida
+
+- **Modal de Rechazo:**
+  - Textarea para motivo del rechazo (requerido)
+  - Aviso de que el mensaje será enviado al solicitante
+  - Al confirmar: actualiza estado y envía email
+
+- **Integración con menú:**
+  - Nuevo item "Solicitudes" en el menú principal de admin
+  - Icono UserPlus
+  - Ubicado entre "Socios" y "Cuotas"
+
+**Archivos modificados:**
+```
+server/prisma/schema.prisma                       # +48 líneas (modelo SolicitudSocio)
+server/src/routes/public.js                       # NUEVO (174 líneas)
+server/src/routes/admin.js                        # +349 líneas (endpoints solicitudes)
+server/src/services/notificacionService.js        # exportar enviarEmailConTemplate
+server/src/index.js                               # registrar rutas públicas
+server/prisma/seeds/emailTemplatesSolicitudes.js  # NUEVO (360 líneas)
+client/src/pages/public/InscripcionSocio.jsx     # NUEVO (634 líneas)
+client/src/pages/admin/Solicitudes.jsx           # NUEVO (758 líneas)
+client/src/App.jsx                                # +3 líneas (imports y rutas)
+client/src/components/AdminLayout.jsx            # +2 líneas (import UserPlus y menu item)
+```
+
+**Commits realizados:**
+```
+b17d1db - feat: Sistema completo de solicitudes de alta de socios
+```
+
+**Estado de prioridades actualizado:**
+- ✅ **Formulario Público Alta Socios** - 100% COMPLETO
+- ✅ **Portal del Socio** - 100% COMPLETO
+- ✅ **Notificaciones Automáticas** - 100% COMPLETO
+- ✅ **Asientos Contables Automáticos** - 100% COMPLETO
+
+**Próximas prioridades:**
+1. Completar Sistema de Inscripciones (70% → 100%)
+2. Validación de edad en inscripciones
+3. CRUD completo de inscripciones desde admin
+
+---
+
+### 📅 SESIÓN ANTERIOR (29 Enero 2026 - Noche)
 
 **Tema: Completar Portal del Socio al 100%**
 
