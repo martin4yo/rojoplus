@@ -165,6 +165,11 @@ export default function AgregarFamiliares() {
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
+            <img
+              src="/images/logo.png"
+              alt="Club Sportivo Pilar"
+              className="h-16 mx-auto mb-4"
+            />
             <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
               <svg className="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>

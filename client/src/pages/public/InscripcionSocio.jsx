@@ -102,6 +102,11 @@ export default function InscripcionSocio() {
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
+            <img
+              src="/images/logo.png"
+              alt="Club Sportivo Pilar"
+              className="h-20 mx-auto mb-6"
+            />
             <h1 className="text-4xl font-bold text-gray-900 mb-2">
               ¡Bienvenido a la gran familia de Sportivo!
             </h1>
