@@ -6582,26 +6582,20 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
     }
   })
 
-  // PASO 7: Enviar email de bienvenida con link de pago
+  // PASO 7: Enviar email de bienvenida
   try {
-    const clubNombre = (await req.prisma.configuracion.findUnique({
-      where: { clave: 'CLUB_NOMBRE' }
-    }))?.valor || 'Club Sportivo Pilar'
-
-    const urlLinkPago = linkPago
-      ? `${process.env.FRONTEND_URL}/pagar/${linkPago.token}`
-      : `${process.env.FRONTEND_URL}/mi-qr`
+    const fechaAlta = new Date().toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    })
 
     await enviarEmailConTemplate('BIENVENIDA', nuevoSocio.email, {
-      nombreCompleto: nuevoSocio.apellidoNombre,
+      socioNombre: nuevoSocio.apellidoNombre,
       nroSocio: nuevoSocio.nroSocio,
-      clubNombre,
-      email: nuevoSocio.email,
-      telefono: nuevoSocio.celular,
-      urlPortal: `${process.env.FRONTEND_URL}/mi-qr`,
-      urlPago: urlLinkPago,
-      montoPrimeraCuota: linkPago ? `$${linkPago.montoTotal.toFixed(2)}` : '0',
-      cantidadFamiliares: solicitud.familiares.length
+      fechaAlta,
+      linkPortal: `${process.env.FRONTEND_URL}/mi-qr`,
+      linkMiQR: `${process.env.FRONTEND_URL}/mi-qr`
     })
   } catch (emailError) {
     console.error('Error enviando email de bienvenida:', emailError)
