@@ -1,7 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import nodemailer from 'nodemailer'
 import Handlebars from 'handlebars'
-import { generarReciboPagoPDF } from './pdfGenerator.js'
 
 const prisma = new PrismaClient()
 
