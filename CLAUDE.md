@@ -474,11 +474,19 @@ client/src/pages/admin/ConciliacionBancaria.jsx
    - Conciliación automática/manual
    - **Impacto:** Control financiero
 
-### **Largo Plazo (3+ meses)**
+### **Largo Plazo (3-6 meses)**
 
-8. Cierre de Caja Diario
-9. Reportes Avanzados
-10. PWA y Mobile
+8. **App Móvil Nativa para Socios** ⭐⭐ ESTRATÉGICO
+   - React Native (iOS + Android)
+   - MVP: Carnet QR, Cuenta corriente, Pagos, Actividades
+   - Chat grupal por equipo + comunicación club
+   - Reservas de instalaciones
+   - Newsfeed y comunidad
+   - **Impacto:** Experiencia del socio de clase mundial
+   - **Documentación:** `docs/19-APP-MOVIL-SOCIOS.md`
+
+9. Cierre de Caja Diario
+10. Reportes Avanzados
 
 ---
 
@@ -594,6 +602,7 @@ Admin: admin@rojoplus.com / admin123
 - `docs/15-PORTAL-PAGOS-ONLINE.md` - Portal del socio y pagos
 - `docs/16-CONFIGURACION-BRANDING.md` - Configuración de marca
 - `docs/18-SISTEMA-TEMPLATES-NOTIFICACIONES.md` - Templates y emails
+- `docs/19-APP-MOVIL-SOCIOS.md` - **App móvil nativa (iOS + Android)**
 - `C:\Users\marti\.claude\plans\linear-cooking-gosling.md` - Plan módulos financieros
 
 ---
