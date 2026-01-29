@@ -12,6 +12,8 @@ import {
   PhoneIcon,
   BanknotesIcon,
   ArrowUpTrayIcon,
+  ArrowDownTrayIcon,
+  TableCellsIcon,
 } from '@heroicons/react/24/outline'
 // import { Smartphone } from 'lucide-react' // MODO temporalmente oculto
 import { useModal } from '../../../components/Modal'
@@ -19,9 +21,11 @@ import { useModal } from '../../../components/Modal'
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [cuotas, setCuotas] = useState([])
   const [historial, setHistorial] = useState([])
+  const [cuentaCorriente, setCuentaCorriente] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('pendientes') // 'pendientes' | 'historial'
+  const [tab, setTab] = useState('pendientes') // 'pendientes' | 'historial' | 'cuenta-corriente'
   const [procesandoPago, setProcesandoPago] = useState(false)
+  const [descargandoPDF, setDescargandoPDF] = useState(null)
   const [configPagos, setConfigPagos] = useState(null)
   const [copiadoAlias, setCopiadoAlias] = useState(false)
   const [copiadoCBU, setCopiadoCBU] = useState(false)
@@ -37,6 +41,12 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
     cargarDatos()
     cargarConfigPagos()
   }, [tokenPortal])
+
+  useEffect(() => {
+    if (tab === 'cuenta-corriente' && !cuentaCorriente) {
+      cargarCuentaCorriente()
+    }
+  }, [tab])
 
   const cargarDatos = async () => {
     try {
@@ -61,6 +71,57 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
       setConfigPagos(config)
     } catch (err) {
       console.error('Error cargando config de pagos:', err)
+    }
+  }
+
+  const cargarCuentaCorriente = async () => {
+    try {
+      setLoading(true)
+      const data = await api.get(`/socio/${tokenPortal}/cuenta-corriente`)
+      setCuentaCorriente(data)
+    } catch (err) {
+      console.error('Error cargando cuenta corriente:', err)
+      showModal({
+        type: 'error',
+        message: 'Error cargando la cuenta corriente',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const descargarReciboPDF = async (pagoId, numeroRecibo) => {
+    try {
+      setDescargandoPDF(pagoId)
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/socio/${tokenPortal}/pagos/${pagoId}/pdf`,
+        {
+          method: 'GET',
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Error descargando el recibo')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Recibo-${numeroRecibo}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      console.error('Error descargando recibo:', err)
+      showModal({
+        type: 'error',
+        message: 'Error al descargar el recibo',
+      })
+    } finally {
+      setDescargandoPDF(null)
     }
   }
 
@@ -292,7 +353,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-3">
           <button
             onClick={() => setTab('pendientes')}
             className={`py-4 px-6 font-semibold transition-colors ${
@@ -301,6 +362,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}
           >
+            <ClockIcon className="h-5 w-5 inline-block mr-2" />
             Pendientes ({cuotas.length})
           </button>
           <button
@@ -311,7 +373,19 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}
           >
+            <CheckCircleIcon className="h-5 w-5 inline-block mr-2" />
             Historial ({historial.length})
+          </button>
+          <button
+            onClick={() => setTab('cuenta-corriente')}
+            className={`py-4 px-6 font-semibold transition-colors ${
+              tab === 'cuenta-corriente'
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <TableCellsIcon className="h-5 w-5 inline-block mr-2" />
+            Cuenta Corriente
           </button>
         </div>
       </div>
@@ -591,7 +665,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
             <div className="divide-y divide-gray-200">
               {historial.map((pago) => (
                 <div key={pago.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <h4 className="font-semibold text-gray-900">{pago.concepto}</h4>
                       <p className="text-sm text-gray-600 mt-1">{formatFecha(pago.fecha)}</p>
@@ -599,13 +673,178 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                         {pago.metodoPago} - {pago.comprobante}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-green-600">{formatMonto(pago.monto)}</p>
-                      <CheckCircleIcon className="h-5 w-5 text-green-500 inline ml-2" />
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-green-600">{formatMonto(pago.monto)}</p>
+                        <CheckCircleIcon className="h-5 w-5 text-green-500 inline ml-2" />
+                      </div>
+                      <button
+                        onClick={() => descargarReciboPDF(pago.id, pago.numero)}
+                        disabled={descargandoPDF === pago.id}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                        title="Descargar recibo"
+                      >
+                        {descargandoPDF === pago.id ? (
+                          <>
+                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                            <span>Descargando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ArrowDownTrayIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">PDF</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'cuenta-corriente' && (
+        <div className="space-y-4">
+          {loading ? (
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+              <div className="animate-spin h-12 w-12 border-4 border-red-600 border-t-transparent rounded-full mx-auto"></div>
+              <p className="text-gray-600 mt-4">Cargando cuenta corriente...</p>
+            </div>
+          ) : cuentaCorriente ? (
+            <>
+              {/* Resumen */}
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen de Cuenta</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-red-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-1">Total Debe</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {formatMonto(cuentaCorriente.resumen.totalDebe)}
+                    </p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-1">Total Haber</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {formatMonto(cuentaCorriente.resumen.totalHaber)}
+                    </p>
+                  </div>
+                  <div className={`rounded-lg p-4 ${
+                    parseFloat(cuentaCorriente.resumen.saldoFinal) > 0 ? 'bg-orange-50' : 'bg-blue-50'
+                  }`}>
+                    <p className="text-sm text-gray-600 mb-1">Saldo Final</p>
+                    <p className={`text-2xl font-bold ${
+                      parseFloat(cuentaCorriente.resumen.saldoFinal) > 0 ? 'text-orange-600' : 'text-blue-600'
+                    }`}>
+                      {formatMonto(cuentaCorriente.resumen.saldoFinal)}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-1">Pendiente de Pago</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatMonto(cuentaCorriente.resumen.totalPendiente)}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {cuentaCorriente.resumen.cargosPendientes} cuota(s)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabla de movimientos */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Fecha
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Concepto
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Detalle
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Debe
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Haber
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Saldo
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {cuentaCorriente.movimientos.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                            No hay movimientos registrados
+                          </td>
+                        </tr>
+                      ) : (
+                        cuentaCorriente.movimientos.map((mov) => (
+                          <tr
+                            key={mov.id}
+                            className={`hover:bg-gray-50 ${
+                              mov.tipo === 'DEBITO' ? 'bg-red-50/30' : 'bg-green-50/30'
+                            }`}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatFecha(mov.fecha)}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                              {mov.concepto}
+                              {mov.estado === 'PENDIENTE' && (
+                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  Pendiente
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {mov.detalle}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600 font-medium">
+                              {mov.debe > 0 ? formatMonto(mov.debe) : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-medium">
+                              {mov.haber > 0 ? formatMonto(mov.haber) : '-'}
+                            </td>
+                            <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
+                              parseFloat(mov.saldo) > 0 ? 'text-orange-600' : 'text-blue-600'
+                            }`}>
+                              {formatMonto(mov.saldo)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {cuentaCorriente.movimientos.length > 0 && (
+                  <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                    <p className="text-sm text-gray-600">
+                      Mostrando {cuentaCorriente.movimientos.length} movimiento(s)
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+              <DocumentTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Error cargando cuenta corriente</h3>
+              <p className="text-gray-600 mb-4">No se pudo cargar la información</p>
+              <button
+                onClick={cargarCuentaCorriente}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Reintentar
+              </button>
             </div>
           )}
         </div>

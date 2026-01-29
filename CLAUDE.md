@@ -59,44 +59,48 @@ RojoPlus/
 
 ## Estado Actual del Desarrollo
 
-### 📅 ÚLTIMA SESIÓN (29 Enero 2026 - Tarde)
+### 📅 ÚLTIMA SESIÓN (29 Enero 2026 - Noche)
 
-**Tema: Verificación Opción C y Desarrollo de Notificaciones**
+**Tema: Completar Portal del Socio al 100%**
 
 **Trabajo realizado:**
-1. ✅ **Exploración exhaustiva del estado de Opción C**
-   - Verificado que Asientos Contables Automáticos está 100% completo y funcional
-   - Identificado que Notificaciones tiene 30% (templates listos, falta cron jobs)
-   - Identificado que Portal del Socio tiene 80% (falta descargas PDF)
-   - Documentados archivos clave encontrados y funcionalidades implementadas
-
-2. ✅ **Desarrollo completo de Notificaciones Automáticas**
-   - Modelo NotificacionLog agregado al schema con 11 campos y 5 índices
-   - Campos de preferencias agregados al modelo Socio (5 campos boolean)
-   - Instalado node-cron para programación de tareas
-   - Creado `server/src/services/notificacionService.js` (570+ líneas)
-   - Creado `server/src/jobs/notificaciones.js` con 4 cron jobs configurados
-   - 5 templates de email creados en BD (CUOTA_PROX_VENCER, CUOTA_VENCIDA, MOROSIDAD, INSCRIPCION_CONFIRMADA, BIENVENIDA)
-   - Integrado en servidor principal (index.js)
-   - Sistema completamente funcional y listo para producción
+1. ✅ **Completar Portal del Socio al 100%**
+   - Implementado endpoint para descargar recibos de pago en PDF
+   - Implementado endpoint de cuenta corriente completa con saldo acumulado
+   - Agregada tercera pestaña "Cuenta Corriente" en el portal
+   - Agregado botón de descarga de PDF en historial de pagos
+   - Tabla completa de movimientos (debe/haber/saldo)
+   - Resumen con KPIs (total debe, total haber, saldo final, pendiente)
+   - Sistema de colores para mejor visualización de saldos
 
 **Funcionalidades implementadas:**
-- **Cron Jobs programados:**
-  - ⏱️ Procesar cola: Cada 10 minutos
-  - 🔔 Cuotas próximas a vencer: Diario a las 9:00 AM (5 días antes)
-  - ⏰ Cuotas vencidas: Diario a las 10:00 AM
-  - 💰 Morosidad: Lunes y viernes a las 11:00 AM (cada 15 días)
 
-- **Notificaciones automáticas:**
-  - Email 5 días antes del vencimiento de cuota
-  - Email día del vencimiento de cuota
-  - Email recordatorio morosidad (cada 15 días si hay deuda)
-  - Email confirmación de inscripción en actividad
-  - Email de bienvenida a nuevo socio
+**Backend:**
+- **GET /api/socio/:tokenPortal/pagos/:pagoId/pdf** - Descargar recibo en PDF
+  - Genera PDF usando template de la BD
+  - Incluye datos del club, socio, y detalle del pago
+  - Headers correctos para descarga automática
 
-- **Centro de preferencias del socio:**
-  - Opt-in/opt-out por tipo de notificación
-  - 5 preferencias configurables en modelo Socio
+- **GET /api/socio/:tokenPortal/cuenta-corriente** - Cuenta corriente completa
+  - Combina cargos (débitos) y pagos (créditos)
+  - Calcula saldo acumulado por movimiento
+  - Ordena cronológicamente
+  - Resumen con totales y pendientes
+  - Filtros opcionales por fecha
+
+**Frontend:**
+- **Nueva pestaña "Cuenta Corriente"**
+  - Tabla responsive con 6 columnas
+  - Resumen visual con 4 KPIs (debe, haber, saldo, pendiente)
+  - Colores diferenciados por tipo de movimiento
+  - Estados visuales (pendiente, confirmado)
+  - Loading states y manejo de errores
+
+- **Botón de descarga en Historial**
+  - Descarga directa de PDF por cada pago
+  - Estado de carga visual
+  - Manejo de errores con modal
+  - Nombre de archivo personalizado
 
 **Estado verificado de Opción C:**
 - ✅ **Asientos Contables Automáticos: 100% COMPLETO**
@@ -116,19 +120,27 @@ RojoPlus/
   - Reintentos automáticos (máximo 3) ✅
   - Log de auditoría completo ✅
 
-- 🟢 **Portal del Socio: 80% COMPLETO**
-  - Dashboard, Mi Perfil, Mis Actividades, Beneficios ✅
-  - Pagos con MercadoPago/MODO, informar pago manual ✅
-  - Falta: descargar comprobantes PDF, cuenta corriente con saldo acumulado
+- ✅ **Portal del Socio: 100% COMPLETO** 🎉
+  - Dashboard completo con resumen y QR ✅
+  - Mi Perfil con edición de datos ✅
+  - Mis Actividades con gestión ✅
+  - Beneficios y comercios adheridos ✅
+  - Pagos con MercadoPago/MODO ✅
+  - Informar pago manual con upload ✅
+  - Historial con descarga de PDF ✅
+  - Cuenta corriente completa con saldo acumulado ✅
 
 **Decisión tomada:**
 - ✅ Asientos Contables verificados como completos
 - ✅ Notificaciones Automáticas completadas al 100%
-- 🔜 Próximo: Completar Portal del Socio (descargas PDF, cuenta corriente)
+- ✅ Portal del Socio completado al 100%
+- 🎉 **OPCIÓN C COMPLETADA AL 100%**
+- 🔜 Próximo: Opción B (Inscripciones + Formulario Público)
 
 **Prioridades establecidas para próximas sesiones:**
 
-**🔴 PRIORIDAD 1 (Opción C - EN DESARROLLO):**
+**✅ PRIORIDAD 1 (Opción C - COMPLETADA 100%)** 🎉
+
 1. ✅ **Asientos Contables Automáticos** - **COMPLETADO 100%**
    - ✅ Modelo Caja con cuentaContableId
    - ✅ Servicio `asientosContables.js` completo (593 líneas)
@@ -137,7 +149,7 @@ RojoPlus/
    - ✅ Integrado en facturas compra/venta (movimientosContables.js)
    - ✅ Reportes: Libro Diario, Libro Mayor, Balance
 
-2. ✅ **Notificaciones Automáticas Programadas** - **COMPLETADO 100%** 🎉
+2. ✅ **Notificaciones Automáticas Programadas** - **COMPLETADO 100%**
    - ✅ Crear modelo NotificacionLog en schema
    - ✅ Instalar node-cron
    - ✅ Implementar cron jobs (server/src/jobs/notificaciones.js)
@@ -147,11 +159,13 @@ RojoPlus/
    - ✅ Email confirmación de inscripción
    - ✅ Centro de preferencias del socio (opt-in/opt-out)
 
-3. 🟡 **Completar Portal del Socio** - **PENDIENTE (80% → 100%)**
-   - [ ] Cuenta corriente completa con historial
-   - [ ] Descarga de comprobantes históricos (PDF)
-   - ✅ Actualizar datos personales (YA FUNCIONA)
-   - ✅ Ver todas las actividades inscriptas (YA FUNCIONA)
+3. ✅ **Completar Portal del Socio** - **COMPLETADO 100%**
+   - ✅ Cuenta corriente completa con historial
+   - ✅ Descarga de comprobantes históricos (PDF)
+   - ✅ Actualizar datos personales
+   - ✅ Ver todas las actividades inscriptas
+   - ✅ Nueva pestaña "Cuenta Corriente" con tabla de movimientos
+   - ✅ Botón de descarga PDF en historial de pagos
 
 **🟡 PRIORIDAD 2 (Opción B - Después de Opción C):**
 1. **Completar Sistema de Inscripciones** (70% → 100%)
@@ -216,7 +230,7 @@ RojoPlus/
 - [ ] Cierre de caja diario (PENDIENTE)
 - [ ] Arqueo de efectivo (PENDIENTE)
 
-#### **FASE 6: Portal del Socio** (80%)
+#### **FASE 6: Portal del Socio** (100%)
 - [x] Pagos online con MercadoPago
 - [x] Pagos online con MODO
 - [x] Informar pago manual con upload de comprobante
@@ -226,8 +240,10 @@ RojoPlus/
 - [x] Ver actividades inscriptas (con dar de baja)
 - [x] Dashboard con resumen de cuotas y QR
 - [x] Ver grupo familiar
-- [ ] Cuenta corriente completa con saldo acumulado (PENDIENTE)
-- [ ] Descargar comprobantes históricos en PDF (PENDIENTE)
+- [x] Cuenta corriente completa con saldo acumulado
+- [x] Descargar comprobantes históricos en PDF
+- [x] Tabla de movimientos con debe/haber/saldo
+- [x] Resumen visual con KPIs de cuenta
 
 #### **Actividades Deportivas** (Backend + Config)
 - [x] CRUD de Actividades (Backend completo)
@@ -374,28 +390,7 @@ POST   /api/admin/categorias-actividad/:id/entrenadores  # Asignar entrenador
 
 ### ❌ PENDIENTES - PRIORIDAD ALTA
 
-#### **1. Completar Portal del Socio** (80% → 100%)
-
-**✅ Ya implementado:**
-- Dashboard con resumen de cuotas y QR
-- Mi Perfil (editar email, celular, domicilio)
-- Mis Actividades (ver y dar de baja)
-- Pagos con MercadoPago/MODO
-- Informar pago manual con upload
-- Beneficios (comercios adheridos, QR)
-
-**❌ Falta implementar:**
-- [ ] Cuenta corriente completa con saldo acumulado
-- [ ] Descarga de comprobantes históricos en PDF
-- [ ] Filtros por fecha en historial de pagos
-
-**Archivos a modificar:**
-- `server/src/routes/socio.js` → Agregar endpoints de descarga PDF
-- `client/src/pages/socio/sections/PagosSocio.jsx` → Botones de descarga
-
----
-
-#### **2. Formulario Público de Alta de Nuevos Socios**
+#### **1. Formulario Público de Alta de Nuevos Socios**
 
 Actualmente los socios se dan de alta manualmente desde el panel admin. Falta crear un formulario público (tipo Google Forms) donde la gente se pueda anotar.
 
@@ -438,7 +433,7 @@ model SolicitudSocio {
 
 ### ❌ PENDIENTES - PRIORIDAD MEDIA
 
-#### **4. Débito Automático (Prisma/Payway)**
+#### **2. Débito Automático (Prisma/Payway)**
 
 **Funcionalidad:**
 - Generación de archivos de débito según formato de cada procesador
@@ -463,7 +458,7 @@ client/src/pages/admin/DebitoAutomatico.jsx
 
 ---
 
-#### **5. Conciliación Bancaria**
+#### **3. Conciliación Bancaria**
 
 **Funcionalidad:**
 - Importación de extractos bancarios (OFX, CSV, PDF manual)
@@ -489,7 +484,7 @@ client/src/pages/admin/ConciliacionBancaria.jsx
 
 ### ❌ PENDIENTES - PRIORIDAD BAJA
 
-#### **6. Cierre de Caja Diario**
+#### **4. Cierre de Caja Diario**
 
 - [ ] Resumen diario de movimientos
 - [ ] Comparar saldo sistema vs saldo real
@@ -498,7 +493,7 @@ client/src/pages/admin/ConciliacionBancaria.jsx
 
 ---
 
-#### **7. Reportes Avanzados**
+#### **5. Reportes Avanzados**
 
 **✅ Ya implementados:**
 - Reporte de Socios
@@ -516,7 +511,7 @@ client/src/pages/admin/ConciliacionBancaria.jsx
 
 ---
 
-#### **8. PWA y Mejoras Mobile**
+#### **6. PWA y Mejoras Mobile**
 
 - [ ] Convertir portal del socio en PWA instalable
 - [ ] Funcionalidad offline (datos cacheados)
@@ -547,12 +542,12 @@ client/src/pages/admin/ConciliacionBancaria.jsx
    - ✅ Centro de preferencias (opt-in/opt-out)
    - **Impacto:** +25% mejora cobranza, reducción morosidad ✅ LOGRADO
 
-3. 🟡 **Completar Portal del Socio** ⭐ ALTA - **PENDIENTE**
-   - Cuenta corriente completa con historial
-   - Descarga de comprobantes históricos (PDF)
-   - Actualizar datos personales del socio
-   - Ver todas las actividades inscriptas
-   - **Impacto:** Autogestión completa del socio
+3. ✅ **Completar Portal del Socio** ⭐ ALTA - **COMPLETADO**
+   - ✅ Cuenta corriente completa con historial
+   - ✅ Descarga de comprobantes históricos (PDF)
+   - ✅ Actualizar datos personales del socio
+   - ✅ Ver todas las actividades inscriptas
+   - **Impacto:** Autogestión completa del socio ✅ LOGRADO
 
 ### **🟡 Mediano Plazo - PRIORIDAD 2 (4-8 semanas)**
 

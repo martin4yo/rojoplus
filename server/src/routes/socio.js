@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
+import { generatePDF } from '../services/pdfGenerator.js'
 
 const router = Router()
 
@@ -1149,6 +1150,231 @@ router.post('/:token/informar-pago', asyncHandler(async (req, res) => {
     success: true,
     message: 'Pago informado correctamente. Será procesado en breve.',
     pagoInformadoId: pagoInformado.id,
+  })
+}))
+
+// GET /api/socio/:tokenPortal/pagos/:pagoId/pdf - Descargar recibo de pago en PDF
+router.get('/:tokenPortal/pagos/:pagoId/pdf', asyncHandler(async (req, res) => {
+  const { tokenPortal, pagoId } = req.params
+
+  // Verificar socio
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal },
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Buscar el pago
+  const pago = await req.prisma.pago.findFirst({
+    where: {
+      id: parseInt(pagoId),
+      socioId: socio.id,
+    },
+    include: {
+      medioPago: true,
+      cargos: {
+        include: {
+          periodo: true,
+          categoriaActividad: {
+            include: {
+              actividad: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!pago) {
+    throw new AppError('Pago no encontrado', 404, 'PAGO_NOT_FOUND')
+  }
+
+  // Obtener configuración del club
+  const configs = await req.prisma.configuracion.findMany({
+    where: {
+      clave: {
+        in: ['CLUB_NOMBRE', 'CLUB_DIRECCION', 'CLUB_TELEFONO', 'CLUB_EMAIL', 'CLUB_LEMA'],
+      },
+    },
+  })
+
+  const configMap = {}
+  configs.forEach(c => {
+    configMap[c.clave] = c.valor
+  })
+
+  // Preparar datos para el PDF
+  const pdfData = {
+    clubNombre: configMap.CLUB_NOMBRE || 'Club Sportivo Pilar',
+    clubLema: configMap.CLUB_LEMA || 'El Rojo de la Avenida',
+    clubDireccion: configMap.CLUB_DIRECCION || '',
+    clubTelefono: configMap.CLUB_TELEFONO || '',
+    clubEmail: configMap.CLUB_EMAIL || '',
+    numero: pago.numero,
+    fecha: new Date(pago.fecha).toLocaleDateString('es-AR'),
+    fechaGeneracion: new Date().toLocaleString('es-AR'),
+    socioNombre: socio.apellidoNombre,
+    socioNumero: socio.nroSocio,
+    medioPago: pago.medioPago?.nombre || 'No especificado',
+    nroOperacion: pago.nroOperacion || '-',
+    montoTotal: pago.montoTotal.toFixed(2),
+    items: pago.cargos.map(c => ({
+      concepto: c.descripcion || c.categoria,
+      periodo: c.periodo?.nombre || '-',
+      monto: c.montoTotal.toFixed(2),
+    })),
+    observaciones: pago.observaciones || '',
+  }
+
+  // Generar PDF
+  const pdfBuffer = await generatePDF(req.prisma, 'RECIBO', pdfData)
+
+  // Enviar PDF
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="Recibo-${pago.numero}.pdf"`)
+  res.send(pdfBuffer)
+}))
+
+// GET /api/socio/:tokenPortal/cuenta-corriente - Obtener cuenta corriente completa con saldo acumulado
+router.get('/:tokenPortal/cuenta-corriente', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+  const { desde, hasta, limite = 100 } = req.query
+
+  // Verificar socio
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal },
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Construir filtros de fecha
+  const filtroFecha = {}
+  if (desde) {
+    filtroFecha.gte = new Date(desde)
+  }
+  if (hasta) {
+    filtroFecha.lte = new Date(hasta)
+  }
+
+  // Obtener cargos (débitos)
+  const cargos = await req.prisma.cargo.findMany({
+    where: {
+      socioId: socio.id,
+      ...(desde || hasta ? { fechaGeneracion: filtroFecha } : {}),
+    },
+    include: {
+      periodo: true,
+      categoriaActividad: {
+        include: {
+          actividad: true,
+        },
+      },
+      pago: true,
+    },
+    orderBy: {
+      fechaGeneracion: 'asc',
+    },
+    take: parseInt(limite),
+  })
+
+  // Obtener pagos (créditos)
+  const pagos = await req.prisma.pago.findMany({
+    where: {
+      socioId: socio.id,
+      estado: 'CONFIRMADO',
+      ...(desde || hasta ? { fecha: filtroFecha } : {}),
+    },
+    include: {
+      medioPago: true,
+      cargos: true,
+    },
+    orderBy: {
+      fecha: 'asc',
+    },
+    take: parseInt(limite),
+  })
+
+  // Combinar y ordenar movimientos cronológicamente
+  const movimientos = []
+
+  // Agregar cargos como débitos
+  cargos.forEach(cargo => {
+    movimientos.push({
+      id: `cargo-${cargo.id}`,
+      tipo: 'DEBITO',
+      fecha: cargo.fechaGeneracion,
+      concepto: cargo.descripcion || cargo.categoria,
+      detalle: cargo.periodo?.nombre ||
+        (cargo.categoriaActividad ?
+          `${cargo.categoriaActividad.actividad.nombre} - ${cargo.categoriaActividad.nombre}` :
+          ''),
+      debe: cargo.montoTotal,
+      haber: 0,
+      estado: cargo.estado,
+      pagoId: cargo.pagoId,
+      vencimiento: cargo.fechaVencimiento,
+    })
+  })
+
+  // Agregar pagos como créditos
+  pagos.forEach(pago => {
+    movimientos.push({
+      id: `pago-${pago.id}`,
+      tipo: 'CREDITO',
+      fecha: pago.fecha,
+      concepto: 'Pago recibido',
+      detalle: `${pago.medioPago?.nombre || 'No especificado'} - ${pago.numero}`,
+      debe: 0,
+      haber: pago.montoTotal,
+      estado: 'CONFIRMADO',
+      pagoId: pago.id,
+      cantidadCuotas: pago.cargos.length,
+    })
+  })
+
+  // Ordenar por fecha
+  movimientos.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+
+  // Calcular saldo acumulado
+  let saldo = 0
+  const movimientosConSaldo = movimientos.map(mov => {
+    saldo += Number(mov.debe) - Number(mov.haber)
+    return {
+      ...mov,
+      saldo: saldo.toFixed(2),
+    }
+  })
+
+  // Resumen
+  const totalDebe = movimientos.reduce((sum, m) => sum + Number(m.debe), 0)
+  const totalHaber = movimientos.reduce((sum, m) => sum + Number(m.haber), 0)
+  const saldoFinal = totalDebe - totalHaber
+
+  const cargosPendientes = cargos.filter(c => c.estado === 'PENDIENTE')
+  const totalPendiente = cargosPendientes.reduce((sum, c) => sum + Number(c.montoTotal), 0)
+
+  res.json({
+    success: true,
+    data: {
+      movimientos: movimientosConSaldo,
+      resumen: {
+        totalDebe: totalDebe.toFixed(2),
+        totalHaber: totalHaber.toFixed(2),
+        saldoFinal: saldoFinal.toFixed(2),
+        cantidadCargos: cargos.length,
+        cantidadPagos: pagos.length,
+        totalPendiente: totalPendiente.toFixed(2),
+        cargosPendientes: cargosPendientes.length,
+      },
+      socio: {
+        nombre: socio.apellidoNombre,
+        nroSocio: socio.nroSocio,
+      },
+    },
   })
 }))
 
