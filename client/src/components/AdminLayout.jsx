@@ -84,6 +84,7 @@ export default function AdminLayout() {
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/socios', label: 'Socios', icon: Users },
     { path: '/admin/solicitudes', label: 'Solicitudes', icon: UserPlus },
+    { path: '/admin/inscripciones', label: 'Inscripciones', icon: ClipboardList },
     { path: '/admin/periodos', label: 'Cuotas', icon: Receipt },
     {
       label: 'Ingresos', icon: TrendingUp,
