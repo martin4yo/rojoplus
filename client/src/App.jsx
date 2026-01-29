@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 
 // Páginas públicas
 import Home from './pages/Home'
@@ -141,9 +142,11 @@ import AdminLayout from './components/AdminLayout'
 
 function App() {
   return (
-    <Routes>
-      {/* Rutas públicas */}
-      <Route path="/" element={<Home />} />
+    <>
+      <Toaster position="top-right" />
+      <Routes>
+        {/* Rutas públicas */}
+        <Route path="/" element={<Home />} />
       <Route path="/registro" element={<Registro />} />
       <Route path="/registro/exito" element={<RegistroExito />} />
       <Route path="/inscripcion-socio" element={<InscripcionSocio />} />
@@ -296,6 +299,7 @@ function App() {
         <Route path="deportes/asistencia/:id" element={<AsistenciaEntrenamiento />} />
       </Route>
     </Routes>
+    </>
   )
 }
 
