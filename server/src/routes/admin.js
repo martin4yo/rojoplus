@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
+import crypto from 'crypto'
 import multer from 'multer'
 import * as XLSX from 'xlsx'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
@@ -6311,7 +6312,10 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
   const { tipoSocioId, categoriaSocioId, observacionesInternas } = req.body
 
   const solicitud = await req.prisma.solicitudSocio.findUnique({
-    where: { id: parseInt(id) }
+    where: { id: parseInt(id) },
+    include: {
+      familiares: true
+    }
   })
 
   if (!solicitud) {
@@ -6322,27 +6326,71 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
     throw new AppError('Esta solicitud ya fue procesada', 400)
   }
 
-  // Generar número de socio (usar el próximo disponible)
+  // Helper function para inscribir en actividades
+  const inscribirEnActividades = async (socioId, actividades, edadSocio) => {
+    const actividadesArray = Array.isArray(actividades) ? actividades : [actividades]
+
+    for (const nombreActividad of actividadesArray) {
+      if (nombreActividad === 'Socio sin actividad') continue
+
+      try {
+        const actividad = await req.prisma.actividad.findFirst({
+          where: {
+            nombre: { contains: nombreActividad, mode: 'insensitive' },
+            activa: true
+          },
+          include: {
+            categorias: {
+              where: { activa: true },
+              orderBy: { edadMinima: 'asc' }
+            }
+          }
+        })
+
+        if (actividad && actividad.categorias.length > 0) {
+          const categoriaApropiada = actividad.categorias.find(cat => {
+            const cumpleMinima = !cat.edadMinima || edadSocio >= cat.edadMinima
+            const cumpleMaxima = !cat.edadMaxima || edadSocio <= cat.edadMaxima
+            return cumpleMinima && cumpleMaxima
+          })
+
+          if (categoriaApropiada) {
+            await req.prisma.inscripcion.create({
+              data: {
+                socioId,
+                categoriaActividadId: categoriaApropiada.id,
+                fechaInicio: new Date(),
+                estado: 'ACTIVA'
+              }
+            })
+          }
+        }
+      } catch (error) {
+        console.error(`Error inscribiendo en ${nombreActividad}:`, error)
+      }
+    }
+  }
+
+  // Generar números de socio para todos (titular + familiares)
   const ultimoSocio = await req.prisma.socio.findFirst({
     orderBy: { nroSocio: 'desc' },
     select: { nroSocio: true }
   })
 
-  let nuevoNumero = '1'
+  let proximoNumero = 1
   if (ultimoSocio?.nroSocio) {
-    const ultimoNumero = parseInt(ultimoSocio.nroSocio)
-    nuevoNumero = (ultimoNumero + 1).toString()
+    proximoNumero = parseInt(ultimoSocio.nroSocio) + 1
   }
 
-  // Calcular si es menor
-  const fechaNac = new Date(solicitud.fechaNacimiento)
-  const edad = Math.floor((new Date() - fechaNac) / (365.25 * 24 * 60 * 60 * 1000))
-  const esMenor = edad < 18
+  // Calcular edad del titular
+  const fechaNacTitular = new Date(solicitud.fechaNacimiento)
+  const edadTitular = Math.floor((new Date() - fechaNacTitular) / (365.25 * 24 * 60 * 60 * 1000))
+  const esMenorTitular = edadTitular < 18
 
-  // Crear el socio
+  // PASO 1: Crear el socio titular
   const nuevoSocio = await req.prisma.socio.create({
     data: {
-      nroSocio: nuevoNumero,
+      nroSocio: proximoNumero.toString(),
       apellido: solicitud.apellidos,
       nombre: solicitud.nombres,
       apellidoNombre: `${solicitud.apellidos} ${solicitud.nombres}`,
@@ -6354,56 +6402,174 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
       celular: solicitud.telefono,
       email: solicitud.email,
       condicionesMedicas: solicitud.detalleEnfermedades,
-      esMenor,
+      esMenor: esMenorTitular,
       tipoSocioRelId: tipoSocioId ? parseInt(tipoSocioId) : null,
       categoriaSocioId: categoriaSocioId ? parseInt(categoriaSocioId) : null,
       estado: 'ACTIVO',
-      fechaAlta: new Date()
+      fechaAlta: new Date(),
+      tipoSocio: 'GRUPO_FAMILIAR' // Si tiene familiares, es grupo familiar
     }
   })
 
-  // Si tiene actividad inscripción, buscar la actividad y crear inscripción
+  proximoNumero++
+
+  // PASO 2: Inscribir al titular en sus actividades
   if (solicitud.actividadInscripcion && solicitud.actividadInscripcion !== 'Socio sin actividad') {
-    try {
-      const actividad = await req.prisma.actividad.findFirst({
+    await inscribirEnActividades(nuevoSocio.id, solicitud.actividadInscripcion, edadTitular)
+  }
+
+  // PASO 3: Crear socios familiares y establecer relación
+  const sociosCreados = [nuevoSocio]
+
+  for (const familiar of solicitud.familiares) {
+    const fechaNacFamiliar = new Date(familiar.fechaNacimiento)
+    const edadFamiliar = Math.floor((new Date() - fechaNacFamiliar) / (365.25 * 24 * 60 * 60 * 1000))
+    const esMenorFamiliar = edadFamiliar < 18
+
+    const socioFamiliar = await req.prisma.socio.create({
+      data: {
+        nroSocio: proximoNumero.toString(),
+        apellido: familiar.apellidos,
+        nombre: familiar.nombres,
+        apellidoNombre: `${familiar.apellidos} ${familiar.nombres}`,
+        documento: familiar.documento,
+        fechaNacimiento: familiar.fechaNacimiento,
+        calle: solicitud.direccionCalle, // Mismo domicilio que titular
+        numero: solicitud.direccionNumero,
+        ciudad: solicitud.localidad,
+        celular: solicitud.telefono, // Mismo teléfono
+        email: solicitud.email, // Mismo email
+        esMenor: esMenorFamiliar,
+        parentescoTitular: familiar.parentesco,
+        tipoSocioRelId: tipoSocioId ? parseInt(tipoSocioId) : null,
+        categoriaSocioId: categoriaSocioId ? parseInt(categoriaSocioId) : null,
+        estado: 'ACTIVO',
+        fechaAlta: new Date(),
+        titularFamiliaId: nuevoSocio.id // Establecer relación con titular
+      }
+    })
+
+    proximoNumero++
+
+    // Actualizar el registro de FamiliarSolicitud con el socio creado
+    await req.prisma.familiarSolicitud.update({
+      where: { id: familiar.id },
+      data: { socioCreado: socioFamiliar.id }
+    })
+
+    // Inscribir en actividades
+    const actividadesFamiliar = JSON.parse(familiar.actividadesSeleccionadas || '[]')
+    if (actividadesFamiliar.length > 0) {
+      await inscribirEnActividades(socioFamiliar.id, actividadesFamiliar, edadFamiliar)
+    }
+
+    sociosCreados.push(socioFamiliar)
+  }
+
+  // PASO 4: Generar cuotas del mes actual para todos los socios creados
+  const hoy = new Date()
+  const mesActual = hoy.getMonth() + 1
+  const anioActual = hoy.getFullYear()
+
+  // Buscar el periodo actual
+  const periodoActual = await req.prisma.periodo.findFirst({
+    where: {
+      mes: mesActual,
+      anio: anioActual
+    }
+  })
+
+  const cuotasGeneradas = []
+
+  if (periodoActual) {
+    // Generar cuotas para cada socio creado
+    for (const socio of sociosCreados) {
+      // Obtener inscripciones activas del socio
+      const inscripciones = await req.prisma.inscripcion.findMany({
         where: {
-          nombre: { contains: solicitud.actividadInscripcion, mode: 'insensitive' },
-          activa: true
+          socioId: socio.id,
+          estado: 'ACTIVA'
         },
         include: {
-          categorias: {
-            where: { activa: true },
-            orderBy: { edadMinima: 'asc' }
+          categoriaActividad: {
+            include: {
+              actividad: true
+            }
           }
         }
       })
 
-      if (actividad && actividad.categorias.length > 0) {
-        // Buscar categoría apropiada para la edad
-        const categoriaApropiada = actividad.categorias.find(cat => {
-          const cumpleMinima = !cat.edadMinima || edad >= cat.edadMinima
-          const cumpleMaxima = !cat.edadMaxima || edad <= cat.edadMaxima
-          return cumpleMinima && cumpleMaxima
-        })
+      // Generar cargo por cuota social
+      const tipoSocio = await req.prisma.tipoSocio.findUnique({
+        where: { id: parseInt(tipoSocioId) }
+      })
 
-        if (categoriaApropiada) {
-          await req.prisma.inscripcion.create({
-            data: {
-              socioId: nuevoSocio.id,
-              categoriaActividadId: categoriaApropiada.id,
-              fechaInicio: new Date(),
-              estado: 'ACTIVA'
-            }
-          })
+      if (tipoSocio && tipoSocio.cuotaMensual) {
+        const cargoSocial = await req.prisma.cargo.create({
+          data: {
+            socioId: socio.id,
+            periodoId: periodoActual.id,
+            descripcion: `Cuota Social ${periodoActual.mes}/${periodoActual.anio}`,
+            montoOriginal: tipoSocio.cuotaMensual,
+            montoTotal: tipoSocio.cuotaMensual,
+            fechaVencimiento: periodoActual.fechaVencimiento,
+            estado: 'PENDIENTE',
+            tipoCargoId: tipoSocio.conceptoTesoreriaId
+          }
+        })
+        cuotasGeneradas.push(cargoSocial)
+      }
+
+      // Generar cargos por actividades
+      for (const insc of inscripciones) {
+        const categoria = insc.categoriaActividad
+        if (categoria.cuotaMensual && parseFloat(categoria.cuotaMensual) > 0) {
+          const montoCuota = insc.exentoCuota
+            ? 0
+            : parseFloat(categoria.cuotaMensual) * (insc.porcentajeCuota || 100) / 100
+
+          if (montoCuota > 0) {
+            const cargoActividad = await req.prisma.cargo.create({
+              data: {
+                socioId: socio.id,
+                periodoId: periodoActual.id,
+                categoriaActividadId: categoria.id,
+                descripcion: `${categoria.nombre} - ${periodoActual.mes}/${periodoActual.anio}`,
+                montoOriginal: montoCuota,
+                montoTotal: montoCuota,
+                fechaVencimiento: periodoActual.fechaVencimiento,
+                estado: 'PENDIENTE',
+                tipoCargoId: categoria.conceptoTesoreriaId
+              }
+            })
+            cuotasGeneradas.push(cargoActividad)
+          }
         }
       }
-    } catch (inscripcionError) {
-      console.error('Error al crear inscripción automática:', inscripcionError)
-      // No fallar la aprobación si la inscripción falla
     }
   }
 
-  // Actualizar la solicitud
+  // PASO 5: Crear LinkPago para la primera cuota
+  let linkPago = null
+  if (cuotasGeneradas.length > 0) {
+    const montoTotal = cuotasGeneradas.reduce((sum, cargo) => sum + parseFloat(cargo.montoTotal), 0)
+
+    linkPago = await req.prisma.linkPago.create({
+      data: {
+        socioId: nuevoSocio.id,
+        token: crypto.randomBytes(32).toString('hex'),
+        montoTotal: montoTotal,
+        estado: 'PENDIENTE',
+        expiraEn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
+        descripcion: 'Primera cuota - Alta de socio',
+        cargos: {
+          connect: cuotasGeneradas.map(c => ({ id: c.id }))
+        }
+      }
+    })
+  }
+
+  // PASO 6: Actualizar la solicitud
   const solicitudActualizada = await req.prisma.solicitudSocio.update({
     where: { id: parseInt(id) },
     data: {
@@ -6412,17 +6578,18 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
       respondidoPor: req.admin.id,
       socioCreado: nuevoSocio.id,
       observacionesInternas
-    },
-    include: {
-      socioCreatedRel: true
     }
   })
 
-  // Enviar email de bienvenida al nuevo socio
+  // PASO 7: Enviar email de bienvenida con link de pago
   try {
     const clubNombre = (await req.prisma.configuracion.findUnique({
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
+
+    const urlLinkPago = linkPago
+      ? `${process.env.FRONTEND_URL}/pagar/${linkPago.token}`
+      : `${process.env.FRONTEND_URL}/mi-qr`
 
     await enviarEmailConTemplate('BIENVENIDA', nuevoSocio.email, {
       nombreCompleto: nuevoSocio.apellidoNombre,
@@ -6430,7 +6597,10 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
       clubNombre,
       email: nuevoSocio.email,
       telefono: nuevoSocio.celular,
-      urlPortal: `${process.env.FRONTEND_URL}/mi-qr`
+      urlPortal: `${process.env.FRONTEND_URL}/mi-qr`,
+      urlPago: urlLinkPago,
+      montoPrimeraCuota: linkPago ? `$${linkPago.montoTotal.toFixed(2)}` : '0',
+      cantidadFamiliares: solicitud.familiares.length
     })
   } catch (emailError) {
     console.error('Error enviando email de bienvenida:', emailError)
@@ -6438,10 +6608,17 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: 'Solicitud aprobada y socio creado correctamente',
+    message: `Solicitud aprobada. ${sociosCreados.length} socio(s) creado(s) correctamente.`,
     data: {
       solicitud: solicitudActualizada,
-      socio: nuevoSocio
+      socioTitular: nuevoSocio,
+      sociosFamiliares: sociosCreados.slice(1),
+      cuotasGeneradas: cuotasGeneradas.length,
+      linkPago: linkPago ? {
+        token: linkPago.token,
+        url: `${process.env.FRONTEND_URL}/pagar/${linkPago.token}`,
+        montoTotal: linkPago.montoTotal
+      } : null
     }
   })
 }))

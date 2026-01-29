@@ -17,6 +17,7 @@ import LoginSocio from './pages/socio/LoginSocio'
 import PortalSocioNuevo from './pages/socio/PortalSocioNuevo'
 import ComerciosPublicos from './pages/public/Comercios'
 import InscripcionSocio from './pages/public/InscripcionSocio'
+import AgregarFamiliares from './pages/public/AgregarFamiliares'
 
 // Páginas admin
 import AdminLogin from './pages/admin/Login'
@@ -146,6 +147,7 @@ function App() {
       <Route path="/registro" element={<Registro />} />
       <Route path="/registro/exito" element={<RegistroExito />} />
       <Route path="/inscripcion-socio" element={<InscripcionSocio />} />
+      <Route path="/inscripcion-socio/:solicitudId/familiares" element={<AgregarFamiliares />} />
 
       {/* Ruta del comerciante */}
       <Route path="/comercio/:token" element={<Comercio />} />

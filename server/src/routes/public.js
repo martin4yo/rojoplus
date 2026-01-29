@@ -160,4 +160,177 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
   })
 }))
 
+/**
+ * POST /api/public/solicitud-socio/:id/familiar
+ * Agregar un familiar a una solicitud existente
+ */
+router.post('/solicitud-socio/:id/familiar', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const {
+    apellidos,
+    nombres,
+    documento,
+    fechaNacimiento,
+    parentesco,
+    actividadesSeleccionadas // Array de strings: ["Basquet", "Futbol 11"]
+  } = req.body
+
+  // Validaciones básicas
+  if (!apellidos || !nombres || !documento || !fechaNacimiento || !parentesco) {
+    throw new AppError('Todos los campos obligatorios deben ser completados', 400)
+  }
+
+  if (!['CONYUGE', 'HIJO'].includes(parentesco)) {
+    throw new AppError('Parentesco inválido. Debe ser CONYUGE o HIJO', 400)
+  }
+
+  // Verificar que la solicitud existe y está PENDIENTE
+  const solicitud = await req.prisma.solicitudSocio.findUnique({
+    where: { id: parseInt(id) }
+  })
+
+  if (!solicitud) {
+    throw new AppError('Solicitud no encontrada', 404)
+  }
+
+  if (solicitud.estado !== 'PENDIENTE') {
+    throw new AppError('No se pueden agregar familiares a una solicitud ya procesada', 400)
+  }
+
+  // Verificar que no exista un familiar con el mismo documento en esta solicitud
+  const familiarExistente = await req.prisma.familiarSolicitud.findFirst({
+    where: {
+      solicitudSocioId: parseInt(id),
+      documento
+    }
+  })
+
+  if (familiarExistente) {
+    throw new AppError('Ya existe un familiar con este número de documento en esta solicitud', 400)
+  }
+
+  // Crear el familiar
+  const familiar = await req.prisma.familiarSolicitud.create({
+    data: {
+      solicitudSocioId: parseInt(id),
+      apellidos,
+      nombres,
+      documento,
+      fechaNacimiento: new Date(fechaNacimiento),
+      parentesco,
+      actividadesSeleccionadas: JSON.stringify(actividadesSeleccionadas || [])
+    }
+  })
+
+  res.status(201).json({
+    success: true,
+    message: 'Familiar agregado correctamente',
+    data: {
+      ...familiar,
+      actividadesSeleccionadas: JSON.parse(familiar.actividadesSeleccionadas)
+    }
+  })
+}))
+
+/**
+ * GET /api/public/solicitud-socio/:id/familiares
+ * Obtener la lista de familiares de una solicitud
+ */
+router.get('/solicitud-socio/:id/familiares', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const familiares = await req.prisma.familiarSolicitud.findMany({
+    where: { solicitudSocioId: parseInt(id) },
+    orderBy: { createdAt: 'asc' }
+  })
+
+  // Parsear el JSON de actividades para cada familiar
+  const familiaresConActividades = familiares.map(f => ({
+    ...f,
+    actividadesSeleccionadas: JSON.parse(f.actividadesSeleccionadas)
+  }))
+
+  res.json({
+    success: true,
+    data: familiaresConActividades
+  })
+}))
+
+/**
+ * DELETE /api/public/solicitud-socio/:id/familiar/:familiarId
+ * Eliminar un familiar de una solicitud
+ */
+router.delete('/solicitud-socio/:id/familiar/:familiarId', asyncHandler(async (req, res) => {
+  const { id, familiarId } = req.params
+
+  // Verificar que la solicitud está PENDIENTE
+  const solicitud = await req.prisma.solicitudSocio.findUnique({
+    where: { id: parseInt(id) }
+  })
+
+  if (!solicitud) {
+    throw new AppError('Solicitud no encontrada', 404)
+  }
+
+  if (solicitud.estado !== 'PENDIENTE') {
+    throw new AppError('No se pueden eliminar familiares de una solicitud ya procesada', 400)
+  }
+
+  // Verificar que el familiar pertenece a esta solicitud
+  const familiar = await req.prisma.familiarSolicitud.findFirst({
+    where: {
+      id: parseInt(familiarId),
+      solicitudSocioId: parseInt(id)
+    }
+  })
+
+  if (!familiar) {
+    throw new AppError('Familiar no encontrado', 404)
+  }
+
+  // Eliminar el familiar
+  await req.prisma.familiarSolicitud.delete({
+    where: { id: parseInt(familiarId) }
+  })
+
+  res.json({
+    success: true,
+    message: 'Familiar eliminado correctamente'
+  })
+}))
+
+/**
+ * GET /api/public/solicitud-socio/:id/verificar-token
+ * Verificar que el solicitante puede acceder a la solicitud (simple validación por documento)
+ */
+router.post('/solicitud-socio/:id/verificar', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { documento } = req.body
+
+  const solicitud = await req.prisma.solicitudSocio.findFirst({
+    where: {
+      id: parseInt(id),
+      documento
+    },
+    include: {
+      familiares: true
+    }
+  })
+
+  if (!solicitud) {
+    throw new AppError('Solicitud no encontrada o documento incorrecto', 404)
+  }
+
+  res.json({
+    success: true,
+    data: {
+      id: solicitud.id,
+      estado: solicitud.estado,
+      nombres: solicitud.nombres,
+      apellidos: solicitud.apellidos,
+      cantidadFamiliares: solicitud.familiares.length
+    }
+  })
+}))
+
 export default router

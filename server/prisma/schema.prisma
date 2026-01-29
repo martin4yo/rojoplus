@@ -206,6 +206,7 @@ model Socio {
   pagosInformados       PagoInformado[]
   notificaciones        NotificacionLog[]
   solicitudesAprobadas  SolicitudSocio[]
+  familiarSolicitud     FamiliarSolicitud[] @relation("FamiliarSolicitudSocio")
 
   @@index([documento])
   @@index([apellidoNombre])
@@ -2023,12 +2024,35 @@ model SolicitudSocio {
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
-  socioCreatedRel         Socio?    @relation(fields: [socioCreado], references: [id])
-  respondidoPorAdmin      Admin?    @relation(fields: [respondidoPor], references: [id])
+  socioCreatedRel         Socio?              @relation(fields: [socioCreado], references: [id])
+  respondidoPorAdmin      Admin?              @relation(fields: [respondidoPor], references: [id])
+  familiares              FamiliarSolicitud[]
 
   @@index([estado])
   @@index([fechaSolicitud])
   @@index([documento])
   @@index([email])
   @@map("solicitudes_socio")
+}
+
+// Familiares agregados a una solicitud de socio (antes de aprobar)
+model FamiliarSolicitud {
+  id                      Int            @id @default(autoincrement())
+  solicitudSocioId        Int            @map("solicitud_socio_id")
+  apellidos               String
+  nombres                 String
+  documento               String
+  fechaNacimiento         DateTime       @map("fecha_nacimiento")
+  parentesco              String         // CONYUGE, HIJO
+  actividadesSeleccionadas String        @default("[]") @map("actividades_seleccionadas") // JSON array ["Basquet", "Futbol 11"]
+  socioCreado             Int?           @map("socio_creado") // ID del socio creado al aprobar
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  solicitud               SolicitudSocio @relation(fields: [solicitudSocioId], references: [id], onDelete: Cascade)
+  socioCreatedRel         Socio?         @relation("FamiliarSolicitudSocio", fields: [socioCreado], references: [id])
+
+  @@index([solicitudSocioId])
+  @@index([documento])
+  @@map("familiares_solicitud")
 }

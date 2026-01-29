@@ -5,8 +5,6 @@ export default function InscripcionSocio() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
-  const [numeroSolicitud, setNumeroSolicitud] = useState(null)
 
   const [formData, setFormData] = useState({
     apellidos: '',
@@ -89,50 +87,13 @@ export default function InscripcionSocio() {
         throw new Error(data.error?.message || 'Error al enviar la solicitud')
       }
 
-      setSuccess(true)
-      setNumeroSolicitud(data.solicitud.id)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      // Redirigir a la página de agregar familiares
+      navigate(`/inscripcion-socio/${data.solicitud.id}/familiares`)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 py-12 px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-lg shadow-xl p-8">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-                <svg className="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">¡Solicitud Enviada!</h2>
-              <p className="text-xl text-gray-600 mb-6">
-                Tu número de solicitud es: <span className="font-bold text-red-600">#{numeroSolicitud}</span>
-              </p>
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-                <p className="text-gray-700">
-                  Hemos recibido tu solicitud correctamente. Nuestro equipo la revisará en las próximas <strong>48 horas</strong> y te enviaremos un correo electrónico con la respuesta.
-                </p>
-              </div>
-              <p className="text-gray-600 mb-8">
-                Te hemos enviado un email de confirmación a <strong>{formData.email}</strong>
-              </p>
-              <button
-                onClick={() => navigate('/')}
-                className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Volver al Inicio
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
