@@ -1472,18 +1472,38 @@ const recargo = calcularRecargo(cuota, hoy)
 - [ ] Servicio de email configurado
 
 ## Por Fase
-- [x] **Fase 0**: Base de Datos ✅ (Schema completo, seeds parciales)
-- [x] **Fase 1**: Gestión de Socios ✅ 100% (grupos familiares migrados automáticamente)
-- [ ] **Fase 2**: Deportes e Inscripciones
-- [ ] **Fase 3**: Sistema de Cuotas
+- [x] **Fase 0**: Base de Datos ✅ 100%
+- [x] **Fase 1**: Gestión de Socios ✅ 100%
+- [x] **Fase 2**: Deportes e Inscripciones ✅ 70% (Backend completo, falta CRUD inscripciones)
+- [x] **Fase 3**: Sistema de Cuotas ✅ 100% (Generación masiva, recargos acumulativos)
 - [x] **Fase 4**: Cobranzas y Pagos ✅ 100%
 - [x] **Fase 5**: Caja y Movimientos ✅ 95% (falta cierre de caja)
-- [ ] **Fase 6**: Portal del Socio (QR básico ✅)
-- [ ] **Fase 7**: Reportes (parcial - ReporteSocios, ReporteCuotas, ReporteActividades ✅)
-- [ ] **Fase 8**: Notificaciones
+- [x] **Fase 6**: Portal del Socio ✅ 60% (Pagos online, falta cuenta corriente completa)
+- [x] **Fase 7**: Reportes ✅ 30% (Socios, Cuotas, Actividades - falta dashboard KPIs)
+- [ ] **Fase 8**: Notificaciones (Templates ✅, falta envíos automáticos programados)
 - [ ] **Fase 9**: PWA
+- [x] **Módulos Financieros**: ✅ 95% (Completo, falta solo asientos automáticos)
+
+## Nuevas Funcionalidades Pendientes
+
+### ⭐ Prioridad Alta
+1. **Completar Sistema de Inscripciones** - CRUD, validaciones, plantel, entrenadores
+2. **Formulario Público Alta Socios** - Recopilar campos del Google Forms del club
+3. **Asientos Contables Automáticos** - Plan en linear-cooking-gosling.md
+4. **Notificaciones Automáticas** - Cron jobs, emails vencimiento/morosidad
+
+### 🔶 Prioridad Media
+5. **Completar Portal del Socio** - Cuenta corriente, descarga comprobantes
+6. **Débito Automático** - Prisma/Payway (ver docs/13-DEBITO-AUTOMATICO.md)
+7. **Conciliación Bancaria** - OFX, CSV (ver docs/14-CONCILIACION-BANCARIA.md)
+
+### ⏳ Prioridad Baja
+8. **Cierre de Caja Diario**
+9. **Reportes Avanzados** - Dashboard KPIs, morosidad, proyecciones
+10. **PWA y Mobile**
 
 ---
 
 *Plan de trabajo creado: Enero 2026*
-*Última actualización: 20 Enero 2026 - Fase 5 casi completa (Tesorería, Plan de Cuentas, Transferencias)*
+*Última actualización: 29 Enero 2026 - Sincronizado con código real*
+*Estado: Fases 0-5 mayormente completas, Módulos Financieros completos*
