@@ -16,6 +16,7 @@ import AccesoSocio from './pages/socio/AccesoSocio'
 import LoginSocio from './pages/socio/LoginSocio'
 import PortalSocioNuevo from './pages/socio/PortalSocioNuevo'
 import ComerciosPublicos from './pages/public/Comercios'
+import InscripcionSocio from './pages/public/InscripcionSocio'
 
 // Páginas admin
 import AdminLogin from './pages/admin/Login'
@@ -28,6 +29,7 @@ import AdminSocioForm from './pages/admin/SocioForm'
 import AdminSociosCargar from './pages/admin/SociosCargar'
 import AdminReportes from './pages/admin/Reportes'
 import AdminTablasAuxiliares from './pages/admin/TablasAuxiliares'
+import AdminSolicitudes from './pages/admin/Solicitudes'
 import AdminConfiguracionLista from './pages/admin/ConfiguracionLista'
 import AdminConfiguracionForm from './pages/admin/ConfiguracionForm'
 import AdminConfiguracionPagos from './pages/admin/ConfiguracionPagos'
@@ -143,6 +145,7 @@ function App() {
       <Route path="/" element={<Home />} />
       <Route path="/registro" element={<Registro />} />
       <Route path="/registro/exito" element={<RegistroExito />} />
+      <Route path="/inscripcion-socio" element={<InscripcionSocio />} />
 
       {/* Ruta del comerciante */}
       <Route path="/comercio/:token" element={<Comercio />} />
@@ -169,6 +172,7 @@ function App() {
         <Route path="socios/cargar" element={<AdminSociosCargar />} />
         <Route path="socios/:id" element={<AdminSocioDetalle />} />
         <Route path="socios/:id/editar" element={<AdminSocioForm />} />
+        <Route path="solicitudes" element={<AdminSolicitudes />} />
         <Route path="reportes" element={<AdminReportes />} />
         <Route path="reportes/actividades" element={<AdminReporteActividades />} />
         <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />

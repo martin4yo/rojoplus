@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { authAdmin, generateToken } from '../middleware/auth.js'
 import { enviarEmailAprobacion, enviarEmailRechazo, enviarEmailLinkAcceso, enviarReciboPago } from '../services/email.js'
+import { enviarEmailConTemplate } from '../services/notificacionService.js'
 import { generarAsientoPagoCuota } from '../services/asientosContables.js'
 
 const router = Router()
@@ -6199,6 +6200,337 @@ router.put('/configuracion/:clave', authAdmin, asyncHandler(async (req, res) => 
   res.json({
     success: true,
     data: config,
+  })
+}))
+
+// ========================================
+// SOLICITUDES DE ALTA DE SOCIOS
+// ========================================
+
+/**
+ * GET /api/admin/solicitudes
+ * Listar solicitudes de alta de socios con filtros
+ */
+router.get('/solicitudes', asyncHandler(async (req, res) => {
+  const { estado, desde, hasta, buscar, limite = 50, pagina = 1 } = req.query
+
+  const where = {}
+
+  if (estado) {
+    where.estado = estado
+  }
+
+  if (desde) {
+    where.fechaSolicitud = { gte: new Date(desde) }
+  }
+
+  if (hasta) {
+    where.fechaSolicitud = {
+      ...where.fechaSolicitud,
+      lte: new Date(hasta)
+    }
+  }
+
+  if (buscar) {
+    where.OR = [
+      { apellidos: { contains: buscar, mode: 'insensitive' } },
+      { nombres: { contains: buscar, mode: 'insensitive' } },
+      { documento: { contains: buscar } },
+      { email: { contains: buscar, mode: 'insensitive' } }
+    ]
+  }
+
+  const skip = (parseInt(pagina) - 1) * parseInt(limite)
+  const take = parseInt(limite)
+
+  const [solicitudes, total] = await Promise.all([
+    req.prisma.solicitudSocio.findMany({
+      where,
+      include: {
+        respondidoPorAdmin: {
+          select: { nombre: true, apellido: true, email: true }
+        },
+        socioCreatedRel: {
+          select: { nroSocio: true, apellidoNombre: true }
+        }
+      },
+      orderBy: { fechaSolicitud: 'desc' },
+      skip,
+      take
+    }),
+    req.prisma.solicitudSocio.count({ where })
+  ])
+
+  res.json({
+    success: true,
+    data: solicitudes,
+    pagination: {
+      total,
+      pagina: parseInt(pagina),
+      limite: parseInt(limite),
+      totalPaginas: Math.ceil(total / parseInt(limite))
+    }
+  })
+}))
+
+/**
+ * GET /api/admin/solicitudes/:id
+ * Obtener detalle de una solicitud
+ */
+router.get('/solicitudes/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const solicitud = await req.prisma.solicitudSocio.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      respondidoPorAdmin: {
+        select: { nombre: true, apellido: true, email: true }
+      },
+      socioCreatedRel: {
+        select: { nroSocio: true, apellidoNombre: true, email: true, celular: true }
+      }
+    }
+  })
+
+  if (!solicitud) {
+    throw new AppError('Solicitud no encontrada', 404)
+  }
+
+  res.json({
+    success: true,
+    data: solicitud
+  })
+}))
+
+/**
+ * PUT /api/admin/solicitudes/:id/aprobar
+ * Aprobar una solicitud y crear el socio
+ */
+router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { tipoSocioId, categoriaSocioId, observacionesInternas } = req.body
+
+  const solicitud = await req.prisma.solicitudSocio.findUnique({
+    where: { id: parseInt(id) }
+  })
+
+  if (!solicitud) {
+    throw new AppError('Solicitud no encontrada', 404)
+  }
+
+  if (solicitud.estado !== 'PENDIENTE') {
+    throw new AppError('Esta solicitud ya fue procesada', 400)
+  }
+
+  // Generar número de socio (usar el próximo disponible)
+  const ultimoSocio = await req.prisma.socio.findFirst({
+    orderBy: { nroSocio: 'desc' },
+    select: { nroSocio: true }
+  })
+
+  let nuevoNumero = '1'
+  if (ultimoSocio?.nroSocio) {
+    const ultimoNumero = parseInt(ultimoSocio.nroSocio)
+    nuevoNumero = (ultimoNumero + 1).toString()
+  }
+
+  // Calcular si es menor
+  const fechaNac = new Date(solicitud.fechaNacimiento)
+  const edad = Math.floor((new Date() - fechaNac) / (365.25 * 24 * 60 * 60 * 1000))
+  const esMenor = edad < 18
+
+  // Crear el socio
+  const nuevoSocio = await req.prisma.socio.create({
+    data: {
+      nroSocio: nuevoNumero,
+      apellido: solicitud.apellidos,
+      nombre: solicitud.nombres,
+      apellidoNombre: `${solicitud.apellidos} ${solicitud.nombres}`,
+      documento: solicitud.documento,
+      fechaNacimiento: solicitud.fechaNacimiento,
+      calle: solicitud.direccionCalle,
+      numero: solicitud.direccionNumero,
+      ciudad: solicitud.localidad,
+      celular: solicitud.telefono,
+      email: solicitud.email,
+      condicionesMedicas: solicitud.detalleEnfermedades,
+      esMenor,
+      tipoSocioRelId: tipoSocioId ? parseInt(tipoSocioId) : null,
+      categoriaSocioId: categoriaSocioId ? parseInt(categoriaSocioId) : null,
+      estado: 'ACTIVO',
+      fechaAlta: new Date()
+    }
+  })
+
+  // Si tiene actividad inscripción, buscar la actividad y crear inscripción
+  if (solicitud.actividadInscripcion && solicitud.actividadInscripcion !== 'Socio sin actividad') {
+    try {
+      const actividad = await req.prisma.actividad.findFirst({
+        where: {
+          nombre: { contains: solicitud.actividadInscripcion, mode: 'insensitive' },
+          activa: true
+        },
+        include: {
+          categorias: {
+            where: { activa: true },
+            orderBy: { edadMinima: 'asc' }
+          }
+        }
+      })
+
+      if (actividad && actividad.categorias.length > 0) {
+        // Buscar categoría apropiada para la edad
+        const categoriaApropiada = actividad.categorias.find(cat => {
+          const cumpleMinima = !cat.edadMinima || edad >= cat.edadMinima
+          const cumpleMaxima = !cat.edadMaxima || edad <= cat.edadMaxima
+          return cumpleMinima && cumpleMaxima
+        })
+
+        if (categoriaApropiada) {
+          await req.prisma.inscripcion.create({
+            data: {
+              socioId: nuevoSocio.id,
+              categoriaActividadId: categoriaApropiada.id,
+              fechaInicio: new Date(),
+              estado: 'ACTIVA'
+            }
+          })
+        }
+      }
+    } catch (inscripcionError) {
+      console.error('Error al crear inscripción automática:', inscripcionError)
+      // No fallar la aprobación si la inscripción falla
+    }
+  }
+
+  // Actualizar la solicitud
+  const solicitudActualizada = await req.prisma.solicitudSocio.update({
+    where: { id: parseInt(id) },
+    data: {
+      estado: 'APROBADA',
+      fechaRespuesta: new Date(),
+      respondidoPor: req.admin.id,
+      socioCreado: nuevoSocio.id,
+      observacionesInternas
+    },
+    include: {
+      socioCreatedRel: true
+    }
+  })
+
+  // Enviar email de bienvenida al nuevo socio
+  try {
+    const clubNombre = (await req.prisma.configuracion.findUnique({
+      where: { clave: 'CLUB_NOMBRE' }
+    }))?.valor || 'Club Sportivo Pilar'
+
+    await enviarEmailConTemplate('BIENVENIDA', nuevoSocio.email, {
+      nombreCompleto: nuevoSocio.apellidoNombre,
+      nroSocio: nuevoSocio.nroSocio,
+      clubNombre,
+      email: nuevoSocio.email,
+      telefono: nuevoSocio.celular,
+      urlPortal: `${process.env.FRONTEND_URL}/mi-qr`
+    })
+  } catch (emailError) {
+    console.error('Error enviando email de bienvenida:', emailError)
+  }
+
+  res.json({
+    success: true,
+    message: 'Solicitud aprobada y socio creado correctamente',
+    data: {
+      solicitud: solicitudActualizada,
+      socio: nuevoSocio
+    }
+  })
+}))
+
+/**
+ * PUT /api/admin/solicitudes/:id/rechazar
+ * Rechazar una solicitud
+ */
+router.put('/solicitudes/:id/rechazar', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { motivoRechazo } = req.body
+
+  if (!motivoRechazo) {
+    throw new AppError('Debe especificar el motivo del rechazo', 400)
+  }
+
+  const solicitud = await req.prisma.solicitudSocio.findUnique({
+    where: { id: parseInt(id) }
+  })
+
+  if (!solicitud) {
+    throw new AppError('Solicitud no encontrada', 404)
+  }
+
+  if (solicitud.estado !== 'PENDIENTE') {
+    throw new AppError('Esta solicitud ya fue procesada', 400)
+  }
+
+  // Actualizar la solicitud
+  const solicitudActualizada = await req.prisma.solicitudSocio.update({
+    where: { id: parseInt(id) },
+    data: {
+      estado: 'RECHAZADA',
+      fechaRespuesta: new Date(),
+      respondidoPor: req.admin.id,
+      motivoRechazo
+    }
+  })
+
+  // Enviar email de rechazo
+  try {
+    const clubNombre = (await req.prisma.configuracion.findUnique({
+      where: { clave: 'CLUB_NOMBRE' }
+    }))?.valor || 'Club Sportivo Pilar'
+
+    await enviarEmailConTemplate('SOLICITUD_RECHAZADA', solicitud.email, {
+      nombreCompleto: `${solicitud.nombres} ${solicitud.apellidos}`,
+      clubNombre,
+      motivoRechazo,
+      telefonoContacto: process.env.CLUB_TELEFONO || '+54 9 230 434 6897'
+    })
+  } catch (emailError) {
+    console.error('Error enviando email de rechazo:', emailError)
+  }
+
+  res.json({
+    success: true,
+    message: 'Solicitud rechazada correctamente',
+    data: solicitudActualizada
+  })
+}))
+
+/**
+ * GET /api/admin/solicitudes/estadisticas
+ * Obtener estadísticas de solicitudes
+ */
+router.get('/solicitudes-stats', asyncHandler(async (req, res) => {
+  const [pendientes, aprobadas, rechazadas, totalMes] = await Promise.all([
+    req.prisma.solicitudSocio.count({ where: { estado: 'PENDIENTE' } }),
+    req.prisma.solicitudSocio.count({ where: { estado: 'APROBADA' } }),
+    req.prisma.solicitudSocio.count({ where: { estado: 'RECHAZADA' } }),
+    req.prisma.solicitudSocio.count({
+      where: {
+        fechaSolicitud: {
+          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        }
+      }
+    })
+  ])
+
+  res.json({
+    success: true,
+    data: {
+      pendientes,
+      aprobadas,
+      rechazadas,
+      total: pendientes + aprobadas + rechazadas,
+      totalMes
+    }
   })
 }))
 

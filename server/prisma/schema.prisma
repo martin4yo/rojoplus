@@ -205,6 +205,7 @@ model Socio {
   estadisticasPartido   EstadisticaPartido[]
   pagosInformados       PagoInformado[]
   notificaciones        NotificacionLog[]
+  solicitudesAprobadas  SolicitudSocio[]
 
   @@index([documento])
   @@index([apellidoNombre])
@@ -1056,6 +1057,7 @@ model Admin {
   asientosRegistrados Asiento[]        @relation("AsientoRegistrador")
   asientosAnulados    Asiento[]        @relation("AsientoAnulador")
   pagosInformados     PagoInformado[]
+  solicitudesProcesadas SolicitudSocio[]
 
   @@map("admins")
 }
@@ -1980,4 +1982,53 @@ model NotificacionLog {
   @@index([enviado])
   @@index([fechaProgramado])
   @@map("notificaciones_log")
+}
+
+// Solicitudes de alta de nuevos socios desde formulario público
+model SolicitudSocio {
+  id                      Int       @id @default(autoincrement())
+  // Datos del solicitante
+  apellidos               String
+  nombres                 String
+  documento               String
+  fechaNacimiento         DateTime  @map("fecha_nacimiento")
+  direccionCalle          String    @map("direccion_calle")
+  direccionNumero         String    @map("direccion_numero")
+  localidad               String
+  telefono                String
+  email                   String
+  actividadInscripcion    String    @map("actividad_inscripcion") // Basquet, Futbol 11, etc.
+
+  // Datos de salud
+  tieneEnfermedades       Boolean   @default(false) @map("tiene_enfermedades")
+  detalleEnfermedades     String?   @db.Text @map("detalle_enfermedades")
+
+  // Datos del tutor (si es menor)
+  tutorApellidos          String?   @map("tutor_apellidos")
+  tutorNombres            String?   @map("tutor_nombres")
+  tutorDocumento          String?   @map("tutor_documento")
+  tutorTelefono           String?   @map("tutor_telefono")
+
+  // Estado de la solicitud
+  estado                  String    @default("PENDIENTE") // PENDIENTE, APROBADA, RECHAZADA
+  motivoRechazo           String?   @db.Text @map("motivo_rechazo")
+
+  // Auditoría
+  fechaSolicitud          DateTime  @default(now()) @map("fecha_solicitud")
+  fechaRespuesta          DateTime? @map("fecha_respuesta")
+  respondidoPor           Int?      @map("respondido_por") // ID del admin que procesó
+  socioCreado             Int?      @map("socio_creado") // ID del socio creado al aprobar
+  observacionesInternas   String?   @db.Text @map("observaciones_internas")
+
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  socioCreatedRel         Socio?    @relation(fields: [socioCreado], references: [id])
+  respondidoPorAdmin      Admin?    @relation(fields: [respondidoPor], references: [id])
+
+  @@index([estado])
+  @@index([fechaSolicitud])
+  @@index([documento])
+  @@index([email])
+  @@map("solicitudes_socio")
 }

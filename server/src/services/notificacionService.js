@@ -51,7 +51,7 @@ function renderTemplate(template, variables) {
 /**
  * Enviar email usando template de la BD
  */
-async function enviarEmailConTemplate(eventType, to, variables) {
+export async function enviarEmailConTemplate(eventType, to, variables) {
   try {
     // Obtener template de la BD
     const template = await prisma.emailTemplate.findUnique({

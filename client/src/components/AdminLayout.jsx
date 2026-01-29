@@ -3,7 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
-  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders
+  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus
 } from 'lucide-react'
 import api from '../services/api'
 
@@ -83,6 +83,7 @@ export default function AdminLayout() {
   const menuItems = [
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/socios', label: 'Socios', icon: Users },
+    { path: '/admin/solicitudes', label: 'Solicitudes', icon: UserPlus },
     { path: '/admin/periodos', label: 'Cuotas', icon: Receipt },
     {
       label: 'Ingresos', icon: TrendingUp,
