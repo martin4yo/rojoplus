@@ -11,29 +11,33 @@ const router = Router()
 // BÚSQUEDA PÚBLICA (para obtener QR) - DEBE IR PRIMERO
 // ==============================================================================
 
-// GET /api/socio/buscar - Buscar socio por DNI o nro socio (acceso público para QR)
-router.get('/buscar', asyncHandler(async (req, res) => {
-  const { q } = req.query
+// POST /api/socio/enviar-qr - Enviar QR por email (seguro)
+router.post('/enviar-qr', asyncHandler(async (req, res) => {
+  const { busqueda } = req.body
 
-  if (!q) {
-    throw new AppError('Parámetro de búsqueda requerido', 400, 'VALIDATION_ERROR')
+  if (!busqueda || !busqueda.trim()) {
+    throw new AppError('Ingresa tu número de socio o DNI', 400, 'VALIDATION_ERROR')
   }
 
   const socio = await req.prisma.socio.findFirst({
     where: {
       OR: [
-        { nroSocio: q.trim() },
-        { documento: q.trim() },
+        { nroSocio: busqueda.trim() },
+        { documento: busqueda.trim() },
       ],
     },
     select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      email: true,
       tokenPortal: true,
       estado: true,
     },
   })
 
   if (!socio) {
-    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+    throw new AppError('No se encontró un socio con ese número o DNI', 404, 'SOCIO_NOT_FOUND')
   }
 
   // Verificar si está activo
@@ -41,17 +45,40 @@ router.get('/buscar', asyncHandler(async (req, res) => {
   const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
 
   if (!esActivo) {
-    throw new AppError('Tu membresía no está activa. Regulariza tu situación en el club para acceder a los beneficios.', 403, 'SOCIO_INACTIVO')
+    throw new AppError('Tu membresía no está activa. Regulariza tu situación en el club.', 403, 'SOCIO_INACTIVO')
+  }
+
+  if (!socio.email) {
+    throw new AppError('No tenés email registrado. Contacta al club para actualizarlo.', 400, 'NO_EMAIL')
   }
 
   if (!socio.tokenPortal) {
     throw new AppError('Error al obtener tu QR. Contacta al club.', 500, 'NO_TOKEN')
   }
 
+  // Generar URL del QR y portal
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+  const portalUrl = `${frontendUrl}/portal-socio/${socio.tokenPortal}`
+  const qrUrl = `${frontendUrl}/s/${socio.tokenPortal}`
+
+  // Enviar email con QR
+  const { enviarEmailQRSocio } = await import('../services/email.js')
+  await enviarEmailQRSocio({
+    to: socio.email,
+    socioNombre: socio.apellidoNombre,
+    nroSocio: socio.nroSocio,
+    qrUrl,
+    portalUrl,
+  })
+
+  // Ocultar parte del email para la respuesta
+  const emailOculto = socio.email.replace(/(.{2})(.*)(@.*)/, '$1***$3')
+
   res.json({
     success: true,
+    message: 'QR enviado correctamente',
     data: {
-      tokenPortal: socio.tokenPortal,
+      emailEnviado: emailOculto,
     },
   })
 }))
