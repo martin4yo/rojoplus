@@ -1,0 +1,959 @@
+import { useState, useEffect } from 'react'
+import {
+  CreditCard, FileText, Upload, Download, RefreshCw,
+  Calendar, Users, DollarSign, CheckCircle, XCircle,
+  AlertTriangle, Clock, Settings, ChevronRight, Eye,
+  Search, Filter, Building, Send, RotateCcw, BarChart3
+} from 'lucide-react'
+import { Button } from '../../components/Button'
+import api from '../../services/api'
+
+export default function DebitoAutomatico() {
+  const [activeTab, setActiveTab] = useState('generar')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  // Estado para Configuraciones
+  const [configuraciones, setConfiguraciones] = useState([])
+
+  // Estado para Generar
+  const [periodoAnio, setPeriodoAnio] = useState(new Date().getFullYear())
+  const [periodoMes, setPeriodoMes] = useState(new Date().getMonth() + 1)
+  const [configuracionId, setConfiguracionId] = useState('')
+  const [sociosDisponibles, setSociosDisponibles] = useState([])
+  const [sociosSeleccionados, setSociosSeleccionados] = useState([])
+  const [resumenSocios, setResumenSocios] = useState(null)
+  const [tipoArchivo, setTipoArchivo] = useState('VISA_CREDITO')
+
+  // Estado para Archivos
+  const [archivos, setArchivos] = useState([])
+  const [archivoSeleccionado, setArchivoSeleccionado] = useState(null)
+  const [showDetalleModal, setShowDetalleModal] = useState(false)
+
+  // Estado para Importar
+  const [archivoImportar, setArchivoImportar] = useState(null)
+  const [contenidoRespuesta, setContenidoRespuesta] = useState('')
+  const [resultadoImportacion, setResultadoImportacion] = useState(null)
+
+  // Estado para Estadísticas
+  const [estadisticas, setEstadisticas] = useState(null)
+
+  useEffect(() => {
+    cargarConfiguraciones()
+    cargarEstadisticas()
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'archivos') {
+      cargarArchivos()
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (periodoAnio && periodoMes && configuracionId) {
+      cargarSociosDisponibles()
+    }
+  }, [periodoAnio, periodoMes, configuracionId])
+
+  async function cargarConfiguraciones() {
+    try {
+      const data = await api.get('/admin/debito/configuraciones')
+      setConfiguraciones(data)
+      if (data.length > 0 && !configuracionId) {
+        setConfiguracionId(data[0].id)
+      }
+    } catch (err) {
+      console.error('Error cargando configuraciones:', err)
+    }
+  }
+
+  async function cargarEstadisticas() {
+    try {
+      const data = await api.get('/admin/debito/estadisticas')
+      setEstadisticas(data)
+    } catch (err) {
+      console.error('Error cargando estadísticas:', err)
+    }
+  }
+
+  async function cargarSociosDisponibles() {
+    setLoading(true)
+    try {
+      const data = await api.get('/admin/debito/socios-disponibles', {
+        periodoAnio,
+        periodoMes,
+        configuracionId
+      })
+      setSociosDisponibles(data.socios)
+      setResumenSocios(data.resumen)
+      setSociosSeleccionados(data.socios.map(s => s.id))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function cargarArchivos() {
+    setLoading(true)
+    try {
+      const data = await api.get('/admin/debito/archivos', {
+        periodoAnio
+      })
+      setArchivos(data.archivos)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function generarArchivo() {
+    if (sociosSeleccionados.length === 0) {
+      setError('Seleccione al menos un socio')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.post('/admin/debito/archivos/generar', {
+        configuracionId,
+        periodoAnio,
+        periodoMes,
+        socioIds: sociosSeleccionados,
+        tipoArchivo
+      })
+
+      // Descargar archivo
+      const blob = new Blob([data.contenido], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = data.nombreArchivo
+      a.click()
+      URL.revokeObjectURL(url)
+
+      alert(data.mensaje)
+      cargarSociosDisponibles()
+      cargarArchivos()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function verDetalleArchivo(id) {
+    setLoading(true)
+    try {
+      const data = await api.get(`/admin/debito/archivos/${id}`)
+      setArchivoSeleccionado(data)
+      setShowDetalleModal(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function descargarArchivo(id) {
+    try {
+      const response = await fetch(`/api/admin/debito/archivos/${id}/descargar`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('content-disposition')
+      const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') || 'archivo.txt'
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function marcarEnviado(id) {
+    try {
+      await api.put(`/admin/debito/archivos/${id}/enviar`)
+      cargarArchivos()
+      if (archivoSeleccionado?.id === id) {
+        verDetalleArchivo(id)
+      }
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function importarRespuesta() {
+    if (!archivoImportar || !contenidoRespuesta) {
+      setError('Seleccione un archivo y pegue el contenido de la respuesta')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.post(`/admin/debito/archivos/${archivoImportar}/importar-respuesta`, {
+        contenido: contenidoRespuesta,
+        nombreArchivo: 'respuesta.txt'
+      })
+      setResultadoImportacion(data)
+      cargarArchivos()
+      cargarEstadisticas()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function reintentarRechazados(id) {
+    setLoading(true)
+    try {
+      const data = await api.post(`/admin/debito/archivos/${id}/reintentar-rechazados`)
+      alert(data.mensaje)
+      cargarArchivos()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function toggleSocio(id) {
+    if (sociosSeleccionados.includes(id)) {
+      setSociosSeleccionados(sociosSeleccionados.filter(s => s !== id))
+    } else {
+      setSociosSeleccionados([...sociosSeleccionados, id])
+    }
+  }
+
+  function toggleTodos() {
+    if (sociosSeleccionados.length === sociosDisponibles.length) {
+      setSociosSeleccionados([])
+    } else {
+      setSociosSeleccionados(sociosDisponibles.map(s => s.id))
+    }
+  }
+
+  const tabs = [
+    { id: 'generar', label: 'Generar Archivo', icon: FileText },
+    { id: 'archivos', label: 'Archivos', icon: Download },
+    { id: 'importar', label: 'Importar Respuesta', icon: Upload },
+    { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
+    { id: 'configuracion', label: 'Configuración', icon: Settings }
+  ]
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+          <CreditCard className="w-7 h-7 text-primary" />
+          Débito Automático
+        </h1>
+        <p className="text-gray-600 mt-1">
+          Gestión de archivos de débito para Prisma, Payway y bancos
+        </p>
+      </div>
+
+      {/* KPIs Rápidos */}
+      {estadisticas && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Socios con Débito</p>
+                <p className="text-xl font-bold text-gray-800">{estadisticas.sociosConDebito}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Cobrados ({estadisticas.anio})</p>
+                <p className="text-xl font-bold text-green-600">{estadisticas.detalles?.cobrados || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <XCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Rechazados ({estadisticas.anio})</p>
+                <p className="text-xl font-bold text-red-600">{estadisticas.detalles?.rechazados || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <DollarSign className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Tasa de Éxito</p>
+                <p className="text-xl font-bold text-purple-600">{estadisticas.tasaExito}%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 mb-6">
+        <div className="flex border-b border-gray-100 overflow-x-auto">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Tab: Generar Archivo */}
+          {activeTab === 'generar' && (
+            <div className="space-y-6">
+              {/* Filtros */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Procesador</label>
+                  <select
+                    value={configuracionId}
+                    onChange={(e) => setConfiguracionId(e.target.value)}
+                    className="input-field"
+                  >
+                    {configuraciones.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
+                  <select
+                    value={periodoAnio}
+                    onChange={(e) => setPeriodoAnio(parseInt(e.target.value))}
+                    className="input-field"
+                  >
+                    {[2024, 2025, 2026, 2027].map(a => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+                  <select
+                    value={periodoMes}
+                    onChange={(e) => setPeriodoMes(parseInt(e.target.value))}
+                    className="input-field"
+                  >
+                    {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+                    ].map((m, i) => (
+                      <option key={i+1} value={i+1}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Tarjeta</label>
+                  <select
+                    value={tipoArchivo}
+                    onChange={(e) => setTipoArchivo(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="VISA_CREDITO">VISA Crédito</option>
+                    <option value="VISA_DEBITO">VISA Débito</option>
+                    <option value="MASTERCARD">Mastercard</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <Button onClick={cargarSociosDisponibles} loading={loading} variant="outline" className="w-full">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Actualizar
+                  </Button>
+                </div>
+              </div>
+
+              {/* Resumen */}
+              {resumenSocios && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <span className="text-sm text-gray-500">Socios disponibles:</span>
+                        <span className="ml-2 font-bold text-gray-800">{resumenSocios.total}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-500">Por CBU:</span>
+                        <span className="ml-2 font-medium text-blue-600">{resumenSocios.porCBU}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-500">Por Tarjeta:</span>
+                        <span className="ml-2 font-medium text-purple-600">{resumenSocios.porTarjeta}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-500">Monto total:</span>
+                        <span className="ml-2 font-bold text-green-600">
+                          ${resumenSocios.montoTotal?.toLocaleString('es-AR')}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-500">Seleccionados:</span>
+                      <span className="ml-2 font-bold text-primary">{sociosSeleccionados.length}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tabla de Socios */}
+              {sociosDisponibles.length > 0 ? (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left">
+                          <input
+                            type="checkbox"
+                            checked={sociosSeleccionados.length === sociosDisponibles.length}
+                            onChange={toggleTodos}
+                            className="rounded border-gray-300"
+                          />
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Socio</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Medio</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CBU/Tarjeta</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cuotas</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Importe</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {sociosDisponibles.map(socio => (
+                        <tr key={socio.id} className={sociosSeleccionados.includes(socio.id) ? 'bg-blue-50' : ''}>
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={sociosSeleccionados.includes(socio.id)}
+                              onChange={() => toggleSocio(socio.id)}
+                              className="rounded border-gray-300"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-gray-900">{socio.apellidoNombre}</div>
+                            <div className="text-sm text-gray-500">#{socio.nroSocio} - DNI {socio.dni}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              socio.medioPago === 'CBU' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                            }`}>
+                              {socio.medioPago === 'CBU' ? (
+                                <><Building className="w-3 h-3 mr-1" /> CBU</>
+                              ) : (
+                                <><CreditCard className="w-3 h-3 mr-1" /> {socio.tarjetaMarca || 'Tarjeta'}</>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500 font-mono">
+                            {socio.medioPago === 'CBU'
+                              ? (socio.cbuDebito?.slice(-8) || '-')
+                              : `****${socio.tarjetaUltimos4 || '****'}`
+                            }
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm text-gray-600">
+                            {socio.cantidadCargos}
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium text-gray-900">
+                            ${socio.totalDebitar?.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>No hay socios con débito activo y cuotas pendientes para este período</p>
+                </div>
+              )}
+
+              {/* Botón Generar */}
+              {sociosDisponibles.length > 0 && (
+                <div className="flex justify-end">
+                  <Button
+                    onClick={generarArchivo}
+                    loading={loading}
+                    disabled={sociosSeleccionados.length === 0}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generar Archivo ({sociosSeleccionados.length} socios)
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Archivos */}
+          {activeTab === 'archivos' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-gray-800">Archivos Generados</h3>
+                <Button onClick={cargarArchivos} variant="outline" size="sm">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Actualizar
+                </Button>
+              </div>
+
+              {archivos.length > 0 ? (
+                <div className="space-y-3">
+                  {archivos.map(archivo => (
+                    <div
+                      key={archivo.id}
+                      className="bg-gray-50 rounded-lg p-4 border border-gray-100 hover:border-gray-200 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h4 className="font-medium text-gray-900">{archivo.numero}</h4>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              archivo.estado === 'GENERADO' ? 'bg-yellow-100 text-yellow-800' :
+                              archivo.estado === 'ENVIADO' ? 'bg-blue-100 text-blue-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {archivo.estado === 'GENERADO' && <Clock className="w-3 h-3 mr-1" />}
+                              {archivo.estado === 'ENVIADO' && <Send className="w-3 h-3 mr-1" />}
+                              {archivo.estado === 'PROCESADO' && <CheckCircle className="w-3 h-3 mr-1" />}
+                              {archivo.estado}
+                            </span>
+                          </div>
+
+                          <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
+                            <span>{archivo.configuracion?.nombre}</span>
+                            <span>•</span>
+                            <span>{String(archivo.periodoMes).padStart(2, '0')}/{archivo.periodoAnio}</span>
+                            <span>•</span>
+                            <span>{archivo.cantidadRegistros} registros</span>
+                            <span>•</span>
+                            <span className="font-medium text-gray-700">
+                              ${parseFloat(archivo.montoTotal).toLocaleString('es-AR')}
+                            </span>
+                          </div>
+
+                          {archivo.estadisticas && (
+                            <div className="mt-2 flex items-center gap-4 text-sm">
+                              <span className="text-yellow-600">
+                                <Clock className="w-3 h-3 inline mr-1" />
+                                {archivo.estadisticas.pendientes} pendientes
+                              </span>
+                              <span className="text-green-600">
+                                <CheckCircle className="w-3 h-3 inline mr-1" />
+                                {archivo.estadisticas.cobrados} cobrados
+                              </span>
+                              <span className="text-red-600">
+                                <XCircle className="w-3 h-3 inline mr-1" />
+                                {archivo.estadisticas.rechazados} rechazados
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => verDetalleArchivo(archivo.id)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => descargarArchivo(archivo.id)}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                          {archivo.estado === 'GENERADO' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => marcarEnviado(archivo.id)}
+                            >
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {archivo.estadisticas?.rechazados > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => reintentarRechazados(archivo.id)}
+                              title="Reintentar rechazados"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>No hay archivos generados</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Importar Respuesta */}
+          {activeTab === 'importar' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">Instrucciones</h4>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                  <li>Seleccione el archivo de débito original</li>
+                  <li>Pegue el contenido del archivo de respuesta del procesador</li>
+                  <li>Haga clic en "Procesar Respuesta"</li>
+                </ol>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Archivo de Débito Original
+                  </label>
+                  <select
+                    value={archivoImportar || ''}
+                    onChange={(e) => setArchivoImportar(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="">Seleccionar archivo...</option>
+                    {archivos.filter(a => a.estado !== 'PROCESADO').map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.numero} - {a.cantidadRegistros} registros (${parseFloat(a.montoTotal).toLocaleString('es-AR')})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Contenido del Archivo de Respuesta
+                </label>
+                <textarea
+                  value={contenidoRespuesta}
+                  onChange={(e) => setContenidoRespuesta(e.target.value)}
+                  rows={10}
+                  className="input-field font-mono text-sm"
+                  placeholder="Pegue aquí el contenido del archivo de respuesta..."
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={importarRespuesta}
+                  loading={loading}
+                  disabled={!archivoImportar || !contenidoRespuesta}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Procesar Respuesta
+                </Button>
+              </div>
+
+              {resultadoImportacion && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-medium text-green-900 mb-3">Resultado de la Importación</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Total procesados:</span>
+                      <span className="ml-2 font-bold text-gray-900">{resultadoImportacion.resumen.total}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Cobrados:</span>
+                      <span className="ml-2 font-bold text-green-600">{resultadoImportacion.resumen.cobrados}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Rechazados:</span>
+                      <span className="ml-2 font-bold text-red-600">{resultadoImportacion.resumen.rechazados}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Monto cobrado:</span>
+                      <span className="ml-2 font-bold text-green-600">
+                        ${resultadoImportacion.resumen.montoCobrado?.toLocaleString('es-AR')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Estadísticas */}
+          {activeTab === 'estadisticas' && estadisticas && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Resumen de Archivos */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-800 mb-4">Archivos {estadisticas.anio}</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Generados</span>
+                      <span className="font-medium">{estadisticas.archivos.generados}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Enviados</span>
+                      <span className="font-medium">{estadisticas.archivos.enviados}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Procesados</span>
+                      <span className="font-medium">{estadisticas.archivos.procesados}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="text-gray-800 font-medium">Monto Total</span>
+                      <span className="font-bold text-primary">
+                        ${estadisticas.archivos.montoTotal?.toLocaleString('es-AR')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumen de Débitos */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-800 mb-4">Débitos {estadisticas.anio}</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-yellow-600">Pendientes</span>
+                      <span className="font-medium">{estadisticas.detalles.pendientes}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-green-600">Cobrados</span>
+                      <span className="font-medium">{estadisticas.detalles.cobrados}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-red-600">Rechazados</span>
+                      <span className="font-medium">{estadisticas.detalles.rechazados}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="text-gray-800 font-medium">Monto Cobrado</span>
+                      <span className="font-bold text-green-600">
+                        ${estadisticas.detalles.montoCobrado?.toLocaleString('es-AR')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Rechazos */}
+              {estadisticas.rechazosPorCodigo?.length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-800 mb-4">Motivos de Rechazo más Frecuentes</h4>
+                  <div className="space-y-2">
+                    {estadisticas.rechazosPorCodigo.map((r, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-mono text-gray-500">{r.codigoRechazo}</span>
+                          <span className="text-sm text-gray-700">{r.motivoRechazo || 'Sin descripción'}</span>
+                        </div>
+                        <span className="text-sm font-medium text-red-600">{r._count} rechazos</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Configuración */}
+          {activeTab === 'configuracion' && (
+            <div className="space-y-6">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-medium text-amber-900 mb-2">Configuración de Procesadores</h4>
+                <p className="text-sm text-amber-800">
+                  Para agregar un nuevo procesador (Prisma, Payway, banco), necesitará la documentación
+                  técnica del formato de archivos que proporciona cada entidad al darse de alta como comercio.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {configuraciones.map(config => (
+                  <div key={config.id} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{config.nombre}</h4>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Código: {config.codigo} | Tipo: {config.tipo} | Formato: {config.formatoArchivo}
+                        </p>
+                        {config.codigoEmpresa && (
+                          <p className="text-sm text-gray-500">
+                            Código Empresa: {config.codigoEmpresa}
+                          </p>
+                        )}
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        config.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {config.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-500">
+                      Archivos generados: {config._count?.archivos || 0}
+                    </div>
+                  </div>
+                ))}
+
+                {configuraciones.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    <Settings className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p>No hay procesadores configurados</p>
+                    <p className="text-sm mt-2">
+                      Se crearán configuraciones de ejemplo al iniciar el sistema
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal Detalle Archivo */}
+      {showDetalleModal && archivoSeleccionado && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900">{archivoSeleccionado.numero}</h3>
+                <p className="text-sm text-gray-500">
+                  {archivoSeleccionado.configuracion?.nombre} - {archivoSeleccionado.cantidadRegistros} registros
+                </p>
+              </div>
+              <button onClick={() => setShowDetalleModal(false)} className="text-gray-400 hover:text-gray-600">
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1">
+              {/* Estadísticas */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-yellow-50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-yellow-600">{archivoSeleccionado.estadisticas?.pendientes || 0}</p>
+                  <p className="text-sm text-yellow-800">Pendientes</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-green-600">{archivoSeleccionado.estadisticas?.cobrados || 0}</p>
+                  <p className="text-sm text-green-800">Cobrados</p>
+                  <p className="text-xs text-green-600 mt-1">
+                    ${archivoSeleccionado.estadisticas?.montoCobrado?.toLocaleString('es-AR')}
+                  </p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-red-600">{archivoSeleccionado.estadisticas?.rechazados || 0}</p>
+                  <p className="text-sm text-red-800">Rechazados</p>
+                </div>
+              </div>
+
+              {/* Tabla de detalles */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Socio</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">CBU/Tarjeta</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Importe</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Estado</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {archivoSeleccionado.detalles?.map(d => (
+                      <tr key={d.id}>
+                        <td className="px-4 py-2">
+                          <div className="text-sm font-medium text-gray-900">{d.socio?.apellidoNombre}</div>
+                          <div className="text-xs text-gray-500">#{d.socio?.nroSocio}</div>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-500 font-mono">
+                          {d.cbuEnviado?.slice(-8) || '****'}
+                        </td>
+                        <td className="px-4 py-2 text-right text-sm font-medium">
+                          ${parseFloat(d.importeEnviado).toLocaleString('es-AR')}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            d.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-800' :
+                            d.estado === 'COBRADO' ? 'bg-green-100 text-green-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {d.estado}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-500">
+                          {d.codigoRechazo && (
+                            <span className="font-mono text-red-600">{d.codigoRechazo}: </span>
+                          )}
+                          {d.motivoRechazo || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 flex justify-end gap-2">
+              {archivoSeleccionado.estado === 'GENERADO' && (
+                <Button variant="outline" onClick={() => marcarEnviado(archivoSeleccionado.id)}>
+                  <Send className="w-4 h-4 mr-2" />
+                  Marcar como Enviado
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => descargarArchivo(archivoSeleccionado.id)}>
+                <Download className="w-4 h-4 mr-2" />
+                Descargar
+              </Button>
+              <Button onClick={() => setShowDetalleModal(false)}>
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

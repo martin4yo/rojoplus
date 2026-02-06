@@ -213,7 +213,9 @@ export async function enviarReciboPago(pago) {
     minute: '2-digit',
   })
 
-  const cuotasHtml = pago.cuotas.map(c => `
+  // Compatibilidad: usar cargos o cuotas (el schema usa "cargos")
+  const cargos = pago.cargos || pago.cuotas || []
+  const cuotasHtml = cargos.map(c => `
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.tipoCuota?.nombre || 'Cuota'}</td>
       <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.periodo?.nombre || '-'}</td>
@@ -371,6 +373,72 @@ export async function enviarMagicLinkSocio(socio, token) {
     subject: 'Tu link de acceso al Portal del Socio',
     html,
   })
+}
+
+// Enviar QR al socio por email (acceso seguro)
+export async function enviarEmailQRSocio({ to, socioNombre, nroSocio, qrUrl, portalUrl }) {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #DC2626; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Club Sportivo Pilar</h1>
+        <p style="color: white; margin: 5px 0 0 0;">Rojo Plus - Tu Código QR</p>
+      </div>
+
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937; margin-top: 0;">Hola ${socioNombre}!</h2>
+
+        <p style="color: #4b5563; line-height: 1.6;">
+          Acá tenés tu código QR para acceder a los beneficios del programa <strong>Rojo Plus</strong>.
+        </p>
+
+        <div style="background-color: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center;">
+          <p style="color: #6b7280; margin: 0 0 5px 0; font-size: 12px;">SOCIO Nº</p>
+          <p style="color: #DC2626; font-size: 28px; font-weight: bold; margin: 0 0 20px 0;">${nroSocio}</p>
+
+          <div style="background-color: #fef2f2; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <p style="color: #991b1b; margin: 0 0 15px 0; font-weight: bold;">Tu QR personal:</p>
+            <a href="${qrUrl}" style="display: inline-block; background-color: #DC2626; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+              Ver mi QR
+            </a>
+          </div>
+
+          <p style="color: #6b7280; font-size: 13px; margin: 0;">
+            Mostrá este QR en comercios adheridos para obtener descuentos
+          </p>
+        </div>
+
+        <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p style="color: #065f46; margin: 0 0 10px 0; font-weight: bold;">Acceso a tu Portal del Socio:</p>
+          <p style="color: #047857; margin: 0 0 15px 0; font-size: 14px;">
+            Desde el portal podés ver tus cuotas, actividades, pagos y más.
+          </p>
+          <a href="${portalUrl}" style="display: inline-block; background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Ir al Portal del Socio
+          </a>
+        </div>
+
+        <div style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 15px; margin-top: 20px;">
+          <p style="color: #92400e; margin: 0; font-size: 13px;">
+            <strong>Tip:</strong> Guardá este email o agregá el portal a tu pantalla de inicio para acceder rápidamente.
+          </p>
+        </div>
+      </div>
+
+      <div style="background-color: #1f2937; padding: 20px; text-align: center;">
+        <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+          Club Sportivo Pilar - "El Rojo de la Avenida"
+        </p>
+      </div>
+    </div>
+  `
+
+  await enviarEmail({
+    to,
+    subject: `Tu código QR - Socio #${nroSocio} - Rojo Plus`,
+    html,
+  })
+
+  console.log(`📧 QR enviado a ${to} (Socio #${nroSocio})`)
 }
 
 // Verificar conexión SMTP al iniciar
