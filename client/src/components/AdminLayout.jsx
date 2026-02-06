@@ -82,6 +82,7 @@ export default function AdminLayout() {
 
   const menuItems = [
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/admin/dashboard-ejecutivo', label: 'Dashboard Ejecutivo', icon: BarChart3 },
     { path: '/admin/socios', label: 'Socios', icon: Users },
     { path: '/admin/solicitudes', label: 'Solicitudes', icon: UserPlus },
     { path: '/admin/inscripciones', label: 'Inscripciones', icon: ClipboardList },
@@ -117,6 +118,7 @@ export default function AdminLayout() {
       submenu: [
         { path: '/admin/tesoreria/cajas', label: 'Cajas', icon: Wallet },
         { path: '/admin/cierres-caja', label: 'Cierre de Caja', icon: ClipboardList },
+        { path: '/admin/debito-automatico', label: 'Debito Automatico', icon: CreditCard },
         { path: '/admin/tesoreria/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
         { path: '/admin/tesoreria/transferencias', label: 'Transferencias', icon: ArrowLeftRight },
       ]

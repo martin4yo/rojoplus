@@ -23,6 +23,7 @@ import AgregarFamiliares from './pages/public/AgregarFamiliares'
 // Páginas admin
 import AdminLogin from './pages/admin/Login'
 import AdminDashboard from './pages/admin/Dashboard'
+import AdminDashboardEjecutivo from './pages/admin/DashboardEjecutivo'
 import AdminComercios from './pages/admin/Comercios'
 import AdminComercioDetalle from './pages/admin/ComercioDetalle'
 import AdminSocios from './pages/admin/Socios'
@@ -34,6 +35,7 @@ import AdminTablasAuxiliares from './pages/admin/TablasAuxiliares'
 import AdminSolicitudes from './pages/admin/Solicitudes'
 import AdminInscripciones from './pages/admin/Inscripciones'
 import AdminCierreCaja from './pages/admin/CierreCaja'
+import AdminDebitoAutomatico from './pages/admin/DebitoAutomatico'
 import AdminConfiguracionLista from './pages/admin/ConfiguracionLista'
 import AdminConfiguracionForm from './pages/admin/ConfiguracionForm'
 import AdminConfiguracionPagos from './pages/admin/ConfiguracionPagos'
@@ -48,6 +50,7 @@ import AdminReporteCuotas from './pages/admin/ReporteCuotas'
 import AdminReporteSocios from './pages/admin/ReporteSocios'
 import AdminReporteComercios from './pages/admin/ReporteComercios'
 import AdminReporteCentrosCosto from './pages/admin/ReporteCentrosCosto'
+import AdminReporteMorosidad from './pages/admin/ReporteMorosidadAvanzado'
 import AdminEntrenadoresLista from './pages/admin/EntrenadoresLista'
 import AdminEntrenadorForm from './pages/admin/EntrenadorForm'
 import AdminPeriodos from './pages/admin/Periodos'
@@ -172,6 +175,7 @@ function App() {
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboard />} />
+        <Route path="dashboard-ejecutivo" element={<AdminDashboardEjecutivo />} />
         <Route path="comercios" element={<AdminComercios />} />
         <Route path="comercios/:id" element={<AdminComercioDetalle />} />
         <Route path="socios" element={<AdminSocios />} />
@@ -182,6 +186,7 @@ function App() {
         <Route path="solicitudes" element={<AdminSolicitudes />} />
         <Route path="inscripciones" element={<AdminInscripciones />} />
         <Route path="cierres-caja" element={<AdminCierreCaja />} />
+        <Route path="debito-automatico" element={<AdminDebitoAutomatico />} />
         <Route path="reportes" element={<AdminReportes />} />
         <Route path="reportes/actividades" element={<AdminReporteActividades />} />
         <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />
@@ -189,6 +194,7 @@ function App() {
         <Route path="reportes/socios" element={<AdminReporteSocios />} />
         <Route path="reportes/comercios" element={<AdminReporteComercios />} />
         <Route path="reportes/centros-costo" element={<AdminReporteCentrosCosto />} />
+        <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
         <Route path="configuracion" element={<AdminTablasAuxiliares />} />
         <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
         <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
