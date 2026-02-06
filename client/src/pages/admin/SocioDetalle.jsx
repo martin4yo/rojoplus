@@ -28,6 +28,9 @@ export default function SocioDetalle() {
   // Foto
   const [fotoError, setFotoError] = useState(false)
 
+  // Actividades
+  const [mostrarTodasActividades, setMostrarTodasActividades] = useState(false)
+
   // Familia
   const [busquedaTitular, setBusquedaTitular] = useState('')
   const [titularesEncontrados, setTitularesEncontrados] = useState([])
@@ -861,33 +864,70 @@ export default function SocioDetalle() {
         {/* Tab Actividades */}
         {activeTab === 'actividades' && (
           <div>
-            <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
-              <Activity className="w-4 h-4" /> Actividades Activas
-            </h3>
-            {socio.inscripciones?.length > 0 ? (
-              <div className="space-y-3">
-                {socio.inscripciones.map(insc => (
-                  <div key={insc.id} className="p-4 bg-gray-50 rounded-lg flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        {insc.categoriaActividad?.actividad?.nombre} - {insc.categoriaActividad?.nombre}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Desde {formatFecha(insc.fechaInicio)}
-                        {insc.becado && ' • Becado'}
-                        {insc.federado && ' • Federado'}
-                      </p>
-                    </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${insc.estado === 'ACTIVA' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium text-gray-800 flex items-center gap-2">
+                <Activity className="w-4 h-4" />
+                {mostrarTodasActividades ? 'Todas las Actividades' : 'Actividades Activas'}
+              </h3>
+              <button
+                onClick={() => setMostrarTodasActividades(!mostrarTodasActividades)}
+                className="px-3 py-1 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition"
+              >
+                {mostrarTodasActividades ? 'Ver solo activas' : 'Ver historial completo'}
+              </button>
+            </div>
+            {(() => {
+              const inscripcionesFiltradas = mostrarTodasActividades
+                ? socio.inscripciones
+                : socio.inscripciones?.filter(i => i.estado === 'ACTIVA')
+
+              return inscripcionesFiltradas?.length > 0 ? (
+                <div className="space-y-3">
+                  {inscripcionesFiltradas.map(insc => (
+                    <div key={insc.id} className={`p-4 rounded-lg flex justify-between items-start ${
+                      insc.estado === 'ACTIVA' ? 'bg-gray-50' : 'bg-gray-100 border border-gray-300'
+                    }`}>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-800">
+                          {insc.categoriaActividad?.actividad?.nombre} - {insc.categoriaActividad?.nombre}
+                        </p>
+                        <div className="text-sm text-gray-500 mt-1 space-y-0.5">
+                          <p>
+                            Desde {formatFecha(insc.fechaInicio)}
+                            {insc.fechaFin && ` hasta ${formatFecha(insc.fechaFin)}`}
+                          </p>
+                          {(insc.becado || insc.federado || insc.exentoCuota) && (
+                            <p className="flex gap-2 flex-wrap">
+                              {insc.becado && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">Becado</span>}
+                              {insc.federado && <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">Federado</span>}
+                              {insc.exentoCuota && <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">Exento de cuota</span>}
+                            </p>
+                          )}
+                          {insc.motivoFin && (
+                            <p className="text-gray-600 italic">
+                              Motivo de baja: {insc.motivoFin}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
+                        insc.estado === 'ACTIVA'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-200 text-gray-700'
                       }`}>
-                      {insc.estado}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500">No tiene actividades activas</p>
-            )}
+                        {insc.estado}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500">
+                  {mostrarTodasActividades
+                    ? 'No tiene actividades registradas'
+                    : 'No tiene actividades activas'}
+                </p>
+              )
+            })()}
           </div>
         )}
 

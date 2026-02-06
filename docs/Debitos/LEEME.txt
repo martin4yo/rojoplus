@@ -1,0 +1,14 @@
+Dentro del archivo “Opción A.zip”, podrá encontrar de forma detallada los diseños de los archivos de:
+
+* Presentación (tarjetas Credito/Debito): es el archivo donde presentaran la deuda a de cada usuario.
+* Rendición: en él se le informara el resultado de cada registro enviado, aceptado o rechazado.
+* Novedades: en este archivo se incluyen las novedades tomadas por nuestro centro de atención (ej: Stop Debit, bajas).
+
+*IMPORTANTE:
+Los nombres que deberan usar para los archivos de Presentacion son:
+Tarjetas Credito Visa: DEBLIQC.txt
+Tarjetas Debito Visa: DEBLIQD.txt
+Tarjetas Credito/Debito Mastercard: DEBLIMC.txt
+Las presentaciones de Mastercard (Débito y crédito) se realizan en un solo archivo llamado DEBLIMC.TXT
+
+Con los cuales podrán usar para desarrollar o adaptar cualquier sistema de facturación a modo de poder confeccionar el archivo.
