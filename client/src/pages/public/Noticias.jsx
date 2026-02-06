@@ -164,78 +164,68 @@ export default function Noticias() {
       </section>
 
       {/* Lista de noticias */}
-      <section className="py-12 md:py-16">
+      <section className="py-12 md:py-16 bg-gray-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Contenido principal */}
-            <div className="flex-1">
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-                </div>
-              ) : noticiasFiltradas.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg">No se encontraron noticias</p>
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 gap-6">
-                  {noticiasFiltradas.map((noticia) => (
-                    <article
-                      key={noticia.id}
-                      className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
-                    >
-                      {/* Imagen */}
-                      <div className="h-48 bg-gray-300 relative overflow-hidden">
-                        {noticia.imagen ? (
-                          <img
-                            src={noticia.imagen}
-                            alt={noticia.titulo}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
-                            <span className="text-white text-4xl font-bold opacity-30">SP</span>
-                          </div>
-                        )}
-                        <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-medium ${getCategoriaColor(noticia.categoria)}`}>
-                          {noticia.categoria}
-                        </span>
-                      </div>
-
-                      {/* Contenido */}
-                      <div className="p-6">
-                        <div className="flex items-center gap-2 text-gray-500 text-sm mb-3">
-                          <Calendar className="w-4 h-4" />
-                          {formatFecha(noticia.fecha)}
-                        </div>
-
-                        <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors">
-                          {noticia.titulo}
-                        </h2>
-
-                        <p className="text-gray-600 text-sm line-clamp-3 mb-4">
-                          {noticia.extracto}
-                        </p>
-
-                        <Link
-                          to={`/noticias/${noticia.id}`}
-                          className="inline-flex items-center text-red-600 font-medium text-sm hover:text-red-700"
-                        >
-                          Leer más
-                          <ChevronRight className="w-4 h-4 ml-1" />
-                        </Link>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
             </div>
+          ) : noticiasFiltradas.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg">No se encontraron noticias</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {noticiasFiltradas.map((noticia) => (
+                <article
+                  key={noticia.id}
+                  className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group"
+                >
+                  {/* Imagen */}
+                  <div className="h-48 bg-gray-300 relative overflow-hidden">
+                    {noticia.imagen ? (
+                      <img
+                        src={noticia.imagen}
+                        alt={noticia.titulo}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
+                        <span className="text-white text-4xl font-bold opacity-30">SP</span>
+                      </div>
+                    )}
+                    <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-medium ${getCategoriaColor(noticia.categoria)}`}>
+                      {noticia.categoria}
+                    </span>
+                  </div>
 
-            {/* Sidebar con banners */}
-            <aside className="lg:w-[300px] flex-shrink-0 space-y-6">
-              <BannerPublicitario tipo="LATERAL_DERECHO" ubicacion="NOTICIAS" />
-            </aside>
-          </div>
+                  {/* Contenido */}
+                  <div className="p-6">
+                    <div className="flex items-center gap-2 text-gray-500 text-sm mb-3">
+                      <Calendar className="w-4 h-4" />
+                      {formatFecha(noticia.fecha)}
+                    </div>
+
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors">
+                      {noticia.titulo}
+                    </h2>
+
+                    <p className="text-gray-600 text-sm line-clamp-3 mb-4">
+                      {noticia.extracto}
+                    </p>
+
+                    <span
+                      title="En desarrollo"
+                      className="inline-flex items-center text-red-600 font-medium text-sm cursor-help"
+                    >
+                      Leer más
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
