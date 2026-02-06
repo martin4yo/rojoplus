@@ -3,13 +3,14 @@ import {
   CreditCard, FileText, Upload, Download, RefreshCw,
   Calendar, Users, DollarSign, CheckCircle, XCircle,
   AlertTriangle, Clock, Settings, ChevronRight, Eye,
-  Search, Filter, Building, Send, RotateCcw, BarChart3
+  Search, Filter, Building, Send, RotateCcw, BarChart3,
+  UserPlus, Check, X
 } from 'lucide-react'
 import { Button } from '../../components/Button'
 import api from '../../services/api'
 
 export default function DebitoAutomatico() {
-  const [activeTab, setActiveTab] = useState('generar')
+  const [activeTab, setActiveTab] = useState('adhesiones')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -38,16 +39,24 @@ export default function DebitoAutomatico() {
   // Estado para Estadísticas
   const [estadisticas, setEstadisticas] = useState(null)
 
+  // Estado para Adhesiones
+  const [adhesiones, setAdhesiones] = useState([])
+  const [filtroAdhesion, setFiltroAdhesion] = useState('PENDIENTE')
+
   useEffect(() => {
     cargarConfiguraciones()
     cargarEstadisticas()
+    cargarAdhesiones()
   }, [])
 
   useEffect(() => {
     if (activeTab === 'archivos') {
       cargarArchivos()
     }
-  }, [activeTab])
+    if (activeTab === 'adhesiones') {
+      cargarAdhesiones()
+    }
+  }, [activeTab, filtroAdhesion])
 
   useEffect(() => {
     if (periodoAnio && periodoMes && configuracionId) {
@@ -243,7 +252,54 @@ export default function DebitoAutomatico() {
     }
   }
 
+  async function cargarAdhesiones() {
+    setLoading(true)
+    try {
+      const data = await api.get('/admin/debito/adhesiones', { estado: filtroAdhesion })
+      setAdhesiones(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function aprobarAdhesion(socioId) {
+    if (!confirm('¿Aprobar esta solicitud de adhesión al débito automático?')) return
+    try {
+      await api.put(`/admin/debito/adhesiones/${socioId}/aprobar`)
+      cargarAdhesiones()
+      cargarEstadisticas()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function rechazarAdhesion(socioId) {
+    const motivo = prompt('Motivo del rechazo (opcional):')
+    try {
+      await api.put(`/admin/debito/adhesiones/${socioId}/rechazar`, { motivo })
+      cargarAdhesiones()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function desactivarDebito(socioId) {
+    if (!confirm('¿Desactivar el débito automático para este socio?')) return
+    try {
+      await api.put(`/admin/debito/adhesiones/${socioId}/desactivar`)
+      cargarAdhesiones()
+      cargarEstadisticas()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const adhesionesPendientes = adhesiones.filter(a => a.estadoAdhesion === 'PENDIENTE').length
+
   const tabs = [
+    { id: 'adhesiones', label: 'Adhesiones', icon: UserPlus, badge: adhesionesPendientes > 0 ? adhesionesPendientes : null },
     { id: 'generar', label: 'Generar Archivo', icon: FileText },
     { id: 'archivos', label: 'Archivos', icon: Download },
     { id: 'importar', label: 'Importar Respuesta', icon: Upload },
@@ -332,6 +388,11 @@ export default function DebitoAutomatico() {
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
+              {tab.badge && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs font-bold bg-red-500 text-white rounded-full">
+                  {tab.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -340,6 +401,129 @@ export default function DebitoAutomatico() {
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
+            </div>
+          )}
+
+          {/* Tab: Adhesiones */}
+          {activeTab === 'adhesiones' && (
+            <div className="space-y-4">
+              {/* Filtros */}
+              <div className="flex gap-2 mb-4">
+                {['PENDIENTE', 'ACTIVO', 'TODOS'].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFiltroAdhesion(f === 'TODOS' ? '' : f)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      (filtroAdhesion === f || (f === 'TODOS' && !filtroAdhesion))
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {f === 'PENDIENTE' && `Pendientes (${adhesiones.filter(a => a.estadoAdhesion === 'PENDIENTE').length})`}
+                    {f === 'ACTIVO' && `Activos (${adhesiones.filter(a => a.estadoAdhesion === 'ACTIVO').length})`}
+                    {f === 'TODOS' && `Todos (${adhesiones.length})`}
+                  </button>
+                ))}
+              </div>
+
+              {loading ? (
+                <div className="text-center py-8 text-gray-500">Cargando...</div>
+              ) : adhesiones.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay solicitudes {filtroAdhesion === 'PENDIENTE' ? 'pendientes' : ''}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Socio</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Medio de Pago</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {adhesiones.map(socio => (
+                        <tr key={socio.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div>
+                              <p className="font-medium text-gray-900">{socio.apellidoNombre}</p>
+                              <p className="text-sm text-gray-500">#{socio.nroSocio} - DNI {socio.documento}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                              socio.debitoTipo === 'TARJETA' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              <CreditCard className="w-3 h-3" />
+                              {socio.debitoTipo || 'CBU'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {socio.debitoTipo === 'TARJETA' ? (
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{socio.tarjetaMarca}</p>
+                                <p className="text-sm font-mono text-gray-500">**** {socio.tarjetaUltimos4} - Vto: {socio.tarjetaVencimiento}</p>
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{socio.bancoDebito}</p>
+                                <p className="text-sm font-mono text-gray-500">{socio.cbuMasked}</p>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              socio.estadoAdhesion === 'ACTIVO' ? 'bg-green-100 text-green-700' :
+                              socio.estadoAdhesion === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {socio.estadoAdhesion}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {new Date(socio.updatedAt).toLocaleDateString('es-AR')}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              {socio.estadoAdhesion === 'PENDIENTE' && (
+                                <>
+                                  <button
+                                    onClick={() => aprobarAdhesion(socio.id)}
+                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg"
+                                    title="Aprobar"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => rechazarAdhesion(socio.id)}
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                                    title="Rechazar"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                              {socio.estadoAdhesion === 'ACTIVO' && (
+                                <button
+                                  onClick={() => desactivarDebito(socio.id)}
+                                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                  title="Desactivar"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 

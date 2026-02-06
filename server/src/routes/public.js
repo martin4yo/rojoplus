@@ -337,4 +337,97 @@ router.post('/solicitud-socio/:id/verificar', asyncHandler(async (req, res) => {
   })
 }))
 
+/**
+ * GET /api/public/actividades
+ * Obtener lista de actividades activas para mostrar en el sitio web
+ */
+router.get('/actividades', asyncHandler(async (req, res) => {
+  const actividades = await req.prisma.actividad.findMany({
+    where: {
+      activo: true
+    },
+    include: {
+      categorias: {
+        where: { activo: true },
+        select: {
+          id: true,
+          nombre: true,
+          _count: {
+            select: {
+              inscripciones: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: { nombre: 'asc' }
+  })
+
+  res.json({
+    success: true,
+    data: actividades.map(act => ({
+      id: act.id,
+      nombre: act.nombre,
+      descripcion: act.descripcion,
+      imagen: act.imagen,
+      categorias: act.categorias.map(c => ({ id: c.id, nombre: c.nombre })),
+      inscriptos: act.categorias.reduce((sum, cat) => sum + cat._count.inscripciones, 0)
+    }))
+  })
+}))
+
+/**
+ * GET /api/public/actividades/:id
+ * Detalle de una actividad para página pública
+ */
+router.get('/actividades/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const actividad = await req.prisma.actividad.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      categorias: {
+        where: { activo: true },
+        include: {
+          horarios: {
+            orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }]
+          },
+          _count: {
+            select: {
+              inscripciones: true
+            }
+          }
+        }
+      }
+    }
+  })
+
+  if (!actividad || !actividad.activo) {
+    throw new AppError('Actividad no encontrada', 404)
+  }
+
+  const totalInscriptos = actividad.categorias.reduce((sum, cat) => sum + cat._count.inscripciones, 0)
+
+  res.json({
+    id: actividad.id,
+    nombre: actividad.nombre,
+    descripcion: actividad.descripcion,
+    imagen: actividad.imagen,
+    inscriptos: totalInscriptos,
+    categorias: actividad.categorias.map(cat => ({
+      id: cat.id,
+      nombre: cat.nombre,
+      edadMinima: cat.edadMinima,
+      edadMaxima: cat.edadMaxima,
+      cupoMaximo: cat.cupoMaximo,
+      genero: cat.genero,
+      horarios: cat.horarios.map(h => ({
+        diaSemana: h.diaSemana,
+        horaInicio: h.horaInicio,
+        horaFin: h.horaFin
+      }))
+    }))
+  })
+}))
+
 export default router

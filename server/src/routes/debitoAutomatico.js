@@ -1405,4 +1405,184 @@ async function obtenerMedioPagoDebito(tx) {
   return medioPago.id
 }
 
+// ============================================
+// GESTIÓN DE ADHESIONES DE SOCIOS
+// ============================================
+
+// GET /api/admin/debito/adhesiones - Listar solicitudes de adhesión pendientes
+router.get('/adhesiones', authAdmin, asyncHandler(async (req, res) => {
+  const { estado } = req.query // PENDIENTE, ACTIVO, RECHAZADO, todos
+
+  // Buscar socios con CBU o tarjeta cargada
+  const where = {
+    OR: [
+      { cbuDebito: { not: null } },
+      { tarjetaUltimos4: { not: null } }
+    ]
+  }
+
+  if (estado === 'PENDIENTE') {
+    where.debitoVerificado = false
+  } else if (estado === 'ACTIVO') {
+    where.debitoVerificado = true
+    where.enviaDebito = true
+  }
+
+  const socios = await prisma.socio.findMany({
+    where,
+    select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      documento: true,
+      email: true,
+      celular: true,
+      debitoTipo: true,
+      // CBU
+      cbuDebito: true,
+      bancoDebito: true,
+      aliasDebito: true,
+      // Tarjeta
+      tarjetaMarca: true,
+      tarjetaUltimos4: true,
+      tarjetaVencimiento: true,
+      // Estado
+      enviaDebito: true,
+      debitoVerificado: true,
+      updatedAt: true
+    },
+    orderBy: { updatedAt: 'desc' }
+  })
+
+  // Agregar estado calculado
+  const sociosConEstado = socios.map(s => ({
+    ...s,
+    estadoAdhesion: !s.debitoVerificado ? 'PENDIENTE' :
+                    s.enviaDebito ? 'ACTIVO' : 'INACTIVO',
+    cbuMasked: s.cbuDebito ? `****${s.cbuDebito.slice(-4)}` : null,
+    debitoTipo: s.debitoTipo || (s.cbuDebito ? 'CBU' : 'TARJETA')
+  }))
+
+  res.json(sociosConEstado)
+}))
+
+// PUT /api/admin/debito/adhesiones/:socioId/aprobar - Aprobar adhesión
+router.put('/adhesiones/:socioId/aprobar', authAdmin, asyncHandler(async (req, res) => {
+  const { socioId } = req.params
+
+  const socio = await prisma.socio.findUnique({
+    where: { id: parseInt(socioId) }
+  })
+
+  if (!socio) {
+    return res.status(404).json({ error: 'Socio no encontrado' })
+  }
+
+  // Verificar que tenga CBU o tarjeta
+  if (!socio.cbuDebito && !socio.tarjetaUltimos4) {
+    return res.status(400).json({ error: 'El socio no tiene medio de pago cargado' })
+  }
+
+  await prisma.socio.update({
+    where: { id: parseInt(socioId) },
+    data: {
+      debitoVerificado: true,
+      enviaDebito: true
+    }
+  })
+
+  // Registrar en audit log
+  const auditData = socio.debitoTipo === 'TARJETA'
+    ? { tipo: 'TARJETA', marca: socio.tarjetaMarca, ultimos4: socio.tarjetaUltimos4 }
+    : { tipo: 'CBU', banco: socio.bancoDebito }
+
+  await prisma.auditLog.create({
+    data: {
+      tabla: 'socio',
+      registroId: parseInt(socioId),
+      accion: 'APROBAR_DEBITO',
+      adminId: req.admin.id,
+      datosNuevos: JSON.stringify(auditData),
+      ip: req.ip
+    }
+  })
+
+  res.json({ success: true, message: 'Adhesión aprobada correctamente' })
+}))
+
+// PUT /api/admin/debito/adhesiones/:socioId/rechazar - Rechazar adhesión
+router.put('/adhesiones/:socioId/rechazar', authAdmin, asyncHandler(async (req, res) => {
+  const { socioId } = req.params
+  const { motivo } = req.body
+
+  const socio = await prisma.socio.findUnique({
+    where: { id: parseInt(socioId) }
+  })
+
+  if (!socio) {
+    return res.status(404).json({ error: 'Socio no encontrado' })
+  }
+
+  // Limpiar todos los datos de débito (CBU y tarjeta)
+  await prisma.socio.update({
+    where: { id: parseInt(socioId) },
+    data: {
+      debitoTipo: null,
+      // CBU
+      cbuDebito: null,
+      bancoDebito: null,
+      aliasDebito: null,
+      // Tarjeta
+      tarjetaNumero: null,
+      tarjetaMarca: null,
+      tarjetaVencimiento: null,
+      tarjetaUltimos4: null,
+      // Estado
+      debitoVerificado: false,
+      enviaDebito: false
+    }
+  })
+
+  // Registrar en audit log
+  await prisma.auditLog.create({
+    data: {
+      tabla: 'socio',
+      registroId: parseInt(socioId),
+      accion: 'RECHAZAR_DEBITO',
+      adminId: req.admin.id,
+      datosNuevos: JSON.stringify({ motivo: motivo || 'No especificado' }),
+      ip: req.ip
+    }
+  })
+
+  res.json({ success: true, message: 'Adhesión rechazada' })
+}))
+
+// PUT /api/admin/debito/adhesiones/:socioId/desactivar - Desactivar débito activo
+router.put('/adhesiones/:socioId/desactivar', authAdmin, asyncHandler(async (req, res) => {
+  const { socioId } = req.params
+  const { motivo } = req.body
+
+  await prisma.socio.update({
+    where: { id: parseInt(socioId) },
+    data: {
+      enviaDebito: false
+    }
+  })
+
+  // Registrar en audit log
+  await prisma.auditLog.create({
+    data: {
+      tabla: 'socio',
+      registroId: parseInt(socioId),
+      accion: 'DESACTIVAR_DEBITO',
+      adminId: req.admin.id,
+      datosNuevos: JSON.stringify({ motivo: motivo || 'Desactivado por admin' }),
+      ip: req.ip
+    }
+  })
+
+  res.json({ success: true, message: 'Débito automático desactivado' })
+}))
+
 export default router

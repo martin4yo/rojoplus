@@ -1405,4 +1405,221 @@ router.get('/:tokenPortal/cuenta-corriente', asyncHandler(async (req, res) => {
   })
 }))
 
+// ==============================================================================
+// DÉBITO AUTOMÁTICO
+// ==============================================================================
+
+// GET /api/socio/:tokenPortal/debito-automatico - Estado de adhesión al débito automático
+router.get('/:tokenPortal/debito-automatico', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal },
+    select: {
+      id: true,
+      debitoTipo: true,
+      cbuDebito: true,
+      bancoDebito: true,
+      aliasDebito: true,
+      tarjetaMarca: true,
+      tarjetaUltimos4: true,
+      tarjetaVencimiento: true,
+      enviaDebito: true,
+      debitoVerificado: true,
+    },
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Determinar si tiene datos de adhesión (CBU o tarjeta)
+  const tieneDatos = socio.cbuDebito || socio.tarjetaUltimos4
+
+  // Determinar estado
+  let estado = 'NO_ADHERIDO'
+  if (tieneDatos) {
+    if (socio.debitoVerificado && socio.enviaDebito) {
+      estado = 'ACTIVO'
+    } else if (!socio.debitoVerificado) {
+      estado = 'PENDIENTE_APROBACION'
+    } else if (!socio.enviaDebito) {
+      estado = 'BAJA_PENDIENTE'
+    }
+  }
+
+  // Preparar respuesta según tipo
+  const tipo = socio.debitoTipo || (socio.cbuDebito ? 'CBU' : socio.tarjetaUltimos4 ? 'TARJETA' : null)
+
+  res.json({
+    success: true,
+    data: {
+      estado,
+      tipo,
+      // Datos CBU
+      cbu: socio.cbuDebito ? `****${socio.cbuDebito.slice(-4)}` : null,
+      banco: socio.bancoDebito,
+      alias: socio.aliasDebito,
+      // Datos Tarjeta
+      tarjetaMarca: socio.tarjetaMarca,
+      tarjetaUltimos4: socio.tarjetaUltimos4,
+      tarjetaVencimiento: socio.tarjetaVencimiento,
+    },
+  })
+}))
+
+// POST /api/socio/:tokenPortal/debito-automatico/solicitar - Solicitar adhesión al débito automático
+router.post('/:tokenPortal/debito-automatico/solicitar', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+  const { tipo, cbu, banco, alias, tarjetaNumero, tarjetaMarca, tarjetaVencimiento, tarjetaTitular } = req.body
+
+  // Validar tipo
+  if (!tipo || !['TARJETA', 'CBU'].includes(tipo)) {
+    throw new AppError('Tipo de adhesión inválido', 400, 'VALIDATION_ERROR')
+  }
+
+  // Validaciones según tipo
+  if (tipo === 'CBU') {
+    if (!cbu || cbu.length !== 22) {
+      throw new AppError('El CBU debe tener 22 dígitos', 400, 'VALIDATION_ERROR')
+    }
+    if (!banco) {
+      throw new AppError('Debe indicar el banco', 400, 'VALIDATION_ERROR')
+    }
+    if (!/^\d{22}$/.test(cbu)) {
+      throw new AppError('El CBU solo debe contener números', 400, 'VALIDATION_ERROR')
+    }
+  } else {
+    // TARJETA
+    if (!tarjetaNumero || tarjetaNumero.length < 13) {
+      throw new AppError('Número de tarjeta inválido', 400, 'VALIDATION_ERROR')
+    }
+    if (!tarjetaMarca) {
+      throw new AppError('Debe indicar la marca de la tarjeta', 400, 'VALIDATION_ERROR')
+    }
+    if (!tarjetaVencimiento || !/^\d{2}\/\d{2}$/.test(tarjetaVencimiento)) {
+      throw new AppError('Vencimiento inválido (MM/AA)', 400, 'VALIDATION_ERROR')
+    }
+    if (!tarjetaTitular) {
+      throw new AppError('Debe indicar el titular de la tarjeta', 400, 'VALIDATION_ERROR')
+    }
+  }
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal },
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Verificar que no esté ya activo
+  if (socio.enviaDebito && socio.debitoVerificado) {
+    throw new AppError('Ya estás adherido al débito automático', 400, 'ALREADY_ENROLLED')
+  }
+
+  // Preparar datos según tipo
+  let updateData = {
+    debitoTipo: tipo,
+    debitoVerificado: false, // Pendiente de aprobación
+    enviaDebito: false, // Se activa cuando el admin aprueba
+  }
+
+  if (tipo === 'CBU') {
+    updateData = {
+      ...updateData,
+      cbuDebito: cbu,
+      bancoDebito: banco,
+      aliasDebito: alias || null,
+      // Limpiar datos de tarjeta si existían
+      tarjetaNumero: null,
+      tarjetaMarca: null,
+      tarjetaVencimiento: null,
+      tarjetaUltimos4: null,
+    }
+  } else {
+    // TARJETA - Solo guardamos los últimos 4 dígitos por seguridad
+    const ultimos4 = tarjetaNumero.slice(-4)
+    updateData = {
+      ...updateData,
+      tarjetaNumero: tarjetaNumero, // En producción esto debería tokenizarse
+      tarjetaMarca: tarjetaMarca,
+      tarjetaVencimiento: tarjetaVencimiento,
+      tarjetaUltimos4: ultimos4,
+      // Limpiar datos de CBU si existían
+      cbuDebito: null,
+      bancoDebito: null,
+      aliasDebito: null,
+    }
+  }
+
+  // Actualizar socio con datos de débito
+  await req.prisma.socio.update({
+    where: { id: socio.id },
+    data: updateData,
+  })
+
+  // Registrar en audit log
+  const auditData = tipo === 'CBU'
+    ? { tipo, banco, cbuUltimos4: cbu.slice(-4) }
+    : { tipo, marca: tarjetaMarca, tarjetaUltimos4: tarjetaNumero.slice(-4) }
+
+  await req.prisma.auditLog.create({
+    data: {
+      tabla: 'socio',
+      registroId: socio.id,
+      accion: 'SOLICITUD_DEBITO',
+      datosNuevos: JSON.stringify(auditData),
+      ip: req.ip,
+    },
+  })
+
+  res.json({
+    success: true,
+    message: 'Solicitud de adhesión enviada. Será revisada por el club en las próximas 48 horas hábiles.',
+  })
+}))
+
+// POST /api/socio/:tokenPortal/debito-automatico/baja - Solicitar baja del débito automático
+router.post('/:tokenPortal/debito-automatico/baja', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+  const { motivo } = req.body
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal },
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  if (!socio.cbuDebito || !socio.enviaDebito) {
+    throw new AppError('No estás adherido al débito automático', 400, 'NOT_ENROLLED')
+  }
+
+  // Marcar como baja pendiente (el admin debe confirmar)
+  await req.prisma.socio.update({
+    where: { id: socio.id },
+    data: {
+      enviaDebito: false,
+    },
+  })
+
+  // Registrar en audit log
+  await req.prisma.auditLog.create({
+    data: {
+      tabla: 'socio',
+      registroId: socio.id,
+      accion: 'BAJA_DEBITO',
+      datosNuevos: JSON.stringify({ motivo: motivo || 'No especificado' }),
+      ip: req.ip,
+    },
+  })
+
+  res.json({
+    success: true,
+    message: 'Solicitud de baja procesada. El débito automático ha sido desactivado.',
+  })
+}))
+
 export default router

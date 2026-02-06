@@ -228,9 +228,9 @@ export default function LoginSocio() {
             </button>
           </form>
 
-          <div className="mt-8 text-center">
-            <p className="text-sm text-gray-500">
-              ¿Primera vez? Contacta al club para registrarte
+          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <p className="text-blue-800 text-sm text-center font-medium">
+              Ingresando tu email o DNI, recibirás un link de acceso exclusivo en tu correo electrónico registrado en el club.
             </p>
           </div>
         </div>

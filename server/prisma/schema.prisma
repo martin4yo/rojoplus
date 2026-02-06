@@ -2119,3 +2119,66 @@ model PushSubscription {
   @@index([activa])
   @@map("push_subscriptions")
 }
+
+// =============================================================================
+// MODULO PUBLICIDAD Y SPONSORS
+// =============================================================================
+
+// Sponsors/Auspiciantes - Empresas que contratan publicidad
+model Sponsor {
+  id              Int       @id @default(autoincrement())
+  nombre          String
+  razonSocial     String?   @map("razon_social")
+  cuit            String?
+  contactoNombre  String?   @map("contacto_nombre")
+  contactoEmail   String?   @map("contacto_email")
+  contactoTelefono String?  @map("contacto_telefono")
+  direccion       String?
+  logo            String?   // URL del logo
+  sitioWeb        String?   @map("sitio_web")
+  observaciones   String?   @db.Text
+  activo          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  banners         Banner[]
+
+  @@index([activo])
+  @@map("sponsors")
+}
+
+// Banners publicitarios
+model Banner {
+  id              Int       @id @default(autoincrement())
+  titulo          String                      // Nombre interno para identificar
+  sponsorId       Int?      @map("sponsor_id") // Sponsor asociado (opcional)
+  tipo            String    @default("LATERAL") // HERO, LATERAL, FOOTER, POPUP
+  ubicacion       String?                     // Páginas donde mostrar: HOME, ACTIVIDADES, NOTICIAS, TODAS
+  imagenDesktop   String    @map("imagen_desktop") // Imagen para desktop
+  imagenMobile    String?   @map("imagen_mobile")  // Imagen opcional para móvil
+  linkDestino     String?   @map("link_destino")   // URL al hacer clic
+  textoAlt        String?   @map("texto_alt")      // Texto alternativo para accesibilidad
+  orden           Int       @default(0)        // Orden de aparición
+  activo          Boolean   @default(true)
+  // Programación
+  fechaInicio     DateTime? @map("fecha_inicio")
+  fechaFin        DateTime? @map("fecha_fin")
+  // Métricas
+  impresiones     Int       @default(0)        // Veces mostrado
+  clics           Int       @default(0)        // Veces clickeado
+  // Contrato/Facturación
+  montoMensual    Decimal?  @map("monto_mensual") @db.Decimal(12, 2)
+  mesContratado   String?   @map("mes_contratado") // "2026-02" formato YYYY-MM
+  pagado          Boolean   @default(false)
+  // Auditoría
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  sponsor         Sponsor?  @relation(fields: [sponsorId], references: [id])
+
+  @@index([tipo])
+  @@index([activo])
+  @@index([ubicacion])
+  @@index([fechaInicio, fechaFin])
+  @@map("banners")
+}

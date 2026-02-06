@@ -244,7 +244,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // Ocupación por actividad (comparar inscriptos vs cupo)
   const actividadesConCupo = await req.prisma.categoriaActividad.findMany({
-    where: { activa: true, cupoMaximo: { gt: 0 } },
+    where: { activo: true, cupoMaximo: { gt: 0 } },
     include: {
       actividad: { select: { nombre: true } },
       inscripciones: {

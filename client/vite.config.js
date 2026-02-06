@@ -92,7 +92,7 @@ export default defineConfig({
         ]
       },
       devOptions: {
-        enabled: true, // Habilitar en desarrollo para testing
+        enabled: false, // Deshabilitado en desarrollo para evitar problemas de cache
         type: 'module'
       }
     })

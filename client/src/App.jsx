@@ -1,8 +1,16 @@
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import ScrollToTop from './components/ScrollToTop'
 
-// Páginas públicas
-import Home from './pages/Home'
+// Páginas públicas - Sitio web del club
+import PublicLayout from './pages/public/Layout/PublicLayout'
+import HomePublic from './pages/public/Home'
+import ActividadesPublic from './pages/public/Actividades'
+import HistoriaPublic from './pages/public/Historia'
+import ContactoPublic from './pages/public/Contacto'
+import NoticiasPublic from './pages/public/Noticias'
+
+// Registro comercios
 import Registro from './pages/registro/Registro'
 import RegistroExito from './pages/registro/RegistroExito'
 
@@ -36,6 +44,7 @@ import AdminSolicitudes from './pages/admin/Solicitudes'
 import AdminInscripciones from './pages/admin/Inscripciones'
 import AdminCierreCaja from './pages/admin/CierreCaja'
 import AdminDebitoAutomatico from './pages/admin/DebitoAutomatico'
+import AdminPublicidad from './pages/admin/Publicidad'
 import AdminConfiguracionLista from './pages/admin/ConfiguracionLista'
 import AdminConfiguracionForm from './pages/admin/ConfiguracionForm'
 import AdminConfiguracionPagos from './pages/admin/ConfiguracionPagos'
@@ -148,10 +157,18 @@ import AdminLayout from './components/AdminLayout'
 function App() {
   return (
     <>
+      <ScrollToTop />
       <Toaster position="top-right" />
       <Routes>
-        {/* Rutas públicas */}
-        <Route path="/" element={<Home />} />
+        {/* Sitio web público del club */}
+        <Route path="/" element={<PublicLayout />}>
+          <Route index element={<HomePublic />} />
+          <Route path="actividades" element={<ActividadesPublic />} />
+          <Route path="historia" element={<HistoriaPublic />} />
+          <Route path="contacto" element={<ContactoPublic />} />
+          <Route path="noticias" element={<NoticiasPublic />} />
+          <Route path="comercios" element={<ComerciosPublicos />} />
+        </Route>
       <Route path="/registro" element={<Registro />} />
       <Route path="/registro/exito" element={<RegistroExito />} />
       <Route path="/inscripcion-socio" element={<InscripcionSocio />} />
@@ -169,7 +186,6 @@ function App() {
       <Route path="/s/:tokenPortal" element={<SocioPortal />} />
       <Route path="/login-socio" element={<LoginSocio />} />
       <Route path="/portal-socio/:tokenPortal" element={<PortalSocioNuevo />} />
-      <Route path="/comercios" element={<ComerciosPublicos />} />
 
       {/* Rutas admin */}
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -187,6 +203,7 @@ function App() {
         <Route path="inscripciones" element={<AdminInscripciones />} />
         <Route path="cierres-caja" element={<AdminCierreCaja />} />
         <Route path="debito-automatico" element={<AdminDebitoAutomatico />} />
+        <Route path="publicidad" element={<AdminPublicidad />} />
         <Route path="reportes" element={<AdminReportes />} />
         <Route path="reportes/actividades" element={<AdminReporteActividades />} />
         <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />

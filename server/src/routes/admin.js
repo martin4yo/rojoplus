@@ -6337,11 +6337,11 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
         const actividad = await req.prisma.actividad.findFirst({
           where: {
             nombre: { contains: nombreActividad, mode: 'insensitive' },
-            activa: true
+            activo: true
           },
           include: {
             categorias: {
-              where: { activa: true },
+              where: { activo: true },
               orderBy: { edadMinima: 'asc' }
             }
           }

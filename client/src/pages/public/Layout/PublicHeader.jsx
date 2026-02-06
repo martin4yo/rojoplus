@@ -1,0 +1,151 @@
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { Menu, X, ChevronDown } from 'lucide-react'
+
+export default function PublicHeader() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [socioMenuOpen, setSocioMenuOpen] = useState(false)
+  const location = useLocation()
+
+  const isActive = (path) => location.pathname === path
+
+  const navLinks = [
+    { path: '/', label: 'Inicio' },
+    { path: '/actividades', label: 'Actividades' },
+    { path: '/noticias', label: 'Noticias' },
+    { path: '/historia', label: 'Historia' },
+    { path: '/contacto', label: 'Contacto' },
+    { path: '/comercios', label: 'Beneficios' },
+  ]
+
+  return (
+    <header className="bg-gray-300 shadow-sm sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16 md:h-20">
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-3">
+            <img
+              src="/images/club/pngwing.com.png"
+              alt="Club Sportivo Pilar"
+              className="h-12 md:h-14 w-auto"
+            />
+            <div className="hidden sm:block">
+              <h1 className="text-lg md:text-xl font-bold text-gray-900">Club Sportivo Pilar</h1>
+              <p className="text-xs text-red-600 font-medium">El Rojo de la Avenida</p>
+            </div>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden lg:flex items-center gap-1">
+            {navLinks.map(link => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive(link.path)
+                    ? 'bg-red-50 text-red-600'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+
+            {/* Dropdown Soy Socio */}
+            <div className="relative">
+              <button
+                onClick={() => setSocioMenuOpen(!socioMenuOpen)}
+                onBlur={() => setTimeout(() => setSocioMenuOpen(false), 150)}
+                className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                Soy Socio
+                <ChevronDown className={`w-4 h-4 transition-transform ${socioMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {socioMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-gray-200 rounded-lg shadow-lg border border-gray-300 py-2">
+                  <Link
+                    to="/mi-qr"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
+                  >
+                    Mi QR de Socio
+                  </Link>
+                  <Link
+                    to="/login-socio"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
+                  >
+                    Portal del Socio
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* CTA Button */}
+            <Link
+              to="/inscripcion-socio"
+              className="ml-4 px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm"
+            >
+              Quiero ser Socio
+            </Link>
+          </nav>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-100"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
+
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden py-4 border-t border-gray-100">
+            <nav className="flex flex-col gap-1">
+              {navLinks.map(link => (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                    isActive(link.path)
+                      ? 'bg-red-50 text-red-600'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+
+              <div className="border-t border-gray-100 my-2 pt-2">
+                <p className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Soy Socio</p>
+                <Link
+                  to="/mi-qr"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Mi QR de Socio
+                </Link>
+                <Link
+                  to="/login-socio"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Portal del Socio
+                </Link>
+              </div>
+
+              <Link
+                to="/inscripcion-socio"
+                onClick={() => setMobileMenuOpen(false)}
+                className="mx-4 mt-2 px-5 py-3 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors text-center"
+              >
+                Quiero ser Socio
+              </Link>
+            </nav>
+          </div>
+        )}
+      </div>
+    </header>
+  )
+}

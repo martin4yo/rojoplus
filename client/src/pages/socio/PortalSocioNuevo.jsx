@@ -9,6 +9,7 @@ import {
   CreditCardIcon,
   XMarkIcon,
   TagIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline'
 import {
   HomeIcon as HomeIconSolid,
@@ -17,6 +18,7 @@ import {
   ChatBubbleLeftRightIcon as ChatIconSolid,
   CreditCardIcon as CreditCardIconSolid,
   TagIcon as TagIconSolid,
+  BanknotesIcon as BanknotesIconSolid,
 } from '@heroicons/react/24/solid'
 import { useModal } from '../../components/Modal'
 import PushNotificationBanner from '../../components/PushNotificationBanner'
@@ -29,6 +31,7 @@ import MisActividadesSocio from './sections/MisActividadesSocio'
 import MensajesSocio from './sections/MensajesSocio'
 import PagosSocio from './sections/PagosSocio'
 import BeneficiosSocio from './sections/BeneficiosSocio'
+import DebitoAutomaticoSocio from './sections/DebitoAutomaticoSocio'
 
 export default function PortalSocioNuevo() {
   const { tokenPortal } = useParams()
@@ -133,6 +136,13 @@ export default function PortalSocioNuevo() {
       badge: cuotasPendientes > 0 ? cuotasPendientes : null,
     },
     {
+      id: 'debito',
+      label: 'Débito',
+      icon: BanknotesIcon,
+      iconSolid: BanknotesIconSolid,
+      badge: null,
+    },
+    {
       id: 'perfil',
       label: 'Perfil',
       icon: UserIcon,
@@ -195,13 +205,14 @@ export default function PortalSocioNuevo() {
         {activeTab === 'beneficios' && <BeneficiosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'actividades' && <MisActividadesSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'pagos' && <PagosSocio socio={socio} tokenPortal={tokenPortal} onPagoRealizado={cargarDatosSocio} />}
+        {activeTab === 'debito' && <DebitoAutomaticoSocio tokenPortal={tokenPortal} />}
         {activeTab === 'perfil' && <MiPerfilSocio socio={socio} tokenPortal={tokenPortal} onUpdate={cargarDatosSocio} />}
       </main>
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-6 gap-1">
             {tabs.map((tab) => {
               const Icon = activeTab === tab.id ? tab.iconSolid : tab.icon
               const isActive = activeTab === tab.id

@@ -32,6 +32,7 @@ import dashboardEjecutivoRoutes from './routes/dashboardEjecutivo.js'
 import reportesMorosidadRoutes from './routes/reportesMorosidad.js'
 import pushSubscriptionRoutes from './routes/pushSubscription.js'
 import debitoAutomaticoRoutes from './routes/debitoAutomatico.js'
+import bannersRoutes from './routes/banners.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -84,6 +85,7 @@ app.use('/api/socio', pushSubscriptionRoutes)
 app.use('/api/admin/debito', debitoAutomaticoRoutes)
 app.use('/api/pagos', pagosRoutes)
 app.use('/api/public', publicRoutes)
+app.use('/api', bannersRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
