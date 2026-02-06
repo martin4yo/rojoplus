@@ -19,6 +19,8 @@ import {
   TagIcon as TagIconSolid,
 } from '@heroicons/react/24/solid'
 import { useModal } from '../../components/Modal'
+import PushNotificationBanner from '../../components/PushNotificationBanner'
+import InstallAppButton from '../../components/InstallAppButton'
 
 // Componentes de secciones
 import DashboardSocio from './sections/DashboardSocio'
@@ -236,6 +238,12 @@ export default function PortalSocioNuevo() {
       </nav>
 
       {ModalComponent}
+
+      {/* Banner de notificaciones push */}
+      <PushNotificationBanner token={tokenPortal} />
+
+      {/* Botón instalar app */}
+      <InstallAppButton />
     </div>
   )
 }

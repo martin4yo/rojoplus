@@ -179,6 +179,7 @@ model Socio {
   notificarMorosidad     Boolean             @default(true) @map("notificar_morosidad") // Email cada 15 días
   notificarInscripcion   Boolean             @default(true) @map("notificar_inscripcion") // Confirmación de inscripción
   notificarNoticias      Boolean             @default(true) @map("notificar_noticias") // Noticias del club
+  notificarPush          Boolean             @default(true) @map("notificar_push") // Notificaciones push
   autorizaciones        AutorizacionMenor[]
   cargos                Cargo[]
   detallesCobranza      DetalleCobranza[]
@@ -207,6 +208,7 @@ model Socio {
   notificaciones        NotificacionLog[]
   solicitudesAprobadas  SolicitudSocio[]
   familiarSolicitud     FamiliarSolicitud[] @relation("FamiliarSolicitudSocio")
+  pushSubscriptions     PushSubscription[]
 
   @@index([documento])
   @@index([apellidoNombre])
@@ -2097,4 +2099,23 @@ model CierreCaja {
   @@index([fecha])
   @@index([cerradoPor])
   @@map("cierres_caja")
+}
+
+// Push Subscriptions para notificaciones web push
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  socioId   Int      @map("socio_id")
+  endpoint  String   @unique @db.Text
+  p256dh    String   @db.Text
+  auth      String
+  userAgent String?  @map("user_agent") @db.Text
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  socio     Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
+
+  @@index([socioId])
+  @@index([activa])
+  @@map("push_subscriptions")
 }

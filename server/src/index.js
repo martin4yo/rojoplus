@@ -28,6 +28,10 @@ import presupuestoRoutes from './routes/presupuesto.js'
 import templatesRoutes from './routes/templates.js'
 import publicRoutes from './routes/public.js'
 import cierreCajaRoutes from './routes/cierreCaja.js'
+import dashboardEjecutivoRoutes from './routes/dashboardEjecutivo.js'
+import reportesMorosidadRoutes from './routes/reportesMorosidad.js'
+import pushSubscriptionRoutes from './routes/pushSubscription.js'
+import debitoAutomaticoRoutes from './routes/debitoAutomatico.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -73,7 +77,11 @@ app.use('/api/admin', deportesRoutes)
 app.use('/api/admin', presupuestoRoutes)
 app.use('/api/admin/templates', templatesRoutes)
 app.use('/api/admin/cierres-caja', cierreCajaRoutes)
+app.use('/api/admin/dashboard', dashboardEjecutivoRoutes)
+app.use('/api/admin/reportes/morosidad', reportesMorosidadRoutes)
 app.use('/api/socio', socioRoutes)
+app.use('/api/socio', pushSubscriptionRoutes)
+app.use('/api/admin/debito', debitoAutomaticoRoutes)
 app.use('/api/pagos', pagosRoutes)
 app.use('/api/public', publicRoutes)
 

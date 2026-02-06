@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import nodemailer from 'nodemailer'
 import Handlebars from 'handlebars'
+import { enviarNotificacionPush } from './webPush.js'
 
 const prisma = new PrismaClient()
 
@@ -19,6 +20,58 @@ const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 // ============================================================================
 // FUNCIONES AUXILIARES
 // ============================================================================
+
+/**
+ * Generar payload para push notification según el tipo de evento
+ */
+function getPushPayloadForEvent(eventType, notif) {
+  const metadata = notif.metadata ? JSON.parse(notif.metadata) : {}
+
+  switch (eventType) {
+    case 'CUOTA_PROX_VENCER':
+      return {
+        title: 'Cuota próxima a vencer',
+        body: `Tu cuota de ${metadata.cargoDescripcion || 'cuota mensual'} vence el ${metadata.fechaVencimiento}`,
+        url: '/portal-socio/pagos',
+        tag: 'cuota-proxima'
+      }
+
+    case 'CUOTA_VENCIDA':
+      return {
+        title: 'Cuota vencida',
+        body: `Tu cuota de ${metadata.cargoDescripcion || 'cuota mensual'} ha vencido. Regulariza tu situación.`,
+        url: '/portal-socio/pagos',
+        tag: 'cuota-vencida'
+      }
+
+    case 'MOROSIDAD':
+      return {
+        title: 'Recordatorio de pago',
+        body: `Tienes cuotas pendientes por un total de $${metadata.deudaTotal || '0'}`,
+        url: '/portal-socio/pagos',
+        tag: 'morosidad'
+      }
+
+    case 'PAGO_CONFIRMADO':
+      return {
+        title: 'Pago confirmado',
+        body: `Tu pago de $${metadata.monto || '0'} fue registrado correctamente`,
+        url: '/portal-socio/pagos',
+        tag: 'pago-confirmado'
+      }
+
+    case 'INSCRIPCION_CONFIRMADA':
+      return {
+        title: 'Inscripción confirmada',
+        body: `Tu inscripción a ${metadata.actividad || 'la actividad'} fue confirmada`,
+        url: '/portal-socio/actividades',
+        tag: 'inscripcion'
+      }
+
+    default:
+      return null
+  }
+}
 
 /**
  * Obtener configuración de modo demo
@@ -165,10 +218,22 @@ export async function procesarNotificacionesPendientes() {
     const resultados = await Promise.allSettled(
       notificacionesPendientes.map(async (notif) => {
         try {
-          // Intentar enviar
+          // Intentar enviar email
           if (notif.tipo === 'EMAIL') {
             const metadata = notif.metadata ? JSON.parse(notif.metadata) : {}
             await enviarEmailConTemplate(notif.eventType, notif.destinatario, metadata)
+          }
+
+          // También enviar push notification si el socio tiene suscripción activa
+          if (notif.socioId) {
+            try {
+              const pushPayload = getPushPayloadForEvent(notif.eventType, notif)
+              if (pushPayload) {
+                await enviarNotificacionPush(notif.socioId, pushPayload)
+              }
+            } catch (pushError) {
+              console.log(`Push notification no enviada para ${notif.socioId}: ${pushError.message}`)
+            }
           }
 
           // Marcar como enviado
