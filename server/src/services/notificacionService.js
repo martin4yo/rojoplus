@@ -68,6 +68,46 @@ function getPushPayloadForEvent(eventType, notif) {
         tag: 'inscripcion'
       }
 
+    case 'CONVOCATORIA_PARTIDO':
+      return {
+        title: 'Convocado a partido',
+        body: `Has sido convocado para el partido vs ${metadata.rival || 'rival'} el ${metadata.fecha}`,
+        url: '/portal-socio/actividades',
+        tag: 'convocatoria-partido'
+      }
+
+    case 'RECORDATORIO_PARTIDO':
+      return {
+        title: 'Recordatorio: Partido mañana',
+        body: `Mañana tienes partido vs ${metadata.rival || 'rival'} a las ${metadata.hora || 'hora por confirmar'}`,
+        url: '/portal-socio/actividades',
+        tag: 'recordatorio-partido'
+      }
+
+    case 'CANCELACION_ENTRENAMIENTO':
+      return {
+        title: 'Entrenamiento cancelado',
+        body: `El entrenamiento del ${metadata.fecha} ha sido cancelado`,
+        url: '/portal-socio/actividades',
+        tag: 'cancelacion-entrenamiento'
+      }
+
+    case 'NUEVO_ENTRENAMIENTO':
+      return {
+        title: 'Nuevo entrenamiento programado',
+        body: `${metadata.actividad} - ${metadata.categoria}: ${metadata.fecha} a las ${metadata.hora}`,
+        url: '/portal-socio/actividades',
+        tag: 'nuevo-entrenamiento'
+      }
+
+    case 'PASAJE_CATEGORIA':
+      return {
+        title: 'Cambio de categoría',
+        body: `${metadata.socioNombre} pasó de ${metadata.categoriaAnterior} a ${metadata.categoriaNueva}`,
+        url: '/portal-socio/actividades',
+        tag: 'pasaje-categoria'
+      }
+
     default:
       return null
   }
@@ -693,6 +733,368 @@ export async function verificarMorosidad() {
   }
 }
 
+// ============================================================================
+// NOTIFICACIONES DEPORTIVAS
+// ============================================================================
+
+/**
+ * Notificar convocatoria a partido
+ */
+export async function notificarConvocatoriaPartido(partidoId, socioId) {
+  try {
+    const [partido, socio] = await Promise.all([
+      prisma.partido.findUnique({
+        where: { id: partidoId },
+        include: {
+          categoriaActividad: {
+            include: { actividad: true }
+          }
+        }
+      }),
+      prisma.socio.findUnique({ where: { id: socioId } })
+    ])
+
+    if (!partido || !socio || !socio.email) {
+      return
+    }
+
+    const fechaPartido = new Date(partido.fecha)
+    const metadata = {
+      socioNombre: socio.apellidoNombre,
+      nroSocio: socio.nroSocio,
+      actividad: partido.categoriaActividad?.actividad?.nombre || 'Actividad',
+      categoria: partido.categoriaActividad?.nombre || '',
+      rival: partido.rival || 'Por definir',
+      fecha: fechaPartido.toLocaleDateString('es-AR'),
+      hora: partido.hora || '',
+      lugar: partido.lugar || '',
+      esLocal: partido.esLocal ? 'LOCAL' : 'VISITANTE',
+      linkPortal: `${frontendUrl}/s/${socio.tokenPortal}`,
+    }
+
+    await programarNotificacion({
+      tipo: 'EMAIL',
+      eventType: 'CONVOCATORIA_PARTIDO',
+      destinatario: socio.email,
+      socioId: socio.id,
+      asunto: `Convocatoria: ${partido.rival || 'Partido'} - ${fechaPartido.toLocaleDateString('es-AR')}`,
+      fechaProgramado: new Date(),
+      metadata,
+    })
+
+    console.log(`📧 Programado: Convocatoria partido para ${socio.apellidoNombre}`)
+  } catch (error) {
+    console.error('Error notificando convocatoria:', error.message)
+  }
+}
+
+/**
+ * Notificar recordatorio de partido (24h antes)
+ */
+export async function notificarRecordatorioPartido(partidoId, socioId) {
+  try {
+    const [partido, socio] = await Promise.all([
+      prisma.partido.findUnique({
+        where: { id: partidoId },
+        include: {
+          categoriaActividad: {
+            include: { actividad: true }
+          }
+        }
+      }),
+      prisma.socio.findUnique({ where: { id: socioId } })
+    ])
+
+    if (!partido || !socio || !socio.email) {
+      return
+    }
+
+    const fechaPartido = new Date(partido.fecha)
+    const metadata = {
+      socioNombre: socio.apellidoNombre,
+      actividad: partido.categoriaActividad?.actividad?.nombre || 'Actividad',
+      rival: partido.rival || 'Por definir',
+      fecha: fechaPartido.toLocaleDateString('es-AR'),
+      hora: partido.hora || '',
+      lugar: partido.lugar || '',
+      esLocal: partido.esLocal ? 'LOCAL' : 'VISITANTE',
+    }
+
+    await programarNotificacion({
+      tipo: 'EMAIL',
+      eventType: 'RECORDATORIO_PARTIDO',
+      destinatario: socio.email,
+      socioId: socio.id,
+      asunto: `Recordatorio: Partido mañana vs ${partido.rival || 'rival'}`,
+      fechaProgramado: new Date(),
+      metadata,
+    })
+
+    console.log(`📧 Programado: Recordatorio partido para ${socio.apellidoNombre}`)
+  } catch (error) {
+    console.error('Error notificando recordatorio partido:', error.message)
+  }
+}
+
+/**
+ * Verificar partidos de mañana y notificar convocados
+ */
+export async function verificarPartidosProximos() {
+  try {
+    const manana = new Date()
+    manana.setDate(manana.getDate() + 1)
+    manana.setHours(0, 0, 0, 0)
+
+    const pasadoManana = new Date()
+    pasadoManana.setDate(pasadoManana.getDate() + 2)
+    pasadoManana.setHours(0, 0, 0, 0)
+
+    // Buscar partidos de mañana que no estén cancelados
+    const partidos = await prisma.partido.findMany({
+      where: {
+        fecha: {
+          gte: manana,
+          lt: pasadoManana,
+        },
+        estado: {
+          notIn: ['CANCELADO', 'SUSPENDIDO']
+        }
+      },
+      include: {
+        convocatorias: {
+          where: {
+            estado: 'CONFIRMADO'
+          },
+          include: {
+            socio: true
+          }
+        }
+      }
+    })
+
+    console.log(`🔍 Encontrados ${partidos.length} partidos para mañana`)
+
+    let notificacionesEnviadas = 0
+
+    for (const partido of partidos) {
+      for (const convocatoria of partido.convocatorias) {
+        // Verificar que no se haya notificado ya
+        const yaNotificado = await prisma.notificacionLog.findFirst({
+          where: {
+            eventType: 'RECORDATORIO_PARTIDO',
+            socioId: convocatoria.socioId,
+            metadata: {
+              contains: `"partidoId":${partido.id}`
+            },
+            enviado: true,
+          },
+        })
+
+        if (!yaNotificado && convocatoria.socio?.email) {
+          await notificarRecordatorioPartido(partido.id, convocatoria.socioId)
+          notificacionesEnviadas++
+        }
+      }
+    }
+
+    return notificacionesEnviadas
+  } catch (error) {
+    console.error('Error verificando partidos próximos:', error.message)
+    throw error
+  }
+}
+
+/**
+ * Notificar cancelación de entrenamiento
+ */
+export async function notificarCancelacionEntrenamiento(entrenamientoId) {
+  try {
+    const entrenamiento = await prisma.entrenamiento.findUnique({
+      where: { id: entrenamientoId },
+      include: {
+        categoriaActividad: {
+          include: {
+            actividad: true,
+            inscripciones: {
+              where: { activo: true },
+              include: { socio: true }
+            }
+          }
+        }
+      }
+    })
+
+    if (!entrenamiento) return 0
+
+    const fechaEntr = new Date(entrenamiento.fecha)
+    let notificados = 0
+
+    for (const inscripcion of entrenamiento.categoriaActividad?.inscripciones || []) {
+      if (!inscripcion.socio?.email) continue
+
+      const metadata = {
+        socioNombre: inscripcion.socio.apellidoNombre,
+        actividad: entrenamiento.categoriaActividad?.actividad?.nombre || '',
+        categoria: entrenamiento.categoriaActividad?.nombre || '',
+        fecha: fechaEntr.toLocaleDateString('es-AR'),
+        hora: entrenamiento.horaInicio || '',
+        motivo: entrenamiento.observaciones || 'Sin especificar',
+      }
+
+      await programarNotificacion({
+        tipo: 'EMAIL',
+        eventType: 'CANCELACION_ENTRENAMIENTO',
+        destinatario: inscripcion.socio.email,
+        socioId: inscripcion.socio.id,
+        asunto: `Entrenamiento cancelado - ${fechaEntr.toLocaleDateString('es-AR')}`,
+        fechaProgramado: new Date(),
+        metadata,
+      })
+
+      notificados++
+    }
+
+    console.log(`📧 Programado: Cancelación entrenamiento para ${notificados} socios`)
+    return notificados
+  } catch (error) {
+    console.error('Error notificando cancelación entrenamiento:', error.message)
+    return 0
+  }
+}
+
+/**
+ * Notificar nuevo entrenamiento a todos los inscriptos de la categoría
+ */
+export async function notificarNuevoEntrenamiento(entrenamientoId) {
+  try {
+    const entrenamiento = await prisma.entrenamiento.findUnique({
+      where: { id: entrenamientoId },
+      include: {
+        categoriaActividad: {
+          include: {
+            actividad: true,
+            inscripciones: {
+              where: {
+                estado: 'ACTIVA',
+                fechaFin: null
+              },
+              include: { socio: true }
+            }
+          }
+        },
+        espacio: true
+      }
+    })
+
+    if (!entrenamiento) return 0
+
+    const fechaEntr = new Date(entrenamiento.fecha)
+    let notificados = 0
+
+    for (const inscripcion of entrenamiento.categoriaActividad?.inscripciones || []) {
+      if (!inscripcion.socio?.email) continue
+
+      const metadata = {
+        socioNombre: inscripcion.socio.apellidoNombre,
+        actividad: entrenamiento.categoriaActividad?.actividad?.nombre || '',
+        categoria: entrenamiento.categoriaActividad?.nombre || '',
+        fecha: fechaEntr.toLocaleDateString('es-AR'),
+        hora: entrenamiento.horaInicio || '',
+        espacio: entrenamiento.espacio?.nombre || '',
+        observaciones: entrenamiento.observaciones || '',
+      }
+
+      await programarNotificacion({
+        tipo: 'EMAIL',
+        eventType: 'NUEVO_ENTRENAMIENTO',
+        destinatario: inscripcion.socio.email,
+        socioId: inscripcion.socio.id,
+        asunto: `Nuevo entrenamiento programado - ${fechaEntr.toLocaleDateString('es-AR')}`,
+        fechaProgramado: new Date(),
+        metadata,
+      })
+
+      notificados++
+    }
+
+    console.log(`📧 Programado: Nuevo entrenamiento para ${notificados} socios`)
+    return notificados
+  } catch (error) {
+    console.error('Error notificando nuevo entrenamiento:', error.message)
+    return 0
+  }
+}
+
+/**
+ * Notificar pasaje de categoría a padres/tutores o al socio
+ * @param {number} socioId - ID del socio
+ * @param {string} categoriaAnterior - Nombre de la categoría anterior
+ * @param {string} categoriaNueva - Nombre de la nueva categoría
+ * @param {string} actividad - Nombre de la actividad
+ */
+export async function notificarPasajeCategoria(socioId, categoriaAnterior, categoriaNueva, actividad) {
+  try {
+    const socio = await prisma.socio.findUnique({
+      where: { id: socioId },
+      select: {
+        id: true,
+        apellidoNombre: true,
+        email: true,
+        fechaNacimiento: true,
+        grupoFamiliar: {
+          include: {
+            titular: { select: { email: true, apellidoNombre: true } }
+          }
+        }
+      }
+    })
+
+    if (!socio) return 0
+
+    // Calcular edad para determinar si es menor
+    let esMenor = false
+    if (socio.fechaNacimiento) {
+      const edad = Math.floor((new Date() - new Date(socio.fechaNacimiento)) / (365.25 * 24 * 60 * 60 * 1000))
+      esMenor = edad < 18
+    }
+
+    // Determinar destinatario: si es menor, notificar al titular del grupo familiar
+    let destinatarioEmail = socio.email
+    let destinatarioNombre = socio.apellidoNombre
+
+    if (esMenor && socio.grupoFamiliar?.titular) {
+      destinatarioEmail = socio.grupoFamiliar.titular.email
+      destinatarioNombre = socio.grupoFamiliar.titular.apellidoNombre
+    }
+
+    if (!destinatarioEmail) return 0
+
+    const metadata = {
+      socioNombre: socio.apellidoNombre,
+      categoriaAnterior,
+      categoriaNueva,
+      actividad,
+      destinatarioNombre,
+    }
+
+    await programarNotificacion({
+      tipo: 'EMAIL',
+      eventType: 'PASAJE_CATEGORIA',
+      destinatario: destinatarioEmail,
+      socioId: socio.id,
+      asunto: `Cambio de categoría - ${socio.apellidoNombre}`,
+      fechaProgramado: new Date(),
+      metadata,
+    })
+
+    console.log(`📧 Programado: Notificación pasaje categoría para ${socio.apellidoNombre}`)
+    return 1
+  } catch (error) {
+    console.error('Error notificando pasaje categoría:', error.message)
+    return 0
+  }
+}
+
 export default {
   programarNotificacion,
   procesarNotificacionesPendientes,
@@ -704,4 +1106,11 @@ export default {
   verificarCuotasProximasVencer,
   verificarCuotasVencidasHoy,
   verificarMorosidad,
+  // Notificaciones deportivas
+  notificarConvocatoriaPartido,
+  notificarRecordatorioPartido,
+  verificarPartidosProximos,
+  notificarCancelacionEntrenamiento,
+  notificarNuevoEntrenamiento,
+  notificarPasajeCategoria,
 }

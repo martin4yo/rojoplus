@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Edit2, Trash2, Tag, Users, Activity, Wallet, Briefcase
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 const COLORES = {
   green: 'bg-green-100 text-green-800',
@@ -105,13 +106,15 @@ export default function ConfiguracionLista() {
             </div>
           </div>
         </div>
-        <Button
-          onClick={() => navigate(`/admin/configuracion/${tabla}/nuevo`)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo
-        </Button>
+{tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+          <Button
+            onClick={() => navigate(`/admin/configuracion/${tabla}/nuevo`)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo
+          </Button>
+        )}
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
@@ -191,22 +194,24 @@ export default function ConfiguracionLista() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-1">
-                    <button
-                      onClick={() => navigate(`/admin/configuracion/${tabla}/${item.id}`)}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                      title="Editar"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => eliminar(item.id)}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                    <div className="flex justify-end gap-1">
+                      <button
+                        onClick={() => navigate(`/admin/configuracion/${tabla}/${item.id}`)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => eliminar(item.id)}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

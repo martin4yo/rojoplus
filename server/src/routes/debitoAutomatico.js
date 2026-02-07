@@ -706,7 +706,7 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
         if (cargos.length > 0) {
           // Obtener o crear medio de pago y caja para débitos
           const medioPagoId = await obtenerMedioPagoDebito(tx)
-          const cajaId = await obtenerCajaDebito(tx)
+          const caja = await obtenerCajaDebito(tx)
 
           // Generar número de pago único
           const ultimoPago = await tx.pago.findFirst({
@@ -727,11 +727,48 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
               montoRecibido: resultado.importe,
               montoACuenta: 0,
               medioPagoId,
-              cajaId,
+              cajaId: caja.id,
               origen: 'DEBITO_AUTOMATICO',
               observaciones: `Débito automático - ${archivo.numero}`,
               registradoPor: req.admin.id
             }
+          })
+
+          // Crear MovimientoCaja para registro en tesorería
+          const anioMov = new Date().getFullYear()
+          const prefijoMov = `MV-${anioMov}-`
+          const ultimoMov = await tx.movimientoCaja.findFirst({
+            where: { numero: { startsWith: prefijoMov } },
+            orderBy: { numero: 'desc' }
+          })
+          let siguienteMov = 1
+          if (ultimoMov) {
+            const partesMov = ultimoMov.numero.split('-')
+            siguienteMov = (parseInt(partesMov[partesMov.length - 1]) || 0) + 1
+          }
+          const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
+
+          await tx.movimientoCaja.create({
+            data: {
+              numero: numeroMov,
+              cajaId: caja.id,
+              cuentaContableId: caja.cuentaContableId,
+              fecha: new Date(),
+              tipo: 'INGRESO',
+              concepto: 'Débito Automático',
+              monto: resultado.importe,
+              descripcion: `Débito automático - Socio #${resultado.socioId} - ${archivo.numero}`,
+              pagoId: pago.id,
+              registradoPor: req.admin.id,
+              // Si la caja requiere conciliación, queda pendiente de acreditar
+              conciliado: !caja.requiereConciliacion
+            }
+          })
+
+          // Actualizar saldo de caja
+          await tx.caja.update({
+            where: { id: caja.id },
+            data: { saldoActual: { increment: resultado.importe } }
           })
 
           // Guardar el pagoId en el resultado para enviar recibo después
@@ -1347,34 +1384,42 @@ function obtenerMotivoRechazo(codigo) {
  * Obtiene o crea una caja para débitos automáticos
  */
 async function obtenerCajaDebito(tx) {
-  // Buscar caja de tipo BANCO o específica para débitos
+  // Buscar caja específica para débitos automáticos (valores pendientes)
   let caja = await tx.caja.findFirst({
     where: {
-      OR: [
-        { codigo: 'DEBITO_AUTO' },
-        { codigo: 'BANCO' },
-        { tipo: 'BANCO' }
-      ],
+      codigo: 'DEBITO_AUTO',
       activo: true
     }
   })
 
   if (!caja) {
-    // Crear caja para débitos automáticos
-    caja = await tx.caja.create({
-      data: {
-        codigo: 'DEBITO_AUTO',
-        nombre: 'Débitos Automáticos',
+    // Buscar cualquier caja de tipo BANCO que requiera conciliación
+    caja = await tx.caja.findFirst({
+      where: {
         tipo: 'BANCO',
-        descripcion: 'Caja virtual para débitos automáticos con tarjeta',
-        saldoInicial: 0,
-        saldoActual: 0,
+        requiereConciliacion: true,
         activo: true
       }
     })
   }
 
-  return caja.id
+  if (!caja) {
+    // Crear caja para débitos automáticos (valores pendientes de acreditación)
+    caja = await tx.caja.create({
+      data: {
+        codigo: 'DEBITO_AUTO',
+        nombre: 'Tarjetas Pendientes de Acreditar',
+        tipo: 'VALORES_PENDIENTES',
+        descripcion: 'Cobranzas con tarjeta pendientes de acreditación bancaria',
+        saldoInicial: 0,
+        saldoActual: 0,
+        requiereConciliacion: true,
+        activo: true
+      }
+    })
+  }
+
+  return caja
 }
 
 /**

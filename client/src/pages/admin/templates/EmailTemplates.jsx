@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Mail, Save, RefreshCw, Eye, Send, ChevronDown, ChevronUp, Loader, FileText } from 'lucide-react'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const EVENT_TYPE_LABELS = {
   COMPROBANTE_PAGO: {
@@ -274,18 +275,20 @@ export default function EmailTemplates() {
                       <Eye className="w-4 h-4" />
                       {showPreview ? 'Editor' : 'Vista Previa'}
                     </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isSaving ? (
-                        <Loader className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                      Guardar
-                    </button>
+                    {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                      <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isSaving ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        Guardar
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -359,18 +362,20 @@ export default function EmailTemplates() {
                           placeholder="email@ejemplo.com"
                           className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
-                        <button
-                          onClick={handleSendTest}
-                          disabled={sendingTest || !testEmail}
-                          className="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
-                        >
-                          {sendingTest ? (
-                            <Loader className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4" />
-                          )}
-                          Enviar Prueba
-                        </button>
+                        {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                          <button
+                            onClick={handleSendTest}
+                            disabled={sendingTest || !testEmail}
+                            className="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {sendingTest ? (
+                              <Loader className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Send className="w-4 h-4" />
+                            )}
+                            Enviar Prueba
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -4,6 +4,7 @@ import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { cargarPermisos } from '../../services/permisos'
 
 export default function AdminLogin() {
   const navigate = useNavigate()
@@ -21,6 +22,8 @@ export default function AdminLogin() {
       const data = await api.post('/admin/login', { email, password })
       localStorage.setItem('adminToken', data.token)
       localStorage.setItem('adminData', JSON.stringify(data.admin))
+      // Cargar permisos del usuario
+      await cargarPermisos()
       navigate('/admin')
     } catch (err) {
       setError(err.message || 'Error al iniciar sesión')

@@ -4,6 +4,7 @@ import { ArrowLeft, Save } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function ActividadForm() {
   const { id } = useParams()
@@ -236,14 +237,16 @@ export default function ActividadForm() {
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={saving} className="flex items-center gap-2">
-            {saving ? (
-              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            {isEdit ? 'Guardar Cambios' : 'Crear Actividad'}
-          </Button>
+          {tienePermiso(PERMISOS.ACTIVIDADES_GESTIONAR) && (
+            <Button type="submit" disabled={saving} className="flex items-center gap-2">
+              {saving ? (
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {isEdit ? 'Guardar Cambios' : 'Crear Actividad'}
+            </Button>
+          )}
         </div>
       </form>
     </div>

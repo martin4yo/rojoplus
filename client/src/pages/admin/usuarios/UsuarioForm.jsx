@@ -35,7 +35,7 @@ export default function UsuarioForm() {
   async function cargarRoles() {
     try {
       const res = await api.get('/admin/roles?activo=true')
-      setRoles(res.data || [])
+      setRoles(res?.data || res || [])
     } catch (err) {
       console.error('Error cargando roles:', err)
     }
@@ -45,7 +45,7 @@ export default function UsuarioForm() {
     setLoading(true)
     try {
       const res = await api.get(`/admin/usuarios/${id}`)
-      const u = res.data
+      const u = res?.data || res
       setForm({
         email: u.email || '',
         password: '',

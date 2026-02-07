@@ -5,6 +5,7 @@ import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const ESTADOS_ASISTENCIA = [
   { value: 'PRESENTE', label: 'Presente', icon: Check, color: 'text-green-600 bg-green-100' },
@@ -197,10 +198,12 @@ export default function AsistenciaEntrenamiento() {
             </p>
           </div>
         </div>
-        <Button onClick={guardarAsistencias} loading={guardando} disabled={!cambiosPendientes}>
-          <Save className="w-4 h-4 mr-2" />
-          Guardar Asistencia
-        </Button>
+        {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+          <Button onClick={guardarAsistencias} loading={guardando} disabled={!cambiosPendientes}>
+            <Save className="w-4 h-4 mr-2" />
+            Guardar Asistencia
+          </Button>
+        )}
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
@@ -268,26 +271,28 @@ export default function AsistenciaEntrenamiento() {
           </div>
 
           {/* Acciones rapidas */}
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => marcarTodos('PRESENTE')}
-              disabled={entrenamiento.estado === 'CANCELADO'}
-            >
-              <Check className="w-4 h-4 mr-1" />
-              Todos presentes
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => marcarTodos('AUSENTE')}
-              disabled={entrenamiento.estado === 'CANCELADO'}
-            >
-              <X className="w-4 h-4 mr-1" />
-              Todos ausentes
-            </Button>
-          </div>
+          {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => marcarTodos('PRESENTE')}
+                disabled={entrenamiento.estado === 'CANCELADO'}
+              >
+                <Check className="w-4 h-4 mr-1" />
+                Todos presentes
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => marcarTodos('AUSENTE')}
+                disabled={entrenamiento.estado === 'CANCELADO'}
+              >
+                <X className="w-4 h-4 mr-1" />
+                Todos ausentes
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -388,7 +393,7 @@ export default function AsistenciaEntrenamiento() {
       )}
 
       {/* Boton guardar fijo en mobile */}
-      {cambiosPendientes && (
+      {cambiosPendientes && tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
         <div className="fixed bottom-4 left-4 right-4 sm:hidden">
           <Button onClick={guardarAsistencias} loading={guardando} className="w-full shadow-lg">
             <Save className="w-4 h-4 mr-2" />

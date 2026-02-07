@@ -4,6 +4,7 @@ import { Search, Plus, Filter, Eye, XCircle, BookOpen, Calendar, ChevronDown } f
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function AsientosLista() {
   const [asientos, setAsientos] = useState([])
@@ -145,12 +146,14 @@ export default function AsientosLista() {
               Libro Mayor
             </Button>
           </Link>
-          <Link to="/admin/contabilidad/asientos/nuevo">
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Asiento
-            </Button>
-          </Link>
+{tienePermiso(PERMISOS.CONTABILIDAD_ASIENTOS) && (
+            <Link to="/admin/contabilidad/asientos/nuevo">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Asiento
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -303,7 +306,7 @@ export default function AsientosLista() {
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
-                          {asiento.estado === 'CONFIRMADO' && (
+                          {asiento.estado === 'CONFIRMADO' && tienePermiso(PERMISOS.CONTABILIDAD_ASIENTOS) && (
                             <button
                               onClick={() => anularAsiento(asiento.id)}
                               className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"

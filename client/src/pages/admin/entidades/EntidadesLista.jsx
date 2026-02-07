@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search, Building2, UserCheck, Briefcase, Eye, Edit, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, tieneAlgunPermiso, PERMISOS } from '../../../services/permisos'
 
 const TIPO_CONFIG = {
   PROVEEDOR: {
@@ -11,7 +12,8 @@ const TIPO_CONFIG = {
     icon: Building2,
     color: 'text-primary',
     bgColor: 'bg-primary/10',
-    ruta: '/admin/egresos/proveedores'
+    ruta: '/admin/egresos/proveedores',
+    permiso: PERMISOS.EGRESOS_GESTIONAR
   },
   CLIENTE: {
     titulo: 'Clientes',
@@ -19,7 +21,8 @@ const TIPO_CONFIG = {
     icon: UserCheck,
     color: 'text-primary',
     bgColor: 'bg-primary/10',
-    ruta: '/admin/ingresos/clientes'
+    ruta: '/admin/ingresos/clientes',
+    permiso: PERMISOS.INGRESOS_GESTIONAR
   },
   PERSONAL: {
     titulo: 'Personal',
@@ -27,7 +30,8 @@ const TIPO_CONFIG = {
     icon: Briefcase,
     color: 'text-primary',
     bgColor: 'bg-primary/10',
-    ruta: '/admin/egresos/personal'
+    ruta: '/admin/egresos/personal',
+    permiso: PERMISOS.SUELDOS_GESTIONAR
   }
 }
 
@@ -92,10 +96,12 @@ export default function EntidadesLista({ tipo }) {
             <p className="text-gray-500 text-sm">{pagination.total} registros</p>
           </div>
         </div>
-        <Button onClick={() => navigate(`${config.ruta}/nuevo`)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo {config.singular}
-        </Button>
+        {tienePermiso(config.permiso) && (
+          <Button onClick={() => navigate(`${config.ruta}/nuevo`)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo {config.singular}
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -199,13 +205,15 @@ export default function EntidadesLista({ tipo }) {
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
-                          <Link
-                            to={`${config.ruta}/${entidad.id}/editar`}
-                            className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
-                            title="Editar"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Link>
+                          {tienePermiso(config.permiso) && (
+                            <Link
+                              to={`${config.ruta}/${entidad.id}/editar`}
+                              className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

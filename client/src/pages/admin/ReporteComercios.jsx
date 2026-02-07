@@ -63,16 +63,34 @@ export default function ReporteComercios() {
     }
   }
 
-  async function handleExportar(formato) {
+  async function handleExportar() {
     try {
-      const params = new URLSearchParams({ formato })
+      const params = new URLSearchParams()
       if (filtros.desde) params.append('desde', filtros.desde)
       if (filtros.hasta) params.append('hasta', filtros.hasta)
 
       const token = localStorage.getItem('adminToken')
-      window.open(`/api/admin/reportes/ventas/export?${params}&token=${token}`, '_blank')
+      const response = await fetch(`/api/admin/reportes/ventas/export?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.message || 'Error al exportar')
+      }
+
+      // Descargar el archivo
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ventas_${filtros.desde || 'inicio'}_${filtros.hasta || 'fin'}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
     } catch (err) {
-      setError('Error al exportar el reporte')
+      setError(err.message || 'Error al exportar el reporte')
     }
   }
 
@@ -124,22 +142,13 @@ export default function ReporteComercios() {
             />
           </div>
           <Button type="submit">Filtrar</Button>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => handleExportar('csv')}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
-            >
-              CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => handleExportar('xlsx')}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
-            >
-              Excel
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleExportar}
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
+          >
+            Exportar CSV
+          </button>
         </form>
       </div>
 

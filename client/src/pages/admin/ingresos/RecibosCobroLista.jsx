@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Filter, CreditCard, Calendar, User, Building2, Eye } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const MEDIOS_PAGO = [
   { value: '', label: 'Todos' },
@@ -120,10 +121,12 @@ export default function RecibosCobroLista() {
             <p className="text-sm text-gray-500">Cobros recibidos de clientes y socios</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/ingresos/recibos/nuevo')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Recibo
-        </Button>
+        {tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/ingresos/recibos/nuevo')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Recibo
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}

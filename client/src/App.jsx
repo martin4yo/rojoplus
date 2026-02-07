@@ -13,6 +13,10 @@ import NoticiaDetallePublic from './pages/public/NoticiaDetalle'
 import InstalacionesPublic from './pages/public/Instalaciones'
 import AutoridadesPublic from './pages/public/Autoridades'
 import MisionPublic from './pages/public/Mision'
+import ActividadDetallePublic from './pages/public/ActividadDetalle'
+import CalendarioPublic from './pages/public/Calendario'
+import GaleriaPublic from './pages/public/Galeria'
+import NotFoundPublic from './pages/public/NotFound'
 
 // Registro comercios
 import Registro from './pages/registro/Registro'
@@ -91,6 +95,9 @@ import MovimientosCajaLista from './pages/admin/tesoreria/MovimientosCajaLista'
 import MovimientoCajaForm from './pages/admin/tesoreria/MovimientoCajaForm'
 import TransferenciasLista from './pages/admin/tesoreria/TransferenciasLista'
 import TransferenciaForm from './pages/admin/tesoreria/TransferenciaForm'
+import PendientesConciliar from './pages/admin/tesoreria/PendientesConciliar'
+import ConciliacionBancaria from './pages/admin/tesoreria/ConciliacionBancaria'
+import ConciliacionDetalle from './pages/admin/tesoreria/ConciliacionDetalle'
 
 // Contabilidad
 import PlanCuentasLista from './pages/admin/contabilidad/PlanCuentasLista'
@@ -156,6 +163,11 @@ import TiposEspacioConfig from './pages/admin/deportes/TiposEspacioConfig'
 import HorariosRecurrentes from './pages/admin/deportes/HorariosRecurrentes'
 import EntrenamientosCalendario from './pages/admin/deportes/EntrenamientosCalendario'
 import AsistenciaEntrenamiento from './pages/admin/deportes/AsistenciaEntrenamiento'
+import Partidos from './pages/admin/Partidos'
+import PartidoDetalle from './pages/admin/PartidoDetalle'
+import ReportesDeportivos from './pages/admin/ReportesDeportivos'
+import PasajeCategoria from './pages/admin/PasajeCategoria'
+import MiPerfil from './pages/admin/MiPerfil'
 
 // Layout admin
 import AdminLayout from './components/AdminLayout'
@@ -170,6 +182,9 @@ function App() {
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<HomePublic />} />
           <Route path="actividades" element={<ActividadesPublic />} />
+          <Route path="actividades/:id" element={<ActividadDetallePublic />} />
+          <Route path="calendario" element={<CalendarioPublic />} />
+          <Route path="galeria" element={<GaleriaPublic />} />
           <Route path="historia" element={<HistoriaPublic />} />
           <Route path="mision" element={<MisionPublic />} />
           <Route path="autoridades" element={<AutoridadesPublic />} />
@@ -178,6 +193,7 @@ function App() {
           <Route path="noticias" element={<NoticiasPublic />} />
           <Route path="noticias/:slug" element={<NoticiaDetallePublic />} />
           <Route path="comercios" element={<ComerciosPublicos />} />
+          <Route path="*" element={<NotFoundPublic />} />
         </Route>
       <Route path="/registro" element={<Registro />} />
       <Route path="/registro/exito" element={<RegistroExito />} />
@@ -201,6 +217,7 @@ function App() {
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboard />} />
+        <Route path="mi-perfil" element={<MiPerfil />} />
         <Route path="dashboard-ejecutivo" element={<AdminDashboardEjecutivo />} />
         <Route path="comercios" element={<AdminComercios />} />
         <Route path="comercios/:id" element={<AdminComercioDetalle />} />
@@ -298,6 +315,9 @@ function App() {
         <Route path="tesoreria/movimientos/nuevo" element={<MovimientoCajaForm />} />
         <Route path="tesoreria/transferencias" element={<TransferenciasLista />} />
         <Route path="tesoreria/transferencias/nueva" element={<TransferenciaForm />} />
+        <Route path="tesoreria/pendientes-conciliar" element={<PendientesConciliar />} />
+        <Route path="tesoreria/conciliacion" element={<ConciliacionBancaria />} />
+        <Route path="tesoreria/conciliacion/:id" element={<ConciliacionDetalle />} />
 
         {/* Contabilidad */}
         <Route path="contabilidad/plan-cuentas" element={<PlanCuentasLista />} />
@@ -336,6 +356,10 @@ function App() {
         <Route path="deportes/horarios" element={<HorariosRecurrentes />} />
         <Route path="deportes/entrenamientos" element={<EntrenamientosCalendario />} />
         <Route path="deportes/asistencia/:id" element={<AsistenciaEntrenamiento />} />
+        <Route path="partidos" element={<Partidos />} />
+        <Route path="partidos/:id" element={<PartidoDetalle />} />
+        <Route path="reportes/deportivos" element={<ReportesDeportivos />} />
+        <Route path="deportes/pasaje-categoria" element={<PasajeCategoria />} />
       </Route>
     </Routes>
     </>

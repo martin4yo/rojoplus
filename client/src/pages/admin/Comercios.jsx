@@ -5,6 +5,7 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { useModal } from '../../components/Modal'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function AdminComercios() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -182,7 +183,7 @@ export default function AdminComercios() {
                     {comercio.descuentoPct}%
                   </td>
                   <td className="px-6 py-4 text-right">
-                    {comercio.estado === 'PENDIENTE' && (
+                    {comercio.estado === 'PENDIENTE' && tienePermiso(PERMISOS.COMERCIOS_GESTIONAR) && (
                       <div className="flex gap-2 justify-end items-center">
                         <button
                           onClick={() => aprobar(comercio.id)}

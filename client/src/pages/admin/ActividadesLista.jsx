@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Users, Dumbb
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function ActividadesLista() {
   const navigate = useNavigate()
@@ -92,13 +93,15 @@ export default function ActividadesLista() {
             </div>
           </div>
         </div>
-        <Button
-          onClick={() => navigate('/admin/actividades/nueva')}
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Actividad
-        </Button>
+        {tienePermiso(PERMISOS.ACTIVIDADES_GESTIONAR) && (
+          <Button
+            onClick={() => navigate('/admin/actividades/nueva')}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva Actividad
+          </Button>
+        )}
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
@@ -140,31 +143,33 @@ export default function ActividadesLista() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate(`/admin/actividades/${actividad.id}/categoria/nueva`)}
-                  className="flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" />
-                  Categoría
-                </Button>
-                <button
-                  onClick={() => navigate(`/admin/actividades/${actividad.id}`)}
-                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                  title="Editar"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => eliminarActividad(actividad.id)}
-                  className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                  title="Eliminar"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+              {tienePermiso(PERMISOS.ACTIVIDADES_GESTIONAR) && (
+                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/admin/actividades/${actividad.id}/categoria/nueva`)}
+                    className="flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Categoría
+                  </Button>
+                  <button
+                    onClick={() => navigate(`/admin/actividades/${actividad.id}`)}
+                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                    title="Editar"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => eliminarActividad(actividad.id)}
+                    className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Categorías */}
@@ -193,22 +198,24 @@ export default function ActividadesLista() {
                         ) : null}
                         {cat.sexo && <span>{cat.sexo === 'M' ? 'Masc.' : cat.sexo === 'F' ? 'Fem.' : 'Mixto'}</span>}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => navigate(`/admin/actividades/${actividad.id}/categoria/${cat.id}`)}
-                          className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                          title="Editar"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => eliminarCategoria(cat.id)}
-                          className="p-1 text-red-600 hover:bg-red-100 rounded"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {tienePermiso(PERMISOS.ACTIVIDADES_GESTIONAR) && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => navigate(`/admin/actividades/${actividad.id}/categoria/${cat.id}`)}
+                            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => eliminarCategoria(cat.id)}
+                            className="p-1 text-red-600 hover:bg-red-100 rounded"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -218,7 +225,9 @@ export default function ActividadesLista() {
             {/* Sin categorías */}
             {expandidas[actividad.id] && (!actividad.categorias || actividad.categorias.length === 0) && (
               <div className="border-t px-4 py-3 pl-12 bg-gray-50 text-sm text-gray-400 italic">
-                Sin categorías. <button onClick={() => navigate(`/admin/actividades/${actividad.id}/categoria/nueva`)} className="text-primary hover:underline">Agregar una</button>
+                Sin categorías. {tienePermiso(PERMISOS.ACTIVIDADES_GESTIONAR) && (
+                  <button onClick={() => navigate(`/admin/actividades/${actividad.id}/categoria/nueva`)} className="text-primary hover:underline">Agregar una</button>
+                )}
               </div>
             )}
           </div>
@@ -227,10 +236,12 @@ export default function ActividadesLista() {
         {actividades.length === 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
             <p className="text-gray-500 mb-4">No hay actividades configuradas</p>
-            <Button onClick={() => navigate('/admin/actividades/nueva')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Crear primera actividad
-            </Button>
+            {tienePermiso(PERMISOS.ACTIVIDADES_GESTIONAR) && (
+              <Button onClick={() => navigate('/admin/actividades/nueva')}>
+                <Plus className="w-4 h-4 mr-2" />
+                Crear primera actividad
+              </Button>
+            )}
           </div>
         )}
       </div>

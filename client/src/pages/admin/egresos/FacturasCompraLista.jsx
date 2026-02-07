@@ -4,6 +4,7 @@ import { Plus, Search, FileText, Eye, XCircle, ChevronLeft, ChevronRight, Filter
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const ESTADOS = {
   PENDIENTE: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
@@ -140,10 +141,12 @@ export default function FacturasCompraLista() {
             <p className="text-gray-500 text-sm">{pagination.total} facturas</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/egresos/facturas/nueva')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Factura
-        </Button>
+        {tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/egresos/facturas/nueva')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Factura
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -291,7 +294,7 @@ export default function FacturasCompraLista() {
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
-                          {factura.estado === 'PENDIENTE' && (
+                          {factura.estado === 'PENDIENTE' && tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (
                             <>
                               <Link
                                 to={`/admin/egresos/facturas/${factura.id}/pagar`}

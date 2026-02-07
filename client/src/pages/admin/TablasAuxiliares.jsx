@@ -4,6 +4,7 @@ import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTri
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function TablasAuxiliares() {
   const navigate = useNavigate()
@@ -409,18 +410,20 @@ export default function TablasAuxiliares() {
               </div>
             </div>
             {/* Botón guardar fijo abajo a la derecha */}
-            <button
-              onClick={guardarConfigVencimiento}
-              disabled={guardandoVencimiento}
-              className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
-              title="Guardar"
-            >
-              {guardandoVencimiento ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Save className="w-5 h-5" />
-              )}
-            </button>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarConfigVencimiento}
+                disabled={guardandoVencimiento}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoVencimiento ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
           </div>
 
           {/* Concepto de Cobranza de Cuotas */}
@@ -461,18 +464,20 @@ export default function TablasAuxiliares() {
               </div>
             </div>
             {/* Botón guardar fijo abajo a la derecha */}
-            <button
-              onClick={guardarConceptoCobranza}
-              disabled={guardandoConceptoCobranza || !conceptoCobranzaCuotas}
-              className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
-              title="Guardar"
-            >
-              {guardandoConceptoCobranza ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Save className="w-5 h-5" />
-              )}
-            </button>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarConceptoCobranza}
+                disabled={guardandoConceptoCobranza || !conceptoCobranzaCuotas}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoConceptoCobranza ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
           </div>
 
           {/* Configuración de Recargos por Mora */}
@@ -583,18 +588,20 @@ export default function TablasAuxiliares() {
               </div>
             </div>
             {/* Botón guardar fijo abajo a la derecha */}
-            <button
-              onClick={guardarRecargo}
-              disabled={guardandoRecargo}
-              className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
-              title="Guardar"
-            >
-              {guardandoRecargo ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Save className="w-5 h-5" />
-              )}
-            </button>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarRecargo}
+                disabled={guardandoRecargo}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoRecargo ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
           </div>
 
           {/* Modo Demo (Email) */}
@@ -644,7 +651,7 @@ export default function TablasAuxiliares() {
               </div>
             </div>
             {/* Botón guardar fijo abajo a la derecha */}
-            {modoDemo.activo && (
+            {modoDemo.activo && tienePermiso(PERMISOS.CONFIG_EDITAR) && (
               <button
                 onClick={guardarModoDemo}
                 disabled={guardandoDemo}
@@ -740,18 +747,20 @@ export default function TablasAuxiliares() {
               </div>
             </div>
             {/* Botón guardar fijo abajo a la derecha */}
-            <button
-              onClick={guardarConfigFiscal}
-              disabled={guardandoFiscal}
-              className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
-              title="Guardar"
-            >
-              {guardandoFiscal ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Save className="w-5 h-5" />
-              )}
-            </button>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarConfigFiscal}
+                disabled={guardandoFiscal}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoFiscal ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       )}

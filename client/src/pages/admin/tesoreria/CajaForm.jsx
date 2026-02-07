@@ -8,6 +8,7 @@ const TIPOS_CAJA = [
   { value: 'EFECTIVO', label: 'Efectivo' },
   { value: 'BANCO', label: 'Cuenta Bancaria' },
   { value: 'MERCADOPAGO', label: 'Mercado Pago' },
+  { value: 'VALORES_PENDIENTES', label: 'Valores Pendientes' },
   { value: 'OTRO', label: 'Otro' }
 ]
 
@@ -28,6 +29,7 @@ export default function CajaForm() {
     descripcion: '',
     saldoInicial: '',
     cuentaContableId: '',
+    requiereConciliacion: false,
     activo: true
   })
 
@@ -59,6 +61,7 @@ export default function CajaForm() {
         descripcion: caja.descripcion || '',
         saldoInicial: '',
         cuentaContableId: caja.cuentaContableId ? String(caja.cuentaContableId) : '',
+        requiereConciliacion: caja.requiereConciliacion || false,
         activo: caja.activo
       })
     } catch (err) {
@@ -93,6 +96,7 @@ export default function CajaForm() {
         tipo: form.tipo,
         descripcion: form.descripcion || null,
         cuentaContableId: form.cuentaContableId ? parseInt(form.cuentaContableId) : null,
+        requiereConciliacion: form.requiereConciliacion,
         activo: form.activo
       }
 
@@ -247,6 +251,24 @@ export default function CajaForm() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Conciliación */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              name="requiereConciliacion"
+              checked={form.requiereConciliacion}
+              onChange={handleChange}
+              className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <span className="text-gray-700 font-medium">Requiere conciliación bancaria</span>
+          </label>
+          <p className="text-sm text-gray-500 mt-2 ml-8">
+            Marcar esta opción para cajas que reciben pagos con tarjeta u otros valores que se acreditan posteriormente.
+            Los ingresos a esta caja quedarán pendientes de conciliar hasta que se verifiquen en el extracto bancario.
+          </p>
         </div>
 
         {/* Estado */}

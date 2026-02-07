@@ -75,21 +75,50 @@ const permisos = [
   { codigo: 'SOCIOS_CREAR', nombre: 'Crear Socios', modulo: 'SOCIOS' },
   { codigo: 'SOCIOS_EDITAR', nombre: 'Editar Socios', modulo: 'SOCIOS' },
   { codigo: 'SOCIOS_ELIMINAR', nombre: 'Eliminar Socios', modulo: 'SOCIOS' },
+  // Inscripciones
+  { codigo: 'INSCRIPCIONES_VER', nombre: 'Ver Inscripciones', modulo: 'INSCRIPCIONES' },
+  { codigo: 'INSCRIPCIONES_GESTIONAR', nombre: 'Gestionar Inscripciones', modulo: 'INSCRIPCIONES' },
   // Actividades
   { codigo: 'ACTIVIDADES_VER', nombre: 'Ver Actividades', modulo: 'ACTIVIDADES' },
   { codigo: 'ACTIVIDADES_GESTIONAR', nombre: 'Gestionar Actividades', modulo: 'ACTIVIDADES' },
+  // Deportes
+  { codigo: 'DEPORTES_VER', nombre: 'Ver Deportes', modulo: 'DEPORTES' },
+  { codigo: 'DEPORTES_PARTIDOS', nombre: 'Gestionar Partidos', modulo: 'DEPORTES' },
+  { codigo: 'DEPORTES_ENTRENAMIENTOS', nombre: 'Gestionar Entrenamientos', modulo: 'DEPORTES' },
+  { codigo: 'DEPORTES_PASAJE', nombre: 'Ejecutar Pasaje Categoría', modulo: 'DEPORTES' },
   // Cuotas
   { codigo: 'CUOTAS_VER', nombre: 'Ver Cuotas', modulo: 'CUOTAS' },
   { codigo: 'CUOTAS_GENERAR', nombre: 'Generar Cuotas', modulo: 'CUOTAS' },
   { codigo: 'CUOTAS_BONIFICAR', nombre: 'Bonificar Cuotas', modulo: 'CUOTAS' },
-  // Caja
-  { codigo: 'CAJA_VER', nombre: 'Ver Caja', modulo: 'CAJA' },
-  { codigo: 'CAJA_COBRAR', nombre: 'Registrar Cobros', modulo: 'CAJA' },
-  { codigo: 'CAJA_MOVIMIENTOS', nombre: 'Registrar Movimientos', modulo: 'CAJA' },
-  { codigo: 'CAJA_ANULAR', nombre: 'Anular Movimientos', modulo: 'CAJA' },
+  { codigo: 'DEBITO_AUTOMATICO', nombre: 'Débito Automático', modulo: 'CUOTAS' },
+  // Caja / Tesorería
+  { codigo: 'CAJA_VER', nombre: 'Ver Caja', modulo: 'TESORERIA' },
+  { codigo: 'CAJA_COBRAR', nombre: 'Registrar Cobros', modulo: 'TESORERIA' },
+  { codigo: 'CAJA_MOVIMIENTOS', nombre: 'Registrar Movimientos', modulo: 'TESORERIA' },
+  { codigo: 'CAJA_ANULAR', nombre: 'Anular Movimientos', modulo: 'TESORERIA' },
+  { codigo: 'CAJA_CIERRE', nombre: 'Cierre de Caja', modulo: 'TESORERIA' },
+  // Contabilidad
+  { codigo: 'CONTABILIDAD_VER', nombre: 'Ver Contabilidad', modulo: 'CONTABILIDAD' },
+  { codigo: 'CONTABILIDAD_ASIENTOS', nombre: 'Registrar Asientos', modulo: 'CONTABILIDAD' },
+  { codigo: 'CONTABILIDAD_PRESUPUESTO', nombre: 'Gestionar Presupuesto', modulo: 'CONTABILIDAD' },
+  // Stock
+  { codigo: 'STOCK_VER', nombre: 'Ver Stock', modulo: 'STOCK' },
+  { codigo: 'STOCK_GESTIONAR', nombre: 'Gestionar Stock', modulo: 'STOCK' },
+  // Ingresos
+  { codigo: 'INGRESOS_VER', nombre: 'Ver Ingresos', modulo: 'INGRESOS' },
+  { codigo: 'INGRESOS_GESTIONAR', nombre: 'Gestionar Ingresos', modulo: 'INGRESOS' },
+  // Egresos
+  { codigo: 'EGRESOS_VER', nombre: 'Ver Egresos', modulo: 'EGRESOS' },
+  { codigo: 'EGRESOS_GESTIONAR', nombre: 'Gestionar Egresos', modulo: 'EGRESOS' },
+  // Sueldos
+  { codigo: 'SUELDOS_VER', nombre: 'Ver Sueldos', modulo: 'SUELDOS' },
+  { codigo: 'SUELDOS_GESTIONAR', nombre: 'Gestionar Sueldos', modulo: 'SUELDOS' },
   // Reportes
   { codigo: 'REPORTES_VER', nombre: 'Ver Reportes', modulo: 'REPORTES' },
   { codigo: 'REPORTES_EXPORTAR', nombre: 'Exportar Reportes', modulo: 'REPORTES' },
+  // Contenido (Noticias, Publicidad)
+  { codigo: 'CONTENIDO_VER', nombre: 'Ver Contenido', modulo: 'CONTENIDO' },
+  { codigo: 'CONTENIDO_GESTIONAR', nombre: 'Gestionar Contenido', modulo: 'CONTENIDO' },
   // Configuración
   { codigo: 'CONFIG_VER', nombre: 'Ver Configuración', modulo: 'CONFIG' },
   { codigo: 'CONFIG_EDITAR', nombre: 'Editar Configuración', modulo: 'CONFIG' },
@@ -335,6 +364,64 @@ const configuracion = [
   // Modo Demo
   { clave: 'MODO_DEMO', valor: 'false', tipo: 'BOOLEAN', modulo: 'SISTEMA', descripcion: 'Modo demo activo' },
   { clave: 'EMAIL_DEMO', valor: '', tipo: 'STRING', modulo: 'SISTEMA', descripcion: 'Email para recibir notificaciones en modo demo' },
+];
+
+const formatosExtracto = [
+  {
+    nombre: 'OFX Estándar',
+    banco: null,
+    tipoArchivo: 'OFX',
+    descripcion: 'Formato OFX/QFX estándar bancario. Soportado por la mayoría de los bancos.',
+    configuracion: { version: '2.0' }
+  },
+  {
+    nombre: 'Banco Galicia CSV',
+    banco: 'Banco Galicia',
+    tipoArchivo: 'CSV',
+    descripcion: 'Formato CSV exportado desde homebanking Galicia',
+    configuracion: {
+      delimitador: ';',
+      primeraFila: 1,
+      formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, referencia: 2, debito: 3, credito: 4, saldo: 5 }
+    }
+  },
+  {
+    nombre: 'Banco Santander CSV',
+    banco: 'Banco Santander',
+    tipoArchivo: 'CSV',
+    descripcion: 'Formato CSV exportado desde homebanking Santander',
+    configuracion: {
+      delimitador: ';',
+      primeraFila: 1,
+      formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, descripcion: 1, concepto: 2, importe: 3, saldo: 4 }
+    }
+  },
+  {
+    nombre: 'Banco Nación CSV',
+    banco: 'Banco Nación',
+    tipoArchivo: 'CSV',
+    descripcion: 'Formato CSV exportado desde homebanking BNA',
+    configuracion: {
+      delimitador: ',',
+      primeraFila: 1,
+      formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, debito: 2, credito: 3, saldo: 4 }
+    }
+  },
+  {
+    nombre: 'Genérico CSV',
+    banco: null,
+    tipoArchivo: 'CSV',
+    descripcion: 'Formato CSV genérico configurable. Ajuste las columnas según su archivo.',
+    configuracion: {
+      delimitador: ';',
+      primeraFila: 1,
+      formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, importe: 2, saldo: 3 }
+    }
+  }
 ];
 
 // ============================================================================
@@ -587,6 +674,17 @@ async function main() {
     },
   });
   console.log('   ✓ Caja principal creada');
+
+  // Formatos de extracto bancario
+  console.log('\n📄 Creando formatos de extracto...');
+  for (const formato of formatosExtracto) {
+    await prisma.formatoExtracto.upsert({
+      where: { nombre: formato.nombre },
+      update: formato,
+      create: formato,
+    });
+  }
+  console.log(`   ✓ ${formatosExtracto.length} formatos de extracto creados`);
 
   console.log('\n✅ Seed completado exitosamente!');
 }

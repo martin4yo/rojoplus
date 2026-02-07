@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Shield, Edit, ArrowLeft, Users } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function RolesLista() {
   const navigate = useNavigate()
@@ -21,7 +22,7 @@ export default function RolesLista() {
       if (soloActivos) params.append('activo', 'true')
 
       const res = await api.get(`/admin/roles?${params}`)
-      setRoles(res.data || [])
+      setRoles(res?.data || res || [])
     } catch (err) {
       console.error('Error cargando roles:', err)
     } finally {
@@ -45,10 +46,12 @@ export default function RolesLista() {
             <p className="text-gray-500 text-sm">{roles.length} roles</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/configuracion/roles/nuevo')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Rol
-        </Button>
+        {tienePermiso(PERMISOS.USUARIOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/configuracion/roles/nuevo')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Rol
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -130,13 +133,15 @@ export default function RolesLista() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => navigate(`/admin/configuracion/roles/${rol.id}`)}
-                          className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                        {tienePermiso(PERMISOS.USUARIOS_GESTIONAR) && (
+                          <button
+                            onClick={() => navigate(`/admin/configuracion/roles/${rol.id}`)}
+                            className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { ArrowUpDown, TrendingUp, TrendingDown, RefreshCw, Filter, Package } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const TIPO_CONFIG = {
   INGRESO: { label: 'Ingreso', color: 'bg-green-100 text-green-700', icon: TrendingUp },
@@ -96,12 +97,14 @@ export default function MovimientosStockLista() {
             <p className="text-gray-500 text-sm">{pagination.total} movimientos</p>
           </div>
         </div>
-        <Link to="/admin/stock/movimientos/ajuste">
-          <Button>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Ajuste de Stock
-          </Button>
-        </Link>
+{tienePermiso(PERMISOS.STOCK_GESTIONAR) && (
+          <Link to="/admin/stock/movimientos/ajuste">
+            <Button>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Ajuste de Stock
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Filtros */}

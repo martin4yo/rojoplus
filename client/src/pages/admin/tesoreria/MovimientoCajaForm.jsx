@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, X } from 'lucide-react'
 import { Button } from '../../../components/Button'
+import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import api from '../../../services/api'
 
 export default function MovimientoCajaForm() {
@@ -23,6 +24,7 @@ export default function MovimientoCajaForm() {
     monto: '',
     conceptoId: '',
     cuentaContableId: '',
+    centroCostoId: null,
     concepto: '',
     descripcion: ''
   })
@@ -138,6 +140,7 @@ export default function MovimientoCajaForm() {
         tipo: form.tipo,
         monto: montoNum,
         cuentaContableId: parseInt(form.cuentaContableId),
+        centroCostoId: form.centroCostoId || null,
         concepto: form.concepto || null,
         descripcion: form.descripcion || null
       })
@@ -318,6 +321,13 @@ export default function MovimientoCajaForm() {
                   Auto-seleccionada desde el concepto
                 </p>
               )}
+            </div>
+            <div>
+              <CentroCostoSelector
+                value={form.centroCostoId}
+                onChange={(id) => setForm(prev => ({ ...prev, centroCostoId: id }))}
+                label="Centro de Costo"
+              />
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">

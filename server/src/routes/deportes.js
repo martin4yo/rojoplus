@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
+import { notificarNuevoEntrenamiento } from '../services/notificacionService.js'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -800,6 +801,38 @@ router.post('/entrenamientos/:id/cancelar', asyncHandler(async (req, res) => {
   res.json({ success: true, data: updated })
 }))
 
+// POST /api/admin/entrenamientos/:id/notificar - Notificar nuevo entrenamiento a inscriptos
+router.post('/entrenamientos/:id/notificar', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const entrenamiento = await prisma.entrenamiento.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      }
+    }
+  })
+
+  if (!entrenamiento) {
+    throw new AppError('Entrenamiento no encontrado', 404)
+  }
+
+  if (entrenamiento.estado === 'CANCELADO') {
+    throw new AppError('No se puede notificar un entrenamiento cancelado', 400)
+  }
+
+  const notificados = await notificarNuevoEntrenamiento(parseInt(id))
+
+  res.json({
+    success: true,
+    data: {
+      notificados,
+      mensaje: `Se notificó a ${notificados} socios sobre el entrenamiento`
+    }
+  })
+}))
+
 // DELETE /api/admin/entrenamientos/:id - Eliminar entrenamiento
 router.delete('/entrenamientos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
@@ -1506,6 +1539,189 @@ router.put('/partidos/:partidoId/convocatoria/:socioId', asyncHandler(async (req
   })
 
   res.json({ success: true, data: updated })
+}))
+
+// POST /api/admin/partidos/:id/notificar-convocados - Enviar notificaciones a convocados
+router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { tipo, socioIds } = req.body // tipo: 'push', 'whatsapp', 'email', 'todos'
+
+  if (!tipo) {
+    throw new AppError('Debe especificar el tipo de notificación', 400)
+  }
+
+  const partido = await prisma.partido.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      },
+      espacio: true
+    }
+  })
+
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  // Obtener convocados a notificar
+  const whereConvocados = { partidoId: parseInt(id) }
+  if (socioIds && Array.isArray(socioIds) && socioIds.length > 0) {
+    whereConvocados.socioId = { in: socioIds.map(id => parseInt(id)) }
+  }
+
+  const convocados = await prisma.convocatoria.findMany({
+    where: whereConvocados,
+    include: {
+      socio: {
+        select: {
+          id: true,
+          nroSocio: true,
+          apellidoNombre: true,
+          email: true,
+          celular: true,
+          tokenPortal: true,
+          notificarPush: true
+        }
+      }
+    }
+  })
+
+  if (convocados.length === 0) {
+    throw new AppError('No hay convocados para notificar', 400)
+  }
+
+  // Preparar mensaje
+  const fechaPartido = new Date(partido.fecha).toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  })
+  const actividad = partido.categoriaActividad.actividad.nombre
+  const categoria = partido.categoriaActividad.nombre
+  const condicionTexto = partido.condicion === 'LOCAL' ? 'de local' : 'de visitante'
+  const lugar = partido.condicion === 'LOCAL'
+    ? (partido.espacio?.nombre || 'La Caldera')
+    : partido.ubicacion || 'A confirmar'
+
+  const mensaje = `¡Fuiste convocado!\n\n` +
+    `${actividad} - ${categoria}\n` +
+    `vs ${partido.rival} (${condicionTexto})\n` +
+    `${fechaPartido} - ${partido.hora}hs\n` +
+    `Lugar: ${lugar}\n\n` +
+    `Confirmá tu asistencia desde el portal del socio.`
+
+  const resultados = {
+    push: { enviados: 0, fallidos: 0 },
+    whatsapp: { enviados: 0, pendientes: 0 },
+    email: { enviados: 0, fallidos: 0 }
+  }
+
+  const ahora = new Date()
+
+  for (const conv of convocados) {
+    const socio = conv.socio
+    const updateData = {}
+
+    // Notificación Push
+    if ((tipo === 'push' || tipo === 'todos') && socio.notificarPush) {
+      try {
+        // Buscar suscripción push del socio
+        const suscripcion = await prisma.pushSubscription.findFirst({
+          where: { socioId: socio.id }
+        })
+
+        if (suscripcion) {
+          // Importar servicio de webPush dinámicamente
+          const webPush = await import('../services/webPush.js')
+          await webPush.enviarNotificacionPush(suscripcion, {
+            title: `Convocatoria: ${actividad} vs ${partido.rival}`,
+            body: `${fechaPartido} - ${partido.hora}hs (${condicionTexto})`,
+            icon: '/images/icon-192.png',
+            badge: '/images/icon-192.png',
+            data: {
+              url: `/s/${socio.tokenPortal}`,
+              tipo: 'convocatoria',
+              partidoId: partido.id
+            }
+          })
+          updateData.notificadoPush = true
+          updateData.fechaNotifPush = ahora
+          resultados.push.enviados++
+        }
+      } catch (err) {
+        console.error(`Error push socio ${socio.id}:`, err.message)
+        resultados.push.fallidos++
+      }
+    }
+
+    // WhatsApp (preparar link, no enviar directamente)
+    if ((tipo === 'whatsapp' || tipo === 'todos') && socio.celular) {
+      // Generar link de WhatsApp
+      const celularLimpio = socio.celular.replace(/\D/g, '')
+      const whatsappUrl = `https://wa.me/${celularLimpio}?text=${encodeURIComponent(mensaje)}`
+
+      updateData.notificadoWhatsapp = false // Marcar como pendiente, el admin debe enviar manualmente
+      updateData.fechaNotifWhatsapp = ahora
+      resultados.whatsapp.pendientes++
+    }
+
+    // Email
+    if ((tipo === 'email' || tipo === 'todos') && socio.email) {
+      try {
+        const emailService = await import('../services/email.js')
+        await emailService.enviarEmail({
+          to: socio.email,
+          subject: `Convocatoria: ${actividad} vs ${partido.rival}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #DC2626;">¡Fuiste convocado!</h2>
+              <p><strong>${actividad} - ${categoria}</strong></p>
+              <p>vs ${partido.rival} (${condicionTexto})</p>
+              <p><strong>Fecha:</strong> ${fechaPartido}</p>
+              <p><strong>Hora:</strong> ${partido.hora}hs</p>
+              <p><strong>Lugar:</strong> ${lugar}</p>
+              <br>
+              <p>Confirmá tu asistencia desde el portal del socio:</p>
+              <a href="${process.env.FRONTEND_URL || 'https://sportivo.axiomacloud.com'}/s/${socio.tokenPortal}"
+                 style="display: inline-block; padding: 12px 24px; background-color: #DC2626; color: white; text-decoration: none; border-radius: 8px;">
+                Ir al Portal
+              </a>
+              <br><br>
+              <p style="color: #666; font-size: 12px;">Club Sportivo Pilar - La Caldera</p>
+            </div>
+          `
+        })
+        updateData.notificadoEmail = true
+        updateData.fechaNotifEmail = ahora
+        resultados.email.enviados++
+      } catch (err) {
+        console.error(`Error email socio ${socio.id}:`, err.message)
+        resultados.email.fallidos++
+      }
+    }
+
+    // Actualizar convocatoria con estado de notificaciones
+    if (Object.keys(updateData).length > 0) {
+      await prisma.convocatoria.update({
+        where: {
+          partidoId_socioId: {
+            partidoId: parseInt(id),
+            socioId: socio.id
+          }
+        },
+        data: updateData
+      })
+    }
+  }
+
+  res.json({
+    success: true,
+    data: {
+      totalConvocados: convocados.length,
+      resultados
+    }
+  })
 }))
 
 // =============================================================================

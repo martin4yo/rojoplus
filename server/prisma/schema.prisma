@@ -209,6 +209,7 @@ model Socio {
   solicitudesAprobadas  SolicitudSocio[]
   familiarSolicitud     FamiliarSolicitud[] @relation("FamiliarSolicitudSocio")
   pushSubscriptions     PushSubscription[]
+  conversaciones        Conversacion[]
 
   @@index([documento])
   @@index([apellidoNombre])
@@ -335,6 +336,7 @@ model CategoriaActividad {
   entrenamientos       Entrenamiento[]
   horariosRecurrentes  HorarioRecurrente[]
   partidos             Partido[]
+  conversaciones       Conversacion[]
 
   @@index([actividadId])
   @@map("categorias_actividad")
@@ -357,6 +359,8 @@ model Inscripcion {
   fechaAutorizacion    DateTime?          @map("fecha_autorizacion")
   estado               String             @default("ACTIVA")
   observaciones        String?
+  exceptuadoPasaje     Boolean            @default(false) @map("exceptuado_pasaje")
+  motivoExcepcion      String?            @map("motivo_excepcion_pasaje")
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
   categoriaActividad   CategoriaActividad @relation(fields: [categoriaActividadId], references: [id])
@@ -384,8 +388,9 @@ model Entrenador {
   activo        Boolean               @default(true)
   createdAt     DateTime              @default(now()) @map("created_at")
   updatedAt     DateTime              @updatedAt @map("updated_at")
-  categorias    EntrenadorCategoria[]
-  entidad       Entidad?              @relation(fields: [entidadId], references: [id])
+  categorias      EntrenadorCategoria[]
+  entidad         Entidad?              @relation(fields: [entidadId], references: [id])
+  conversaciones  Conversacion[]
 
   @@map("entrenadores")
 }
@@ -703,6 +708,7 @@ model Caja {
   saldoInicial         Decimal              @default(0) @map("saldo_inicial") @db.Decimal(12, 2)
   saldoActual          Decimal              @default(0) @map("saldo_actual") @db.Decimal(12, 2)
   cuentaContableId     Int?                 @map("cuenta_contable_id")
+  requiereConciliacion Boolean              @default(false) @map("requiere_conciliacion") // true = ingresos quedan pendientes de conciliar
   activo               Boolean              @default(true)
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
@@ -834,6 +840,8 @@ model MovimientoCaja {
   anuladoPor              Int?                @map("anulado_por")
   conciliado              Boolean             @default(false)
   conciliacionId          Int?                @map("conciliacion_id")
+  fechaConciliacion       DateTime?           @map("fecha_conciliacion")
+  observacionConciliacion String?             @map("observacion_conciliacion")
   movimientoContableId    Int?                @map("movimiento_contable_id")
   anulado                 Boolean             @default(false)
   registradoPor           Int                 @map("registrado_por")
@@ -858,51 +866,79 @@ model MovimientoCaja {
   @@map("movimientos_caja")
 }
 
+// Formato parametrizable para importación de extractos bancarios
+model FormatoExtracto {
+  id            Int                @id @default(autoincrement())
+  nombre        String             @unique // "Banco Galicia CSV", "Santander OFX"
+  banco         String?            // Nombre del banco
+  tipoArchivo   String             @map("tipo_archivo") // CSV, OFX, TXT, XLSX
+  descripcion   String?
+  activo        Boolean            @default(true)
+  // Configuración de parseo en JSON flexible
+  // CSV: { delimitador, primeraFila, encoding, columnas: {fecha, concepto, debito, credito, saldo}, formatoFecha }
+  // OFX: { version } - OFX es estándar
+  // TXT: { anchos: [{campo, inicio, fin}], formatoFecha }
+  configuracion Json               @default("{}")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  extractos     ExtractoBancario[]
+
+  @@map("formatos_extracto")
+}
+
 model ExtractoBancario {
   id                  Int                  @id @default(autoincrement())
   cajaId              Int                  @map("caja_id")
+  formatoId           Int?                 @map("formato_id")
   numero              String               @unique
   periodoDesde        DateTime             @map("periodo_desde")
   periodoHasta        DateTime             @map("periodo_hasta")
   nombreArchivo       String?              @map("nombre_archivo")
-  formatoArchivo      String?              @map("formato_archivo")
   fechaImportacion    DateTime             @default(now()) @map("fecha_importacion")
   saldoInicial        Decimal              @map("saldo_inicial") @db.Decimal(12, 2)
   saldoFinal          Decimal              @map("saldo_final") @db.Decimal(12, 2)
   cantidadMovimientos Int                  @map("cantidad_movimientos")
-  estado              String               @default("IMPORTADO")
+  totalDebitos        Decimal?             @map("total_debitos") @db.Decimal(12, 2)
+  totalCreditos       Decimal?             @map("total_creditos") @db.Decimal(12, 2)
+  estado              String               @default("IMPORTADO") // IMPORTADO, EN_CONCILIACION, CONCILIADO
   importadoPor        Int                  @map("importado_por")
   observaciones       String?
   createdAt           DateTime             @default(now()) @map("created_at")
   conciliaciones      Conciliacion[]
   caja                Caja                 @relation(fields: [cajaId], references: [id])
+  formato             FormatoExtracto?     @relation(fields: [formatoId], references: [id])
   movimientos         MovimientoExtracto[]
 
   @@index([cajaId])
+  @@index([formatoId])
   @@index([periodoDesde, periodoHasta])
   @@map("extractos_bancarios")
 }
 
 model MovimientoExtracto {
-  id             Int              @id @default(autoincrement())
-  extractoId     Int              @map("extracto_id")
-  fecha          DateTime
-  fechaValor     DateTime?        @map("fecha_valor")
-  concepto       String
-  descripcion    String?
-  referencia     String?
-  tipo           String
-  importe        Decimal          @db.Decimal(12, 2)
-  saldo          Decimal?         @db.Decimal(12, 2)
-  conciliado     Boolean          @default(false)
-  conciliacionId Int?             @map("conciliacion_id")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  conciliacion   Conciliacion?    @relation(fields: [conciliacionId], references: [id])
-  extracto       ExtractoBancario @relation(fields: [extractoId], references: [id])
+  id               Int              @id @default(autoincrement())
+  extractoId       Int              @map("extracto_id")
+  fecha            DateTime
+  fechaValor       DateTime?        @map("fecha_valor")
+  concepto         String
+  descripcion      String?
+  referencia       String?          // Número de referencia del banco
+  numeroComprobante String?         @map("numero_comprobante") // Para matching automático
+  tipo             String           // CREDITO, DEBITO
+  importe          Decimal          @db.Decimal(12, 2)
+  saldo            Decimal?         @db.Decimal(12, 2)
+  conciliado       Boolean          @default(false)
+  conciliacionId   Int?             @map("conciliacion_id")
+  movimientoCajaId Int?             @map("movimiento_caja_id") // Link directo para trazabilidad
+  fechaConciliacion DateTime?       @map("fecha_conciliacion")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  conciliacion     Conciliacion?    @relation(fields: [conciliacionId], references: [id])
+  extracto         ExtractoBancario @relation(fields: [extractoId], references: [id])
 
   @@index([extractoId])
   @@index([fecha])
   @@index([conciliado])
+  @@index([movimientoCajaId])
   @@map("movimientos_extracto")
 }
 
@@ -1799,6 +1835,15 @@ model Convocatoria {
   socioId       Int      @map("socio_id")
   confirmado    Boolean? // null=pendiente, true=confirmado, false=rechazado
   motivoRechazo String?  @map("motivo_rechazo")
+
+  // Tracking de notificaciones
+  notificadoPush     Boolean?  @map("notificado_push")
+  fechaNotifPush     DateTime? @map("fecha_notif_push")
+  notificadoWhatsapp Boolean?  @map("notificado_whatsapp")
+  fechaNotifWhatsapp DateTime? @map("fecha_notif_whatsapp")
+  notificadoEmail    Boolean?  @map("notificado_email")
+  fechaNotifEmail    DateTime? @map("fecha_notif_email")
+
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -2232,4 +2277,53 @@ model Autoridad {
   @@index([seccion])
   @@index([activo])
   @@map("autoridades")
+}
+
+// =============================================================================
+// MODULO MENSAJERÍA - Chat Socio/Entrenador
+// =============================================================================
+
+// Conversación entre un socio y un entrenador de una categoría específica
+model Conversacion {
+  id                   Int                @id @default(autoincrement())
+  socioId              Int                @map("socio_id")
+  entrenadorId         Int                @map("entrenador_id")
+  categoriaActividadId Int?               @map("categoria_actividad_id")
+  asunto               String?            // Asunto opcional de la conversación
+  estado               String             @default("ACTIVA") // ACTIVA, ARCHIVADA, CERRADA
+  ultimoMensaje        DateTime?          @map("ultimo_mensaje")
+  mensajesNoLeidos     Int                @default(0) @map("mensajes_no_leidos")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  socio                Socio              @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  entrenador           Entrenador         @relation(fields: [entrenadorId], references: [id], onDelete: Cascade)
+  categoriaActividad   CategoriaActividad? @relation(fields: [categoriaActividadId], references: [id])
+  mensajes             Mensaje[]
+
+  @@unique([socioId, entrenadorId, categoriaActividadId])
+  @@index([socioId])
+  @@index([entrenadorId])
+  @@index([estado])
+  @@index([ultimoMensaje])
+  @@map("conversaciones")
+}
+
+// Mensaje dentro de una conversación
+model Mensaje {
+  id              Int          @id @default(autoincrement())
+  conversacionId  Int          @map("conversacion_id")
+  emisorTipo      String       @map("emisor_tipo") // SOCIO, ENTRENADOR
+  emisorId        Int          @map("emisor_id")   // ID del socio o entrenador
+  contenido       String       @db.Text
+  leido           Boolean      @default(false)
+  fechaLeido      DateTime?    @map("fecha_leido")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  conversacion    Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+
+  @@index([conversacionId])
+  @@index([leido])
+  @@index([createdAt])
+  @@map("mensajes")
 }

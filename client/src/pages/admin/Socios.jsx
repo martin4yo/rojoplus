@@ -8,6 +8,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 // Componente Avatar con fallback si la imagen no carga
 function AvatarSocio({ foto, nombre }) {
@@ -156,14 +157,18 @@ export default function AdminSocios() {
           <h1 className="text-2xl font-bold text-gray-800">Socios</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => navigate('/admin/socios/nuevo')} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Nuevo Socio
-          </Button>
-          <Link to="/admin/socios/cargar" className="btn-secondary flex items-center gap-2">
-            <Upload className="w-4 h-4" />
-            Cargar Excel
-          </Link>
+          {tienePermiso(PERMISOS.SOCIOS_CREAR) && (
+            <Button onClick={() => navigate('/admin/socios/nuevo')} className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Nuevo Socio
+            </Button>
+          )}
+          {tienePermiso(PERMISOS.SOCIOS_CREAR) && (
+            <Link to="/admin/socios/cargar" className="btn-secondary flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Cargar Excel
+            </Link>
+          )}
         </div>
       </div>
 
@@ -387,13 +392,15 @@ export default function AdminSocios() {
                           >
                             <Eye className="w-5 h-5" />
                           </button>
-                          <button
-                            onClick={() => navigate(`/admin/socios/${socio.id}/editar`)}
-                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
-                            title="Editar"
-                          >
-                            <Edit className="w-5 h-5" />
-                          </button>
+                          {tienePermiso(PERMISOS.SOCIOS_EDITAR) && (
+                            <button
+                              onClick={() => navigate(`/admin/socios/${socio.id}/editar`)}
+                              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
+                              title="Editar"
+                            >
+                              <Edit className="w-5 h-5" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setQrModal(socio)}
                             className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"

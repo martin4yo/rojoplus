@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
-import { authAdmin } from '../middleware/auth.js'
+import { authAdmin, invalidarCachePermisos } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 
 const router = Router()
@@ -9,6 +9,70 @@ const prisma = new PrismaClient()
 
 // Todas las rutas requieren autenticacion de admin
 router.use(authAdmin)
+
+// =============================================================================
+// MIS PERMISOS (para el usuario autenticado)
+// =============================================================================
+
+// GET /api/admin/mis-permisos - Obtener permisos del usuario actual
+router.get('/mis-permisos', asyncHandler(async (req, res) => {
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      email: true,
+      rol: {
+        select: {
+          id: true,
+          codigo: true,
+          nombre: true,
+          esSuperAdmin: true,
+          permisos: {
+            include: { permiso: true }
+          }
+        }
+      }
+    }
+  })
+
+  if (!admin) {
+    throw new AppError('Usuario no encontrado', 404)
+  }
+
+  let permisos = []
+  let esSuperAdmin = false
+
+  if (admin.rol) {
+    esSuperAdmin = admin.rol.esSuperAdmin
+    if (esSuperAdmin) {
+      // Super admin tiene todos los permisos
+      permisos = ['*']
+    } else {
+      permisos = admin.rol.permisos.map(pr => pr.permiso.codigo)
+    }
+  }
+
+  res.json({
+    success: true,
+    data: {
+      usuario: {
+        id: admin.id,
+        nombre: admin.nombre,
+        apellido: admin.apellido,
+        email: admin.email
+      },
+      rol: admin.rol ? {
+        id: admin.rol.id,
+        codigo: admin.rol.codigo,
+        nombre: admin.rol.nombre
+      } : null,
+      esSuperAdmin,
+      permisos
+    }
+  })
+}))
 
 // =============================================================================
 // ROLES
@@ -142,6 +206,9 @@ router.put('/roles/:id', asyncHandler(async (req, res) => {
       }
     })
   })
+
+  // Invalidar cache de permisos
+  invalidarCachePermisos()
 
   res.json({ success: true, data: rol })
 }))
@@ -322,11 +389,20 @@ router.put('/usuarios/:id', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/admin/usuarios/:id/cambiar-password - Cambiar password de usuario
+// Si es el propio usuario, requiere passwordActual
+// Si es un admin cambiando la password de otro, solo requiere password
 router.post('/usuarios/:id/cambiar-password', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { password } = req.body
+  const { password, passwordActual, passwordNueva } = req.body
+  const usuarioActualId = req.admin?.id
 
-  if (!password || password.length < 6) {
+  // Determinar si es cambio propio o por admin
+  const esPropio = usuarioActualId === parseInt(id)
+
+  // Si es cambio propio, usar passwordNueva y verificar passwordActual
+  const nuevaPassword = esPropio ? passwordNueva : password
+
+  if (!nuevaPassword || nuevaPassword.length < 6) {
     throw new AppError('La password debe tener al menos 6 caracteres', 400)
   }
 
@@ -335,7 +411,18 @@ router.post('/usuarios/:id/cambiar-password', asyncHandler(async (req, res) => {
     throw new AppError('Usuario no encontrado', 404)
   }
 
-  const passwordHash = await bcrypt.hash(password, 10)
+  // Si es cambio propio, verificar la password actual
+  if (esPropio) {
+    if (!passwordActual) {
+      throw new AppError('Debe ingresar la contraseña actual', 400)
+    }
+    const passwordValida = await bcrypt.compare(passwordActual, existente.passwordHash)
+    if (!passwordValida) {
+      throw new AppError('La contraseña actual es incorrecta', 400)
+    }
+  }
+
+  const passwordHash = await bcrypt.hash(nuevaPassword, 10)
   await prisma.admin.update({
     where: { id: parseInt(id) },
     data: { passwordHash }

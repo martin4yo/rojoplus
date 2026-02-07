@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, ArrowRightLeft, ChevronLeft, ChevronRight, Ban, XCircle } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function TransferenciasLista() {
   const navigate = useNavigate()
@@ -71,10 +72,12 @@ export default function TransferenciasLista() {
             <p className="text-gray-500 text-sm">{pagination.total} transferencias</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/tesoreria/transferencias/nueva')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Transferencia
-        </Button>
+{tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
+          <Button onClick={() => navigate('/admin/tesoreria/transferencias/nueva')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Transferencia
+          </Button>
+        )}
       </div>
 
       {/* Filtros compactos */}
@@ -182,7 +185,7 @@ export default function TransferenciasLista() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {t.estado !== 'ANULADO' && (
+                        {t.estado !== 'ANULADO' && tienePermiso(PERMISOS.CAJA_ANULAR) && (
                           <button
                             onClick={() => handleAnular(t.id)}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"

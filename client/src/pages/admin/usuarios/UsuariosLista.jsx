@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search, User, Eye, Edit, ArrowLeft } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function UsuariosLista() {
   const navigate = useNavigate()
@@ -27,8 +28,8 @@ export default function UsuariosLista() {
         api.get(`/admin/usuarios?${params}`),
         api.get('/admin/roles')
       ])
-      setUsuarios(usrsData.data || [])
-      setRoles(rolesData.data || [])
+      setUsuarios(usrsData?.data || usrsData || [])
+      setRoles(rolesData?.data || rolesData || [])
     } catch (err) {
       console.error('Error cargando datos:', err)
     } finally {
@@ -52,10 +53,12 @@ export default function UsuariosLista() {
             <p className="text-gray-500 text-sm">{usuarios.length} usuarios</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/configuracion/usuarios/nuevo')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Usuario
-        </Button>
+        {tienePermiso(PERMISOS.USUARIOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/configuracion/usuarios/nuevo')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Usuario
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -155,13 +158,15 @@ export default function UsuariosLista() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <Link
-                          to={`/admin/configuracion/usuarios/${usuario.id}`}
-                          className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Link>
+                        {tienePermiso(PERMISOS.USUARIOS_GESTIONAR) && (
+                          <Link
+                            to={`/admin/configuracion/usuarios/${usuario.id}`}
+                            className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>

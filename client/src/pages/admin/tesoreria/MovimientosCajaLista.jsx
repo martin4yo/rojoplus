@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, Filter, Calendar, ChevronLeft, ChevronRight, XCircle, Ban } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function MovimientosCajaLista() {
   const navigate = useNavigate()
@@ -94,10 +95,12 @@ export default function MovimientosCajaLista() {
             <p className="text-gray-500 text-sm">{pagination.total} movimientos</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/tesoreria/movimientos/nuevo')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Movimiento
-        </Button>
+{tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
+          <Button onClick={() => navigate('/admin/tesoreria/movimientos/nuevo')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Movimiento
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -231,7 +234,7 @@ export default function MovimientosCajaLista() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {!mov.anulado && !mov.pagoId && (
+                        {!mov.anulado && !mov.pagoId && tienePermiso(PERMISOS.CAJA_ANULAR) && (
                           <button
                             onClick={() => handleAnular(mov.id)}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState([])
@@ -319,7 +320,7 @@ export default function Solicitudes() {
                       >
                         Ver
                       </button>
-                      {sol.estado === 'PENDIENTE' && (
+                      {sol.estado === 'PENDIENTE' && tienePermiso(PERMISOS.SOCIOS_CREAR) && (
                         <>
                           <button
                             onClick={() => handleAprobar(sol)}
@@ -470,7 +471,7 @@ export default function Solicitudes() {
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
-              {selectedSolicitud.estado === 'PENDIENTE' && (
+              {selectedSolicitud.estado === 'PENDIENTE' && tienePermiso(PERMISOS.SOCIOS_CREAR) && (
                 <>
                   <button
                     onClick={() => {

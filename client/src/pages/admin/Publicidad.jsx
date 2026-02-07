@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 import {
   PlusIcon,
   PencilSquareIcon,
@@ -192,15 +193,17 @@ export default function Publicidad() {
           {/* Tab: Banners */}
           {tab === 'banners' && (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setModalBanner({ open: true, data: null })}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                  Nuevo Banner
-                </button>
-              </div>
+              {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setModalBanner({ open: true, data: null })}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    Nuevo Banner
+                  </button>
+                </div>
+              )}
 
               {banners.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
@@ -264,22 +267,24 @@ export default function Publicidad() {
                       )}
 
                       {/* Acciones */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setModalBanner({ open: true, data: banner })}
-                          className="p-2 text-gray-400 hover:text-blue-600"
-                          title="Editar"
-                        >
-                          <PencilSquareIcon className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBanner(banner.id)}
-                          className="p-2 text-gray-400 hover:text-red-600"
-                          title="Eliminar"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </button>
-                      </div>
+                      {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setModalBanner({ open: true, data: banner })}
+                            className="p-2 text-gray-400 hover:text-blue-600"
+                            title="Editar"
+                          >
+                            <PencilSquareIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBanner(banner.id)}
+                            className="p-2 text-gray-400 hover:text-red-600"
+                            title="Eliminar"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -290,15 +295,17 @@ export default function Publicidad() {
           {/* Tab: Sponsors */}
           {tab === 'sponsors' && (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setModalSponsor({ open: true, data: null })}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                  Nuevo Sponsor
-                </button>
-              </div>
+              {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setModalSponsor({ open: true, data: null })}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    Nuevo Sponsor
+                  </button>
+                </div>
+              )}
 
               {sponsors.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
@@ -353,20 +360,24 @@ export default function Publicidad() {
                             <GlobeAltIcon className="w-5 h-5" />
                           </a>
                         )}
-                        <button
-                          onClick={() => setModalSponsor({ open: true, data: sponsor })}
-                          className="p-2 text-gray-400 hover:text-blue-600"
-                          title="Editar"
-                        >
-                          <PencilSquareIcon className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSponsor(sponsor.id)}
-                          className="p-2 text-gray-400 hover:text-red-600"
-                          title="Eliminar"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </button>
+                        {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+                          <button
+                            onClick={() => setModalSponsor({ open: true, data: sponsor })}
+                            className="p-2 text-gray-400 hover:text-blue-600"
+                            title="Editar"
+                          >
+                            <PencilSquareIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+                          <button
+                            onClick={() => handleDeleteSponsor(sponsor.id)}
+                            className="p-2 text-gray-400 hover:text-red-600"
+                            title="Eliminar"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

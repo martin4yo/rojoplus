@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, MapPin, Users, X, RefreshCw, Settings } from 'lucide-react'
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, MapPin, Users, X, RefreshCw, Settings, Bell } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 const DIAS_SEMANA_FULL = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
@@ -43,6 +44,7 @@ export default function EntrenamientosCalendario() {
   const [modalCancelar, setModalCancelar] = useState({ visible: false, entrenamiento: null })
   const [cancelando, setCancelando] = useState(false)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
+  const [notificando, setNotificando] = useState(false)
 
   // Modal nuevo entrenamiento
   const [modalNuevo, setModalNuevo] = useState(false)
@@ -228,6 +230,19 @@ export default function EntrenamientosCalendario() {
     }
   }
 
+  async function handleNotificarEntrenamiento(entrenamientoId) {
+    setNotificando(true)
+    try {
+      const response = await api.post(`/admin/entrenamientos/${entrenamientoId}/notificar`)
+      setSuccess(response.data?.mensaje || 'Notificaciones enviadas')
+      setModalEntrenamiento({ visible: false, entrenamiento: null })
+    } catch (err) {
+      setError(err.message || 'Error al notificar')
+    } finally {
+      setNotificando(false)
+    }
+  }
+
   async function handleCrearEntrenamiento(e) {
     e.preventDefault()
     setError(null)
@@ -305,28 +320,34 @@ export default function EntrenamientosCalendario() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Link to="/admin/deportes/horarios">
-            <Button variant="secondary">
-              <Settings className="w-4 h-4 mr-2" />
-              Horarios
+          {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+            <Link to="/admin/deportes/horarios">
+              <Button variant="secondary">
+                <Settings className="w-4 h-4 mr-2" />
+                Horarios
+              </Button>
+            </Link>
+          )}
+          {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+            <Button variant="secondary" onClick={() => {
+              const { desde, hasta } = getRangoFechas()
+              setFormGenerar({
+                categoriaActividadId: filtroCategoria || '',
+                fechaDesde: desde.toISOString().split('T')[0],
+                fechaHasta: hasta.toISOString().split('T')[0]
+              })
+              setModalGenerar(true)
+            }}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Generar
             </Button>
-          </Link>
-          <Button variant="secondary" onClick={() => {
-            const { desde, hasta } = getRangoFechas()
-            setFormGenerar({
-              categoriaActividadId: filtroCategoria || '',
-              fechaDesde: desde.toISOString().split('T')[0],
-              fechaHasta: hasta.toISOString().split('T')[0]
-            })
-            setModalGenerar(true)
-          }}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Generar
-          </Button>
-          <Button onClick={() => setModalNuevo(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo
-          </Button>
+          )}
+          {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+            <Button onClick={() => setModalNuevo(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo
+            </Button>
+          )}
         </div>
       </div>
 
@@ -719,7 +740,7 @@ export default function EntrenamientosCalendario() {
             )}
 
             <div className="flex justify-end gap-3 pt-4 border-t">
-              {modalEntrenamiento.entrenamiento.estado !== 'CANCELADO' && (
+              {modalEntrenamiento.entrenamiento.estado !== 'CANCELADO' && tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
                 <Button
                   variant="danger"
                   onClick={() => {
@@ -731,12 +752,24 @@ export default function EntrenamientosCalendario() {
                   Cancelar
                 </Button>
               )}
-              <Link to={`/admin/deportes/asistencia/${modalEntrenamiento.entrenamiento.id}`}>
-                <Button>
-                  <Users className="w-4 h-4 mr-2" />
-                  Asistencia
+              {modalEntrenamiento.entrenamiento.estado !== 'CANCELADO' && tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+                <Button
+                  variant="secondary"
+                  onClick={() => handleNotificarEntrenamiento(modalEntrenamiento.entrenamiento.id)}
+                  disabled={notificando}
+                >
+                  <Bell className="w-4 h-4 mr-2" />
+                  {notificando ? 'Enviando...' : 'Notificar'}
                 </Button>
-              </Link>
+              )}
+              {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+                <Link to={`/admin/deportes/asistencia/${modalEntrenamiento.entrenamiento.id}`}>
+                  <Button>
+                    <Users className="w-4 h-4 mr-2" />
+                    Asistencia
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         )}

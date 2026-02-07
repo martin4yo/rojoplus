@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Package, Search, Eye, Edit, AlertTriangle, Image, LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function ProductosLista() {
   const navigate = useNavigate()
@@ -194,10 +195,12 @@ export default function ProductosLista() {
               Exportar
             </Button>
           )}
-          <Button onClick={() => navigate('/admin/stock/productos/nuevo')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Producto
-          </Button>
+{tienePermiso(PERMISOS.STOCK_GESTIONAR) && (
+            <Button onClick={() => navigate('/admin/stock/productos/nuevo')}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Producto
+            </Button>
+          )}
         </div>
       </div>
 
@@ -459,13 +462,15 @@ export default function ProductosLista() {
                           >
                             <ArrowUpDown className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => navigate(`/admin/stock/productos/${producto.id}?editar=true`)}
-                            className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
-                            title="Editar"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                          {tienePermiso(PERMISOS.STOCK_GESTIONAR) && (
+                            <button
+                              onClick={() => navigate(`/admin/stock/productos/${producto.id}?editar=true`)}
+                              className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -601,16 +606,18 @@ export default function ProductosLista() {
                   >
                     <ArrowUpDown className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      navigate(`/admin/stock/productos/${producto.id}?editar=true`)
-                    }}
-                    className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
-                    title="Editar"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
+                  {tienePermiso(PERMISOS.STOCK_GESTIONAR) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/admin/stock/productos/${producto.id}?editar=true`)
+                      }}
+                      className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
+                      title="Editar"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -2060,6 +2060,67 @@ router.get('/reportes/ventas', authAdmin, asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/admin/reportes/ventas/export - Exportar ventas a Excel
+router.get('/reportes/ventas/export', authAdmin, asyncHandler(async (req, res) => {
+  const { desde, hasta, comercioId } = req.query
+
+  const where = {}
+
+  if (desde) {
+    const desdeDate = new Date(desde + 'T00:00:00')
+    where.fecha = { ...where.fecha, gte: desdeDate }
+  }
+  if (hasta) {
+    const hastaDate = new Date(hasta + 'T23:59:59.999')
+    where.fecha = { ...where.fecha, lte: hastaDate }
+  }
+  if (comercioId) {
+    where.comercioId = parseInt(comercioId)
+  }
+
+  // Obtener ventas con detalle
+  const ventas = await req.prisma.venta.findMany({
+    where,
+    include: {
+      comercio: { select: { nombre: true, cuit: true } },
+      socio: { select: { nroSocio: true, apellidoNombre: true } }
+    },
+    orderBy: { fecha: 'desc' }
+  })
+
+  // Formatear datos para CSV
+  const rows = ventas.map(v => ({
+    Fecha: v.fecha.toISOString().split('T')[0],
+    Hora: v.fecha.toISOString().split('T')[1].substring(0, 5),
+    Comercio: v.comercio?.nombre || '',
+    CUIT: v.comercio?.cuit || '',
+    'Nro Socio': v.socio?.nroSocio || '',
+    Socio: v.socio?.apellidoNombre || '',
+    'Importe Original': Number(v.importeOriginal || 0).toFixed(2),
+    'Descuento %': Number(v.descuentoPorcentaje || 0).toFixed(2),
+    'Descuento $': Number(v.descuentoMonto || 0).toFixed(2),
+    'Importe Final': Number(v.importeFinal || 0).toFixed(2)
+  }))
+
+  // Generar CSV
+  if (rows.length === 0) {
+    return res.status(404).json({ success: false, message: 'No hay datos para exportar' })
+  }
+
+  const headers = Object.keys(rows[0])
+  const csvContent = [
+    headers.join(';'),
+    ...rows.map(row => headers.map(h => `"${row[h]}"`).join(';'))
+  ].join('\n')
+
+  // Agregar BOM para UTF-8 en Excel
+  const bom = '\uFEFF'
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="ventas_${desde || 'inicio'}_${hasta || 'fin'}.csv"`)
+  res.send(bom + csvContent)
+}))
+
 // ============================================================================
 // ACTIVIDADES Y CATEGORÍAS DE ACTIVIDAD
 // ============================================================================
@@ -4288,7 +4349,10 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         monto: montoTotal,
         descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
         pagoId: pago.id,
-        registradoPor: req.admin.id
+        registradoPor: req.admin.id,
+        // Si la caja requiere conciliación, el movimiento queda pendiente (conciliado=false)
+        // Si no requiere, se marca como conciliado automáticamente
+        conciliado: !caja.requiereConciliacion
       }
     })
 

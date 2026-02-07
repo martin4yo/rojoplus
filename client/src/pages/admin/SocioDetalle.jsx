@@ -9,6 +9,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function SocioDetalle() {
   const { id } = useParams()
@@ -319,10 +320,12 @@ export default function SocioDetalle() {
             <DollarSign className="w-4 h-4" />
             Cobrar
           </Button>
-          <Button onClick={() => navigate(`/admin/socios/${id}/editar`)} className="flex items-center gap-2">
-            <Edit className="w-4 h-4" />
-            Editar
-          </Button>
+          {tienePermiso(PERMISOS.SOCIOS_EDITAR) && (
+            <Button onClick={() => navigate(`/admin/socios/${id}/editar`)} className="flex items-center gap-2">
+              <Edit className="w-4 h-4" />
+              Editar
+            </Button>
+          )}
         </div>
       </div>
 

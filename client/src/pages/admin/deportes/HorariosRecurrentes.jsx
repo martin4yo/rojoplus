@@ -4,6 +4,7 @@ import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const DIAS_SEMANA = [
   { value: 1, label: 'Lunes', short: 'Lun' },
@@ -219,10 +220,12 @@ export default function HorariosRecurrentes() {
             <p className="text-gray-500 text-sm">Templates de horarios semanales por categoria</p>
           </div>
         </div>
-        <Button onClick={() => abrirModal()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Horario
-        </Button>
+        {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+          <Button onClick={() => abrirModal()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Horario
+          </Button>
+        )}
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
@@ -252,9 +255,11 @@ export default function HorariosRecurrentes() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500">No hay horarios recurrentes configurados</p>
-          <button onClick={() => abrirModal()} className="text-primary hover:underline mt-2">
-            Crear el primer horario
-          </button>
+          {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+            <button onClick={() => abrirModal()} className="text-primary hover:underline mt-2">
+              Crear el primer horario
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
@@ -297,22 +302,24 @@ export default function HorariosRecurrentes() {
                             </div>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => abrirModal(horario)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => setModalEliminar({ visible: true, horario })}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => abrirModal(horario)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => setModalEliminar({ visible: true, horario })}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )
                   })}

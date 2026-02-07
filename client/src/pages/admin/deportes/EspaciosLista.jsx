@@ -4,6 +4,7 @@ import { MapPin, Plus, Edit, Trash2, Sun, Moon, Users, CheckCircle, XCircle } fr
 import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function EspaciosLista() {
   const [espacios, setEspacios] = useState([])
@@ -88,12 +89,14 @@ export default function EspaciosLista() {
             <p className="text-gray-500 text-sm">Canchas, gimnasios y otros espacios del club</p>
           </div>
         </div>
-        <Link to="/admin/deportes/espacios/nuevo">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Espacio
-          </Button>
-        </Link>
+        {tienePermiso(PERMISOS.DEPORTES_VER) && (
+          <Link to="/admin/deportes/espacios/nuevo">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Espacio
+            </Button>
+          </Link>
+        )}
       </div>
 
       {error && (
@@ -139,9 +142,11 @@ export default function EspaciosLista() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500">No hay espacios deportivos registrados</p>
-          <Link to="/admin/deportes/espacios/nuevo" className="text-primary hover:underline mt-2 inline-block">
-            Crear el primer espacio
-          </Link>
+          {tienePermiso(PERMISOS.DEPORTES_VER) && (
+            <Link to="/admin/deportes/espacios/nuevo" className="text-primary hover:underline mt-2 inline-block">
+              Crear el primer espacio
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -217,20 +222,22 @@ export default function EspaciosLista() {
                 <p className="text-sm text-gray-500 mb-4 line-clamp-2">{espacio.descripcion}</p>
               )}
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                <Link to={`/admin/deportes/espacios/${espacio.id}`}>
-                  <Button variant="secondary" size="sm">
-                    <Edit className="w-4 h-4" />
+              {tienePermiso(PERMISOS.DEPORTES_VER) && (
+                <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                  <Link to={`/admin/deportes/espacios/${espacio.id}`}>
+                    <Button variant="secondary" size="sm">
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setModalEliminar({ visible: true, espacio })}
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </Button>
-                </Link>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setModalEliminar({ visible: true, espacio })}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

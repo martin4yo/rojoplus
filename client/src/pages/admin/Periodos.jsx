@@ -5,6 +5,7 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { useModal } from '../../components/Modal'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -233,10 +234,12 @@ export default function Periodos() {
             <p className="text-gray-500 text-sm">Genera y administra las cuotas mensuales</p>
           </div>
         </div>
-        <Button onClick={() => setShowCrearModal(true)} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Nuevo Periodo
-        </Button>
+        {tienePermiso(PERMISOS.CUOTAS_GENERAR) && (
+          <Button onClick={() => setShowCrearModal(true)} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Nuevo Periodo
+          </Button>
+        )}
       </div>
 
       {/* Filtro de periodo */}
@@ -358,7 +361,7 @@ export default function Periodos() {
                     >
                       <Receipt className="w-5 h-5" />
                     </button>
-                    {periodo.cuotasPagadas === 0 && (
+                    {tienePermiso(PERMISOS.CUOTAS_GENERAR) && periodo.cuotasPagadas === 0 && (
                       <>
                         <button
                           onClick={() => confirmarGenerarCuotas(periodo.id)}
@@ -383,22 +386,26 @@ export default function Periodos() {
               ) : (
                 /* Periodo pendiente - botón generar */
                 <div className="flex gap-2">
-                  <Button
-                    onClick={() => confirmarGenerarCuotas(periodo.id)}
-                    loading={generando === periodo.id}
-                    className="flex-1 flex items-center justify-center gap-2"
-                  >
-                    <Play className="w-4 h-4" />
-                    Generar Cuotas
-                  </Button>
-                  <button
-                    onClick={() => confirmarEliminarPeriodo(periodo)}
-                    disabled={eliminando === periodo.id}
-                    className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition disabled:opacity-50"
-                    title="Eliminar Periodo"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  {tienePermiso(PERMISOS.CUOTAS_GENERAR) && (
+                    <Button
+                      onClick={() => confirmarGenerarCuotas(periodo.id)}
+                      loading={generando === periodo.id}
+                      className="flex-1 flex items-center justify-center gap-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      Generar Cuotas
+                    </Button>
+                  )}
+                  {tienePermiso(PERMISOS.CUOTAS_GENERAR) && (
+                    <button
+                      onClick={() => confirmarEliminarPeriodo(periodo)}
+                      disabled={eliminando === periodo.id}
+                      className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition disabled:opacity-50"
+                      title="Eliminar Periodo"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>

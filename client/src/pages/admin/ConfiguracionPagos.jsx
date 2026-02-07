@@ -3,6 +3,7 @@ import { CreditCard, Save, Loader } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function ConfiguracionPagos() {
   const [loading, setLoading] = useState(true)
@@ -151,12 +152,14 @@ export default function ConfiguracionPagos() {
             <p className="text-xs text-gray-500 mt-1">Número al cual los socios pueden enviar el comprobante</p>
           </div>
 
-          <div className="pt-4 border-t border-gray-200">
-            <Button type="submit" loading={guardando} className="w-full">
-              <Save className="w-4 h-4 mr-2" />
-              Guardar Configuración
-            </Button>
-          </div>
+          {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+            <div className="pt-4 border-t border-gray-200">
+              <Button type="submit" loading={guardando} className="w-full">
+                <Save className="w-4 h-4 mr-2" />
+                Guardar Configuración
+              </Button>
+            </div>
+          )}
         </div>
       </form>
 

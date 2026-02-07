@@ -4,6 +4,7 @@ import { ClipboardList, Plus, Edit2, X, Search, Filter, UserMinus, Download } fr
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function Inscripciones() {
   const navigate = useNavigate()
@@ -286,13 +287,15 @@ export default function Inscripciones() {
             </p>
           </div>
         </div>
-        <Button
-          onClick={() => setModalNueva(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Inscripción
-        </Button>
+        {tienePermiso(PERMISOS.INSCRIPCIONES_GESTIONAR) && (
+          <Button
+            onClick={() => setModalNueva(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva Inscripción
+          </Button>
+        )}
       </div>
 
       {/* Alerts */}
@@ -466,14 +469,16 @@ export default function Inscripciones() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => abrirModalEditar(inscripcion)}
-                        className="text-blue-600 hover:text-blue-900 mr-3"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      {inscripcion.estado === 'ACTIVA' && (
+                      {tienePermiso(PERMISOS.INSCRIPCIONES_GESTIONAR) && (
+                        <button
+                          onClick={() => abrirModalEditar(inscripcion)}
+                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          title="Editar"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {tienePermiso(PERMISOS.INSCRIPCIONES_GESTIONAR) && inscripcion.estado === 'ACTIVA' && (
                         <button
                           onClick={() => abrirModalBaja(inscripcion)}
                           className="text-red-600 hover:text-red-900"

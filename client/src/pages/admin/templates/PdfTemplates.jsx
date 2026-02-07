@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FileText, Save, RefreshCw, Eye, Download, Loader, Code } from 'lucide-react'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const TIPO_LABELS = {
   RECIBO: {
@@ -270,18 +271,20 @@ export default function PdfTemplates() {
                       )}
                       Descargar Prueba
                     </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isSaving ? (
-                        <Loader className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                      Guardar
-                    </button>
+                    {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                      <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isSaving ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        Guardar
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

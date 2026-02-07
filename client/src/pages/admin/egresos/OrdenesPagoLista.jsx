@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Filter, CreditCard, Calendar, Building2, Eye } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const ESTADOS = [
   { value: '', label: 'Todos' },
@@ -130,10 +131,12 @@ export default function OrdenesPagoLista() {
             <p className="text-sm text-gray-500">Pagos a proveedores</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/egresos/ordenes-pago/nueva')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Orden de Pago
-        </Button>
+        {tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/egresos/ordenes-pago/nueva')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Orden de Pago
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}

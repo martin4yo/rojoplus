@@ -3,6 +3,7 @@ import { Tags, Plus, Edit2, Save, X, Trash2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function CategoriasProducto() {
   const [categorias, setCategorias] = useState([])
@@ -98,7 +99,7 @@ export default function CategoriasProducto() {
             <p className="text-gray-500 text-sm">{categorias.length} categorias</p>
           </div>
         </div>
-        {!creando && !editandoId && (
+        {!creando && !editandoId && tienePermiso(PERMISOS.STOCK_GESTIONAR) && (
           <Button onClick={iniciarCreacion}>
             <Plus className="w-4 h-4 mr-2" />
             Nueva Categoria
@@ -242,13 +243,15 @@ export default function CategoriasProducto() {
                         </button>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => iniciarEdicion(cat)}
-                          className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
-                          title="Editar"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                        {tienePermiso(PERMISOS.STOCK_GESTIONAR) && (
+                          <button
+                            onClick={() => iniciarEdicion(cat)}
+                            className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </>
                   )}

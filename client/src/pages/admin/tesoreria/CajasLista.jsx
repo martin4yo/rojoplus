@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Wallet, Building, CreditCard, Eye, Edit, TrendingUp, TrendingDown } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const TIPO_ICONS = {
   EFECTIVO: Wallet,
@@ -56,10 +57,12 @@ export default function CajasLista() {
             <p className="text-gray-500 text-sm">{cajas.length} cajas registradas</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/tesoreria/cajas/nueva')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Caja
-        </Button>
+{tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
+          <Button onClick={() => navigate('/admin/tesoreria/cajas/nueva')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Caja
+          </Button>
+        )}
       </div>
 
       {/* Resumen */}
@@ -141,16 +144,18 @@ export default function CajasLista() {
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigate(`/admin/tesoreria/cajas/${caja.id}/editar`)
-                      }}
-                      className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
-                      title="Editar"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
+                    {tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/admin/tesoreria/cajas/${caja.id}/editar`)
+                        }}
+                        className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
+                        title="Editar"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -32,8 +32,8 @@ export default function RolForm() {
 
   async function cargarPermisos() {
     try {
-      const res = await api.get('/admin/permisos')
-      setPermisosDisponibles(res.agrupados || {})
+      const res = await api.getFull('/admin/permisos')
+      setPermisosDisponibles(res?.agrupados || {})
     } catch (err) {
       console.error('Error cargando permisos:', err)
     }
@@ -43,7 +43,7 @@ export default function RolForm() {
     setLoading(true)
     try {
       const res = await api.get(`/admin/roles/${id}`)
-      const r = res.data
+      const r = res?.data || res
       setForm({
         codigo: r.codigo || '',
         nombre: r.nombre || '',

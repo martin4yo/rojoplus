@@ -4,6 +4,7 @@ import { Plus, Calendar, Edit, Trash2, Copy, Eye, CheckCircle, Lock, FileText, S
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function PresupuestosLista() {
   const [anios, setAnios] = useState([])
@@ -235,10 +236,12 @@ export default function PresupuestosLista() {
           <h1 className="text-2xl font-bold text-gray-900">Presupuestos Anuales</h1>
           <p className="text-gray-500 mt-1">Gestión de presupuestos con múltiples versiones por año</p>
         </div>
-        <Button onClick={crearPresupuesto}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Presupuesto
-        </Button>
+{tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
+          <Button onClick={crearPresupuesto}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Presupuesto
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -305,7 +308,7 @@ export default function PresupuestosLista() {
                         </div>
 
                         <div className="flex items-center gap-1">
-                          {!presupuesto.esPrincipal && (
+                          {!presupuesto.esPrincipal && tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -315,7 +318,7 @@ export default function PresupuestosLista() {
                               <Star className="w-4 h-4 text-gray-400" />
                             </Button>
                           )}
-                          {presupuesto.estado === 'BORRADOR' && (
+                          {presupuesto.estado === 'BORRADOR' && tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -325,7 +328,7 @@ export default function PresupuestosLista() {
                               <CheckCircle className="w-4 h-4 text-green-600" />
                             </Button>
                           )}
-                          {presupuesto.estado === 'APROBADO' && (
+                          {presupuesto.estado === 'APROBADO' && tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -335,33 +338,39 @@ export default function PresupuestosLista() {
                               <Lock className="w-4 h-4 text-gray-600" />
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => crearNuevaVersion(presupuesto)}
-                            title="Nueva versión"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copiarAOtroAnio(presupuesto)}
-                            title="Copiar a otro año"
-                          >
-                            <Calendar className="w-4 h-4" />
-                          </Button>
+                          {tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => crearNuevaVersion(presupuesto)}
+                              title="Nueva versión"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copiarAOtroAnio(presupuesto)}
+                              title="Copiar a otro año"
+                            >
+                              <Calendar className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Link to={`/admin/contabilidad/presupuestos/${presupuesto.id}/ejecucion`}>
                             <Button variant="ghost" size="sm" title="Ver ejecución">
                               <Eye className="w-4 h-4" />
                             </Button>
                           </Link>
-                          <Link to={`/admin/contabilidad/presupuestos/${presupuesto.id}`}>
-                            <Button variant="ghost" size="sm" title="Editar">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          {presupuesto.estado === 'BORRADOR' && (
+                          {tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
+                            <Link to={`/admin/contabilidad/presupuestos/${presupuesto.id}`}>
+                              <Button variant="ghost" size="sm" title="Editar">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          )}
+                          {presupuesto.estado === 'BORRADOR' && tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
                             <Button
                               variant="ghost"
                               size="sm"

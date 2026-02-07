@@ -1,10 +1,14 @@
 import cron from 'node-cron'
+import { PrismaClient } from '@prisma/client'
 import {
   procesarNotificacionesPendientes,
   verificarCuotasProximasVencer,
   verificarCuotasVencidasHoy,
   verificarMorosidad,
+  verificarPartidosProximos,
 } from '../services/notificacionService.js'
+
+const prisma = new PrismaClient()
 
 /**
  * Sistema de Notificaciones Automáticas
@@ -83,6 +87,84 @@ const verificarMorosidadCron = cron.schedule('0 11 * * 1,5', async () => {
 })
 
 /**
+ * Verificar partidos de mañana (recordatorios 24h antes)
+ * Se ejecuta todos los días a las 18:00
+ */
+const verificarPartidosCron = cron.schedule('0 18 * * *', async () => {
+  try {
+    console.log('\n⚽ [CRON] Verificando partidos de mañana...')
+    const cantidad = await verificarPartidosProximos()
+    console.log(`✅ [CRON] Programadas ${cantidad} notificaciones de recordatorio de partido\n`)
+  } catch (error) {
+    console.error('❌ [CRON] Error verificando partidos próximos:', error.message)
+  }
+}, {
+  scheduled: false,
+  timezone: 'America/Argentina/Buenos_Aires',
+})
+
+/**
+ * Sugerir pasajes de categoría al inicio de temporada
+ * Se ejecuta el 1 de diciembre a las 8:00 AM
+ * Solo genera un log/reporte - la ejecución real es manual desde la UI
+ */
+const sugerirPasajesCron = cron.schedule('0 8 1 12 *', async () => {
+  try {
+    console.log('\n🔄 [CRON] Revisando socios que necesitan pasaje de categoría...')
+
+    // Fecha de referencia: 1 de enero del próximo año
+    const fechaRef = new Date(new Date().getFullYear() + 1, 0, 1)
+
+    // Obtener inscripciones activas no exceptuadas
+    const inscripciones = await prisma.inscripcion.findMany({
+      where: {
+        estado: 'ACTIVA',
+        fechaFin: null,
+        exceptuadoPasaje: false,
+      },
+      include: {
+        socio: { select: { id: true, fechaNacimiento: true, apellidoNombre: true } },
+        categoriaActividad: {
+          include: {
+            actividad: { select: { id: true, nombre: true } }
+          }
+        }
+      }
+    })
+
+    let fueraDeRango = 0
+
+    for (const insc of inscripciones) {
+      if (!insc.socio?.fechaNacimiento) continue
+
+      const nacimiento = new Date(insc.socio.fechaNacimiento)
+      let edad = fechaRef.getFullYear() - nacimiento.getFullYear()
+      if (fechaRef.getMonth() < nacimiento.getMonth() ||
+          (fechaRef.getMonth() === nacimiento.getMonth() && fechaRef.getDate() < nacimiento.getDate())) {
+        edad--
+      }
+
+      const cat = insc.categoriaActividad
+      const edadMin = cat.edadMinima || 0
+      const edadMax = cat.edadMaxima || 99
+
+      if (edad < edadMin || edad > edadMax) {
+        fueraDeRango++
+      }
+    }
+
+    console.log(`✅ [CRON] Encontrados ${fueraDeRango} socios fuera de rango de edad para pasaje`)
+    console.log(`   Revisar en: /admin/deportes/pasaje-categoria\n`)
+
+  } catch (error) {
+    console.error('❌ [CRON] Error revisando pasajes de categoría:', error.message)
+  }
+}, {
+  scheduled: false,
+  timezone: 'America/Argentina/Buenos_Aires',
+})
+
+/**
  * Iniciar todos los cron jobs
  */
 export function iniciarCronJobs() {
@@ -93,12 +175,16 @@ export function iniciarCronJobs() {
   console.log('  🔔 Cuotas próximas a vencer: Todos los días a las 9:00 AM')
   console.log('  ⏰ Cuotas vencidas: Todos los días a las 10:00 AM')
   console.log('  💰 Morosidad: Lunes y viernes a las 11:00 AM')
+  console.log('  ⚽ Recordatorio partidos: Todos los días a las 18:00')
+  console.log('  🔄 Sugerir pasajes: 1 de diciembre a las 8:00 AM')
   console.log('  🌍 Timezone: America/Argentina/Buenos_Aires\n')
 
   procesarCola.start()
   verificarProximasVencer.start()
   verificarVencidasHoy.start()
   verificarMorosidadCron.start()
+  verificarPartidosCron.start()
+  sugerirPasajesCron.start()
 
   console.log('✅ Todos los cron jobs iniciados correctamente\n')
 }
@@ -113,6 +199,8 @@ export function detenerCronJobs() {
   verificarProximasVencer.stop()
   verificarVencidasHoy.stop()
   verificarMorosidadCron.stop()
+  verificarPartidosCron.stop()
+  sugerirPasajesCron.stop()
 
   console.log('✅ Todos los cron jobs detenidos\n')
 }
@@ -132,6 +220,8 @@ export async function ejecutarManual(tipo) {
       return await verificarCuotasVencidasHoy()
     case 'morosidad':
       return await verificarMorosidad()
+    case 'partidos':
+      return await verificarPartidosProximos()
     default:
       throw new Error(`Tipo desconocido: ${tipo}`)
   }

@@ -430,4 +430,119 @@ router.get('/actividades/:id', asyncHandler(async (req, res) => {
   })
 }))
 
+/**
+ * GET /api/public/calendario
+ * Obtener eventos del mes para calendario público
+ * Query params: year, month
+ */
+router.get('/calendario', asyncHandler(async (req, res) => {
+  const year = parseInt(req.query.year) || new Date().getFullYear()
+  const month = parseInt(req.query.month) || new Date().getMonth() + 1
+
+  // Fecha inicio y fin del mes
+  const fechaInicio = new Date(year, month - 1, 1)
+  const fechaFin = new Date(year, month, 0, 23, 59, 59)
+
+  // Obtener partidos del mes
+  const partidos = await req.prisma.partido.findMany({
+    where: {
+      fecha: {
+        gte: fechaInicio,
+        lte: fechaFin
+      },
+      estado: {
+        not: 'CANCELADO'
+      }
+    },
+    include: {
+      categoria: {
+        include: {
+          actividad: true
+        }
+      }
+    },
+    orderBy: { fecha: 'asc' }
+  })
+
+  // Obtener entrenamientos del mes
+  const entrenamientos = await req.prisma.entrenamiento.findMany({
+    where: {
+      fecha: {
+        gte: fechaInicio,
+        lte: fechaFin
+      },
+      estado: 'PROGRAMADO'
+    },
+    include: {
+      categoria: {
+        include: {
+          actividad: true
+        }
+      }
+    },
+    orderBy: { fecha: 'asc' }
+  })
+
+  // Formatear eventos
+  const eventos = [
+    ...partidos.map(p => ({
+      tipo: 'PARTIDO',
+      fecha: p.fecha.toISOString(),
+      hora: p.hora,
+      titulo: `${p.categoria?.actividad?.nombre || 'Partido'} - ${p.categoria?.nombre || ''}`,
+      lugar: p.lugar || 'Por confirmar',
+      categoria: p.categoria?.nombre,
+      rival: p.rival,
+      esLocal: p.esLocal
+    })),
+    ...entrenamientos.map(e => ({
+      tipo: 'ENTRENAMIENTO',
+      fecha: e.fecha.toISOString(),
+      hora: e.horaInicio,
+      titulo: `Entrenamiento ${e.categoria?.actividad?.nombre || ''}`,
+      lugar: e.lugar || 'Club',
+      categoria: e.categoria?.nombre
+    }))
+  ].sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+
+  res.json({ eventos })
+}))
+
+/**
+ * GET /api/public/galeria
+ * Obtener álbumes y fotos de la galería pública
+ */
+router.get('/galeria', asyncHandler(async (req, res) => {
+  // Buscar si existen álbumes/galerías en la BD
+  // Por ahora retornamos estructura vacía para que el frontend maneje el caso
+  const albumes = []
+  const fotos = []
+
+  // Si en el futuro se implementa modelo Album/FotoGaleria:
+  // const albumes = await req.prisma.album.findMany({
+  //   where: { activo: true, publico: true },
+  //   include: { _count: { select: { fotos: true } } },
+  //   orderBy: { fecha: 'desc' }
+  // })
+
+  res.json({ albumes, fotos })
+}))
+
+/**
+ * GET /api/public/galeria/album/:id
+ * Obtener fotos de un álbum específico
+ */
+router.get('/galeria/album/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Por ahora retornamos array vacío
+  // En el futuro cuando se implemente el modelo:
+  // const fotos = await req.prisma.fotoGaleria.findMany({
+  //   where: { albumId: parseInt(id), activo: true },
+  //   orderBy: { orden: 'asc' }
+  // })
+
+  res.json({ fotos: [] })
+}))
+
 export default router

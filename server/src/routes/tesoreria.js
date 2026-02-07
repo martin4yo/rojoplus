@@ -58,14 +58,14 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/cajas - Crear caja
 router.post('/cajas', asyncHandler(async (req, res) => {
-  const { codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId } = req.body
+  const { codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId, requiereConciliacion } = req.body
 
   if (!codigo || !nombre || !tipo) {
     throw new AppError('Codigo, nombre y tipo son requeridos', 400)
   }
 
-  if (!['EFECTIVO', 'BANCO', 'MERCADOPAGO', 'OTRO'].includes(tipo)) {
-    throw new AppError('Tipo debe ser EFECTIVO, BANCO, MERCADOPAGO u OTRO', 400)
+  if (!['EFECTIVO', 'BANCO', 'MERCADOPAGO', 'VALORES_PENDIENTES', 'OTRO'].includes(tipo)) {
+    throw new AppError('Tipo debe ser EFECTIVO, BANCO, MERCADOPAGO, VALORES_PENDIENTES u OTRO', 400)
   }
 
   const existente = await prisma.caja.findUnique({ where: { codigo } })
@@ -80,7 +80,8 @@ router.post('/cajas', asyncHandler(async (req, res) => {
       tipo,
       descripcion,
       saldoActual: saldoInicial ? parseFloat(saldoInicial) : 0,
-      cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null
+      cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null,
+      requiereConciliacion: requiereConciliacion === true
     }
   })
 
@@ -93,7 +94,7 @@ router.post('/cajas', asyncHandler(async (req, res) => {
 // PUT /api/admin/cajas/:id - Actualizar caja
 router.put('/cajas/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, tipo, descripcion, activo, cuentaContableId } = req.body
+  const { codigo, nombre, tipo, descripcion, activo, cuentaContableId, requiereConciliacion } = req.body
 
   const existente = await prisma.caja.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
@@ -118,7 +119,8 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
       activo: activo !== undefined ? activo : existente.activo,
       cuentaContableId: cuentaContableId !== undefined
         ? (cuentaContableId ? parseInt(cuentaContableId) : null)
-        : existente.cuentaContableId
+        : existente.cuentaContableId,
+      requiereConciliacion: requiereConciliacion !== undefined ? requiereConciliacion : existente.requiereConciliacion
     }
   })
 
@@ -234,7 +236,7 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/movimientos-caja - Crear movimiento manual
 router.post('/movimientos-caja', asyncHandler(async (req, res) => {
-  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion } = req.body
+  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion, centroCostoId } = req.body
 
   if (!cajaId || !tipo || !monto || !cuentaContableId) {
     throw new AppError('Caja, tipo, monto y cuenta contable son requeridos', 400)
@@ -282,6 +284,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
         tipo,
         monto: montoNum,
         cuentaContableId: parseInt(cuentaContableId),
+        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
         concepto: concepto || cuentaContable.nombre,
         descripcion: descripcion || null,
         registradoPor: req.admin.id
@@ -686,6 +689,309 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
         ...m,
         monto: Number(m.monto)
       }))
+    }
+  })
+}))
+
+// =============================================================================
+// VALORES PENDIENTES DE CONCILIAR
+// =============================================================================
+
+// GET /api/admin/pendientes-conciliar - Listar movimientos pendientes de conciliar
+router.get('/pendientes-conciliar', asyncHandler(async (req, res) => {
+  const { cajaId, desde, hasta, page = 1, limit = 50 } = req.query
+
+  // Buscar movimientos no conciliados en cajas que requieren conciliación
+  const where = {
+    conciliado: false,
+    anulado: false,
+    caja: {
+      requiereConciliacion: true,
+      activo: true
+    }
+  }
+
+  if (cajaId) {
+    where.cajaId = parseInt(cajaId)
+  }
+
+  if (desde || hasta) {
+    where.fecha = {}
+    if (desde) where.fecha.gte = new Date(desde)
+    if (hasta) where.fecha.lte = new Date(hasta)
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit)
+
+  const [movimientos, total] = await Promise.all([
+    prisma.movimientoCaja.findMany({
+      where,
+      orderBy: { fecha: 'desc' },
+      skip,
+      take: parseInt(limit),
+      include: {
+        caja: { select: { id: true, codigo: true, nombre: true, tipo: true } },
+        pago: {
+          select: {
+            id: true,
+            socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+            medioPago: { select: { id: true, nombre: true } }
+          }
+        }
+      }
+    }),
+    prisma.movimientoCaja.count({ where })
+  ])
+
+  const movimientosFormateados = movimientos.map(m => ({
+    ...m,
+    monto: Number(m.monto)
+  }))
+
+  res.json({
+    success: true,
+    data: movimientosFormateados,
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      pages: Math.ceil(total / parseInt(limit))
+    }
+  })
+}))
+
+// GET /api/admin/pendientes-conciliar/resumen - Resumen de valores pendientes
+router.get('/pendientes-conciliar/resumen', asyncHandler(async (req, res) => {
+  // Obtener cajas que requieren conciliación
+  const cajas = await prisma.caja.findMany({
+    where: {
+      requiereConciliacion: true,
+      activo: true
+    }
+  })
+
+  const resumenPorCaja = []
+
+  for (const caja of cajas) {
+    const pendientes = await prisma.movimientoCaja.aggregate({
+      where: {
+        cajaId: caja.id,
+        conciliado: false,
+        anulado: false
+      },
+      _sum: { monto: true },
+      _count: true
+    })
+
+    const conciliados = await prisma.movimientoCaja.aggregate({
+      where: {
+        cajaId: caja.id,
+        conciliado: true,
+        anulado: false
+      },
+      _sum: { monto: true },
+      _count: true
+    })
+
+    resumenPorCaja.push({
+      caja: {
+        id: caja.id,
+        codigo: caja.codigo,
+        nombre: caja.nombre,
+        tipo: caja.tipo,
+        saldoActual: Number(caja.saldoActual)
+      },
+      pendientes: {
+        cantidad: pendientes._count,
+        monto: Number(pendientes._sum.monto || 0)
+      },
+      conciliados: {
+        cantidad: conciliados._count,
+        monto: Number(conciliados._sum.monto || 0)
+      }
+    })
+  }
+
+  const totalPendiente = resumenPorCaja.reduce((sum, r) => sum + r.pendientes.monto, 0)
+  const totalCantidadPendiente = resumenPorCaja.reduce((sum, r) => sum + r.pendientes.cantidad, 0)
+
+  res.json({
+    success: true,
+    data: {
+      totalPendiente,
+      totalCantidadPendiente,
+      cajas: resumenPorCaja
+    }
+  })
+}))
+
+// POST /api/admin/pendientes-conciliar/conciliar - Marcar movimientos como conciliados
+router.post('/pendientes-conciliar/conciliar', asyncHandler(async (req, res) => {
+  const { movimientoIds, observacion } = req.body
+
+  if (!movimientoIds || !Array.isArray(movimientoIds) || movimientoIds.length === 0) {
+    throw new AppError('Debe seleccionar al menos un movimiento', 400)
+  }
+
+  // Verificar que todos los movimientos existen y están pendientes
+  const movimientos = await prisma.movimientoCaja.findMany({
+    where: {
+      id: { in: movimientoIds.map(id => parseInt(id)) },
+      conciliado: false,
+      anulado: false
+    },
+    include: {
+      caja: true
+    }
+  })
+
+  if (movimientos.length !== movimientoIds.length) {
+    throw new AppError('Algunos movimientos no existen o ya fueron conciliados', 400)
+  }
+
+  // Verificar que todos pertenecen a cajas que requieren conciliación
+  const cajasInvalidas = movimientos.filter(m => !m.caja.requiereConciliacion)
+  if (cajasInvalidas.length > 0) {
+    throw new AppError('Algunos movimientos pertenecen a cajas que no requieren conciliación', 400)
+  }
+
+  // Marcar como conciliados
+  await prisma.movimientoCaja.updateMany({
+    where: {
+      id: { in: movimientoIds.map(id => parseInt(id)) }
+    },
+    data: {
+      conciliado: true,
+      fechaConciliacion: new Date(),
+      observacionConciliacion: observacion || null
+    }
+  })
+
+  const montoTotal = movimientos.reduce((sum, m) => sum + Number(m.monto), 0)
+
+  res.json({
+    success: true,
+    message: `${movimientos.length} movimientos conciliados correctamente`,
+    data: {
+      cantidad: movimientos.length,
+      montoTotal
+    }
+  })
+}))
+
+// POST /api/admin/pendientes-conciliar/transferir - Transferir valores conciliados a cuenta bancaria
+router.post('/pendientes-conciliar/transferir', asyncHandler(async (req, res) => {
+  const { cajaOrigenId, cajaDestinoId, movimientoIds, concepto } = req.body
+
+  if (!cajaOrigenId || !cajaDestinoId || !movimientoIds || movimientoIds.length === 0) {
+    throw new AppError('Debe especificar caja origen, destino y movimientos a transferir', 400)
+  }
+
+  // Obtener los movimientos conciliados
+  const movimientos = await prisma.movimientoCaja.findMany({
+    where: {
+      id: { in: movimientoIds.map(id => parseInt(id)) },
+      cajaId: parseInt(cajaOrigenId),
+      conciliado: true,
+      anulado: false
+    }
+  })
+
+  if (movimientos.length !== movimientoIds.length) {
+    throw new AppError('Algunos movimientos no existen, no están conciliados o no pertenecen a la caja origen', 400)
+  }
+
+  const montoTotal = movimientos.reduce((sum, m) => sum + Number(m.monto), 0)
+
+  // Verificar cajas
+  const [cajaOrigen, cajaDestino] = await Promise.all([
+    prisma.caja.findUnique({ where: { id: parseInt(cajaOrigenId) } }),
+    prisma.caja.findUnique({ where: { id: parseInt(cajaDestinoId) } })
+  ])
+
+  if (!cajaOrigen || !cajaDestino) {
+    throw new AppError('Caja origen o destino no encontrada', 404)
+  }
+
+  if (Number(cajaOrigen.saldoActual) < montoTotal) {
+    throw new AppError('Saldo insuficiente en la caja origen', 400)
+  }
+
+  // Crear transferencia
+  const resultado = await prisma.$transaction(async (tx) => {
+    const numero = await generarNumeroTransferencia()
+    const numeroMovOrigen = await generarNumeroMovimiento()
+    const numeroMovDestino = `MV-${new Date().getFullYear()}-${String(parseInt(numeroMovOrigen.split('-')[2]) + 1).padStart(5, '0')}`
+
+    // Crear transferencia
+    const transferencia = await tx.transferenciaCaja.create({
+      data: {
+        numero,
+        cajaOrigenId: parseInt(cajaOrigenId),
+        cajaDestinoId: parseInt(cajaDestinoId),
+        fecha: new Date(),
+        monto: montoTotal,
+        concepto: concepto || 'Acreditación de valores conciliados',
+        descripcion: `Transferencia de ${movimientos.length} movimientos conciliados`,
+        estado: 'CONFIRMADO',
+        registradoPor: req.admin.id
+      }
+    })
+
+    // Crear movimiento de egreso en caja origen
+    await tx.movimientoCaja.create({
+      data: {
+        numero: numeroMovOrigen,
+        cajaId: parseInt(cajaOrigenId),
+        fecha: new Date(),
+        tipo: 'EGRESO',
+        monto: montoTotal,
+        cuentaContableId: cajaDestino.cuentaContableId || cajaOrigen.cuentaContableId,
+        concepto: `Transferencia a ${cajaDestino.nombre}`,
+        descripcion: `Acreditación ${numero}`,
+        cajaDestinoId: parseInt(cajaDestinoId),
+        registradoPor: req.admin.id,
+        conciliado: true // Este movimiento ya está conciliado
+      }
+    })
+
+    // Crear movimiento de ingreso en caja destino
+    await tx.movimientoCaja.create({
+      data: {
+        numero: numeroMovDestino,
+        cajaId: parseInt(cajaDestinoId),
+        fecha: new Date(),
+        tipo: 'INGRESO',
+        monto: montoTotal,
+        cuentaContableId: cajaOrigen.cuentaContableId || cajaDestino.cuentaContableId,
+        concepto: `Acreditación desde ${cajaOrigen.nombre}`,
+        descripcion: `Acreditación ${numero}`,
+        registradoPor: req.admin.id,
+        conciliado: !cajaDestino.requiereConciliacion // Según config de caja destino
+      }
+    })
+
+    // Actualizar saldos
+    await tx.caja.update({
+      where: { id: parseInt(cajaOrigenId) },
+      data: { saldoActual: { decrement: montoTotal } }
+    })
+
+    await tx.caja.update({
+      where: { id: parseInt(cajaDestinoId) },
+      data: { saldoActual: { increment: montoTotal } }
+    })
+
+    return transferencia
+  })
+
+  res.json({
+    success: true,
+    message: `Transferencia creada correctamente`,
+    data: {
+      transferencia: { ...resultado, monto: Number(resultado.monto) },
+      movimientosConciliados: movimientos.length,
+      montoTotal
     }
   })
 }))

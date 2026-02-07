@@ -4,6 +4,7 @@ import { Plus, Search, ShoppingCart, Eye, Edit, Trash2, CheckCircle, XCircle, Ch
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const ESTADOS = {
   PENDIENTE: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
@@ -155,10 +156,12 @@ export default function OrdenesCompraLista() {
             <p className="text-gray-500 text-sm">{pagination.total} ordenes</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/egresos/ordenes-compra/nueva')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Orden
-        </Button>
+        {tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/egresos/ordenes-compra/nueva')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Orden
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -304,7 +307,7 @@ export default function OrdenesCompraLista() {
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
-                          {orden.estado === 'PENDIENTE' && (
+                          {orden.estado === 'PENDIENTE' && tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (
                             <>
                               <Link
                                 to={`/admin/egresos/ordenes-compra/${orden.id}/editar`}
@@ -329,7 +332,7 @@ export default function OrdenesCompraLista() {
                               </button>
                             </>
                           )}
-                          {(orden.estado === 'PENDIENTE' || orden.estado === 'PARCIAL') && (
+                          {(orden.estado === 'PENDIENTE' || orden.estado === 'PARCIAL') && tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (
                             <Link
                               to={`/admin/egresos/ordenes-compra/${orden.id}/recibir`}
                               className="p-2 text-gray-500 hover:text-green-600 hover:bg-gray-100 rounded-lg"

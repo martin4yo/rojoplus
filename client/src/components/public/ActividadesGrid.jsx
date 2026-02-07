@@ -110,9 +110,10 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {actividades.map((actividad) => (
-            <div
+            <Link
+              to={`/actividades/${actividad.id}`}
               key={actividad.id}
-              className="group bg-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-default"
+              className="group bg-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
             >
               <div className="relative h-48 overflow-hidden">
                 <img
@@ -147,16 +148,13 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
                     )}
                   </div>
 
-                  <span
-                    title="En desarrollo"
-                    className="text-red-600 font-medium text-sm flex items-center gap-1 cursor-help"
-                  >
+                  <span className="text-red-600 font-medium text-sm flex items-center gap-1 group-hover:text-red-700">
                     Ver más
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 

@@ -1622,4 +1622,391 @@ router.post('/:tokenPortal/debito-automatico/baja', asyncHandler(async (req, res
   })
 }))
 
+// ==============================================================================
+// MENSAJERÍA - Chat con Entrenadores
+// ==============================================================================
+
+/**
+ * GET /api/socio/:token/conversaciones
+ * Obtener todas las conversaciones del socio con entrenadores
+ */
+router.get('/:token/conversaciones', asyncHandler(async (req, res) => {
+  const { token } = req.params
+
+  const socio = await req.prisma.socio.findFirst({
+    where: { tokenPortal: token }
+  })
+
+  if (!socio) {
+    throw new AppError('Token inválido', 401)
+  }
+
+  const conversaciones = await req.prisma.conversacion.findMany({
+    where: {
+      socioId: socio.id,
+      estado: { not: 'CERRADA' }
+    },
+    include: {
+      entrenador: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          email: true
+        }
+      },
+      categoriaActividad: {
+        select: {
+          id: true,
+          nombre: true,
+          actividad: {
+            select: { nombre: true }
+          }
+        }
+      },
+      mensajes: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: {
+          contenido: true,
+          createdAt: true,
+          emisorTipo: true
+        }
+      }
+    },
+    orderBy: { ultimoMensaje: 'desc' }
+  })
+
+  // Formatear respuesta
+  const resultado = conversaciones.map(conv => ({
+    id: conv.id,
+    entrenador: {
+      id: conv.entrenador.id,
+      nombre: `${conv.entrenador.nombre} ${conv.entrenador.apellido || ''}`.trim()
+    },
+    actividad: conv.categoriaActividad?.actividad?.nombre || null,
+    categoria: conv.categoriaActividad?.nombre || null,
+    asunto: conv.asunto,
+    ultimoMensaje: conv.mensajes[0] || null,
+    mensajesNoLeidos: conv.mensajesNoLeidos,
+    estado: conv.estado,
+    updatedAt: conv.ultimoMensaje || conv.createdAt
+  }))
+
+  res.json({ success: true, data: resultado })
+}))
+
+/**
+ * POST /api/socio/:token/conversaciones
+ * Crear una nueva conversación con un entrenador
+ */
+router.post('/:token/conversaciones', asyncHandler(async (req, res) => {
+  const { token } = req.params
+  const { entrenadorId, categoriaActividadId, asunto, mensaje } = req.body
+
+  const socio = await req.prisma.socio.findFirst({
+    where: { tokenPortal: token }
+  })
+
+  if (!socio) {
+    throw new AppError('Token inválido', 401)
+  }
+
+  if (!entrenadorId || !mensaje) {
+    throw new AppError('Entrenador y mensaje son requeridos', 400)
+  }
+
+  // Verificar que el entrenador existe
+  const entrenador = await req.prisma.entrenador.findUnique({
+    where: { id: parseInt(entrenadorId) }
+  })
+
+  if (!entrenador || !entrenador.activo) {
+    throw new AppError('Entrenador no encontrado', 404)
+  }
+
+  // Verificar si ya existe una conversación con este entrenador
+  let conversacion = await req.prisma.conversacion.findFirst({
+    where: {
+      socioId: socio.id,
+      entrenadorId: parseInt(entrenadorId),
+      categoriaActividadId: categoriaActividadId ? parseInt(categoriaActividadId) : null,
+      estado: { not: 'CERRADA' }
+    }
+  })
+
+  // Si no existe, crear nueva conversación
+  if (!conversacion) {
+    conversacion = await req.prisma.conversacion.create({
+      data: {
+        socioId: socio.id,
+        entrenadorId: parseInt(entrenadorId),
+        categoriaActividadId: categoriaActividadId ? parseInt(categoriaActividadId) : null,
+        asunto: asunto || null,
+        ultimoMensaje: new Date()
+      }
+    })
+  }
+
+  // Crear el primer mensaje
+  const nuevoMensaje = await req.prisma.mensaje.create({
+    data: {
+      conversacionId: conversacion.id,
+      emisorTipo: 'SOCIO',
+      emisorId: socio.id,
+      contenido: mensaje
+    }
+  })
+
+  // Actualizar timestamp de la conversación
+  await req.prisma.conversacion.update({
+    where: { id: conversacion.id },
+    data: { ultimoMensaje: new Date() }
+  })
+
+  res.status(201).json({
+    success: true,
+    data: {
+      conversacionId: conversacion.id,
+      mensaje: nuevoMensaje
+    }
+  })
+}))
+
+/**
+ * GET /api/socio/:token/conversaciones/:id/mensajes
+ * Obtener todos los mensajes de una conversación
+ */
+router.get('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res) => {
+  const { token, id } = req.params
+
+  const socio = await req.prisma.socio.findFirst({
+    where: { tokenPortal: token }
+  })
+
+  if (!socio) {
+    throw new AppError('Token inválido', 401)
+  }
+
+  // Verificar que la conversación pertenece al socio
+  const conversacion = await req.prisma.conversacion.findFirst({
+    where: {
+      id: parseInt(id),
+      socioId: socio.id
+    },
+    include: {
+      entrenador: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true
+        }
+      },
+      categoriaActividad: {
+        select: {
+          nombre: true,
+          actividad: { select: { nombre: true } }
+        }
+      }
+    }
+  })
+
+  if (!conversacion) {
+    throw new AppError('Conversación no encontrada', 404)
+  }
+
+  // Obtener mensajes
+  const mensajes = await req.prisma.mensaje.findMany({
+    where: { conversacionId: parseInt(id) },
+    orderBy: { createdAt: 'asc' }
+  })
+
+  // Marcar como leídos los mensajes del entrenador
+  await req.prisma.mensaje.updateMany({
+    where: {
+      conversacionId: parseInt(id),
+      emisorTipo: 'ENTRENADOR',
+      leido: false
+    },
+    data: {
+      leido: true,
+      fechaLeido: new Date()
+    }
+  })
+
+  // Resetear contador de no leídos
+  await req.prisma.conversacion.update({
+    where: { id: parseInt(id) },
+    data: { mensajesNoLeidos: 0 }
+  })
+
+  res.json({
+    success: true,
+    data: {
+      conversacion: {
+        id: conversacion.id,
+        entrenador: `${conversacion.entrenador.nombre} ${conversacion.entrenador.apellido || ''}`.trim(),
+        actividad: conversacion.categoriaActividad?.actividad?.nombre,
+        categoria: conversacion.categoriaActividad?.nombre,
+        asunto: conversacion.asunto
+      },
+      mensajes: mensajes.map(m => ({
+        id: m.id,
+        contenido: m.contenido,
+        emisorTipo: m.emisorTipo,
+        esPropio: m.emisorTipo === 'SOCIO',
+        createdAt: m.createdAt,
+        leido: m.leido
+      }))
+    }
+  })
+}))
+
+/**
+ * POST /api/socio/:token/conversaciones/:id/mensajes
+ * Enviar un nuevo mensaje en una conversación existente
+ */
+router.post('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res) => {
+  const { token, id } = req.params
+  const { contenido } = req.body
+
+  const socio = await req.prisma.socio.findFirst({
+    where: { tokenPortal: token }
+  })
+
+  if (!socio) {
+    throw new AppError('Token inválido', 401)
+  }
+
+  if (!contenido?.trim()) {
+    throw new AppError('El mensaje no puede estar vacío', 400)
+  }
+
+  // Verificar que la conversación pertenece al socio
+  const conversacion = await req.prisma.conversacion.findFirst({
+    where: {
+      id: parseInt(id),
+      socioId: socio.id,
+      estado: 'ACTIVA'
+    }
+  })
+
+  if (!conversacion) {
+    throw new AppError('Conversación no encontrada o cerrada', 404)
+  }
+
+  // Crear mensaje
+  const mensaje = await req.prisma.mensaje.create({
+    data: {
+      conversacionId: parseInt(id),
+      emisorTipo: 'SOCIO',
+      emisorId: socio.id,
+      contenido: contenido.trim()
+    }
+  })
+
+  // Actualizar conversación
+  await req.prisma.conversacion.update({
+    where: { id: parseInt(id) },
+    data: { ultimoMensaje: new Date() }
+  })
+
+  res.status(201).json({
+    success: true,
+    data: {
+      id: mensaje.id,
+      contenido: mensaje.contenido,
+      emisorTipo: mensaje.emisorTipo,
+      esPropio: true,
+      createdAt: mensaje.createdAt
+    }
+  })
+}))
+
+/**
+ * GET /api/socio/:token/entrenadores-disponibles
+ * Obtener entrenadores disponibles para contactar (de las actividades donde está inscripto)
+ */
+router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => {
+  const { token } = req.params
+
+  const socio = await req.prisma.socio.findFirst({
+    where: { tokenPortal: token }
+  })
+
+  if (!socio) {
+    throw new AppError('Token inválido', 401)
+  }
+
+  // Obtener categorías donde está inscripto el socio
+  const inscripciones = await req.prisma.inscripcion.findMany({
+    where: {
+      socioId: socio.id,
+      activo: true
+    },
+    select: {
+      categoriaActividadId: true,
+      categoriaActividad: {
+        select: {
+          id: true,
+          nombre: true,
+          actividad: { select: { id: true, nombre: true } }
+        }
+      }
+    }
+  })
+
+  const categoriaIds = inscripciones.map(i => i.categoriaActividadId)
+
+  // Obtener entrenadores de esas categorías
+  const entrenadoresCategorias = await req.prisma.entrenadorCategoria.findMany({
+    where: {
+      categoriaActividadId: { in: categoriaIds },
+      activo: true,
+      entrenador: { activo: true }
+    },
+    include: {
+      entrenador: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          email: true
+        }
+      },
+      categoriaActividad: {
+        select: {
+          id: true,
+          nombre: true,
+          actividad: { select: { nombre: true } }
+        }
+      }
+    }
+  })
+
+  // Agrupar por entrenador
+  const entrenadoresMap = new Map()
+  entrenadoresCategorias.forEach(ec => {
+    const key = ec.entrenador.id
+    if (!entrenadoresMap.has(key)) {
+      entrenadoresMap.set(key, {
+        id: ec.entrenador.id,
+        nombre: `${ec.entrenador.nombre} ${ec.entrenador.apellido || ''}`.trim(),
+        email: ec.entrenador.email,
+        categorias: []
+      })
+    }
+    entrenadoresMap.get(key).categorias.push({
+      id: ec.categoriaActividad.id,
+      nombre: ec.categoriaActividad.nombre,
+      actividad: ec.categoriaActividad.actividad.nombre
+    })
+  })
+
+  res.json({
+    success: true,
+    data: Array.from(entrenadoresMap.values())
+  })
+}))
+
 export default router

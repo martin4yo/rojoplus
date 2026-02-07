@@ -3,9 +3,10 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
-  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper
+  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User
 } from 'lucide-react'
 import api from '../services/api'
+import { cargarPermisos, limpiarPermisos, tieneAlgunPermiso, getPermisos, PERMISOS } from '../services/permisos'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
@@ -15,15 +16,26 @@ export default function AdminLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState([])
   const [pagosPendientesCount, setPagosPendientesCount] = useState(0)
+  const [permisosLoaded, setPermisosLoaded] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken')
-    const adminData = localStorage.getItem('adminData')
-    if (!token) {
-      navigate('/admin/login')
-    } else if (adminData) {
-      setAdmin(JSON.parse(adminData))
+    async function initSession() {
+      const token = localStorage.getItem('adminToken')
+      const adminData = localStorage.getItem('adminData')
+      if (!token) {
+        navigate('/admin/login')
+      } else {
+        if (adminData) {
+          setAdmin(JSON.parse(adminData))
+        }
+        // Cargar permisos si no están cargados
+        if (getPermisos().length === 0) {
+          await cargarPermisos()
+        }
+        setPermisosLoaded(true)
+      }
     }
+    initSession()
   }, [navigate])
 
   // Cerrar menú al cambiar de ruta
@@ -69,6 +81,7 @@ export default function AdminLayout() {
   function handleLogout() {
     localStorage.removeItem('adminToken')
     localStorage.removeItem('adminData')
+    limpiarPermisos()
     navigate('/admin/login')
   }
 
@@ -80,15 +93,23 @@ export default function AdminLayout() {
     )
   }
 
-  const menuItems = [
+  // Definición de items del menú con permisos requeridos
+  // permisos: array de permisos - el usuario debe tener AL MENOS UNO para ver el item
+  // Si no tiene permisos definidos, es visible para todos los usuarios autenticados
+  const menuItemsBase = [
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/admin/dashboard-ejecutivo', label: 'Dashboard Ejecutivo', icon: BarChart3 },
-    { path: '/admin/socios', label: 'Socios', icon: Users },
-    { path: '/admin/solicitudes', label: 'Solicitudes', icon: UserPlus },
-    { path: '/admin/inscripciones', label: 'Inscripciones', icon: ClipboardList },
-    { path: '/admin/periodos', label: 'Cuotas', icon: Receipt },
+    { path: '/admin/dashboard-ejecutivo', label: 'Dashboard Ejecutivo', icon: BarChart3, permisos: [PERMISOS.REPORTES_VER] },
     {
-      label: 'Ingresos', icon: TrendingUp,
+      label: 'Socios', icon: Users, permisos: [PERMISOS.SOCIOS_VER],
+      submenu: [
+        { path: '/admin/socios', label: 'Listado Socios', icon: Users },
+        { path: '/admin/solicitudes', label: 'Solicitudes Alta', icon: UserPlus, permisos: [PERMISOS.SOCIOS_CREAR] },
+        { path: '/admin/inscripciones', label: 'Inscripciones', icon: ClipboardList, permisos: [PERMISOS.INSCRIPCIONES_VER] },
+        { path: '/admin/periodos', label: 'Cuotas y Periodos', icon: Receipt, permisos: [PERMISOS.CUOTAS_VER] },
+      ]
+    },
+    {
+      label: 'Ingresos', icon: TrendingUp, permisos: [PERMISOS.INGRESOS_VER],
       submenu: [
         { path: '/admin/ingresos/clientes', label: 'Clientes', icon: UserCheck },
         { path: '/admin/ingresos/pedidos', label: 'Pedidos', icon: ShoppingCart },
@@ -97,7 +118,7 @@ export default function AdminLayout() {
       ]
     },
     {
-      label: 'Egresos', icon: TrendingDown,
+      label: 'Egresos', icon: TrendingDown, permisos: [PERMISOS.EGRESOS_VER],
       submenu: [
         { path: '/admin/egresos/proveedores', label: 'Proveedores', icon: Building2 },
         { path: '/admin/egresos/personal', label: 'Personal', icon: Briefcase },
@@ -107,24 +128,26 @@ export default function AdminLayout() {
       ]
     },
     {
-      label: 'Sueldos', icon: DollarSign,
+      label: 'Sueldos', icon: DollarSign, permisos: [PERMISOS.SUELDOS_VER],
       submenu: [
         { path: '/admin/liquidaciones', label: 'Liquidaciones', icon: FileText },
         { path: '/admin/liquidaciones/conceptos', label: 'Conceptos', icon: Settings },
       ]
     },
     {
-      label: 'Tesoreria', icon: Wallet,
+      label: 'Tesoreria', icon: Wallet, permisos: [PERMISOS.CAJA_VER],
       submenu: [
         { path: '/admin/tesoreria/cajas', label: 'Cajas', icon: Wallet },
-        { path: '/admin/cierres-caja', label: 'Cierre de Caja', icon: ClipboardList },
-        { path: '/admin/debito-automatico', label: 'Debito Automatico', icon: CreditCard },
-        { path: '/admin/tesoreria/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
-        { path: '/admin/tesoreria/transferencias', label: 'Transferencias', icon: ArrowLeftRight },
+        { path: '/admin/cierres-caja', label: 'Cierre de Caja', icon: ClipboardList, permisos: [PERMISOS.CAJA_CIERRE] },
+        { path: '/admin/debito-automatico', label: 'Debito Automatico', icon: CreditCard, permisos: [PERMISOS.DEBITO_AUTOMATICO] },
+        { path: '/admin/tesoreria/movimientos', label: 'Movimientos', icon: ArrowLeftRight, permisos: [PERMISOS.CAJA_MOVIMIENTOS] },
+        { path: '/admin/tesoreria/transferencias', label: 'Transferencias', icon: ArrowLeftRight, permisos: [PERMISOS.CAJA_MOVIMIENTOS] },
+        { path: '/admin/tesoreria/pendientes-conciliar', label: 'Valores Pendientes', icon: CreditCard, permisos: [PERMISOS.CAJA_MOVIMIENTOS] },
+        { path: '/admin/tesoreria/conciliacion', label: 'Conciliacion Bancaria', icon: FileCheck, permisos: [PERMISOS.CAJA_MOVIMIENTOS] },
       ]
     },
     {
-      label: 'Stock', icon: Package,
+      label: 'Stock', icon: Package, permisos: [PERMISOS.STOCK_VER],
       submenu: [
         { path: '/admin/stock/productos', label: 'Productos', icon: BoxesIcon },
         { path: '/admin/stock/categorias', label: 'Categorias', icon: Tag },
@@ -133,38 +156,72 @@ export default function AdminLayout() {
       ]
     },
     {
-      label: 'Contabilidad', icon: Calculator,
+      label: 'Contabilidad', icon: Calculator, permisos: [PERMISOS.CONTABILIDAD_VER],
       submenu: [
         { path: '/admin/contabilidad/plan-cuentas', label: 'Plan de Cuentas', icon: BookOpen },
-        { path: '/admin/contabilidad/asientos', label: 'Libro Diario', icon: FileText },
+        { path: '/admin/contabilidad/asientos', label: 'Libro Diario', icon: FileText, permisos: [PERMISOS.CONTABILIDAD_ASIENTOS] },
         { path: '/admin/contabilidad/libro-mayor', label: 'Libro Mayor', icon: BookOpen },
-        { path: '/admin/contabilidad/presupuestos', label: 'Presupuestos', icon: BarChart3 },
+        { path: '/admin/contabilidad/presupuestos', label: 'Presupuestos', icon: BarChart3, permisos: [PERMISOS.CONTABILIDAD_PRESUPUESTO] },
       ]
     },
     {
-      label: 'Deportes', icon: Trophy,
+      label: 'Deportes', icon: Trophy, permisos: [PERMISOS.DEPORTES_VER],
       submenu: [
-        { path: '/admin/deportes/entrenamientos', label: 'Entrenamientos', icon: Calendar },
+        { path: '/admin/partidos', label: 'Partidos', icon: Trophy, permisos: [PERMISOS.DEPORTES_PARTIDOS] },
+        { path: '/admin/deportes/entrenamientos', label: 'Entrenamientos', icon: Calendar, permisos: [PERMISOS.DEPORTES_ENTRENAMIENTOS] },
         { path: '/admin/deportes/horarios', label: 'Horarios', icon: ClipboardList },
         { path: '/admin/deportes/espacios', label: 'Espacios', icon: MapPin },
         { path: '/admin/deportes/tipos-espacio', label: 'Tipos de Espacio', icon: Settings },
+        { path: '/admin/reportes/deportivos', label: 'Reportes Deportivos', icon: BarChart3, permisos: [PERMISOS.REPORTES_VER] },
+        { path: '/admin/deportes/pasaje-categoria', label: 'Pasaje Categoría', icon: ArrowUpCircle, permisos: [PERMISOS.DEPORTES_PASAJE] },
       ]
     },
-    { path: '/admin/comercios', label: 'Comercios', icon: Store },
-    { path: '/admin/publicidad', label: 'Publicidad', icon: Megaphone },
-    { path: '/admin/noticias', label: 'Noticias', icon: Newspaper },
-    { path: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
     {
-      label: 'Configuracion', icon: Settings,
+      label: 'Contenido', icon: Newspaper, permisos: [PERMISOS.CONTENIDO_VER],
+      submenu: [
+        { path: '/admin/noticias', label: 'Noticias', icon: Newspaper },
+        { path: '/admin/publicidad', label: 'Banners', icon: Megaphone },
+        { path: '/admin/comercios', label: 'Comercios', icon: Store, permisos: [PERMISOS.COMERCIOS_GESTIONAR] },
+      ]
+    },
+    { path: '/admin/reportes', label: 'Reportes', icon: BarChart3, permisos: [PERMISOS.REPORTES_VER] },
+    {
+      label: 'Configuracion', icon: Settings, permisos: [PERMISOS.CONFIG_VER],
       submenu: [
         { path: '/admin/configuracion', label: 'General', icon: Sliders },
         { path: '/admin/configuracion/pagos', label: 'Datos Bancarios', icon: CreditCard },
-        { path: '/admin/configuracion/autoridades', label: 'Autoridades', icon: Users },
+        { path: '/admin/configuracion/autoridades', label: 'Autoridades', icon: Users, permisos: [PERMISOS.CONTENIDO_GESTIONAR] },
+        { path: '/admin/configuracion/usuarios', label: 'Usuarios', icon: Users, permisos: [PERMISOS.USUARIOS_GESTIONAR] },
         { path: '/admin/configuracion/templates/email', label: 'Templates Email', icon: Mail },
         { path: '/admin/configuracion/templates/pdf', label: 'Templates PDF', icon: FileText },
       ]
     },
   ]
+
+  // Función para verificar si el usuario tiene permiso para ver un item
+  function tieneAcceso(item) {
+    // Si no tiene permisos definidos, es visible para todos
+    if (!item.permisos || item.permisos.length === 0) {
+      return true
+    }
+    // Verificar si tiene alguno de los permisos requeridos
+    return tieneAlgunPermiso(...item.permisos)
+  }
+
+  // Filtrar items del menú según permisos
+  const menuItems = menuItemsBase
+    .filter(item => tieneAcceso(item))
+    .map(item => {
+      // Si tiene submenu, filtrar también los subitems
+      if (item.submenu) {
+        const submenuFiltrado = item.submenu.filter(subItem => tieneAcceso(subItem))
+        // Si no quedan subitems, no mostrar el menú padre
+        if (submenuFiltrado.length === 0) return null
+        return { ...item, submenu: submenuFiltrado }
+      }
+      return item
+    })
+    .filter(Boolean) // Eliminar nulls
 
   function isActive(path) {
     if (path === '/admin') {
@@ -373,7 +430,13 @@ export default function AdminLayout() {
         {/* Info del usuario en sidebar móvil */}
         <div className="md:hidden absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700 bg-gray-900">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-300">{admin?.nombre || 'Admin'}</span>
+            <Link
+              to="/admin/mi-perfil"
+              className="flex items-center gap-2 text-gray-300 hover:text-white"
+            >
+              <User className="w-4 h-4" />
+              <span className="text-sm">{admin?.nombre || 'Admin'}</span>
+            </Link>
             <button
               onClick={handleLogout}
               className="flex items-center gap-1 text-red-400 hover:text-red-300 text-sm"
@@ -408,9 +471,13 @@ export default function AdminLayout() {
             </div>
           </div>
           <div className="hidden md:flex items-center gap-4">
-            <span className="text-gray-600 text-sm">
-              {admin?.nombre || 'Admin'}
-            </span>
+            <Link
+              to="/admin/mi-perfil"
+              className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
+            >
+              <User className="w-4 h-4" />
+              <span className="text-sm">{admin?.nombre || 'Admin'}</span>
+            </Link>
             <button
               onClick={handleLogout}
               className="flex items-center gap-1 text-gray-500 hover:text-primary transition-colors"
@@ -423,7 +490,36 @@ export default function AdminLayout() {
 
         {/* Content */}
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
-          <Outlet />
+          {permisosLoaded && getPermisos().length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md">
+                <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-gray-800 mb-2">Sin acceso</h2>
+                <p className="text-gray-600 mb-4">
+                  Tu usuario no tiene permisos asignados para acceder al panel de administración.
+                </p>
+                <p className="text-sm text-gray-500 mb-6">
+                  Comunicate con el club a través de los medios disponibles en la página web para solicitar acceso.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <a
+                    href="/contacto"
+                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Ir a Contacto
+                  </a>
+                  <button
+                    onClick={handleLogout}
+                    className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>

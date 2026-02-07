@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Search, X, User, Phone, Mail, Dumbbell, Edit, Trash2, 
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function EntrenadoresLista() {
   const navigate = useNavigate()
@@ -77,10 +78,12 @@ export default function EntrenadoresLista() {
             </div>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/entrenadores/nuevo')} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Nuevo Entrenador
-        </Button>
+{tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+          <Button onClick={() => navigate('/admin/entrenadores/nuevo')} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Nuevo Entrenador
+          </Button>
+        )}
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
@@ -169,20 +172,24 @@ export default function EntrenadoresLista() {
                     <span className={`px-2 py-1 text-xs rounded ${entrenador.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                       {entrenador.activo ? 'Activo' : 'Inactivo'}
                     </span>
-                    <button
-                      onClick={() => navigate(`/admin/entrenadores/${entrenador.id}`)}
-                      className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition"
-                      title="Editar"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => eliminarEntrenador(entrenador)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+                      <>
+                        <button
+                          onClick={() => navigate(`/admin/entrenadores/${entrenador.id}`)}
+                          className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg transition"
+                          title="Editar"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => eliminarEntrenador(entrenador)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

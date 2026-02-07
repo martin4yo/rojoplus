@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { useModal } from '../../components/Modal'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 import {
   PlusIcon,
   PencilSquareIcon,
@@ -143,13 +144,15 @@ export default function Noticias() {
           <h1 className="text-2xl font-bold text-gray-900">Noticias</h1>
           <p className="text-gray-500">Gestiona las noticias y novedades del club</p>
         </div>
-        <button
-          onClick={handleNueva}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          <PlusIcon className="w-5 h-5" />
-          Nueva Noticia
-        </button>
+        {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+          <button
+            onClick={handleNueva}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <PlusIcon className="w-5 h-5" />
+            Nueva Noticia
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -285,20 +288,24 @@ export default function Noticias() {
                       <EyeIcon className="w-5 h-5" />
                     )}
                   </button>
-                  <button
-                    onClick={() => handleEditar(noticia)}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Editar"
-                  >
-                    <PencilSquareIcon className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => handleEliminar(noticia.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Eliminar"
-                  >
-                    <TrashIcon className="w-5 h-5" />
-                  </button>
+                  {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+                    <button
+                      onClick={() => handleEditar(noticia)}
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <PencilSquareIcon className="w-5 h-5" />
+                    </button>
+                  )}
+                  {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+                    <button
+                      onClick={() => handleEliminar(noticia.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

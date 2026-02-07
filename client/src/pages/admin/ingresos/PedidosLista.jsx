@@ -4,6 +4,7 @@ import { Plus, Search, Filter, ShoppingCart, Calendar, User, Building2, Eye, Edi
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const ESTADOS = [
   { value: '', label: 'Todos' },
@@ -145,10 +146,12 @@ export default function PedidosLista() {
             <p className="text-sm text-gray-500">Pedidos de clientes y socios</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/ingresos/pedidos/nuevo')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Pedido
-        </Button>
+        {tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/ingresos/pedidos/nuevo')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Pedido
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -304,7 +307,7 @@ export default function PedidosLista() {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            {pedido.estado === 'PENDIENTE' && (
+                            {pedido.estado === 'PENDIENTE' && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
                               <>
                                 <button
                                   onClick={() => navigate(`/admin/ingresos/pedidos/${pedido.id}/editar`)}

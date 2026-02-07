@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Save, X, ChevronUp, ChevronDown, Upload, User, AlertTriangle } from 'lucide-react'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 // Modal de confirmación personalizado
 function ConfirmModal({ open, onClose, onConfirm, title, message }) {
@@ -428,36 +429,38 @@ export default function Autoridades() {
           </div>
 
           {/* Acciones */}
-          <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={() => handleMover(autoridad.id, 'up')}
-              className="p-1 hover:bg-gray-100 rounded"
-              title="Subir"
-            >
-              <ChevronUp className="w-4 h-4 text-gray-500" />
-            </button>
-            <button
-              onClick={() => handleMover(autoridad.id, 'down')}
-              className="p-1 hover:bg-gray-100 rounded"
-              title="Bajar"
-            >
-              <ChevronDown className="w-4 h-4 text-gray-500" />
-            </button>
-            <button
-              onClick={() => handleEdit(autoridad)}
-              className="p-1 hover:bg-blue-100 rounded"
-              title="Editar"
-            >
-              <Edit2 className="w-4 h-4 text-blue-600" />
-            </button>
-            <button
-              onClick={() => handleDeleteClick(autoridad.id)}
-              className="p-1 hover:bg-red-100 rounded"
-              title="Eliminar"
-            >
-              <Trash2 className="w-4 h-4 text-red-600" />
-            </button>
-          </div>
+          {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+            <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => handleMover(autoridad.id, 'up')}
+                className="p-1 hover:bg-gray-100 rounded"
+                title="Subir"
+              >
+                <ChevronUp className="w-4 h-4 text-gray-500" />
+              </button>
+              <button
+                onClick={() => handleMover(autoridad.id, 'down')}
+                className="p-1 hover:bg-gray-100 rounded"
+                title="Bajar"
+              >
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              </button>
+              <button
+                onClick={() => handleEdit(autoridad)}
+                className="p-1 hover:bg-blue-100 rounded"
+                title="Editar"
+              >
+                <Edit2 className="w-4 h-4 text-blue-600" />
+              </button>
+              <button
+                onClick={() => handleDeleteClick(autoridad.id)}
+                className="p-1 hover:bg-red-100 rounded"
+                title="Eliminar"
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -545,13 +548,15 @@ export default function Autoridades() {
                   </div>
                 )}
               </div>
-              <button
-                onClick={() => handleAgregar(seccion.key)}
-                className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-1 text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Agregar
-              </button>
+              {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
+                <button
+                  onClick={() => handleAgregar(seccion.key)}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-1 text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Agregar
+                </button>
+              )}
             </div>
 
             {/* Formulario de agregar */}

@@ -5,6 +5,7 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const TIPO_COLORES = {
   ACTIVO: 'bg-blue-100 text-blue-700',
@@ -106,21 +107,25 @@ function CuentaItem({ cuenta, nivel = 0, onEdit, onDelete, onAddHijo, expandedId
         </td>
         <td className="px-4 py-2 text-right">
           <div className="flex justify-end gap-1">
-            <button
-              onClick={() => onAddHijo(cuenta)}
-              className="p-1.5 text-green-600 hover:bg-green-50 rounded"
-              title="Agregar subcuenta"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onEdit(cuenta.id)}
-              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-              title="Editar"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-            {cuenta.esImputable && (!cuenta.hijos || cuenta.hijos.length === 0) && (
+            {tienePermiso(PERMISOS.CONTABILIDAD_ASIENTOS) && (
+              <button
+                onClick={() => onAddHijo(cuenta)}
+                className="p-1.5 text-green-600 hover:bg-green-50 rounded"
+                title="Agregar subcuenta"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
+            {tienePermiso(PERMISOS.CONTABILIDAD_ASIENTOS) && (
+              <button
+                onClick={() => onEdit(cuenta.id)}
+                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                title="Editar"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
+            {tienePermiso(PERMISOS.CONTABILIDAD_ASIENTOS) && cuenta.esImputable && (!cuenta.hijos || cuenta.hijos.length === 0) && (
               <button
                 onClick={() => onDelete(cuenta.id)}
                 className="p-1.5 text-red-600 hover:bg-red-50 rounded"
@@ -323,10 +328,12 @@ export default function PlanCuentasLista() {
             </div>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/contabilidad/plan-cuentas/nuevo')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Cuenta
-        </Button>
+{tienePermiso(PERMISOS.CONTABILIDAD_ASIENTOS) && (
+          <Button onClick={() => navigate('/admin/contabilidad/plan-cuentas/nuevo')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Cuenta
+          </Button>
+        )}
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}

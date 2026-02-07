@@ -4,6 +4,7 @@ import { Plus, Edit, Settings, TrendingUp, TrendingDown, Check } from 'lucide-re
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function ConceptosLiquidacion() {
   const navigate = useNavigate()
@@ -142,10 +143,12 @@ export default function ConceptosLiquidacion() {
             <p className="text-gray-500 text-sm">Configure los conceptos para liquidaciones de sueldos</p>
           </div>
         </div>
-        <Button onClick={handleNuevo}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Concepto
-        </Button>
+{tienePermiso(PERMISOS.SUELDOS_GESTIONAR) && (
+          <Button onClick={handleNuevo}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Concepto
+          </Button>
+        )}
       </div>
 
       {/* Formulario de edicion */}
@@ -318,18 +321,22 @@ export default function ConceptosLiquidacion() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleToggleActivo(concepto)}
-                        className={`p-2 rounded-lg ${concepto.activo ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEditar(concepto)}
-                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                      {tienePermiso(PERMISOS.SUELDOS_GESTIONAR) && (
+                        <button
+                          onClick={() => handleToggleActivo(concepto)}
+                          className={`p-2 rounded-lg ${concepto.activo ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      )}
+                      {tienePermiso(PERMISOS.SUELDOS_GESTIONAR) && (
+                        <button
+                          onClick={() => handleEditar(concepto)}
+                          className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -372,18 +379,22 @@ export default function ConceptosLiquidacion() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleToggleActivo(concepto)}
-                        className={`p-2 rounded-lg ${concepto.activo ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEditar(concepto)}
-                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                      {tienePermiso(PERMISOS.SUELDOS_GESTIONAR) && (
+                        <button
+                          onClick={() => handleToggleActivo(concepto)}
+                          className={`p-2 rounded-lg ${concepto.activo ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      )}
+                      {tienePermiso(PERMISOS.SUELDOS_GESTIONAR) && (
+                        <button
+                          onClick={() => handleEditar(concepto)}
+                          className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))

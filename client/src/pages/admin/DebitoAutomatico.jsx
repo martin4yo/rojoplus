@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../../components/Button'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function DebitoAutomatico() {
   const [activeTab, setActiveTab] = useState('adhesiones')
@@ -698,7 +699,7 @@ export default function DebitoAutomatico() {
               )}
 
               {/* Botón Generar */}
-              {sociosDisponibles.length > 0 && (
+              {sociosDisponibles.length > 0 && tienePermiso(PERMISOS.DEBITO_AUTOMATICO) && (
                 <div className="flex justify-end">
                   <Button
                     onClick={generarArchivo}
@@ -870,16 +871,18 @@ export default function DebitoAutomatico() {
                 />
               </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={importarRespuesta}
-                  loading={loading}
-                  disabled={!archivoImportar || !contenidoRespuesta}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Procesar Respuesta
-                </Button>
-              </div>
+              {tienePermiso(PERMISOS.DEBITO_AUTOMATICO) && (
+                <div className="flex justify-end">
+                  <Button
+                    onClick={importarRespuesta}
+                    loading={loading}
+                    disabled={!archivoImportar || !contenidoRespuesta}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Procesar Respuesta
+                  </Button>
+                </div>
+              )}
 
               {resultadoImportacion && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">

@@ -4,6 +4,7 @@ import { Lock, CheckCircle, AlertTriangle, X, Eye, FileText, Calendar, DollarSig
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import { tienePermiso, PERMISOS } from '../../services/permisos'
 
 export default function CierreCaja() {
   const navigate = useNavigate()
@@ -204,14 +205,16 @@ export default function CierreCaja() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={() => abrirModalCerrar(caja)}
-                  className="w-full"
-                  size="sm"
-                >
-                  <Lock className="w-4 h-4 mr-2" />
-                  Cerrar Caja
-                </Button>
+                {tienePermiso(PERMISOS.CAJA_CIERRE) && (
+                  <Button
+                    onClick={() => abrirModalCerrar(caja)}
+                    className="w-full"
+                    size="sm"
+                  >
+                    <Lock className="w-4 h-4 mr-2" />
+                    Cerrar Caja
+                  </Button>
+                )}
               </div>
             ))}
           </div>
@@ -581,13 +584,15 @@ export default function CierreCaja() {
                     <p className="text-sm text-yellow-700 mb-3">
                       Este cierre requiere firma de un supervisor
                     </p>
-                    <Button
-                      onClick={() => firmarCierre(cierreSeleccionado.id)}
-                      size="sm"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Firmar Cierre
-                    </Button>
+                    {tienePermiso(PERMISOS.CAJA_CIERRE) && (
+                      <Button
+                        onClick={() => firmarCierre(cierreSeleccionado.id)}
+                        size="sm"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Firmar Cierre
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

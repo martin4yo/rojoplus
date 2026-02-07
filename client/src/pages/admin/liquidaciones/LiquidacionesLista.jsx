@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Eye, Calendar, DollarSign, Users, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const ESTADOS = {
   PENDIENTE: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -65,10 +66,12 @@ export default function LiquidacionesLista() {
             <p className="text-gray-500 text-sm">Gestion de liquidaciones del personal</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/liquidaciones/nueva')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Liquidacion
-        </Button>
+{tienePermiso(PERMISOS.SUELDOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/liquidaciones/nueva')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Liquidacion
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -100,13 +103,15 @@ export default function LiquidacionesLista() {
           <div className="text-center py-12">
             <DollarSign className="w-16 h-16 mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500">No hay liquidaciones para el anio {filtroAnio}</p>
-            <Button
-              variant="secondary"
-              onClick={() => navigate('/admin/liquidaciones/nueva')}
-              className="mt-4"
-            >
-              Generar Primera Liquidacion
-            </Button>
+{tienePermiso(PERMISOS.SUELDOS_GESTIONAR) && (
+              <Button
+                variant="secondary"
+                onClick={() => navigate('/admin/liquidaciones/nueva')}
+                className="mt-4"
+              >
+                Generar Primera Liquidacion
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">

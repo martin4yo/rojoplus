@@ -4,6 +4,7 @@ import { Plus, Search, Filter, FileText, Calendar, User, Building2, Eye, Ban } f
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const ESTADOS = [
   { value: '', label: 'Todos' },
@@ -144,10 +145,12 @@ export default function FacturasVentaLista() {
             <p className="text-sm text-gray-500">Facturas emitidas a clientes y socios</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/admin/ingresos/facturas/nueva')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Factura
-        </Button>
+        {tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
+          <Button onClick={() => navigate('/admin/ingresos/facturas/nueva')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Factura
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -310,7 +313,7 @@ export default function FacturasVentaLista() {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            {factura.estado !== 'ANULADO' && (
+                            {factura.estado !== 'ANULADO' && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
                               <button
                                 onClick={() => handleAnular(factura)}
                                 className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
