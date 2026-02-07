@@ -12,8 +12,10 @@ import {
   GlobeAltIcon,
   CurrencyDollarIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline'
+import { BANNER_SIZES } from '../../components/public/BannerPublicitario'
 
 export default function Publicidad() {
   const [tab, setTab] = useState('banners') // 'banners' | 'sponsors' | 'estadisticas'
@@ -235,9 +237,7 @@ export default function Publicidad() {
                           )}
                         </div>
                         <p className="text-sm text-gray-500">
-                          {banner.tipo === 'LATERAL_IZQUIERDO' ? 'Lateral Izq.' :
-                           banner.tipo === 'LATERAL_DERECHO' ? 'Lateral Der.' :
-                           banner.tipo} • {banner.ubicacion || 'Todas'}
+                          {BANNER_SIZES[banner.tipo]?.label || banner.tipo} • {banner.ubicacion || 'Todas'}
                           {banner.sponsor && ` • ${banner.sponsor.nombre}`}
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
@@ -476,7 +476,7 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
     id: data?.id || null,
     titulo: data?.titulo || '',
     sponsorId: data?.sponsorId || '',
-    tipo: data?.tipo || 'LATERAL',
+    tipo: data?.tipo || 'FOOTER',
     ubicacion: data?.ubicacion || 'TODAS',
     imagenDesktop: data?.imagenDesktop || '',
     imagenMobile: data?.imagenMobile || '',
@@ -608,13 +608,23 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
                   onChange={e => setForm({ ...form, tipo: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
                 >
-                  <option value="HERO">Hero (banner principal grande)</option>
-                  <option value="HEADER">Header (debajo del hero)</option>
-                  <option value="LATERAL_IZQUIERDO">Lateral Izquierdo</option>
-                  <option value="LATERAL_DERECHO">Lateral Derecho</option>
-                  <option value="MEDIO">Medio (entre secciones)</option>
-                  <option value="FOOTER">Footer (pie de página)</option>
+                  <option value="HERO">Hero - {BANNER_SIZES.HERO.label}</option>
+                  <option value="HEADER">Header - {BANNER_SIZES.HEADER.label}</option>
+                  <option value="MEDIO">Medio - {BANNER_SIZES.MEDIO.label}</option>
+                  <option value="FOOTER">Footer - {BANNER_SIZES.FOOTER.label}</option>
                 </select>
+                {/* Info de tamaño recomendado */}
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <InformationCircleIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-700">
+                      <p className="font-medium">Tamaño recomendado: {BANNER_SIZES[form.tipo]?.width}×{BANNER_SIZES[form.tipo]?.height} px</p>
+                      <p className="text-blue-600 mt-1">
+                        Ratio {BANNER_SIZES[form.tipo]?.ratio}. La imagen se recortará automáticamente para ajustarse.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -666,13 +676,28 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
                     </div>
                   )}
                 </div>
-                {form.imagenDesktop && (
-                  <p className="mt-1 text-xs text-green-600 truncate">
-                    {form.imagenDesktop}
-                  </p>
-                )}
                 {!form.imagenDesktop && (
                   <p className="mt-1 text-xs text-gray-500">Formatos: JPG, PNG, GIF, WebP (máx. 5MB)</p>
+                )}
+                {/* Preview con aspect ratio correcto */}
+                {form.imagenDesktop && (
+                  <div className="mt-3">
+                    <p className="text-xs text-gray-500 mb-2">Preview (así se verá el banner):</p>
+                    <div
+                      className="relative bg-gray-100 rounded-lg overflow-hidden border-2 border-dashed border-gray-300"
+                      style={{
+                        aspectRatio: `${BANNER_SIZES[form.tipo]?.width} / ${BANNER_SIZES[form.tipo]?.height}`,
+                        maxWidth: form.tipo === 'HERO' ? '100%' : `${Math.min(BANNER_SIZES[form.tipo]?.width, 400)}px`
+                      }}
+                    >
+                      <img
+                        src={form.imagenDesktop}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-green-600 truncate">{form.imagenDesktop}</p>
+                  </div>
                 )}
               </div>
 
@@ -800,19 +825,6 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
                 </label>
               </div>
             </div>
-
-            {/* Preview */}
-            {form.imagenDesktop && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-500 mb-2">Vista previa:</p>
-                <img
-                  src={form.imagenDesktop}
-                  alt="Preview"
-                  className="max-h-40 rounded"
-                  onError={e => e.target.style.display = 'none'}
-                />
-              </div>
-            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button

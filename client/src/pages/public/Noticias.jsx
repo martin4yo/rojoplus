@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, ChevronRight, Search } from 'lucide-react'
+import { Calendar, ChevronRight, Search, X } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import api from '../../services/api'
 
-// Noticias reales del club (hasta que se implemente el backend completo)
+// Noticias de ejemplo (fallback si no hay datos en la BD)
 const noticiasEjemplo = [
   {
     id: 1,
     titulo: 'Sportivo Pilar clasificó a Playoffs Interconferencias',
     extracto: 'En un partido de altísima tensión, el equipo de La Caldera superó a Gimnasia de Ituzaingó 73-71 y avanzó en la Liga Federal 2025.',
     imagen: '/images/club/68f64b9d.jpeg',
-    fecha: '2026-01-28',
+    fechaPublicacion: '2026-01-28',
     categoria: 'DEPORTES',
   },
   {
@@ -18,7 +19,7 @@ const noticiasEjemplo = [
     titulo: 'Categoría 2012: ¡Tricampeones!',
     extracto: 'La categoría 2012 cerró el grupo con victoria 3-0 y se consagró tricampeona (2023/24/25) de la Liga Argentina. Un orgullo para el club.',
     imagen: '/images/club/pngwing.com.png',
-    fecha: '2026-01-20',
+    fechaPublicacion: '2026-01-20',
     categoria: 'DEPORTES',
   },
   {
@@ -26,7 +27,7 @@ const noticiasEjemplo = [
     titulo: 'Mendoza Cup 2024: Campeones internacionales',
     extracto: 'Nuestra categoría 2012 conquistó el torneo internacional Mendoza Cup 2024, sumando otro título a su impresionante palmarés.',
     imagen: '/images/club/gf6127dd755feb3d69457e16a134e721500df191447b9681a6e921d8f92a648aef97dcca6db09cdf4f391cdbe339b3441_1280.jpg',
-    fecha: '2025-12-15',
+    fechaPublicacion: '2025-12-15',
     categoria: 'DEPORTES',
   },
   {
@@ -34,7 +35,7 @@ const noticiasEjemplo = [
     titulo: 'Femenino campeón: Sportivo venció a Derqui',
     extracto: 'El básquet femenino de Sportivo Pilar se consagró campeón tras vencer a Presidente Derqui en una gran final.',
     imagen: '/images/club/4177dee1f84c3c767bad32efd0d41d885df4931c46126ea3b2acc298fe99ee3cd61de290a4edd84e73bdfc6bf9686d1e2148d8ac79f0ced8fbeeee_1280.jpg',
-    fecha: '2025-11-28',
+    fechaPublicacion: '2025-11-28',
     categoria: 'DEPORTES',
   },
   {
@@ -42,7 +43,7 @@ const noticiasEjemplo = [
     titulo: 'Formativas arrasan en Torneo de Verano',
     extracto: 'Las categorías 2014 y 2017 se coronaron campeonas divisionales. La 2012 lideró su zona con 111 puntos rumbo a la Copa de Campeones.',
     imagen: '/images/club/4874ca4a8ac815adf95e7c540ced359e6a736d059848c1f1656a0757d8ad9508c98157fed290419d407ae3cd546c441677e987dd9b4936f73fd145_1280.jpg',
-    fecha: '2025-11-10',
+    fechaPublicacion: '2025-11-10',
     categoria: 'DEPORTES',
   },
   {
@@ -50,7 +51,7 @@ const noticiasEjemplo = [
     titulo: 'Sportivo Pilar cumplió 93 años de historia',
     extracto: 'El 4 de junio celebramos un nuevo aniversario de La Caldera. Más de 90 años formando deportistas y construyendo comunidad en Pilar.',
     imagen: '/images/club/8ad73f3c.jpeg',
-    fecha: '2025-06-04',
+    fechaPublicacion: '2025-06-04',
     categoria: 'INSTITUCIONAL',
   },
   {
@@ -58,7 +59,7 @@ const noticiasEjemplo = [
     titulo: 'Liga Federal 2026: Sportivo confirmado',
     extracto: 'El club continuará participando en la Liga Federal de Básquet 2026, dentro de la Conferencia Metropolitana junto a otros 23 clubes.',
     imagen: '/images/club/0fd3416c.jpeg',
-    fecha: '2026-02-01',
+    fechaPublicacion: '2026-02-01',
     categoria: 'INSTITUCIONAL',
   },
   {
@@ -66,7 +67,7 @@ const noticiasEjemplo = [
     titulo: 'Inscripciones abiertas temporada 2026',
     extracto: 'Ya podés inscribirte en todas las actividades deportivas del club. Básquet, fútbol, gimnasia y más. ¡Sumate a La Caldera!',
     imagen: '/images/club/IMG_2915.JPG',
-    fecha: '2026-02-05',
+    fechaPublicacion: '2026-02-05',
     categoria: 'INSTITUCIONAL',
   },
 ]
@@ -84,14 +85,30 @@ export default function Noticias() {
   const [loading, setLoading] = useState(true)
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [noticiaModal, setNoticiaModal] = useState(null)
+  const [loadingDetalle, setLoadingDetalle] = useState(false)
 
   useEffect(() => {
-    // Simular carga de noticias (después se conecta al backend)
-    setTimeout(() => {
-      setNoticias(noticiasEjemplo)
-      setLoading(false)
-    }, 500)
+    fetchNoticias()
   }, [])
+
+  const fetchNoticias = async () => {
+    try {
+      const data = await api.getFull('/public/noticias')
+      // Si hay noticias en la BD, usarlas; si no, usar las de ejemplo
+      if (data?.noticias && data.noticias.length > 0) {
+        setNoticias(data.noticias)
+      } else {
+        setNoticias(noticiasEjemplo)
+      }
+    } catch (err) {
+      console.error('Error cargando noticias:', err)
+      // Usar noticias de ejemplo como fallback
+      setNoticias(noticiasEjemplo)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const noticiasFiltradas = noticias.filter(n => {
     const matchCategoria = !filtroCategoria || n.categoria === filtroCategoria
@@ -117,6 +134,22 @@ export default function Noticias() {
       case 'EVENTOS': return 'bg-orange-100 text-orange-700'
       default: return 'bg-gray-100 text-gray-700'
     }
+  }
+
+  const abrirNoticia = async (slug) => {
+    setLoadingDetalle(true)
+    try {
+      const data = await api.getFull(`/public/noticias/${slug}`)
+      setNoticiaModal(data?.noticia || null)
+    } catch (err) {
+      console.error('Error cargando noticia:', err)
+    } finally {
+      setLoadingDetalle(false)
+    }
+  }
+
+  const cerrarModal = () => {
+    setNoticiaModal(null)
   }
 
   return (
@@ -203,7 +236,7 @@ export default function Noticias() {
                   <div className="p-6">
                     <div className="flex items-center gap-2 text-gray-500 text-sm mb-3">
                       <Calendar className="w-4 h-4" />
-                      {formatFecha(noticia.fecha)}
+                      {formatFecha(noticia.fechaPublicacion)}
                     </div>
 
                     <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors">
@@ -214,13 +247,13 @@ export default function Noticias() {
                       {noticia.extracto}
                     </p>
 
-                    <span
-                      title="En desarrollo"
-                      className="inline-flex items-center text-red-600 font-medium text-sm cursor-help"
+                    <button
+                      onClick={() => abrirNoticia(noticia.slug)}
+                      className="inline-flex items-center text-red-600 font-medium text-sm hover:text-red-700"
                     >
                       Leer más
                       <ChevronRight className="w-4 h-4 ml-1" />
-                    </span>
+                    </button>
                   </div>
                 </article>
               ))}
@@ -246,6 +279,93 @@ export default function Noticias() {
           </p>
         </div>
       </section>
+
+      {/* Modal de Noticia */}
+      {(noticiaModal || loadingDetalle) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            {loadingDetalle ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+              </div>
+            ) : noticiaModal ? (
+              <>
+                {/* Header con imagen */}
+                <div className="relative h-64 bg-gray-200">
+                  {noticiaModal.imagen ? (
+                    <img
+                      src={noticiaModal.imagen}
+                      alt={noticiaModal.titulo}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
+                      <span className="text-white text-6xl font-bold opacity-30">SP</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <button
+                    onClick={cerrarModal}
+                    className="absolute top-4 right-4 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-700" />
+                  </button>
+                  <div className="absolute bottom-4 left-6 right-6">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getCategoriaColor(noticiaModal.categoria)}`}>
+                        {noticiaModal.categoria}
+                      </span>
+                      {noticiaModal.destacada && (
+                        <span className="px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-semibold rounded-full">
+                          Destacada
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-bold text-white">
+                      {noticiaModal.titulo}
+                    </h2>
+                  </div>
+                </div>
+
+                {/* Contenido */}
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-16rem)]">
+                  <div className="flex items-center gap-4 text-gray-500 text-sm mb-6 pb-4 border-b">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      {formatFecha(noticiaModal.fechaPublicacion)}
+                    </div>
+                    {noticiaModal.autor && (
+                      <div>
+                        Por {noticiaModal.autor.nombre} {noticiaModal.autor.apellido}
+                      </div>
+                    )}
+                  </div>
+
+                  {noticiaModal.extracto && (
+                    <p className="text-lg text-gray-600 mb-6 font-medium">
+                      {noticiaModal.extracto}
+                    </p>
+                  )}
+
+                  <div
+                    className="prose prose-gray max-w-none"
+                    dangerouslySetInnerHTML={{ __html: noticiaModal.contenido }}
+                  />
+
+                  <div className="mt-8 pt-6 border-t flex justify-end">
+                    <button
+                      onClick={cerrarModal}
+                      className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

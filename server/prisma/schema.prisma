@@ -1064,6 +1064,7 @@ model Admin {
   solicitudesProcesadas   SolicitudSocio[]
   cierresCerrados         CierreCaja[]     @relation("CierreCajaCerradoPor")
   cierresFirmados         CierreCaja[]     @relation("CierreCajaFirmadoPor")
+  noticias                Noticia[]
 
   @@map("admins")
 }
@@ -2181,4 +2182,32 @@ model Banner {
   @@index([ubicacion])
   @@index([fechaInicio, fechaFin])
   @@map("banners")
+}
+
+// =============================================================================
+// MODULO NOTICIAS / BLOG
+// =============================================================================
+
+model Noticia {
+  id               Int       @id @default(autoincrement())
+  titulo           String
+  slug             String    @unique              // URL amigable
+  extracto         String?   @db.Text             // Resumen corto
+  contenido        String    @db.Text             // Contenido completo (HTML)
+  imagen           String?                        // URL imagen principal
+  categoria        String    @default("INSTITUCIONAL") // INSTITUCIONAL, DEPORTES, ACTIVIDADES, EVENTOS
+  destacada        Boolean   @default(false)      // Mostrar en home
+  publicada        Boolean   @default(false)      // Solo visible si está publicada
+  fechaPublicacion DateTime? @map("fecha_publicacion")
+  autorId          Int?      @map("autor_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  autor            Admin?    @relation(fields: [autorId], references: [id])
+
+  @@index([publicada])
+  @@index([categoria])
+  @@index([fechaPublicacion])
+  @@index([destacada])
+  @@map("noticias")
 }

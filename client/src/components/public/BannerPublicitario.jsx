@@ -2,15 +2,20 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 
 /**
- * Componente de Banner Publicitario
- * Muestra banners según posición y ubicación
- *
- * Props:
- * - tipo: HERO, HEADER, LATERAL_IZQUIERDO, LATERAL_DERECHO, MEDIO, FOOTER
- * - ubicacion: HOME, ACTIVIDADES, NOTICIAS, CONTACTO, HISTORIA, COMERCIOS, TODAS
- * - className: clases adicionales
+ * Tamaños estándar de banners (basados en IAB standards)
  */
-export default function BannerPublicitario({ tipo = 'LATERAL_DERECHO', ubicacion, className = '' }) {
+export const BANNER_SIZES = {
+  HERO: { width: 1200, height: 400, label: 'Hero (1200×400)', ratio: '3:1' },
+  HEADER: { width: 728, height: 90, label: 'Leaderboard (728×90)', ratio: '8:1' },
+  MEDIO: { width: 728, height: 90, label: 'Leaderboard (728×90)', ratio: '8:1' },
+  FOOTER: { width: 728, height: 90, label: 'Leaderboard (728×90)', ratio: '8:1' },
+}
+
+/**
+ * Componente de Banner Publicitario
+ * Muestra banners según posición y ubicación con tamaños fijos IAB
+ */
+export default function BannerPublicitario({ tipo = 'FOOTER', ubicacion, className = '' }) {
   const [banners, setBanners] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -67,75 +72,55 @@ export default function BannerPublicitario({ tipo = 'LATERAL_DERECHO', ubicacion
   }
 
   const currentBanner = banners[currentIndex]
+  const size = BANNER_SIZES[tipo] || BANNER_SIZES.FOOTER
 
-  // Estilos según posición/tipo
-  const getContainerStyles = () => {
+  // Calcular padding-bottom como porcentaje para mantener aspect ratio
+  const paddingPercent = (size.height / size.width) * 100
+
+  // Estilos según tipo de banner
+  const getWrapperClass = () => {
     switch (tipo) {
       case 'HERO':
-        // Banner grande, ancho completo, aspect ratio 21:9 en desktop, 16:9 en mobile
-        return 'w-full aspect-[16/9] md:aspect-[21/9] max-h-[500px]'
+        return 'w-full'
       case 'HEADER':
-        // Banner horizontal debajo del hero
-        return 'w-full max-w-5xl mx-auto aspect-[4/1] md:aspect-[6/1]'
-      case 'LATERAL_IZQUIERDO':
-      case 'LATERAL_DERECHO':
-        // Banner vertical para sidebars
-        return 'w-full max-w-[300px] aspect-[1/1] md:aspect-[3/4]'
       case 'MEDIO':
-        // Banner horizontal entre secciones
-        return 'w-full max-w-4xl mx-auto aspect-[4/1] md:aspect-[5/1]'
       case 'FOOTER':
-        // Banner horizontal al pie
-        return 'w-full max-w-4xl mx-auto aspect-[4/1] md:aspect-[6/1]'
+        return 'w-full flex justify-center py-4 px-4'
       default:
-        return 'w-full max-w-[300px]'
+        return 'w-full flex justify-center py-4 px-4'
     }
   }
 
-  // Estilos del contenedor exterior según tipo
-  const getWrapperStyles = () => {
-    switch (tipo) {
-      case 'HERO':
-        return 'relative overflow-hidden'
-      case 'HEADER':
-        return 'py-4 px-4'
-      case 'LATERAL_IZQUIERDO':
-      case 'LATERAL_DERECHO':
-        return 'sticky top-4'
-      case 'MEDIO':
-        return 'py-8 px-4 bg-gray-100'
-      case 'FOOTER':
-        return 'py-6 px-4'
-      default:
-        return ''
-    }
+  const getMaxWidth = () => {
+    if (tipo === 'HERO') return '100%'
+    return `${size.width}px`
   }
 
   return (
-    <div className={`${getWrapperStyles()} ${className}`}>
-      <div className={`relative ${getContainerStyles()}`}>
+    <div className={`${getWrapperClass()} ${className}`}>
+      {/* Contenedor con aspect ratio fijo usando padding-bottom */}
+      <div
+        className="relative w-full overflow-hidden rounded bg-gray-200"
+        style={{
+          maxWidth: getMaxWidth(),
+          paddingBottom: `${paddingPercent}%`
+        }}
+      >
+        {/* Imagen posicionada absolutamente para llenar el contenedor */}
         <button
           onClick={() => handleClick(currentBanner)}
-          className="block w-full h-full cursor-pointer transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-red-500 rounded-lg overflow-hidden"
+          className="absolute inset-0 w-full h-full cursor-pointer transition-opacity hover:opacity-90 focus:outline-none"
         >
-          <picture>
-            {currentBanner.imagenMobile && (
-              <source
-                media="(max-width: 768px)"
-                srcSet={currentBanner.imagenMobile}
-              />
-            )}
-            <img
-              src={currentBanner.imagenDesktop}
-              alt={currentBanner.textoAlt || currentBanner.titulo}
-              className="w-full h-full object-cover"
-            />
-          </picture>
+          <img
+            src={currentBanner.imagenDesktop}
+            alt={currentBanner.textoAlt || currentBanner.titulo}
+            className="absolute inset-0 w-full h-full object-contain"
+          />
         </button>
 
         {/* Indicadores si hay múltiples banners */}
         {banners.length > 1 && (
-          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1.5">
+          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10">
             {banners.map((_, idx) => (
               <button
                 key={idx}
@@ -152,7 +137,7 @@ export default function BannerPublicitario({ tipo = 'LATERAL_DERECHO', ubicacion
 
         {/* Badge de sponsor */}
         {currentBanner.sponsor && (
-          <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+          <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded z-10">
             {currentBanner.sponsor.nombre}
           </div>
         )}
@@ -161,31 +146,3 @@ export default function BannerPublicitario({ tipo = 'LATERAL_DERECHO', ubicacion
   )
 }
 
-/**
- * Componente wrapper para mostrar banners laterales en un layout de página
- * Uso: envolver el contenido principal con este componente
- */
-export function BannerLayout({ children, ubicacion, showLeft = true, showRight = true }) {
-  return (
-    <div className="flex gap-6 max-w-[1400px] mx-auto px-4">
-      {/* Banner lateral izquierdo */}
-      {showLeft && (
-        <aside className="hidden lg:block w-[300px] flex-shrink-0">
-          <BannerPublicitario tipo="LATERAL_IZQUIERDO" ubicacion={ubicacion} />
-        </aside>
-      )}
-
-      {/* Contenido principal */}
-      <main className="flex-1 min-w-0">
-        {children}
-      </main>
-
-      {/* Banner lateral derecho */}
-      {showRight && (
-        <aside className="hidden lg:block w-[300px] flex-shrink-0">
-          <BannerPublicitario tipo="LATERAL_DERECHO" ubicacion={ubicacion} />
-        </aside>
-      )}
-    </div>
-  )
-}

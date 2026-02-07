@@ -1,11 +1,75 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, Phone, Mail, ChevronRight, Users, Trophy, Heart, Calendar } from 'lucide-react'
+import { MapPin, Phone, Mail, ChevronRight, Users, Trophy, Heart, Calendar, X } from 'lucide-react'
 import HeroSection from '../../components/public/HeroSection'
 import ActividadesGrid from '../../components/public/ActividadesGrid'
 import SponsorsSection from '../../components/public/SponsorsSection'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import api from '../../services/api'
 
 export default function Home() {
+  const [noticias, setNoticias] = useState([])
+  const [loadingNoticias, setLoadingNoticias] = useState(true)
+  const [noticiaModal, setNoticiaModal] = useState(null)
+  const [loadingDetalle, setLoadingDetalle] = useState(false)
+
+  useEffect(() => {
+    fetchNoticias()
+  }, [])
+
+  const fetchNoticias = async () => {
+    try {
+      // Primero buscar destacadas
+      const destacadasRes = await api.getFull('/public/noticias?destacada=true&limit=10')
+      let noticiasFinales = destacadasRes?.noticias || []
+
+      // Si hay menos de 3 destacadas, completar con las últimas
+      if (noticiasFinales.length < 3) {
+        const ultimasRes = await api.getFull('/public/noticias?limit=10')
+        const ultimas = ultimasRes?.noticias || []
+
+        // Agregar las últimas que no estén ya en destacadas
+        const idsDestacadas = new Set(noticiasFinales.map(n => n.id))
+        for (const noticia of ultimas) {
+          if (!idsDestacadas.has(noticia.id) && noticiasFinales.length < 3) {
+            noticiasFinales.push(noticia)
+          }
+        }
+      }
+
+      setNoticias(noticiasFinales.slice(0, 6)) // Máximo 6 para el grid
+    } catch (err) {
+      console.error('Error cargando noticias:', err)
+      setNoticias([])
+    } finally {
+      setLoadingNoticias(false)
+    }
+  }
+
+  const formatFecha = (fecha) => {
+    return new Date(fecha).toLocaleDateString('es-AR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  }
+
+  const abrirNoticia = async (slug) => {
+    setLoadingDetalle(true)
+    try {
+      const data = await api.getFull(`/public/noticias/${slug}`)
+      setNoticiaModal(data?.noticia || null)
+    } catch (err) {
+      console.error('Error cargando noticia:', err)
+    } finally {
+      setLoadingDetalle(false)
+    }
+  }
+
+  const cerrarModal = () => {
+    setNoticiaModal(null)
+  }
+
   return (
     <div>
       {/* Hero del Club */}
@@ -182,7 +246,7 @@ export default function Home() {
       {/* Sponsors/Auspiciantes */}
       <SponsorsSection />
 
-      {/* Noticias Preview - Placeholder para Fase 3 */}
+      {/* Últimas Noticias */}
       <section className="py-16 md:py-24 bg-gray-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -194,25 +258,84 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Placeholder cards */}
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="h-48 bg-gray-200 flex items-center justify-center">
-                  <span className="text-gray-400 text-sm">Próximamente</span>
+          {loadingNoticias ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+            </div>
+          ) : noticias.length === 0 ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="h-48 bg-gray-300 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm">Próximamente</span>
+                  </div>
+                  <div className="p-6">
+                    <p className="text-gray-400 text-sm mb-2">Noticia {i}</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Novedades del club
+                    </h3>
+                    <p className="text-gray-500 text-sm">
+                      Pronto podrás ver aquí las últimas novedades.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-6">
-                  <p className="text-gray-400 text-sm mb-2">Noticia {i}</p>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Sistema de noticias en desarrollo
-                  </h3>
-                  <p className="text-gray-500 text-sm">
-                    Pronto podrás ver aquí las últimas novedades del club.
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-6">
+              {noticias.map((noticia) => (
+                <article
+                  key={noticia.id}
+                  className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group"
+                >
+                  <div className="h-48 bg-gray-300 relative overflow-hidden">
+                    {noticia.imagen ? (
+                      <img
+                        src={noticia.imagen}
+                        alt={noticia.titulo}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
+                        <span className="text-white text-4xl font-bold opacity-30">SP</span>
+                      </div>
+                    )}
+                    {noticia.destacada && (
+                      <span className="absolute top-3 right-3 px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-semibold rounded-full">
+                        Destacada
+                      </span>
+                    )}
+                    <span className="absolute top-3 left-3 px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
+                      {noticia.categoria}
+                    </span>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="flex items-center gap-2 text-gray-500 text-sm mb-3">
+                      <Calendar className="w-4 h-4" />
+                      {formatFecha(noticia.fechaPublicacion)}
+                    </div>
+
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors">
+                      {noticia.titulo}
+                    </h3>
+
+                    <p className="text-gray-500 text-sm line-clamp-3 mb-4">
+                      {noticia.extracto}
+                    </p>
+
+                    <button
+                      onClick={() => abrirNoticia(noticia.slug)}
+                      className="inline-flex items-center text-red-600 font-medium text-sm hover:text-red-700"
+                    >
+                      Leer más
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
 
           <div className="text-center mt-10">
             <Link
@@ -228,6 +351,93 @@ export default function Home() {
 
       {/* Banner FOOTER - Al final de la página */}
       <BannerPublicitario tipo="FOOTER" ubicacion="HOME" />
+
+      {/* Modal de Noticia */}
+      {(noticiaModal || loadingDetalle) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            {loadingDetalle ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+              </div>
+            ) : noticiaModal ? (
+              <>
+                {/* Header con imagen */}
+                <div className="relative h-64 bg-gray-200">
+                  {noticiaModal.imagen ? (
+                    <img
+                      src={noticiaModal.imagen}
+                      alt={noticiaModal.titulo}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
+                      <span className="text-white text-6xl font-bold opacity-30">SP</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <button
+                    onClick={cerrarModal}
+                    className="absolute top-4 right-4 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-700" />
+                  </button>
+                  <div className="absolute bottom-4 left-6 right-6">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="px-3 py-1 bg-red-600 text-white text-xs font-medium rounded-full">
+                        {noticiaModal.categoria}
+                      </span>
+                      {noticiaModal.destacada && (
+                        <span className="px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-semibold rounded-full">
+                          Destacada
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-bold text-white">
+                      {noticiaModal.titulo}
+                    </h2>
+                  </div>
+                </div>
+
+                {/* Contenido */}
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-16rem)]">
+                  <div className="flex items-center gap-4 text-gray-500 text-sm mb-6 pb-4 border-b">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      {formatFecha(noticiaModal.fechaPublicacion)}
+                    </div>
+                    {noticiaModal.autor && (
+                      <div>
+                        Por {noticiaModal.autor.nombre} {noticiaModal.autor.apellido}
+                      </div>
+                    )}
+                  </div>
+
+                  {noticiaModal.extracto && (
+                    <p className="text-lg text-gray-600 mb-6 font-medium">
+                      {noticiaModal.extracto}
+                    </p>
+                  )}
+
+                  <div
+                    className="prose prose-gray max-w-none"
+                    dangerouslySetInnerHTML={{ __html: noticiaModal.contenido }}
+                  />
+
+                  <div className="mt-8 pt-6 border-t flex justify-end">
+                    <button
+                      onClick={cerrarModal}
+                      className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

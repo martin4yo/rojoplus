@@ -3,7 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
-  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone
+  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper
 } from 'lucide-react'
 import api from '../services/api'
 
@@ -152,6 +152,7 @@ export default function AdminLayout() {
     },
     { path: '/admin/comercios', label: 'Comercios', icon: Store },
     { path: '/admin/publicidad', label: 'Publicidad', icon: Megaphone },
+    { path: '/admin/noticias', label: 'Noticias', icon: Newspaper },
     { path: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
     {
       label: 'Configuracion', icon: Settings,
