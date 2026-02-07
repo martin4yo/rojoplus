@@ -5,6 +5,7 @@ import { Menu, X, ChevronDown } from 'lucide-react'
 export default function PublicHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [socioMenuOpen, setSocioMenuOpen] = useState(false)
+  const [clubMenuOpen, setClubMenuOpen] = useState(false)
   const location = useLocation()
 
   const isActive = (path) => location.pathname === path
@@ -12,10 +13,14 @@ export default function PublicHeader() {
   const navLinks = [
     { path: '/', label: 'Inicio' },
     { path: '/actividades', label: 'Actividades' },
+    { path: '/instalaciones', label: 'Instalaciones' },
     { path: '/noticias', label: 'Noticias' },
-    { path: '/historia', label: 'Historia' },
-    { path: '/contacto', label: 'Contacto' },
     { path: '/comercios', label: 'Beneficios' },
+    { path: '/nosotros', label: 'Nosotros', submenu: [
+      { path: '/historia', label: 'Historia' },
+      { path: '/mision', label: 'Misión y Valores' },
+      { path: '/autoridades', label: 'Autoridades' },
+    ]},
   ]
 
   return (
@@ -38,17 +43,48 @@ export default function PublicHeader() {
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-1">
             {navLinks.map(link => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive(link.path)
-                    ? 'bg-red-50 text-red-600'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {link.label}
-              </Link>
+              link.submenu ? (
+                <div key={link.path} className="relative">
+                  <button
+                    onClick={() => setClubMenuOpen(!clubMenuOpen)}
+                    onBlur={() => setTimeout(() => setClubMenuOpen(false), 150)}
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      link.submenu.some(sub => isActive(sub.path))
+                        ? 'bg-red-50 text-red-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {link.label}
+                    <ChevronDown className={`w-4 h-4 transition-transform ${clubMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {clubMenuOpen && (
+                    <div className="absolute left-0 mt-2 w-48 bg-gray-200 rounded-lg shadow-lg border border-gray-300 py-2">
+                      {link.submenu.map(sub => (
+                        <Link
+                          key={sub.path}
+                          to={sub.path}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
+                        >
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive(link.path)
+                      ? 'bg-red-50 text-red-600'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              )
             ))}
 
             {/* Dropdown Soy Socio */}
@@ -103,18 +139,38 @@ export default function PublicHeader() {
           <div className="lg:hidden py-4 border-t border-gray-100">
             <nav className="flex flex-col gap-1">
               {navLinks.map(link => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive(link.path)
-                      ? 'bg-red-50 text-red-600'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  {link.label}
-                </Link>
+                link.submenu ? (
+                  <div key={link.path}>
+                    <p className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">{link.label}</p>
+                    {link.submenu.map(sub => (
+                      <Link
+                        key={sub.path}
+                        to={sub.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors ${
+                          isActive(sub.path)
+                            ? 'bg-red-50 text-red-600'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {sub.label}
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      isActive(link.path)
+                        ? 'bg-red-50 text-red-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                )
               ))}
 
               <div className="border-t border-gray-100 my-2 pt-2">

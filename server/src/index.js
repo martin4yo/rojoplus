@@ -34,6 +34,8 @@ import pushSubscriptionRoutes from './routes/pushSubscription.js'
 import debitoAutomaticoRoutes from './routes/debitoAutomatico.js'
 import bannersRoutes from './routes/banners.js'
 import noticiasRoutes from './routes/noticias.js'
+import contactoRoutes from './routes/contacto.js'
+import autoridadesRoutes from './routes/autoridades.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -88,6 +90,9 @@ app.use('/api/pagos', pagosRoutes)
 app.use('/api/public', publicRoutes)
 app.use('/api', bannersRoutes)
 app.use('/api', noticiasRoutes)
+app.use('/api', contactoRoutes)
+app.use('/api/admin/autoridades', autoridadesRoutes)
+app.use('/api/autoridades', autoridadesRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -9,6 +9,10 @@ import ActividadesPublic from './pages/public/Actividades'
 import HistoriaPublic from './pages/public/Historia'
 import ContactoPublic from './pages/public/Contacto'
 import NoticiasPublic from './pages/public/Noticias'
+import NoticiaDetallePublic from './pages/public/NoticiaDetalle'
+import InstalacionesPublic from './pages/public/Instalaciones'
+import AutoridadesPublic from './pages/public/Autoridades'
+import MisionPublic from './pages/public/Mision'
 
 // Registro comercios
 import Registro from './pages/registro/Registro'
@@ -46,6 +50,7 @@ import AdminCierreCaja from './pages/admin/CierreCaja'
 import AdminDebitoAutomatico from './pages/admin/DebitoAutomatico'
 import AdminPublicidad from './pages/admin/Publicidad'
 import AdminNoticias from './pages/admin/Noticias'
+import AdminAutoridades from './pages/admin/Autoridades'
 import AdminConfiguracionLista from './pages/admin/ConfiguracionLista'
 import AdminConfiguracionForm from './pages/admin/ConfiguracionForm'
 import AdminConfiguracionPagos from './pages/admin/ConfiguracionPagos'
@@ -166,8 +171,12 @@ function App() {
           <Route index element={<HomePublic />} />
           <Route path="actividades" element={<ActividadesPublic />} />
           <Route path="historia" element={<HistoriaPublic />} />
+          <Route path="mision" element={<MisionPublic />} />
+          <Route path="autoridades" element={<AutoridadesPublic />} />
+          <Route path="instalaciones" element={<InstalacionesPublic />} />
           <Route path="contacto" element={<ContactoPublic />} />
           <Route path="noticias" element={<NoticiasPublic />} />
+          <Route path="noticias/:slug" element={<NoticiaDetallePublic />} />
           <Route path="comercios" element={<ComerciosPublicos />} />
         </Route>
       <Route path="/registro" element={<Registro />} />
@@ -216,6 +225,7 @@ function App() {
         <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
         <Route path="configuracion" element={<AdminTablasAuxiliares />} />
         <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
+        <Route path="configuracion/autoridades" element={<AdminAutoridades />} />
         <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
         <Route path="configuracion/templates/email" element={<EmailTemplates />} />
         <Route path="configuracion/templates/pdf" element={<PdfTemplates />} />

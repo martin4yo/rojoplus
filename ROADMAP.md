@@ -841,6 +841,140 @@ Sistema semi-automático que identifica jugadores que deben cambiar de categorí
 
 ---
 
+## FASE 35: Débito Automático
+> Sistema de débito automático con múltiples procesadores
+
+### Prisma Medios de Pago ✅
+- [x] **35.1** Configuración de números de establecimiento (VISA Crédito, VISA Débito, Mastercard)
+- [x] **35.2** Generación de archivos TXT formato Prisma (DEBLIQC, DEBLIQD, DEBLIMC)
+- [x] **35.3** Importación de respuestas (RDEBLIQC, RDEBLIQD, RDEBLIMC)
+- [x] **35.4** Creación automática de pagos para débitos exitosos
+- [x] **35.5** Envío de recibos por email a socios
+- [x] **35.6** Mapeo de códigos de rechazo (50+ códigos)
+- [x] **35.7** Reintento de rechazados
+- [x] **35.8** Estadísticas y KPIs (cobrados, rechazados, tasa éxito)
+- [x] **35.9** UI completa con 5 pestañas (Generar, Archivos, Importar, Estadísticas, Configuración)
+
+### Payway ⏳
+- [ ] **35.10** Configuración de credenciales Payway
+- [ ] **35.11** Integración con API REST de Payway
+- [ ] **35.12** Generación de débitos vía API
+- [ ] **35.13** Webhook para recibir respuestas
+- [ ] **35.14** Procesamiento de archivo de respuesta alternativo
+
+### Débito Directo Bancario ⏳
+- [ ] **35.15** Formato de archivo Banco Galicia
+- [ ] **35.16** Formato de archivo Banco Macro
+- [ ] **35.17** Formato de archivo Banco Santander
+- [ ] **35.18** Formato de archivo Banco Provincia
+- [ ] **35.19** Importación de respuestas por banco
+- [ ] **35.20** UI para seleccionar banco en generación
+
+---
+
+## FASE 36: Conciliación Bancaria
+> Comparación de movimientos del sistema con extractos bancarios
+
+### Importación de Extractos
+- [ ] **36.1** Parser de archivos OFX (Open Financial Exchange)
+- [ ] **36.2** Parser de archivos CSV con mapeo configurable
+- [ ] **36.3** Parser de archivos Excel con mapeo configurable
+- [ ] **36.4** Modelo ExtractoBancario (cabecera del extracto)
+- [ ] **36.5** Modelo MovimientoExtracto (líneas del extracto)
+- [ ] **36.6** Modelo Conciliacion (registro de conciliaciones)
+- [ ] **36.7** Configuración de mapeo de columnas por banco
+- [ ] **36.8** Preview de movimientos antes de confirmar importación
+
+### Conciliación Automática
+- [ ] **36.9** Match por importe exacto + misma fecha
+- [ ] **36.10** Match por importe exacto + fecha cercana (±3 días)
+- [ ] **36.11** Match por número de operación/referencia
+- [ ] **36.12** Match por concepto + importe
+- [ ] **36.13** Campo `conciliado` en MovimientoCaja
+- [ ] **36.14** Vinculación MovimientoExtracto ↔ MovimientoCaja
+
+### Conciliación Manual
+- [ ] **36.15** Vista en dos columnas (Extracto vs Sistema)
+- [ ] **36.16** Filtros: solo pendientes, por fecha, por importe
+- [ ] **36.17** Checkbox para marcar conciliados manualmente
+- [ ] **36.18** Opción "Ignorar" para movimientos sin contrapartida
+- [ ] **36.19** Registro de diferencias detectadas
+
+### Cierre y Reportes
+- [ ] **36.20** Verificación saldo conciliado vs saldo extracto
+- [ ] **36.21** Cierre de período de conciliación
+- [ ] **36.22** Reporte de estado de conciliación por cuenta
+- [ ] **36.23** Reporte de movimientos no conciliados
+- [ ] **36.24** Histórico de conciliaciones realizadas
+
+---
+
+## FASE 37: Sitio Institucional Público
+> Mejoras y funcionalidades adicionales del sitio público
+
+### Páginas Completadas ✅
+- [x] **37.1** Home con secciones (HeroSection, Actividades, CTA, Sponsors, Noticias, Contacto)
+- [x] **37.2** Actividades con grid de actividades
+- [x] **37.3** Noticias con listado y filtros por categoría
+- [x] **37.4** Detalle de Noticia con URL compartible (`/noticias/:slug`)
+- [x] **37.5** Instalaciones con galería y modal detalle
+- [x] **37.6** Historia del club
+- [x] **37.7** Misión y Valores
+- [x] **37.8** Autoridades (Comisión Directiva, Vocales, Revisores, Subcomisiones)
+- [x] **37.9** Contacto con formulario funcional (envía email real)
+- [x] **37.10** Comercios/Beneficios con mapa y geolocalización
+- [x] **37.11** Inscripción de Socio (formulario público)
+- [x] **37.12** Navegación con menú "Nosotros" y submenús
+
+### Pendientes ⏳
+- [ ] **37.13** Detalle de Actividad (`/actividades/:slug`) - Página con info, horarios, requisitos
+- [ ] **37.14** Calendario de Eventos - Vista calendario con actividades y partidos
+- [ ] **37.15** Galería de Fotos general - Álbumes del club
+- [ ] **37.16** Página 404 personalizada
+- [x] **37.17** Autoridades editables desde admin (CRUD completo con foto, cargo, orden)
+
+---
+
+## FASE 38: Usuarios, Roles y Permisos
+> Sistema completo de control de acceso basado en roles
+
+### Modelos Base
+- [ ] **38.1** Modelo Admin ya existe (id, email, nombre, password, activo)
+- [ ] **38.2** Modelo Rol ya existe (id, codigo, nombre, descripcion)
+- [ ] **38.3** Modelo Permiso ya existe (id, codigo, nombre, modulo)
+- [ ] **38.4** Modelo PermisoRol ya existe (relación muchos-a-muchos)
+- [ ] **38.5** Agregar relación Admin -> Rol (adminId en rol o rolId en admin)
+
+### Backend - Endpoints
+- [ ] **38.6** CRUD de Admins/Usuarios (crear, editar, activar/desactivar)
+- [ ] **38.7** CRUD de Roles
+- [ ] **38.8** Asignar permisos a roles
+- [ ] **38.9** Asignar rol a usuario
+- [ ] **38.10** Middleware de verificación de permisos por ruta
+- [ ] **38.11** Seed con permisos por módulo del sistema
+
+### Frontend - UI
+- [ ] **38.12** Página /admin/configuracion/usuarios (lista de usuarios)
+- [ ] **38.13** Formulario de usuario (email, nombre, contraseña, rol)
+- [ ] **38.14** Página /admin/configuracion/roles (lista de roles)
+- [ ] **38.15** Formulario de rol con checkboxes de permisos
+- [ ] **38.16** Protección de rutas/botones según permisos del usuario logueado
+- [ ] **38.17** Mi Perfil: cambiar contraseña
+
+### Permisos por Módulo
+- Socios: ver, crear, editar, eliminar
+- Cuotas: ver, generar, cobrar, anular
+- Actividades: ver, crear, editar, eliminar
+- Inscripciones: ver, crear, eliminar
+- Comercios: ver, aprobar, editar
+- Tesorería: ver, crear movimientos, cierre de caja
+- Contabilidad: ver, crear asientos, anular
+- Stock: ver, crear, ajustar
+- Reportes: ver todos, exportar
+- Configuración: acceso total
+
+---
+
 ## Progreso General
 
 | Fase | Descripcion | Estado |
@@ -878,6 +1012,10 @@ Sistema semi-automático que identifica jugadores que deben cambiar de categorí
 | 31 | Control de Accesos | ⏳ Pendiente |
 | 32 | Centros de Costos | ⏳ Pendiente |
 | 33 | Gestión Deportiva | 🔄 En Progreso |
+| 34 | Portal del Socio | 🔶 Parcial |
+| 35 | Débito Automático | 🔶 Parcial (Prisma ✅) |
+| 36 | Conciliación Bancaria | ⏳ Pendiente |
+| 37 | Sitio Institucional Público | 🔶 Parcial |
 
 ---
 
@@ -899,4 +1037,4 @@ npm run dev
 
 ---
 
-*Ultima actualizacion: 24 de Enero 2026 - FASE 9 Templates y Notificaciones ✅ (Sistema completo de templates editables con UI, PDFs con Puppeteer, emails con Handlebars)*
+*Ultima actualizacion: 7 de Febrero 2026 - Agregadas FASE 35 (Débito Automático), FASE 36 (Conciliación Bancaria), FASE 37 (Sitio Institucional Público)*

@@ -102,12 +102,12 @@ router.get('/public/banners', asyncHandler(async (req, res) => {
     AND: [fechaFilter]
   }
 
-  // Filtro de ubicación: específica o TODAS
+  // Filtro de ubicación: si tiene la ubicación en el array o el array está vacío (= todas)
   if (ubicacion) {
     where.AND.push({
       OR: [
-        { ubicacion },
-        { ubicacion: 'TODAS' }
+        { ubicaciones: { has: ubicacion } },
+        { ubicaciones: { isEmpty: true } }
       ]
     })
   }
@@ -532,7 +532,7 @@ router.post('/admin/banners', authAdmin, asyncHandler(async (req, res) => {
     titulo,
     sponsorId,
     tipo,
-    ubicacion,
+    ubicaciones,
     imagenDesktop,
     imagenMobile,
     linkDestino,
@@ -557,7 +557,7 @@ router.post('/admin/banners', authAdmin, asyncHandler(async (req, res) => {
       titulo,
       sponsorId: sponsorId ? parseInt(sponsorId) : null,
       tipo: tipo || 'LATERAL_DERECHO',
-      ubicacion: emptyToNull(ubicacion) || 'TODAS',
+      ubicaciones: Array.isArray(ubicaciones) ? ubicaciones : [],
       imagenDesktop,
       imagenMobile: emptyToNull(imagenMobile),
       linkDestino: emptyToNull(linkDestino),
@@ -589,7 +589,7 @@ router.put('/admin/banners/:id', authAdmin, asyncHandler(async (req, res) => {
     titulo,
     sponsorId,
     tipo,
-    ubicacion,
+    ubicaciones,
     imagenDesktop,
     imagenMobile,
     linkDestino,
@@ -612,7 +612,7 @@ router.put('/admin/banners/:id', authAdmin, asyncHandler(async (req, res) => {
       titulo,
       sponsorId: sponsorId ? parseInt(sponsorId) : null,
       tipo,
-      ubicacion: emptyToNull(ubicacion),
+      ubicaciones: Array.isArray(ubicaciones) ? ubicaciones : [],
       imagenDesktop,
       imagenMobile: emptyToNull(imagenMobile),
       linkDestino: emptyToNull(linkDestino),

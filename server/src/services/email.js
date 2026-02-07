@@ -441,6 +441,124 @@ export async function enviarEmailQRSocio({ to, socioNombre, nroSocio, qrUrl, por
   console.log(`📧 QR enviado a ${to} (Socio #${nroSocio})`)
 }
 
+/**
+ * Envía email desde formulario de contacto
+ */
+export async function enviarEmailContacto({ nombre, email, telefono, asunto, mensaje }) {
+  // Email al club
+  const asuntoMap = {
+    inscripcion: 'Inscripción de socio',
+    actividades: 'Consulta sobre actividades',
+    eventos: 'Alquiler de instalaciones',
+    sugerencia: 'Sugerencia',
+    otro: 'Otro',
+  }
+
+  const asuntoTexto = asuntoMap[asunto] || asunto || 'Consulta general'
+  const emailClub = process.env.EMAIL_CONTACTO || process.env.SMTP_USER
+
+  const htmlClub = `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb;">
+      <div style="background: linear-gradient(135deg, #DC2626 0%, #b91c1c 100%); padding: 30px 20px; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Nuevo mensaje de contacto</h1>
+      </div>
+
+      <div style="padding: 30px; background-color: white;">
+        <div style="background-color: #fef2f2; border-left: 4px solid #DC2626; padding: 15px; margin-bottom: 20px;">
+          <p style="margin: 0; color: #991b1b; font-weight: bold;">Asunto: ${asuntoTexto}</p>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; width: 120px;">Nombre:</td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #111827; font-weight: 500;">${nombre}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">Email:</td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">
+              <a href="mailto:${email}" style="color: #DC2626;">${email}</a>
+            </td>
+          </tr>
+          ${telefono ? `
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">Teléfono:</td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">
+              <a href="tel:${telefono}" style="color: #DC2626;">${telefono}</a>
+            </td>
+          </tr>
+          ` : ''}
+        </table>
+
+        <div style="background-color: #f3f4f6; border-radius: 8px; padding: 20px;">
+          <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px; font-weight: bold;">Mensaje:</p>
+          <p style="margin: 0; color: #374151; white-space: pre-wrap; line-height: 1.6;">${mensaje}</p>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center;">
+          <a href="mailto:${email}?subject=Re: ${asuntoTexto}" style="display: inline-block; background-color: #DC2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Responder
+          </a>
+        </div>
+      </div>
+
+      <div style="background-color: #1f2937; padding: 20px; text-align: center;">
+        <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+          Mensaje enviado desde el formulario de contacto del sitio web
+        </p>
+      </div>
+    </div>
+  `
+
+  await enviarEmail({
+    to: emailClub,
+    subject: `[Contacto Web] ${asuntoTexto} - ${nombre}`,
+    html: htmlClub,
+  })
+
+  // Email de confirmación al usuario
+  const htmlUsuario = `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb;">
+      <div style="background: linear-gradient(135deg, #DC2626 0%, #b91c1c 100%); padding: 30px 20px; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">¡Recibimos tu mensaje!</h1>
+      </div>
+
+      <div style="padding: 30px; background-color: white;">
+        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+          Hola <strong>${nombre}</strong>,
+        </p>
+        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+          Gracias por contactarte con Club Sportivo Pilar. Recibimos tu consulta y te responderemos a la brevedad.
+        </p>
+
+        <div style="background-color: #f3f4f6; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Tu mensaje:</p>
+          <p style="margin: 0; color: #374151; font-style: italic;">"${mensaje.substring(0, 200)}${mensaje.length > 200 ? '...' : ''}"</p>
+        </div>
+
+        <p style="color: #6b7280; font-size: 14px;">
+          Si necesitás comunicarte de forma urgente, podés llamarnos al <strong>0230 442-0297</strong>
+          o escribirnos por WhatsApp.
+        </p>
+      </div>
+
+      <div style="background-color: #1f2937; padding: 20px; text-align: center;">
+        <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+          Club Sportivo Pilar - "El Rojo de la Avenida"<br>
+          Av. Tomás Márquez 1125, Pilar
+        </p>
+      </div>
+    </div>
+  `
+
+  await enviarEmail({
+    to: email,
+    subject: 'Recibimos tu mensaje - Club Sportivo Pilar',
+    html: htmlUsuario,
+  })
+
+  console.log(`📧 Email de contacto procesado: ${nombre} <${email}>`)
+}
+
 // Verificar conexión SMTP al iniciar
 export async function verificarConexionSMTP() {
   try {

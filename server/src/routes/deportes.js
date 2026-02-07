@@ -1080,4 +1080,638 @@ router.delete('/entrenamientos/:id/asistencia/:socioId', asyncHandler(async (req
   res.json({ success: true, message: 'Asistencia eliminada' })
 }))
 
+// =============================================================================
+// PARTIDOS
+// =============================================================================
+
+// GET /api/admin/partidos - Listar partidos
+router.get('/partidos', asyncHandler(async (req, res) => {
+  const { categoriaActividadId, actividadId, fechaDesde, fechaHasta, estado, condicion, tipo } = req.query
+
+  const where = {}
+  if (categoriaActividadId) where.categoriaActividadId = parseInt(categoriaActividadId)
+  if (estado) where.estado = estado
+  if (condicion) where.condicion = condicion
+  if (tipo) where.tipo = tipo
+
+  // Filtro por rango de fechas
+  if (fechaDesde || fechaHasta) {
+    where.fecha = {}
+    if (fechaDesde) where.fecha.gte = new Date(fechaDesde)
+    if (fechaHasta) where.fecha.lte = new Date(fechaHasta)
+  }
+
+  // Filtro por actividad (a través de categoriaActividad)
+  if (actividadId) {
+    where.categoriaActividad = { actividadId: parseInt(actividadId) }
+  }
+
+  const partidos = await prisma.partido.findMany({
+    where,
+    orderBy: [{ fecha: 'desc' }, { hora: 'asc' }],
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      },
+      espacio: true,
+      _count: {
+        select: { convocados: true, estadisticas: true }
+      }
+    }
+  })
+
+  res.json({ success: true, data: partidos })
+}))
+
+// GET /api/admin/partidos/:id - Detalle de partido
+router.get('/partidos/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const partido = await prisma.partido.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      },
+      espacio: true,
+      convocados: {
+        include: {
+          socio: {
+            select: { id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true }
+          }
+        },
+        orderBy: { socio: { apellidoNombre: 'asc' } }
+      },
+      estadisticas: {
+        include: {
+          socio: {
+            select: { id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true }
+          }
+        },
+        orderBy: { socio: { apellidoNombre: 'asc' } }
+      }
+    }
+  })
+
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  res.json({ success: true, data: partido })
+}))
+
+// POST /api/admin/partidos - Crear partido
+router.post('/partidos', asyncHandler(async (req, res) => {
+  const { categoriaActividadId, fecha, hora, tipo, condicion, rival, ubicacion, espacioId, observaciones } = req.body
+
+  if (!categoriaActividadId || !fecha || !hora || !condicion || !rival) {
+    throw new AppError('Categoría, fecha, hora, condición y rival son requeridos', 400)
+  }
+
+  // Verificar que la categoría existe
+  const categoria = await prisma.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
+  if (!categoria) {
+    throw new AppError('Categoría de actividad no encontrada', 404)
+  }
+
+  // Verificar conflicto de espacio si es local
+  if (espacioId && condicion === 'LOCAL') {
+    const conflicto = await prisma.partido.findFirst({
+      where: {
+        espacioId: parseInt(espacioId),
+        fecha: new Date(fecha),
+        hora,
+        estado: { not: 'CANCELADO' }
+      }
+    })
+    if (conflicto) {
+      throw new AppError('Ya existe un partido en ese espacio, fecha y hora', 400)
+    }
+  }
+
+  const partido = await prisma.partido.create({
+    data: {
+      categoriaActividadId: parseInt(categoriaActividadId),
+      fecha: new Date(fecha),
+      hora,
+      tipo: tipo || 'LIGA',
+      condicion,
+      rival,
+      ubicacion: ubicacion || null,
+      espacioId: espacioId ? parseInt(espacioId) : null,
+      observaciones: observaciones || null,
+      registradoPor: req.admin.id
+    },
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      },
+      espacio: true
+    }
+  })
+
+  res.status(201).json({ success: true, data: partido })
+}))
+
+// PUT /api/admin/partidos/:id - Actualizar partido
+router.put('/partidos/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { fecha, hora, tipo, condicion, rival, ubicacion, espacioId, observaciones, estado } = req.body
+
+  const existente = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  const partido = await prisma.partido.update({
+    where: { id: parseInt(id) },
+    data: {
+      fecha: fecha ? new Date(fecha) : existente.fecha,
+      hora: hora || existente.hora,
+      tipo: tipo || existente.tipo,
+      condicion: condicion || existente.condicion,
+      rival: rival || existente.rival,
+      ubicacion: ubicacion !== undefined ? ubicacion : existente.ubicacion,
+      espacioId: espacioId !== undefined ? (espacioId ? parseInt(espacioId) : null) : existente.espacioId,
+      observaciones: observaciones !== undefined ? observaciones : existente.observaciones,
+      estado: estado || existente.estado
+    },
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      },
+      espacio: true
+    }
+  })
+
+  res.json({ success: true, data: partido })
+}))
+
+// POST /api/admin/partidos/:id/resultado - Cargar resultado
+router.post('/partidos/:id/resultado', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { golesLocal, golesVisitante } = req.body
+
+  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  if (partido.estado === 'CANCELADO') {
+    throw new AppError('No se puede cargar resultado de un partido cancelado', 400)
+  }
+
+  const updated = await prisma.partido.update({
+    where: { id: parseInt(id) },
+    data: {
+      golesLocal: golesLocal !== undefined ? parseInt(golesLocal) : null,
+      golesVisitante: golesVisitante !== undefined ? parseInt(golesVisitante) : null,
+      estado: 'FINALIZADO'
+    },
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      },
+      espacio: true
+    }
+  })
+
+  res.json({ success: true, data: updated })
+}))
+
+// POST /api/admin/partidos/:id/suspender - Suspender partido
+router.post('/partidos/:id/suspender', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { motivo } = req.body
+
+  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  const updated = await prisma.partido.update({
+    where: { id: parseInt(id) },
+    data: {
+      estado: 'SUSPENDIDO',
+      observaciones: motivo ? `SUSPENDIDO: ${motivo}` : 'SUSPENDIDO'
+    },
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      },
+      espacio: true
+    }
+  })
+
+  res.json({ success: true, data: updated })
+}))
+
+// POST /api/admin/partidos/:id/cancelar - Cancelar partido
+router.post('/partidos/:id/cancelar', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { motivo } = req.body
+
+  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  const updated = await prisma.partido.update({
+    where: { id: parseInt(id) },
+    data: {
+      estado: 'CANCELADO',
+      observaciones: motivo ? `CANCELADO: ${motivo}` : 'CANCELADO'
+    },
+    include: {
+      categoriaActividad: {
+        include: { actividad: true }
+      },
+      espacio: true
+    }
+  })
+
+  res.json({ success: true, data: updated })
+}))
+
+// DELETE /api/admin/partidos/:id - Eliminar partido
+router.delete('/partidos/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const partido = await prisma.partido.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      _count: { select: { convocados: true, estadisticas: true } }
+    }
+  })
+
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  // Eliminar convocatorias y estadísticas primero (cascade)
+  await prisma.partido.delete({ where: { id: parseInt(id) } })
+
+  res.json({ success: true, message: 'Partido eliminado correctamente' })
+}))
+
+// =============================================================================
+// CONVOCATORIAS
+// =============================================================================
+
+// GET /api/admin/partidos/:id/convocados - Listar socios convocables y convocados
+router.get('/partidos/:id/convocados', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const partido = await prisma.partido.findUnique({
+    where: { id: parseInt(id) },
+    include: { categoriaActividad: true }
+  })
+
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  // Obtener inscripciones activas de la categoría
+  const inscripciones = await prisma.inscripcion.findMany({
+    where: {
+      categoriaActividadId: partido.categoriaActividadId,
+      estado: 'ACTIVA',
+      fechaInicio: { lte: partido.fecha },
+      OR: [
+        { fechaFin: null },
+        { fechaFin: { gte: partido.fecha } }
+      ]
+    },
+    include: {
+      socio: {
+        select: {
+          id: true,
+          nroSocio: true,
+          apellidoNombre: true,
+          fotoUrl: true,
+          documento: true
+        }
+      }
+    },
+    orderBy: { socio: { apellidoNombre: 'asc' } }
+  })
+
+  // Obtener convocatorias existentes
+  const convocatorias = await prisma.convocatoria.findMany({
+    where: { partidoId: parseInt(id) }
+  })
+
+  const convocatoriasMap = new Map(convocatorias.map(c => [c.socioId, c]))
+
+  // Combinar inscripciones con convocatorias
+  const socios = inscripciones.map(ins => ({
+    ...ins.socio,
+    inscripcionId: ins.id,
+    convocatoria: convocatoriasMap.get(ins.socioId) || null
+  }))
+
+  res.json({ success: true, data: socios })
+}))
+
+// POST /api/admin/partidos/:id/convocar - Convocar jugadores (masivo)
+router.post('/partidos/:id/convocar', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { socioIds } = req.body // Array de socioIds a convocar
+
+  if (!Array.isArray(socioIds) || socioIds.length === 0) {
+    throw new AppError('Debe enviar un array de socioIds', 400)
+  }
+
+  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  const resultados = []
+
+  for (const socioId of socioIds) {
+    try {
+      const convocatoria = await prisma.convocatoria.upsert({
+        where: {
+          partidoId_socioId: {
+            partidoId: parseInt(id),
+            socioId: parseInt(socioId)
+          }
+        },
+        update: {},
+        create: {
+          partidoId: parseInt(id),
+          socioId: parseInt(socioId)
+        }
+      })
+      resultados.push(convocatoria)
+    } catch (err) {
+      console.error(`Error convocando socio ${socioId}:`, err.message)
+    }
+  }
+
+  res.json({ success: true, data: { convocados: resultados.length } })
+}))
+
+// DELETE /api/admin/partidos/:id/convocar/:socioId - Quitar de convocatoria
+router.delete('/partidos/:id/convocar/:socioId', asyncHandler(async (req, res) => {
+  const { id, socioId } = req.params
+
+  await prisma.convocatoria.delete({
+    where: {
+      partidoId_socioId: {
+        partidoId: parseInt(id),
+        socioId: parseInt(socioId)
+      }
+    }
+  })
+
+  res.json({ success: true, message: 'Jugador quitado de la convocatoria' })
+}))
+
+// PUT /api/admin/partidos/:partidoId/convocatoria/:socioId - Confirmar/rechazar convocatoria
+router.put('/partidos/:partidoId/convocatoria/:socioId', asyncHandler(async (req, res) => {
+  const { partidoId, socioId } = req.params
+  const { confirmado, motivoRechazo } = req.body
+
+  const convocatoria = await prisma.convocatoria.findUnique({
+    where: {
+      partidoId_socioId: {
+        partidoId: parseInt(partidoId),
+        socioId: parseInt(socioId)
+      }
+    }
+  })
+
+  if (!convocatoria) {
+    throw new AppError('Convocatoria no encontrada', 404)
+  }
+
+  const updated = await prisma.convocatoria.update({
+    where: {
+      partidoId_socioId: {
+        partidoId: parseInt(partidoId),
+        socioId: parseInt(socioId)
+      }
+    },
+    data: {
+      confirmado,
+      motivoRechazo: confirmado === false ? (motivoRechazo || null) : null
+    },
+    include: {
+      socio: {
+        select: { id: true, nroSocio: true, apellidoNombre: true }
+      }
+    }
+  })
+
+  res.json({ success: true, data: updated })
+}))
+
+// =============================================================================
+// ESTADÍSTICAS DE PARTIDO
+// =============================================================================
+
+// GET /api/admin/partidos/:id/estadisticas - Obtener estadísticas del partido
+router.get('/partidos/:id/estadisticas', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const estadisticas = await prisma.estadisticaPartido.findMany({
+    where: { partidoId: parseInt(id) },
+    include: {
+      socio: {
+        select: { id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true }
+      }
+    },
+    orderBy: { socio: { apellidoNombre: 'asc' } }
+  })
+
+  res.json({ success: true, data: estadisticas })
+}))
+
+// POST /api/admin/partidos/:id/estadisticas - Guardar estadísticas (masivo)
+router.post('/partidos/:id/estadisticas', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { estadisticas } = req.body // Array de { socioId, minutosJugados, goles, asistencias, tarjetaAmarilla, tarjetaRoja, esTitular }
+
+  if (!Array.isArray(estadisticas)) {
+    throw new AppError('El campo estadísticas debe ser un array', 400)
+  }
+
+  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  if (!partido) {
+    throw new AppError('Partido no encontrado', 404)
+  }
+
+  const resultados = []
+
+  for (const est of estadisticas) {
+    const { socioId, minutosJugados, goles, asistencias, tarjetaAmarilla, tarjetaRoja, esTitular } = est
+
+    if (!socioId) continue
+
+    try {
+      const registro = await prisma.estadisticaPartido.upsert({
+        where: {
+          partidoId_socioId: {
+            partidoId: parseInt(id),
+            socioId: parseInt(socioId)
+          }
+        },
+        update: {
+          minutosJugados: minutosJugados !== undefined ? parseInt(minutosJugados) : null,
+          goles: goles !== undefined ? parseInt(goles) : 0,
+          asistencias: asistencias !== undefined ? parseInt(asistencias) : 0,
+          tarjetaAmarilla: tarjetaAmarilla !== undefined ? parseInt(tarjetaAmarilla) : 0,
+          tarjetaRoja: tarjetaRoja !== undefined ? parseInt(tarjetaRoja) : 0,
+          esTitular: esTitular !== undefined ? esTitular : false
+        },
+        create: {
+          partidoId: parseInt(id),
+          socioId: parseInt(socioId),
+          minutosJugados: minutosJugados !== undefined ? parseInt(minutosJugados) : null,
+          goles: goles !== undefined ? parseInt(goles) : 0,
+          asistencias: asistencias !== undefined ? parseInt(asistencias) : 0,
+          tarjetaAmarilla: tarjetaAmarilla !== undefined ? parseInt(tarjetaAmarilla) : 0,
+          tarjetaRoja: tarjetaRoja !== undefined ? parseInt(tarjetaRoja) : 0,
+          esTitular: esTitular !== undefined ? esTitular : false
+        }
+      })
+      resultados.push(registro)
+    } catch (err) {
+      console.error(`Error guardando estadística socio ${socioId}:`, err.message)
+    }
+  }
+
+  res.json({ success: true, data: { guardados: resultados.length } })
+}))
+
+// GET /api/admin/estadisticas/jugador/:socioId - Estadísticas acumuladas de un jugador
+router.get('/estadisticas/jugador/:socioId', asyncHandler(async (req, res) => {
+  const { socioId } = req.params
+  const { temporada, actividadId } = req.query
+
+  const where = { socioId: parseInt(socioId) }
+
+  // Filtro por temporada (año)
+  if (temporada) {
+    const anio = parseInt(temporada)
+    where.partido = {
+      fecha: {
+        gte: new Date(`${anio}-01-01`),
+        lte: new Date(`${anio}-12-31`)
+      }
+    }
+  }
+
+  // Filtro por actividad
+  if (actividadId) {
+    where.partido = {
+      ...where.partido,
+      categoriaActividad: { actividadId: parseInt(actividadId) }
+    }
+  }
+
+  const estadisticas = await prisma.estadisticaPartido.findMany({
+    where,
+    include: {
+      partido: {
+        include: {
+          categoriaActividad: {
+            include: { actividad: true }
+          }
+        }
+      }
+    },
+    orderBy: { partido: { fecha: 'desc' } }
+  })
+
+  // Calcular totales
+  const totales = {
+    partidos: estadisticas.length,
+    titularidades: estadisticas.filter(e => e.esTitular).length,
+    minutosJugados: estadisticas.reduce((sum, e) => sum + (e.minutosJugados || 0), 0),
+    goles: estadisticas.reduce((sum, e) => sum + e.goles, 0),
+    asistencias: estadisticas.reduce((sum, e) => sum + e.asistencias, 0),
+    tarjetasAmarillas: estadisticas.reduce((sum, e) => sum + e.tarjetaAmarilla, 0),
+    tarjetasRojas: estadisticas.reduce((sum, e) => sum + e.tarjetaRoja, 0)
+  }
+
+  res.json({ success: true, data: { estadisticas, totales } })
+}))
+
+// GET /api/admin/estadisticas/ranking - Ranking de goleadores/asistencias
+router.get('/estadisticas/ranking', asyncHandler(async (req, res) => {
+  const { tipo, actividadId, categoriaActividadId, temporada, limite } = req.query
+
+  const tipoRanking = tipo || 'goles' // goles, asistencias
+  const limit = parseInt(limite) || 10
+
+  let wherePartido = {}
+
+  // Filtro por temporada
+  if (temporada) {
+    const anio = parseInt(temporada)
+    wherePartido.fecha = {
+      gte: new Date(`${anio}-01-01`),
+      lte: new Date(`${anio}-12-31`)
+    }
+  }
+
+  // Filtro por actividad
+  if (actividadId) {
+    wherePartido.categoriaActividad = { actividadId: parseInt(actividadId) }
+  }
+
+  // Filtro por categoría
+  if (categoriaActividadId) {
+    wherePartido.categoriaActividadId = parseInt(categoriaActividadId)
+  }
+
+  const estadisticas = await prisma.estadisticaPartido.groupBy({
+    by: ['socioId'],
+    where: {
+      partido: wherePartido
+    },
+    _sum: {
+      goles: true,
+      asistencias: true,
+      tarjetaAmarilla: true,
+      tarjetaRoja: true,
+      minutosJugados: true
+    },
+    _count: {
+      id: true
+    },
+    orderBy: {
+      _sum: {
+        [tipoRanking]: 'desc'
+      }
+    },
+    take: limit
+  })
+
+  // Obtener datos de los socios
+  const socioIds = estadisticas.map(e => e.socioId)
+  const socios = await prisma.socio.findMany({
+    where: { id: { in: socioIds } },
+    select: { id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true }
+  })
+
+  const sociosMap = new Map(socios.map(s => [s.id, s]))
+
+  const ranking = estadisticas.map((e, index) => ({
+    posicion: index + 1,
+    socio: sociosMap.get(e.socioId),
+    partidos: e._count.id,
+    goles: e._sum.goles || 0,
+    asistencias: e._sum.asistencias || 0,
+    tarjetasAmarillas: e._sum.tarjetaAmarilla || 0,
+    tarjetasRojas: e._sum.tarjetaRoja || 0,
+    minutosJugados: e._sum.minutosJugados || 0
+  }))
+
+  res.json({ success: true, data: ranking })
+}))
+
 export default router

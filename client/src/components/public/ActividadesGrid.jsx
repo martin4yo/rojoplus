@@ -70,7 +70,7 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
 
   const sectionClass = fullWidth
     ? ""
-    : "py-16 md:py-24 bg-gray-400"
+    : "py-16 md:py-24 bg-gray-300"
 
   if (loading) {
     return (

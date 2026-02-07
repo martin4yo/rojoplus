@@ -2154,7 +2154,7 @@ model Banner {
   titulo          String                      // Nombre interno para identificar
   sponsorId       Int?      @map("sponsor_id") // Sponsor asociado (opcional)
   tipo            String    @default("LATERAL") // HERO, LATERAL, FOOTER, POPUP
-  ubicacion       String?                     // Páginas donde mostrar: HOME, ACTIVIDADES, NOTICIAS, TODAS
+  ubicaciones     String[]  @default([])       // Páginas donde mostrar: HOME, ACTIVIDADES, NOTICIAS, etc. Vacío = TODAS
   imagenDesktop   String    @map("imagen_desktop") // Imagen para desktop
   imagenMobile    String?   @map("imagen_mobile")  // Imagen opcional para móvil
   linkDestino     String?   @map("link_destino")   // URL al hacer clic
@@ -2179,7 +2179,6 @@ model Banner {
 
   @@index([tipo])
   @@index([activo])
-  @@index([ubicacion])
   @@index([fechaInicio, fechaFin])
   @@map("banners")
 }
@@ -2210,4 +2209,27 @@ model Noticia {
   @@index([fechaPublicacion])
   @@index([destacada])
   @@map("noticias")
+}
+
+// Autoridades del club - editable desde admin
+model Autoridad {
+  id          Int      @id @default(autoincrement())
+  seccion     String   // COMISION_DIRECTIVA, VOCALES, REVISORES, SUBCOMISIONES
+  cargo       String?  // Para Comisión: Presidente, Vicepresidente, etc.
+  nombre      String   // Nombre completo de la persona o nombre de subcomisión
+  tipo        String?  // Para Vocales/Revisores: TITULAR, SUPLENTE
+  desde       String?  // Año desde (ej: "2024")
+  email       String?
+  telefono    String?
+  foto        String?  // URL de la foto
+  descripcion String?  @db.Text // Para subcomisiones: descripción
+  responsable String?  // Para subcomisiones: nombre del responsable
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([seccion])
+  @@index([activo])
+  @@map("autoridades")
 }

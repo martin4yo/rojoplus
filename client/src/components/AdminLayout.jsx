@@ -159,6 +159,7 @@ export default function AdminLayout() {
       submenu: [
         { path: '/admin/configuracion', label: 'General', icon: Sliders },
         { path: '/admin/configuracion/pagos', label: 'Datos Bancarios', icon: CreditCard },
+        { path: '/admin/configuracion/autoridades', label: 'Autoridades', icon: Users },
         { path: '/admin/configuracion/templates/email', label: 'Templates Email', icon: Mail },
         { path: '/admin/configuracion/templates/pdf', label: 'Templates PDF', icon: FileText },
       ]

@@ -31,9 +31,29 @@ export default function PublicFooter() {
           {/* Links Rápidos */}
           <div>
             <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
-              Links Rápidos
+              El Club
             </h4>
             <ul className="space-y-3">
+              <li>
+                <Link to="/historia" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Historia
+                </Link>
+              </li>
+              <li>
+                <Link to="/mision" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Misión y Valores
+                </Link>
+              </li>
+              <li>
+                <Link to="/autoridades" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Autoridades
+                </Link>
+              </li>
+              <li>
+                <Link to="/instalaciones" className="text-gray-300 hover:text-white text-sm transition-colors">
+                  Instalaciones
+                </Link>
+              </li>
               <li>
                 <Link to="/actividades" className="text-gray-300 hover:text-white text-sm transition-colors">
                   Actividades
@@ -45,18 +65,8 @@ export default function PublicFooter() {
                 </Link>
               </li>
               <li>
-                <Link to="/historia" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  Nuestra Historia
-                </Link>
-              </li>
-              <li>
-                <Link to="/inscripcion-socio" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  Hacete Socio
-                </Link>
-              </li>
-              <li>
-                <Link to="/mi-qr" className="text-gray-300 hover:text-white text-sm transition-colors">
-                  Portal del Socio
+                <Link to="/contacto" className="text-gray-300 hover:text-white text-sm transition-colors font-medium">
+                  Contacto
                 </Link>
               </li>
             </ul>

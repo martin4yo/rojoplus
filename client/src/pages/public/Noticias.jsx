@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, ChevronRight, Search, X } from 'lucide-react'
+import { Calendar, ChevronRight, Search } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
 import api from '../../services/api'
 
@@ -85,8 +85,6 @@ export default function Noticias() {
   const [loading, setLoading] = useState(true)
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [busqueda, setBusqueda] = useState('')
-  const [noticiaModal, setNoticiaModal] = useState(null)
-  const [loadingDetalle, setLoadingDetalle] = useState(false)
 
   useEffect(() => {
     fetchNoticias()
@@ -136,22 +134,6 @@ export default function Noticias() {
     }
   }
 
-  const abrirNoticia = async (slug) => {
-    setLoadingDetalle(true)
-    try {
-      const data = await api.getFull(`/public/noticias/${slug}`)
-      setNoticiaModal(data?.noticia || null)
-    } catch (err) {
-      console.error('Error cargando noticia:', err)
-    } finally {
-      setLoadingDetalle(false)
-    }
-  }
-
-  const cerrarModal = () => {
-    setNoticiaModal(null)
-  }
-
   return (
     <div className="bg-gray-300 min-h-screen">
       {/* Hero */}
@@ -167,7 +149,7 @@ export default function Noticias() {
       </section>
 
       {/* Filtros */}
-      <section className="py-8 bg-gray-400">
+      <section className="py-8 bg-gray-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Búsqueda */}
@@ -197,7 +179,7 @@ export default function Noticias() {
       </section>
 
       {/* Lista de noticias */}
-      <section className="py-12 md:py-16 bg-gray-400">
+      <section className="py-12 md:py-16 bg-gray-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
             <div className="flex justify-center py-12">
@@ -215,15 +197,15 @@ export default function Noticias() {
                   className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group"
                 >
                   {/* Imagen */}
-                  <div className="h-48 bg-gray-300 relative overflow-hidden">
+                  <div className="relative overflow-hidden">
                     {noticia.imagen ? (
                       <img
                         src={noticia.imagen}
                         alt={noticia.titulo}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-auto group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
+                      <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
                         <span className="text-white text-4xl font-bold opacity-30">SP</span>
                       </div>
                     )}
@@ -247,13 +229,13 @@ export default function Noticias() {
                       {noticia.extracto}
                     </p>
 
-                    <button
-                      onClick={() => abrirNoticia(noticia.slug)}
+                    <Link
+                      to={`/noticias/${noticia.slug}`}
                       className="inline-flex items-center text-red-600 font-medium text-sm hover:text-red-700"
                     >
                       Leer más
                       <ChevronRight className="w-4 h-4 ml-1" />
-                    </button>
+                    </Link>
                   </div>
                 </article>
               ))}
@@ -279,93 +261,6 @@ export default function Noticias() {
           </p>
         </div>
       </section>
-
-      {/* Modal de Noticia */}
-      {(noticiaModal || loadingDetalle) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-            {loadingDetalle ? (
-              <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-              </div>
-            ) : noticiaModal ? (
-              <>
-                {/* Header con imagen */}
-                <div className="relative h-64 bg-gray-200">
-                  {noticiaModal.imagen ? (
-                    <img
-                      src={noticiaModal.imagen}
-                      alt={noticiaModal.titulo}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
-                      <span className="text-white text-6xl font-bold opacity-30">SP</span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <button
-                    onClick={cerrarModal}
-                    className="absolute top-4 right-4 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-gray-700" />
-                  </button>
-                  <div className="absolute bottom-4 left-6 right-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getCategoriaColor(noticiaModal.categoria)}`}>
-                        {noticiaModal.categoria}
-                      </span>
-                      {noticiaModal.destacada && (
-                        <span className="px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-semibold rounded-full">
-                          Destacada
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="text-2xl md:text-3xl font-bold text-white">
-                      {noticiaModal.titulo}
-                    </h2>
-                  </div>
-                </div>
-
-                {/* Contenido */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-16rem)]">
-                  <div className="flex items-center gap-4 text-gray-500 text-sm mb-6 pb-4 border-b">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      {formatFecha(noticiaModal.fechaPublicacion)}
-                    </div>
-                    {noticiaModal.autor && (
-                      <div>
-                        Por {noticiaModal.autor.nombre} {noticiaModal.autor.apellido}
-                      </div>
-                    )}
-                  </div>
-
-                  {noticiaModal.extracto && (
-                    <p className="text-lg text-gray-600 mb-6 font-medium">
-                      {noticiaModal.extracto}
-                    </p>
-                  )}
-
-                  <div
-                    className="prose prose-gray max-w-none"
-                    dangerouslySetInnerHTML={{ __html: noticiaModal.contenido }}
-                  />
-
-                  <div className="mt-8 pt-6 border-t flex justify-end">
-                    <button
-                      onClick={cerrarModal}
-                      className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-                    >
-                      Cerrar
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -62,6 +62,9 @@ export default function Historia() {
         </div>
       </section>
 
+      {/* Banner Header */}
+      <BannerPublicitario tipo="HEADER" ubicacion="HISTORIA" />
+
       {/* Intro */}
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -148,14 +151,14 @@ export default function Historia() {
         </div>
       </section>
 
-      {/* Palmarés */}
+      {/* Logros Deportivos */}
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-gray-900 text-center mb-4">
-            Palmarés
+            Logros Deportivos
           </h2>
           <p className="text-gray-600 text-center max-w-2xl mx-auto mb-12">
-            Nuestros logros deportivos más destacados
+            Nuestros logros más destacados a lo largo de la historia
           </p>
 
           <div className="grid md:grid-cols-4 gap-6 mb-16">

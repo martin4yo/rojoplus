@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MapPin, Phone, Mail, Clock, Send, Instagram, Facebook, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import api from '../../services/api'
 
 export default function Contacto() {
   const [formData, setFormData] = useState({
@@ -21,14 +22,22 @@ export default function Contacto() {
       return
     }
 
+    if (formData.mensaje.length < 10) {
+      toast.error('El mensaje debe tener al menos 10 caracteres')
+      return
+    }
+
     setEnviando(true)
 
-    // Simular envío (después se puede conectar a un backend)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    toast.success('Mensaje enviado correctamente. Te responderemos pronto.')
-    setFormData({ nombre: '', email: '', telefono: '', asunto: '', mensaje: '' })
-    setEnviando(false)
+    try {
+      await api.post('/public/contacto', formData)
+      toast.success('Mensaje enviado correctamente. Te responderemos pronto.')
+      setFormData({ nombre: '', email: '', telefono: '', asunto: '', mensaje: '' })
+    } catch (error) {
+      toast.error(error.message || 'Error al enviar el mensaje')
+    } finally {
+      setEnviando(false)
+    }
   }
 
   return (

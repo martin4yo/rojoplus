@@ -64,7 +64,89 @@ RojoPlus/
 
 ---
 
-## 📅 ÚLTIMA SESIÓN (6 Febrero 2026)
+## 📅 ÚLTIMA SESIÓN (7 Febrero 2026)
+
+**Tema: Mejoras Sitio Institucional + Bugs Fixes**
+
+### ✅ AUTORIDADES CRUD - CORREGIDO
+
+**Problema:** El CRUD de Autoridades mostraba vacío y la página pública usaba datos mock.
+
+**Causa:** El backend no devolvía el formato esperado `{ success: true, data: ... }`.
+
+**Solución:**
+- Corregido formato de respuesta en todas las rutas de `autoridades.js`
+- Agregadas validaciones `Array.isArray()` y optional chaining en frontend
+
+### ✅ PERÍODO COMISIÓN DIRECTIVA - IMPLEMENTADO
+
+**Requerimiento:** Campo "Período" global para toda la Comisión Directiva (no por integrante).
+
+**Implementación:**
+- Nuevo endpoint `GET/PUT /api/admin/autoridades/config/periodo`
+- Usa tabla `Configuracion` con clave `PERIODO_COMISION_DIRECTIVA`
+- Campo editable en el CRUD de Autoridades
+- Se muestra en la página pública de Autoridades
+
+### ✅ BANNERS MULTI-PÁGINA - IMPLEMENTADO
+
+**Requerimiento:** Poder seleccionar múltiples páginas donde mostrar un banner.
+
+**Cambios en schema:**
+```prisma
+# Antes
+ubicacion     String?
+# Después
+ubicaciones   String[]  @default([])
+```
+
+**Cambios en backend:**
+- Filtro con `{ ubicaciones: { has: ubicacion } }`
+- POST/PUT aceptan array de ubicaciones
+
+**Cambios en frontend:**
+- Checkboxes para selección múltiple de páginas
+- Páginas disponibles: Home, Actividades, Noticias, Historia, Contacto, Autoridades, Comercios
+
+### ✅ MEJORAS VISUALES SITIO PÚBLICO
+
+| Cambio | Archivo |
+|--------|---------|
+| "Palmarés" → "Logros Deportivos" | Historia.jsx |
+| Agregado banner HEADER | Historia.jsx |
+| Fondo unificado `bg-gray-300` | Comercios.jsx, Noticias.jsx, ActividadesGrid.jsx |
+| Imágenes noticias sin recortar | Noticias.jsx, NoticiaDetalle.jsx |
+
+**Detalle imágenes noticias:**
+- Removidas alturas fijas (`h-48`, `h-72`, `h-40`)
+- Cambiado `object-cover` por `h-auto`
+- Imagen principal detalle: `max-h-[500px] object-contain`
+- Noticias relacionadas: `h-auto` con escala `scale-105`
+
+### 📁 Archivos Modificados
+
+```
+# Backend
+server/src/routes/autoridades.js              # +50 líneas (formato respuesta, endpoints periodo)
+server/src/routes/banners.js                  # Cambio ubicacion → ubicaciones[]
+server/prisma/schema.prisma                   # Banner.ubicaciones String[]
+
+# Frontend Admin
+client/src/pages/admin/Autoridades.jsx        # Fix undefined, campo periodo global
+client/src/pages/admin/Publicidad.jsx         # Multi-select ubicaciones
+
+# Frontend Público
+client/src/pages/public/Autoridades.jsx       # Usa periodo desde API
+client/src/pages/public/Historia.jsx          # Banner HEADER, "Logros Deportivos"
+client/src/pages/public/Noticias.jsx          # bg-gray-300, imágenes sin recortar
+client/src/pages/public/NoticiaDetalle.jsx    # Imágenes sin recortar
+client/src/pages/public/Comercios.jsx         # bg-gray-300
+client/src/components/public/ActividadesGrid.jsx  # bg-gray-300
+```
+
+---
+
+## 📅 SESIÓN ANTERIOR (6 Febrero 2026)
 
 **Tema: Débito Automático con Prisma Medios de Pago**
 
@@ -277,6 +359,7 @@ client/src/components/InstallAppButton.jsx        # NUEVO (290 líneas)
 | **Push Notifications** | ✅ Cuotas, pagos, integrado con cron jobs |
 | **Seguridad Acceso QR** | ✅ QR enviado por email, no visible público |
 | **Débito Automático** | ✅ Prisma: DEBLIQC/D, DEBLIMC, respuestas, recibos |
+| **Sitio Institucional** | ✅ Historia, Autoridades, Noticias, Comercios, Banners |
 
 ### 🟡 PENDIENTES - PRIORIDAD MEDIA
 
@@ -335,19 +418,34 @@ Próxima opción disponible:
 
 | URL | Descripción |
 |-----|-------------|
+| **Públicas** | |
+| `/` | Home institucional |
+| `/historia` | Historia del club |
+| `/autoridades` | Comisión Directiva |
+| `/noticias` | Listado de noticias |
+| `/noticias/:slug` | Detalle de noticia |
+| `/actividades` | Actividades deportivas |
+| `/comercios` | Comercios adheridos |
+| `/contacto` | Formulario de contacto |
+| **Socios** | |
 | `/mi-qr` | Socio obtiene su QR |
 | `/s/{tokenPortal}` | Portal del socio |
-| `/c/{token}` | Portal del comerciante |
 | `/inscripcion-socio` | Formulario público alta socios |
+| **Comercios** | |
+| `/c/{token}` | Portal del comerciante |
+| `/registro` | Registro de comercios |
+| **Admin** | |
 | `/admin` | Panel de administración |
 | `/admin/socios` | Gestión de socios |
 | `/admin/solicitudes` | Aprobación solicitudes alta |
 | `/admin/inscripciones` | Gestión de inscripciones |
 | `/admin/periodos` | Gestión de periodos y cuotas |
 | `/admin/cierres-caja` | Cierre de caja diario |
+| `/admin/publicidad` | Banners y sponsors |
+| `/admin/autoridades` | CRUD Comisión Directiva |
+| `/admin/noticias` | CRUD Noticias |
 | `/admin/configuracion/templates/email` | Editor templates email |
 | `/admin/configuracion/templates/pdf` | Editor templates PDF |
-| `/registro` | Registro de comercios |
 
 ---
 
@@ -444,18 +542,26 @@ Database: rojoplus
 Current branch: main
 
 Modified:
-M client/src/pages/admin/SocioDetalle.jsx
+M client/src/App.jsx
+M client/src/components/AdminLayout.jsx
+M client/src/components/public/BannerPublicitario.jsx
+M client/src/pages/admin/Publicidad.jsx
+M client/src/pages/public/Noticias.jsx
+M server/prisma/schema.prisma
+M server/src/index.js
+
+Untracked:
+?? client/src/pages/admin/Noticias.jsx
+?? server/src/routes/noticias.js
 
 Recent commits:
-409dc15 docs: Documentar implementación completa de Cierre de Caja Diario
-f82b09a feat: Implementar Sistema de Cierre de Caja Diario (COMPLETO)
-fbfef87 docs: Elevar prioridad de Cierre de Caja Diario a URGENTE
-c9fbf62 docs: Actualizar CLAUDE.md - Sistema de Inscripciones 100% completo
-135d99d feat: Completar Sistema de Inscripciones al 100%
+160d961 Ajuste en Noticias
+5768059 Ajustes en sitio institucional
+dc4a029 Ajustes finales antes de prod
 ```
 
 ---
 
-*Última actualización: 30 Enero 2026 - Noche*
-*Estado: Cierre de Caja Diario 100% COMPLETADO*
-*Próximo: Evaluar Opción A (Reportes + PWA) vs Opción B (Débito Automático)*
+*Última actualización: 7 Febrero 2026*
+*Estado: Sitio Institucional mejorado - Autoridades, Banners, Noticias*
+*Próximo: Continuar mejoras sitio público o Conciliación Bancaria*

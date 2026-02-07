@@ -237,7 +237,11 @@ export default function Publicidad() {
                           )}
                         </div>
                         <p className="text-sm text-gray-500">
-                          {BANNER_SIZES[banner.tipo]?.label || banner.tipo} • {banner.ubicacion || 'Todas'}
+                          {BANNER_SIZES[banner.tipo]?.label || banner.tipo} • {
+                            banner.ubicaciones?.length > 0
+                              ? banner.ubicaciones.join(', ')
+                              : 'Todas las páginas'
+                          }
                           {banner.sponsor && ` • ${banner.sponsor.nombre}`}
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
@@ -471,13 +475,23 @@ export default function Publicidad() {
 }
 
 // ============ MODAL BANNER ============
+const UBICACIONES_DISPONIBLES = [
+  { value: 'HOME', label: 'Home' },
+  { value: 'ACTIVIDADES', label: 'Actividades' },
+  { value: 'NOTICIAS', label: 'Noticias' },
+  { value: 'HISTORIA', label: 'Historia' },
+  { value: 'CONTACTO', label: 'Contacto' },
+  { value: 'AUTORIDADES', label: 'Autoridades' },
+  { value: 'COMERCIOS', label: 'Comercios' },
+]
+
 function ModalBanner({ data, sponsors, onClose, onSave }) {
   const [form, setForm] = useState({
     id: data?.id || null,
     titulo: data?.titulo || '',
     sponsorId: data?.sponsorId || '',
     tipo: data?.tipo || 'FOOTER',
-    ubicacion: data?.ubicacion || 'TODAS',
+    ubicaciones: data?.ubicaciones || [],
     imagenDesktop: data?.imagenDesktop || '',
     imagenMobile: data?.imagenMobile || '',
     linkDestino: data?.linkDestino || '',
@@ -490,6 +504,17 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
     mesContratado: data?.mesContratado || '',
     pagado: data?.pagado || false
   })
+
+  const handleUbicacionToggle = (ubicacion) => {
+    setForm(prev => {
+      const ubicaciones = prev.ubicaciones || []
+      if (ubicaciones.includes(ubicacion)) {
+        return { ...prev, ubicaciones: ubicaciones.filter(u => u !== ubicacion) }
+      } else {
+        return { ...prev, ubicaciones: [...ubicaciones, ubicacion] }
+      }
+    })
+  }
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState({ desktop: false, mobile: false })
 
@@ -627,23 +652,28 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ubicación (página)
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ubicaciones (páginas donde se muestra)
                 </label>
-                <select
-                  value={form.ubicacion}
-                  onChange={e => setForm({ ...form, ubicacion: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
-                >
-                  <option value="TODAS">Todas las páginas</option>
-                  <option value="HOME">Home</option>
-                  <option value="ACTIVIDADES">Actividades</option>
-                  <option value="NOTICIAS">Noticias</option>
-                  <option value="HISTORIA">Historia</option>
-                  <option value="CONTACTO">Contacto</option>
-                  <option value="COMERCIOS">Beneficios/Comercios</option>
-                </select>
+                <div className="bg-gray-50 rounded-lg p-3 border">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Si no seleccionas ninguna, se mostrará en todas las páginas.
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {UBICACIONES_DISPONIBLES.map(ub => (
+                      <label key={ub.value} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(form.ubicaciones || []).includes(ub.value)}
+                          onChange={() => handleUbicacionToggle(ub.value)}
+                          className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                        />
+                        <span className="text-sm text-gray-700">{ub.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div>
