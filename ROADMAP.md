@@ -960,764 +960,179 @@ SISTEMA: USUARIOS_GESTIONAR, COMERCIOS_GESTIONAR
 
 ---
 
-## FASE 39: Módulo Buffet/Restaurant
-> Sistema completo de gestión de buffet, restaurant, bar y kiosco del club
+## FASE 39: Módulo Buffet/Restaurant (MVP)
+> Sistema de gestión de buffet, kiosco y take away del club
 
 ### Concepto General
-Sistema integral para la operación del buffet del club que incluye:
-- **Restaurant/Buffet**: Gestión de mesas, comandas, mozos
-- **Bar/Mostrador**: Venta de bebidas con despacho rápido
-- **Cocina**: Pantalla de preparación (KDS)
-- **Kiosco**: Venta rápida de golosinas y productos
+MVP del módulo buffet con funcionalidades esenciales:
+- **Mesas y Comandas**: Gestión de mesas, toma de pedidos, cobro
+- **Cocina (KDS)**: Pantalla de preparación para cocineros
+- **Kiosco**: Venta rápida sin mesa
 - **Take Away**: Pedidos para llevar
 
-### Integraciones con RojoPlus (CRÍTICO)
+### Integraciones con RojoPlus
 
 #### Menú en Sidebar (AdminLayout.jsx)
-- Submenú "Buffet" integrado en el sidebar existente (igual que Deportes, Ingresos, Egresos)
+- Submenú "Buffet" integrado en el sidebar existente
 - NO es una aplicación separada, usa el mismo layout admin
 - Acceso controlado por permisos del sistema
 
 #### Permisos (Sistema existente Fase 38)
 - Los permisos de Buffet se agregan a `seed.js` junto con los demás
-- Se crean en tabla `Permiso` existente
-- Se asignan a roles mediante `PermisoRol` existente
 - El frontend usa `tienePermiso()` de `permisos.js` existente
-- Protección de rutas/botones igual que el resto del sistema
+- Permisos: BUFFET_VER, BUFFET_MESAS, BUFFET_COBRAR, BUFFET_COCINA, BUFFET_KIOSCO
 
 #### Tesorería y Cobranza (INTEGRADO 100%)
 - **NO** se crea CajaBuffet separada - se usa `Caja` existente
 - Cobros generan `MovimientoCaja` en la caja del club
 - Usa `MedioPago` existentes (Efectivo, Tarjeta, QR, etc.)
-- Genera `Asiento` contable automático igual que otros cobros
 - Centro de costo BUFFET para análisis separado
-- El arqueo y cierre de caja es el mismo del sistema
 
 #### Stock (Sistema existente - NO duplicar productos)
 - Los productos del buffet se dan de alta en el módulo Stock existente
 - Agregar campo `esParaBuffet` (boolean) al modelo Producto existente
-- Agregar campo `esIngrediente` (boolean) para insumos de cocina
 - **Usuario con permiso BUFFET solo ve productos con esParaBuffet=true**
-- Usuario con permiso STOCK_VER ve todos los productos
-- El CRUD de productos se reutiliza, solo cambia el filtro
-- ProductoMenu es solo metadata adicional (categoría menú, variantes, modificadores)
-- Descuento automático de ingredientes usa MovimientoStock existente
-
-#### Otras Integraciones
-- **Socios**: QR para identificación, descuentos, cuenta corriente
-- **Personal**: Mozos vinculados a entidades tipo PERSONAL
 
 ---
 
-### Etapa 39.1: Modelos de Datos Base
-> Estructura de base de datos para el módulo buffet
+### Etapa 39.1: Configuración y Setup
+> Modelos, productos, mesas, impresoras y permisos
 
-#### Modelos Principales
-- [ ] **39.1.1** Modelo `ZonaBuffet` (codigo, nombre, descripcion, activo)
-  - Zonas: SALON, TERRAZA, VIP, BARRA, KIOSCO
-- [ ] **39.1.2** Modelo `Mesa` (numero, zona, capacidad, posX, posY, estado, activo)
-  - Estados: LIBRE, OCUPADA, RESERVADA, CUENTA_PEDIDA, LIMPIEZA, FUERA_SERVICIO
-- [ ] **39.1.3** Modelo `CategoriaMenu` (codigo, nombre, orden, color, icono, activo)
-  - Categorías: BEBIDAS, COMIDAS, POSTRES, CAFETERIA, SNACKS, COMBOS
-- [ ] **39.1.4** Modelo `ProductoMenu` (codigo, nombre, descripcion, categoriaId, precio, precioSocio, tiempoPreparacion, foto, disponible, activo)
-- [ ] **39.1.5** Modelo `VarianteProducto` (productoMenuId, nombre, precioExtra)
-  - Ej: Cerveza → Pinta (+$0), Litro (+$500)
-- [ ] **39.1.6** Modelo `ModificadorProducto` (productoMenuId, nombre, precioExtra, esGratis)
-  - Ej: Sin hielo, Extra queso, Término medio
-- [ ] **39.1.7** Modelo `RecetaIngrediente` (productoMenuId, productoStockId, cantidad, unidad)
-  - Vincula producto del menú con productos del stock para descuento automático
-
-#### Modelos de Impresión
-- [ ] **39.1.8** Modelo `ImpresoraTermica` (codigo, nombre, tipo, ip, puerto, activo)
-  - Tipos: COCINA, BARRA, CAJA, KIOSCO
-- [ ] **39.1.9** Modelo `DestinoImpresion` (categoriaMenuId, impresoraId, copias)
-  - Define qué categorías se imprimen en qué impresora
-  - Ej: BEBIDAS → Impresora BARRA, COMIDAS → Impresora COCINA
-
-#### Modelos Operativos
-- [ ] **39.1.10** Modelo `TurnoBuffet` (usuarioId, fechaInicio, fechaFin, fondoInicial, totalVentas, totalPropinas, estado)
-  - Estados: ABIERTO, CERRADO
-- [ ] **39.1.11** Modelo `Comanda` (numero, mesaId, turnoId, socioId?, cantidadComensales, estado, horaApertura, horaCierre, observaciones)
-  - Estados: ABIERTA, EN_PREPARACION, SERVIDA, CUENTA_PEDIDA, CERRADA, ANULADA
-- [ ] **39.1.12** Modelo `ItemComanda` (comandaId, productoMenuId, varianteId?, cantidad, precioUnitario, descuento, comensal, estado, horaEnvio, horaListo, horaEntregado, observaciones)
-  - Estados: PENDIENTE, ENVIADO_COCINA, EN_PREPARACION, LISTO, ENTREGADO, ANULADO
-- [ ] **39.1.13** Modelo `ModificadorItem` (itemComandaId, modificadorId, cantidad)
-- [ ] **39.1.14** Modelo `PedidoTakeAway` (numero, socioId?, nombreCliente, telefono, estado, horaEstimada, horaEntrega, total, observaciones)
+#### Modelos Prisma
+- [ ] **39.1.1** Modelo `Mesa` (numero, capacidad, estado, activo)
+  - Estados: LIBRE, OCUPADA, CUENTA_PEDIDA, LIMPIEZA
+- [ ] **39.1.2** Modelo `CategoriaMenu` (codigo, nombre, orden, color, activo)
+  - Categorías: BEBIDAS, COMIDAS, POSTRES, SNACKS
+- [ ] **39.1.3** Modelo `Comanda` (numero, mesaId, socioId?, estado, horaApertura, horaCierre, total)
+  - Estados: ABIERTA, EN_PREPARACION, CUENTA_PEDIDA, CERRADA, ANULADA
+- [ ] **39.1.4** Modelo `ItemComanda` (comandaId, productoId, cantidad, precioUnitario, estado, observaciones)
+  - Estados: PENDIENTE, ENVIADO_COCINA, EN_PREPARACION, LISTO, ENTREGADO
+- [ ] **39.1.5** Modelo `PedidoTakeAway` (numero, nombreCliente, telefono, estado, horaEstimada, total)
   - Estados: RECIBIDO, EN_PREPARACION, LISTO, ENTREGADO, CANCELADO
-- [ ] **39.1.15** Modelo `ItemPedidoTakeAway` (pedidoId, productoMenuId, varianteId?, cantidad, precioUnitario, observaciones)
-- [ ] **39.1.16** Modelo `ReservaBuffet` (mesaId, fecha, hora, duracionEstimada, comensales, nombreCliente, telefono, socioId?, estado, observaciones)
-  - Estados: PENDIENTE, CONFIRMADA, CANCELADA, COMPLETADA, NO_SHOW
-- [ ] **39.1.17** Modelo `AnulacionItem` (itemComandaId, motivo, autorizadoPor, fecha)
-- [ ] **39.1.18** Modelo `CierreBuffet` (cajaId, turnoId, fecha, fondoInicial, totalVentas, totalPropinas, totalEfectivo, totalTarjeta, efectivoArqueado, diferencia, observaciones, cerradoPorId)
+- [ ] **39.1.6** Modelo `ItemPedidoTakeAway` (pedidoId, productoId, cantidad, precioUnitario, observaciones)
+- [ ] **39.1.7** Modelo `ImpresoraTermica` (nombre, tipo, ip, puerto, activo)
+  - Tipos: COCINA, BARRA, CAJA
+- [ ] **39.1.8** Modelo `DestinoImpresion` (categoriaMenuId, impresoraId)
+- [ ] **39.1.9** Migración Prisma
 
 #### Modificaciones a modelos existentes
-- [ ] **39.1.19** Agregar campo `comandaId` a modelo `MovimientoCaja` existente (nullable)
-- [ ] **39.1.20** Agregar campo `pedidoTakeAwayId` a modelo `MovimientoCaja` existente (nullable)
-- [ ] **39.1.21** Agregar campo `esPropina` a modelo `MovimientoCaja` existente (boolean, default false)
-- [ ] **39.1.22** Agregar campo `esParaBuffet` a modelo `Producto` existente (boolean, default false)
-- [ ] **39.1.23** Agregar campo `esIngrediente` a modelo `Producto` existente (boolean, default false)
-- [ ] **39.1.24** Agregar tipo "BUFFET" a enum/campo tipo de `Caja` existente
-- [ ] **39.1.25** Migración y relaciones Prisma
+- [ ] **39.1.10** Agregar campo `esParaBuffet` a modelo `Producto` (boolean, default false)
+- [ ] **39.1.11** Agregar campo `comandaId` a modelo `MovimientoCaja` (nullable)
+- [ ] **39.1.12** Agregar campo `pedidoTakeAwayId` a modelo `MovimientoCaja` (nullable)
 
-**NOTA**: Se usa Caja y MovimientoCaja existentes. Los productos del buffet se crean en Stock existente con esParaBuffet=true. El buffet tiene su caja tipo BUFFET con cierres propios (CierreBuffet).
+#### Backend - Endpoints Base
+- [ ] **39.1.13** Endpoints CRUD de `Mesa`
+- [ ] **39.1.14** Endpoints CRUD de `CategoriaMenu`
+- [ ] **39.1.15** Endpoint GET productos buffet (filtro esParaBuffet=true)
+- [ ] **39.1.16** Endpoints CRUD de `ImpresoraTermica`
+- [ ] **39.1.17** Endpoints CRUD de `DestinoImpresion`
+- [ ] **39.1.18** Endpoint test conexión impresora
+- [ ] **39.1.19** Servicio impresión ESC/POS básico
 
----
+#### Frontend - Configuración
+- [ ] **39.1.20** Menú "Buffet" en AdminLayout.jsx
+- [ ] **39.1.21** Página `/admin/buffet/mesas` (MesasLista.jsx)
+- [ ] **39.1.22** Página `/admin/buffet/categorias` (CategoriasMenu.jsx)
+- [ ] **39.1.23** Página `/admin/buffet/productos` (ProductosBuffet.jsx) - filtro esParaBuffet
+- [ ] **39.1.24** Página `/admin/buffet/impresoras` (ImpresorasLista.jsx)
+- [ ] **39.1.25** Página `/admin/buffet/destinos-impresion` (DestinosImpresion.jsx)
 
-### Etapa 39.2: Configuración de Impresoras y Destinos
-> Sistema de impresión térmica con enrutamiento por categoría
-
-#### Backend - Gestión de Impresoras
-- [ ] **39.2.1** Endpoints CRUD de `ImpresoraTermica`
-- [ ] **39.2.2** Endpoint test de conexión a impresora (ping IP)
-- [ ] **39.2.3** Endpoints CRUD de `DestinoImpresion`
-- [ ] **39.2.4** Endpoint obtener destinos por categoría
-- [ ] **39.2.5** Servicio de impresión ESC/POS
-  - Comandos básicos: texto, negrita, tamaño, corte
-  - Formato ticket comanda
-  - Formato ticket pre-cuenta
-  - Formato ticket cobro
-- [ ] **39.2.6** Servicio de envío a impresora por TCP/IP
-- [ ] **39.2.7** Cola de impresión con reintentos
-- [ ] **39.2.8** Endpoint imprimir comanda (separa por destino automáticamente)
-- [ ] **39.2.9** Endpoint reimprimir comanda/item
-
-#### Frontend - Configuración Impresoras
-- [ ] **39.2.10** Página `/admin/buffet/configuracion/impresoras` (ImpresorasLista.jsx)
-- [ ] **39.2.11** Formulario de impresora (ImpresoraForm.jsx)
-  - Campos: nombre, tipo (select), IP, puerto
-  - Botón "Probar conexión"
-  - Botón "Imprimir prueba"
-- [ ] **39.2.12** Página `/admin/buffet/configuracion/destinos-impresion` (DestinosImpresion.jsx)
-  - Tabla: Categoría | Impresora destino | Copias
-  - Selector de impresora por categoría
-- [ ] **39.2.13** Preview de ticket antes de imprimir (opcional)
-
-#### Lógica de Enrutamiento
-```
-Al enviar comanda a cocina:
-1. Obtener items de la comanda
-2. Agrupar items por categoría
-3. Para cada categoría:
-   a. Buscar destino de impresión configurado
-   b. Generar ticket ESC/POS con items de esa categoría
-   c. Enviar a impresora correspondiente
-4. Si no hay destino configurado → usar impresora por defecto
-```
+#### Permisos (seed.js)
+- [ ] **39.1.26** Agregar permisos: BUFFET_VER, BUFFET_MESAS, BUFFET_COBRAR, BUFFET_COCINA, BUFFET_KIOSCO
+- [ ] **39.1.27** Agregar constantes a permisos.js del frontend
 
 ---
 
-### Etapa 39.3: Gestión de Carta/Menú
-> Reutiliza CRUD de Stock existente, filtrado por esParaBuffet=true
+### Etapa 39.2: Operación
+> Flujos de venta: Mesas, Take Away, Kiosco y Cocina (KDS)
 
-#### Concepto Clave
-- **NO** se duplica el CRUD de productos
-- Los productos del buffet son Productos normales del Stock con `esParaBuffet=true`
-- La persona del buffet accede a la página de productos existente **filtrada**
-- Solo necesitan modelos adicionales para categorías del menú, variantes y modificadores
-
-#### Backend - Productos Buffet (reutiliza stock.js)
-- [ ] **39.3.1** Agregar filtro `?esParaBuffet=true` a endpoint GET /productos existente
-- [ ] **39.3.2** Al crear producto desde buffet, setear `esParaBuffet=true` automáticamente
-- [ ] **39.3.3** Endpoints CRUD de `CategoriaMenu` (categorías del menú, no del stock)
-- [ ] **39.3.4** Endpoint reordenar categorías (drag & drop)
-- [ ] **39.3.5** Endpoints CRUD de `VarianteProductoMenu` (tamaños: pinta, litro, etc.)
-- [ ] **39.3.6** Endpoints CRUD de `ModificadorProducto` (sin sal, extra queso, etc.)
-- [ ] **39.3.7** Endpoints CRUD de `RecetaIngrediente` (ingredientes para descuento stock)
-- [ ] **39.3.8** Endpoint toggle disponibilidad producto (agotado/disponible)
-- [ ] **39.3.9** Endpoint obtener carta completa organizada por categoría (para app mozo)
-- [ ] **39.3.10** Endpoint buscar productos buffet (autocomplete)
-- [ ] **39.3.11** Endpoint productos más vendidos (favoritos)
-
-#### Frontend - Administración Carta
-- [ ] **39.3.12** Página `/admin/buffet/productos` (ProductosBuffet.jsx)
-  - **Reutiliza componentes de Stock** pero con filtro esParaBuffet=true
-  - Solo muestra productos del buffet
-  - Botón "Nuevo Producto" crea con esParaBuffet=true
-- [ ] **39.3.13** Página `/admin/buffet/carta` (CartaLista.jsx)
-  - Organiza productos por categorías del menú
-  - Drag & drop para reordenar en cada categoría
-  - Asignar productos a categorías
-  - Vista similar a un menú real
-- [ ] **39.3.14** Formulario de categoría menú (CategoriaMenuForm.jsx)
-  - Campos: código, nombre, color, icono, orden
-- [ ] **39.3.15** Modal asignar producto a categoría
-  - Selector de producto (filtrado buffet)
-  - Precio de venta (puede diferir del precio stock)
-  - Precio socio
-  - Tiempo de preparación
-- [ ] **39.3.16** Tab variantes en producto (VariantesTab.jsx)
-  - Lista de variantes con precio extra
-  - Agregar/editar/eliminar variantes
-- [ ] **39.3.17** Tab modificadores en producto (ModificadoresTab.jsx)
-  - Lista de modificadores
-  - Marcar si es gratis o tiene costo
-- [ ] **39.3.18** Tab receta en producto (RecetaTab.jsx)
-  - Selector de productos del stock (esIngrediente=true)
-  - Cantidad y unidad por ingrediente
-  - Cálculo de costo estimado
-- [ ] **39.3.19** Vista previa de carta (CartaPreview.jsx)
-  - Como se vería en app del mozo
-
-#### Filtrado por Permisos
-- [ ] **39.3.20** Usuario con BUFFET_CARTA solo ve productos con esParaBuffet=true
-- [ ] **39.3.21** Si tiene permiso STOCK_VER puede ver todos los productos
-- [ ] **39.3.22** El filtro se aplica en backend según permisos del usuario
-
----
-
-### Etapa 39.4: Gestión de Mesas y Zonas
-> Layout visual del salón con mesas arrastrables
-
-#### Backend - Mesas
-- [ ] **39.4.1** Endpoints CRUD de `ZonaBuffet`
-- [ ] **39.4.2** Endpoints CRUD de `Mesa`
-- [ ] **39.4.3** Endpoint actualizar posición mesa (posX, posY)
-- [ ] **39.4.4** Endpoint cambiar estado mesa
-- [ ] **39.4.5** Endpoint unir mesas (mesa principal + mesas unidas)
-- [ ] **39.4.6** Endpoint separar mesas unidas
-- [ ] **39.4.7** Endpoint obtener estado actual de todas las mesas
-- [ ] **39.4.8** WebSocket para actualización en tiempo real de estados
-
-#### Frontend - Gestión Mesas
-- [ ] **39.4.9** Página `/admin/buffet/mesas` (MesasLayout.jsx)
-  - Canvas con mesas arrastrables
-  - Colores por estado (verde libre, rojo ocupada, etc.)
-  - Zoom in/out
-  - Filtro por zona
-- [ ] **39.4.10** Formulario de zona (ZonaForm.jsx)
-- [ ] **39.4.11** Formulario de mesa (MesaForm.jsx)
-  - Campos: número, zona, capacidad
-  - Toggle activo/fuera de servicio
-- [ ] **39.4.12** Modo edición de layout (arrastrar mesas)
-- [ ] **39.4.13** Modo operación (ver estados, click abre comanda)
-- [ ] **39.4.14** Indicador de tiempo de ocupación por mesa
-- [ ] **39.4.15** Modal unir mesas (selección múltiple)
-
----
-
-### Etapa 39.5: Reservas
-> Sistema de reservas de mesas
-
-#### Backend - Reservas
-- [ ] **39.5.1** Endpoints CRUD de `ReservaBuffet`
-- [ ] **39.5.2** Endpoint verificar disponibilidad (fecha, hora, comensales)
-- [ ] **39.5.3** Endpoint confirmar reserva
-- [ ] **39.5.4** Endpoint cancelar reserva
-- [ ] **39.5.5** Endpoint marcar no-show
-- [ ] **39.5.6** Endpoint reservas del día
-- [ ] **39.5.7** Notificación recordatorio de reserva (1 día antes, 2 horas antes)
-- [ ] **39.5.8** Buscar socio por QR/DNI para vincular reserva
-
-#### Frontend - Reservas
-- [ ] **39.5.9** Página `/admin/buffet/reservas` (ReservasLista.jsx)
-  - Vista calendario día/semana
-  - Vista lista con filtros
-  - Estados con colores
-- [ ] **39.5.10** Formulario de reserva (ReservaForm.jsx)
-  - Selector de fecha y hora
-  - Cantidad de comensales
-  - Mesa sugerida automáticamente
-  - Datos del cliente o vincular socio
-- [ ] **39.5.11** Timeline de reservas por mesa
-- [ ] **39.5.12** Alertas de reservas próximas en mapa de mesas
-
----
-
-### Etapa 39.6: Turnos de Mozos
-> Control de turnos del personal del buffet
-
-#### Backend - Turnos
-- [ ] **39.6.1** Endpoints CRUD de `TurnoBuffet`
-- [ ] **39.6.2** Endpoint abrir turno (con fondo inicial)
-- [ ] **39.6.3** Endpoint cerrar turno (resumen ventas, propinas)
-- [ ] **39.6.4** Endpoint obtener turno activo del usuario
-- [ ] **39.6.5** Endpoint listar ventas del turno
-- [ ] **39.6.6** Endpoint registrar propina
-- [ ] **39.6.7** Endpoint asignar mesas a mozo
-- [ ] **39.6.8** Reporte de ventas por mozo
-
-#### Frontend - Turnos
-- [ ] **39.6.9** Página `/admin/buffet/turnos` (TurnosLista.jsx)
-  - Turnos del día con estado
-  - Histórico con filtros
-- [ ] **39.6.10** Modal apertura de turno (AperturaTurno.jsx)
-  - Fondo inicial
-  - Mesas asignadas
-- [ ] **39.6.11** Modal cierre de turno (CierreTurno.jsx)
-  - Resumen de ventas
-  - Total propinas
-  - Diferencia de caja
-- [ ] **39.6.12** Dashboard del mozo (ventas del día, mesas activas)
-
----
-
-### Etapa 39.7: Toma de Comandas
-> Flujo principal de registro de pedidos en mesas
-
-#### Backend - Comandas
-- [ ] **39.7.1** Endpoint abrir comanda (mesa, mozo, comensales, socio opcional)
-- [ ] **39.7.2** Endpoint agregar item a comanda
-- [ ] **39.7.3** Endpoint modificar item (cantidad, observaciones)
-- [ ] **39.7.4** Endpoint anular item (con motivo y autorización)
-- [ ] **39.7.5** Endpoint enviar a cocina (cambia estado items a ENVIADO_COCINA)
-- [ ] **39.7.6** Endpoint obtener comanda activa de mesa
-- [ ] **39.7.7** Endpoint listar comandas activas (para mozo)
-- [ ] **39.7.8** Endpoint historial de comandas
-- [ ] **39.7.9** Endpoint transferir comanda a otra mesa
-- [ ] **39.7.10** Endpoint dividir comanda (crear nueva con items seleccionados)
-- [ ] **39.7.11** Lógica de impresión al enviar a cocina (usa destinos configurados)
-- [ ] **39.7.12** Descuento automático de stock al cerrar comanda (usa recetas)
-
-#### Frontend - App Mozo TABLET (PWA optimizada)
-- [ ] **39.7.13** Layout especial buffet tablet (sin sidebar, bottom nav)
-- [ ] **39.7.14** Pantalla mapa de mesas del mozo (MozoMesas.jsx)
-  - Solo mesas asignadas o todas
-  - Click en mesa → abre comanda
-  - Indicadores visuales de estado
-- [ ] **39.7.15** Pantalla toma de comanda tablet (TomaComanda.jsx)
-  - Header: mesa, comensales, tiempo
-  - Grid de categorías (3-4 columnas)
-  - Lista de productos por categoría
-  - Búsqueda rápida
-  - Productos favoritos/frecuentes
-- [ ] **39.7.16** Selector de variante al agregar producto
-- [ ] **39.7.17** Selector de modificadores
-- [ ] **39.7.18** Asignar item a comensal (1, 2, 3...)
-- [ ] **39.7.19** Campo observaciones por item
-- [ ] **39.7.20** Resumen de comanda actual
-  - Lista de items pendientes de enviar
-  - Items ya enviados
-  - Total parcial
-- [ ] **39.7.21** Botón "Enviar a Cocina" (solo items pendientes)
-- [ ] **39.7.22** Notificación push cuando item está listo
-- [ ] **39.7.23** Marcar item como entregado
-- [ ] **39.7.24** Botón "Pedir Cuenta" (cambia estado comanda)
-
-#### Frontend - App Mozo MÓVIL (PWA optimizada celular)
-> Versión específica para celular con UX adaptada a pantalla pequeña
-
-- [ ] **39.7.25** Layout móvil específico (TomaComandaMobile.jsx)
-  - Full screen, sin chrome del navegador
-  - Bottom navigation fija (Mesas, Comanda, Cuenta)
-  - Gestos swipe para navegación
-- [ ] **39.7.26** Mapa de mesas versión móvil
-  - Lista vertical con cards grandes (touch-friendly)
-  - Indicadores de estado con colores
-  - Pull-to-refresh
-  - Filtro rápido por zona (tabs horizontales)
-- [ ] **39.7.27** Toma de comanda versión móvil
-  - Categorías en scroll horizontal (chips)
-  - Productos en lista vertical con fotos grandes
-  - Búsqueda con teclado optimizado
-  - FAB flotante para ver resumen
-- [ ] **39.7.28** Agregar producto modal full-screen
-  - Imagen del producto grande
-  - Selector de cantidad (+/-)
-  - Variantes en chips seleccionables
-  - Modificadores como toggles
-  - Teclado para observaciones
-  - Botón grande "Agregar"
-- [ ] **39.7.29** Resumen de comanda (drawer desde abajo)
-  - Swipe up para expandir
-  - Lista de items con swipe para eliminar
-  - Total siempre visible
-  - Botones: Enviar a Cocina, Pedir Cuenta
-- [ ] **39.7.30** Notificaciones push en móvil
-  - Vibración cuando item está listo
-  - Badge con cantidad de items listos
-- [ ] **39.7.31** Modo offline móvil
-  - Cola de comandas local
-  - Sincronización automática
-  - Indicador de conexión
-- [ ] **39.7.32** Detección automática de dispositivo
-  - Si ancho < 768px → TomaComandaMobile
-  - Si ancho >= 768px → TomaComanda (tablet)
-  - O selector manual en configuración de usuario
-
----
-
-### Etapa 39.8: Pantalla Cocina (KDS - Kitchen Display System)
-> Visualización y gestión de pedidos en cocina
-
-#### Backend - KDS
-- [ ] **39.8.1** Endpoint items pendientes de preparación (filtrado por impresora/destino)
-- [ ] **39.8.2** Endpoint marcar item como "en preparación"
-- [ ] **39.8.3** Endpoint marcar item como "listo"
-- [ ] **39.8.4** Endpoint marcar todos los items de una comanda como listos
-- [ ] **39.8.5** WebSocket para actualización en tiempo real
-- [ ] **39.8.6** Endpoint bumper (quitar de pantalla)
-- [ ] **39.8.7** Cálculo de tiempo de espera por item
-- [ ] **39.8.8** Alertas de items con espera excesiva
-
-#### Frontend - KDS
-- [ ] **39.8.9** Página `/buffet/cocina` (PantallaCocina.jsx)
-  - Sin login (o PIN simple)
-  - Pantalla completa optimizada para monitor/TV
-- [ ] **39.8.10** Grid de tickets pendientes
-  - Cada ticket = items de una comanda para esa estación
-  - Ordenados por hora de llegada (FIFO)
-- [ ] **39.8.11** Colores por tiempo de espera
-  - Verde: < 5 min
-  - Amarillo: 5-10 min
-  - Rojo: > 10 min
-- [ ] **39.8.12** Touch en item → marcar en preparación
-- [ ] **39.8.13** Touch en ticket completo → marcar todos listos
-- [ ] **39.8.14** Swipe → bump (quitar de pantalla)
-- [ ] **39.8.15** Sonido/alerta en nuevos pedidos
-- [ ] **39.8.16** Filtro por estación (si hay múltiples)
-- [ ] **39.8.17** Contador de tickets pendientes
-
----
-
-### Etapa 39.9: Cierre de Mesa y Cobro
-> Pre-cuenta, división, cobro y facturación
-
-#### Backend - Cobro (Integrado con Tesorería existente)
-- [ ] **39.9.1** Endpoint generar pre-cuenta
-- [ ] **39.9.2** Endpoint calcular totales (subtotal, descuentos, propina sugerida, total)
-- [ ] **39.9.3** Endpoint aplicar descuento (%, monto fijo, motivo)
-- [ ] **39.9.4** Endpoint división de cuenta
-  - Por partes iguales
-  - Por comensal (cada uno paga lo suyo)
-  - Monto fijo por persona
-- [ ] **39.9.5** Endpoint cobrar comanda (usa servicios existentes):
-  - Crea `MovimientoCaja` en caja activa del club
-  - Usa `MedioPago` existentes del sistema
-  - Múltiples medios de pago en una operación
-  - Registro de propina (MovimientoCaja con esPropina=true)
-  - Vinculación con socio (cuenta corriente)
-- [ ] **39.9.6** Endpoint cargar a cuenta corriente socio (crea Cargo pendiente)
-- [ ] **39.9.7** Endpoint cerrar comanda (cambia estado mesa a LIMPIEZA)
-- [ ] **39.9.8** Impresión de ticket de cobro
-- [ ] **39.9.9** Generación de factura usando sistema existente (A/B/C)
-- [ ] **39.9.10** Generación de `Asiento` contable automático (mismo servicio que cuotas)
-- [ ] **39.9.11** Centro de costo BUFFET en cada asiento generado
-
-#### Frontend - Cobro
-- [ ] **39.9.12** Modal pre-cuenta (PreCuenta.jsx)
-  - Detalle de items consumidos
-  - Subtotal, descuentos, total
-  - Botón imprimir pre-cuenta
-- [ ] **39.9.13** Modal división de cuenta (DivisionCuenta.jsx)
-  - Opciones: iguales, por comensal, personalizado
-  - Arrastrar items a cada cuenta
-- [ ] **39.9.14** Modal cobro (CobroComanda.jsx)
-  - Selector de medio de pago
-  - Múltiples pagos (parte efectivo, parte tarjeta)
-  - Campo propina
-  - Escanear QR socio para cuenta corriente
-  - Selector tipo comprobante
-  - Botón cobrar + imprimir
-- [ ] **39.9.15** Confirmación de cierre de mesa
-- [ ] **39.9.16** Notificación a mozo de mesa liberada
-
----
-
-### Etapa 39.10: Pedidos Take Away
-> Flujo de pedidos para llevar
+#### Backend - Comandas (Mesas)
+- [ ] **39.2.1** Endpoint POST `/buffet/comandas` - Abrir comanda en mesa
+- [ ] **39.2.2** Endpoint GET `/buffet/comandas/:id` - Detalle comanda
+- [ ] **39.2.3** Endpoint POST `/buffet/comandas/:id/items` - Agregar items
+- [ ] **39.2.4** Endpoint PUT `/buffet/comandas/:id/items/:itemId` - Modificar item
+- [ ] **39.2.5** Endpoint DELETE `/buffet/comandas/:id/items/:itemId` - Anular item
+- [ ] **39.2.6** Endpoint POST `/buffet/comandas/:id/enviar-cocina` - Enviar a cocina + imprimir
+- [ ] **39.2.7** Endpoint POST `/buffet/comandas/:id/cobrar` - Cobrar (genera MovimientoCaja)
+- [ ] **39.2.8** Endpoint POST `/buffet/comandas/:id/cerrar` - Cerrar mesa
 
 #### Backend - Take Away
-- [ ] **39.10.1** Endpoints CRUD de `PedidoTakeAway`
-- [ ] **39.10.2** Endpoint crear pedido rápido
-- [ ] **39.10.3** Endpoint agregar items a pedido
-- [ ] **39.10.4** Endpoint calcular hora estimada de entrega
-- [ ] **39.10.5** Endpoint cambiar estado pedido
-- [ ] **39.10.6** Endpoint cobrar pedido
-- [ ] **39.10.7** Endpoint listar pedidos activos
-- [ ] **39.10.8** Notificación push cuando pedido está listo
-- [ ] **39.10.9** Impresión de comanda a cocina (mismo sistema de destinos)
-- [ ] **39.10.10** Impresión de ticket de retiro
+- [ ] **39.2.9** Endpoint POST `/buffet/takeaway` - Crear pedido
+- [ ] **39.2.10** Endpoint GET `/buffet/takeaway` - Listar pendientes
+- [ ] **39.2.11** Endpoint POST `/buffet/takeaway/:id/items` - Agregar items
+- [ ] **39.2.12** Endpoint POST `/buffet/takeaway/:id/enviar-cocina` - Enviar a cocina + imprimir
+- [ ] **39.2.13** Endpoint PUT `/buffet/takeaway/:id/listo` - Marcar listo
+- [ ] **39.2.14** Endpoint POST `/buffet/takeaway/:id/cobrar` - Cobrar y entregar
+
+#### Backend - Kiosco (Venta Rápida)
+- [ ] **39.2.15** Endpoint POST `/buffet/kiosco/venta` - Venta directa sin mesa
+  - Recibe: items[], medioPagoId, socioId?
+  - Genera: MovimientoCaja + imprime ticket
+
+#### Backend - Cocina (KDS)
+- [ ] **39.2.16** Endpoint GET `/buffet/cocina/pendientes` - Items pendientes de preparación
+- [ ] **39.2.17** Endpoint PUT `/buffet/cocina/items/:id/preparando` - Marcar en preparación
+- [ ] **39.2.18** Endpoint PUT `/buffet/cocina/items/:id/listo` - Marcar listo
+- [ ] **39.2.19** WebSocket o polling para actualizaciones en tiempo real
+
+#### Backend - Dashboard
+- [ ] **39.2.20** Endpoint GET `/buffet/dashboard` - KPIs (mesas ocupadas, comandas activas, ventas día)
+- [ ] **39.2.21** Endpoint GET `/buffet/mesas/estado` - Estado de todas las mesas
+
+#### Frontend - Operación Mesas
+- [ ] **39.2.22** Página `/admin/buffet` - Dashboard con estado de mesas
+- [ ] **39.2.23** Componente `MesaCard` - Click abre comanda
+- [ ] **39.2.24** Página `/admin/buffet/comanda/:id` - Toma de pedido
+  - Grid de categorías y productos
+  - Carrito con items agregados
+  - Botones: Enviar a cocina, Ver cuenta, Cobrar
+- [ ] **39.2.25** Modal de cobro (selección medio de pago)
 
 #### Frontend - Take Away
-- [ ] **39.10.11** Página `/admin/buffet/takeaway` (TakeAwayLista.jsx)
-  - Lista de pedidos activos con estados
-  - Filtros por estado
-  - Búsqueda por número/nombre
-- [ ] **39.10.12** Modal nuevo pedido (TakeAwayForm.jsx)
-  - Datos cliente (nombre, teléfono) o escanear socio
-  - Selector de productos (igual que comanda)
-  - Hora estimada de retiro
-- [ ] **39.10.13** Pantalla de números listos (PantallaRetiro.jsx)
-  - Para mostrar en mostrador
-  - Números de pedidos listos
-  - Animación al agregar nuevo
-
----
-
-### Etapa 39.11: Punto de Venta Kiosco
-> Venta rápida sin mesa para golosinas y productos menores
-
-#### Backend - Kiosco
-- [ ] **39.11.1** Endpoint venta rápida kiosco (productos, cobro inmediato)
-- [ ] **39.11.2** Endpoint productos frecuentes kiosco
-- [ ] **39.11.3** Endpoint buscar producto por código de barras
-- [ ] **39.11.4** Endpoint cargar a cuenta socio (con límite)
-- [ ] **39.11.5** Integración con caja kiosco
+- [ ] **39.2.26** Página `/admin/buffet/takeaway` - Lista de pedidos pendientes
+- [ ] **39.2.27** Modal nuevo pedido (nombre, teléfono, items)
+- [ ] **39.2.28** Acciones: Enviar cocina, Marcar listo, Cobrar
 
 #### Frontend - Kiosco
-- [ ] **39.11.6** Página `/buffet/kiosco` (PuntoVentaKiosco.jsx)
-  - Layout simplificado para venta rápida
-  - Grid de productos frecuentes
-  - Búsqueda por código/nombre
-  - Campo para lector de código de barras
-- [ ] **39.11.7** Lista de items en venta actual
-- [ ] **39.11.8** Botones de cobro rápido (efectivo, tarjeta, cuenta socio)
-- [ ] **39.11.9** Modal identificar socio (QR o DNI)
-- [ ] **39.11.10** Impresión de ticket
+- [ ] **39.2.29** Página `/admin/buffet/kiosco` - Venta rápida
+  - Grid de productos (solo SNACKS, BEBIDAS)
+  - Carrito simple
+  - Botón "Cobrar" directo
+
+#### Frontend - Cocina (KDS)
+- [ ] **39.2.30** Página `/admin/buffet/cocina` - Pantalla para cocina
+  - Cards de items pendientes ordenados por tiempo
+  - Colores por estado (nuevo=rojo, preparando=amarillo)
+  - Click para marcar estado
+  - Actualización automática (polling 10s o WebSocket)
+
+#### Frontend - Menú Público
+- [ ] **39.2.31** Página `/buffet/menu` - Menú público (sin login)
+  - Grid de productos con foto, nombre, descripción, precio
+  - Filtro por categoría
+  - Solo visualización (sin compra online en MVP)
+
+#### Rutas App.jsx
+- [ ] **39.2.32** Agregar rutas: /admin/buffet/*, /buffet/menu
 
 ---
 
-### Etapa 39.12: Caja del Buffet (Integrada pero con cierre propio)
-> Usa Caja existente pero permite cierre independiente del buffet
+### Fases Futuras (Post-MVP)
+> Funcionalidades a agregar después de validar el MVP
 
-#### Backend - Caja Buffet
-- [ ] **39.12.1** Crear Caja tipo "BUFFET" en sistema existente (ej: "Caja Buffet Principal")
-- [ ] **39.12.2** Los cobros del buffet van a la caja tipo BUFFET
-- [ ] **39.12.3** Modelo `CierreBuffet` (cajaId, turnoId, fecha, fondoInicial, totalVentas, totalPropinas, totalEfectivo, totalTarjeta, efectivoArqueado, diferencia, observaciones, cerradoPor)
-- [ ] **39.12.4** Endpoint apertura de turno buffet (fondo inicial en caja BUFFET)
-- [ ] **39.12.5** Endpoint cierre de turno buffet:
-  - Calcula totales de MovimientoCaja del turno
-  - Registra arqueo de efectivo
-  - Calcula diferencias
-  - Genera CierreBuffet
-- [ ] **39.12.6** Endpoint movimientos filtrados por caja BUFFET
-- [ ] **39.12.7** Endpoint resumen del día (ventas, propinas, por medio de pago)
-- [ ] **39.12.8** Endpoint histórico de cierres buffet
-- [ ] **39.12.9** Las propinas se registran como MovimientoCaja con esPropina=true
-- [ ] **39.12.10** Transferencia de efectivo a caja principal (opcional, al final del día)
-
-#### Frontend - Caja Buffet
-- [ ] **39.12.11** Página `/admin/buffet/caja` (CajaBuffet.jsx)
-  - Estado actual de caja BUFFET
-  - Movimientos del turno actual
-  - Totales por medio de pago
-  - Propinas acumuladas
-- [ ] **39.12.12** Modal apertura de turno (AperturaTurnoBuffet.jsx)
-  - Fondo inicial (conteo de efectivo)
-  - Mozo/encargado que abre
-- [ ] **39.12.13** Modal cierre de turno (CierreTurnoBuffet.jsx)
-  - Arqueo de efectivo por denominación
-  - Totales por medio de pago
-  - Propinas del turno
-  - Diferencias detectadas
-  - Observaciones
-- [ ] **39.12.14** Histórico de cierres con filtros
-- [ ] **39.12.15** Opción de transferir efectivo a caja principal
-
-**NOTA**: El buffet tiene su propia caja (tipo BUFFET) y puede hacer cierres independientes. Los movimientos siguen usando MovimientoCaja del sistema, permitiendo reportes consolidados del club.
-
----
-
-### Etapa 39.13: Reportes y Analytics
-> Dashboard y reportes gerenciales del buffet
-
-#### Backend - Reportes
-- [ ] **39.13.1** Endpoint dashboard buffet (KPIs del día)
-- [ ] **39.13.2** Endpoint ventas por período
-- [ ] **39.13.3** Endpoint productos más vendidos
-- [ ] **39.13.4** Endpoint productos menos vendidos
-- [ ] **39.13.5** Endpoint margen por producto (precio - costo ingredientes)
-- [ ] **39.13.6** Endpoint ventas por categoría
-- [ ] **39.13.7** Endpoint ventas por hora (curva de demanda)
-- [ ] **39.13.8** Endpoint ventas por mozo
-- [ ] **39.13.9** Endpoint rotación de mesas (promedio ocupación)
-- [ ] **39.13.10** Endpoint ticket promedio
-- [ ] **39.13.11** Endpoint comparativo períodos
-- [ ] **39.13.12** Endpoint consumo socios vs público
-- [ ] **39.13.13** Endpoint items anulados con motivos
-- [ ] **39.13.14** Endpoint exportar a Excel
-
-#### Frontend - Reportes
-- [ ] **39.13.15** Página `/admin/buffet/dashboard` (DashboardBuffet.jsx)
-  - KPIs: ventas del día, ticket promedio, mesas atendidas
-  - Gráfico ventas por hora
-  - Top 5 productos
-  - Alertas (stock bajo, tiempos altos)
-- [ ] **39.13.16** Página `/admin/buffet/reportes` (ReportesBuffet.jsx)
-  - Tabs: Ventas, Productos, Mozos, Mesas, Análisis
-- [ ] **39.13.17** Tab Ventas
-  - Filtros de fecha
-  - Gráficos con Recharts
-  - Tabla detallada
-- [ ] **39.13.18** Tab Productos
-  - Ranking más/menos vendidos
-  - Margen por producto
-  - Productos agotados frecuentemente
-- [ ] **39.13.19** Tab Mozos
-  - Ventas por mozo
-  - Tickets promedio
-  - Propinas
-- [ ] **39.13.20** Tab Mesas
-  - Ocupación por zona
-  - Tiempo promedio
-  - Mesas más rentables
-- [ ] **39.13.21** Tab Análisis
-  - Comparativo con período anterior
-  - Tendencias
-  - Proyecciones
-
----
-
-### Etapa 39.14: Integraciones Avanzadas
-> Conexión profunda con módulos existentes
-
-#### Integración Socios
-- [ ] **39.14.1** Descuento automático por tipo de socio
-- [ ] **39.14.2** Límite de cuenta corriente por categoría de socio
-- [ ] **39.14.3** Historial de consumos en ficha del socio
-- [ ] **39.14.4** Bloqueo de cuenta si socio moroso
-
-#### Integración Stock
-- [ ] **39.14.5** Descuento automático de ingredientes al cerrar comanda
-- [ ] **39.14.6** Alertas de stock bajo de insumos
-- [ ] **39.14.7** Sugerencia de pedido a proveedor
-- [ ] **39.14.8** Recálculo de costos cuando cambian precios de insumos
-
-#### Integración Contabilidad
-- [ ] **39.14.9** Asientos automáticos de ventas buffet
-- [ ] **39.14.10** Centro de costo BUFFET
-- [ ] **39.14.11** Cuenta contable por categoría de producto (opcional)
-- [ ] **39.14.12** Estado de resultados del buffet
-
-#### Integración Notificaciones
-- [ ] **39.14.13** Push a socio cuando pedido take away listo
-- [ ] **39.14.14** Email recordatorio de reserva
-- [ ] **39.14.15** Notificación de consumo cargado a cuenta
-
----
-
-### Etapa 39.15: Menú, Navegación y Permisos
-> Integración completa con AdminLayout y sistema de permisos existente
-
-#### Menú en AdminLayout.jsx (Sidebar existente)
-- [ ] **39.15.1** Agregar submenú "Buffet" en AdminLayout.jsx (igual que Deportes, Ingresos)
-  - Icono: UtensilsCrossed de lucide-react
-  - Expandible con subitems
-  - Protegido por permisos
-- [ ] **39.15.2** Subitems del menú Buffet:
-  - Dashboard (BUFFET_VER)
-  - Mesas (BUFFET_MESAS)
-  - Carta/Menú (BUFFET_CARTA)
-  - Reservas (BUFFET_RESERVAS)
-  - Turnos (BUFFET_TURNOS)
-  - Take Away (BUFFET_TAKEAWAY)
-  - Ventas del Día (BUFFET_VENTAS)
-  - Reportes (BUFFET_REPORTES)
-  - Configuración → submenu: Impresoras, Destinos, Zonas (BUFFET_CONFIG)
-
-#### Rutas en App.jsx
-- [ ] **39.15.3** Rutas admin (protegidas por ProtectedRoute existente):
-  - `/admin/buffet/dashboard` → DashboardBuffet
-  - `/admin/buffet/mesas` → MesasLayout
-  - `/admin/buffet/carta` → CartaLista
-  - `/admin/buffet/reservas` → ReservasLista
-  - `/admin/buffet/turnos` → TurnosLista
-  - `/admin/buffet/takeaway` → TakeAwayLista
-  - `/admin/buffet/ventas` → VentasBuffet
-  - `/admin/buffet/reportes` → ReportesBuffet
-  - `/admin/buffet/configuracion/impresoras` → ImpresorasLista
-  - `/admin/buffet/configuracion/destinos` → DestinosImpresion
-  - `/admin/buffet/configuracion/zonas` → ZonasLista
-
-#### Rutas Operativas (dentro del mismo sistema)
-- [ ] **39.15.4** Rutas operativas:
-  - `/admin/buffet/mozo` → MozoMesas (mapa de mesas para mozo)
-  - `/admin/buffet/comanda/:mesaId` → TomaComanda
-  - `/admin/buffet/cocina` → PantallaCocina (KDS)
-  - `/admin/buffet/kiosco` → PuntoVentaKiosco
-  - `/admin/buffet/retiro` → PantallaRetiro (take away)
-
-#### Permisos en seed.js (Sistema existente Fase 38)
-- [ ] **39.15.5** Agregar permisos a seed.js junto con los demás:
-  ```javascript
-  // En seed.js, array de permisos existente, agregar:
-  { codigo: 'BUFFET_VER', nombre: 'Ver módulo Buffet', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_CARTA', nombre: 'Gestionar carta/menú', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_MESAS', nombre: 'Gestionar mesas y zonas', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_RESERVAS', nombre: 'Gestionar reservas', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_TURNOS', nombre: 'Gestionar turnos', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_TAKEAWAY', nombre: 'Gestionar pedidos take away', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_VENTAS', nombre: 'Ver ventas del buffet', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_REPORTES', nombre: 'Ver reportes del buffet', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_CONFIG', nombre: 'Configurar buffet', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_MOZO', nombre: 'Tomar comandas (mozo)', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_COCINA', nombre: 'Pantalla cocina (KDS)', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_KIOSCO', nombre: 'Punto de venta kiosco', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_COBRAR', nombre: 'Cobrar comandas', modulo: 'BUFFET' },
-  { codigo: 'BUFFET_ANULAR', nombre: 'Anular items/comandas', modulo: 'BUFFET' },
-  ```
-- [ ] **39.15.6** Agregar constantes a permisos.js del frontend:
-  ```javascript
-  // En client/src/services/permisos.js
-  BUFFET_VER: 'BUFFET_VER',
-  BUFFET_CARTA: 'BUFFET_CARTA',
-  // ... etc
-  ```
-- [ ] **39.15.7** Usar tienePermiso() en componentes del buffet
-- [ ] **39.15.8** Filtrar menú en AdminLayout según permisos de buffet
-
----
-
-### Etapa 39.16: PWA y Modo Offline
-> Optimización para tablets y funcionamiento sin conexión
-
-#### PWA Mozo
-- [ ] **39.16.1** Service worker específico para buffet
-- [ ] **39.16.2** Cache de carta/menú
-- [ ] **39.16.3** Cola de comandas offline
-- [ ] **39.16.4** Sincronización al recuperar conexión
-- [ ] **39.16.5** Indicador de estado de conexión
-- [ ] **39.16.6** Modo offline básico (ver mesas, tomar comanda, sincronizar después)
-
-#### Optimizaciones
-- [ ] **39.16.7** Precarga de imágenes de productos
-- [ ] **39.16.8** Lazy loading de secciones
-- [ ] **39.16.9** Animaciones táctiles (feedback)
-- [ ] **39.16.10** Tamaño de botones optimizado para touch
-
----
-
-### Resumen de Modelos
-
-#### Modelos Nuevos (15)
-```prisma
-// Configuración
-ZonaBuffet, Mesa, CategoriaMenu, ProductoMenu
-VarianteProductoMenu, ModificadorProducto, RecetaIngrediente
-ImpresoraTermica, DestinoImpresion
-
-// Operación
-TurnoBuffet, Comanda, ItemComanda, ModificadorItem
-PedidoTakeAway, ItemPedidoTakeAway, ReservaBuffet
-AnulacionItem, CierreBuffet
-```
-
-#### Modelos Existentes Modificados
-```prisma
-MovimientoCaja  // +comandaId, +pedidoTakeAwayId, +esPropina
-Producto        // +esParaBuffet, +esIngrediente
-Caja            // +tipo BUFFET
-```
-
-### Resumen de Endpoints (~120)
-- Configuración: ~25
-- Carta/Menú: ~15
-- Mesas: ~10
-- Reservas: ~10
-- Turnos: ~10
-- Comandas: ~15
-- KDS: ~10
-- Cobro: ~12
-- Take Away: ~10
-- Kiosco: ~5
-- Caja: ~12
-- Reportes: ~15
-
-### Resumen de Páginas (~30)
-- Admin: ~15 páginas
-- Operativas Tablet: ~8 páginas
-- Operativas Móvil: ~5 páginas (versión celular optimizada)
-- Configuración: ~4 páginas
+- Reservas de mesas
+- Turnos de mozos
+- Pedidos online (socios y público)
+- Promociones, Happy Hour, Combos
+- Delivery con repartidores
+- Menú digital QR (pedir desde la mesa)
+- Recetas e ingredientes (descuento automático de stock)
+- Variantes y modificadores de productos
+- Reportes y analytics avanzados
+- PWA y modo offline
+- Eventos y catering
+- Propinas y split de cuentas
+- Feedback y encuestas
 
 ---
 
@@ -1785,4 +1200,5 @@ npm run dev
 
 ---
 
-*Ultima actualizacion: 7 de Febrero 2026 - Agregada FASE 39 (Módulo Buffet/Restaurant) con 16 etapas y ~188 items (incluye versión móvil optimizada)*
+*Ultima actualizacion: 7 de Febrero 2026 - FASE 39 (Módulo Buffet/Restaurant) simplificada a MVP con 2 etapas*
+*MVP incluye: Mesas/Comandas, Take Away, Kiosco, Cocina (KDS), Impresoras Térmicas, Menú Público*
