@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
+import { createServer } from 'http'
 import cors from 'cors'
 import helmet from 'helmet'
 import path from 'path'
@@ -39,15 +40,18 @@ import autoridadesRoutes from './routes/autoridades.js'
 import reportesDeportivosRoutes from './routes/reportesDeportivos.js'
 import pasajeCategoriaRoutes from './routes/pasajeCategoria.js'
 import conciliacionBancariaRoutes from './routes/conciliacionBancaria.js'
+import buffetRoutes from './routes/buffet.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
 import { iniciarCronJobs, detenerCronJobs } from './jobs/notificaciones.js'
+import { initSocket } from './services/socketService.js'
 
 // Middlewares
 import { errorHandler } from './middleware/errorHandler.js'
 
 const app = express()
+const httpServer = createServer(app)
 const prisma = new PrismaClient()
 const PORT = process.env.PORT || 3001
 
@@ -99,6 +103,8 @@ app.use('/api/autoridades', autoridadesRoutes)
 app.use('/api/admin/reportes/deportivos', reportesDeportivosRoutes)
 app.use('/api/admin/categorias/pasaje', pasajeCategoriaRoutes)
 app.use('/api/admin/conciliacion', conciliacionBancariaRoutes)
+app.use('/api/admin/buffet', buffetRoutes)
+app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -108,12 +114,16 @@ app.get('/api/health', (req, res) => {
 // Error handler
 app.use(errorHandler)
 
+// Inicializar Socket.io
+const io = initSocket(httpServer)
+
 // Iniciar servidor
-app.listen(PORT, async () => {
+httpServer.listen(PORT, async () => {
   console.log(`
 🚀 Servidor RojoPlus iniciado
 📍 Puerto: ${PORT}
 🔗 API: http://localhost:${PORT}/api
+🔌 Socket.io: Activo
   `)
 
   // Verificar conexión SMTP

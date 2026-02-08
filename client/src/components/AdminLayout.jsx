@@ -3,7 +3,8 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
-  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User
+  UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User,
+  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag
 } from 'lucide-react'
 import api from '../services/api'
 import { cargarPermisos, limpiarPermisos, tieneAlgunPermiso, getPermisos, PERMISOS } from '../services/permisos'
@@ -174,6 +175,19 @@ export default function AdminLayout() {
         { path: '/admin/deportes/tipos-espacio', label: 'Tipos de Espacio', icon: Settings },
         { path: '/admin/reportes/deportivos', label: 'Reportes Deportivos', icon: BarChart3, permisos: [PERMISOS.REPORTES_VER] },
         { path: '/admin/deportes/pasaje-categoria', label: 'Pasaje Categoría', icon: ArrowUpCircle, permisos: [PERMISOS.DEPORTES_PASAJE] },
+      ]
+    },
+    {
+      label: 'Buffet', icon: UtensilsCrossed, permisos: [PERMISOS.BUFFET_VER],
+      submenu: [
+        { path: '/admin/buffet', label: 'Dashboard', icon: LayoutDashboard, permisos: [PERMISOS.BUFFET_VER] },
+        { path: '/admin/buffet/mesas', label: 'Mesas', icon: UtensilsCrossed, permisos: [PERMISOS.BUFFET_MESAS] },
+        { path: '/admin/buffet/takeaway', label: 'Take Away', icon: ShoppingBag, permisos: [PERMISOS.BUFFET_MESAS] },
+        { path: '/admin/buffet/kiosco', label: 'Kiosco', icon: Coffee, permisos: [PERMISOS.BUFFET_KIOSCO] },
+        { path: '/admin/buffet/cocina', label: 'Cocina (KDS)', icon: ChefHat, permisos: [PERMISOS.BUFFET_COCINA] },
+        { path: '/admin/buffet/productos', label: 'Productos', icon: Package, permisos: [PERMISOS.BUFFET_CONFIG] },
+        { path: '/admin/buffet/categorias', label: 'Categorías', icon: Tag, permisos: [PERMISOS.BUFFET_CONFIG] },
+        { path: '/admin/buffet/impresoras', label: 'Impresoras', icon: Printer, permisos: [PERMISOS.BUFFET_CONFIG] },
       ]
     },
     {
@@ -489,7 +503,11 @@ export default function AdminLayout() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <main className={`flex-1 overflow-y-auto ${
+          location.pathname.includes('/buffet/kds') || location.pathname.includes('/buffet/cocina')
+            ? ''
+            : 'p-4 md:p-6'
+        }`}>
           {permisosLoaded && getPermisos().length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md">

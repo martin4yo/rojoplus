@@ -86,6 +86,13 @@ const permisos = [
   { codigo: 'DEPORTES_PARTIDOS', nombre: 'Gestionar Partidos', modulo: 'DEPORTES' },
   { codigo: 'DEPORTES_ENTRENAMIENTOS', nombre: 'Gestionar Entrenamientos', modulo: 'DEPORTES' },
   { codigo: 'DEPORTES_PASAJE', nombre: 'Ejecutar Pasaje Categoría', modulo: 'DEPORTES' },
+  // Buffet
+  { codigo: 'BUFFET_VER', nombre: 'Ver Buffet', modulo: 'BUFFET' },
+  { codigo: 'BUFFET_MESAS', nombre: 'Gestionar Mesas', modulo: 'BUFFET' },
+  { codigo: 'BUFFET_COBRAR', nombre: 'Cobrar Buffet', modulo: 'BUFFET' },
+  { codigo: 'BUFFET_COCINA', nombre: 'Pantalla Cocina', modulo: 'BUFFET' },
+  { codigo: 'BUFFET_KIOSCO', nombre: 'Kiosco/Venta Rápida', modulo: 'BUFFET' },
+  { codigo: 'BUFFET_CONFIG', nombre: 'Configurar Buffet', modulo: 'BUFFET' },
   // Cuotas
   { codigo: 'CUOTAS_VER', nombre: 'Ver Cuotas', modulo: 'CUOTAS' },
   { codigo: 'CUOTAS_GENERAR', nombre: 'Generar Cuotas', modulo: 'CUOTAS' },
@@ -170,7 +177,8 @@ const centrosCosto = [
   // Centros Administrativos
   { codigo: 'ADM', nombre: 'Administración', descripcion: 'Gastos administrativos generales del club', tipo: 'ADMINISTRATIVO', orden: 10 },
   { codigo: 'BAR', nombre: 'Bar', descripcion: 'Ingresos y egresos del bar del club', tipo: 'OPERATIVO', orden: 11 },
-  { codigo: 'EVE', nombre: 'Eventos', descripcion: 'Eventos sociales y recreativos', tipo: 'OPERATIVO', orden: 12 },
+  { codigo: 'BUFFET', nombre: 'Buffet', descripcion: 'Ingresos y egresos del buffet/restaurant', tipo: 'OPERATIVO', orden: 12 },
+  { codigo: 'EVE', nombre: 'Eventos', descripcion: 'Eventos sociales y recreativos', tipo: 'OPERATIVO', orden: 13 },
   { codigo: 'MER', nombre: 'Merchandising', descripcion: 'Venta de productos y merchandising', tipo: 'OPERATIVO', orden: 13 },
   { codigo: 'MAN', nombre: 'Mantenimiento', descripcion: 'Mantenimiento de instalaciones', tipo: 'ADMINISTRATIVO', orden: 14 },
 ];
@@ -360,6 +368,9 @@ const configuracion = [
   // RojoPlus (comercios)
   { clave: 'DESCUENTO_DEFAULT', valor: '10', tipo: 'NUMBER', modulo: 'COMERCIOS', descripcion: 'Descuento sugerido para nuevos comercios' },
   { clave: 'SLOGAN_APP', valor: 'Rojo Plus convierte la pasión en consumo', tipo: 'STRING', modulo: 'COMERCIOS', descripcion: 'Slogan de RojoPlus' },
+
+  // Buffet
+  { clave: 'BUFFET_DESCUENTO_SOCIO', valor: '10', tipo: 'NUMBER', modulo: 'BUFFET', descripcion: 'Porcentaje de descuento para socios al día en el buffet' },
 
   // Modo Demo
   { clave: 'MODO_DEMO', valor: 'false', tipo: 'BOOLEAN', modulo: 'SISTEMA', descripcion: 'Modo demo activo' },
