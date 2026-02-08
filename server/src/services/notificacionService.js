@@ -751,10 +751,22 @@ export async function notificarConvocatoriaPartido(partidoId, socioId) {
           }
         }
       }),
-      prisma.socio.findUnique({ where: { id: socioId } })
+      prisma.socio.findUnique({
+        where: { id: socioId },
+        select: {
+          id: true, email: true, apellidoNombre: true, nroSocio: true, tokenPortal: true,
+          notificarConvocatoria: true
+        }
+      })
     ])
 
     if (!partido || !socio || !socio.email) {
+      return
+    }
+
+    // Respetar preferencia del socio
+    if (!socio.notificarConvocatoria) {
+      console.log(`⏭️ Socio ${socio.apellidoNombre} tiene desactivadas notificaciones de convocatoria`)
       return
     }
 
@@ -802,10 +814,22 @@ export async function notificarRecordatorioPartido(partidoId, socioId) {
           }
         }
       }),
-      prisma.socio.findUnique({ where: { id: socioId } })
+      prisma.socio.findUnique({
+        where: { id: socioId },
+        select: {
+          id: true, email: true, apellidoNombre: true,
+          notificarRecordatorioPartido: true
+        }
+      })
     ])
 
     if (!partido || !socio || !socio.email) {
+      return
+    }
+
+    // Respetar preferencia del socio
+    if (!socio.notificarRecordatorioPartido) {
+      console.log(`⏭️ Socio ${socio.apellidoNombre} tiene desactivado recordatorio de partidos`)
       return
     }
 
@@ -917,7 +941,14 @@ export async function notificarCancelacionEntrenamiento(entrenamientoId) {
             actividad: true,
             inscripciones: {
               where: { activo: true },
-              include: { socio: true }
+              include: {
+                socio: {
+                  select: {
+                    id: true, email: true, apellidoNombre: true,
+                    notificarCancelacionEntreno: true
+                  }
+                }
+              }
             }
           }
         }
@@ -928,9 +959,16 @@ export async function notificarCancelacionEntrenamiento(entrenamientoId) {
 
     const fechaEntr = new Date(entrenamiento.fecha)
     let notificados = 0
+    let omitidos = 0
 
     for (const inscripcion of entrenamiento.categoriaActividad?.inscripciones || []) {
       if (!inscripcion.socio?.email) continue
+
+      // Respetar preferencia del socio
+      if (!inscripcion.socio.notificarCancelacionEntreno) {
+        omitidos++
+        continue
+      }
 
       const metadata = {
         socioNombre: inscripcion.socio.apellidoNombre,
@@ -954,7 +992,7 @@ export async function notificarCancelacionEntrenamiento(entrenamientoId) {
       notificados++
     }
 
-    console.log(`📧 Programado: Cancelación entrenamiento para ${notificados} socios`)
+    console.log(`📧 Cancelación entrenamiento: ${notificados} notificados, ${omitidos} omitidos por preferencia`)
     return notificados
   } catch (error) {
     console.error('Error notificando cancelación entrenamiento:', error.message)
@@ -978,7 +1016,14 @@ export async function notificarNuevoEntrenamiento(entrenamientoId) {
                 estado: 'ACTIVA',
                 fechaFin: null
               },
-              include: { socio: true }
+              include: {
+                socio: {
+                  select: {
+                    id: true, email: true, apellidoNombre: true,
+                    notificarNuevoEntrenamiento: true
+                  }
+                }
+              }
             }
           }
         },
@@ -990,9 +1035,16 @@ export async function notificarNuevoEntrenamiento(entrenamientoId) {
 
     const fechaEntr = new Date(entrenamiento.fecha)
     let notificados = 0
+    let omitidos = 0
 
     for (const inscripcion of entrenamiento.categoriaActividad?.inscripciones || []) {
       if (!inscripcion.socio?.email) continue
+
+      // Respetar preferencia del socio
+      if (!inscripcion.socio.notificarNuevoEntrenamiento) {
+        omitidos++
+        continue
+      }
 
       const metadata = {
         socioNombre: inscripcion.socio.apellidoNombre,
@@ -1017,7 +1069,7 @@ export async function notificarNuevoEntrenamiento(entrenamientoId) {
       notificados++
     }
 
-    console.log(`📧 Programado: Nuevo entrenamiento para ${notificados} socios`)
+    console.log(`📧 Nuevo entrenamiento: ${notificados} notificados, ${omitidos} omitidos por preferencia`)
     return notificados
   } catch (error) {
     console.error('Error notificando nuevo entrenamiento:', error.message)

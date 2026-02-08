@@ -173,13 +173,18 @@ model Socio {
   estadoSocioId         Int?                 @map("estado_socio_id")
   tipoSocioRelId        Int?                 @map("tipo_socio_rel_id")
   titularFamiliaId      Int?                 @map("titular_familia_id")
-  // Preferencias de notificaciones
+  // Preferencias de notificaciones - Cuotas y General
   notificarCuotaProxVenc Boolean             @default(true) @map("notificar_cuota_prox_venc") // Email 5 días antes
   notificarCuotaVencida  Boolean             @default(true) @map("notificar_cuota_vencida") // Email día vencimiento
   notificarMorosidad     Boolean             @default(true) @map("notificar_morosidad") // Email cada 15 días
   notificarInscripcion   Boolean             @default(true) @map("notificar_inscripcion") // Confirmación de inscripción
   notificarNoticias      Boolean             @default(true) @map("notificar_noticias") // Noticias del club
   notificarPush          Boolean             @default(true) @map("notificar_push") // Notificaciones push
+  // Preferencias de notificaciones - Deportivas
+  notificarConvocatoria      Boolean         @default(true) @map("notificar_convocatoria") // Convocatoria a partidos
+  notificarRecordatorioPartido Boolean       @default(true) @map("notificar_recordatorio_partido") // Recordatorio 24h antes
+  notificarCancelacionEntreno Boolean        @default(true) @map("notificar_cancelacion_entreno") // Cancelación de entrenamiento
+  notificarNuevoEntrenamiento Boolean        @default(true) @map("notificar_nuevo_entrenamiento") // Nuevo entrenamiento programado
   autorizaciones        AutorizacionMenor[]
   cargos                Cargo[]
   detallesCobranza      DetalleCobranza[]
@@ -203,6 +208,8 @@ model Socio {
   echeqs                ECheq[]
   asistencias           Asistencia[]
   convocatorias         Convocatoria[]
+  comandas              Comanda[]
+  pedidosTakeAway       PedidoTakeAway[]
   estadisticasPartido   EstadisticaPartido[]
   pagosInformados       PagoInformado[]
   notificaciones        NotificacionLog[]
@@ -496,6 +503,11 @@ model MedioPago {
   comisionPct        Decimal @default(0) @map("comision_pct") @db.Decimal(5, 2)
   activo             Boolean @default(true)
   orden              Int     @default(0)
+  // Puntos de venta donde está disponible
+  paraCaja           Boolean @default(true) @map("para_caja")      // Caja general del club
+  paraBuffet         Boolean @default(true) @map("para_buffet")    // Mesas del buffet
+  paraKiosco         Boolean @default(true) @map("para_kiosco")    // Venta rápida kiosco
+  paraTakeaway       Boolean @default(true) @map("para_takeaway")  // Pedidos para llevar
   pagos              Pago[]
 
   @@map("medios_pago")
@@ -710,6 +722,11 @@ model Caja {
   cuentaContableId     Int?                 @map("cuenta_contable_id")
   requiereConciliacion Boolean              @default(false) @map("requiere_conciliacion") // true = ingresos quedan pendientes de conciliar
   activo               Boolean              @default(true)
+  // Puntos de venta donde está disponible
+  paraCaja             Boolean              @default(true) @map("para_caja")      // Caja general del club
+  paraBuffet           Boolean              @default(true) @map("para_buffet")    // Mesas del buffet
+  paraKiosco           Boolean              @default(true) @map("para_kiosco")    // Venta rápida kiosco
+  paraTakeaway         Boolean              @default(true) @map("para_takeaway")  // Pedidos para llevar
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
   cuentaContable       CuentaContable?      @relation(fields: [cuentaContableId], references: [id])
@@ -855,9 +872,15 @@ model MovimientoCaja {
   registrador             Admin               @relation(fields: [registradoPor], references: [id])
   movimientoContable      MovimientoContable? @relation(fields: [movimientoContableId], references: [id])
   echeq                   ECheq? // eCheq que generó este movimiento (al acreditarse/debitarse)
+  comandaId               Int?                @map("comanda_id")
+  pedidoTakeAwayId        Int?                @map("pedido_takeaway_id")
+  comanda                 Comanda?            @relation(fields: [comandaId], references: [id])
+  pedidoTakeAway          PedidoTakeAway?     @relation(fields: [pedidoTakeAwayId], references: [id])
 
   @@index([cajaId])
   @@index([fecha])
+  @@index([comandaId])
+  @@index([pedidoTakeAwayId])
   @@index([tipo])
   @@index([cuentaContableId])
   @@index([centroCostoId])
@@ -1101,6 +1124,12 @@ model Admin {
   cierresCerrados         CierreCaja[]     @relation("CierreCajaCerradoPor")
   cierresFirmados         CierreCaja[]     @relation("CierreCajaFirmadoPor")
   noticias                Noticia[]
+  mesasAsignadas          Mesa[]           @relation("MesasAsignadas")
+  notificacionesRecibidas NotificacionBuffet[] @relation("NotificacionesRecibidas")
+  notificacionesVistas    NotificacionVista[]  @relation("NotificacionesVistas")
+  comandasAtendidas       Comanda[]        @relation("ComandaAtendedor")
+  comandasCerradas        Comanda[]        @relation("ComandaCerrador")
+  pedidosTakeAway         PedidoTakeAway[]
 
   @@map("admins")
 }
@@ -1443,6 +1472,7 @@ model Producto {
   conceptoVenta    ConceptoTesoreria? @relation("ProductoConceptoVenta", fields: [conceptoVentaId], references: [id])
   variantes        ProductoVariante[]
   fotos            ProductoFoto[]
+  productoBuffet   ProductoBuffet?
 
   @@index([categoriaId])
   @@index([conceptoCompraId])
@@ -2326,4 +2356,271 @@ model Mensaje {
   @@index([leido])
   @@index([createdAt])
   @@map("mensajes")
+}
+
+// =============================================================================
+// MODULO BUFFET / RESTAURANT
+// =============================================================================
+
+// Mesa del buffet/restaurant
+model Mesa {
+  id              Int       @id @default(autoincrement())
+  numero          Int       @unique
+  nombre          String?   // "Mesa 1", "Barra", etc.
+  capacidad       Int       @default(4)
+  estado          String    @default("LIBRE") // LIBRE, OCUPADA, CUENTA_PEDIDA, LIMPIEZA
+  zona            String?   // SALON, TERRAZA, BARRA
+  esComunal       Boolean   @default(false) @map("es_comunal") // Permite múltiples comandas simultáneas
+  mozoAsignadoId  Int?      @map("mozo_asignado_id") // Mozo responsable de esta mesa
+  activo          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  mozoAsignado Admin?    @relation("MesasAsignadas", fields: [mozoAsignadoId], references: [id])
+  comandas     Comanda[]
+
+  @@index([estado])
+  @@index([activo])
+  @@index([mozoAsignadoId])
+  @@map("mesas")
+}
+
+// Categoría del menú (BEBIDAS, COMIDAS, POSTRES, etc.)
+model CategoriaMenu {
+  id                Int                 @id @default(autoincrement())
+  codigo            String              @unique
+  nombre            String
+  descripcion       String?
+  color             String?             // Color para UI
+  icono             String?             // Icono lucide
+  orden             Int                 @default(0)
+  activo            Boolean             @default(true)
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  productos         ProductoBuffet[]
+  destinosImpresion DestinoImpresion[]
+
+  @@map("categorias_menu")
+}
+
+// Producto específico del buffet (referencia a Producto del stock)
+model ProductoBuffet {
+  id               Int              @id @default(autoincrement())
+  productoId       Int              @map("producto_id")
+  categoriaMenuId  Int              @map("categoria_menu_id")
+  nombre           String           // Nombre para mostrar en el menú
+  descripcion      String?
+  codigoBarras     String?          @map("codigo_barras") // Para escaneo en kiosco
+  precio           Decimal          @db.Decimal(12, 2)
+  imagen           String?          // URL de la imagen
+  tiposVenta       String[]         @default(["BUFFET", "KIOSCO"]) @map("tipos_venta") // BUFFET, KIOSCO o ambos
+  disponible       Boolean          @default(true)
+  destacado        Boolean          @default(false)
+  orden            Int              @default(0)
+  activo           Boolean          @default(true)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  producto         Producto      @relation(fields: [productoId], references: [id])
+  categoriaMenu    CategoriaMenu @relation(fields: [categoriaMenuId], references: [id])
+  itemsComanda     ItemComanda[]
+  itemsTakeAway    ItemPedidoTakeAway[]
+
+  @@unique([productoId])
+  @@index([categoriaMenuId])
+  @@index([disponible])
+  @@index([activo])
+  @@index([tiposVenta])
+  @@index([codigoBarras])
+  @@map("productos_buffet")
+}
+
+// Comanda de una mesa
+model Comanda {
+  id              Int            @id @default(autoincrement())
+  numero          String         @unique
+  mesaId          Int            @map("mesa_id")
+  socioId         Int?           @map("socio_id") // Si es socio identificado
+  estado          String         @default("ABIERTA") // ABIERTA, EN_PREPARACION, CUENTA_PEDIDA, CERRADA, ANULADA
+  horaApertura    DateTime       @default(now()) @map("hora_apertura")
+  horaCierre      DateTime?      @map("hora_cierre")
+  subtotal        Decimal        @default(0) @db.Decimal(12, 2)
+  descuento       Decimal        @default(0) @db.Decimal(12, 2)
+  total           Decimal        @default(0) @db.Decimal(12, 2)
+  observaciones   String?
+  atendidoPor     Int?           @map("atendido_por") // Admin/mozo que atendió
+  cerradoPor      Int?           @map("cerrado_por")  // Admin que cerró/cobró
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  mesa            Mesa           @relation(fields: [mesaId], references: [id])
+  socio           Socio?         @relation(fields: [socioId], references: [id])
+  atendedor       Admin?         @relation("ComandaAtendedor", fields: [atendidoPor], references: [id])
+  cerrador        Admin?         @relation("ComandaCerrador", fields: [cerradoPor], references: [id])
+  items           ItemComanda[]
+  movimientosCaja MovimientoCaja[]
+
+  @@index([mesaId])
+  @@index([socioId])
+  @@index([estado])
+  @@index([horaApertura])
+  @@map("comandas")
+}
+
+// Item de una comanda
+model ItemComanda {
+  id               Int            @id @default(autoincrement())
+  comandaId        Int            @map("comanda_id")
+  productoBuffetId Int            @map("producto_buffet_id")
+  cantidad         Int            @default(1)
+  precioUnitario   Decimal        @db.Decimal(12, 2)
+  subtotal         Decimal        @db.Decimal(12, 2)
+  estado           String         @default("PENDIENTE") // PENDIENTE, ENVIADO_COCINA, EN_PREPARACION, LISTO, ENTREGADO, ANULADO
+  observaciones    String?        // "Sin sal", "Bien cocido", etc.
+  enviadoCocinaAt  DateTime?      @map("enviado_cocina_at")
+  listoAt          DateTime?      @map("listo_at")
+  entregadoAt      DateTime?      @map("entregado_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  comanda          Comanda        @relation(fields: [comandaId], references: [id], onDelete: Cascade)
+  productoBuffet   ProductoBuffet @relation(fields: [productoBuffetId], references: [id])
+
+  @@index([comandaId])
+  @@index([estado])
+  @@map("items_comanda")
+}
+
+// Pedido Take Away
+model PedidoTakeAway {
+  id              Int                  @id @default(autoincrement())
+  numero          String               @unique
+  nombreCliente   String               @map("nombre_cliente")
+  telefono        String?
+  socioId         Int?                 @map("socio_id") // Si es socio identificado
+  estado          String               @default("RECIBIDO") // RECIBIDO, EN_PREPARACION, LISTO, ENTREGADO, CANCELADO
+  horaRecibido    DateTime             @default(now()) @map("hora_recibido")
+  horaEstimada    DateTime?            @map("hora_estimada")
+  horaListo       DateTime?            @map("hora_listo")
+  horaEntregado   DateTime?            @map("hora_entregado")
+  subtotal        Decimal              @default(0) @db.Decimal(12, 2)
+  descuento       Decimal              @default(0) @db.Decimal(12, 2)
+  total           Decimal              @default(0) @db.Decimal(12, 2)
+  observaciones   String?
+  atendidoPor     Int?                 @map("atendido_por")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  socio           Socio?               @relation(fields: [socioId], references: [id])
+  atendedor       Admin?               @relation(fields: [atendidoPor], references: [id])
+  items           ItemPedidoTakeAway[]
+  movimientosCaja MovimientoCaja[]
+
+  @@index([socioId])
+  @@index([estado])
+  @@index([horaRecibido])
+  @@map("pedidos_takeaway")
+}
+
+// Item de un pedido Take Away
+model ItemPedidoTakeAway {
+  id               Int            @id @default(autoincrement())
+  pedidoId         Int            @map("pedido_id")
+  productoBuffetId Int            @map("producto_buffet_id")
+  cantidad         Int            @default(1)
+  precioUnitario   Decimal        @db.Decimal(12, 2)
+  subtotal         Decimal        @db.Decimal(12, 2)
+  estado           String         @default("PENDIENTE") // PENDIENTE, EN_PREPARACION, LISTO
+  observaciones    String?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  pedido           PedidoTakeAway @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  productoBuffet   ProductoBuffet @relation(fields: [productoBuffetId], references: [id])
+
+  @@index([pedidoId])
+  @@index([estado])
+  @@map("items_pedido_takeaway")
+}
+
+// Impresora térmica para tickets
+// Sector de preparación del Buffet (Cocina, Barra, Parrilla, etc.)
+model SectorBuffet {
+  id          Int                @id @default(autoincrement())
+  codigo      String             @unique
+  nombre      String
+  icono       String?            // Nombre del icono lucide (ChefHat, Coffee, Flame, etc.)
+  color       String             @default("#DC2626") // Color hex para UI
+  orden       Int                @default(0)
+  activo      Boolean            @default(true)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  impresoras  ImpresoraTermica[]
+
+  @@map("sectores_buffet")
+}
+
+model ImpresoraTermica {
+  id                Int                @id @default(autoincrement())
+  nombre            String             @unique
+  sectorId          Int?               @map("sector_id")
+  ip                String
+  puerto            Int                @default(9100)
+  activo            Boolean            @default(true)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  sector            SectorBuffet?      @relation(fields: [sectorId], references: [id])
+  destinosImpresion DestinoImpresion[]
+
+  @@map("impresoras_termicas")
+}
+
+// Mapeo: qué categoría imprime en qué impresora
+model DestinoImpresion {
+  id              Int              @id @default(autoincrement())
+  categoriaMenuId Int              @map("categoria_menu_id")
+  impresoraId     Int              @map("impresora_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  categoriaMenu   CategoriaMenu    @relation(fields: [categoriaMenuId], references: [id], onDelete: Cascade)
+  impresora       ImpresoraTermica @relation(fields: [impresoraId], references: [id], onDelete: Cascade)
+
+  @@unique([categoriaMenuId, impresoraId])
+  @@map("destinos_impresion")
+}
+
+// Notificaciones en tiempo real del buffet
+model NotificacionBuffet {
+  id            Int       @id @default(autoincrement())
+  tipo          String    // NUEVA_COMANDA, ITEM_LISTO, CUENTA_PEDIDA, MESA_COBRADA
+  titulo        String
+  mensaje       String
+  datos         Json?     // { mesaId, comandaId, itemIds, total, etc }
+  sonido        String    @default("default") // default, bell, chime, alert
+  paraUsuarioId Int?      @map("para_usuario_id") // Si es para un usuario específico
+  paraDestino   String?   @map("para_destino") // COCINA, BARRA, CAJA (tipo de impresora)
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  paraUsuario   Admin?    @relation("NotificacionesRecibidas", fields: [paraUsuarioId], references: [id])
+  vistas        NotificacionVista[]
+
+  @@index([paraUsuarioId])
+  @@index([paraDestino])
+  @@index([createdAt])
+  @@map("notificaciones_buffet")
+}
+
+model NotificacionVista {
+  notificacionId Int      @map("notificacion_id")
+  adminId        Int      @map("admin_id")
+  vistaAt        DateTime @default(now()) @map("vista_at")
+
+  notificacion   NotificacionBuffet @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
+  admin          Admin              @relation("NotificacionesVistas", fields: [adminId], references: [id])
+
+  @@id([notificacionId, adminId])
+  @@map("notificaciones_vistas")
 }

@@ -10,6 +10,7 @@ import {
   XMarkIcon,
   TagIcon,
   BanknotesIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline'
 import {
   HomeIcon as HomeIconSolid,
@@ -19,6 +20,7 @@ import {
   CreditCardIcon as CreditCardIconSolid,
   TagIcon as TagIconSolid,
   BanknotesIcon as BanknotesIconSolid,
+  BellIcon as BellIconSolid,
 } from '@heroicons/react/24/solid'
 import { useModal } from '../../components/Modal'
 import PushNotificationBanner from '../../components/PushNotificationBanner'
@@ -32,6 +34,7 @@ import MensajesSocio from './sections/MensajesSocio'
 import PagosSocio from './sections/PagosSocio'
 import BeneficiosSocio from './sections/BeneficiosSocio'
 import DebitoAutomaticoSocio from './sections/DebitoAutomaticoSocio'
+import NotificacionesSocio from './sections/NotificacionesSocio'
 
 export default function PortalSocioNuevo() {
   const { tokenPortal } = useParams()
@@ -143,6 +146,13 @@ export default function PortalSocioNuevo() {
       badge: null,
     },
     {
+      id: 'notificaciones',
+      label: 'Avisos',
+      icon: BellIcon,
+      iconSolid: BellIconSolid,
+      badge: null,
+    },
+    {
       id: 'perfil',
       label: 'Perfil',
       icon: UserIcon,
@@ -206,6 +216,7 @@ export default function PortalSocioNuevo() {
         {activeTab === 'actividades' && <MisActividadesSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'pagos' && <PagosSocio socio={socio} tokenPortal={tokenPortal} onPagoRealizado={cargarDatosSocio} />}
         {activeTab === 'debito' && <DebitoAutomaticoSocio tokenPortal={tokenPortal} />}
+        {activeTab === 'notificaciones' && <NotificacionesSocio tokenPortal={tokenPortal} />}
         {activeTab === 'perfil' && <MiPerfilSocio socio={socio} tokenPortal={tokenPortal} onUpdate={cargarDatosSocio} />}
       </main>
 

@@ -2009,4 +2009,123 @@ router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => 
   })
 }))
 
+// ==============================================================================
+// PREFERENCIAS DE NOTIFICACIONES
+// ==============================================================================
+
+// GET /api/socio/:token/preferencias-notificaciones
+router.get('/:token/preferencias-notificaciones', asyncHandler(async (req, res) => {
+  const { token } = req.params
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal: token },
+    select: {
+      id: true,
+      // Cuotas y General
+      notificarCuotaProxVenc: true,
+      notificarCuotaVencida: true,
+      notificarMorosidad: true,
+      notificarInscripcion: true,
+      notificarNoticias: true,
+      notificarPush: true,
+      // Deportivas
+      notificarConvocatoria: true,
+      notificarRecordatorioPartido: true,
+      notificarCancelacionEntreno: true,
+      notificarNuevoEntrenamiento: true
+    }
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  res.json({
+    success: true,
+    data: {
+      cuotasYGeneral: {
+        cuotaProximaVencer: socio.notificarCuotaProxVenc,
+        cuotaVencida: socio.notificarCuotaVencida,
+        recordatorioMorosidad: socio.notificarMorosidad,
+        confirmacionInscripcion: socio.notificarInscripcion,
+        noticiasClub: socio.notificarNoticias,
+        notificacionesPush: socio.notificarPush
+      },
+      deportivas: {
+        convocatoriaPartido: socio.notificarConvocatoria,
+        recordatorioPartido: socio.notificarRecordatorioPartido,
+        cancelacionEntrenamiento: socio.notificarCancelacionEntreno,
+        nuevoEntrenamiento: socio.notificarNuevoEntrenamiento
+      }
+    }
+  })
+}))
+
+// PUT /api/socio/:token/preferencias-notificaciones
+router.put('/:token/preferencias-notificaciones', asyncHandler(async (req, res) => {
+  const { token } = req.params
+  const { cuotasYGeneral, deportivas } = req.body
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal: token },
+    select: { id: true }
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Construir objeto de actualización
+  const updateData = {}
+
+  // Cuotas y General
+  if (cuotasYGeneral) {
+    if (typeof cuotasYGeneral.cuotaProximaVencer === 'boolean') {
+      updateData.notificarCuotaProxVenc = cuotasYGeneral.cuotaProximaVencer
+    }
+    if (typeof cuotasYGeneral.cuotaVencida === 'boolean') {
+      updateData.notificarCuotaVencida = cuotasYGeneral.cuotaVencida
+    }
+    if (typeof cuotasYGeneral.recordatorioMorosidad === 'boolean') {
+      updateData.notificarMorosidad = cuotasYGeneral.recordatorioMorosidad
+    }
+    if (typeof cuotasYGeneral.confirmacionInscripcion === 'boolean') {
+      updateData.notificarInscripcion = cuotasYGeneral.confirmacionInscripcion
+    }
+    if (typeof cuotasYGeneral.noticiasClub === 'boolean') {
+      updateData.notificarNoticias = cuotasYGeneral.noticiasClub
+    }
+    if (typeof cuotasYGeneral.notificacionesPush === 'boolean') {
+      updateData.notificarPush = cuotasYGeneral.notificacionesPush
+    }
+  }
+
+  // Deportivas
+  if (deportivas) {
+    if (typeof deportivas.convocatoriaPartido === 'boolean') {
+      updateData.notificarConvocatoria = deportivas.convocatoriaPartido
+    }
+    if (typeof deportivas.recordatorioPartido === 'boolean') {
+      updateData.notificarRecordatorioPartido = deportivas.recordatorioPartido
+    }
+    if (typeof deportivas.cancelacionEntrenamiento === 'boolean') {
+      updateData.notificarCancelacionEntreno = deportivas.cancelacionEntrenamiento
+    }
+    if (typeof deportivas.nuevoEntrenamiento === 'boolean') {
+      updateData.notificarNuevoEntrenamiento = deportivas.nuevoEntrenamiento
+    }
+  }
+
+  // Actualizar
+  await req.prisma.socio.update({
+    where: { id: socio.id },
+    data: updateData
+  })
+
+  res.json({
+    success: true,
+    message: 'Preferencias actualizadas correctamente'
+  })
+}))
+
 export default router

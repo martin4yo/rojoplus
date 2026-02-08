@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import ScrollToTop from './components/ScrollToTop'
+import { TicketProvider } from './contexts/TicketContext'
+import { NotificacionBuffetProvider } from './contexts/NotificacionBuffetContext'
 
 // Páginas públicas - Sitio web del club
 import PublicLayout from './pages/public/Layout/PublicLayout'
@@ -169,15 +171,28 @@ import ReportesDeportivos from './pages/admin/ReportesDeportivos'
 import PasajeCategoria from './pages/admin/PasajeCategoria'
 import MiPerfil from './pages/admin/MiPerfil'
 
+// Buffet
+import BuffetDashboard from './pages/admin/buffet/BuffetDashboard'
+import BuffetMesas from './pages/admin/buffet/BuffetMesas'
+import BuffetCategorias from './pages/admin/buffet/BuffetCategorias'
+import BuffetProductos from './pages/admin/buffet/BuffetProductos'
+import BuffetComanda from './pages/admin/buffet/BuffetComanda'
+import BuffetCocina from './pages/admin/buffet/BuffetCocina'
+import BuffetKiosco from './pages/admin/buffet/BuffetKiosco'
+import BuffetTakeAway from './pages/admin/buffet/BuffetTakeAway'
+import BuffetImpresoras from './pages/admin/buffet/BuffetImpresoras'
+import MenuBuffet from './pages/public/MenuBuffet'
+
 // Layout admin
 import AdminLayout from './components/AdminLayout'
 
 function App() {
   return (
-    <>
-      <ScrollToTop />
-      <Toaster position="top-right" />
-      <Routes>
+    <TicketProvider>
+      <NotificacionBuffetProvider>
+        <ScrollToTop />
+        <Toaster position="top-right" />
+        <Routes>
         {/* Sitio web público del club */}
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<HomePublic />} />
@@ -212,6 +227,9 @@ function App() {
       <Route path="/s/:tokenPortal" element={<SocioPortal />} />
       <Route path="/login-socio" element={<LoginSocio />} />
       <Route path="/portal-socio/:tokenPortal" element={<PortalSocioNuevo />} />
+
+      {/* Menú Buffet Público */}
+      <Route path="/buffet/menu" element={<MenuBuffet />} />
 
       {/* Rutas admin */}
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -360,9 +378,23 @@ function App() {
         <Route path="partidos/:id" element={<PartidoDetalle />} />
         <Route path="reportes/deportivos" element={<ReportesDeportivos />} />
         <Route path="deportes/pasaje-categoria" element={<PasajeCategoria />} />
+
+        {/* Buffet */}
+        <Route path="buffet" element={<BuffetDashboard />} />
+        <Route path="buffet/mesas" element={<BuffetMesas />} />
+        <Route path="buffet/categorias" element={<BuffetCategorias />} />
+        <Route path="buffet/productos" element={<BuffetProductos />} />
+        <Route path="buffet/comanda/:mesaId" element={<BuffetComanda />} />
+        <Route path="buffet/kds" element={<BuffetCocina />} />
+        <Route path="buffet/kds/:sector" element={<BuffetCocina />} />
+        <Route path="buffet/cocina" element={<BuffetCocina />} />
+        <Route path="buffet/kiosco" element={<BuffetKiosco />} />
+        <Route path="buffet/takeaway" element={<BuffetTakeAway />} />
+        <Route path="buffet/impresoras" element={<BuffetImpresoras />} />
       </Route>
-    </Routes>
-    </>
+      </Routes>
+      </NotificacionBuffetProvider>
+    </TicketProvider>
   )
 }
 

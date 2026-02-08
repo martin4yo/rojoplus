@@ -795,7 +795,7 @@ Portal responsive y mobile-first donde el socio puede gestionar toda su informac
 - [x] **33.7.6** Notificación automática: convocatoria a partido
 - [x] **33.7.7** Notificación automática: recordatorio 24h antes (cron 18:00)
 - [x] **33.7.8** Notificación automática: pasaje de categoría ✅
-- [ ] **33.7.9** Panel de configuración de notificaciones por socio (futuro)
+- [x] **33.7.9** Panel de configuración de notificaciones por socio ✅
 
 ### Menú y Navegación ✅
 - [x] **33.8.1** Agregar submenu "Deportes" en AdminLayout
