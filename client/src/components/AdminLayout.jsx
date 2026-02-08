@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
   UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User,
-  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag
+  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink
 } from 'lucide-react'
 import api from '../services/api'
 import { cargarPermisos, limpiarPermisos, tieneAlgunPermiso, getPermisos, PERMISOS } from '../services/permisos'
@@ -441,6 +441,22 @@ export default function AdminLayout() {
             )
           })}
         </nav>
+
+        {/* Link al sitio público */}
+        <div className="px-3 py-4 border-t border-gray-700">
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <ExternalLink className="w-5 h-5 flex-shrink-0" />
+            <span className={`whitespace-nowrap ${sidebarCollapsed ? 'md:hidden' : ''}`}>
+              Ver sitio web
+            </span>
+          </a>
+        </div>
+
         {/* Info del usuario en sidebar móvil */}
         <div className="md:hidden absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700 bg-gray-900">
           <div className="flex items-center justify-between">
