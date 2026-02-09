@@ -19,19 +19,14 @@ export default function Inscripciones() {
   const [sociosBuscados, setSociosBuscados] = useState([])
 
   // Filtros
-  const [filtros, setFiltros] = useState({
-    actividadId: '',
-    categoriaActividadId: '',
-    estado: '',
-    socioId: '',
-    search: '',
-    page: 1,
-    limit: 50
-  })
+  const [actividadId, setActividadId] = useState('')
+  const [categoriaActividadId, setCategoriaActividadId] = useState('')
+  const [estado, setEstado] = useState('')
+  const [search, setSearch] = useState('')
 
   // Paginación
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState(null)
 
   // Modales
   const [modalNueva, setModalNueva] = useState(false)
@@ -69,32 +64,34 @@ export default function Inscripciones() {
 
   useEffect(() => {
     cargarInscripciones()
-  }, [filtros])
+  }, [page, actividadId, categoriaActividadId, estado])
 
   useEffect(() => {
-    if (filtros.actividadId) {
-      cargarCategorias(filtros.actividadId)
+    if (actividadId) {
+      cargarCategorias(actividadId)
     } else {
       setCategorias([])
+      setCategoriaActividadId('')
     }
-  }, [filtros.actividadId])
+  }, [actividadId])
 
   async function cargarInscripciones() {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams()
-      Object.keys(filtros).forEach(key => {
-        if (filtros[key]) params.append(key, filtros[key])
-      })
+      const params = new URLSearchParams({ page: page.toString() })
+      if (actividadId) params.append('actividadId', actividadId)
+      if (categoriaActividadId) params.append('categoriaId', categoriaActividadId)
+      if (estado) params.append('estado', estado)
+      if (search) params.append('q', search)
 
-      const data = await api.get(`/admin/inscripciones?${params}`)
-      setInscripciones(data.data || [])
-      setTotal(data.total || 0)
-      setTotalPages(data.totalPages || 1)
+      // Usar getFull para obtener data + pagination
+      const response = await api.getFull(`/admin/inscripciones?${params}`)
+      setInscripciones(response?.data || [])
+      setPagination(response?.pagination || null)
     } catch (err) {
+      console.error('Error cargando inscripciones:', err)
       setError('Error al cargar inscripciones')
-      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -111,8 +108,8 @@ export default function Inscripciones() {
 
   async function cargarCategorias(actividadId) {
     try {
-      const data = await api.get(`/admin/actividades/${actividadId}`)
-      setCategorias(data.categorias || [])
+      const data = await api.get(`/admin/actividades/${actividadId}?soloActivas=true`)
+      setCategorias(data?.categorias || [])
     } catch (err) {
       console.error('Error al cargar categorías:', err)
     }
@@ -126,8 +123,9 @@ export default function Inscripciones() {
 
     setBuscandoSocio(true)
     try {
-      const data = await api.get(`/admin/socios?search=${query}&limit=10`)
-      setSociosBuscados(data.socios || [])
+      // Solo buscar socios activos o vigentes para inscripciones
+      const data = await api.get(`/admin/socios?q=${encodeURIComponent(query)}&limit=10&estadosValidos=ACTIVO,VIGENTE`)
+      setSociosBuscados(data?.socios || [])
     } catch (err) {
       console.error('Error al buscar socios:', err)
     } finally {
@@ -135,24 +133,18 @@ export default function Inscripciones() {
     }
   }
 
-  function handleFiltroChange(key, value) {
-    setFiltros(prev => ({
-      ...prev,
-      [key]: value,
-      page: 1 // Reset page when filters change
-    }))
+  function handleBuscar(e) {
+    e.preventDefault()
+    setPage(1)
+    cargarInscripciones()
   }
 
   function limpiarFiltros() {
-    setFiltros({
-      actividadId: '',
-      categoriaActividadId: '',
-      estado: '',
-      socioId: '',
-      search: '',
-      page: 1,
-      limit: 50
-    })
+    setActividadId('')
+    setCategoriaActividadId('')
+    setEstado('')
+    setSearch('')
+    setPage(1)
   }
 
   async function crearInscripcion(e) {
@@ -164,6 +156,7 @@ export default function Inscripciones() {
       return
     }
 
+    console.log('Enviando inscripción:', formNueva)
     try {
       await api.post('/admin/inscripciones', formNueva)
       setSuccess('Inscripción creada exitosamente')
@@ -180,7 +173,8 @@ export default function Inscripciones() {
       setBusquedaSocio('')
       cargarInscripciones()
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al crear inscripción')
+      console.error('Error al crear inscripción:', err)
+      setError(err.message || 'Error al crear inscripción')
     }
   }
 
@@ -283,7 +277,7 @@ export default function Inscripciones() {
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Inscripciones</h1>
             <p className="text-gray-500 text-sm">
-              {total} inscripciones totales
+              {pagination?.total || 0} inscripciones totales
             </p>
           </div>
         </div>
@@ -330,8 +324,8 @@ export default function Inscripciones() {
               Actividad
             </label>
             <select
-              value={filtros.actividadId}
-              onChange={(e) => handleFiltroChange('actividadId', e.target.value)}
+              value={actividadId}
+              onChange={(e) => { setActividadId(e.target.value); setPage(1) }}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todas las actividades</option>
@@ -347,10 +341,10 @@ export default function Inscripciones() {
               Categoría
             </label>
             <select
-              value={filtros.categoriaActividadId}
-              onChange={(e) => handleFiltroChange('categoriaActividadId', e.target.value)}
+              value={categoriaActividadId}
+              onChange={(e) => { setCategoriaActividadId(e.target.value); setPage(1) }}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              disabled={!filtros.actividadId}
+              disabled={!actividadId}
             >
               <option value="">Todas las categorías</option>
               {categorias.map(cat => (
@@ -365,8 +359,8 @@ export default function Inscripciones() {
               Estado
             </label>
             <select
-              value={filtros.estado}
-              onChange={(e) => handleFiltroChange('estado', e.target.value)}
+              value={estado}
+              onChange={(e) => { setEstado(e.target.value); setPage(1) }}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos los estados</option>
@@ -376,21 +370,21 @@ export default function Inscripciones() {
           </div>
 
           {/* Búsqueda */}
-          <div>
+          <form onSubmit={handleBuscar}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Buscar socio
             </label>
             <div className="relative">
               <input
                 type="text"
-                value={filtros.search}
-                onChange={(e) => handleFiltroChange('search', e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Nombre o documento..."
                 className="w-full px-3 py-2 pl-9 border rounded-lg focus:ring-2 focus:ring-blue-500"
               />
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
             </div>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -435,10 +429,10 @@ export default function Inscripciones() {
                   <tr key={inscripcion.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {inscripcion.socio.apellidos}, {inscripcion.socio.nombres}
+                        {inscripcion.socio?.apellidoNombre || `${inscripcion.socio?.apellidos || ''}, ${inscripcion.socio?.nombres || ''}`}
                       </div>
                       <div className="text-sm text-gray-500">
-                        #{inscripcion.socio.numeroSocio} - {inscripcion.socio.documento}
+                        #{inscripcion.socio?.nroSocio || inscripcion.socio?.numeroSocio} - {inscripcion.socio?.documento || '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -496,23 +490,26 @@ export default function Inscripciones() {
         </div>
 
         {/* Paginación */}
-        {totalPages > 1 && (
+        {pagination && pagination.totalPages > 1 && (
           <div className="px-6 py-4 border-t flex items-center justify-between">
             <div className="text-sm text-gray-700">
-              Mostrando {(filtros.page - 1) * filtros.limit + 1} a {Math.min(filtros.page * filtros.limit, total)} de {total} inscripciones
+              Mostrando {(page - 1) * 50 + 1} a {Math.min(page * 50, pagination.total)} de {pagination.total} inscripciones
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={() => handleFiltroChange('page', filtros.page - 1)}
-                disabled={filtros.page === 1}
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
               >
                 Anterior
               </Button>
+              <span className="text-sm text-gray-500">
+                Página {page} de {pagination.totalPages}
+              </span>
               <Button
                 variant="outline"
-                onClick={() => handleFiltroChange('page', filtros.page + 1)}
-                disabled={filtros.page === totalPages}
+                onClick={() => setPage(page + 1)}
+                disabled={page === pagination.totalPages}
               >
                 Siguiente
               </Button>
@@ -574,13 +571,13 @@ export default function Inscripciones() {
                         type="button"
                         onClick={() => {
                           setFormNueva(prev => ({ ...prev, socioId: socio.id }))
-                          setBusquedaSocio(`${socio.apellidos}, ${socio.nombres} (${socio.documento})`)
+                          setBusquedaSocio(`${socio.apellidoNombre} (${socio.documento || socio.nroSocio})`)
                           setSociosBuscados([])
                         }}
                         className="w-full px-3 py-2 text-left hover:bg-gray-100 border-b last:border-b-0"
                       >
-                        <div className="font-medium">{socio.apellidos}, {socio.nombres}</div>
-                        <div className="text-sm text-gray-500">#{socio.numeroSocio} - {socio.documento}</div>
+                        <div className="font-medium">{socio.apellidoNombre}</div>
+                        <div className="text-sm text-gray-500">#{socio.nroSocio} - DNI: {socio.documento || '-'}</div>
                       </button>
                     ))}
                   </div>
@@ -745,9 +742,9 @@ export default function Inscripciones() {
             <form onSubmit={editarInscripcion} className="p-6 space-y-4">
               <div className="p-3 bg-gray-50 rounded-lg mb-4">
                 <div className="text-sm text-gray-600">Socio:</div>
-                <div className="font-medium">{inscripcionSeleccionada.socio.apellidos}, {inscripcionSeleccionada.socio.nombres}</div>
+                <div className="font-medium">{inscripcionSeleccionada.socio?.apellidoNombre || `${inscripcionSeleccionada.socio?.apellidos}, ${inscripcionSeleccionada.socio?.nombres}`}</div>
                 <div className="text-sm text-gray-600 mt-1">Actividad:</div>
-                <div className="font-medium">{inscripcionSeleccionada.categoriaActividad.actividad.nombre} - {inscripcionSeleccionada.categoriaActividad.nombre}</div>
+                <div className="font-medium">{inscripcionSeleccionada.categoriaActividad?.actividad?.nombre} - {inscripcionSeleccionada.categoriaActividad?.nombre}</div>
               </div>
 
               {/* Exento Cuota */}
@@ -832,8 +829,8 @@ export default function Inscripciones() {
                 <div className="text-sm text-red-800">
                   ¿Está seguro de dar de baja esta inscripción?
                 </div>
-                <div className="font-medium mt-2">{inscripcionSeleccionada.socio.apellidos}, {inscripcionSeleccionada.socio.nombres}</div>
-                <div className="text-sm text-gray-600">{inscripcionSeleccionada.categoriaActividad.actividad.nombre} - {inscripcionSeleccionada.categoriaActividad.nombre}</div>
+                <div className="font-medium mt-2">{inscripcionSeleccionada.socio?.apellidoNombre || `${inscripcionSeleccionada.socio?.apellidos}, ${inscripcionSeleccionada.socio?.nombres}`}</div>
+                <div className="text-sm text-gray-600">{inscripcionSeleccionada.categoriaActividad?.actividad?.nombre} - {inscripcionSeleccionada.categoriaActividad?.nombre}</div>
               </div>
 
               <div>

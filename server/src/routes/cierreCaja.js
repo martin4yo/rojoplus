@@ -316,12 +316,17 @@ router.get('/:id', asyncHandler(async (req, res) => {
       }
     },
     include: {
-      concepto: true,
-      admin: {
+      registrador: {
         select: {
           id: true,
           nombre: true,
           apellido: true
+        }
+      },
+      pago: {
+        select: {
+          id: true,
+          socio: { select: { nroSocio: true, apellidoNombre: true } }
         }
       }
     },

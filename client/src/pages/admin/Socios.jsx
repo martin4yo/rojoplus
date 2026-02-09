@@ -189,11 +189,14 @@ export default function AdminSocios() {
           <button
             type="button"
             onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 rounded-lg border flex items-center gap-2 transition ${showFilters ? 'bg-primary text-white border-primary' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            className={`px-4 py-2 rounded-lg border flex items-center gap-2 transition relative ${showFilters ? 'bg-primary text-white border-primary' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
               }`}
           >
             <Filter className="w-4 h-4" />
             Filtros
+            {hayFiltrosActivos && !showFilters && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+            )}
             <ChevronDown className={`w-4 h-4 transition ${showFilters ? 'rotate-180' : ''}`} />
           </button>
         </div>

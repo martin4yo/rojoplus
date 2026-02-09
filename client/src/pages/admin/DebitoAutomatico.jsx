@@ -44,6 +44,21 @@ export default function DebitoAutomatico() {
   const [adhesiones, setAdhesiones] = useState([])
   const [filtroAdhesion, setFiltroAdhesion] = useState('PENDIENTE')
 
+  // Estado para Modal Nuevo Procesador
+  const [showNuevoProcesador, setShowNuevoProcesador] = useState(false)
+  const [formProcesador, setFormProcesador] = useState({
+    codigo: '',
+    nombre: '',
+    tipo: 'TARJETA_CREDITO',
+    plataforma: 'PRISMA',
+    formatoArchivo: 'FIXED',
+    codigoEmpresa: '',
+    codigoComercio: '',
+    nombreEmpresa: '',
+    cuitEmpresa: ''
+  })
+  const [savingProcesador, setSavingProcesador] = useState(false)
+
   useEffect(() => {
     cargarConfiguraciones()
     cargarEstadisticas()
@@ -68,21 +83,52 @@ export default function DebitoAutomatico() {
   async function cargarConfiguraciones() {
     try {
       const data = await api.get('/admin/debito/configuraciones')
-      setConfiguraciones(data)
-      if (data.length > 0 && !configuracionId) {
-        setConfiguracionId(data[0].id)
+      const configs = Array.isArray(data) ? data : (data?.data || [])
+      setConfiguraciones(configs)
+      if (configs.length > 0 && !configuracionId) {
+        setConfiguracionId(configs[0].id)
       }
     } catch (err) {
       console.error('Error cargando configuraciones:', err)
     }
   }
 
+  async function guardarProcesador() {
+    if (!formProcesador.codigo || !formProcesador.nombre) {
+      setError('Código y nombre son requeridos')
+      return
+    }
+    setSavingProcesador(true)
+    setError(null)
+    try {
+      await api.post('/admin/debito/configuraciones', formProcesador)
+      setShowNuevoProcesador(false)
+      setFormProcesador({
+        codigo: '',
+        nombre: '',
+        tipo: 'TARJETA_CREDITO',
+        plataforma: 'PRISMA',
+        formatoArchivo: 'FIXED',
+        codigoEmpresa: '',
+        codigoComercio: '',
+        nombreEmpresa: '',
+        cuitEmpresa: ''
+      })
+      cargarConfiguraciones()
+    } catch (err) {
+      setError(err.message || 'Error al guardar procesador')
+    } finally {
+      setSavingProcesador(false)
+    }
+  }
+
   async function cargarEstadisticas() {
     try {
       const data = await api.get('/admin/debito/estadisticas')
-      setEstadisticas(data)
+      setEstadisticas(data || null)
     } catch (err) {
       console.error('Error cargando estadísticas:', err)
+      setEstadisticas(null)
     }
   }
 
@@ -94,9 +140,10 @@ export default function DebitoAutomatico() {
         periodoMes,
         configuracionId
       })
-      setSociosDisponibles(data.socios)
-      setResumenSocios(data.resumen)
-      setSociosSeleccionados(data.socios.map(s => s.id))
+      const socios = data?.socios || []
+      setSociosDisponibles(socios)
+      setResumenSocios(data?.resumen || null)
+      setSociosSeleccionados(socios.map(s => s.id))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -110,7 +157,7 @@ export default function DebitoAutomatico() {
       const data = await api.get('/admin/debito/archivos', {
         periodoAnio
       })
-      setArchivos(data.archivos)
+      setArchivos(data?.archivos || [])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -257,7 +304,7 @@ export default function DebitoAutomatico() {
     setLoading(true)
     try {
       const data = await api.get('/admin/debito/adhesiones', { estado: filtroAdhesion })
-      setAdhesiones(data)
+      setAdhesiones(Array.isArray(data) ? data : (data?.data || []))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -297,7 +344,7 @@ export default function DebitoAutomatico() {
     }
   }
 
-  const adhesionesPendientes = adhesiones.filter(a => a.estadoAdhesion === 'PENDIENTE').length
+  const adhesionesPendientes = (adhesiones || []).filter(a => a.estadoAdhesion === 'PENDIENTE').length
 
   const tabs = [
     { id: 'adhesiones', label: 'Adhesiones', icon: UserPlus, badge: adhesionesPendientes > 0 ? adhesionesPendientes : null },
@@ -990,12 +1037,17 @@ export default function DebitoAutomatico() {
           {/* Tab: Configuración */}
           {activeTab === 'configuracion' && (
             <div className="space-y-6">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h4 className="font-medium text-amber-900 mb-2">Configuración de Procesadores</h4>
-                <p className="text-sm text-amber-800">
-                  Para agregar un nuevo procesador (Prisma, Payway, banco), necesitará la documentación
-                  técnica del formato de archivos que proporciona cada entidad al darse de alta como comercio.
-                </p>
+              <div className="flex items-center justify-between">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex-1 mr-4">
+                  <h4 className="font-medium text-amber-900 mb-2">Configuración de Procesadores</h4>
+                  <p className="text-sm text-amber-800">
+                    Configure los procesadores de débito automático (Prisma, Payway, bancos).
+                  </p>
+                </div>
+                <Button onClick={() => setShowNuevoProcesador(true)}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Nuevo Procesador
+                </Button>
               </div>
 
               <div className="space-y-4">
@@ -1136,6 +1188,149 @@ export default function DebitoAutomatico() {
               </Button>
               <Button onClick={() => setShowDetalleModal(false)}>
                 Cerrar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nuevo Procesador */}
+      {showNuevoProcesador && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Nuevo Procesador de Débito</h3>
+              <button onClick={() => setShowNuevoProcesador(false)} className="text-gray-400 hover:text-gray-600">
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Código *</label>
+                  <input
+                    type="text"
+                    value={formProcesador.codigo}
+                    onChange={e => setFormProcesador({ ...formProcesador, codigo: e.target.value.toUpperCase() })}
+                    className="input-field w-full"
+                    placeholder="Ej: PRISMA_VISA"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                  <input
+                    type="text"
+                    value={formProcesador.nombre}
+                    onChange={e => setFormProcesador({ ...formProcesador, nombre: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="Ej: Prisma VISA Crédito"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                  <select
+                    value={formProcesador.tipo}
+                    onChange={e => setFormProcesador({ ...formProcesador, tipo: e.target.value })}
+                    className="input-field w-full"
+                  >
+                    <option value="TARJETA_CREDITO">Tarjeta Crédito</option>
+                    <option value="TARJETA_DEBITO">Tarjeta Débito</option>
+                    <option value="DEBITO_BANCARIO">Débito Bancario</option>
+                    <option value="CBU">CBU / Cuenta Bancaria</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
+                  <select
+                    value={formProcesador.plataforma}
+                    onChange={e => setFormProcesador({ ...formProcesador, plataforma: e.target.value })}
+                    className="input-field w-full"
+                  >
+                    <option value="PRISMA">Prisma</option>
+                    <option value="PAYWAY">Payway</option>
+                    <option value="MERCADOPAGO">MercadoPago</option>
+                    <option value="BANCO">Banco (Débito Directo)</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Formato de Archivo</label>
+                <select
+                  value={formProcesador.formatoArchivo}
+                  onChange={e => setFormProcesador({ ...formProcesador, formatoArchivo: e.target.value })}
+                  className="input-field w-full"
+                >
+                  <option value="FIXED">Posiciones Fijas (FIXED)</option>
+                  <option value="CSV">CSV (separado por comas)</option>
+                  <option value="TXT">TXT (separado por pipes)</option>
+                  <option value="JSON">JSON</option>
+                  <option value="XML">XML</option>
+                </select>
+              </div>
+
+              <hr className="my-4" />
+              <h4 className="font-medium text-gray-700">Datos del Comercio</h4>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Código Empresa</label>
+                  <input
+                    type="text"
+                    value={formProcesador.codigoEmpresa}
+                    onChange={e => setFormProcesador({ ...formProcesador, codigoEmpresa: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="Asignado por el procesador"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Código Comercio</label>
+                  <input
+                    type="text"
+                    value={formProcesador.codigoComercio}
+                    onChange={e => setFormProcesador({ ...formProcesador, codigoComercio: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="Nro. de establecimiento"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Empresa</label>
+                  <input
+                    type="text"
+                    value={formProcesador.nombreEmpresa}
+                    onChange={e => setFormProcesador({ ...formProcesador, nombreEmpresa: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="Razón social"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">CUIT Empresa</label>
+                  <input
+                    type="text"
+                    value={formProcesador.cuitEmpresa}
+                    onChange={e => setFormProcesador({ ...formProcesador, cuitEmpresa: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="XX-XXXXXXXX-X"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowNuevoProcesador(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={guardarProcesador} loading={savingProcesador}>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Guardar Procesador
               </Button>
             </div>
           </div>

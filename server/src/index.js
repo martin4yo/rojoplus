@@ -41,6 +41,7 @@ import reportesDeportivosRoutes from './routes/reportesDeportivos.js'
 import pasajeCategoriaRoutes from './routes/pasajeCategoria.js'
 import conciliacionBancariaRoutes from './routes/conciliacionBancaria.js'
 import buffetRoutes from './routes/buffet.js'
+import adjuntosRoutes from './routes/adjuntos.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -104,6 +105,7 @@ app.use('/api/admin/reportes/deportivos', reportesDeportivosRoutes)
 app.use('/api/admin/categorias/pasaje', pasajeCategoriaRoutes)
 app.use('/api/admin/conciliacion', conciliacionBancariaRoutes)
 app.use('/api/admin/buffet', buffetRoutes)
+app.use('/api/admin/adjuntos', adjuntosRoutes)
 app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
 
 // Health check
@@ -118,7 +120,7 @@ app.use(errorHandler)
 const io = initSocket(httpServer)
 
 // Iniciar servidor
-httpServer.listen(PORT, async () => {
+httpServer.listen(PORT, 'localhost', async () => {
   console.log(`
 🚀 Servidor RojoPlus iniciado
 📍 Puerto: ${PORT}

@@ -530,6 +530,7 @@ model Pago {
   fechaOperacion    DateTime?         @map("fecha_operacion")
   comprobanteNro    String?           @map("comprobante_nro")
   comprobanteTipo   String?           @map("comprobante_tipo")
+  comprobanteUrl    String?           @map("comprobante_url")
   estado            String            @default("CONFIRMADO")
   fechaAnulacion    DateTime?         @map("fecha_anulacion")
   motivoAnulacion   String?           @map("motivo_anulacion")
@@ -544,6 +545,7 @@ model Pago {
   saldosAplicados   AplicacionSaldo[] @relation("SaldoAplicado")
   cargos            Cargo[]
   movimientos       MovimientoCaja[]
+  adjuntos          AdjuntoComprobante[]
   caja              Caja              @relation(fields: [cajaId], references: [id])
   cobrador          Cobrador?         @relation(fields: [cobradorId], references: [id])
   linkPago          LinkPago?         @relation(fields: [linkPagoId], references: [id])
@@ -722,6 +724,8 @@ model Caja {
   cuentaContableId     Int?                 @map("cuenta_contable_id")
   requiereConciliacion Boolean              @default(false) @map("requiere_conciliacion") // true = ingresos quedan pendientes de conciliar
   activo               Boolean              @default(true)
+  // Medios de pago permitidos: EFECTIVO, TRANSFERENCIA, CHEQUE, TARJETA, QR, DEBITO_AUTOMATICO
+  mediosPagoPermitidos String[]             @default(["EFECTIVO", "TRANSFERENCIA", "CHEQUE", "TARJETA"]) @map("medios_pago_permitidos")
   // Puntos de venta donde está disponible
   paraCaja             Boolean              @default(true) @map("para_caja")      // Caja general del club
   paraBuffet           Boolean              @default(true) @map("para_buffet")    // Mesas del buffet
@@ -806,6 +810,7 @@ model Asiento {
   lineas      AsientoLinea[]
   registrador Admin          @relation("AsientoRegistrador", fields: [registradoPor], references: [id])
   anulador    Admin?         @relation("AsientoAnulador", fields: [anuladoPor], references: [id])
+  adjuntos    AdjuntoComprobante[]
 
   @@index([fecha])
   @@index([tipoOrigen, origenId])
@@ -876,6 +881,7 @@ model MovimientoCaja {
   pedidoTakeAwayId        Int?                @map("pedido_takeaway_id")
   comanda                 Comanda?            @relation(fields: [comandaId], references: [id])
   pedidoTakeAway          PedidoTakeAway?     @relation(fields: [pedidoTakeAwayId], references: [id])
+  adjuntos                AdjuntoComprobante[]
 
   @@index([cajaId])
   @@index([fecha])
@@ -1130,6 +1136,7 @@ model Admin {
   comandasAtendidas       Comanda[]        @relation("ComandaAtendedor")
   comandasCerradas        Comanda[]        @relation("ComandaCerrador")
   pedidosTakeAway         PedidoTakeAway[]
+  adjuntosSubidos         AdjuntoComprobante[]
 
   @@map("admins")
 }
@@ -1364,6 +1371,7 @@ model OrdenCompra {
   entidad              Entidad              @relation(fields: [entidadId], references: [id])
   items                ItemOrdenCompra[]
   movimientosContables MovimientoContable[] // Facturas asociadas a esta OC
+  adjuntos             AdjuntoComprobante[]
 
   @@index([entidadId])
   @@index([estado])
@@ -1414,6 +1422,7 @@ model Pedido {
   socio    Socio?               @relation(fields: [socioId], references: [id])
   items    ItemPedido[]
   facturas MovimientoContable[]
+  adjuntos AdjuntoComprobante[]
 
   @@index([entidadId])
   @@index([socioId])
@@ -1601,6 +1610,7 @@ model MovimientoContable {
   items            ItemMovimiento[]
   movimientosCaja  MovimientoCaja[]
   movimientosStock MovimientoStock[]
+  adjuntos         AdjuntoComprobante[]
 
   @@index([tipo])
   @@index([entidadId])
@@ -2623,4 +2633,48 @@ model NotificacionVista {
 
   @@id([notificacionId, adminId])
   @@map("notificaciones_vistas")
+}
+
+// =============================================================================
+// ADJUNTOS DE COMPROBANTES
+// =============================================================================
+
+model AdjuntoComprobante {
+  id                   Int       @id @default(autoincrement())
+
+  // Referencias opcionales (solo una tendrá valor)
+  movimientoContableId Int?      @map("movimiento_contable_id")
+  movimientoCajaId     Int?      @map("movimiento_caja_id")
+  ordenCompraId        Int?      @map("orden_compra_id")
+  pedidoId             Int?      @map("pedido_id")
+  asientoId            Int?      @map("asiento_id")
+  pagoId               Int?      @map("pago_id")
+
+  // Datos del archivo
+  nombreOriginal       String    @map("nombre_original")
+  nombreArchivo        String    @map("nombre_archivo") // UUID.ext almacenado en disco
+  rutaArchivo          String    @map("ruta_archivo")
+  tipoMime             String    @map("tipo_mime")
+  tamanio              Int       // bytes
+
+  // Auditoría
+  subidoPor            Int       @map("subido_por")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  // Relaciones
+  movimientoContable   MovimientoContable? @relation(fields: [movimientoContableId], references: [id], onDelete: Cascade)
+  movimientoCaja       MovimientoCaja?     @relation(fields: [movimientoCajaId], references: [id], onDelete: Cascade)
+  ordenCompra          OrdenCompra?        @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  pedido               Pedido?             @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  asiento              Asiento?            @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  pago                 Pago?               @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  admin                Admin               @relation(fields: [subidoPor], references: [id])
+
+  @@index([movimientoContableId])
+  @@index([movimientoCajaId])
+  @@index([ordenCompraId])
+  @@index([pedidoId])
+  @@index([asientoId])
+  @@index([pagoId])
+  @@map("adjuntos_comprobantes")
 }

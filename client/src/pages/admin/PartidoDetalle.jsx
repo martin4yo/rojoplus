@@ -32,13 +32,13 @@ export default function PartidoDetalle() {
   const fetchPartido = async () => {
     setLoading(true)
     try {
-      const data = await api.get(`/admin/deportes/partidos/${id}`)
+      const data = await api.get(`/admin/partidos/${id}`)
       setPartido(data)
       setGolesLocal(data.golesLocal ?? '')
       setGolesVisitante(data.golesVisitante ?? '')
 
       // Cargar socios disponibles para convocar
-      const sociosData = await api.get(`/admin/deportes/partidos/${id}/convocados`)
+      const sociosData = await api.get(`/admin/partidos/${id}/convocados`)
       setSociosDisponibles(sociosData || [])
 
       // Inicializar estadísticas desde convocados
@@ -75,7 +75,7 @@ export default function PartidoDetalle() {
 
   const handleConvocar = async (socioId) => {
     try {
-      await api.post(`/admin/deportes/partidos/${id}/convocar`, { socioIds: [socioId] })
+      await api.post(`/admin/partidos/${id}/convocar`, { socioIds: [socioId] })
       toast.success('Jugador convocado')
       fetchPartido()
     } catch (err) {
@@ -85,7 +85,7 @@ export default function PartidoDetalle() {
 
   const handleQuitarConvocatoria = async (socioId) => {
     try {
-      await api.delete(`/admin/deportes/partidos/${id}/convocar/${socioId}`)
+      await api.delete(`/admin/partidos/${id}/convocar/${socioId}`)
       toast.success('Jugador quitado de la convocatoria')
       fetchPartido()
     } catch (err) {
@@ -100,7 +100,7 @@ export default function PartidoDetalle() {
       return
     }
     try {
-      await api.post(`/admin/deportes/partidos/${id}/convocar`, {
+      await api.post(`/admin/partidos/${id}/convocar`, {
         socioIds: noConvocados.map(s => s.id)
       })
       toast.success(`${noConvocados.length} jugadores convocados`)
@@ -112,7 +112,7 @@ export default function PartidoDetalle() {
 
   const handleNotificar = async (tipo) => {
     try {
-      const result = await api.post(`/admin/deportes/partidos/${id}/notificar-convocados`, { tipo })
+      const result = await api.post(`/admin/partidos/${id}/notificar-convocados`, { tipo })
       const { resultados } = result
       let mensaje = 'Notificaciones enviadas: '
       if (tipo === 'push' || tipo === 'todos') mensaje += `Push: ${resultados.push.enviados}. `
@@ -127,7 +127,7 @@ export default function PartidoDetalle() {
 
   const handleGuardarResultado = async () => {
     try {
-      await api.post(`/admin/deportes/partidos/${id}/resultado`, {
+      await api.post(`/admin/partidos/${id}/resultado`, {
         golesLocal: golesLocal !== '' ? parseInt(golesLocal) : null,
         golesVisitante: golesVisitante !== '' ? parseInt(golesVisitante) : null
       })
@@ -140,7 +140,7 @@ export default function PartidoDetalle() {
 
   const handleGuardarEstadisticas = async () => {
     try {
-      await api.post(`/admin/deportes/partidos/${id}/estadisticas`, { estadisticas })
+      await api.post(`/admin/partidos/${id}/estadisticas`, { estadisticas })
       toast.success('Estadísticas guardadas')
       fetchPartido()
     } catch (err) {

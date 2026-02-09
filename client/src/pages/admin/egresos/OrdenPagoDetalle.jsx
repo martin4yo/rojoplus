@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CreditCard, Calendar, Building2, Wallet, FileText, Hash, Ban } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import api from '../../../services/api'
 
 export default function OrdenPagoDetalle() {
@@ -275,6 +276,11 @@ export default function OrdenPagoDetalle() {
             ) : (
               <p className="text-gray-500">Sin caja asociada</p>
             )}
+          </div>
+
+          {/* Adjuntos */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <AdjuntosComprobante tipo="movimientoContable" comprobanteId={orden.id} />
           </div>
 
           {/* Información de registro */}

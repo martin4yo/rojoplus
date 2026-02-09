@@ -23,7 +23,19 @@ const TITULOS = {
   'cargos-personal': 'Cargo de Personal',
   'descuentos-disponibles': 'Descuento Disponible',
   'rubros': 'Rubro',
+  'medios-pago': 'Medio de Pago',
 }
+
+const TIPOS_MEDIO_PAGO = [
+  { value: 'EFECTIVO', label: 'Efectivo' },
+  { value: 'TRANSFERENCIA', label: 'Transferencia' },
+  { value: 'CHEQUE', label: 'Cheque' },
+  { value: 'TARJETA_CREDITO', label: 'Tarjeta Crédito' },
+  { value: 'TARJETA_DEBITO', label: 'Tarjeta Débito' },
+  { value: 'QR', label: 'QR / MercadoPago' },
+  { value: 'CUENTA_CORRIENTE', label: 'Cuenta Corriente' },
+  { value: 'OTRO', label: 'Otro' },
+]
 
 export default function ConfiguracionForm() {
   const { tabla, id } = useParams()
@@ -60,6 +72,14 @@ export default function ConfiguracionForm() {
     cuentaContableId: '',
     // descuentos-disponibles
     porcentaje: '',
+    // medios-pago
+    tipoMedioPago: 'EFECTIVO',
+    requiereDatosBanco: false,
+    comisionPct: 0,
+    paraCaja: true,
+    paraBuffet: true,
+    paraKiosco: true,
+    paraTakeaway: true,
   })
 
   useEffect(() => {
@@ -113,6 +133,14 @@ export default function ConfiguracionForm() {
         usaEnVentas: data.usaEnVentas || false,
         usaEnTesoreria: data.usaEnTesoreria !== false,
         cuentaContableId: data.cuentaContableId ? String(data.cuentaContableId) : '',
+        // medios-pago
+        tipoMedioPago: data.tipo || 'EFECTIVO',
+        requiereDatosBanco: data.requiereDatosBanco || false,
+        comisionPct: data.comisionPct || 0,
+        paraCaja: data.paraCaja !== false,
+        paraBuffet: data.paraBuffet !== false,
+        paraKiosco: data.paraKiosco !== false,
+        paraTakeaway: data.paraTakeaway !== false,
       })
     } catch (err) {
       setError('Error al cargar datos')
@@ -169,6 +197,18 @@ export default function ConfiguracionForm() {
       if (tabla === 'rubros') {
         delete datos.codigo // No usa código
         delete datos.color // No usa color
+      }
+
+      if (tabla === 'medios-pago') {
+        datos.tipo = form.tipoMedioPago
+        datos.requiereDatosBanco = form.requiereDatosBanco
+        datos.comisionPct = parseFloat(form.comisionPct) || 0
+        datos.paraCaja = form.paraCaja
+        datos.paraBuffet = form.paraBuffet
+        datos.paraKiosco = form.paraKiosco
+        datos.paraTakeaway = form.paraTakeaway
+        delete datos.color
+        delete datos.descripcion
       }
 
       if (isEditing) {
@@ -441,8 +481,98 @@ export default function ConfiguracionForm() {
             </div>
           )}
 
-          {/* Color del badge (no para conceptos-tesoreria, descuentos-disponibles ni rubros) */}
-          {tabla !== 'conceptos-tesoreria' && tabla !== 'descuentos-disponibles' && tabla !== 'rubros' && (
+          {/* Campos específicos para medios-pago */}
+          {tabla === 'medios-pago' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                <select
+                  value={form.tipoMedioPago}
+                  onChange={e => setForm({ ...form, tipoMedioPago: e.target.value })}
+                  className="input-field w-full"
+                >
+                  {TIPOS_MEDIO_PAGO.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Comisión (%)</label>
+                <input
+                  type="number"
+                  value={form.comisionPct}
+                  onChange={e => setForm({ ...form, comisionPct: e.target.value })}
+                  className="input-field w-full"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="Ej: 3.5"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Porcentaje de comisión que cobra el procesador de pagos
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <input
+                  type="checkbox"
+                  id="requiereDatosBanco"
+                  checked={form.requiereDatosBanco}
+                  onChange={e => setForm({ ...form, requiereDatosBanco: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="requiereDatosBanco" className="text-sm text-blue-800">
+                  Requiere datos bancarios (CBU, banco, etc.)
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Disponible en</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={form.paraCaja}
+                      onChange={e => setForm({ ...form, paraCaja: e.target.checked })}
+                      className="rounded border-gray-300 text-primary"
+                    />
+                    <span className="text-sm text-gray-700">Caja General</span>
+                  </label>
+                  <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={form.paraBuffet}
+                      onChange={e => setForm({ ...form, paraBuffet: e.target.checked })}
+                      className="rounded border-gray-300 text-primary"
+                    />
+                    <span className="text-sm text-gray-700">Buffet</span>
+                  </label>
+                  <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={form.paraKiosco}
+                      onChange={e => setForm({ ...form, paraKiosco: e.target.checked })}
+                      className="rounded border-gray-300 text-primary"
+                    />
+                    <span className="text-sm text-gray-700">Kiosco</span>
+                  </label>
+                  <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={form.paraTakeaway}
+                      onChange={e => setForm({ ...form, paraTakeaway: e.target.checked })}
+                      className="rounded border-gray-300 text-primary"
+                    />
+                    <span className="text-sm text-gray-700">Take Away</span>
+                  </label>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Color del badge (no para conceptos-tesoreria, descuentos-disponibles, rubros ni medios-pago) */}
+          {tabla !== 'conceptos-tesoreria' && tabla !== 'descuentos-disponibles' && tabla !== 'rubros' && tabla !== 'medios-pago' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Color del Badge</label>
               <div className="flex flex-wrap gap-2">

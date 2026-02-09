@@ -163,6 +163,15 @@ const categoriasSocio = [
   { codigo: 'C', nombre: 'Categoría C', descripcion: 'Socio nuevo', porcentajeDescuento: 0, color: '#6B7280', orden: 3 },
 ];
 
+const estadosSocio = [
+  { codigo: 'ACTIVO', nombre: 'ACTIVO', descripcion: 'Socio activo con todos los beneficios', color: '#10B981', permiteDescuentos: true, orden: 1 },
+  { codigo: 'VIGENTE', nombre: 'VIGENTE', descripcion: 'Socio con cuota al día', color: '#10B981', permiteDescuentos: true, orden: 2 },
+  { codigo: 'SUSPENDIDO', nombre: 'SUSPENDIDO', descripcion: 'Socio suspendido temporalmente', color: '#F59E0B', permiteDescuentos: false, orden: 3 },
+  { codigo: 'MOROSO', nombre: 'MOROSO', descripcion: 'Socio con cuotas adeudadas', color: '#EF4444', permiteDescuentos: false, orden: 4 },
+  { codigo: 'BAJA', nombre: 'BAJA', descripcion: 'Socio dado de baja', color: '#6B7280', permiteDescuentos: false, orden: 5 },
+  { codigo: 'INACTIVO', nombre: 'INACTIVO', descripcion: 'Socio inactivo', color: '#9CA3AF', permiteDescuentos: false, orden: 6 },
+];
+
 const centrosCosto = [
   // Centros Operativos (por actividad/deporte)
   { codigo: 'FUT', nombre: 'Fútbol', descripcion: 'Centro de costos de actividades de fútbol', tipo: 'OPERATIVO', orden: 1 },
@@ -563,6 +572,17 @@ async function main() {
     });
   }
   console.log(`   ✓ ${categoriasSocio.length} categorías de socio creadas`);
+
+  // Estados de Socio
+  console.log('📊 Creando estados de socio...');
+  for (const estado of estadosSocio) {
+    await prisma.estadoSocio.upsert({
+      where: { codigo: estado.codigo },
+      update: estado,
+      create: estado,
+    });
+  }
+  console.log(`   ✓ ${estadosSocio.length} estados de socio creados`);
 
   // Roles
   console.log('👥 Creando roles...');

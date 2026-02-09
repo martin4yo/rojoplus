@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, CreditCard, XCircle, Building2, Calendar, Package, Clock, CheckCircle } from 'lucide-react'
+import { ArrowLeft, FileText, CreditCard, XCircle, Building2, Calendar, Package, Clock, CheckCircle, Plus, Trash2, Wallet, AlertCircle } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import api from '../../../services/api'
 
 const ESTADOS = {
@@ -25,15 +26,16 @@ export default function FacturaCompraDetalle() {
   const [factura, setFactura] = useState(null)
   const [loading, setLoading] = useState(true)
   const [cajas, setCajas] = useState([])
+  const [mediosPago, setMediosPago] = useState([])
 
-  // Estado para pago
+  // Estado para múltiples pagos
   const [mostrarPago, setMostrarPago] = useState(false)
-  const [pago, setPago] = useState({
+  const [pagos, setPagos] = useState([{
     cajaId: '',
     medioPago: 'TRANSFERENCIA',
-    nroOperacion: '',
-    monto: ''
-  })
+    monto: '',
+    nroOperacion: ''
+  }])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -43,16 +45,25 @@ export default function FacturaCompraDetalle() {
   async function cargarDatos() {
     setLoading(true)
     try {
-      const [facturaRes, cajasRes] = await Promise.all([
+      const [facturaRes, cajasRes, mediosRes] = await Promise.all([
         api.getFull(`/admin/movimientos-contables/${id}`),
-        api.getFull('/admin/cajas?activo=true')
+        api.getFull('/admin/cajas?activo=true'),
+        api.getFull('/admin/medios-pago?activo=true')
       ])
       setFactura(facturaRes.data)
       setCajas(cajasRes.data || [])
+      setMediosPago(mediosRes.data || mediosRes || [])
 
-      // Inicializar monto de pago con saldo pendiente
-      if (facturaRes.data.saldoPendiente > 0) {
-        setPago(prev => ({ ...prev, monto: facturaRes.data.saldoPendiente.toString() }))
+      // Inicializar primer pago con saldo pendiente y primera caja
+      if (facturaRes.data.saldoPendiente > 0 && cajasRes.data?.length) {
+        const primeraCaja = cajasRes.data[0]
+        const primerMedio = primeraCaja.mediosPagoPermitidos?.[0] || 'TRANSFERENCIA'
+        setPagos([{
+          cajaId: primeraCaja.id.toString(),
+          medioPago: primerMedio,
+          monto: facturaRes.data.saldoPendiente.toString(),
+          nroOperacion: ''
+        }])
       }
     } catch (err) {
       console.error('Error cargando factura:', err)
@@ -61,6 +72,15 @@ export default function FacturaCompraDetalle() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Obtener medios de pago permitidos para una caja
+  function getMediosPermitidos(cajaId) {
+    const caja = cajas.find(c => c.id === parseInt(cajaId))
+    if (!caja || !caja.mediosPagoPermitidos?.length) {
+      return mediosPago // Si no hay restricción, mostrar todos
+    }
+    return mediosPago.filter(mp => caja.mediosPagoPermitidos.includes(mp.codigo))
   }
 
   function handleAnular() {
@@ -82,41 +102,110 @@ export default function FacturaCompraDetalle() {
     })
   }
 
+  // Funciones para manejar múltiples pagos
+  function agregarPago() {
+    const primeraCaja = cajas[0]
+    const primerMedio = primeraCaja?.mediosPagoPermitidos?.[0] || 'TRANSFERENCIA'
+    setPagos(prev => [...prev, {
+      cajaId: primeraCaja?.id.toString() || '',
+      medioPago: primerMedio,
+      monto: '',
+      nroOperacion: ''
+    }])
+  }
+
+  function eliminarPago(index) {
+    if (pagos.length === 1) return
+    setPagos(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function handlePagoChange(index, field, value) {
+    setPagos(prev => prev.map((pago, i) => {
+      if (i !== index) return pago
+
+      const updated = { ...pago, [field]: value }
+
+      // Si cambió la caja, resetear el medio de pago al primero permitido
+      if (field === 'cajaId') {
+        const caja = cajas.find(c => c.id === parseInt(value))
+        if (caja?.mediosPagoPermitidos?.length) {
+          if (!caja.mediosPagoPermitidos.includes(pago.medioPago)) {
+            updated.medioPago = caja.mediosPagoPermitidos[0]
+          }
+        }
+      }
+
+      return updated
+    }))
+  }
+
+  function calcularTotalPagos() {
+    return pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0)
+  }
+
+  function autocompletarMontoPago() {
+    const saldo = factura?.saldoPendiente || 0
+    const totalPagosActuales = pagos.slice(0, -1).reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0)
+    const restante = saldo - totalPagosActuales
+
+    if (pagos.length > 0 && restante > 0) {
+      setPagos(prev => prev.map((p, i) =>
+        i === prev.length - 1 ? { ...p, monto: restante.toFixed(2) } : p
+      ))
+    }
+  }
+
   async function handlePagar(e) {
     e.preventDefault()
 
-    if (!pago.cajaId) {
-      showModal({ type: 'warning', message: 'Debe seleccionar una caja' })
-      return
+    // Validar cada pago
+    for (const pago of pagos) {
+      if (!pago.cajaId) {
+        showModal({ type: 'warning', message: 'Cada pago debe tener una caja asignada' })
+        return
+      }
+      if (!pago.monto || parseFloat(pago.monto) <= 0) {
+        showModal({ type: 'warning', message: 'Cada pago debe tener un monto mayor a 0' })
+        return
+      }
+      // Verificar saldo de caja
+      const caja = cajas.find(c => c.id === parseInt(pago.cajaId))
+      if (caja && parseFloat(pago.monto) > caja.saldoActual) {
+        showModal({
+          type: 'warning',
+          message: `Saldo insuficiente en caja ${caja.nombre}. Disponible: ${formatMonto(caja.saldoActual)}`
+        })
+        return
+      }
     }
 
-    const montoPago = parseFloat(pago.monto)
-    if (!montoPago || montoPago <= 0) {
-      showModal({ type: 'warning', message: 'El monto debe ser mayor a 0' })
-      return
-    }
-
-    if (montoPago > factura.saldoPendiente) {
-      showModal({ type: 'warning', message: 'El monto no puede ser mayor al saldo pendiente' })
+    const totalPagos = calcularTotalPagos()
+    if (totalPagos > factura.saldoPendiente) {
+      showModal({ type: 'warning', message: 'El total de pagos no puede ser mayor al saldo pendiente' })
       return
     }
 
     setSaving(true)
     try {
-      await api.post('/admin/movimientos-contables', {
-        tipo: 'ORDEN_PAGO',
+      await api.post('/admin/ordenes-pago', {
         entidadId: factura.entidadId,
-        movimientoPadreId: factura.id,
-        montoTotal: montoPago,
-        cajaId: parseInt(pago.cajaId),
-        medioPago: pago.medioPago,
-        nroOperacion: pago.nroOperacion || null,
-        observaciones: `Pago de ${factura.numero}`
+        fecha: new Date().toISOString().split('T')[0],
+        observaciones: `Pago de ${factura.numero}`,
+        montoTotal: totalPagos,
+        facturasCanceladas: [{
+          movimientoContableId: factura.id,
+          montoPagado: totalPagos
+        }],
+        pagos: pagos.map(p => ({
+          cajaId: parseInt(p.cajaId),
+          medioPago: p.medioPago,
+          monto: parseFloat(p.monto),
+          nroOperacion: p.nroOperacion || null
+        }))
       })
 
       await cargarDatos()
       setMostrarPago(false)
-      setPago({ cajaId: '', medioPago: 'TRANSFERENCIA', nroOperacion: '', monto: '' })
       showModal({ type: 'success', message: 'Pago registrado correctamente' })
     } catch (err) {
       showModal({ type: 'error', message: err.message || 'Error al registrar pago' })
@@ -301,65 +390,143 @@ export default function FacturaCompraDetalle() {
         </div>
       </div>
 
-      {/* Formulario de Pago */}
+      {/* Formulario de Pago - Múltiples Medios */}
       {mostrarPago && (
         <div className="bg-green-50 rounded-lg border border-green-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Registrar Pago</h2>
-          <form onSubmit={handlePagar} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Caja *</label>
-              <select
-                value={pago.cajaId}
-                onChange={(e) => setPago(prev => ({ ...prev, cajaId: e.target.value }))}
-                required
-                className="input-field w-full"
-              >
-                <option value="">Seleccionar caja...</option>
-                {cajas.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre} ({formatMonto(c.saldoActual)})</option>
-                ))}
-              </select>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-gray-600" />
+              <h2 className="text-lg font-semibold text-gray-800">Registrar Pago</h2>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
-              <select
-                value={pago.medioPago}
-                onChange={(e) => setPago(prev => ({ ...prev, medioPago: e.target.value }))}
-                className="input-field w-full"
-              >
-                <option value="EFECTIVO">Efectivo</option>
-                <option value="TRANSFERENCIA">Transferencia</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={autocompletarMontoPago}>
+                Autocompletar
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={agregarPago}>
+                <Plus className="w-4 h-4 mr-1" />
+                Agregar Pago
+              </Button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nro. Operacion</label>
-              <input
-                type="text"
-                value={pago.nroOperacion}
-                onChange={(e) => setPago(prev => ({ ...prev, nroOperacion: e.target.value }))}
-                placeholder="Referencia..."
-                className="input-field w-full"
-              />
+          </div>
+
+          <form onSubmit={handlePagar}>
+            <div className="space-y-3">
+              {pagos.map((pago, index) => (
+                  <div key={index} className="flex gap-3 items-end p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Caja
+                      </label>
+                      <select
+                        value={pago.cajaId}
+                        onChange={(e) => handlePagoChange(index, 'cajaId', e.target.value)}
+                        className="input-field w-full text-sm"
+                      >
+                        <option value="">Seleccionar...</option>
+                        {cajas.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre} ({formatMonto(c.saldoActual)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="w-40">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Medio
+                      </label>
+                      <select
+                        value={pago.medioPago}
+                        onChange={(e) => handlePagoChange(index, 'medioPago', e.target.value)}
+                        className="input-field w-full text-sm"
+                      >
+                        {getMediosPermitidos(pago.cajaId).map((mp) => (
+                          <option key={mp.codigo} value={mp.codigo}>{mp.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="w-36">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Monto
+                      </label>
+                      <input
+                        type="number"
+                        value={pago.monto}
+                        onChange={(e) => handlePagoChange(index, 'monto', e.target.value)}
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="input-field w-full text-sm text-right"
+                      />
+                    </div>
+
+                    <div className="w-36">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Nro. Oper.
+                      </label>
+                      <input
+                        type="text"
+                        value={pago.nroOperacion}
+                        onChange={(e) => handlePagoChange(index, 'nroOperacion', e.target.value)}
+                        placeholder="Opcional"
+                        className="input-field w-full text-sm"
+                      />
+                    </div>
+
+                    {pagos.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => eliminarPago(index)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+              ))}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
-              <input
-                type="number"
-                value={pago.monto}
-                onChange={(e) => setPago(prev => ({ ...prev, monto: e.target.value }))}
-                max={factura.saldoPendiente}
-                step="0.01"
-                required
-                className="input-field w-full"
-              />
+
+            {/* Resumen de pagos */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Saldo pendiente:</span>
+                <span className="font-medium text-gray-800">{formatMonto(factura.saldoPendiente)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Total en pagos:</span>
+                <span className={`text-lg font-bold ${
+                  Math.abs(calcularTotalPagos() - factura.saldoPendiente) < 0.01
+                    ? 'text-green-600'
+                    : calcularTotalPagos() > factura.saldoPendiente
+                      ? 'text-red-600'
+                      : 'text-yellow-600'
+                }`}>
+                  {formatMonto(calcularTotalPagos())}
+                </span>
+              </div>
+              {calcularTotalPagos() !== factura.saldoPendiente && calcularTotalPagos() > 0 && (
+                <div className="text-sm text-right mt-1">
+                  {calcularTotalPagos() < factura.saldoPendiente ? (
+                    <span className="text-yellow-600">
+                      Pago parcial: quedará saldo de {formatMonto(factura.saldoPendiente - calcularTotalPagos())}
+                    </span>
+                  ) : (
+                    <span className="text-red-600">
+                      <AlertCircle className="w-4 h-4 inline mr-1" />
+                      Excede el saldo pendiente
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="md:col-span-4 flex justify-end gap-2">
+
+            <div className="flex justify-end gap-2 mt-4">
               <Button type="button" variant="secondary" onClick={() => setMostrarPago(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? 'Guardando...' : 'Confirmar Pago'}
+              <Button type="submit" disabled={saving || calcularTotalPagos() <= 0 || calcularTotalPagos() > factura.saldoPendiente}>
+                {saving ? 'Guardando...' : `Confirmar Pago (${formatMonto(calcularTotalPagos())})`}
               </Button>
             </div>
           </form>
@@ -467,6 +634,11 @@ export default function FacturaCompraDetalle() {
           <p className="text-gray-600">{factura.observaciones}</p>
         </div>
       )}
+
+      {/* Adjuntos */}
+      <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <AdjuntosComprobante tipo="movimientoContable" comprobanteId={factura.id} />
+      </div>
     </div>
   )
 }

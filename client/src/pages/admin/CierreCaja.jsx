@@ -12,6 +12,10 @@ export default function CierreCaja() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
+  // Obtener el ID del admin actual
+  const adminData = JSON.parse(localStorage.getItem('adminData') || '{}')
+  const adminActualId = adminData.id
+
   // Datos
   const [cajasPendientes, setCajasPendientes] = useState([])
   const [cierresRecientes, setCierresRecientes] = useState([])
@@ -20,6 +24,7 @@ export default function CierreCaja() {
   const [modalCerrar, setModalCerrar] = useState(false)
   const [modalDetalle, setModalDetalle] = useState(false)
   const [cierreSeleccionado, setCierreSeleccionado] = useState(null)
+  const [confirmarFirma, setConfirmarFirma] = useState(null) // ID del cierre a firmar
 
   // Formulario de cierre
   const [formCierre, setFormCierre] = useState({
@@ -94,12 +99,11 @@ export default function CierreCaja() {
   }
 
   async function firmarCierre(cierreId) {
-    if (!confirm('¿Desea firmar este cierre de caja?')) return
-
     try {
       await api.post(`/admin/cierres-caja/${cierreId}/firmar`)
       setSuccess('Cierre firmado exitosamente')
       setModalDetalle(false)
+      setConfirmarFirma(null)
       cargarDatos()
     } catch (err) {
       setError(err.response?.data?.message || 'Error al firmar cierre')
@@ -584,15 +588,19 @@ export default function CierreCaja() {
                     <p className="text-sm text-yellow-700 mb-3">
                       Este cierre requiere firma de un supervisor
                     </p>
-                    {tienePermiso(PERMISOS.CAJA_CIERRE) && (
+                    {tienePermiso(PERMISOS.CAJA_CIERRE) && cierreSeleccionado.cerradoPor !== adminActualId ? (
                       <Button
-                        onClick={() => firmarCierre(cierreSeleccionado.id)}
+                        onClick={() => setConfirmarFirma(cierreSeleccionado.id)}
                         size="sm"
                       >
                         <CheckCircle className="w-4 h-4 mr-2" />
                         Firmar Cierre
                       </Button>
-                    )}
+                    ) : tienePermiso(PERMISOS.CAJA_CIERRE) && cierreSeleccionado.cerradoPor === adminActualId ? (
+                      <p className="text-xs text-gray-500 italic">
+                        No puede firmar un cierre realizado por usted mismo
+                      </p>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -607,6 +615,34 @@ export default function CierreCaja() {
                 className="w-full"
               >
                 Cerrar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Firma */}
+      {confirmarFirma && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-primary/10">
+                <CheckCircle className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800">Confirmar Firma</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              ¿Desea firmar este cierre de caja? Esta acción valida el arqueo realizado.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setConfirmarFirma(null)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={() => firmarCierre(confirmarFirma)}>
+                Sí, Firmar
               </Button>
             </div>
           </div>

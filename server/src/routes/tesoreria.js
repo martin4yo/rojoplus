@@ -58,7 +58,7 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/cajas - Crear caja
 router.post('/cajas', asyncHandler(async (req, res) => {
-  const { codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId, requiereConciliacion } = req.body
+  const { codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId, requiereConciliacion, mediosPagoPermitidos } = req.body
 
   if (!codigo || !nombre || !tipo) {
     throw new AppError('Codigo, nombre y tipo son requeridos', 400)
@@ -80,8 +80,11 @@ router.post('/cajas', asyncHandler(async (req, res) => {
       tipo,
       descripcion,
       saldoActual: saldoInicial ? parseFloat(saldoInicial) : 0,
-      cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null,
-      requiereConciliacion: requiereConciliacion === true
+      requiereConciliacion: requiereConciliacion === true,
+      mediosPagoPermitidos: mediosPagoPermitidos || [],
+      ...(cuentaContableId && {
+        cuentaContable: { connect: { id: parseInt(cuentaContableId) } }
+      })
     }
   })
 
@@ -94,7 +97,7 @@ router.post('/cajas', asyncHandler(async (req, res) => {
 // PUT /api/admin/cajas/:id - Actualizar caja
 router.put('/cajas/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, tipo, descripcion, activo, cuentaContableId, requiereConciliacion } = req.body
+  const { codigo, nombre, tipo, descripcion, activo, cuentaContableId, requiereConciliacion, mediosPagoPermitidos } = req.body
 
   const existente = await prisma.caja.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
@@ -109,19 +112,29 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
     }
   }
 
+  // Preparar datos de actualización
+  const updateData = {
+    codigo: codigo || existente.codigo,
+    nombre: nombre || existente.nombre,
+    tipo: tipo || existente.tipo,
+    descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
+    activo: activo !== undefined ? activo : existente.activo,
+    requiereConciliacion: requiereConciliacion !== undefined ? requiereConciliacion : existente.requiereConciliacion,
+    mediosPagoPermitidos: mediosPagoPermitidos !== undefined ? mediosPagoPermitidos : existente.mediosPagoPermitidos
+  }
+
+  // Manejar la relación con cuenta contable
+  if (cuentaContableId !== undefined) {
+    if (cuentaContableId) {
+      updateData.cuentaContable = { connect: { id: parseInt(cuentaContableId) } }
+    } else {
+      updateData.cuentaContable = { disconnect: true }
+    }
+  }
+
   const caja = await prisma.caja.update({
     where: { id: parseInt(id) },
-    data: {
-      codigo: codigo || existente.codigo,
-      nombre: nombre || existente.nombre,
-      tipo: tipo || existente.tipo,
-      descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
-      activo: activo !== undefined ? activo : existente.activo,
-      cuentaContableId: cuentaContableId !== undefined
-        ? (cuentaContableId ? parseInt(cuentaContableId) : null)
-        : existente.cuentaContableId,
-      requiereConciliacion: requiereConciliacion !== undefined ? requiereConciliacion : existente.requiereConciliacion
-    }
+    data: updateData
   })
 
   res.json({

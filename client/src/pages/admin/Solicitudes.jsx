@@ -42,16 +42,16 @@ export default function Solicitudes() {
     try {
       const [resSolicitudes, resStats, resTipos, resCategorias] = await Promise.all([
         fetch(`${import.meta.env.VITE_API_URL}/admin/solicitudes?${new URLSearchParams(filtros)}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
         }),
         fetch(`${import.meta.env.VITE_API_URL}/admin/solicitudes-stats`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
         }),
         fetch(`${import.meta.env.VITE_API_URL}/admin/tipos-socio`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
         }),
         fetch(`${import.meta.env.VITE_API_URL}/admin/categorias-socio`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
         })
       ])
 
@@ -75,7 +75,7 @@ export default function Solicitudes() {
   const handleVerDetalle = async (id) => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/solicitudes/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
       })
       const data = await res.json()
       setSelectedSolicitud(data.data)
@@ -113,7 +113,7 @@ export default function Solicitudes() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem('adminToken')}`
         },
         body: JSON.stringify(formAprobar)
       })
@@ -124,7 +124,7 @@ export default function Solicitudes() {
         throw new Error(data.error?.message || 'Error al aprobar solicitud')
       }
 
-      toast.success(`Solicitud aprobada. Socio #${data.data.socio.nroSocio} creado`)
+      toast.success(`Solicitud aprobada. Socio #${data.data.socioTitular?.nroSocio || 'N/A'} creado`)
       setShowModalAprobar(false)
       cargarDatos()
     } catch (error) {
@@ -144,7 +144,7 @@ export default function Solicitudes() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem('adminToken')}`
         },
         body: JSON.stringify({ motivoRechazo })
       })

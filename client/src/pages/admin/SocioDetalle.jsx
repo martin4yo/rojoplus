@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Edit, QrCode, Users, CreditCard, Activity,
   Phone, Mail, MapPin, Calendar, User, AlertCircle,
-  Heart, Shield, FileText, Clock, DollarSign, X, Copy, Check, RefreshCw, ExternalLink
+  Heart, Shield, FileText, Clock, DollarSign, X, Copy, Check, RefreshCw, ExternalLink, List
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '../../components/Button'
@@ -20,6 +20,12 @@ export default function SocioDetalle() {
   const [cuotasPendientes, setCuotasPendientes] = useState([])
   const [resumenPagos, setResumenPagos] = useState(null)
   const [activeTab, setActiveTab] = useState('general')
+
+  // Cuenta Corriente
+  const [mostrarCtaCte, setMostrarCtaCte] = useState(false)
+  const [cuentaCorriente, setCuentaCorriente] = useState(null)
+  const [loadingCtaCte, setLoadingCtaCte] = useState(false)
+  const [incluirFamilia, setIncluirFamilia] = useState(false)
 
   // Modal QR
   const [qrModal, setQrModal] = useState(false)
@@ -62,6 +68,26 @@ export default function SocioDetalle() {
       setLoading(false)
     }
   }
+
+  async function cargarCuentaCorriente() {
+    setLoadingCtaCte(true)
+    try {
+      const params = new URLSearchParams()
+      if (incluirFamilia) params.append('incluirFamilia', 'true')
+      const data = await api.get(`/admin/socios/${id}/cuenta-corriente?${params}`)
+      setCuentaCorriente(data)
+    } catch (err) {
+      console.error('Error al cargar cuenta corriente:', err)
+    } finally {
+      setLoadingCtaCte(false)
+    }
+  }
+
+  useEffect(() => {
+    if (mostrarCtaCte) {
+      cargarCuentaCorriente()
+    }
+  }, [mostrarCtaCte, incluirFamilia])
 
   function getEstadoColor(estado) {
     const upper = estado?.toUpperCase() || ''
@@ -954,38 +980,151 @@ export default function SocioDetalle() {
               </div>
             </div>
 
-            <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
-              <Clock className="w-4 h-4" /> Cuotas Pendientes
-            </h3>
-            {cuotasPendientes.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Periodo</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tipo</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Monto</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Recargo</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {cuotasPendientes.map(cuota => (
-                      <tr key={cuota.id}>
-                        <td className="px-4 py-3 text-gray-800">
-                          {cuota.periodo?.nombre || `${cuota.periodo?.mes}/${cuota.periodo?.anio}`}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">{cuota.tipoCuota?.nombre}</td>
-                        <td className="px-4 py-3 text-right text-gray-800">{formatMonto(cuota.montoOriginal)}</td>
-                        <td className="px-4 py-3 text-right text-red-600">{formatMonto(cuota.montoRecargo)}</td>
-                        <td className="px-4 py-3 text-right font-medium text-gray-800">{formatMonto(cuota.montoTotal)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Toggle Cuotas Pendientes / Cuenta Corriente */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium text-gray-800 flex items-center gap-2">
+                {mostrarCtaCte ? (
+                  <><List className="w-4 h-4" /> Cuenta Corriente</>
+                ) : (
+                  <><Clock className="w-4 h-4" /> Cuotas Pendientes</>
+                )}
+              </h3>
+              <button
+                onClick={() => setMostrarCtaCte(!mostrarCtaCte)}
+                className="px-3 py-1 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition"
+              >
+                {mostrarCtaCte ? 'Ver solo pendientes' : 'Ver Cuenta Corriente'}
+              </button>
+            </div>
+
+            {/* Vista Cuotas Pendientes */}
+            {!mostrarCtaCte && (
+              <>
+                {cuotasPendientes.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Periodo</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tipo</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Monto</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Recargo</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {cuotasPendientes.map(cuota => (
+                          <tr key={cuota.id}>
+                            <td className="px-4 py-3 text-gray-800">
+                              {cuota.periodo?.nombre || `${cuota.periodo?.mes}/${cuota.periodo?.anio}`}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{cuota.tipoCuota?.nombre}</td>
+                            <td className="px-4 py-3 text-right text-gray-800">{formatMonto(cuota.montoOriginal)}</td>
+                            <td className="px-4 py-3 text-right text-red-600">{formatMonto(cuota.montoRecargo)}</td>
+                            <td className="px-4 py-3 text-right font-medium text-gray-800">{formatMonto(cuota.montoTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-gray-500">No tiene cuotas pendientes</p>
+                )}
+              </>
+            )}
+
+            {/* Vista Cuenta Corriente */}
+            {mostrarCtaCte && (
+              <div>
+                {/* Opciones */}
+                {(socio.tipoSocio?.toLowerCase().includes('titular') || socio.miembrosFamilia?.length > 0) && (
+                  <div className="flex items-center gap-2 mb-4">
+                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={incluirFamilia}
+                        onChange={(e) => setIncluirFamilia(e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      Incluir miembros de familia
+                    </label>
+                  </div>
+                )}
+
+                {loadingCtaCte ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                  </div>
+                ) : cuentaCorriente ? (
+                  <>
+                    {/* Resumen */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                        <p className="text-xs text-red-600">Total Cargos</p>
+                        <p className="text-lg font-bold text-red-700">{formatMonto(cuentaCorriente.resumen?.totalDebe)}</p>
+                      </div>
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p className="text-xs text-green-600">Total Pagos</p>
+                        <p className="text-lg font-bold text-green-700">{formatMonto(cuentaCorriente.resumen?.totalHaber)}</p>
+                      </div>
+                      <div className={`p-3 rounded-lg border ${cuentaCorriente.resumen?.saldoActual > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                        <p className={`text-xs ${cuentaCorriente.resumen?.saldoActual > 0 ? 'text-red-600' : 'text-green-600'}`}>Saldo Actual</p>
+                        <p className={`text-lg font-bold ${cuentaCorriente.resumen?.saldoActual > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                          {formatMonto(Math.abs(cuentaCorriente.resumen?.saldoActual || 0))}
+                          {cuentaCorriente.resumen?.saldoActual < 0 && ' a favor'}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-xs text-gray-500">Movimientos</p>
+                        <p className="text-lg font-bold text-gray-700">{cuentaCorriente.movimientos?.length || 0}</p>
+                      </div>
+                    </div>
+
+                    {/* Tabla de movimientos */}
+                    {cuentaCorriente.movimientos?.length > 0 ? (
+                      <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Concepto</th>
+                              {incluirFamilia && (
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Socio</th>
+                              )}
+                              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Debe</th>
+                              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Haber</th>
+                              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Saldo</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {cuentaCorriente.movimientos.map((mov, idx) => (
+                              <tr key={idx} className={mov.tipo === 'CARGO' ? 'bg-white' : 'bg-green-50'}>
+                                <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{formatFecha(mov.fecha)}</td>
+                                <td className="px-3 py-2 text-gray-800">{mov.concepto}</td>
+                                {incluirFamilia && (
+                                  <td className="px-3 py-2 text-gray-600 text-xs">{mov.socio?.apellidoNombre || mov.socioNombre}</td>
+                                )}
+                                <td className="px-3 py-2 text-right text-red-600 font-medium">
+                                  {mov.debe > 0 ? formatMonto(mov.debe) : ''}
+                                </td>
+                                <td className="px-3 py-2 text-right text-green-600 font-medium">
+                                  {mov.haber > 0 ? formatMonto(mov.haber) : ''}
+                                </td>
+                                <td className={`px-3 py-2 text-right font-medium ${mov.saldo > 0 ? 'text-red-600' : mov.saldo < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                                  {formatMonto(Math.abs(mov.saldo))}
+                                  {mov.saldo < 0 && ' (F)'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No hay movimientos registrados</p>
+                    )}
+                  </>
+                ) : null}
               </div>
-            ) : (
-              <p className="text-gray-500">No tiene cuotas pendientes</p>
             )}
           </div>
         )}

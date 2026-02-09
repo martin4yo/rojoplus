@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Edit2, Trash2, Tag, Users, Activity, Wallet, Briefcase, Percent } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, Trash2, Tag, Users, Activity, Wallet, Briefcase, Percent, CreditCard } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -24,6 +24,7 @@ const TITULOS = {
   'cargos-personal': 'Cargos de Personal',
   'descuentos-disponibles': 'Descuentos Disponibles',
   'rubros': 'Rubros',
+  'medios-pago': 'Medios de Pago',
 }
 
 const ICONOS = {
@@ -34,6 +35,7 @@ const ICONOS = {
   'cargos-personal': { icon: Briefcase, bgColor: 'bg-rose-100', color: 'text-rose-600' },
   'descuentos-disponibles': { icon: Percent, bgColor: 'bg-amber-100', color: 'text-amber-600' },
   'rubros': { icon: Tag, bgColor: 'bg-cyan-100', color: 'text-cyan-600' },
+  'medios-pago': { icon: CreditCard, bgColor: 'bg-violet-100', color: 'text-violet-600' },
 }
 
 export default function ConfiguracionLista() {
@@ -140,6 +142,12 @@ export default function ConfiguracionLista() {
               {tabla === 'estados-socio' && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RojoPlus</th>
               )}
+              {tabla === 'medios-pago' && (
+                <>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Comisión</th>
+                </>
+              )}
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orden</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
@@ -152,7 +160,7 @@ export default function ConfiguracionLista() {
                   {tabla === 'descuentos-disponibles' ? `#${item.id}` : tabla === 'rubros' ? `#${item.id}` : item.codigo}
                 </td>
                 <td className="px-4 py-3">
-                  {tabla === 'rubros' || tabla === 'descuentos-disponibles' ? (
+                  {tabla === 'rubros' || tabla === 'descuentos-disponibles' || tabla === 'medios-pago' ? (
                     <span className="text-sm font-medium text-gray-800">{item.nombre}</span>
                   ) : (
                     <span className={`px-2 py-1 text-sm rounded-full ${COLORES[item.color] || COLORES.gray}`}>
@@ -184,6 +192,14 @@ export default function ConfiguracionLista() {
                       <span className="text-gray-400">No</span>
                     )}
                   </td>
+                )}
+                {tabla === 'medios-pago' && (
+                  <>
+                    <td className="px-4 py-3 text-sm text-gray-600">{item.tipo}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {Number(item.comisionPct) > 0 ? `${item.comisionPct}%` : '-'}
+                    </td>
+                  </>
                 )}
                 <td className="px-4 py-3 text-sm text-gray-600">{item.orden}</td>
                 <td className="px-4 py-3 text-sm">

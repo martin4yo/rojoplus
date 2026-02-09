@@ -26,7 +26,7 @@ router.get('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
     }
   })
 
-  res.json(configuraciones)
+  res.json({ success: true, data: configuraciones })
 }))
 
 // POST /api/admin/debito/configuraciones - Crear configuración
@@ -52,6 +52,26 @@ router.post('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
     ambiente
   } = req.body
 
+  // Validar campos requeridos
+  if (!codigo || !nombre) {
+    return res.status(400).json({
+      success: false,
+      error: 'Código y nombre son requeridos'
+    })
+  }
+
+  // Verificar que no exista un procesador con el mismo código
+  const existente = await prisma.configuracionDebito.findUnique({
+    where: { codigo }
+  })
+
+  if (existente) {
+    return res.status(400).json({
+      success: false,
+      error: 'Ya existe un procesador con ese código'
+    })
+  }
+
   const configuracion = await prisma.configuracionDebito.create({
     data: {
       codigo,
@@ -75,7 +95,7 @@ router.post('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
     }
   })
 
-  res.status(201).json(configuracion)
+  res.status(201).json({ success: true, data: configuracion })
 }))
 
 // PUT /api/admin/debito/configuraciones/:id - Actualizar configuración
@@ -88,7 +108,7 @@ router.put('/configuraciones/:id', authAdmin, asyncHandler(async (req, res) => {
     data
   })
 
-  res.json(configuracion)
+  res.json({ success: true, data: configuracion })
 }))
 
 // DELETE /api/admin/debito/configuraciones/:id - Eliminar configuración
@@ -129,7 +149,7 @@ router.get('/socios-disponibles', authAdmin, asyncHandler(async (req, res) => {
   const socios = await prisma.socio.findMany({
     where: {
       enviaDebito: true,
-      activo: true,
+      estado: 'ACTIVO',
       tarjetaNumero: { not: null }, // Requiere número de tarjeta
       cargos: {
         some: {
@@ -325,7 +345,7 @@ router.post('/archivos/generar', authAdmin, asyncHandler(async (req, res) => {
     where: {
       id: { in: socioIds.map(id => parseInt(id)) },
       enviaDebito: true,
-      activo: true,
+      estado: 'ACTIVO',
       tarjetaNumero: { not: null }
     },
     include: {
@@ -1009,7 +1029,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
   const sociosConDebito = await prisma.socio.count({
     where: {
       enviaDebito: true,
-      activo: true,
+      estado: 'ACTIVO',
       tarjetaNumero: { not: null }
     }
   })
@@ -1441,7 +1461,7 @@ async function obtenerMedioPagoDebito(tx) {
         codigo: 'DEBITO_AUTO',
         nombre: 'Débito Automático',
         tipo: 'BANCO',
-        activo: true,
+        estado: 'ACTIVO',
         orden: 10
       }
     })

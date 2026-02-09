@@ -35,7 +35,11 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
     if (response.status === 401) {
       handleInvalidToken()
     }
-    throw new Error(data.error?.message || 'Error en la solicitud')
+    // Manejar error como string o como objeto con message
+    const errorMessage = typeof data.error === 'string'
+      ? data.error
+      : (data.error?.message || data.message || 'Error en la solicitud')
+    throw new Error(errorMessage)
   }
 
   return returnFullResponse ? data : data.data
@@ -86,7 +90,10 @@ const api = {
       if (response.status === 401) {
         handleInvalidToken()
       }
-      throw new Error(data.error?.message || 'Error en la solicitud')
+      const errorMessage = typeof data.error === 'string'
+        ? data.error
+        : (data.error?.message || data.message || 'Error en la solicitud')
+      throw new Error(errorMessage)
     }
     return data.data
   },
@@ -110,7 +117,10 @@ const api = {
       if (response.status === 401) {
         handleInvalidToken()
       }
-      throw new Error(data.error?.message || 'Error en la solicitud')
+      const errorMessage = typeof data.error === 'string'
+        ? data.error
+        : (data.error?.message || data.message || 'Error en la solicitud')
+      throw new Error(errorMessage)
     }
     return data
   },

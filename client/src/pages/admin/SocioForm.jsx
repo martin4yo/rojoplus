@@ -19,7 +19,6 @@ export default function SocioForm() {
   const [activeTab, setActiveTab] = useState('personal')
 
   // Datos auxiliares
-  const [deportes, setDeportes] = useState([])
   const [cobradores, setCobradores] = useState([])
   const [tiposSocio, setTiposSocio] = useState([])
   const [categoriasSocio, setCategoriasSocio] = useState([])
@@ -131,21 +130,33 @@ export default function SocioForm() {
   }, [id])
 
   async function cargarDatosAuxiliares() {
+    // Cargar cada dato de forma independiente para que un error no afecte a los demás
     try {
-      const [deportesData, cobradoresData, tiposData, categoriasData, estadosData] = await Promise.all([
-        api.get('/admin/deportes'),
-        api.get('/admin/cobradores'),
-        api.get('/admin/tipos-socio?activo=true'),
-        api.get('/admin/categorias-socio?activo=true'),
-        api.get('/admin/estados-socio?activo=true'),
-      ])
-      setDeportes(deportesData || [])
-      setCobradores(cobradoresData || [])
-      setTiposSocio(tiposData || [])
-      setCategoriasSocio(categoriasData || [])
-      setEstadosSocio(estadosData || [])
+      const tiposData = await api.get('/admin/tipos-socio?activo=true')
+      setTiposSocio(Array.isArray(tiposData) ? tiposData : [])
     } catch (err) {
-      console.error('Error cargando datos auxiliares:', err)
+      console.error('Error cargando tipos de socio:', err)
+    }
+
+    try {
+      const categoriasData = await api.get('/admin/categorias-socio?activo=true')
+      setCategoriasSocio(Array.isArray(categoriasData) ? categoriasData : [])
+    } catch (err) {
+      console.error('Error cargando categorías de socio:', err)
+    }
+
+    try {
+      const estadosData = await api.get('/admin/estados-socio?activo=true')
+      setEstadosSocio(Array.isArray(estadosData) ? estadosData : [])
+    } catch (err) {
+      console.error('Error cargando estados de socio:', err)
+    }
+
+    try {
+      const cobradoresData = await api.get('/admin/cobradores')
+      setCobradores(Array.isArray(cobradoresData) ? cobradoresData : [])
+    } catch (err) {
+      console.error('Error cargando cobradores:', err)
     }
   }
 
@@ -423,17 +434,12 @@ export default function SocioForm() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                   <select name="estado" value={form.estado} onChange={handleChange} className="input-field w-full">
                     <option value="">Seleccionar</option>
-                    {estadosSocio.length > 0 ? (
-                      estadosSocio.map(e => (
-                        <option key={e.id} value={e.nombre}>{e.nombre}</option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="ACTIVO">Activo</option>
-                        <option value="INACTIVO">Inactivo</option>
-                        <option value="SUSPENDIDO">Suspendido</option>
-                        <option value="BAJA">Baja</option>
-                      </>
+                    {estadosSocio.map(e => (
+                      <option key={e.id} value={e.nombre}>{e.nombre}</option>
+                    ))}
+                    {/* Si el valor actual no está en la lista, mostrarlo igual */}
+                    {form.estado && !estadosSocio.find(e => e.nombre === form.estado) && (
+                      <option value={form.estado}>{form.estado}</option>
                     )}
                   </select>
                 </div>
@@ -444,6 +450,9 @@ export default function SocioForm() {
                     {categoriasSocio.map(c => (
                       <option key={c.id} value={c.nombre}>{c.nombre}</option>
                     ))}
+                    {form.categoria && !categoriasSocio.find(c => c.nombre === form.categoria) && (
+                      <option value={form.categoria}>{form.categoria}</option>
+                    )}
                   </select>
                 </div>
                 <div className="col-span-6 sm:col-span-3">
@@ -453,6 +462,9 @@ export default function SocioForm() {
                     {tiposSocio.map(t => (
                       <option key={t.id} value={t.nombre}>{t.nombre}</option>
                     ))}
+                    {form.tipoSocio && !tiposSocio.find(t => t.nombre === form.tipoSocio) && (
+                      <option value={form.tipoSocio}>{form.tipoSocio}</option>
+                    )}
                   </select>
                 </div>
                 <div className="col-span-6 sm:col-span-2">

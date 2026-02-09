@@ -38,12 +38,12 @@ export default function Mision() {
   return (
     <div className="bg-gray-300 min-h-screen">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-red-600 to-red-700 py-12 md:py-16">
+      <section className="bg-gradient-to-br from-red-600 to-red-700 py-6 md:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
             Misión y Valores
           </h1>
-          <p className="text-lg text-red-100 max-w-3xl mx-auto">
+          <p className="text-base text-red-100 max-w-3xl mx-auto">
             Los principios que guían cada paso de Club Sportivo Pilar desde 1932
           </p>
         </div>

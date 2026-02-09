@@ -79,8 +79,22 @@ export default function Periodos() {
     setError(null)
 
     try {
-      await api.post('/admin/periodos', formData)
-      setSuccess('Periodo creado correctamente')
+      const resultado = await api.post('/admin/periodos', formData)
+      const periodoId = resultado.id
+
+      // Si el periodo ya existía (creado por plan de pagos), generar cuotas automáticamente
+      if (resultado.existente) {
+        setSuccess(`El periodo ${MESES[formData.mes - 1]} ${formData.anio} ya existía. Generando cuotas...`)
+        // Generar cuotas automáticamente
+        try {
+          const genResult = await api.post(`/admin/periodos/${periodoId}/generar`)
+          setSuccess(genResult.mensaje || `Cuotas generadas: ${genResult.cuotasGeneradas}`)
+        } catch (genErr) {
+          setError(genErr.message || 'Error al generar cuotas')
+        }
+      } else {
+        setSuccess('Periodo creado correctamente')
+      }
       setShowCrearModal(false)
       setFormData({
         anio: new Date().getFullYear(),
@@ -89,7 +103,8 @@ export default function Periodos() {
       })
       cargarPeriodos()
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al crear periodo')
+      const mensaje = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Error al crear periodo'
+      setError(mensaje)
     } finally {
       setCreando(false)
     }
@@ -112,10 +127,11 @@ export default function Periodos() {
 
     try {
       const result = await api.post(`/admin/periodos/${periodoId}/generar`)
-      setSuccess(`Se generaron ${result.cuotasGeneradas} cuotas para ${result.sociosProcesados} socios`)
+      // Usar mensaje del servidor que incluye info de saltados
+      setSuccess(result.mensaje || `Se generaron ${result.cuotasGeneradas} cuotas`)
       cargarPeriodos()
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al generar cuotas')
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Error al generar cuotas')
     } finally {
       setGenerando(null)
     }
@@ -451,16 +467,21 @@ export default function Periodos() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha de Vencimiento
+                  <span className="text-gray-400 font-normal ml-1">(calculada automáticamente)</span>
+                </label>
                 <input
                   type="date"
                   value={formData.fechaVencimiento}
                   onChange={e => setFormData({ ...formData, fechaVencimiento: e.target.value })}
                   className="input-field w-full"
-                  required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Fecha limite para pagar sin recargo
+                  {venceMismoMes
+                    ? `Día ${diaVencimiento} del mismo mes del periodo`
+                    : `Día ${diaVencimiento} del mes siguiente al periodo`
+                  }
                 </p>
               </div>
 

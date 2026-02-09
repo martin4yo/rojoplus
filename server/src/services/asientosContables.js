@@ -158,12 +158,12 @@ async function generarAsientoPagoCuota(prisma, datos) {
       cuentaCajaCodigo = CUENTAS.BANCO_CC
     }
 
-    // Determinar centro de costo según las cuotas pagadas
-    // Obtener las cuotas con sus categorías de actividad para determinar el centro
-    const cuotasConActividad = await Promise.all(
+    // Determinar centro de costo según los cargos pagados
+    // Obtener los cargos con sus categorías de actividad para determinar el centro
+    const cargosConActividad = await Promise.all(
       cargos.map(async cargo => {
-        const cuota = await prisma.cuota.findUnique({
-          where: { id: cargo.cuotaId },
+        const cargoCompleto = await prisma.cargo.findUnique({
+          where: { id: cargo.id },
           include: {
             categoriaActividad: {
               include: {
@@ -174,19 +174,19 @@ async function generarAsientoPagoCuota(prisma, datos) {
             },
           },
         })
-        return cuota
+        return cargoCompleto
       })
     )
 
     // Determinar centro de costo:
-    // - Si todas las cuotas son DEPORTIVAS de la misma actividad, usar ese centro
-    // - Si hay mix o solo SOCIAL, usar Administración
+    // - Si hay cargos de CUOTA_ACTIVIDAD con actividad, usar ese centro
+    // - Si solo hay CUOTA_SOCIAL, usar Administración
     let centroCostoId = null
-    const cuotasDeportivas = cuotasConActividad.filter(c => c?.tipo === 'DEPORTIVA')
+    const cargosDeportivos = cargosConActividad.filter(c => c?.categoria === 'CUOTA_ACTIVIDAD' && c?.categoriaActividad)
 
-    if (cuotasDeportivas.length > 0 && cuotasDeportivas.every(c => c.categoriaActividad?.actividad?.centroCostoId)) {
+    if (cargosDeportivos.length > 0 && cargosDeportivos.every(c => c.categoriaActividad?.actividad?.centroCostoId)) {
       // Usar el centro de la primera actividad (si todas son iguales, será el mismo)
-      centroCostoId = cuotasDeportivas[0].categoriaActividad.actividad.centroCostoId
+      centroCostoId = cargosDeportivos[0].categoriaActividad.actividad.centroCostoId
     } else {
       // Usar Administración (ADM)
       const centroAdm = await prisma.centroCosto.findUnique({
@@ -463,25 +463,62 @@ async function generarAsientoFacturaVenta(prisma, datos) {
 
 /**
  * Genera asiento para orden de pago (pago a proveedor)
+ * Soporta múltiples medios de pago (múltiples cajas)
  *
  * Asiento:
- *   D: Proveedores  $monto
- *   H: Caja/Banco   $monto
+ *   D: Proveedores  $montoTotal
+ *   H: Caja1        $monto1
+ *   H: Caja2        $monto2
+ *   ... (una línea por cada pago)
  */
 async function generarAsientoOrdenPago(prisma, datos) {
-  const { ordenPago, caja, registradoPor } = datos
+  const { ordenPago, caja, cajas, pagos, registradoPor } = datos
 
   try {
-    // Cuenta de la caja
-    let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
-    if (caja.cuentaContable?.codigo) {
-      cuentaCajaCodigo = caja.cuentaContable.codigo
-    } else if (caja.tipo === 'BANCO') {
-      cuentaCajaCodigo = CUENTAS.BANCO_CC
-    }
-
     const monto = Number(ordenPago.montoTotal)
     const nombreProveedor = ordenPago.entidad?.razonSocial || 'Proveedor'
+
+    // Línea de débito: Proveedores
+    const lineas = [
+      { cuentaCodigo: CUENTAS.PROVEEDORES, debe: monto, haber: 0, descripcion: 'Cancelación deuda' },
+    ]
+
+    // Si hay múltiples pagos, crear una línea de haber por cada uno
+    if (pagos && pagos.length > 0 && cajas && cajas.length > 0) {
+      for (let i = 0; i < pagos.length; i++) {
+        const pago = pagos[i]
+        const cajaDelPago = cajas.find(c => c.id === parseInt(pago.cajaId)) || cajas[i]
+
+        let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
+        if (cajaDelPago?.cuentaContable?.codigo) {
+          cuentaCajaCodigo = cajaDelPago.cuentaContable.codigo
+        } else if (cajaDelPago?.tipo === 'BANCO') {
+          cuentaCajaCodigo = CUENTAS.BANCO_CC
+        }
+
+        lineas.push({
+          cuentaCodigo: cuentaCajaCodigo,
+          debe: 0,
+          haber: parseFloat(pago.monto),
+          descripcion: `${pago.medioPago} - OP ${ordenPago.numero}`
+        })
+      }
+    } else if (caja) {
+      // Fallback: un solo pago (compatibilidad con código anterior)
+      let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
+      if (caja.cuentaContable?.codigo) {
+        cuentaCajaCodigo = caja.cuentaContable.codigo
+      } else if (caja.tipo === 'BANCO') {
+        cuentaCajaCodigo = CUENTAS.BANCO_CC
+      }
+
+      lineas.push({
+        cuentaCodigo: cuentaCajaCodigo,
+        debe: 0,
+        haber: monto,
+        descripcion: `OP ${ordenPago.numero}`
+      })
+    }
 
     const asiento = await crearAsiento(prisma, {
       concepto: `Pago a proveedor ${nombreProveedor}`,
@@ -489,11 +526,8 @@ async function generarAsientoOrdenPago(prisma, datos) {
       tipoOrigen: 'ORDEN_PAGO',
       origenId: ordenPago.id,
       registradoPor,
-      centroCostoId: ordenPago.centroCostoId || null, // Usar centro de costo de la orden
-      lineas: [
-        { cuentaCodigo: CUENTAS.PROVEEDORES, debe: monto, haber: 0, descripcion: 'Cancelación deuda' },
-        { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto, descripcion: `OP ${ordenPago.numero}` },
-      ],
+      centroCostoId: ordenPago.centroCostoId || null,
+      lineas,
     })
 
     console.log(`[AsientoContable] Creado asiento ${asiento.numero} para orden pago ${ordenPago.numero}`)

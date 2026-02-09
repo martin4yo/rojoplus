@@ -160,7 +160,7 @@ export default function AgregarFamiliares() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 py-12 px-4">
+    <div className="min-h-screen bg-gray-300 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Header */}

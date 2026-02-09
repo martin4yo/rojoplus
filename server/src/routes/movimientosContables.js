@@ -873,37 +873,55 @@ router.get('/ordenes-pago', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/admin/ordenes-pago - Crear orden de pago (pagar facturas)
+// Soporta múltiples medios de pago
 router.post('/ordenes-pago', asyncHandler(async (req, res) => {
   const {
-    entidadId, fecha, cajaId, medioPago, nroOperacion,
-    conceptoId, observaciones, montoTotal,
-    facturasCanceladas // [{ movimientoContableId, montoPagado }]
+    entidadId, fecha, observaciones, montoTotal,
+    facturasCanceladas, // [{ movimientoContableId, montoPagado }]
+    pagos // [{ cajaId, medioPago, monto, nroOperacion? }] - NUEVO: múltiples pagos
   } = req.body
 
   // Validaciones
   if (!entidadId) {
     throw new AppError('El proveedor es requerido', 400)
   }
-  if (!cajaId) {
-    throw new AppError('La caja es requerida', 400)
-  }
   if (!facturasCanceladas || facturasCanceladas.length === 0) {
     throw new AppError('Debe seleccionar al menos una factura a pagar', 400)
   }
-
-  // Verificar caja
-  const caja = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
-  if (!caja) {
-    throw new AppError('Caja no encontrada', 404)
-  }
-  if (!caja.activo) {
-    throw new AppError('La caja no está activa', 400)
+  if (!pagos || pagos.length === 0) {
+    throw new AppError('Debe especificar al menos un medio de pago', 400)
   }
 
-  // Verificar saldo suficiente
+  // Calcular monto total de pagos
+  const montoTotalPagos = pagos.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0)
   const montoTotalNum = parseFloat(montoTotal)
-  if (montoTotalNum > Number(caja.saldoActual)) {
-    throw new AppError('Saldo insuficiente en caja', 400)
+
+  if (Math.abs(montoTotalPagos - montoTotalNum) > 0.01) {
+    throw new AppError(`La suma de los pagos (${montoTotalPagos}) no coincide con el total (${montoTotalNum})`, 400)
+  }
+
+  // Verificar cada caja y su saldo
+  for (const pago of pagos) {
+    if (!pago.cajaId) {
+      throw new AppError('Cada pago debe tener una caja asignada', 400)
+    }
+    const caja = await prisma.caja.findUnique({
+      where: { id: parseInt(pago.cajaId) },
+      include: { cuentaContable: true }
+    })
+    if (!caja) {
+      throw new AppError(`Caja ${pago.cajaId} no encontrada`, 404)
+    }
+    if (!caja.activo) {
+      throw new AppError(`La caja ${caja.nombre} no está activa`, 400)
+    }
+    if (!caja.cuentaContableId) {
+      throw new AppError(`La caja ${caja.nombre} no tiene cuenta contable asignada`, 400)
+    }
+    if (parseFloat(pago.monto) > Number(caja.saldoActual)) {
+      throw new AppError(`Saldo insuficiente en caja ${caja.nombre}`, 400)
+    }
+    pago.caja = caja // Guardar para usar después
   }
 
   // Verificar facturas
@@ -938,6 +956,9 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
     }
     const numero = `${prefijo}${String(siguiente).padStart(5, '0')}`
 
+    // Resumir medios de pago para descripción
+    const mediosPagoDesc = pagos.map(p => `${p.medioPago}: $${p.monto}`).join(', ')
+
     // Crear movimiento contable de tipo ORDEN_PAGO
     const ordenPago = await tx.movimientoContable.create({
       data: {
@@ -948,10 +969,9 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
         montoTotal: montoTotalNum,
         montoPagado: 0,
         saldoPendiente: 0,
-        cajaId: parseInt(cajaId),
-        medioPago,
-        nroOperacion: nroOperacion || null,
-        conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        cajaId: parseInt(pagos[0].cajaId), // Caja principal (la primera)
+        medioPago: pagos.length === 1 ? pagos[0].medioPago : 'MULTIPLE',
+        nroOperacion: pagos.length === 1 ? (pagos[0].nroOperacion || null) : null,
         observaciones: observaciones || null,
         estado: 'CONFIRMADO',
         registradoPor: req.admin.id
@@ -976,56 +996,53 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
           estado: nuevoEstado
         }
       })
-
-      // Crear relación con movimiento padre (la factura que se cancela)
-      // Nota: Para múltiples facturas, creamos items o usamos observaciones
     }
 
-    // Crear movimiento de caja (EGRESO)
-    const prefijoMV = `MV-${anio}-`
-    const ultimoMV = await tx.movimientoCaja.findFirst({
-      where: { numero: { startsWith: prefijoMV } },
-      orderBy: { numero: 'desc' }
-    })
-    let siguienteMV = 1
-    if (ultimoMV) {
-      const partesMV = ultimoMV.numero.split('-')
-      siguienteMV = (parseInt(partesMV[partesMV.length - 1]) || 0) + 1
-    }
-    const numeroMV = `${prefijoMV}${String(siguienteMV).padStart(5, '0')}`
-
-    await tx.movimientoCaja.create({
-      data: {
-        numero: numeroMV,
-        cajaId: parseInt(cajaId),
-        fecha: fecha ? new Date(fecha) : new Date(),
-        tipo: 'EGRESO',
-        concepto: 'Orden de Pago',
-        monto: montoTotalNum,
-        conceptoId: conceptoId ? parseInt(conceptoId) : null,
-        descripcion: `Orden de Pago ${numero}`,
-        movimientoContableId: ordenPago.id,
-        registradoPor: req.admin.id
+    // Crear movimiento de caja para CADA pago
+    for (const pago of pagos) {
+      const prefijoMV = `MV-${anio}-`
+      const ultimoMV = await tx.movimientoCaja.findFirst({
+        where: { numero: { startsWith: prefijoMV } },
+        orderBy: { numero: 'desc' }
+      })
+      let siguienteMV = 1
+      if (ultimoMV) {
+        const partesMV = ultimoMV.numero.split('-')
+        siguienteMV = (parseInt(partesMV[partesMV.length - 1]) || 0) + 1
       }
-    })
+      const numeroMV = `${prefijoMV}${String(siguienteMV).padStart(5, '0')}`
 
-    // Actualizar saldo de caja
-    await tx.caja.update({
-      where: { id: parseInt(cajaId) },
-      data: { saldoActual: { decrement: montoTotalNum } }
-    })
+      await tx.movimientoCaja.create({
+        data: {
+          numero: numeroMV,
+          cajaId: parseInt(pago.cajaId),
+          cuentaContableId: pago.caja.cuentaContableId,
+          fecha: fecha ? new Date(fecha) : new Date(),
+          tipo: 'EGRESO',
+          concepto: 'ORDEN_PAGO',
+          monto: parseFloat(pago.monto),
+          descripcion: `${pago.medioPago} - ${numero}${pago.nroOperacion ? ` (${pago.nroOperacion})` : ''}`,
+          movimientoContableId: ordenPago.id,
+          registradoPor: req.admin.id
+        }
+      })
+
+      // Actualizar saldo de caja
+      await tx.caja.update({
+        where: { id: parseInt(pago.cajaId) },
+        data: { saldoActual: { decrement: parseFloat(pago.monto) } }
+      })
+    }
 
     return ordenPago
   })
 
   // Generar asiento contable automático para la orden de pago
-  const cajaConCuenta = await prisma.caja.findUnique({
-    where: { id: parseInt(cajaId) },
-    include: { cuentaContable: true }
-  })
+  const cajasConCuenta = pagos.map(p => p.caja)
   generarAsientoOrdenPago(prisma, {
     ordenPago: resultado,
-    caja: cajaConCuenta,
+    cajas: cajasConCuenta,
+    pagos: pagos,
     registradoPor: req.admin.id,
   }).catch(err => console.error('Error generando asiento orden pago:', err))
 

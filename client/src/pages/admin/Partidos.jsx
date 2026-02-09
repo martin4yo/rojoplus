@@ -72,7 +72,7 @@ export default function Partidos() {
       if (fechaDesde) params.append('fechaDesde', fechaDesde)
       if (fechaHasta) params.append('fechaHasta', fechaHasta)
 
-      const data = await api.get(`/admin/deportes/partidos?${params}`)
+      const data = await api.get(`/admin/partidos?${params}`)
       setPartidos(data || [])
     } catch (err) {
       console.error('Error cargando partidos:', err)
@@ -106,7 +106,7 @@ export default function Partidos() {
 
   const fetchEspacios = async () => {
     try {
-      const data = await api.get('/admin/deportes/espacios-deportivos?activo=true')
+      const data = await api.get('/admin/espacios-deportivos?activo=true')
       setEspacios(data || [])
     } catch (err) {
       console.error('Error cargando espacios:', err)
@@ -117,10 +117,10 @@ export default function Partidos() {
     e.preventDefault()
     try {
       if (editando) {
-        await api.put(`/admin/deportes/partidos/${editando.id}`, form)
+        await api.put(`/admin/partidos/${editando.id}`, form)
         toast.success('Partido actualizado')
       } else {
-        await api.post('/admin/deportes/partidos', form)
+        await api.post('/admin/partidos', form)
         toast.success('Partido creado')
       }
       setShowModal(false)
@@ -154,7 +154,7 @@ export default function Partidos() {
   const handleDelete = async (partido) => {
     if (!confirm(`¿Eliminar partido vs ${partido.rival}?`)) return
     try {
-      await api.delete(`/admin/deportes/partidos/${partido.id}`)
+      await api.delete(`/admin/partidos/${partido.id}`)
       toast.success('Partido eliminado')
       fetchPartidos()
     } catch (err) {
@@ -166,7 +166,7 @@ export default function Partidos() {
     const motivo = prompt('Motivo de cancelación:')
     if (motivo === null) return
     try {
-      await api.post(`/admin/deportes/partidos/${partido.id}/cancelar`, { motivo })
+      await api.post(`/admin/partidos/${partido.id}/cancelar`, { motivo })
       toast.success('Partido cancelado')
       fetchPartidos()
     } catch (err) {
@@ -178,7 +178,7 @@ export default function Partidos() {
     const motivo = prompt('Motivo de suspensión:')
     if (motivo === null) return
     try {
-      await api.post(`/admin/deportes/partidos/${partido.id}/suspender`, { motivo })
+      await api.post(`/admin/partidos/${partido.id}/suspender`, { motivo })
       toast.success('Partido suspendido')
       fetchPartidos()
     } catch (err) {

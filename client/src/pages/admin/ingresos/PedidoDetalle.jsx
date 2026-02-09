@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ShoppingCart, Calendar, User, Building2, Package, FileText, Ban, Edit } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import api from '../../../services/api'
 
 export default function PedidoDetalle() {
@@ -348,6 +349,11 @@ export default function PedidoDetalle() {
                 )
               })}
             </div>
+          </div>
+
+          {/* Adjuntos */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <AdjuntosComprobante tipo="pedido" comprobanteId={pedido.id} />
           </div>
 
           {/* Información de registro */}

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CreditCard, Calendar, User, Building2, Wallet, FileText } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import api from '../../../services/api'
 
 export default function ReciboCobroDetalle() {
@@ -251,6 +252,11 @@ export default function ReciboCobroDetalle() {
               <span>Total Cobrado:</span>
               <span className="text-green-600">{formatMonto(recibo.montoTotal)}</span>
             </div>
+          </div>
+
+          {/* Adjuntos */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <AdjuntosComprobante tipo="movimientoContable" comprobanteId={recibo.id} />
           </div>
 
           {/* Informacion de registro */}

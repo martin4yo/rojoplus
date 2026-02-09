@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, BookOpen, Calendar, User, XCircle, Edit, Printer } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import api from '../../../services/api'
 
 export default function AsientoDetalle() {
@@ -275,6 +276,11 @@ export default function AsientoDetalle() {
             </tfoot>
           </table>
         </div>
+      </div>
+
+      {/* Adjuntos */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <AdjuntosComprobante tipo="asiento" comprobanteId={asiento.id} />
       </div>
 
       {/* Timestamps */}

@@ -137,13 +137,17 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
 
+    const actividadesTexto = Array.isArray(actividadesSeleccionadas) && actividadesSeleccionadas.length > 0
+      ? actividadesSeleccionadas.join(', ')
+      : 'Ninguna'
+
     for (const admin of emailsAdmin) {
       await enviarEmailConTemplate('NOTIF_NUEVA_SOLICITUD', admin.email, {
         nombreCompleto: `${nombres} ${apellidos}`,
         documento,
         email,
         telefono,
-        actividadInscripcion,
+        actividadInscripcion: actividadesTexto,
         numeroSolicitud: solicitud.id,
         urlGestion: `${process.env.FRONTEND_URL}/admin/solicitudes/${solicitud.id}`
       })

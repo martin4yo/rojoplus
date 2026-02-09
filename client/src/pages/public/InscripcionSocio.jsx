@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 
 export default function InscripcionSocio() {
   const navigate = useNavigate()
@@ -118,8 +119,17 @@ export default function InscripcionSocio() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 py-12 px-4">
+    <div className="min-h-screen bg-gray-300 py-12 px-4">
       <div className="max-w-4xl mx-auto">
+        {/* Botón volver */}
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Volver al sitio web
+        </Link>
+
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">

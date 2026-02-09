@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Edit, ShoppingCart, Package, CheckCircle, XCircle, Truck, Building2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import api from '../../../services/api'
 
 const ESTADOS = {
@@ -329,6 +330,11 @@ export default function OrdenCompraDetalle() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Adjuntos */}
+      <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <AdjuntosComprobante tipo="ordenCompra" comprobanteId={orden.id} />
       </div>
     </div>
   )

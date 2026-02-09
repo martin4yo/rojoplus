@@ -4,6 +4,7 @@ import { Receipt, Search, CheckCircle, Clock, AlertTriangle, DollarSign, X, User
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { PlanPagosModal } from '../../components/PlanPagosModal'
+import AdjuntosComprobante from '../../components/AdjuntosComprobante'
 import api from '../../services/api'
 
 export default function Cuotas() {
@@ -45,6 +46,7 @@ export default function Cuotas() {
   const [success, setSuccess] = useState(null)
   const [showPagoExitosoModal, setShowPagoExitosoModal] = useState(false)
   const [numeroRecibo, setNumeroRecibo] = useState(null)
+  const [pagoId, setPagoId] = useState(null)
 
   // Edicion de cargo
   const [showEditModal, setShowEditModal] = useState(false)
@@ -379,6 +381,7 @@ export default function Cuotas() {
         cajaId: parseInt(cajaId),
       })
       setNumeroRecibo(result.numero)
+      setPagoId(result.id)
       setSeleccionadas([])
       setShowPagoModal(false)
       setShowPagoExitosoModal(true)
@@ -392,6 +395,7 @@ export default function Cuotas() {
   function cerrarModalPagoExitoso() {
     setShowPagoExitosoModal(false)
     setNumeroRecibo(null)
+    setPagoId(null)
 
     // Si vino desde otra página (con cobrarSocioId), volver atrás
     const cobrarSocioId = searchParams.get('cobrarSocioId')
@@ -806,7 +810,7 @@ export default function Cuotas() {
         {/* Modal de pago exitoso */}
         {showPagoExitosoModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
               <div className="px-6 py-6 text-center">
                 <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
                   <CheckCircle className="h-10 w-10 text-green-600" />
@@ -816,12 +820,20 @@ export default function Cuotas() {
                   El pago se registró correctamente
                 </p>
                 {numeroRecibo && (
-                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
                     <p className="text-sm text-gray-600 mb-1">Número de Recibo</p>
                     <p className="text-3xl font-bold text-primary">#{numeroRecibo}</p>
                   </div>
                 )}
               </div>
+
+              {/* Sección de adjuntos */}
+              {pagoId && (
+                <div className="px-6 pb-4 border-t pt-4">
+                  <AdjuntosComprobante tipo="pago" comprobanteId={pagoId} />
+                </div>
+              )}
+
               <div className="px-6 pb-6">
                 <Button
                   onClick={cerrarModalPagoExitoso}
@@ -911,7 +923,8 @@ export default function Cuotas() {
               {resultadosSocio.map(socio => (
                 <div
                   key={socio.id}
-                  className="px-4 py-3 flex items-center gap-3 border-b border-gray-100 last:border-0 hover:bg-gray-50"
+                  className="px-4 py-3 flex items-center gap-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => seleccionarSocioParaCobranza(socio)}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary font-bold">
                     {socio.apellidoNombre?.charAt(0)}
@@ -927,14 +940,14 @@ export default function Cuotas() {
                       </span>
                     )}
                     <button
-                      onClick={() => { setShowResultados(false); abrirCrearCargo(socio) }}
+                      onClick={(e) => { e.stopPropagation(); setShowResultados(false); abrirCrearCargo(socio) }}
                       className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
                       title="Agregar Cargo"
                     >
                       <Plus className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => seleccionarSocioParaCobranza(socio)}
+                      onClick={(e) => { e.stopPropagation(); seleccionarSocioParaCobranza(socio) }}
                       className="p-2 text-primary hover:bg-primary-light rounded-lg transition"
                       title="Cobrar"
                     >

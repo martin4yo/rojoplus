@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Calendar, User, Building2, Package, CreditCard, ShoppingCart, Ban } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import api from '../../../services/api'
 
 export default function FacturaVentaDetalle() {
@@ -387,6 +388,11 @@ export default function FacturaVentaDetalle() {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Adjuntos */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <AdjuntosComprobante tipo="movimientoContable" comprobanteId={factura.id} />
           </div>
 
           {/* Informacion de registro */}

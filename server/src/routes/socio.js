@@ -1058,6 +1058,134 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
 }))
 
 // ==============================================================================
+// CUENTA CORRIENTE DEL SOCIO
+// ==============================================================================
+
+// GET /api/socio/:token/cuenta-corriente - Estado de cuenta con cargos y pagos
+router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
+  const { token } = req.params
+  const { incluirFamilia } = req.query
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal: token },
+    select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      titularFamiliaId: true,
+      miembrosFamilia: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+    },
+  })
+
+  if (!socio) {
+    throw new AppError('Token inválido', 404, 'INVALID_TOKEN')
+  }
+
+  // Determinar qué socios incluir
+  let socioIds = [socio.id]
+  if (incluirFamilia === 'true' && socio.miembrosFamilia?.length > 0) {
+    socioIds = [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
+  }
+
+  // Obtener cargos
+  const cargos = await req.prisma.cargo.findMany({
+    where: { socioId: { in: socioIds } },
+    include: {
+      periodo: { select: { nombre: true, mes: true, anio: true } },
+      tipoCuota: { select: { nombre: true } },
+      categoriaActividad: { select: { nombre: true, actividad: { select: { nombre: true } } } },
+      socio: { select: { nroSocio: true, apellidoNombre: true } },
+    },
+    orderBy: { fechaEmision: 'asc' },
+  })
+
+  // Obtener pagos
+  const pagos = await req.prisma.pago.findMany({
+    where: { socioId: { in: socioIds } },
+    include: {
+      socio: { select: { nroSocio: true, apellidoNombre: true } },
+    },
+    orderBy: { fecha: 'asc' },
+  })
+
+  // Unificar movimientos
+  const movimientos = []
+  let movId = 1
+
+  cargos.forEach(cargo => {
+    let concepto = cargo.tipoCuota?.nombre || cargo.concepto || 'Cargo'
+    let detalle = ''
+    if (cargo.periodo) {
+      detalle = cargo.periodo.nombre || `${cargo.periodo.mes}/${cargo.periodo.anio}`
+    }
+    if (cargo.categoriaActividad) {
+      detalle += (detalle ? ' - ' : '') + `${cargo.categoriaActividad.actividad?.nombre || ''} ${cargo.categoriaActividad.nombre}`
+    }
+    movimientos.push({
+      id: `C${cargo.id}`,
+      tipo: 'DEBITO',
+      fecha: cargo.fechaEmision,
+      concepto,
+      detalle: detalle || '-',
+      estado: cargo.estado,
+      debe: parseFloat(cargo.montoTotal || cargo.montoOriginal || 0),
+      haber: 0,
+      socioNombre: cargo.socio?.apellidoNombre,
+      socioNro: cargo.socio?.nroSocio,
+    })
+  })
+
+  pagos.forEach(pago => {
+    movimientos.push({
+      id: `P${pago.id}`,
+      tipo: 'CREDITO',
+      fecha: pago.fecha,
+      concepto: 'Pago recibido',
+      detalle: `${pago.medioPago || ''} - Recibo #${pago.nroRecibo || pago.id}`,
+      estado: 'PAGADO',
+      debe: 0,
+      haber: parseFloat(pago.monto || 0),
+      socioNombre: pago.socio?.apellidoNombre,
+      socioNro: pago.socio?.nroSocio,
+    })
+  })
+
+  // Ordenar por fecha
+  movimientos.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+
+  // Calcular saldo acumulado
+  let saldo = 0
+  movimientos.forEach(mov => {
+    saldo += mov.debe - mov.haber
+    mov.saldo = saldo
+  })
+
+  const totalDebe = movimientos.reduce((acc, m) => acc + m.debe, 0)
+  const totalHaber = movimientos.reduce((acc, m) => acc + m.haber, 0)
+  const cargosPendientes = cargos.filter(c => c.estado === 'PENDIENTE')
+  const totalPendiente = cargosPendientes.reduce((acc, c) => acc + parseFloat(c.montoTotal || c.montoOriginal || 0), 0)
+
+  res.json({
+    success: true,
+    data: {
+      socio: {
+        id: socio.id,
+        nroSocio: socio.nroSocio,
+        apellidoNombre: socio.apellidoNombre,
+      },
+      movimientos,
+      resumen: {
+        totalDebe,
+        totalHaber,
+        saldoFinal: saldo,
+        totalPendiente,
+        cargosPendientes: cargosPendientes.length,
+      },
+    },
+  })
+}))
+
+// ==============================================================================
 // CONFIGURACIÓN DE PAGOS (CBU, Alias, Teléfono)
 // ==============================================================================
 

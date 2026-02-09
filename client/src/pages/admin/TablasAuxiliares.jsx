@@ -25,6 +25,7 @@ export default function TablasAuxiliares() {
   const [cuentasContables, setCuentasContables] = useState([])
   const [usuarios, setUsuarios] = useState([])
   const [roles, setRoles] = useState([])
+  const [mediosPago, setMediosPago] = useState([])
 
   // Modo Demo
   const [modoDemo, setModoDemo] = useState({ activo: false, email: '' })
@@ -32,7 +33,7 @@ export default function TablasAuxiliares() {
 
   // Configuración de cuotas
   const [diaVencimiento, setDiaVencimiento] = useState('10')
-  const [venceMismomes, setVenceMismoMes] = useState(false)
+  const [venceMismoMes, setVenceMismoMes] = useState(false)
   const [guardandoVencimiento, setGuardandoVencimiento] = useState(false)
 
   // Configuración de tesorería
@@ -63,7 +64,7 @@ export default function TablasAuxiliares() {
   async function cargarDatos() {
     setLoading(true)
     try {
-      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, descuentos, rubrosData, cuentas, usrs, rols] = await Promise.all([
+      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, descuentos, rubrosData, cuentas, usrs, rols, medios] = await Promise.all([
         api.get('/admin/tipos-socio'),
         api.get('/admin/categorias-socio'),
         api.get('/admin/estados-socio'),
@@ -76,6 +77,7 @@ export default function TablasAuxiliares() {
         api.getFull('/admin/cuentas-contables?flat=true').catch(() => ({ data: [] })),
         api.get('/admin/usuarios').catch(() => ({ data: [] })),
         api.get('/admin/roles').catch(() => ({ data: [] })),
+        api.getFull('/admin/medios-pago').catch(() => ({ data: [] })),
       ])
       setTiposSocio(tipos || [])
       setCategoriasSocio(categorias || [])
@@ -89,6 +91,7 @@ export default function TablasAuxiliares() {
       setCuentasContables(cuentas?.data || [])
       setUsuarios(usrs?.data || usrs || [])
       setRoles(rols?.data || rols || [])
+      setMediosPago(medios?.data || medios || [])
     } catch (err) {
       setError('Error al cargar datos')
     } finally {
@@ -149,7 +152,7 @@ export default function TablasAuxiliares() {
     try {
       await Promise.all([
         api.put('/admin/sistema/configuracion/CUOTA_DIA_VENCIMIENTO', { valor: diaVencimiento }),
-        api.put('/admin/sistema/configuracion/CUOTA_VENCE_MISMO_MES', { valor: venceMismomes ? 'true' : 'false' }),
+        api.put('/admin/sistema/configuracion/CUOTA_VENCE_MISMO_MES', { valor: venceMismoMes ? 'true' : 'false' }),
       ])
       setSuccess('Configuración de vencimiento actualizada')
     } catch (err) {
@@ -364,19 +367,19 @@ export default function TablasAuxiliares() {
                   <div>
                     <label className="text-sm font-medium text-gray-700">Mes de vencimiento</label>
                     <p className="text-xs text-gray-500">
-                      {venceMismomes ? 'Mismo mes del periodo' : 'Mes siguiente al periodo'}
+                      {venceMismoMes ? 'Mismo mes del periodo' : 'Mes siguiente al periodo'}
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setVenceMismoMes(!venceMismomes)}
+                    onClick={() => setVenceMismoMes(!venceMismoMes)}
                     className={`relative w-14 h-7 rounded-full transition-colors ${
-                      venceMismomes ? 'bg-primary' : 'bg-gray-300'
+                      venceMismoMes ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span
                       className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                        venceMismomes ? 'translate-x-7' : ''
+                        venceMismoMes ? 'translate-x-7' : ''
                       }`}
                     />
                   </button>
@@ -403,7 +406,7 @@ export default function TablasAuxiliares() {
                   <p className="text-xs text-gray-600">
                     <span className="font-medium">Ejemplo:</span> Las cuotas de Enero vencerán el{' '}
                     <span className="font-semibold text-primary">
-                      {diaVencimiento} de {venceMismomes ? 'Enero' : 'Febrero'}
+                      {diaVencimiento} de {venceMismoMes ? 'Enero' : 'Febrero'}
                     </span>
                   </p>
                 </div>
@@ -1035,6 +1038,38 @@ export default function TablasAuxiliares() {
                     <p className="text-2xl font-bold text-gray-900 mt-1">{cuentasContables.length}</p>
                     <p className="text-xs text-gray-500">
                       {cuentasContables.filter(c => c.activo).length} activas
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+                  Ver listado →
+                </div>
+              </div>
+
+              {/* Medios de Pago */}
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+                onClick={() => navigate('/admin/configuracion/medios-pago')}
+              >
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="p-3 rounded-xl bg-violet-100">
+                      <CreditCard className="w-6 h-6 text-violet-600" />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/medios-pago/nuevo') }}
+                      className="flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nuevo
+                    </Button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-base font-semibold text-gray-800">Medios de Pago</h3>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{mediosPago.length}</p>
+                    <p className="text-xs text-gray-500">
+                      {mediosPago.filter(m => m.activo).length} activos
                     </p>
                   </div>
                 </div>

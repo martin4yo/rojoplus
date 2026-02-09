@@ -701,6 +701,7 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   const {
     q,
     estado,
+    estadosValidos,
     categoria,
     tipoSocio,
     zona,
@@ -725,7 +726,11 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
     ]
   }
 
-  if (estado) {
+  // Filtrar por múltiples estados válidos (ej: estadosValidos=ACTIVO,VIGENTE)
+  if (estadosValidos) {
+    const estados = estadosValidos.split(',').map(e => e.trim())
+    where.estado = { in: estados }
+  } else if (estado) {
     where.estado = { contains: estado, mode: 'insensitive' }
   }
 
@@ -2159,10 +2164,12 @@ router.get('/actividades', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/actividades/:id - Detalle de actividad
 router.get('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { soloActivas } = req.query
   const actividad = await req.prisma.actividad.findUnique({
     where: { id: parseInt(req.params.id) },
     include: {
       categorias: {
+        where: soloActivas === 'true' ? { activo: true } : {},
         orderBy: { orden: 'asc' },
         include: {
           _count: { select: { inscripciones: { where: { estado: 'ACTIVA' } } } }
@@ -3582,20 +3589,73 @@ router.get('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
 router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
   const { anio, mes, fechaVencimiento } = req.body
 
-  if (!anio || !mes || !fechaVencimiento) {
-    throw new AppError('anio, mes y fechaVencimiento son requeridos', 400, 'VALIDATION_ERROR')
+  if (!anio || !mes) {
+    throw new AppError('anio y mes son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  const anioInt = parseInt(anio)
+  const mesInt = parseInt(mes)
+
+  // Verificar si ya existe un periodo con el mismo año/mes
+  const periodoExistente = await req.prisma.periodo.findFirst({
+    where: { anio: anioInt, mes: mesInt }
+  })
+
+  // Si ya existe, devolverlo (puede haber sido creado por un plan de pagos)
+  if (periodoExistente) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...periodoExistente,
+        existente: true
+      }
+    })
   }
 
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-  const nombre = `${meses[parseInt(mes) - 1]} ${anio}`
+  const nombre = `${meses[mesInt - 1]} ${anio}`
+
+  // Calcular fecha de vencimiento según configuración
+  let fechaVenc
+  if (fechaVencimiento) {
+    // Si se proporciona fecha de vencimiento, usarla
+    fechaVenc = new Date(fechaVencimiento)
+  } else {
+    // Obtener configuración
+    const configDia = await req.prisma.configuracion.findUnique({
+      where: { clave: 'CUOTA_DIA_VENCIMIENTO' }
+    })
+    const configMismoMes = await req.prisma.configuracion.findUnique({
+      where: { clave: 'CUOTA_VENCE_MISMO_MES' }
+    })
+
+    const diaVencimiento = configDia ? parseInt(configDia.valor) : 10
+    const venceMismoMes = configMismoMes ? configMismoMes.valor === 'true' : false
+
+    // Calcular mes y año del vencimiento
+    let mesVenc = mesInt
+    let anioVenc = anioInt
+
+    if (!venceMismoMes) {
+      // Vencimiento en el mes siguiente
+      mesVenc = mesInt + 1
+      if (mesVenc > 12) {
+        mesVenc = 1
+        anioVenc = anioInt + 1
+      }
+    }
+
+    // Crear fecha de vencimiento (mes es 0-indexed en JavaScript)
+    fechaVenc = new Date(anioVenc, mesVenc - 1, diaVencimiento)
+  }
 
   const periodo = await req.prisma.periodo.create({
     data: {
-      anio: parseInt(anio),
-      mes: parseInt(mes),
+      anio: anioInt,
+      mes: mesInt,
       nombre,
-      fechaVencimiento: new Date(fechaVencimiento),
+      fechaVencimiento: fechaVenc,
       estado: 'PENDIENTE',
     },
   })
@@ -3652,35 +3712,25 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
     throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
   }
 
-  // Verificar si ya tiene cuotas generadas
-  const cuotasExistentes = await req.prisma.cargo.count({
-    where: { periodoId: periodo.id },
+  // Obtener socios que YA tienen cuota social en este periodo (pueden ser de planes de pago)
+  const sociosConCuotaSocial = await req.prisma.cargo.findMany({
+    where: {
+      periodoId: periodo.id,
+      categoria: 'CUOTA_SOCIAL'
+    },
+    select: { socioId: true }
   })
+  const sociosConCuotaSocialIds = new Set(sociosConCuotaSocial.map(c => c.socioId))
 
-  if (cuotasExistentes > 0) {
-    // Verificar si hay pagos asociados a estas cuotas
-    const cuotasPagadas = await req.prisma.cargo.count({
-      where: {
-        periodoId: periodo.id,
-        estado: 'PAGADO',
-      },
-    })
-
-    if (cuotasPagadas > 0) {
-      throw new AppError('No se puede regenerar: ya hay cuotas pagadas en este periodo', 400, 'HAS_PAYMENTS')
-    }
-
-    // Si no hay pagos, eliminar cuotas existentes para regenerar
-    await req.prisma.cargo.deleteMany({
-      where: { periodoId: periodo.id },
-    })
-
-    // Actualizar estado del periodo a PENDIENTE para regenerar
-    await req.prisma.periodo.update({
-      where: { id: periodo.id },
-      data: { estado: 'PENDIENTE' },
-    })
-  }
+  // Obtener cargos de actividad que YA existen en este periodo (socio + categoriaActividad)
+  const cargosActividad = await req.prisma.cargo.findMany({
+    where: {
+      periodoId: periodo.id,
+      categoria: 'CUOTA_ACTIVIDAD'
+    },
+    select: { socioId: true, categoriaActividadId: true }
+  })
+  const actividadesConCargo = new Set(cargosActividad.map(c => `${c.socioId}-${c.categoriaActividadId}`))
 
   // Obtener socios activos con sus relaciones
   const socios = await req.prisma.socio.findMany({
@@ -3705,6 +3755,10 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   })
 
   const cargosACrear = []
+  let sociosSaltados = 0
+  let inscripcionesSaltadas = 0
+  let sociosNoTitulares = 0
+  let sociosSinCuotaMensual = 0
 
   for (const socio of socios) {
     // Calcular descuento por categoria
@@ -3717,7 +3771,18 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
     // O socios únicos (no pertenece a ninguna familia)
     const esTitularOUnico = !socio.titularFamiliaId
 
-    if (esTitularOUnico && socio.tipoSocioRel?.cuotaMensual) {
+    // Verificar si ya tiene cuota social en este periodo (puede ser de plan de pagos)
+    const yaTeníaCuotaSocial = sociosConCuotaSocialIds.has(socio.id)
+
+    // Contar motivos de exclusión para diagnóstico
+    if (!esTitularOUnico) {
+      sociosNoTitulares++
+    }
+    if (!socio.tipoSocioRel?.cuotaMensual) {
+      sociosSinCuotaMensual++
+    }
+
+    if (esTitularOUnico && socio.tipoSocioRel?.cuotaMensual && !yaTeníaCuotaSocial) {
       const montoBase = Number(socio.tipoSocioRel.cuotaMensual)
       const montoBonificacion = montoBase * (descuentoPct / 100)
       const montoTotal = montoBase - montoBonificacion
@@ -3741,12 +3806,21 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
         origen: 'GENERACION_MASIVA',
         motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
       })
+    } else if (yaTeníaCuotaSocial) {
+      sociosSaltados++
     }
 
     // Cargos por actividades (inscripciones activas)
     for (const inscripcion of socio.inscripciones) {
       // Saltar si está exento de cuota
       if (inscripcion.exentoCuota) continue
+
+      // Verificar si ya tiene cargo para esta categoría de actividad en este periodo
+      const claveActividad = `${socio.id}-${inscripcion.categoriaActividadId}`
+      if (actividadesConCargo.has(claveActividad)) {
+        inscripcionesSaltadas++
+        continue
+      }
 
       const categoria = inscripcion.categoriaActividad
       const actividad = categoria.actividad
@@ -3789,23 +3863,53 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
     await req.prisma.cargo.createMany({ data: cargosACrear })
   }
 
-  // Actualizar estado del periodo
-  await req.prisma.periodo.update({
-    where: { id: periodo.id },
-    data: {
-      estado: 'GENERADO',
-      fechaGeneracion: new Date(),
-      generadoPor: req.admin.id,
-    },
+  // Actualizar estado del periodo (solo si se generaron nuevas cuotas o es la primera vez)
+  const totalCuotasPeriodo = await req.prisma.cargo.count({
+    where: { periodoId: periodo.id }
   })
+
+  if (totalCuotasPeriodo > 0) {
+    await req.prisma.periodo.update({
+      where: { id: periodo.id },
+      data: {
+        estado: 'GENERADO',
+        fechaGeneracion: new Date(),
+        generadoPor: req.admin.id,
+      },
+    })
+  }
+
+  // Construir mensaje de respuesta
+  let mensaje = ''
+  if (cargosACrear.length === 0) {
+    if (socios.length === 0) {
+      mensaje = 'No hay socios activos para generar cuotas'
+    } else if (sociosSaltados > 0 || inscripcionesSaltadas > 0) {
+      mensaje = `No se generaron cuotas nuevas. ${sociosSaltados} socios y ${inscripcionesSaltadas} inscripciones ya tenían cuotas en este periodo.`
+    } else {
+      const detalles = []
+      if (sociosNoTitulares > 0) detalles.push(`${sociosNoTitulares} son miembros de familia (no titulares)`)
+      if (sociosSinCuotaMensual > 0) detalles.push(`${sociosSinCuotaMensual} tienen tipo de socio sin cuota mensual configurada`)
+      mensaje = `No se generaron cuotas. ${socios.length} socios activos encontrados. ${detalles.length > 0 ? detalles.join(', ') + '.' : ''}`
+    }
+  } else {
+    mensaje = `Se generaron ${cargosACrear.length} cuotas para ${socios.length} socios`
+    if (sociosSaltados > 0 || inscripcionesSaltadas > 0) {
+      mensaje += ` (${sociosSaltados} socios y ${inscripcionesSaltadas} inscripciones ya tenían cuotas)`
+    }
+  }
 
   res.json({
     success: true,
     data: {
-      mensaje: 'Cargos generados correctamente',
-      cargosGenerados: cargosACrear.length,
+      cuotasGeneradas: cargosACrear.length,
       sociosProcesados: socios.length,
-    },
+      sociosSaltados,
+      inscripcionesSaltadas,
+      sociosNoTitulares,
+      sociosSinCuotaMensual,
+      mensaje,
+    }
   })
 }))
 
@@ -3983,9 +4087,14 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
   const esFamilia = socio.miembrosFamilia?.length > 0 || socio.titularFamiliaId !== null
   const titularId = socio.titularFamiliaId || socio.id
 
-  // Construir query - si no se especifica estado, trae todas
+  // Construir query - por defecto solo trae cuotas PENDIENTES (cobrables)
   const where = {}
-  if (estado) where.estado = estado
+  if (estado) {
+    where.estado = estado
+  } else {
+    // Por defecto solo traer cuotas pendientes (cobrables)
+    where.estado = 'PENDIENTE'
+  }
   if (periodoId) where.periodoId = parseInt(periodoId)
 
   if (esFamilia) {
@@ -4071,6 +4180,179 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
         totalConRecargo,
       },
     },
+  })
+}))
+
+// ============================================
+// CUENTA CORRIENTE
+// ============================================
+
+// GET /api/admin/socios/:socioId/cuenta-corriente - Cuenta corriente del socio
+router.get('/socios/:socioId/cuenta-corriente', authAdmin, asyncHandler(async (req, res) => {
+  const { socioId } = req.params
+  const { desde, hasta, incluirFamilia } = req.query
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { id: parseInt(socioId) },
+    select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      titularFamiliaId: true,
+      miembrosFamilia: { select: { id: true, nroSocio: true, apellidoNombre: true } }
+    }
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404)
+  }
+
+  // Determinar si incluir familia
+  const esTitular = !socio.titularFamiliaId
+  const tieneFamilia = esTitular && socio.miembrosFamilia?.length > 0
+  const mostrarFamilia = incluirFamilia === 'true' && tieneFamilia
+
+  // Construir filtro de socio(s)
+  let socioIds = [socio.id]
+  if (mostrarFamilia) {
+    socioIds = [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
+  }
+
+  // Filtro de fechas
+  const whereFecha = {}
+  if (desde) whereFecha.gte = new Date(desde)
+  if (hasta) whereFecha.lte = new Date(hasta)
+
+  // Obtener todos los cargos
+  const cargos = await req.prisma.cargo.findMany({
+    where: {
+      socioId: { in: socioIds },
+      estado: { not: 'ANULADO' },
+      ...(desde || hasta ? { createdAt: whereFecha } : {})
+    },
+    include: {
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+      periodo: { select: { nombre: true } },
+      categoriaActividad: {
+        select: {
+          nombre: true,
+          actividad: { select: { nombre: true } }
+        }
+      },
+      pago: { select: { id: true, numero: true, fecha: true } }
+    },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  // Obtener todos los pagos
+  const pagos = await req.prisma.pago.findMany({
+    where: {
+      socioId: { in: socioIds },
+      estado: 'CONFIRMADO',
+      ...(desde || hasta ? { fecha: whereFecha } : {})
+    },
+    include: {
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+      medioPago: { select: { nombre: true } },
+      cargos: {
+        select: {
+          id: true,
+          categoria: true,
+          descripcion: true,
+          montoTotal: true,
+          periodo: { select: { nombre: true } }
+        }
+      }
+    },
+    orderBy: { fecha: 'desc' }
+  })
+
+  // Crear movimientos unificados para la cuenta corriente
+  const movimientos = []
+
+  // Agregar cargos como débitos
+  for (const cargo of cargos) {
+    let concepto = ''
+    if (cargo.categoria === 'CUOTA_SOCIAL') {
+      concepto = `Cuota Social - ${cargo.periodo?.nombre || ''}`
+    } else if (cargo.categoria === 'CUOTA_ACTIVIDAD') {
+      concepto = `${cargo.categoriaActividad?.actividad?.nombre || 'Actividad'} - ${cargo.categoriaActividad?.nombre || ''} - ${cargo.periodo?.nombre || ''}`
+    } else if (cargo.categoria === 'FINANCIACION') {
+      concepto = cargo.descripcion || 'Financiación'
+    } else {
+      concepto = cargo.descripcion || cargo.categoria
+    }
+
+    movimientos.push({
+      id: `cargo-${cargo.id}`,
+      tipo: 'CARGO',
+      fecha: cargo.createdAt,
+      concepto,
+      debe: Number(cargo.montoTotal),
+      haber: 0,
+      estado: cargo.estado,
+      socio: mostrarFamilia ? cargo.socio : null,
+      referencia: cargo.pago ? `Recibo #${cargo.pago.numero}` : null,
+      cargoId: cargo.id,
+      pagoId: cargo.pagoId
+    })
+  }
+
+  // Agregar pagos como créditos
+  for (const pago of pagos) {
+    const conceptos = pago.cargos.map(c => c.periodo?.nombre || c.descripcion).filter(Boolean)
+    const concepto = `Pago Recibo #${pago.numero}${conceptos.length > 0 ? ' - ' + conceptos.join(', ') : ''}`
+
+    movimientos.push({
+      id: `pago-${pago.id}`,
+      tipo: 'PAGO',
+      fecha: pago.fecha,
+      concepto,
+      debe: 0,
+      haber: Number(pago.montoTotal),
+      estado: 'CONFIRMADO',
+      socio: mostrarFamilia ? pago.socio : null,
+      referencia: `${pago.medioPago?.nombre || ''}`,
+      pagoId: pago.id
+    })
+  }
+
+  // Ordenar por fecha descendente
+  movimientos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+
+  // Calcular saldo acumulado (desde el más antiguo al más reciente)
+  const movimientosOrdenados = [...movimientos].reverse()
+  let saldoAcumulado = 0
+  for (const mov of movimientosOrdenados) {
+    saldoAcumulado += mov.debe - mov.haber
+    mov.saldo = saldoAcumulado
+  }
+
+  // Calcular totales
+  const totalDebe = movimientos.reduce((sum, m) => sum + m.debe, 0)
+  const totalHaber = movimientos.reduce((sum, m) => sum + m.haber, 0)
+  const saldoActual = totalDebe - totalHaber
+
+  res.json({
+    success: true,
+    data: {
+      socio: {
+        id: socio.id,
+        nroSocio: socio.nroSocio,
+        apellidoNombre: socio.apellidoNombre
+      },
+      esTitular,
+      tieneFamilia,
+      mostrandoFamilia: mostrarFamilia,
+      movimientos,
+      resumen: {
+        totalDebe,
+        totalHaber,
+        saldoActual,
+        cantidadCargos: cargos.length,
+        cantidadPagos: pagos.length
+      }
+    }
   })
 }))
 
@@ -4403,13 +4685,119 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: pagoCompleto })
 }))
 
-// GET /api/admin/medios-pago - Listar medios de pago activos
+// ============================================
+// CRUD MEDIOS DE PAGO
+// ============================================
+
+// GET /api/admin/medios-pago - Listar medios de pago
 router.get('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
   const medios = await req.prisma.medioPago.findMany({
-    where: { activo: true },
+    where,
     orderBy: { orden: 'asc' },
   })
   res.json({ success: true, data: medios })
+}))
+
+// GET /api/admin/medios-pago/:id - Obtener medio de pago por ID
+router.get('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
+  const medio = await req.prisma.medioPago.findUnique({
+    where: { id: parseInt(req.params.id) },
+  })
+  if (!medio) throw new AppError('Medio de pago no encontrado', 404, 'NOT_FOUND')
+  res.json({ success: true, data: medio })
+}))
+
+// POST /api/admin/medios-pago - Crear medio de pago
+router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
+  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway } = req.body
+
+  if (!codigo || !nombre) {
+    throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  // Verificar código único
+  const existente = await req.prisma.medioPago.findUnique({ where: { codigo } })
+  if (existente) {
+    throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
+  }
+
+  const medio = await req.prisma.medioPago.create({
+    data: {
+      codigo,
+      nombre,
+      tipo: tipo || 'EFECTIVO',
+      requiereDatosBanco: requiereDatosBanco || false,
+      comisionPct: comisionPct || 0,
+      orden: orden || 0,
+      activo: activo !== false,
+      paraCaja: paraCaja !== false,
+      paraBuffet: paraBuffet !== false,
+      paraKiosco: paraKiosco !== false,
+      paraTakeaway: paraTakeaway !== false,
+    },
+  })
+
+  res.status(201).json({ success: true, data: medio })
+}))
+
+// PUT /api/admin/medios-pago/:id - Actualizar medio de pago
+router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway } = req.body
+
+  const existente = await req.prisma.medioPago.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Medio de pago no encontrado', 404, 'NOT_FOUND')
+
+  // Verificar código único (si cambió)
+  if (codigo && codigo !== existente.codigo) {
+    const duplicado = await req.prisma.medioPago.findUnique({ where: { codigo } })
+    if (duplicado) {
+      throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
+    }
+  }
+
+  const medio = await req.prisma.medioPago.update({
+    where: { id: parseInt(id) },
+    data: {
+      ...(codigo !== undefined && { codigo }),
+      ...(nombre !== undefined && { nombre }),
+      ...(tipo !== undefined && { tipo }),
+      ...(requiereDatosBanco !== undefined && { requiereDatosBanco }),
+      ...(comisionPct !== undefined && { comisionPct }),
+      ...(orden !== undefined && { orden }),
+      ...(activo !== undefined && { activo }),
+      ...(paraCaja !== undefined && { paraCaja }),
+      ...(paraBuffet !== undefined && { paraBuffet }),
+      ...(paraKiosco !== undefined && { paraKiosco }),
+      ...(paraTakeaway !== undefined && { paraTakeaway }),
+    },
+  })
+
+  res.json({ success: true, data: medio })
+}))
+
+// DELETE /api/admin/medios-pago/:id - Eliminar medio de pago
+router.delete('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Verificar si hay pagos usando este medio
+  const pagosConMedio = await req.prisma.pago.count({
+    where: { medioPagoId: parseInt(id) },
+  })
+
+  if (pagosConMedio > 0) {
+    throw new AppError(
+      `No se puede eliminar: hay ${pagosConMedio} pagos registrados con este medio`,
+      400,
+      'HAS_DEPENDENCIES'
+    )
+  }
+
+  await req.prisma.medioPago.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, message: 'Medio de pago eliminado' })
 }))
 
 // ============================================
@@ -6371,7 +6759,7 @@ router.get('/solicitudes/:id', asyncHandler(async (req, res) => {
  * PUT /api/admin/solicitudes/:id/aprobar
  * Aprobar una solicitud y crear el socio
  */
-router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
+router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { tipoSocioId, categoriaSocioId, observacionesInternas } = req.body
 
@@ -6421,8 +6809,8 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
           if (categoriaApropiada) {
             await req.prisma.inscripcion.create({
               data: {
-                socioId,
-                categoriaActividadId: categoriaApropiada.id,
+                socio: { connect: { id: socioId } },
+                categoriaActividad: { connect: { id: categoriaApropiada.id } },
                 fechaInicio: new Date(),
                 estado: 'ACTIVA'
               }
@@ -6436,14 +6824,15 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
   }
 
   // Generar números de socio para todos (titular + familiares)
-  const ultimoSocio = await req.prisma.socio.findFirst({
-    orderBy: { nroSocio: 'desc' },
+  // Obtenemos todos los nroSocio y buscamos el máximo numérico
+  const socios = await req.prisma.socio.findMany({
     select: { nroSocio: true }
   })
 
   let proximoNumero = 1
-  if (ultimoSocio?.nroSocio) {
-    proximoNumero = parseInt(ultimoSocio.nroSocio) + 1
+  if (socios.length > 0) {
+    const maxNro = Math.max(...socios.map(s => parseInt(s.nroSocio) || 0))
+    proximoNumero = maxNro + 1
   }
 
   // Calcular edad del titular
@@ -6555,14 +6944,14 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
     if (tipoSocio && tipoSocio.cuotaMensual && parseFloat(tipoSocio.cuotaMensual) > 0) {
       const cargoSocial = await req.prisma.cargo.create({
         data: {
-          socioId: nuevoSocio.id, // Solo el titular
-          periodoId: periodoActual.id,
+          socio: { connect: { id: nuevoSocio.id } },
+          periodo: { connect: { id: periodoActual.id } },
+          categoria: 'CUOTA_SOCIAL',
           descripcion: `Cuota Social ${periodoActual.mes}/${periodoActual.anio}`,
           montoOriginal: tipoSocio.cuotaMensual,
           montoTotal: tipoSocio.cuotaMensual,
           fechaVencimiento: periodoActual.fechaVencimiento,
-          estado: 'PENDIENTE',
-          tipoCargoId: tipoSocio.conceptoTesoreriaId
+          estado: 'PENDIENTE'
         }
       })
       cuotasGeneradas.push(cargoSocial)
@@ -6596,15 +6985,15 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
           if (montoCuota > 0) {
             const cargoActividad = await req.prisma.cargo.create({
               data: {
-                socioId: socio.id,
-                periodoId: periodoActual.id,
-                categoriaActividadId: categoria.id,
+                socio: { connect: { id: socio.id } },
+                periodo: { connect: { id: periodoActual.id } },
+                categoriaActividad: { connect: { id: categoria.id } },
+                categoria: 'CUOTA_ACTIVIDAD',
                 descripcion: `${categoria.nombre} - ${socio.apellidoNombre} - ${periodoActual.mes}/${periodoActual.anio}`,
                 montoOriginal: montoCuota,
                 montoTotal: montoCuota,
                 fechaVencimiento: periodoActual.fechaVencimiento,
-                estado: 'PENDIENTE',
-                tipoCargoId: categoria.conceptoTesoreriaId
+                estado: 'PENDIENTE'
               }
             })
             cuotasGeneradas.push(cargoActividad)
@@ -6621,15 +7010,14 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
 
     linkPago = await req.prisma.linkPago.create({
       data: {
-        socioId: nuevoSocio.id,
-        token: crypto.randomBytes(32).toString('hex'),
-        montoTotal: montoTotal,
-        estado: 'PENDIENTE',
-        expiraEn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
+        socio: { connect: { id: nuevoSocio.id } },
+        concepto: 'Primera cuota - Alta de socio',
         descripcion: 'Primera cuota - Alta de socio',
-        cargos: {
-          connect: cuotasGeneradas.map(c => ({ id: c.id }))
-        }
+        montoTotal: montoTotal,
+        cargosIds: cuotasGeneradas.map(c => c.id).join(','),
+        plataforma: 'MERCADOPAGO',
+        estado: 'PENDIENTE',
+        fechaExpiracion: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 días
       }
     })
   }
@@ -6674,8 +7062,8 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
       sociosFamiliares: sociosCreados.slice(1),
       cuotasGeneradas: cuotasGeneradas.length,
       linkPago: linkPago ? {
-        token: linkPago.token,
-        url: `${process.env.FRONTEND_URL}/pagar/${linkPago.token}`,
+        codigo: linkPago.codigo,
+        url: `${process.env.FRONTEND_URL}/pagar/${linkPago.codigo}`,
         montoTotal: linkPago.montoTotal
       } : null
     }
@@ -6686,7 +7074,7 @@ router.put('/solicitudes/:id/aprobar', asyncHandler(async (req, res) => {
  * PUT /api/admin/solicitudes/:id/rechazar
  * Rechazar una solicitud
  */
-router.put('/solicitudes/:id/rechazar', asyncHandler(async (req, res) => {
+router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { motivoRechazo } = req.body
 
@@ -6903,8 +7291,9 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Socio no encontrado', 404)
   }
 
-  if (socio.estado !== 'ACTIVO') {
-    throw new AppError('El socio no está activo', 400)
+  const estadosValidos = ['ACTIVO', 'VIGENTE']
+  if (!estadosValidos.includes(socio.estado)) {
+    throw new AppError(`El socio no está activo (estado: ${socio.estado})`, 400)
   }
 
   // Verificar que la categoría existe y está activa
@@ -6919,7 +7308,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Categoría de actividad no encontrada', 404)
   }
 
-  if (!categoria.activa) {
+  if (!categoria.activo) {
     throw new AppError('La categoría no está activa', 400)
   }
 

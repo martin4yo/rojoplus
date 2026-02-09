@@ -12,6 +12,7 @@ const TIPOS_CAJA = [
   { value: 'OTRO', label: 'Otro' }
 ]
 
+
 export default function CajaForm() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -21,6 +22,7 @@ export default function CajaForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [cuentasContables, setCuentasContables] = useState([])
+  const [mediosPago, setMediosPago] = useState([])
 
   const [form, setForm] = useState({
     codigo: '',
@@ -30,23 +32,35 @@ export default function CajaForm() {
     saldoInicial: '',
     cuentaContableId: '',
     requiereConciliacion: false,
-    activo: true
+    activo: true,
+    mediosPagoPermitidos: ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA']
   })
 
   useEffect(() => {
-    cargarCuentasContables()
+    cargarDatosIniciales()
     if (isEditing) {
       cargarCaja()
     }
   }, [id])
 
-  async function cargarCuentasContables() {
+  async function cargarDatosIniciales() {
     try {
-      // Cargar solo cuentas de tipo ACTIVO que sean imputables (de último nivel)
-      const response = await api.getFull('/admin/cuentas-contables?tipo=ACTIVO&esImputable=true&flat=true')
-      setCuentasContables(response.data || [])
+      const [cuentasRes, mediosRes] = await Promise.all([
+        api.getFull('/admin/cuentas-contables?tipo=ACTIVO&esImputable=true&flat=true'),
+        api.getFull('/admin/medios-pago?activo=true')
+      ])
+      setCuentasContables(cuentasRes.data || [])
+      setMediosPago(mediosRes.data || mediosRes || [])
+
+      // Si es nueva caja, inicializar con todos los medios de pago activos
+      if (!isEditing && mediosRes.data?.length) {
+        setForm(prev => ({
+          ...prev,
+          mediosPagoPermitidos: mediosRes.data.map(mp => mp.codigo)
+        }))
+      }
     } catch (err) {
-      console.error('Error cargando cuentas contables:', err)
+      console.error('Error cargando datos iniciales:', err)
     }
   }
 
@@ -62,7 +76,8 @@ export default function CajaForm() {
         saldoInicial: '',
         cuentaContableId: caja.cuentaContableId ? String(caja.cuentaContableId) : '',
         requiereConciliacion: caja.requiereConciliacion || false,
-        activo: caja.activo
+        activo: caja.activo,
+        mediosPagoPermitidos: caja.mediosPagoPermitidos || []
       })
     } catch (err) {
       setError('Error al cargar la caja')
@@ -76,6 +91,15 @@ export default function CajaForm() {
     setForm(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
+    }))
+  }
+
+  function toggleMedioPago(codigo) {
+    setForm(prev => ({
+      ...prev,
+      mediosPagoPermitidos: prev.mediosPagoPermitidos.includes(codigo)
+        ? prev.mediosPagoPermitidos.filter(c => c !== codigo)
+        : [...prev.mediosPagoPermitidos, codigo]
     }))
   }
 
@@ -97,7 +121,8 @@ export default function CajaForm() {
         descripcion: form.descripcion || null,
         cuentaContableId: form.cuentaContableId ? parseInt(form.cuentaContableId) : null,
         requiereConciliacion: form.requiereConciliacion,
-        activo: form.activo
+        activo: form.activo,
+        mediosPagoPermitidos: form.mediosPagoPermitidos
       }
 
       if (!isEditing && form.saldoInicial) {
@@ -251,6 +276,43 @@ export default function CajaForm() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Medios de Pago Permitidos */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-2">Medios de Pago Permitidos</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Selecciona qué medios de pago se pueden usar en esta caja
+          </p>
+          {mediosPago.length === 0 ? (
+            <p className="text-gray-500 text-sm">Cargando medios de pago...</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {mediosPago.map(mp => (
+                <label
+                  key={mp.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    form.mediosPagoPermitidos.includes(mp.codigo)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.mediosPagoPermitidos.includes(mp.codigo)}
+                    onChange={() => toggleMedioPago(mp.codigo)}
+                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <span className="text-gray-700 font-medium">{mp.nombre}</span>
+                </label>
+              ))}
+            </div>
+          )}
+          {form.mediosPagoPermitidos.length === 0 && mediosPago.length > 0 && (
+            <p className="text-amber-600 text-sm mt-3">
+              ⚠️ Debes seleccionar al menos un medio de pago
+            </p>
+          )}
         </div>
 
         {/* Conciliación */}
