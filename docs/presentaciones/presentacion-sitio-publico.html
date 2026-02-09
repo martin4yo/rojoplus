@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RojoPlus - Sitio Institucional | Presentación</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    /* Top Navigation */
+    .top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      padding: 12px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-link {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .nav-link:hover {
+      color: white;
+      background: rgba(255,255,255,0.1);
+    }
+
+    .nav-link.active {
+      color: white;
+      background: rgba(220, 38, 38, 0.2);
+      border-color: rgba(220, 38, 38, 0.5);
+    }
+
+    .club-logo {
+      width: 45px;
+      height: 45px;
+      background: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .slide {
+      min-height: 100vh;
+      padding: 100px 80px 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 80%;
+      height: 200%;
+      background: radial-gradient(ellipse, rgba(220, 38, 38, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Slide 1 - Portada */
+    .slide-cover {
+      text-align: center;
+      background: linear-gradient(135deg, #DC2626 0%, #991b1b 50%, #7f1d1d 100%);
+    }
+
+    .slide-cover::before {
+      background: radial-gradient(ellipse, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    }
+
+    .logo-container {
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      width: 150px;
+      height: 150px;
+      background: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      font-size: 60px;
+    }
+
+    .slide-cover h1 {
+      font-size: 4rem;
+      font-weight: 800;
+      margin-bottom: 20px;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .slide-cover h2 {
+      font-size: 1.8rem;
+      font-weight: 400;
+      opacity: 0.9;
+      margin-bottom: 60px;
+    }
+
+    .slide-cover .subtitle {
+      font-size: 1.2rem;
+      opacity: 0.8;
+      border-top: 1px solid rgba(255,255,255,0.3);
+      padding-top: 30px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Slide genérico */
+    .slide h2 {
+      font-size: 2.8rem;
+      font-weight: 700;
+      margin-bottom: 50px;
+      background: linear-gradient(135deg, #fff 0%, #e5e5e5 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide h2 span {
+      color: #DC2626;
+      -webkit-text-fill-color: #DC2626;
+    }
+
+    /* Cards grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cards-grid.two-cols {
+      grid-template-columns: repeat(2, 1fr);
+      max-width: 900px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 35px;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(220, 38, 38, 0.5);
+    }
+
+    .card-icon {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #DC2626 0%, #b91c1c 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+
+    .card h3 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .card p {
+      font-size: 1rem;
+      line-height: 1.6;
+      opacity: 0.8;
+    }
+
+    /* Comparativa antes/después */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 40px;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .comparison-box {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      padding: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .comparison-box.before {
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .comparison-box.after {
+      border-color: rgba(34, 197, 94, 0.3);
+      background: rgba(34, 197, 94, 0.05);
+    }
+
+    .comparison-box h3 {
+      font-size: 1.5rem;
+      margin-bottom: 25px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .comparison-box.before h3 {
+      color: #f87171;
+    }
+
+    .comparison-box.after h3 {
+      color: #4ade80;
+    }
+
+    .comparison-box ul {
+      list-style: none;
+    }
+
+    .comparison-box li {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.05rem;
+    }
+
+    .comparison-box li:last-child {
+      border-bottom: none;
+    }
+
+    .comparison-arrow {
+      font-size: 3rem;
+      color: #DC2626;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 30px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .stat-card {
+      text-align: center;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      padding: 40px 30px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stat-number {
+      font-size: 3.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #DC2626 0%, #f87171 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .stat-label {
+      font-size: 1.1rem;
+      opacity: 0.8;
+    }
+
+    /* Benefits list */
+    .benefits-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 25px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .benefit-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 25px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .benefit-icon {
+      width: 50px;
+      height: 50px;
+      background: linear-gradient(135deg, #DC2626 0%, #b91c1c 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .benefit-content h4 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .benefit-content p {
+      font-size: 0.95rem;
+      opacity: 0.7;
+      line-height: 1.5;
+    }
+
+    /* Screenshot mockup */
+    .screenshot-container {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      margin-top: 40px;
+    }
+
+    .browser-mockup {
+      background: #1e1e2e;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .browser-bar {
+      background: #2d2d3d;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .browser-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .browser-dot.red { background: #ff5f56; }
+    .browser-dot.yellow { background: #ffbd2e; }
+    .browser-dot.green { background: #27ca3f; }
+
+    .browser-content {
+      background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 100%);
+      padding: 30px;
+      min-height: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .mock-header {
+      background: linear-gradient(135deg, #DC2626 0%, #991b1b 100%);
+      height: 80px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 1.2rem;
+    }
+
+    .mock-content {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      flex: 1;
+    }
+
+    .mock-card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .mock-card-title {
+      height: 12px;
+      background: #ddd;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      width: 70%;
+    }
+
+    .mock-card-line {
+      height: 8px;
+      background: #eee;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    /* Navigation */
+    .nav-dots {
+      position: fixed;
+      right: 30px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .nav-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .nav-dot:hover,
+    .nav-dot.active {
+      background: #DC2626;
+      transform: scale(1.3);
+    }
+
+    /* Footer */
+    .slide-footer {
+      position: absolute;
+      bottom: 30px;
+      left: 80px;
+      right: 80px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      opacity: 0.6;
+      font-size: 0.9rem;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .slide > * {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .slide {
+        padding: 40px;
+      }
+
+      .cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-arrow {
+        transform: rotate(90deg);
+      }
+    }
+
+    @media print {
+      .slide {
+        page-break-after: always;
+        min-height: auto;
+        padding: 40px;
+      }
+
+      .nav-dots, .top-nav {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <nav class="top-nav">
+    <div class="nav-links">
+      <a href="presentacion-sitio-publico.html" class="nav-link active">🌐 Sitio Público</a>
+      <a href="presentacion-panel-admin.html" class="nav-link">⚙️ Panel Admin</a>
+      <a href="presentacion-portal-socio.html" class="nav-link">📱 Portal Socio</a>
+      <a href="presentacion-portal-comercio.html" class="nav-link">🏪 Portal Comercio</a>
+    </div>
+    <div class="club-logo">⚽</div>
+  </nav>
+
+  <!-- Navigation dots -->
+  <nav class="nav-dots">
+    <a href="#slide1" class="nav-dot active"></a>
+    <a href="#slide2" class="nav-dot"></a>
+    <a href="#slide3" class="nav-dot"></a>
+    <a href="#slide4" class="nav-dot"></a>
+    <a href="#slide5" class="nav-dot"></a>
+    <a href="#slide6" class="nav-dot"></a>
+  </nav>
+
+  <!-- Slide 1: Portada -->
+  <section id="slide1" class="slide slide-cover">
+    <div class="logo-container">
+      <div class="logo">⚽</div>
+    </div>
+    <h1>RojoPlus</h1>
+    <h2>Sitio Web Institucional</h2>
+    <p class="subtitle">
+      La nueva cara digital del Club Sportivo Pilar<br>
+      Modernidad, presencia online y comunicación efectiva
+    </p>
+    <div class="slide-footer">
+      <span>Club Sportivo Pilar</span>
+      <span>Febrero 2026</span>
+    </div>
+  </section>
+
+  <!-- Slide 2: El Problema -->
+  <section id="slide2" class="slide">
+    <h2>¿Cómo era <span>antes</span>?</h2>
+    <div class="comparison">
+      <div class="comparison-box before">
+        <h3>❌ Situación Anterior</h3>
+        <ul>
+          <li>🚫 Sin presencia web profesional</li>
+          <li>🚫 Información dispersa en redes sociales</li>
+          <li>🚫 Difícil comunicar noticias oficiales</li>
+          <li>🚫 Sin agenda de actividades centralizada</li>
+          <li>🚫 Comercios adheridos sin visibilidad</li>
+          <li>🚫 Historia del club no documentada</li>
+        </ul>
+      </div>
+      <div class="comparison-arrow">→</div>
+      <div class="comparison-box after">
+        <h3>✅ Con RojoPlus</h3>
+        <ul>
+          <li>✓ Sitio web moderno y profesional</li>
+          <li>✓ Toda la información en un solo lugar</li>
+          <li>✓ Noticias con notificaciones automáticas</li>
+          <li>✓ Calendario de eventos y partidos</li>
+          <li>✓ Directorio de comercios con beneficios</li>
+          <li>✓ Historia, logros y autoridades del club</li>
+        </ul>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Sitio Web Institucional</span>
+      <span>El Problema</span>
+    </div>
+  </section>
+
+  <!-- Slide 3: Funcionalidades -->
+  <section id="slide3" class="slide">
+    <h2>¿Qué incluye el <span>Sitio Web</span>?</h2>
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-icon">🏠</div>
+        <h3>Página de Inicio</h3>
+        <p>Hero impactante, noticias destacadas, próximos eventos y accesos rápidos a las secciones más importantes.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📰</div>
+        <h3>Noticias</h3>
+        <p>Comunicados oficiales, resultados de partidos, eventos y novedades del club con imágenes y videos.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚽</div>
+        <h3>Actividades</h3>
+        <p>Todas las disciplinas deportivas con horarios, categorías, requisitos e información de inscripción.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📜</div>
+        <h3>Historia</h3>
+        <p>Trayectoria del club, momentos históricos, logros deportivos y el legado de "El Rojo de la Avenida".</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">👥</div>
+        <h3>Autoridades</h3>
+        <p>Comisión Directiva actual con fotos, cargos y período de gestión. Transparencia institucional.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🏪</div>
+        <h3>Comercios Adheridos</h3>
+        <p>Directorio completo de comercios con descuentos para socios, rubros y datos de contacto.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📣</div>
+        <h3>Banners Publicitarios</h3>
+        <p>Espacios para sponsors y publicidad en todas las páginas. Fuente de ingresos adicional para el club.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📝</div>
+        <h3>Formulario de Contacto</h3>
+        <p>Los interesados pueden contactar al club directamente. Las consultas llegan por email.</p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Sitio Web Institucional</span>
+      <span>Funcionalidades</span>
+    </div>
+  </section>
+
+  <!-- Slide 4: Beneficios -->
+  <section id="slide4" class="slide">
+    <h2>Beneficios para el <span>Club</span></h2>
+    <div class="benefits-list">
+      <div class="benefit-item">
+        <div class="benefit-icon">🌐</div>
+        <div class="benefit-content">
+          <h4>Presencia Digital Profesional</h4>
+          <p>El club proyecta una imagen moderna y actualizada. Primera impresión positiva para potenciales socios.</p>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <div class="benefit-icon">📢</div>
+        <div class="benefit-content">
+          <h4>Comunicación Centralizada</h4>
+          <p>Un único canal oficial para noticias, evitando desinformación y rumores en redes sociales.</p>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <div class="benefit-icon">🔍</div>
+        <div class="benefit-content">
+          <h4>Encontrable en Google</h4>
+          <p>Cuando alguien busca "Club Sportivo Pilar", encuentra el sitio oficial con toda la información.</p>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <div class="benefit-icon">💰</div>
+        <div class="benefit-content">
+          <h4>Genera Ingresos por Publicidad</h4>
+          <p>Banners en todas las páginas: Home, Noticias, Actividades, etc. Espacios para vender a sponsors locales y empresas.</p>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <div class="benefit-icon">🤝</div>
+        <div class="benefit-content">
+          <h4>Valor para Comercios</h4>
+          <p>Los comercios adheridos obtienen visibilidad, incentivando más convenios y beneficios.</p>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <div class="benefit-icon">📱</div>
+        <div class="benefit-content">
+          <h4>Responsive (Móvil)</h4>
+          <p>Se ve perfecto en celulares, tablets y computadoras. El 80% de las visitas son desde móviles.</p>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Sitio Web Institucional</span>
+      <span>Beneficios</span>
+    </div>
+  </section>
+
+  <!-- Slide 5: Números -->
+  <section id="slide5" class="slide">
+    <h2>El Club en <span>Números</span></h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number">1165</div>
+        <div class="stat-label">Socios Activos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">10</div>
+        <div class="stat-label">Actividades Deportivas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">50+</div>
+        <div class="stat-label">Comercios Adheridos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">24/7</div>
+        <div class="stat-label">Disponible Online</div>
+      </div>
+    </div>
+    <div class="screenshot-container">
+      <div class="browser-mockup">
+        <div class="browser-bar">
+          <div class="browser-dot red"></div>
+          <div class="browser-dot yellow"></div>
+          <div class="browser-dot green"></div>
+        </div>
+        <div class="browser-content">
+          <div class="mock-header">🏆 Club Sportivo Pilar - El Rojo de la Avenida</div>
+          <div class="mock-content">
+            <div class="mock-card">
+              <div class="mock-card-title"></div>
+              <div class="mock-card-line"></div>
+              <div class="mock-card-line" style="width: 80%"></div>
+              <div class="mock-card-line" style="width: 60%"></div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-card-title"></div>
+              <div class="mock-card-line"></div>
+              <div class="mock-card-line" style="width: 90%"></div>
+              <div class="mock-card-line" style="width: 70%"></div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-card-title"></div>
+              <div class="mock-card-line"></div>
+              <div class="mock-card-line" style="width: 75%"></div>
+              <div class="mock-card-line" style="width: 85%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Sitio Web Institucional</span>
+      <span>Estadísticas</span>
+    </div>
+  </section>
+
+  <!-- Slide 6: Resumen -->
+  <section id="slide6" class="slide slide-cover">
+    <h1>El Club del Futuro</h1>
+    <h2>está listo hoy</h2>
+    <div class="cards-grid two-cols" style="max-width: 800px; margin: 40px auto 0;">
+      <div class="card" style="text-align: center;">
+        <div class="card-icon" style="margin: 0 auto 20px;">💰</div>
+        <h3>$0 Costo Mensual</h3>
+        <p>Sin pagos a proveedores externos. El sistema es propiedad del club.</p>
+      </div>
+      <div class="card" style="text-align: center;">
+        <div class="card-icon" style="margin: 0 auto 20px;">🚀</div>
+        <h3>Listo para Usar</h3>
+        <p>Completamente desarrollado y funcionando. Solo necesita contenido.</p>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 60px;">
+      Un sitio web profesional que posiciona al Club Sportivo Pilar<br>
+      como una institución moderna y transparente
+    </p>
+    <div class="slide-footer">
+      <span>Club Sportivo Pilar</span>
+      <span>RojoPlus - Sitio Institucional</span>
+    </div>
+  </section>
+
+  <script>
+    // Smooth scroll for navigation dots
+    document.querySelectorAll('.nav-dot').forEach(dot => {
+      dot.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = document.querySelector(dot.getAttribute('href'));
+        target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // Update active dot on scroll
+    const slides = document.querySelectorAll('.slide');
+    const dots = document.querySelectorAll('.nav-dot');
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const index = Array.from(slides).indexOf(entry.target);
+          dots.forEach((dot, i) => {
+            dot.classList.toggle('active', i === index);
+          });
+        }
+      });
+    }, { threshold: 0.5 });
+
+    slides.forEach(slide => observer.observe(slide));
+  </script>
+
+</body>
+</html>

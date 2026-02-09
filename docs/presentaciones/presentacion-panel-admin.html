@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RojoPlus - Panel de Administración | Presentación</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    /* Top Navigation */
+    .top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      padding: 12px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-link {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .nav-link:hover {
+      color: white;
+      background: rgba(255,255,255,0.1);
+    }
+
+    .nav-link.active {
+      color: white;
+      background: rgba(220, 38, 38, 0.2);
+      border-color: rgba(220, 38, 38, 0.5);
+    }
+
+    .club-logo {
+      width: 45px;
+      height: 45px;
+      background: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .slide {
+      min-height: 100vh;
+      padding: 100px 80px 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 80%;
+      height: 200%;
+      background: radial-gradient(ellipse, rgba(220, 38, 38, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Slide 1 - Portada */
+    .slide-cover {
+      text-align: center;
+      background: linear-gradient(135deg, #1F2937 0%, #111827 50%, #0f172a 100%);
+    }
+
+    .slide-cover::before {
+      background: radial-gradient(ellipse, rgba(220, 38, 38, 0.2) 0%, transparent 70%);
+    }
+
+    .logo-container {
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      width: 150px;
+      height: 150px;
+      background: linear-gradient(135deg, #DC2626 0%, #991b1b 100%);
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      box-shadow: 0 20px 60px rgba(220, 38, 38, 0.4);
+      font-size: 60px;
+    }
+
+    .slide-cover h1 {
+      font-size: 4rem;
+      font-weight: 800;
+      margin-bottom: 20px;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .slide-cover h2 {
+      font-size: 1.8rem;
+      font-weight: 400;
+      opacity: 0.9;
+      margin-bottom: 60px;
+    }
+
+    .slide-cover .subtitle {
+      font-size: 1.2rem;
+      opacity: 0.8;
+      border-top: 1px solid rgba(255,255,255,0.3);
+      padding-top: 30px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* Slide genérico */
+    .slide h2 {
+      font-size: 2.8rem;
+      font-weight: 700;
+      margin-bottom: 50px;
+      background: linear-gradient(135deg, #fff 0%, #e5e5e5 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide h2 span {
+      color: #DC2626;
+      -webkit-text-fill-color: #DC2626;
+    }
+
+    /* Cards grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cards-grid.four-cols {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .cards-grid.two-cols {
+      grid-template-columns: repeat(2, 1fr);
+      max-width: 900px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 35px;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(220, 38, 38, 0.5);
+    }
+
+    .card-icon {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #DC2626 0%, #b91c1c 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+
+    .card h3 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .card p {
+      font-size: 1rem;
+      line-height: 1.6;
+      opacity: 0.8;
+    }
+
+    .card-small {
+      padding: 25px;
+    }
+
+    .card-small .card-icon {
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+      margin-bottom: 15px;
+    }
+
+    .card-small h3 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .card-small p {
+      font-size: 0.9rem;
+    }
+
+    /* Comparativa antes/después */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 40px;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .comparison-box {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      padding: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .comparison-box.before {
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .comparison-box.after {
+      border-color: rgba(34, 197, 94, 0.3);
+      background: rgba(34, 197, 94, 0.05);
+    }
+
+    .comparison-box h3 {
+      font-size: 1.5rem;
+      margin-bottom: 25px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .comparison-box.before h3 {
+      color: #f87171;
+    }
+
+    .comparison-box.after h3 {
+      color: #4ade80;
+    }
+
+    .comparison-box ul {
+      list-style: none;
+    }
+
+    .comparison-box li {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.05rem;
+    }
+
+    .comparison-box li:last-child {
+      border-bottom: none;
+    }
+
+    .comparison-arrow {
+      font-size: 3rem;
+      color: #DC2626;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    /* Module sections */
+    .modules-section {
+      margin-bottom: 40px;
+    }
+
+    .modules-section h3 {
+      font-size: 1.3rem;
+      color: #DC2626;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid rgba(220, 38, 38, 0.3);
+    }
+
+    .module-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .module-tag {
+      background: rgba(220, 38, 38, 0.15);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 30px;
+      position: relative;
+      z-index: 1;
+      margin-bottom: 50px;
+    }
+
+    .stat-card {
+      text-align: center;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      padding: 35px 25px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stat-number {
+      font-size: 3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #DC2626 0%, #f87171 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .stat-label {
+      font-size: 1rem;
+      opacity: 0.8;
+    }
+
+    /* Timeline */
+    .timeline {
+      position: relative;
+      z-index: 1;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: linear-gradient(180deg, #DC2626 0%, #7f1d1d 100%);
+      border-radius: 2px;
+    }
+
+    .timeline-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .timeline-item:nth-child(odd) {
+      flex-direction: row-reverse;
+    }
+
+    .timeline-content {
+      width: 45%;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .timeline-content h4 {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+      color: #DC2626;
+    }
+
+    .timeline-content p {
+      font-size: 0.95rem;
+      opacity: 0.8;
+      line-height: 1.5;
+    }
+
+    .timeline-dot {
+      width: 20px;
+      height: 20px;
+      background: #DC2626;
+      border-radius: 50%;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 0 20px rgba(220, 38, 38, 0.5);
+    }
+
+    /* Benefits highlight */
+    .benefit-highlight {
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.05) 100%);
+      border: 2px solid rgba(220, 38, 38, 0.3);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .benefit-highlight h3 {
+      font-size: 2rem;
+      margin-bottom: 15px;
+    }
+
+    .benefit-highlight p {
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+
+    .benefit-highlight .price {
+      font-size: 4rem;
+      font-weight: 800;
+      color: #4ade80;
+      margin: 20px 0;
+    }
+
+    .benefit-highlight .price-note {
+      font-size: 1rem;
+      opacity: 0.7;
+    }
+
+    /* Navigation */
+    .nav-dots {
+      position: fixed;
+      right: 30px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .nav-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .nav-dot:hover,
+    .nav-dot.active {
+      background: #DC2626;
+      transform: scale(1.3);
+    }
+
+    /* Footer */
+    .slide-footer {
+      position: absolute;
+      bottom: 30px;
+      left: 80px;
+      right: 80px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      opacity: 0.6;
+      font-size: 0.9rem;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .slide > * {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+
+    /* Proceso flow */
+    .process-flow {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+      margin-top: 30px;
+    }
+
+    .process-step {
+      text-align: center;
+      flex: 1;
+    }
+
+    .process-icon {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #DC2626 0%, #b91c1c 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      margin: 0 auto 15px;
+      box-shadow: 0 10px 30px rgba(220, 38, 38, 0.3);
+    }
+
+    .process-step h4 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .process-step p {
+      font-size: 0.9rem;
+      opacity: 0.7;
+    }
+
+    .process-arrow {
+      font-size: 2rem;
+      color: rgba(255,255,255,0.3);
+      margin: 0 10px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .slide {
+        padding: 40px;
+      }
+
+      .cards-grid, .cards-grid.four-cols {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-arrow {
+        transform: rotate(90deg);
+      }
+
+      .process-flow {
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      .process-arrow {
+        display: none;
+      }
+    }
+
+    @media print {
+      .slide {
+        page-break-after: always;
+        min-height: auto;
+        padding: 40px;
+      }
+
+      .nav-dots, .top-nav {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <nav class="top-nav">
+    <div class="nav-links">
+      <a href="presentacion-sitio-publico.html" class="nav-link">🌐 Sitio Público</a>
+      <a href="presentacion-panel-admin.html" class="nav-link active">⚙️ Panel Admin</a>
+      <a href="presentacion-portal-socio.html" class="nav-link">📱 Portal Socio</a>
+      <a href="presentacion-portal-comercio.html" class="nav-link">🏪 Portal Comercio</a>
+    </div>
+    <div class="club-logo">⚽</div>
+  </nav>
+
+  <!-- Navigation dots -->
+  <nav class="nav-dots">
+    <a href="#slide1" class="nav-dot active"></a>
+    <a href="#slide2" class="nav-dot"></a>
+    <a href="#slide3" class="nav-dot"></a>
+    <a href="#slide4" class="nav-dot"></a>
+    <a href="#slide5" class="nav-dot"></a>
+    <a href="#slide6" class="nav-dot"></a>
+    <a href="#slide7" class="nav-dot"></a>
+    <a href="#slide8" class="nav-dot"></a>
+  </nav>
+
+  <!-- Slide 1: Portada -->
+  <section id="slide1" class="slide slide-cover">
+    <div class="logo-container">
+      <div class="logo">⚙️</div>
+    </div>
+    <h1>RojoPlus</h1>
+    <h2>Panel de Administración</h2>
+    <p class="subtitle">
+      El centro de control total del Club Sportivo Pilar<br>
+      Gestión integral de socios, finanzas, deportes y más
+    </p>
+    <div class="slide-footer">
+      <span>Club Sportivo Pilar</span>
+      <span>Febrero 2026</span>
+    </div>
+  </section>
+
+  <!-- Slide 2: El Problema -->
+  <section id="slide2" class="slide">
+    <h2>El <span>Desafío</span> de Administrar un Club</h2>
+    <div class="comparison">
+      <div class="comparison-box before">
+        <h3>❌ Situación Anterior</h3>
+        <ul>
+          <li>🚫 Excel para socios, otro para cuotas, otro para pagos...</li>
+          <li>🚫 Información dispersa y desactualizada</li>
+          <li>🚫 Cobros manuales sin control de caja</li>
+          <li>🚫 Sin historial de quién hizo qué</li>
+          <li>🚫 Reportes armados a mano</li>
+          <li>🚫 Sistema anterior limitado y costoso</li>
+        </ul>
+      </div>
+      <div class="comparison-arrow">→</div>
+      <div class="comparison-box after">
+        <h3>✅ Con RojoPlus</h3>
+        <ul>
+          <li>✓ Todo en un solo sistema integrado</li>
+          <li>✓ Datos actualizados en tiempo real</li>
+          <li>✓ Caja con cierre diario y control</li>
+          <li>✓ Auditoría completa de acciones</li>
+          <li>✓ Reportes automáticos al instante</li>
+          <li>✓ Sin costos mensuales, propiedad del club</li>
+        </ul>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Panel de Administración</span>
+      <span>El Desafío</span>
+    </div>
+  </section>
+
+  <!-- Slide 3: Módulos Principales -->
+  <section id="slide3" class="slide">
+    <h2>Módulos <span>Principales</span></h2>
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-icon">👥</div>
+        <h3>Gestión de Socios</h3>
+        <p>Alta, baja, modificación. Grupos familiares, menores a cargo. QR único por socio. Historial completo.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">💰</div>
+        <h3>Cuotas y Cobranzas</h3>
+        <p>Generación masiva de cuotas. Múltiples medios de pago. Recargos automáticos. Recibos digitales.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚽</div>
+        <h3>Gestión Deportiva</h3>
+        <p>Actividades, categorías, inscripciones. Control de asistencia. Partidos y estadísticas. Entrenadores.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🏦</div>
+        <h3>Tesorería</h3>
+        <p>Múltiples cajas. Movimientos de ingreso/egreso. Cierre diario con doble firma. Transferencias entre cajas.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3>Contabilidad</h3>
+        <p>Plan de cuentas. Asientos automáticos. Libro diario y mayor. Balance de comprobación.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📦</div>
+        <h3>Stock</h3>
+        <p>Control de productos e insumos. Movimientos de entrada/salida. Alertas de stock mínimo.</p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Panel de Administración</span>
+      <span>Módulos Principales</span>
+    </div>
+  </section>
+
+  <!-- Slide 4: Más Módulos -->
+  <section id="slide4" class="slide">
+    <h2>Y <span>Mucho Más</span>...</h2>
+    <div class="cards-grid four-cols">
+      <div class="card card-small">
+        <div class="card-icon">📄</div>
+        <h3>Facturación</h3>
+        <p>Pedidos, facturas de venta y compra, órdenes de pago</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">💳</div>
+        <h3>Débito Automático</h3>
+        <p>Prisma (VISA/Master). Generación y respuestas automáticas</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">🏪</div>
+        <h3>Comercios</h3>
+        <p>Gestión de convenios, descuentos y uso de beneficios</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">👨‍💼</div>
+        <h3>Sueldos</h3>
+        <p>Liquidaciones, conceptos, recibos de sueldo</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">📰</div>
+        <h3>Contenido</h3>
+        <p>Noticias, banners, autoridades del sitio web</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">📧</div>
+        <h3>Notificaciones</h3>
+        <p>Emails y push automáticos. Templates editables</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">🔐</div>
+        <h3>Usuarios y Roles</h3>
+        <p>Control de acceso. Permisos granulares por función</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">📈</div>
+        <h3>Reportes</h3>
+        <p>Dashboard ejecutivo, morosidad, deportivos, exportables</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">🍔</div>
+        <h3>Buffet / Restaurant</h3>
+        <p>Mesas, comandas, cocina, cobro. Integrado con caja y stock</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">🏬</div>
+        <h3>Kiosco</h3>
+        <p>Punto de venta rápido. Ideal para eventos y partidos</p>
+      </div>
+      <div class="card card-small">
+        <div class="card-icon">👕</div>
+        <h3>Merchandising</h3>
+        <p>Venta de indumentaria y artículos del club. Control de stock</p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Panel de Administración</span>
+      <span>Módulos Adicionales</span>
+    </div>
+  </section>
+
+  <!-- Slide 5: Flujo de Trabajo -->
+  <section id="slide5" class="slide">
+    <h2>Flujo de <span>Cobranza</span> Simplificado</h2>
+    <div class="process-flow">
+      <div class="process-step">
+        <div class="process-icon">📋</div>
+        <h4>1. Generar Cuotas</h4>
+        <p>Un click genera cuotas para todos los socios del período</p>
+      </div>
+      <span class="process-arrow">→</span>
+      <div class="process-step">
+        <div class="process-icon">📱</div>
+        <h4>2. Notificar</h4>
+        <p>Email y push automático a los socios con el monto a pagar</p>
+      </div>
+      <span class="process-arrow">→</span>
+      <div class="process-step">
+        <div class="process-icon">💳</div>
+        <h4>3. Cobrar</h4>
+        <p>Efectivo, transferencia, MercadoPago o débito automático</p>
+      </div>
+      <span class="process-arrow">→</span>
+      <div class="process-step">
+        <div class="process-icon">🧾</div>
+        <h4>4. Recibo</h4>
+        <p>Recibo PDF automático enviado por email al socio</p>
+      </div>
+      <span class="process-arrow">→</span>
+      <div class="process-step">
+        <div class="process-icon">📊</div>
+        <h4>5. Control</h4>
+        <p>Cierre de caja diario con doble firma de verificación</p>
+      </div>
+    </div>
+    <div style="margin-top: 60px; text-align: center; position: relative; z-index: 1;">
+      <div class="benefit-highlight" style="max-width: 600px; margin: 0 auto; padding: 30px;">
+        <h3>⏱️ Tiempo Promedio de Cobranza</h3>
+        <div style="display: flex; justify-content: center; gap: 60px; margin-top: 20px;">
+          <div>
+            <div style="font-size: 2.5rem; font-weight: 800; color: #f87171;">5 min</div>
+            <div style="opacity: 0.7;">Antes (manual)</div>
+          </div>
+          <div>
+            <div style="font-size: 2.5rem; font-weight: 800; color: #4ade80;">30 seg</div>
+            <div style="opacity: 0.7;">Con RojoPlus</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Panel de Administración</span>
+      <span>Flujo de Cobranza</span>
+    </div>
+  </section>
+
+  <!-- Slide 6: Control y Seguridad -->
+  <section id="slide6" class="slide">
+    <h2>Control y <span>Transparencia</span></h2>
+    <div class="cards-grid two-cols" style="margin: 0 auto;">
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <h3>Auditoría Completa</h3>
+        <p>Cada acción queda registrada: quién, qué, cuándo. Imposible modificar datos sin dejar rastro. Historial completo de cambios.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔐</div>
+        <h3>Permisos por Rol</h3>
+        <p>Cada usuario solo ve y hace lo que su rol permite. El cajero no puede anular pagos. El entrenador no ve finanzas.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">✅</div>
+        <h3>Cierre de Caja con Doble Firma</h3>
+        <p>El que cierra la caja no puede ser el mismo que la firma. Control cruzado obligatorio para mayor seguridad.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3>Dashboard en Tiempo Real</h3>
+        <p>La comisión puede ver KPIs actualizados: recaudación, morosidad, inscripciones, sin depender de nadie.</p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Panel de Administración</span>
+      <span>Control y Seguridad</span>
+    </div>
+  </section>
+
+  <!-- Slide 7: Ahorro -->
+  <section id="slide7" class="slide">
+    <h2>Inversión vs <span>Ahorro</span></h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number">$0</div>
+        <div class="stat-label">Costo Mensual</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">$0</div>
+        <div class="stat-label">Licencias</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">$0</div>
+        <div class="stat-label">Por Usuario</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">100%</div>
+        <div class="stat-label">Propiedad del Club</div>
+      </div>
+    </div>
+    <div class="comparison" style="margin-top: 20px;">
+      <div class="comparison-box before">
+        <h3>💸 Sistemas Comerciales</h3>
+        <ul>
+          <li>Cuota mensual: $50.000 - $150.000/mes</li>
+          <li>Costo por usuario adicional</li>
+          <li>Funciones limitadas por plan</li>
+          <li>Datos en servidores de terceros</li>
+          <li>Si dejás de pagar, perdés acceso</li>
+        </ul>
+      </div>
+      <div class="comparison-arrow">→</div>
+      <div class="comparison-box after">
+        <h3>💰 RojoPlus</h3>
+        <ul>
+          <li>Desarrollo ya realizado e incluido</li>
+          <li>Usuarios ilimitados sin costo extra</li>
+          <li>Todas las funciones disponibles</li>
+          <li>Datos en servidores del club</li>
+          <li>Propiedad permanente del sistema</li>
+        </ul>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>Panel de Administración</span>
+      <span>Ahorro Económico</span>
+    </div>
+  </section>
+
+  <!-- Slide 8: Resumen -->
+  <section id="slide8" class="slide slide-cover">
+    <h1>Gestión Profesional</h1>
+    <h2>al alcance del club</h2>
+    <div class="modules-section" style="max-width: 1100px; margin: 40px auto 0; text-align: left;">
+      <h3 style="color: white; border-color: rgba(255,255,255,0.3);">Todo incluido:</h3>
+      <div class="module-list" style="justify-content: center;">
+        <span class="module-tag">👥 Socios</span>
+        <span class="module-tag">💰 Cuotas</span>
+        <span class="module-tag">🏦 Tesorería</span>
+        <span class="module-tag">⚽ Deportes</span>
+        <span class="module-tag">📊 Contabilidad</span>
+        <span class="module-tag">📦 Stock</span>
+        <span class="module-tag">🍔 Buffet</span>
+        <span class="module-tag">🏬 Kiosco</span>
+        <span class="module-tag">👕 Merchandising</span>
+        <span class="module-tag">💳 Débito Automático</span>
+        <span class="module-tag">📧 Notificaciones</span>
+        <span class="module-tag">📈 Reportes</span>
+        <span class="module-tag">🔐 Seguridad</span>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 50px;">
+      Un sistema integral que profesionaliza la gestión del club,<br>
+      reduce errores, ahorra tiempo y brinda control total
+    </p>
+    <div class="slide-footer">
+      <span>Club Sportivo Pilar</span>
+      <span>RojoPlus - Panel de Administración</span>
+    </div>
+  </section>
+
+  <script>
+    // Smooth scroll for navigation dots
+    document.querySelectorAll('.nav-dot').forEach(dot => {
+      dot.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = document.querySelector(dot.getAttribute('href'));
+        target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // Update active dot on scroll
+    const slides = document.querySelectorAll('.slide');
+    const dots = document.querySelectorAll('.nav-dot');
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const index = Array.from(slides).indexOf(entry.target);
+          dots.forEach((dot, i) => {
+            dot.classList.toggle('active', i === index);
+          });
+        }
+      });
+    }, { threshold: 0.5 });
+
+    slides.forEach(slide => observer.observe(slide));
+  </script>
+
+</body>
+</html>
