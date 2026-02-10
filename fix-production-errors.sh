@@ -41,13 +41,23 @@ su - sportivouser -c "cd /var/www/rojoplus && git pull"
 echo "✅ Código actualizado"
 echo ""
 
-# 6. Reiniciar servicios PM2
-echo "🔄 Reiniciando servicios PM2..."
-su - sportivouser -c "pm2 restart rojoplus-client rojoplus-server"
-echo "✅ Servicios reiniciados"
+# 6. Detener procesos PM2 antiguos (si existen)
+echo "🛑 Deteniendo procesos PM2 antiguos..."
+su - sportivouser -c "pm2 delete rojoplus-backend 2>/dev/null || true"
+su - sportivouser -c "pm2 delete rojoplus-frontend 2>/dev/null || true"
+su - sportivouser -c "pm2 delete rojoplus-client 2>/dev/null || true"
+su - sportivouser -c "pm2 delete rojoplus-server 2>/dev/null || true"
+echo "✅ Procesos antiguos eliminados"
 echo ""
 
-# 7. Verificar logs
+# 7. Iniciar PM2 con ecosystem.config.js (carga .env automáticamente)
+echo "🚀 Iniciando servicios PM2 con configuración actualizada..."
+su - sportivouser -c "cd /var/www/rojoplus && pm2 start ecosystem.config.js"
+su - sportivouser -c "pm2 save"
+echo "✅ Servicios iniciados con variables de entorno cargadas"
+echo ""
+
+# 8. Verificar logs
 echo "📋 Verificando logs (últimas 20 líneas)..."
 echo ""
 echo "=== LOGS CLIENTE ==="

@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'rojoplus-backend',
+      name: 'rojoplus-server',
       cwd: '/var/www/rojoplus/server',
       script: 'src/index.js',
       instances: 1,
@@ -9,9 +9,11 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '500M',
+      // Cargar archivo .env (PM2 >= 5.2.0)
+      env_file: '/var/www/rojoplus/server/.env',
       env: {
         NODE_ENV: 'production',
-        PORT: 5300
+        PORT: 5300,
       },
       error_file: '/var/log/rojoplus/backend-error.log',
       out_file: '/var/log/rojoplus/backend-out.log',
@@ -19,7 +21,7 @@ module.exports = {
       merge_logs: true
     },
     {
-      name: 'rojoplus-frontend',
+      name: 'rojoplus-client',
       cwd: '/var/www/rojoplus/client',
       script: 'node_modules/vite/bin/vite.js',
       args: 'preview --port 8090 --host',
@@ -28,8 +30,10 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '500M',
+      // Cargar archivo .env (PM2 >= 5.2.0)
+      env_file: '/var/www/rojoplus/client/.env',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
       },
       error_file: '/var/log/rojoplus/frontend-error.log',
       out_file: '/var/log/rojoplus/frontend-out.log',
