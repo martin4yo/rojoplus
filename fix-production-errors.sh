@@ -1,54 +1,68 @@
 #!/bin/bash
 
 # Script para corregir errores en producción
-# Ejecutar en el servidor como usuario sportivouser
+# Ejecutar en el servidor como ROOT (sudo bash fix-production-errors.sh)
 
 echo "🔧 Corrigiendo errores de producción en RojoPlus..."
 echo ""
 
-# 1. Corregir permisos de Vite
-echo "📁 Corrigiendo permisos de node_modules (cliente)..."
-cd /var/www/rojoplus/client
+# 1. Detener servicios PM2
+echo "⏸️  Deteniendo servicios PM2..."
+su - sportivouser -c "pm2 stop rojoplus-client rojoplus-server"
+echo "✅ Servicios detenidos"
+echo ""
 
-# Limpiar cache de Vite
+# 2. Corregir permisos de TODO el proyecto
+echo "📁 Corrigiendo permisos del proyecto completo..."
+chown -R sportivouser:sportivouser /var/www/rojoplus
+echo "✅ Owner corregido a sportivouser"
+echo ""
+
+# 3. Limpiar cache de Vite
+echo "🗑️  Limpiando cache de Vite..."
+cd /var/www/rojoplus/client
 rm -rf node_modules/.vite
 rm -rf node_modules/.vite-temp
 rm -rf dist
-
-# Dar permisos correctos al usuario sportivouser
-chown -R sportivouser:sportivouser /var/www/rojoplus/client/node_modules
-chmod -R 755 /var/www/rojoplus/client/node_modules
-
-echo "✅ Permisos corregidos"
+echo "✅ Cache limpiado"
 echo ""
 
-# 2. Rebuild del cliente
+# 4. Rebuild del cliente (como sportivouser)
 echo "🔨 Rebuilding cliente..."
-npm run build
-
+cd /var/www/rojoplus/client
+su - sportivouser -c "cd /var/www/rojoplus/client && npm run build"
 echo "✅ Cliente rebuildeado"
 echo ""
 
-# 3. Reiniciar servicios PM2
-echo "🔄 Reiniciando servicios PM2..."
-pm2 restart rojoplus-client
-pm2 restart rojoplus-server
+# 5. Actualizar código del servidor (git pull)
+echo "📥 Actualizando código desde Git..."
+cd /var/www/rojoplus
+su - sportivouser -c "cd /var/www/rojoplus && git pull"
+echo "✅ Código actualizado"
+echo ""
 
+# 6. Reiniciar servicios PM2
+echo "🔄 Reiniciando servicios PM2..."
+su - sportivouser -c "pm2 restart rojoplus-client rojoplus-server"
 echo "✅ Servicios reiniciados"
 echo ""
 
-# 4. Verificar logs
-echo "📋 Verificando logs..."
-pm2 logs rojoplus-client --lines 10 --nostream
-pm2 logs rojoplus-server --lines 10 --nostream
+# 7. Verificar logs
+echo "📋 Verificando logs (últimas 20 líneas)..."
+echo ""
+echo "=== LOGS CLIENTE ==="
+su - sportivouser -c "pm2 logs rojoplus-client --lines 20 --nostream"
+echo ""
+echo "=== LOGS SERVER ==="
+su - sportivouser -c "pm2 logs rojoplus-server --lines 20 --nostream"
 
 echo ""
-echo "✅ Script completado"
+echo "✅ Script completado exitosamente"
 echo ""
-echo "💡 Si persisten errores de permisos:"
-echo "   chown -R sportivouser:sportivouser /var/www/rojoplus"
+echo "💡 Para monitorear en tiempo real:"
+echo "   su - sportivouser"
+echo "   pm2 logs"
 echo ""
 echo "💡 Para verificar el estado:"
+echo "   su - sportivouser"
 echo "   pm2 status"
-echo "   pm2 logs rojoplus-client"
-echo "   pm2 logs rojoplus-server"
