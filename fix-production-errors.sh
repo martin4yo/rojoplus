@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para corregir errores en producción
-# Ejecutar en el servidor como root o con sudo
+# Ejecutar en el servidor como usuario sportivouser
 
 echo "🔧 Corrigiendo errores de producción en RojoPlus..."
 echo ""
@@ -15,9 +15,8 @@ rm -rf node_modules/.vite
 rm -rf node_modules/.vite-temp
 rm -rf dist
 
-# Dar permisos correctos al usuario de PM2 (ajustar según tu usuario)
-# Reemplazar 'www-data' con tu usuario si es diferente
-chown -R www-data:www-data /var/www/rojoplus/client/node_modules
+# Dar permisos correctos al usuario sportivouser
+chown -R sportivouser:sportivouser /var/www/rojoplus/client/node_modules
 chmod -R 755 /var/www/rojoplus/client/node_modules
 
 echo "✅ Permisos corregidos"
@@ -47,7 +46,7 @@ echo ""
 echo "✅ Script completado"
 echo ""
 echo "💡 Si persisten errores de permisos:"
-echo "   sudo chown -R \$(whoami):\$(whoami) /var/www/rojoplus"
+echo "   chown -R sportivouser:sportivouser /var/www/rojoplus"
 echo ""
 echo "💡 Para verificar el estado:"
 echo "   pm2 status"
