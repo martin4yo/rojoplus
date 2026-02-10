@@ -885,7 +885,7 @@ export async function verificarPartidosProximos() {
         }
       },
       include: {
-        convocatorias: {
+        convocados: {
           where: {
             estado: 'CONFIRMADO'
           },
@@ -901,7 +901,7 @@ export async function verificarPartidosProximos() {
     let notificacionesEnviadas = 0
 
     for (const partido of partidos) {
-      for (const convocatoria of partido.convocatorias) {
+      for (const convocatoria of partido.convocados) {
         // Verificar que no se haya notificado ya
         const yaNotificado = await prisma.notificacionLog.findFirst({
           where: {
