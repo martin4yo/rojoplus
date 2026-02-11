@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { authAdmin } from '../middleware/auth.js'
+import { generarAsientoPagoSueldo } from '../services/asientosContables.js'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -345,7 +346,7 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
       }
     })
 
-    res.status(201).json(liquidacion)
+    res.status(201).json({ data: liquidacion })
   } catch (error) {
     console.error('Error creando liquidacion:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
@@ -552,6 +553,26 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
 
       return op
     })
+
+    // Generar asiento contable (fuera de la transacción para no fallar el pago si hay error)
+    try {
+      const caja = await prisma.caja.findUnique({
+        where: { id: parseInt(cajaId) },
+        include: { cuentaContable: true }
+      })
+
+      await generarAsientoPagoSueldo(prisma, {
+        ordenPago,
+        itemLiquidacion: item,
+        entidad: item.entidad,
+        caja,
+        liquidacion: item.liquidacion,
+        registradoPor: req.admin.id
+      })
+    } catch (asientoError) {
+      console.error('[Liquidacion] Error generando asiento contable:', asientoError)
+      // No fallar el pago si el asiento falla
+    }
 
     // Verificar si todos los items estan pagados
     const itemsPendientes = await prisma.itemLiquidacion.count({

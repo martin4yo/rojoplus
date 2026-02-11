@@ -34,6 +34,7 @@ const CUENTAS = {
   OTROS_INGRESOS: '4.3.99',
 
   // Egresos
+  GASTOS_PERSONAL: '5.2.01', // Sueldos y jornales
   GASTOS_VARIOS: '5.9.99',
 }
 
@@ -584,6 +585,49 @@ async function generarAsientoReciboCobro(prisma, datos) {
 }
 
 /**
+ * Genera asiento para pago de sueldo
+ *
+ * Asiento:
+ *   D: Gastos de Personal  $monto
+ *   H: Caja/Banco          $monto
+ */
+async function generarAsientoPagoSueldo(prisma, datos) {
+  const { ordenPago, itemLiquidacion, entidad, caja, liquidacion, registradoPor } = datos
+
+  try {
+    // Cuenta de la caja
+    let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
+    if (caja.cuentaContable?.codigo) {
+      cuentaCajaCodigo = caja.cuentaContable.codigo
+    } else if (caja.tipo === 'BANCO') {
+      cuentaCajaCodigo = CUENTAS.BANCO_CC
+    }
+
+    const monto = Number(itemLiquidacion.netoAPagar)
+    const nombreEmpleado = entidad?.razonSocial || 'Personal'
+
+    const asiento = await crearAsiento(prisma, {
+      concepto: `Pago sueldo ${liquidacion.periodo} - ${nombreEmpleado}`,
+      fecha: ordenPago.fecha,
+      tipoOrigen: 'PAGO_SUELDO',
+      origenId: ordenPago.id,
+      registradoPor,
+      centroCostoId: null, // TODO: Asignar centro de costo según departamento del empleado
+      lineas: [
+        { cuentaCodigo: CUENTAS.GASTOS_PERSONAL, debe: monto, haber: 0, descripcion: `Liquidación ${liquidacion.numero}` },
+        { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto, descripcion: `OP ${ordenPago.numero}` },
+      ],
+    })
+
+    console.log(`[AsientoContable] Creado asiento ${asiento.numero} para pago sueldo ${ordenPago.numero}`)
+    return asiento
+  } catch (error) {
+    console.error(`[AsientoContable] Error generando asiento para pago sueldo ${ordenPago.id}:`, error.message)
+    return null
+  }
+}
+
+/**
  * Anula un asiento contable (cuando se anula la operación origen)
  */
 async function anularAsiento(prisma, tipoOrigen, origenId, anuladoPor, motivo) {
@@ -622,6 +666,7 @@ export {
   generarAsientoFacturaVenta,
   generarAsientoOrdenPago,
   generarAsientoReciboCobro,
+  generarAsientoPagoSueldo,
   anularAsiento,
   CUENTAS,
 }

@@ -35,7 +35,7 @@ export default function ConceptosLiquidacion() {
     setLoading(true)
     try {
       const response = await api.getFull('/admin/conceptos-liquidacion')
-      setConceptos(response.data || [])
+      setConceptos(response.data || response || [])
     } catch (err) {
       console.error('Error cargando conceptos:', err)
     } finally {

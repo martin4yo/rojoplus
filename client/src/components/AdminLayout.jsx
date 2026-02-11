@@ -122,7 +122,6 @@ export default function AdminLayout() {
       label: 'Egresos', icon: TrendingDown, permisos: [PERMISOS.EGRESOS_VER],
       submenu: [
         { path: '/admin/egresos/proveedores', label: 'Proveedores', icon: Building2 },
-        { path: '/admin/egresos/personal', label: 'Personal', icon: Briefcase },
         { path: '/admin/egresos/ordenes-compra', label: 'Ordenes de Compra', icon: ShoppingCart },
         { path: '/admin/egresos/facturas', label: 'Facturas Recibidas', icon: FileText },
         { path: '/admin/egresos/ordenes-pago', label: 'Ordenes de Pago', icon: CreditCard },
@@ -131,6 +130,7 @@ export default function AdminLayout() {
     {
       label: 'Sueldos', icon: DollarSign, permisos: [PERMISOS.SUELDOS_VER],
       submenu: [
+        { path: '/admin/egresos/personal', label: 'Personal', icon: Briefcase },
         { path: '/admin/liquidaciones', label: 'Liquidaciones', icon: FileText },
         { path: '/admin/liquidaciones/conceptos', label: 'Conceptos', icon: Settings },
       ]

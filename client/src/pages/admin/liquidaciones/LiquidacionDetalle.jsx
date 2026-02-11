@@ -34,6 +34,9 @@ export default function LiquidacionDetalle() {
   const [medioPago, setMedioPago] = useState('TRANSFERENCIA')
   const [nroOperacion, setNroOperacion] = useState('')
 
+  // Estado para seleccion multiple
+  const [itemsSeleccionados, setItemsSeleccionados] = useState([])
+
   // Estado para edicion de conceptos
   const [editando, setEditando] = useState(null) // ID del item que se esta editando
 
@@ -49,11 +52,13 @@ export default function LiquidacionDetalle() {
         api.getFull('/admin/cajas?activo=true'),
         api.getFull('/admin/conceptos-liquidacion?activo=true')
       ])
-      setLiquidacion(liqRes.data)
-      setCajas(cajasRes.data || [])
-      setConceptosDisponibles(conceptosRes.data || [])
-      if (cajasRes.data?.length > 0) {
-        setCajaId(cajasRes.data[0].id.toString())
+      setLiquidacion(liqRes)
+      const cajasArray = cajasRes.data || cajasRes || []
+      const conceptosArray = conceptosRes.data || conceptosRes || []
+      setCajas(cajasArray)
+      setConceptosDisponibles(conceptosArray)
+      if (cajasArray.length > 0) {
+        setCajaId(cajasArray[0].id.toString())
       }
     } catch (err) {
       console.error('Error cargando datos:', err)
@@ -114,32 +119,60 @@ export default function LiquidacionDetalle() {
     }
   }
 
-  async function handlePagarTodos() {
+  function toggleSeleccion(itemId) {
+    setItemsSeleccionados(prev =>
+      prev.includes(itemId)
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    )
+  }
+
+  function toggleSeleccionarTodos() {
+    const pendientes = liquidacion.items.filter(i => i.estado === 'PENDIENTE')
+    if (itemsSeleccionados.length === pendientes.length) {
+      setItemsSeleccionados([])
+    } else {
+      setItemsSeleccionados(pendientes.map(i => i.id))
+    }
+  }
+
+  async function handlePagarSeleccionados() {
     if (!cajaId) {
       showModal({ type: 'warning', message: 'Debe seleccionar una caja' })
       return
     }
 
-    const pendientes = liquidacion.items.filter(i => i.estado === 'PENDIENTE')
+    if (itemsSeleccionados.length === 0) {
+      showModal({ type: 'warning', message: 'Debe seleccionar al menos un empleado para pagar' })
+      return
+    }
+
+    const itemsAPagar = liquidacion.items.filter(i => itemsSeleccionados.includes(i.id))
+    const totalAPagar = itemsAPagar.reduce((sum, i) => sum + parseFloat(i.netoAPagar), 0)
 
     showModal({
       type: 'confirm',
-      title: 'Pagar Todos',
-      message: `Se pagaran ${pendientes.length} empleados por un total de ${formatMonto(pendientes.reduce((sum, i) => sum + parseFloat(i.netoAPagar), 0))}. ¿Desea continuar?`,
+      title: 'Pago Masivo',
+      message: `Se pagaran ${itemsAPagar.length} empleados seleccionados por un total de ${formatMonto(totalAPagar)}. ¿Desea continuar?`,
       onConfirm: async () => {
-        setPagando('all')
+        setPagando('selected')
         try {
-          await api.post(`/admin/liquidaciones/${id}/pagar-todos`, {
-            cajaId: parseInt(cajaId),
-            medioPago,
-            nroOperacion: nroOperacion || null
-          })
+          // Pagar cada item seleccionado
+          for (const itemId of itemsSeleccionados) {
+            await api.post(`/admin/liquidaciones/${id}/pagar`, {
+              itemId,
+              cajaId: parseInt(cajaId),
+              medioPago,
+              nroOperacion: nroOperacion || null
+            })
+          }
 
           showModal({
             type: 'success',
-            message: 'Todos los pagos fueron registrados correctamente'
+            message: `Se pagaron ${itemsSeleccionados.length} empleados correctamente`
           })
 
+          setItemsSeleccionados([])
           await cargarDatos()
         } catch (err) {
           showModal({
@@ -323,11 +356,11 @@ export default function LiquidacionDetalle() {
 
             <div className="flex items-end">
               <Button
-                onClick={handlePagarTodos}
-                disabled={pagando || !cajaId}
+                onClick={handlePagarSeleccionados}
+                disabled={pagando || !cajaId || itemsSeleccionados.length === 0}
                 className="w-full"
               >
-                {pagando === 'all' ? (
+                {pagando === 'selected' ? (
                   <>
                     <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
                     Pagando...
@@ -335,7 +368,7 @@ export default function LiquidacionDetalle() {
                 ) : (
                   <>
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Pagar Todos ({itemsPendientes.length})
+                    Pago Masivo ({itemsSeleccionados.length})
                   </>
                 )}
               </Button>
@@ -343,9 +376,21 @@ export default function LiquidacionDetalle() {
           </div>
 
           <p className="text-sm text-gray-500">
-            Total pendiente: <span className="font-bold text-purple-600">
-              {formatMonto(itemsPendientes.reduce((sum, i) => sum + parseFloat(i.netoAPagar), 0))}
-            </span>
+            {itemsSeleccionados.length > 0 ? (
+              <>
+                Seleccionados: <span className="font-bold text-purple-600">{itemsSeleccionados.length}</span> empleados
+                {' - '}
+                Total: <span className="font-bold text-purple-600">
+                  {formatMonto(liquidacion.items.filter(i => itemsSeleccionados.includes(i.id)).reduce((sum, i) => sum + parseFloat(i.netoAPagar), 0))}
+                </span>
+              </>
+            ) : (
+              <>
+                Total pendiente: <span className="font-bold text-purple-600">
+                  {formatMonto(itemsPendientes.reduce((sum, i) => sum + parseFloat(i.netoAPagar), 0))}
+                </span>
+              </>
+            )}
           </p>
         </div>
       )}
@@ -360,6 +405,16 @@ export default function LiquidacionDetalle() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
+                {itemsPendientes.length > 0 && (
+                  <th className="text-center py-3 px-4 font-medium text-gray-600 w-12">
+                    <input
+                      type="checkbox"
+                      checked={itemsSeleccionados.length === itemsPendientes.length && itemsPendientes.length > 0}
+                      onChange={toggleSeleccionarTodos}
+                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="text-left py-3 px-4 font-medium text-gray-600">Empleado</th>
                 <th className="text-right py-3 px-4 font-medium text-gray-600">Sueldo Base</th>
                 <th className="text-right py-3 px-4 font-medium text-gray-600">Haberes</th>
@@ -376,6 +431,18 @@ export default function LiquidacionDetalle() {
 
                 return (
                   <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    {itemsPendientes.length > 0 && (
+                      <td className="py-3 px-4 text-center">
+                        {item.estado === 'PENDIENTE' && (
+                          <input
+                            type="checkbox"
+                            checked={itemsSeleccionados.includes(item.id)}
+                            onChange={() => toggleSeleccion(item.id)}
+                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                          />
+                        )}
+                      </td>
+                    )}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-gray-100 rounded-lg">

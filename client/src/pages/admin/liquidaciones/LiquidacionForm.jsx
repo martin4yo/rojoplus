@@ -49,8 +49,8 @@ export default function LiquidacionForm() {
 
       showModal({
         type: 'success',
-        message: `Liquidacion de ${MESES.find(m => m.value === mes)?.label} ${anio} generada correctamente con ${response.data.items?.length || 0} empleados`,
-        onConfirm: () => navigate(`/admin/liquidaciones/${response.data.id}`)
+        message: `Liquidacion de ${MESES.find(m => m.value === mes)?.label} ${anio} generada correctamente con ${response?.items?.length || 0} empleados`,
+        onConfirm: () => navigate(`/admin/liquidaciones/${response?.id}`)
       })
     } catch (err) {
       showModal({
