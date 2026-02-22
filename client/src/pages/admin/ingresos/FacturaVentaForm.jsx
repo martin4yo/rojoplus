@@ -4,6 +4,7 @@ import { ArrowLeft, FileText, Plus, Trash2, Search, User, Building2, ShoppingCar
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import { SearchInputWithDropdown } from '../../../components/SearchInput'
 import {
   CONDICIONES_IVA_OPTIONS,
   getTipoComprobanteVenta,
@@ -60,12 +61,12 @@ export default function FacturaVentaForm() {
 
   // Datos para selects y busquedas
   const [clientes, setClientes] = useState([])
-  const [socios, setSocios] = useState([])
   const [pedidos, setPedidos] = useState([])
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null)
   const [productos, setProductos] = useState([])
   const [conceptos, setConceptos] = useState([])
   const [busquedaSocio, setBusquedaSocio] = useState('')
+  const [resultadosSocio, setResultadosSocio] = useState([])
   const [buscandoSocio, setBuscandoSocio] = useState(false)
 
   useEffect(() => {
@@ -126,16 +127,17 @@ export default function FacturaVentaForm() {
 
   async function buscarSocios(query) {
     if (!query || query.length < 2) {
-      setSocios([])
+      setResultadosSocio([])
       return
     }
 
     setBuscandoSocio(true)
     try {
       const response = await api.getFull(`/admin/socios?q=${encodeURIComponent(query)}&limit=10`)
-      setSocios(response.data?.socios || [])
+      setResultadosSocio(response.data?.socios || [])
     } catch (err) {
       console.error('Error buscando socios:', err)
+      setResultadosSocio([])
     } finally {
       setBuscandoSocio(false)
     }
@@ -203,7 +205,7 @@ export default function FacturaVentaForm() {
   function handleSelectSocio(socio) {
     setSocioId(socio.id)
     setBusquedaSocio(`#${socio.nroSocio} - ${socio.apellidoNombre}`)
-    setSocios([])
+    setResultadosSocio([])
     setPedidoId('')
     setPedidoSeleccionado(null)
     setItems([])
@@ -476,44 +478,30 @@ export default function FacturaVentaForm() {
 
                 {/* Selector segun tipo */}
                 {tipoCliente === 'SOCIO' ? (
-                  <div className="relative">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Buscar Socio *
                     </label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={busquedaSocio}
-                        onChange={(e) => {
-                          setBusquedaSocio(e.target.value)
-                          buscarSocios(e.target.value)
-                        }}
-                        placeholder="Buscar por nombre, DNI o nro de socio..."
-                        className="input-field w-full pl-10"
-                      />
-                    </div>
-                    {/* Resultados de busqueda */}
-                    {socios.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {socios.map(socio => (
-                          <button
-                            key={socio.id}
-                            type="button"
-                            onClick={() => handleSelectSocio(socio)}
-                            className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2"
-                          >
-                            <User className="w-4 h-4 text-gray-400" />
-                            <span>#{socio.nroSocio} - {socio.apellidoNombre}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {buscandoSocio && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500">
-                        Buscando...
-                      </div>
-                    )}
+                    <SearchInputWithDropdown
+                      value={busquedaSocio}
+                      onChange={(value) => {
+                        setBusquedaSocio(value)
+                        buscarSocios(value)
+                      }}
+                      results={resultadosSocio}
+                      loading={buscandoSocio}
+                      onSelectResult={handleSelectSocio}
+                      renderResult={(socio) => (
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-gray-400" />
+                          <span>#{socio.nroSocio} - {socio.apellidoNombre}</span>
+                        </div>
+                      )}
+                      placeholder="Buscar por nombre, DNI o nro de socio..."
+                      minChars={2}
+                      debounceMs={300}
+                      emptyMessage="No se encontraron socios"
+                    />
                   </div>
                 ) : (
                   <div>

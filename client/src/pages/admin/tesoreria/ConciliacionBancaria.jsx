@@ -6,24 +6,8 @@ import {
 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
-
-function formatMoney(amount) {
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS'
-  }).format(amount || 0)
-}
-
-function formatDate(date) {
-  if (!date) return '-'
-  return new Date(date).toLocaleDateString('es-AR')
-}
-
-const ESTADO_BADGE = {
-  IMPORTADO: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Importado' },
-  EN_CONCILIACION: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'En Conciliacion' },
-  CONCILIADO: { bg: 'bg-green-100', text: 'text-green-700', label: 'Conciliado' }
-}
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+import StatusBadge from '../../../components/StatusBadge'
 
 export default function ConciliacionBancaria() {
   const navigate = useNavigate()
@@ -303,7 +287,7 @@ export default function ConciliacionBancaria() {
           <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
             <p className="text-sm text-amber-600">Movimientos Pendientes</p>
             <p className="text-2xl font-bold text-amber-700">{resumen.movimientosCajaPendientes?.cantidad || 0}</p>
-            <p className="text-xs text-amber-500">{formatMoney(resumen.movimientosCajaPendientes?.monto)}</p>
+            <p className="text-xs text-amber-500">{formatCurrency(resumen.movimientosCajaPendientes?.monto)}</p>
           </div>
         </div>
       )}
@@ -400,57 +384,52 @@ export default function ConciliacionBancaria() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {extractos.map(ext => {
-                    const badge = ESTADO_BADGE[ext.estado] || ESTADO_BADGE.IMPORTADO
-                    return (
-                      <tr key={ext.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-sm">{ext.numero}</span>
-                          {ext.formato && (
-                            <p className="text-xs text-gray-400">{ext.formato.nombre}</p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm">{ext.caja?.nombre}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {formatDate(ext.periodoDesde)} - {formatDate(ext.periodoHasta)}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {ext.cantidadMovimientos}
-                          <span className="text-gray-400 ml-1">
-                            ({ext._count?.conciliaciones || 0} conc.)
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-medium">
-                          {formatMoney(ext.saldoFinal)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
-                            {badge.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1">
+                  {extractos.map(ext => (
+                    <tr key={ext.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-sm">{ext.numero}</span>
+                        {ext.formato && (
+                          <p className="text-xs text-gray-400">{ext.formato.nombre}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{ext.caja?.nombre}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {formatDate(ext.periodoDesde)} - {formatDate(ext.periodoHasta)}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {ext.cantidadMovimientos}
+                        <span className="text-gray-400 ml-1">
+                          ({ext._count?.conciliaciones || 0} conc.)
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-medium">
+                        {formatCurrency(ext.saldoFinal)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={ext.estado} type="generic" />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() => navigate(`/admin/tesoreria/conciliacion/${ext.id}`)}
+                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/10 rounded"
+                            title="Ver/Conciliar"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {ext.estado === 'IMPORTADO' && (
                             <button
-                              onClick={() => navigate(`/admin/tesoreria/conciliacion/${ext.id}`)}
-                              className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/10 rounded"
-                              title="Ver/Conciliar"
+                              onClick={() => handleEliminarExtracto(ext.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                              title="Eliminar"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                            {ext.estado === 'IMPORTADO' && (
-                              <button
-                                onClick={() => handleEliminarExtracto(ext.id)}
-                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}

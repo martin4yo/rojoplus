@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Save, Package, Plus, Trash2, Upload, Star, X, Image } from 'lucide-react'
+import { ArrowLeft, Save, Package, Plus, Trash2, Star, Image } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
+import { MultiImageUpload } from '../../../components/ImageUpload'
 import api from '../../../services/api'
 
 const TALLES_DEFAULT = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'UNICO']
@@ -13,7 +14,6 @@ export default function ProductoForm() {
   const [searchParams] = useSearchParams()
   const isEditing = id && id !== 'nuevo'
   const startInEditMode = searchParams.get('editar') === 'true'
-  const fileInputRef = useRef(null)
 
   const [loading, setLoading] = useState(isEditing)
   const [saving, setSaving] = useState(false)
@@ -45,6 +45,7 @@ export default function ProductoForm() {
   // Fotos
   const [fotos, setFotos] = useState([])
   const [uploadingFoto, setUploadingFoto] = useState(false)
+  const [fotosUrls, setFotosUrls] = useState([])
 
   useEffect(() => {
     cargarDatosAuxiliares()
@@ -84,6 +85,7 @@ export default function ProductoForm() {
       })
       setVariantes(producto.variantes || [])
       setFotos(producto.fotos || [])
+      setFotosUrls((producto.fotos || []).map(f => f.url))
     } catch (err) {
       setError('Error al cargar producto')
     } finally {
@@ -188,51 +190,77 @@ export default function ProductoForm() {
     }
   }
 
-  // Fotos
-  async function handleFotoUpload(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  // Fotos - Handlers para MultiImageUpload
+  async function handleFotosChange(newUrls) {
     if (!isEditing) {
       setError('Guarde el producto primero para subir fotos')
       return
     }
 
-    setUploadingFoto(true)
-    try {
-      const formData = new FormData()
-      formData.append('foto', file)
-      const res = await api.postFormData(`/admin/productos/${id}/fotos`, formData)
-      setFotos([...fotos, res.data])
-      setSuccess('Foto subida correctamente')
-    } catch (err) {
-      setError(err.message || 'Error al subir foto')
-    } finally {
-      setUploadingFoto(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+    // Detectar si se agregó una nueva imagen
+    if (newUrls.length > fotosUrls.length) {
+      const newUrl = newUrls[newUrls.length - 1]
+
+      // Convertir base64/file a FormData y subir
+      setUploadingFoto(true)
+      try {
+        // Si es un archivo (File object) o base64
+        let file
+        if (newUrl instanceof File) {
+          file = newUrl
+        } else if (typeof newUrl === 'string' && newUrl.startsWith('data:')) {
+          // Convertir base64 a File
+          const response = await fetch(newUrl)
+          const blob = await response.blob()
+          file = new File([blob], 'imagen.jpg', { type: 'image/jpeg' })
+        }
+
+        if (file) {
+          const formData = new FormData()
+          formData.append('foto', file)
+          const res = await api.postFormData(`/admin/productos/${id}/fotos`, formData)
+          setFotos([...fotos, res.data])
+          setFotosUrls([...fotosUrls, res.data.url])
+          setSuccess('Foto subida correctamente')
+        }
+      } catch (err) {
+        setError(err.message || 'Error al subir foto')
+        // Revertir el cambio en la UI
+        setFotosUrls(fotosUrls)
+      } finally {
+        setUploadingFoto(false)
+      }
+    }
+    // Detectar si se eliminó una imagen
+    else if (newUrls.length < fotosUrls.length) {
+      const removedUrl = fotosUrls.find(url => !newUrls.includes(url))
+      const fotoToDelete = fotos.find(f => f.url === removedUrl)
+
+      if (fotoToDelete) {
+        try {
+          await api.delete(`/admin/producto-fotos/${fotoToDelete.id}`)
+          setFotos(fotos.filter(f => f.id !== fotoToDelete.id))
+          setFotosUrls(newUrls)
+          setSuccess('Foto eliminada')
+        } catch (err) {
+          setError(err.message || 'Error al eliminar foto')
+          // Revertir el cambio en la UI
+          setFotosUrls(fotosUrls)
+        }
       }
     }
   }
 
-  async function marcarFotoPrincipal(fotoId) {
+  async function handleMainImageChange(index) {
+    const fotoToMarkMain = fotos[index]
+    if (!fotoToMarkMain) return
+
     try {
-      await api.put(`/admin/producto-fotos/${fotoId}/principal`)
-      setFotos(fotos.map(f => ({ ...f, esPrincipal: f.id === fotoId })))
+      await api.put(`/admin/producto-fotos/${fotoToMarkMain.id}/principal`)
+      setFotos(fotos.map(f => ({ ...f, esPrincipal: f.id === fotoToMarkMain.id })))
       setSuccess('Foto marcada como principal')
     } catch (err) {
       setError(err.message || 'Error al marcar foto')
-    }
-  }
-
-  async function eliminarFoto(fotoId) {
-    if (!confirm('Eliminar esta foto?')) return
-    try {
-      await api.delete(`/admin/producto-fotos/${fotoId}`)
-      setFotos(fotos.filter(f => f.id !== fotoId))
-      setSuccess('Foto eliminada')
-    } catch (err) {
-      setError(err.message || 'Error al eliminar foto')
     }
   }
 
@@ -574,11 +602,20 @@ export default function ProductoForm() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="font-semibold text-gray-800 mb-4">Fotos</h2>
 
-            {/* Grid de fotos */}
-            {fotos.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2 mb-4">
+            {isEditing && editMode ? (
+              <MultiImageUpload
+                images={fotosUrls}
+                onChange={handleFotosChange}
+                maxImages={10}
+                mainImageIndex={fotos.findIndex(f => f.esPrincipal)}
+                onMainChange={handleMainImageChange}
+                maxSize={5 * 1024 * 1024}
+                accept="image/jpeg,image/png,image/webp"
+              />
+            ) : fotos.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
                 {fotos.map(foto => (
-                  <div key={foto.id} className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100">
+                  <div key={foto.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
                     <img
                       src={foto.url}
                       alt="Producto"
@@ -589,67 +626,16 @@ export default function ProductoForm() {
                         <Star className="w-3 h-3" /> Principal
                       </div>
                     )}
-                    {editMode && (
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
-                        {!foto.esPrincipal && (
-                          <button
-                            type="button"
-                            onClick={() => marcarFotoPrincipal(foto.id)}
-                            className="p-2 bg-white rounded-full text-yellow-600 hover:bg-yellow-50"
-                            title="Marcar como principal"
-                          >
-                            <Star className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => eliminarFoto(foto.id)}
-                          className="p-2 bg-white rounded-full text-red-600 hover:bg-red-50"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                <Image className="w-16 h-16 text-gray-300" />
-              </div>
-            )}
-
-            {/* Upload */}
-            {isEditing && editMode && (
-              <div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFotoUpload}
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => fileInputRef.current?.click()}
-                  loading={uploadingFoto}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Subir Foto
-                </Button>
-                <p className="text-xs text-gray-500 mt-2 text-center">
-                  JPG, PNG o WebP. Max 5MB
+              <div className="aspect-square bg-gray-100 rounded-lg flex flex-col items-center justify-center">
+                <Image className="w-16 h-16 text-gray-300 mb-2" />
+                <p className="text-sm text-gray-500 text-center">
+                  {isEditing ? 'No hay fotos del producto' : 'Guarde el producto para agregar fotos'}
                 </p>
               </div>
-            )}
-
-            {!isEditing && (
-              <p className="text-sm text-gray-500 text-center">
-                Guarde el producto para poder agregar fotos
-              </p>
             )}
           </div>
 

@@ -7,8 +7,12 @@ import {
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import StatusBadge from '../../components/StatusBadge'
+import Pagination from '../../components/Pagination'
+import Table from '../../components/Table'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { usePagination } from '../../hooks/usePagination'
 
 // Componente Avatar con fallback si la imagen no carga
 function AvatarSocio({ foto, nombre }) {
@@ -44,8 +48,7 @@ export default function AdminSocios() {
   const [tipoSocio, setTipoSocio] = useState('')
   const [zona, setZona] = useState('')
   const [esMenor, setEsMenor] = useState('')
-  const [page, setPage] = useState(1)
-  const [pagination, setPagination] = useState(null)
+  const { page, pagination, setPagination, goToPage } = usePagination()
   const [filtros, setFiltros] = useState({ estados: [], categorias: [], tiposSocio: [], zonas: [] })
   const [showFilters, setShowFilters] = useState(false)
 
@@ -81,7 +84,7 @@ export default function AdminSocios() {
 
   function handleBuscar(e) {
     e.preventDefault()
-    setPage(1)
+    goToPage(1)
     cargarSocios(busqueda)
   }
 
@@ -92,21 +95,10 @@ export default function AdminSocios() {
     setTipoSocio('')
     setZona('')
     setEsMenor('')
-    setPage(1)
+    goToPage(1)
   }
 
   const hayFiltrosActivos = estado || categoria || tipoSocio || zona || esMenor || busqueda
-
-  function getEstadoColor(estado) {
-    const upper = estado?.toUpperCase() || ''
-    if (upper.includes('VIGENT') || upper.includes('ACTIV')) {
-      return 'bg-green-100 text-green-800'
-    }
-    if (upper.includes('BAJA') || upper.includes('INACTIV')) {
-      return 'bg-red-100 text-red-800'
-    }
-    return 'bg-yellow-100 text-yellow-800'
-  }
 
   function getQrUrl(tokenPortal) {
     return `https://sportivo.axiomacloud.com/s/${tokenPortal}`
@@ -146,6 +138,147 @@ export default function AdminSocios() {
     }
     return edad
   }
+
+  const columns = [
+    {
+      key: 'socio',
+      label: 'Socio',
+      sortable: false,
+      render: (socio) => (
+        <div className="flex items-center gap-3">
+          <AvatarSocio foto={socio.fotoUrl} nombre={socio.apellidoNombre} />
+          <div>
+            <div className="font-medium text-gray-800">
+              {socio.apellidoNombre}
+            </div>
+            <div className="text-sm text-gray-500">
+              #{socio.nroSocio} • DNI: {socio.documento || '-'}
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'contacto',
+      label: 'Contacto',
+      sortable: false,
+      className: 'hidden lg:table-cell',
+      cellClassName: 'hidden lg:table-cell',
+      render: (socio) => (
+        <div className="text-sm text-gray-600">
+          <div>{socio.email || '-'}</div>
+          <div>{socio.celular || '-'}</div>
+        </div>
+      )
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      sortable: false,
+      render: (socio) => (
+        <div>
+          <StatusBadge status={socio.estado} type="socio" />
+          {socio.esMenor && (
+            <span className="ml-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              Menor
+              {socio.fechaNacimiento && ` (${calcularEdad(socio.fechaNacimiento)})`}
+            </span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'categoria',
+      label: 'Categoria',
+      sortable: false,
+      className: 'hidden md:table-cell',
+      cellClassName: 'hidden md:table-cell',
+      render: (socio) => (
+        <div className="text-sm text-gray-600">
+          <div>{socio.categoria || '-'}</div>
+          <div className="text-gray-400">{socio.tipoSocio || '-'}</div>
+        </div>
+      )
+    },
+    {
+      key: 'info',
+      label: 'Info',
+      sortable: false,
+      className: 'hidden sm:table-cell text-center',
+      cellClassName: 'hidden sm:table-cell',
+      render: (socio) => (
+        <div className="flex justify-center gap-1">
+          {(socio.titularFamiliaId || socio.miembrosFamilia?.length > 0) && (
+            <span
+              title={socio.titularFamiliaId ? 'Miembro de grupo familiar' : 'Titular de grupo familiar'}
+              className="p-1 rounded bg-purple-100 text-purple-600"
+            >
+              <Users className="w-4 h-4" />
+            </span>
+          )}
+          {socio.enviaDebito && (
+            <span title="Debito automatico activo" className="p-1 rounded bg-green-100 text-green-600">
+              <CreditCard className="w-4 h-4" />
+            </span>
+          )}
+          {socio.tieneDeuda && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(`/admin/cuotas?cobrarSocioId=${socio.id}`)
+              }}
+              title="Cobrar cuotas pendientes"
+              className="p-1 rounded bg-orange-100 text-orange-600 hover:bg-orange-200 transition"
+            >
+              <DollarSign className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      className: 'text-center',
+      render: (socio) => (
+        <div className="flex justify-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/socios/${socio.id}`)
+            }}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
+            title="Ver detalle"
+          >
+            <Eye className="w-5 h-5" />
+          </button>
+          {tienePermiso(PERMISOS.SOCIOS_EDITAR) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(`/admin/socios/${socio.id}/editar`)
+              }}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
+              title="Editar"
+            >
+              <Edit className="w-5 h-5" />
+            </button>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setQrModal(socio)
+            }}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
+            title="Ver QR del socio"
+          >
+            <QrCode className="w-5 h-5" />
+          </button>
+        </div>
+      )
+    }
+  ]
 
   return (
     <div>
@@ -208,7 +341,7 @@ export default function AdminSocios() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <select
               value={estado}
-              onChange={(e) => { setEstado(e.target.value); setPage(1) }}
+              onChange={(e) => { setEstado(e.target.value); goToPage(1) }}
               className="input-field"
             >
               <option value="">Todos los estados</option>
@@ -218,7 +351,7 @@ export default function AdminSocios() {
             </select>
             <select
               value={categoria}
-              onChange={(e) => { setCategoria(e.target.value); setPage(1) }}
+              onChange={(e) => { setCategoria(e.target.value); goToPage(1) }}
               className="input-field"
             >
               <option value="">Todas las categorias</option>
@@ -228,7 +361,7 @@ export default function AdminSocios() {
             </select>
             <select
               value={tipoSocio}
-              onChange={(e) => { setTipoSocio(e.target.value); setPage(1) }}
+              onChange={(e) => { setTipoSocio(e.target.value); goToPage(1) }}
               className="input-field"
             >
               <option value="">Todos los tipos</option>
@@ -238,7 +371,7 @@ export default function AdminSocios() {
             </select>
             <select
               value={zona}
-              onChange={(e) => { setZona(e.target.value); setPage(1) }}
+              onChange={(e) => { setZona(e.target.value); goToPage(1) }}
               className="input-field"
             >
               <option value="">Todas las zonas</option>
@@ -248,7 +381,7 @@ export default function AdminSocios() {
             </select>
             <select
               value={esMenor}
-              onChange={(e) => { setEsMenor(e.target.value); setPage(1) }}
+              onChange={(e) => { setEsMenor(e.target.value); goToPage(1) }}
               className="input-field"
             >
               <option value="">Mayores y menores</option>
@@ -301,147 +434,23 @@ export default function AdminSocios() {
       ) : (
         <>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Socio
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
-                      Contacto
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Estado
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
-                      Categoria
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">
-                      Info
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {socios.map((socio) => (
-                    <tr key={socio.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <AvatarSocio foto={socio.fotoUrl} nombre={socio.apellidoNombre} />
-                          <div>
-                            <div className="font-medium text-gray-800">
-                              {socio.apellidoNombre}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              #{socio.nroSocio} • DNI: {socio.documento || '-'}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
-                        <div>{socio.email || '-'}</div>
-                        <div>{socio.celular || '-'}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoColor(socio.estado)}`}>
-                          {socio.estado}
-                        </span>
-                        {socio.esMenor && (
-                          <span className="ml-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Menor
-                            {socio.fechaNacimiento && ` (${calcularEdad(socio.fechaNacimiento)})`}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
-                        <div>{socio.categoria || '-'}</div>
-                        <div className="text-gray-400">{socio.tipoSocio || '-'}</div>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <div className="flex justify-center gap-1">
-                          {(socio.titularFamiliaId || socio.miembrosFamilia?.length > 0) && (
-                            <span
-                              title={socio.titularFamiliaId ? 'Miembro de grupo familiar' : 'Titular de grupo familiar'}
-                              className="p-1 rounded bg-purple-100 text-purple-600"
-                            >
-                              <Users className="w-4 h-4" />
-                            </span>
-                          )}
-                          {socio.enviaDebito && (
-                            <span title="Debito automatico activo" className="p-1 rounded bg-green-100 text-green-600">
-                              <CreditCard className="w-4 h-4" />
-                            </span>
-                          )}
-                          {socio.tieneDeuda && (
-                            <button
-                              onClick={() => navigate(`/admin/cuotas?cobrarSocioId=${socio.id}`)}
-                              title="Cobrar cuotas pendientes"
-                              className="p-1 rounded bg-orange-100 text-orange-600 hover:bg-orange-200 transition"
-                            >
-                              <DollarSign className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center gap-1">
-                          <button
-                            onClick={() => navigate(`/admin/socios/${socio.id}`)}
-                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
-                            title="Ver detalle"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </button>
-                          {tienePermiso(PERMISOS.SOCIOS_EDITAR) && (
-                            <button
-                              onClick={() => navigate(`/admin/socios/${socio.id}/editar`)}
-                              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
-                              title="Editar"
-                            >
-                              <Edit className="w-5 h-5" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setQrModal(socio)}
-                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
-                            title="Ver QR del socio"
-                          >
-                            <QrCode className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              columns={columns}
+              data={socios}
+              keyField="id"
+              sortable={false}
+              onRowClick={(socio) => navigate(`/admin/socios/${socio.id}`)}
+              emptyMessage="No se encontraron socios"
+            />
           </div>
 
           {/* Paginacion */}
-          {pagination && pagination.pages > 1 && (
-            <div className="flex justify-center gap-2 mt-6">
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-600 disabled:opacity-50 hover:bg-gray-200 transition"
-              >
-                Anterior
-              </button>
-              <span className="px-4 py-2 text-gray-600">
-                Pagina {page} de {pagination.pages}
-              </span>
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={page === pagination.pages}
-                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-600 disabled:opacity-50 hover:bg-gray-200 transition"
-              >
-                Siguiente
-              </button>
-            </div>
-          )}
+          <Pagination
+            pagination={pagination}
+            page={page}
+            onPageChange={goToPage}
+            className="mt-6"
+          />
         </>
       )}
 
@@ -468,9 +477,7 @@ export default function AdminSocios() {
               <div className="text-center">
                 <p className="text-gray-800 font-semibold text-lg mb-2">{qrModal.apellidoNombre}</p>
                 <div className="flex justify-center mb-4">
-                  <span className={`text-sm px-3 py-1 rounded-full font-medium ${getEstadoColor(qrModal.estado)}`}>
-                    {qrModal.estado}
-                  </span>
+                  <StatusBadge status={qrModal.estado} type="socio" size="md" />
                 </div>
               </div>
 

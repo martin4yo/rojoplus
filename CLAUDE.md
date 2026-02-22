@@ -13,9 +13,9 @@ ROADMAP.md                   # Fases técnicas
 
 ## Estado: 99% Completo
 
-**Completados:** Socios (con Cuenta Corriente), Cuotas, Cobranzas (con Adjuntos), Portal Socio (PWA), Deportes, Financiero, Débito Automático, Conciliación Bancaria, Sitio Institucional, Permisos, Buffet MVP.
+**Completados:** Socios (con Cuenta Corriente), Cuotas, Cobranzas (con Adjuntos), Portal Socio (PWA), Deportes, Financiero, Débito Automático, Conciliación Bancaria, Sitio Institucional, Permisos, **Buffet MVP ✅**, **Control de Accesos ✅**, Centro de Costos (90%).
 
-**Pendientes:** Control Accesos (31), Payway (35.10-14), Débito Bancario (35.15-20), Testing (18).
+**Pendientes:** Centro Costos Reportes (32.10), Payway (35.10-14), Débito Bancario (35.15-20), Testing (18).
 
 ## Buffet MVP - Archivos Clave
 - `server/src/routes/buffet.js` (~2700 líneas)

@@ -1,0 +1,1247 @@
+import { Router } from 'express'
+import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
+import { authAdmin } from '../../middleware/auth.js'
+
+const router = Router()
+
+// GET /api/admin/cobradores - Listado de cobradores
+router.get('/cobradores', authAdmin, asyncHandler(async (req, res) => {
+  const cobradores = await req.prisma.cobrador.findMany({
+    where: { activo: true },
+    orderBy: { nombre: 'asc' },
+  })
+
+  res.json({
+    success: true,
+    data: cobradores.map(c => ({
+      ...c,
+      comisionPct: Number(c.comisionPct),
+    })),
+  })
+}))
+
+// ============================================================================
+// TABLAS AUXILIARES DE SOCIOS
+// ============================================================================
+
+// --- TIPOS DE SOCIO ---
+
+// GET /api/admin/tipos-socio
+router.get('/tipos-socio', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
+  const tipos = await req.prisma.tipoSocio.findMany({
+    where,
+    include: {
+      conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
+    },
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({ success: true, data: tipos })
+}))
+
+// GET /api/admin/tipos-socio/:id
+router.get('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const tipo = await req.prisma.tipoSocio.findUnique({
+    where: { id: parseInt(req.params.id) },
+    include: {
+      conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
+    },
+  })
+  if (!tipo) throw new AppError('Tipo de socio no encontrado', 404, 'NOT_FOUND')
+  res.json({ success: true, data: tipo })
+}))
+
+// POST /api/admin/tipos-socio
+router.post('/tipos-socio', authAdmin, asyncHandler(async (req, res) => {
+  const { codigo, nombre, descripcion, cuotaMensual, conceptoTesoreriaId, color, orden } = req.body
+
+  if (!codigo || !nombre) {
+    throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  const existente = await req.prisma.tipoSocio.findUnique({ where: { codigo } })
+  if (existente) throw new AppError('Ya existe un tipo con ese código', 400, 'DUPLICATE')
+
+  const tipo = await req.prisma.tipoSocio.create({
+    data: {
+      codigo,
+      nombre,
+      descripcion,
+      cuotaMensual: cuotaMensual ? parseFloat(cuotaMensual) : null,
+      conceptoTesoreriaId: conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null,
+      color,
+      orden: orden || 0,
+    },
+    include: {
+      conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
+    },
+  })
+
+  res.status(201).json({ success: true, data: tipo })
+}))
+
+// PUT /api/admin/tipos-socio/:id
+router.put('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { codigo, nombre, descripcion, cuotaMensual, conceptoTesoreriaId, color, orden, activo } = req.body
+
+  const existente = await req.prisma.tipoSocio.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Tipo de socio no encontrado', 404, 'NOT_FOUND')
+
+  if (codigo && codigo !== existente.codigo) {
+    const duplicado = await req.prisma.tipoSocio.findUnique({ where: { codigo } })
+    if (duplicado) throw new AppError('Ya existe un tipo con ese código', 400, 'DUPLICATE')
+  }
+
+  const tipo = await req.prisma.tipoSocio.update({
+    where: { id: parseInt(id) },
+    data: {
+      codigo: codigo ?? existente.codigo,
+      nombre: nombre ?? existente.nombre,
+      descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
+      cuotaMensual: cuotaMensual !== undefined ? (cuotaMensual ? parseFloat(cuotaMensual) : null) : existente.cuotaMensual,
+      conceptoTesoreriaId: conceptoTesoreriaId !== undefined ? (conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null) : existente.conceptoTesoreriaId,
+      color: color !== undefined ? color : existente.color,
+      orden: orden !== undefined ? orden : existente.orden,
+      activo: activo !== undefined ? activo : existente.activo,
+    },
+    include: {
+      conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
+    },
+  })
+
+  res.json({ success: true, data: tipo })
+}))
+
+// DELETE /api/admin/tipos-socio/:id
+router.delete('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Verificar si hay socios usando este tipo
+  const sociosConTipo = await req.prisma.socio.count({
+    where: { tipoSocioRelId: parseInt(id) },
+  })
+
+  if (sociosConTipo > 0) {
+    throw new AppError(`No se puede eliminar, hay ${sociosConTipo} socio(s) con este tipo`, 400, 'HAS_RELATIONS')
+  }
+
+  await req.prisma.tipoSocio.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Tipo de socio eliminado' } })
+}))
+
+// --- CATEGORÍAS DE SOCIO ---
+
+// GET /api/admin/categorias-socio
+router.get('/categorias-socio', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
+  const categorias = await req.prisma.categoriaSocio.findMany({
+    where,
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({
+    success: true,
+    data: categorias.map(c => ({
+      ...c,
+      porcentajeDescuento: c.porcentajeDescuento ? Number(c.porcentajeDescuento) : 0,
+    })),
+  })
+}))
+
+// GET /api/admin/categorias-socio/:id
+router.get('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const categoria = await req.prisma.categoriaSocio.findUnique({
+    where: { id: parseInt(req.params.id) },
+  })
+  if (!categoria) throw new AppError('Categoría de socio no encontrada', 404, 'NOT_FOUND')
+  res.json({
+    success: true,
+    data: { ...categoria, porcentajeDescuento: categoria.porcentajeDescuento ? Number(categoria.porcentajeDescuento) : 0 },
+  })
+}))
+
+// POST /api/admin/categorias-socio
+router.post('/categorias-socio', authAdmin, asyncHandler(async (req, res) => {
+  const { codigo, nombre, descripcion, porcentajeDescuento, color, orden } = req.body
+
+  if (!codigo || !nombre) {
+    throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  const existente = await req.prisma.categoriaSocio.findUnique({ where: { codigo } })
+  if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
+
+  const categoria = await req.prisma.categoriaSocio.create({
+    data: {
+      codigo,
+      nombre,
+      descripcion,
+      porcentajeDescuento: porcentajeDescuento ? parseFloat(porcentajeDescuento) : 0,
+      color,
+      orden: orden || 0,
+    },
+  })
+
+  res.status(201).json({ success: true, data: categoria })
+}))
+
+// PUT /api/admin/categorias-socio/:id
+router.put('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { codigo, nombre, descripcion, porcentajeDescuento, color, orden, activo } = req.body
+
+  const existente = await req.prisma.categoriaSocio.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Categoría de socio no encontrada', 404, 'NOT_FOUND')
+
+  if (codigo && codigo !== existente.codigo) {
+    const duplicado = await req.prisma.categoriaSocio.findUnique({ where: { codigo } })
+    if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
+  }
+
+  const categoria = await req.prisma.categoriaSocio.update({
+    where: { id: parseInt(id) },
+    data: {
+      codigo: codigo ?? existente.codigo,
+      nombre: nombre ?? existente.nombre,
+      descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
+      porcentajeDescuento: porcentajeDescuento !== undefined ? parseFloat(porcentajeDescuento) : existente.porcentajeDescuento,
+      color: color !== undefined ? color : existente.color,
+      orden: orden !== undefined ? orden : existente.orden,
+      activo: activo !== undefined ? activo : existente.activo,
+    },
+  })
+
+  res.json({ success: true, data: categoria })
+}))
+
+// DELETE /api/admin/categorias-socio/:id
+router.delete('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const sociosConCategoria = await req.prisma.socio.count({
+    where: { categoriaSocioId: parseInt(id) },
+  })
+
+  if (sociosConCategoria > 0) {
+    throw new AppError(`No se puede eliminar, hay ${sociosConCategoria} socio(s) con esta categoría`, 400, 'HAS_RELATIONS')
+  }
+
+  await req.prisma.categoriaSocio.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Categoría de socio eliminada' } })
+}))
+
+// --- ESTADOS DE SOCIO ---
+
+// GET /api/admin/estados-socio
+router.get('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
+  const estados = await req.prisma.estadoSocio.findMany({
+    where,
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({ success: true, data: estados })
+}))
+
+// GET /api/admin/estados-socio/:id
+router.get('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const estado = await req.prisma.estadoSocio.findUnique({
+    where: { id: parseInt(req.params.id) },
+  })
+  if (!estado) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
+  res.json({ success: true, data: estado })
+}))
+
+// POST /api/admin/estados-socio
+router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
+  const { codigo, nombre, descripcion, color, permiteDescuentos, orden } = req.body
+
+  if (!codigo || !nombre) {
+    throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  const existente = await req.prisma.estadoSocio.findUnique({ where: { codigo } })
+  if (existente) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
+
+  const estado = await req.prisma.estadoSocio.create({
+    data: {
+      codigo,
+      nombre,
+      descripcion,
+      color,
+      permiteDescuentos: permiteDescuentos || false,
+      orden: orden || 0,
+    },
+  })
+
+  res.status(201).json({ success: true, data: estado })
+}))
+
+// PUT /api/admin/estados-socio/:id
+router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { codigo, nombre, descripcion, color, permiteDescuentos, orden, activo } = req.body
+
+  const existente = await req.prisma.estadoSocio.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
+
+  if (codigo && codigo !== existente.codigo) {
+    const duplicado = await req.prisma.estadoSocio.findUnique({ where: { codigo } })
+    if (duplicado) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
+  }
+
+  const estado = await req.prisma.estadoSocio.update({
+    where: { id: parseInt(id) },
+    data: {
+      codigo: codigo ?? existente.codigo,
+      nombre: nombre ?? existente.nombre,
+      descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
+      color: color !== undefined ? color : existente.color,
+      permiteDescuentos: permiteDescuentos !== undefined ? permiteDescuentos : existente.permiteDescuentos,
+      orden: orden !== undefined ? orden : existente.orden,
+      activo: activo !== undefined ? activo : existente.activo,
+    },
+  })
+
+  res.json({ success: true, data: estado })
+}))
+
+// DELETE /api/admin/estados-socio/:id
+router.delete('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const sociosConEstado = await req.prisma.socio.count({
+    where: { estadoSocioId: parseInt(id) },
+  })
+
+  if (sociosConEstado > 0) {
+    throw new AppError(`No se puede eliminar, hay ${sociosConEstado} socio(s) con este estado`, 400, 'HAS_RELATIONS')
+  }
+
+  await req.prisma.estadoSocio.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Estado de socio eliminado' } })
+}))
+
+// ==================== DESCUENTOS DISPONIBLES ====================
+
+// GET /api/admin/descuentos-disponibles
+router.get('/descuentos-disponibles', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
+  const descuentos = await req.prisma.descuentoDisponible.findMany({
+    where,
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({ success: true, data: descuentos })
+}))
+
+// GET /api/admin/descuentos-disponibles/:id
+router.get('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req, res) => {
+  const descuento = await req.prisma.descuentoDisponible.findUnique({
+    where: { id: parseInt(req.params.id) },
+  })
+  if (!descuento) throw new AppError('Descuento no encontrado', 404, 'NOT_FOUND')
+  res.json({ success: true, data: descuento })
+}))
+
+// POST /api/admin/descuentos-disponibles
+router.post('/descuentos-disponibles', authAdmin, asyncHandler(async (req, res) => {
+  const { nombre, porcentaje, descripcion, orden } = req.body
+
+  if (!nombre || porcentaje === undefined) {
+    throw new AppError('Nombre y porcentaje son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  if (porcentaje < 0 || porcentaje > 100) {
+    throw new AppError('El porcentaje debe estar entre 0 y 100', 400, 'VALIDATION_ERROR')
+  }
+
+  const descuento = await req.prisma.descuentoDisponible.create({
+    data: {
+      nombre,
+      porcentaje: parseFloat(porcentaje),
+      descripcion,
+      orden: orden || 0,
+    },
+  })
+
+  res.status(201).json({ success: true, data: descuento })
+}))
+
+// PUT /api/admin/descuentos-disponibles/:id
+router.put('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { nombre, porcentaje, descripcion, orden, activo } = req.body
+
+  const existente = await req.prisma.descuentoDisponible.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Descuento no encontrado', 404, 'NOT_FOUND')
+
+  if (porcentaje !== undefined && (porcentaje < 0 || porcentaje > 100)) {
+    throw new AppError('El porcentaje debe estar entre 0 y 100', 400, 'VALIDATION_ERROR')
+  }
+
+  const descuento = await req.prisma.descuentoDisponible.update({
+    where: { id: parseInt(id) },
+    data: {
+      nombre: nombre ?? existente.nombre,
+      porcentaje: porcentaje !== undefined ? parseFloat(porcentaje) : existente.porcentaje,
+      descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
+      orden: orden !== undefined ? orden : existente.orden,
+      activo: activo !== undefined ? activo : existente.activo,
+    },
+  })
+
+  res.json({ success: true, data: descuento })
+}))
+
+// DELETE /api/admin/descuentos-disponibles/:id
+router.delete('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Verificar si hay comercios usando este descuento
+  const comerciosConDescuento = await req.prisma.comercio.count({
+    where: { descuentoDisponibleId: parseInt(id) },
+  })
+
+  if (comerciosConDescuento > 0) {
+    throw new AppError(`No se puede eliminar, hay ${comerciosConDescuento} comercio(s) con este descuento`, 400, 'HAS_RELATIONS')
+  }
+
+  await req.prisma.descuentoDisponible.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Descuento eliminado' } })
+}))
+
+// ==================== RUBROS ====================
+
+// GET /api/admin/rubros
+router.get('/rubros', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
+  const rubros = await req.prisma.rubro.findMany({
+    where,
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({ success: true, data: rubros })
+}))
+
+// GET /api/admin/rubros/:id
+router.get('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
+  const rubro = await req.prisma.rubro.findUnique({
+    where: { id: parseInt(req.params.id) },
+  })
+  if (!rubro) throw new AppError('Rubro no encontrado', 404, 'NOT_FOUND')
+  res.json({ success: true, data: rubro })
+}))
+
+// POST /api/admin/rubros
+router.post('/rubros', authAdmin, asyncHandler(async (req, res) => {
+  const { nombre, orden } = req.body
+
+  if (!nombre) {
+    throw new AppError('El nombre es requerido', 400, 'VALIDATION_ERROR')
+  }
+
+  const rubro = await req.prisma.rubro.create({
+    data: {
+      nombre,
+      orden: orden || 0,
+    },
+  })
+
+  res.status(201).json({ success: true, data: rubro })
+}))
+
+// PUT /api/admin/rubros/:id
+router.put('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { nombre, orden, activo } = req.body
+
+  const existente = await req.prisma.rubro.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Rubro no encontrado', 404, 'NOT_FOUND')
+
+  const rubro = await req.prisma.rubro.update({
+    where: { id: parseInt(id) },
+    data: {
+      nombre: nombre ?? existente.nombre,
+      orden: orden !== undefined ? orden : existente.orden,
+      activo: activo !== undefined ? activo : existente.activo,
+    },
+  })
+
+  res.json({ success: true, data: rubro })
+}))
+
+// DELETE /api/admin/rubros/:id
+router.delete('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Verificar si hay comercios usando este rubro
+  const comerciosConRubro = await req.prisma.comercio.count({
+    where: { rubroId: parseInt(id) },
+  })
+
+  if (comerciosConRubro > 0) {
+    throw new AppError(`No se puede eliminar, hay ${comerciosConRubro} comercio(s) con este rubro`, 400, 'HAS_RELATIONS')
+  }
+
+  await req.prisma.rubro.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Rubro eliminado' } })
+}))
+
+// ==================== CONCEPTOS DE TESORERIA ====================
+
+// GET /api/admin/conceptos-tesoreria
+router.get('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => {
+  const { activo, tipo } = req.query
+  const where = {}
+  if (activo !== undefined) where.activo = activo === 'true'
+  if (tipo) where.tipo = tipo
+
+  const conceptos = await req.prisma.conceptoTesoreria.findMany({
+    where,
+    include: {
+      cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+    },
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({ success: true, data: conceptos })
+}))
+
+// GET /api/admin/conceptos-tesoreria/:id
+router.get('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) => {
+  const concepto = await req.prisma.conceptoTesoreria.findUnique({
+    where: { id: parseInt(req.params.id) },
+    include: {
+      cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+    },
+  })
+  if (!concepto) throw new AppError('Concepto no encontrado', 404, 'NOT_FOUND')
+  res.json({ success: true, data: concepto })
+}))
+
+// POST /api/admin/conceptos-tesoreria
+router.post('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => {
+  const { codigo, nombre, descripcion, tipo, usaEnCompras, usaEnVentas, usaEnTesoreria, cuentaContableId, orden } = req.body
+
+  if (!codigo || !nombre) {
+    throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  const existente = await req.prisma.conceptoTesoreria.findUnique({ where: { codigo } })
+  if (existente) throw new AppError('Ya existe un concepto con ese código', 400, 'DUPLICATE')
+
+  const concepto = await req.prisma.conceptoTesoreria.create({
+    data: {
+      codigo,
+      nombre,
+      descripcion,
+      tipo: tipo || 'INGRESO',
+      usaEnCompras: usaEnCompras || false,
+      usaEnVentas: usaEnVentas || false,
+      usaEnTesoreria: usaEnTesoreria !== false,
+      cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null,
+      orden: orden || 0,
+    },
+    include: {
+      cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+    },
+  })
+
+  res.status(201).json({ success: true, data: concepto })
+}))
+
+// PUT /api/admin/conceptos-tesoreria/:id
+router.put('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { codigo, nombre, descripcion, tipo, usaEnCompras, usaEnVentas, usaEnTesoreria, cuentaContableId, orden, activo } = req.body
+
+  const concepto = await req.prisma.conceptoTesoreria.update({
+    where: { id: parseInt(id) },
+    data: {
+      codigo,
+      nombre,
+      descripcion,
+      tipo,
+      usaEnCompras,
+      usaEnVentas,
+      usaEnTesoreria,
+      cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null,
+      orden,
+      activo,
+    },
+    include: {
+      cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+    },
+  })
+
+  res.json({ success: true, data: concepto })
+}))
+
+// DELETE /api/admin/conceptos-tesoreria/:id
+router.delete('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Verificar si hay tipos de socio o actividades usando este concepto
+  const [tiposSocio, actividades, categorias] = await Promise.all([
+    req.prisma.tipoSocio.count({ where: { conceptoId: parseInt(id) } }),
+    req.prisma.actividad.count({ where: { conceptoId: parseInt(id) } }),
+    req.prisma.categoriaActividad.count({ where: { conceptoId: parseInt(id) } }),
+  ])
+
+  if (tiposSocio > 0 || actividades > 0 || categorias > 0) {
+    throw new AppError('No se puede eliminar, el concepto está en uso', 400, 'IN_USE')
+  }
+
+  await req.prisma.conceptoTesoreria.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Concepto eliminado' } })
+}))
+
+// ============================================
+// PERIODOS DE CUOTA
+// ============================================
+
+// GET /api/admin/periodos - Listar periodos de cuota
+router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
+  const { anio } = req.query
+
+  const where = {}
+  if (anio) where.anio = parseInt(anio)
+
+  const periodos = await req.prisma.periodo.findMany({
+    where,
+    orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
+    include: {
+      _count: { select: { cargos: true } },
+    },
+  })
+
+  // Agregar estadísticas de cada periodo
+  const periodosConStats = await Promise.all(periodos.map(async (periodo) => {
+    const ahora = new Date()
+    const [statsTotal, statsPagadas, statsPendientes, statsVencidas] = await Promise.all([
+      req.prisma.cargo.aggregate({
+        where: { periodoId: periodo.id },
+        _sum: { montoTotal: true },
+        _count: { _all: true },
+      }),
+      req.prisma.cargo.aggregate({
+        where: { periodoId: periodo.id, estado: 'PAGADO' },
+        _sum: { montoTotal: true },
+        _count: { _all: true },
+      }),
+      req.prisma.cargo.aggregate({
+        where: { periodoId: periodo.id, estado: 'PENDIENTE' },
+        _sum: { montoTotal: true },
+        _count: { _all: true },
+      }),
+      req.prisma.cargo.aggregate({
+        where: {
+          periodoId: periodo.id,
+          estado: 'PENDIENTE',
+          fechaVencimiento: { lt: ahora },
+        },
+        _sum: { montoTotal: true },
+        _count: { _all: true },
+      }),
+    ])
+    return {
+      ...periodo,
+      totalCuotas: statsTotal._count._all,
+      montoTotal: Number(statsTotal._sum.montoTotal) || 0,
+      cuotasPagadas: statsPagadas._count._all,
+      montoPagado: Number(statsPagadas._sum.montoTotal) || 0,
+      cuotasPendientes: statsPendientes._count._all,
+      montoPendiente: Number(statsPendientes._sum.montoTotal) || 0,
+      cuotasVencidas: statsVencidas._count._all,
+      montoVencido: Number(statsVencidas._sum.montoTotal) || 0,
+    }
+  }))
+
+  res.json({ success: true, data: periodosConStats })
+}))
+
+// GET /api/admin/periodos/:id - Detalle de un periodo
+router.get('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const periodo = await req.prisma.periodo.findUnique({
+    where: { id: parseInt(id) },
+  })
+
+  if (!periodo) {
+    throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
+  }
+
+  const stats = await req.prisma.cargo.groupBy({
+    by: ['estado'],
+    where: { periodoId: periodo.id },
+    _count: true,
+    _sum: { montoTotal: true },
+  })
+
+  res.json({ success: true, data: { ...periodo, estadisticas: stats } })
+}))
+
+// POST /api/admin/periodos - Crear periodo de cuota
+router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
+  const { anio, mes, fechaVencimiento } = req.body
+
+  if (!anio || !mes) {
+    throw new AppError('anio y mes son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  const anioInt = parseInt(anio)
+  const mesInt = parseInt(mes)
+
+  // Verificar si ya existe un periodo con el mismo año/mes
+  const periodoExistente = await req.prisma.periodo.findFirst({
+    where: { anio: anioInt, mes: mesInt }
+  })
+
+  // Si ya existe, devolverlo (puede haber sido creado por un plan de pagos)
+  if (periodoExistente) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...periodoExistente,
+        existente: true
+      }
+    })
+  }
+
+  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+  const nombre = `${meses[mesInt - 1]} ${anio}`
+
+  // Calcular fecha de vencimiento según configuración
+  let fechaVenc
+  if (fechaVencimiento) {
+    // Si se proporciona fecha de vencimiento, usarla
+    fechaVenc = new Date(fechaVencimiento)
+  } else {
+    // Obtener configuración
+    const configDia = await req.prisma.configuracion.findUnique({
+      where: { clave: 'CUOTA_DIA_VENCIMIENTO' }
+    })
+    const configMismoMes = await req.prisma.configuracion.findUnique({
+      where: { clave: 'CUOTA_VENCE_MISMO_MES' }
+    })
+
+    const diaVencimiento = configDia ? parseInt(configDia.valor) : 10
+    const venceMismoMes = configMismoMes ? configMismoMes.valor === 'true' : false
+
+    // Calcular mes y año del vencimiento
+    let mesVenc = mesInt
+    let anioVenc = anioInt
+
+    if (!venceMismoMes) {
+      // Vencimiento en el mes siguiente
+      mesVenc = mesInt + 1
+      if (mesVenc > 12) {
+        mesVenc = 1
+        anioVenc = anioInt + 1
+      }
+    }
+
+    // Crear fecha de vencimiento (mes es 0-indexed en JavaScript)
+    fechaVenc = new Date(anioVenc, mesVenc - 1, diaVencimiento)
+  }
+
+  const periodo = await req.prisma.periodo.create({
+    data: {
+      anio: anioInt,
+      mes: mesInt,
+      nombre,
+      fechaVencimiento: fechaVenc,
+      estado: 'PENDIENTE',
+    },
+  })
+
+  res.status(201).json({ success: true, data: periodo })
+}))
+
+// DELETE /api/admin/periodos/:id - Eliminar periodo (solo si no tiene pagos)
+router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const periodo = await req.prisma.periodo.findUnique({
+    where: { id: parseInt(id) },
+  })
+
+  if (!periodo) {
+    throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
+  }
+
+  // Verificar si hay cuotas pagadas
+  const cuotasPagadas = await req.prisma.cargo.count({
+    where: {
+      periodoId: periodo.id,
+      estado: 'PAGADO',
+    },
+  })
+
+  if (cuotasPagadas > 0) {
+    throw new AppError('No se puede eliminar: hay cuotas pagadas en este periodo', 400, 'HAS_PAYMENTS')
+  }
+
+  // Eliminar cuotas pendientes del periodo
+  await req.prisma.cargo.deleteMany({
+    where: { periodoId: periodo.id },
+  })
+
+  // Eliminar el periodo
+  await req.prisma.periodo.delete({
+    where: { id: periodo.id },
+  })
+
+  res.json({ success: true, message: 'Periodo eliminado correctamente' })
+}))
+
+// POST /api/admin/periodos/:id/generar - Generar cuotas para un periodo
+router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const periodo = await req.prisma.periodo.findUnique({
+    where: { id: parseInt(id) },
+  })
+
+  if (!periodo) {
+    throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
+  }
+
+  // Obtener socios que YA tienen cuota social en este periodo (pueden ser de planes de pago)
+  const sociosConCuotaSocial = await req.prisma.cargo.findMany({
+    where: {
+      periodoId: periodo.id,
+      categoria: 'CUOTA_SOCIAL'
+    },
+    select: { socioId: true }
+  })
+  const sociosConCuotaSocialIds = new Set(sociosConCuotaSocial.map(c => c.socioId))
+
+  // Obtener cargos de actividad que YA existen en este periodo (socio + categoriaActividad)
+  const cargosActividad = await req.prisma.cargo.findMany({
+    where: {
+      periodoId: periodo.id,
+      categoria: 'CUOTA_ACTIVIDAD'
+    },
+    select: { socioId: true, categoriaActividadId: true }
+  })
+  const actividadesConCargo = new Set(cargosActividad.map(c => `${c.socioId}-${c.categoriaActividadId}`))
+
+  // Obtener socios activos con sus relaciones
+  const socios = await req.prisma.socio.findMany({
+    where: {
+      OR: [
+        { estado: { contains: 'Activ', mode: 'insensitive' } },
+        { estado: { contains: 'Vigent', mode: 'insensitive' } },
+      ],
+    },
+    include: {
+      tipoSocioRel: true,
+      categoriaSocioRel: true,
+      inscripciones: {
+        where: { estado: 'ACTIVA' },
+        include: {
+          categoriaActividad: {
+            include: { actividad: true },
+          },
+        },
+      },
+    },
+  })
+
+  const cargosACrear = []
+  let sociosSaltados = 0
+  let inscripcionesSaltadas = 0
+  let sociosNoTitulares = 0
+  let sociosSinCuotaMensual = 0
+
+  for (const socio of socios) {
+    // Calcular descuento por categoria
+    const descuentoPct = socio.categoriaSocioRel?.porcentajeDescuento
+      ? Number(socio.categoriaSocioRel.porcentajeDescuento)
+      : 0
+
+    // Determinar si debe pagar cuota social
+    // Solo pagan: Titulares de familia (titularFamiliaId === null y tiene miembros)
+    // O socios únicos (no pertenece a ninguna familia)
+    const esTitularOUnico = !socio.titularFamiliaId
+
+    // Verificar si ya tiene cuota social en este periodo (puede ser de plan de pagos)
+    const yaTeníaCuotaSocial = sociosConCuotaSocialIds.has(socio.id)
+
+    // Contar motivos de exclusión para diagnóstico
+    if (!esTitularOUnico) {
+      sociosNoTitulares++
+    }
+    if (!socio.tipoSocioRel?.cuotaMensual) {
+      sociosSinCuotaMensual++
+    }
+
+    if (esTitularOUnico && socio.tipoSocioRel?.cuotaMensual && !yaTeníaCuotaSocial) {
+      const montoBase = Number(socio.tipoSocioRel.cuotaMensual)
+      const montoBonificacion = montoBase * (descuentoPct / 100)
+      const montoTotal = montoBase - montoBonificacion
+
+      // Determinar tipo de cuota: Grupo Familiar si tiene miembros, sino Socio Único
+      const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
+      const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
+
+      cargosACrear.push({
+        periodoId: periodo.id,
+        socioId: socio.id,
+        grupoFamiliarId: socio.titularFamiliaId || socio.id,
+        categoria: 'CUOTA_SOCIAL',
+        tipoCuota,
+        descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'}`,
+        montoOriginal: montoBase,
+        montoBonificacion,
+        montoTotal,
+        estado: 'PENDIENTE',
+        fechaVencimiento: periodo.fechaVencimiento,
+        origen: 'GENERACION_MASIVA',
+        motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+      })
+    } else if (yaTeníaCuotaSocial) {
+      sociosSaltados++
+    }
+
+    // Cargos por actividades (inscripciones activas)
+    for (const inscripcion of socio.inscripciones) {
+      // Saltar si está exento de cuota
+      if (inscripcion.exentoCuota) continue
+
+      // Verificar si ya tiene cargo para esta categoría de actividad en este periodo
+      const claveActividad = `${socio.id}-${inscripcion.categoriaActividadId}`
+      if (actividadesConCargo.has(claveActividad)) {
+        inscripcionesSaltadas++
+        continue
+      }
+
+      const categoria = inscripcion.categoriaActividad
+      const actividad = categoria.actividad
+
+      // Determinar monto: primero categoría, luego actividad
+      let montoBase = categoria.cuotaMensual
+        ? Number(categoria.cuotaMensual)
+        : (actividad.cuotaMensual ? Number(actividad.cuotaMensual) : 0)
+
+      // Aplicar porcentaje de inscripción si no es 100%
+      if (inscripcion.porcentajeCuota && Number(inscripcion.porcentajeCuota) !== 100) {
+        montoBase = montoBase * (Number(inscripcion.porcentajeCuota) / 100)
+      }
+
+      if (montoBase > 0) {
+        const montoBonificacion = montoBase * (descuentoPct / 100)
+        const montoTotal = montoBase - montoBonificacion
+
+        cargosACrear.push({
+          periodoId: periodo.id,
+          socioId: socio.id,
+          grupoFamiliarId: socio.titularFamiliaId || socio.id,
+          categoria: 'CUOTA_ACTIVIDAD',
+          categoriaActividadId: categoria.id,
+          descripcion: `${actividad.nombre} - ${categoria.nombre}`,
+          montoOriginal: montoBase,
+          montoBonificacion,
+          montoTotal,
+          estado: 'PENDIENTE',
+          fechaVencimiento: periodo.fechaVencimiento,
+          origen: 'GENERACION_MASIVA',
+          motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+        })
+      }
+    }
+  }
+
+  // Crear todos los cargos en batch
+  if (cargosACrear.length > 0) {
+    await req.prisma.cargo.createMany({ data: cargosACrear })
+  }
+
+  // Actualizar estado del periodo (solo si se generaron nuevas cuotas o es la primera vez)
+  const totalCuotasPeriodo = await req.prisma.cargo.count({
+    where: { periodoId: periodo.id }
+  })
+
+  if (totalCuotasPeriodo > 0) {
+    await req.prisma.periodo.update({
+      where: { id: periodo.id },
+      data: {
+        estado: 'GENERADO',
+        fechaGeneracion: new Date(),
+        generadoPor: req.admin.id,
+      },
+    })
+  }
+
+  // Construir mensaje de respuesta
+  let mensaje = ''
+  if (cargosACrear.length === 0) {
+    if (socios.length === 0) {
+      mensaje = 'No hay socios activos para generar cuotas'
+    } else if (sociosSaltados > 0 || inscripcionesSaltadas > 0) {
+      mensaje = `No se generaron cuotas nuevas. ${sociosSaltados} socios y ${inscripcionesSaltadas} inscripciones ya tenían cuotas en este periodo.`
+    } else {
+      const detalles = []
+      if (sociosNoTitulares > 0) detalles.push(`${sociosNoTitulares} son miembros de familia (no titulares)`)
+      if (sociosSinCuotaMensual > 0) detalles.push(`${sociosSinCuotaMensual} tienen tipo de socio sin cuota mensual configurada`)
+      mensaje = `No se generaron cuotas. ${socios.length} socios activos encontrados. ${detalles.length > 0 ? detalles.join(', ') + '.' : ''}`
+    }
+  } else {
+    mensaje = `Se generaron ${cargosACrear.length} cuotas para ${socios.length} socios`
+    if (sociosSaltados > 0 || inscripcionesSaltadas > 0) {
+      mensaje += ` (${sociosSaltados} socios y ${inscripcionesSaltadas} inscripciones ya tenían cuotas)`
+    }
+  }
+
+  res.json({
+    success: true,
+    data: {
+      cuotasGeneradas: cargosACrear.length,
+      sociosProcesados: socios.length,
+      sociosSaltados,
+      inscripcionesSaltadas,
+      sociosNoTitulares,
+      sociosSinCuotaMensual,
+      mensaje,
+    }
+  })
+}))
+// ============================================
+// CONFIGURACION DEL SISTEMA
+// ============================================
+
+// GET /api/admin/sistema/configuracion - Obtener configuraciones del sistema
+router.get('/sistema/configuracion', authAdmin, asyncHandler(async (req, res) => {
+  const { modulo } = req.query
+
+  const where = {}
+  if (modulo) where.modulo = modulo
+
+  const configuraciones = await req.prisma.configuracion.findMany({
+    where,
+    orderBy: [{ modulo: 'asc' }, { clave: 'asc' }],
+  })
+
+  res.json({ success: true, data: configuraciones })
+}))
+
+// GET /api/admin/sistema/configuracion/:clave - Obtener una configuración
+router.get('/sistema/configuracion/:clave', authAdmin, asyncHandler(async (req, res) => {
+  const { clave } = req.params
+
+  const config = await req.prisma.configuracion.findUnique({
+    where: { clave },
+  })
+
+  if (!config) {
+    return res.status(404).json({ success: false, error: { message: 'Configuración no encontrada' } })
+  }
+
+  res.json({ success: true, data: config })
+}))
+
+// PUT /api/admin/sistema/configuracion/:clave - Actualizar o crear una configuración
+router.put('/sistema/configuracion/:clave', authAdmin, asyncHandler(async (req, res) => {
+  const { clave } = req.params
+  const { valor, tipo, modulo, descripcion } = req.body
+
+  // Verificar si existe y si es editable
+  const existing = await req.prisma.configuracion.findUnique({
+    where: { clave },
+  })
+
+  if (existing && !existing.editable) {
+    return res.status(400).json({ success: false, error: { message: 'Esta configuración no es editable' } })
+  }
+
+  // Upsert: actualizar si existe, crear si no
+  const updated = await req.prisma.configuracion.upsert({
+    where: { clave },
+    update: { valor: String(valor) },
+    create: {
+      clave,
+      valor: String(valor),
+      tipo: tipo || 'STRING',
+      modulo: modulo || 'SISTEMA',
+      descripcion: descripcion || null,
+    },
+  })
+
+  res.json({ success: true, data: updated })
+}))
+
+// PUT /api/admin/sistema/modo-demo - Actualizar modo demo (shortcut)
+router.put('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
+  const { activo, email } = req.body
+
+  // Actualizar MODO_DEMO
+  await req.prisma.configuracion.upsert({
+    where: { clave: 'MODO_DEMO' },
+    update: { valor: activo ? 'true' : 'false' },
+    create: {
+      clave: 'MODO_DEMO',
+      valor: activo ? 'true' : 'false',
+      tipo: 'BOOLEAN',
+      modulo: 'SISTEMA',
+      descripcion: 'Modo demo activo',
+    },
+  })
+
+  // Actualizar EMAIL_DEMO si se proporciona
+  if (email !== undefined) {
+    await req.prisma.configuracion.upsert({
+      where: { clave: 'EMAIL_DEMO' },
+      update: { valor: email || '' },
+      create: {
+        clave: 'EMAIL_DEMO',
+        valor: email || '',
+        tipo: 'STRING',
+        modulo: 'SISTEMA',
+        descripcion: 'Email para recibir notificaciones en modo demo',
+      },
+    })
+  }
+
+  res.json({ success: true, data: { activo, email } })
+}))
+
+// GET /api/admin/sistema/modo-demo - Obtener estado del modo demo
+router.get('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
+  const [modoDemo, emailDemo] = await Promise.all([
+    req.prisma.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
+    req.prisma.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
+  ])
+
+  res.json({
+    success: true,
+    data: {
+      activo: modoDemo?.valor === 'true',
+      email: emailDemo?.valor || '',
+    },
+  })
+}))
+
+// ============================================
+// CONFIGURACIÓN DE RECARGOS POR MORA
+// ============================================
+
+// GET /api/admin/configuracion-recargo - Obtener configuración de recargo
+router.get('/configuracion-recargo', authAdmin, asyncHandler(async (req, res) => {
+  const config = await req.prisma.configuracionRecargo.findFirst({
+    where: { activo: true },
+  })
+  res.json({ success: true, data: config })
+}))
+
+// PUT /api/admin/configuracion-recargo - Actualizar configuración de recargo
+router.put('/configuracion-recargo', authAdmin, asyncHandler(async (req, res) => {
+  const { tipo, porcentaje, cadaDias, topeMaximo } = req.body
+
+  if (!tipo || !['FIJO', 'ACUMULATIVO'].includes(tipo)) {
+    throw new AppError('Tipo debe ser FIJO o ACUMULATIVO', 400, 'VALIDATION_ERROR')
+  }
+
+  if (porcentaje === undefined || porcentaje < 0) {
+    throw new AppError('Porcentaje es requerido y debe ser >= 0', 400, 'VALIDATION_ERROR')
+  }
+
+  if (tipo === 'ACUMULATIVO' && (!cadaDias || cadaDias < 1)) {
+    throw new AppError('Para tipo ACUMULATIVO, cadaDias es requerido y debe ser >= 1', 400, 'VALIDATION_ERROR')
+  }
+
+  // Desactivar configuraciones anteriores
+  await req.prisma.configuracionRecargo.updateMany({
+    where: { activo: true },
+    data: { activo: false },
+  })
+
+  // Crear nueva configuración activa
+  const config = await req.prisma.configuracionRecargo.create({
+    data: {
+      tipo,
+      porcentaje: parseFloat(porcentaje),
+      cadaDias: tipo === 'ACUMULATIVO' ? parseInt(cadaDias) : null,
+      topeMaximo: topeMaximo ? parseFloat(topeMaximo) : null,
+      activo: true,
+    },
+  })
+
+  res.json({ success: true, data: config })
+}))
+
+// Función para calcular recargo de un cargo
+async function calcularRecargoCargo(prisma, cargo) {
+  if (!cargo.fechaVencimiento || cargo.estado !== 'PENDIENTE') {
+    return { recargo: 0, porcentaje: 0, diasMora: 0 }
+  }
+
+  const hoy = new Date()
+  const vencimiento = new Date(cargo.fechaVencimiento)
+  const diasMora = Math.floor((hoy - vencimiento) / (1000 * 60 * 60 * 24))
+
+  if (diasMora <= 0) {
+    return { recargo: 0, porcentaje: 0, diasMora: 0 }
+  }
+
+  const config = await prisma.configuracionRecargo.findFirst({
+    where: { activo: true },
+  })
+
+  if (!config || Number(config.porcentaje) === 0) {
+    return { recargo: 0, porcentaje: 0, diasMora }
+  }
+
+  let porcentajeRecargo = 0
+
+  if (config.tipo === 'FIJO') {
+    porcentajeRecargo = Number(config.porcentaje)
+  } else {
+    // ACUMULATIVO: porcentaje × (diasMora / cadaDias)
+    const periodos = Math.floor(diasMora / config.cadaDias)
+    porcentajeRecargo = periodos * Number(config.porcentaje)
+
+    // Aplicar tope máximo si está definido
+    if (config.topeMaximo && porcentajeRecargo > Number(config.topeMaximo)) {
+      porcentajeRecargo = Number(config.topeMaximo)
+    }
+  }
+
+  const montoOriginal = Number(cargo.montoOriginal)
+  const recargo = Math.round(montoOriginal * porcentajeRecargo / 100)
+
+  return { recargo, porcentaje: porcentajeRecargo, diasMora }
+}
+
+// GET /api/admin/cargos/:id/recargo - Calcular recargo de un cargo
+router.get('/cargos/:id/recargo', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const cargo = await req.prisma.cargo.findUnique({
+    where: { id: parseInt(id) },
+  })
+
+  if (!cargo) {
+    throw new AppError('Cargo no encontrado', 404, 'NOT_FOUND')
+  }
+
+  const resultado = await calcularRecargoCargo(req.prisma, cargo)
+  res.json({ success: true, data: resultado })
+}))
+
+export default router

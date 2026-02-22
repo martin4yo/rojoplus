@@ -4,6 +4,7 @@ import { ArrowLeft, Receipt, TrendingUp, DollarSign, ChevronDown, ChevronRight, 
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { formatCurrency } from '../../utils/formatters'
 
 // Colores para los gráficos
 const COLORES_COBRADO = ['#22c55e', '#16a34a', '#15803d', '#166534', '#14532d']
@@ -16,7 +17,7 @@ const CustomTooltip = ({ active, payload }) => {
     return (
       <div className="bg-white px-3 py-2 shadow-lg rounded-lg border border-gray-200">
         <p className="font-medium text-gray-800">{data.nombre}</p>
-        <p className="text-sm text-gray-600">${data.valor?.toLocaleString('es-AR')}</p>
+        <p className="text-sm text-gray-600">{formatCurrency(data.valor, { showSymbol: false })}</p>
       </div>
     )
   }
@@ -63,7 +64,7 @@ function GraficoTorta({ datos, colores, titulo, total, onSliceClick }) {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-xl font-bold text-gray-800 mt-1">${total.toLocaleString('es-AR')}</p>
+      <p className="text-xl font-bold text-gray-800 mt-1">{formatCurrency(total, { showSymbol: false })}</p>
 
       {/* Leyenda compacta */}
       <div className="mt-2 w-full space-y-0.5 max-h-24 overflow-y-auto">
@@ -408,7 +409,7 @@ export default function ReporteCuotas() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Generado</p>
-              <p className="text-lg font-bold text-gray-800">${(kpis.generado?.monto || 0).toLocaleString('es-AR')}</p>
+              <p className="text-lg font-bold text-gray-800">{formatCurrency(kpis.generado?.monto || 0, { showSymbol: false })}</p>
               <p className="text-xs text-gray-400">{kpis.generado?.cantidad || 0} cuotas</p>
             </div>
           </div>
@@ -421,7 +422,7 @@ export default function ReporteCuotas() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Cobrado</p>
-              <p className="text-lg font-bold text-green-600">${(kpis.cobrado?.monto || 0).toLocaleString('es-AR')}</p>
+              <p className="text-lg font-bold text-green-600">{formatCurrency(kpis.cobrado?.monto || 0, { showSymbol: false })}</p>
               <p className="text-xs text-gray-400">{kpis.cobrado?.cantidad || 0} cuotas</p>
             </div>
           </div>
@@ -434,7 +435,7 @@ export default function ReporteCuotas() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Pendiente</p>
-              <p className="text-lg font-bold text-yellow-600">${(kpis.pendiente?.monto || 0).toLocaleString('es-AR')}</p>
+              <p className="text-lg font-bold text-yellow-600">{formatCurrency(kpis.pendiente?.monto || 0, { showSymbol: false })}</p>
               <p className="text-xs text-gray-400">{kpis.pendiente?.cantidad || 0} cuotas</p>
             </div>
           </div>
@@ -471,7 +472,7 @@ export default function ReporteCuotas() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Recargo acum.</p>
-              <p className="text-lg font-bold text-orange-600">${(kpis.recargoPendiente || 0).toLocaleString('es-AR')}</p>
+              <p className="text-lg font-bold text-orange-600">{formatCurrency(kpis.recargoPendiente || 0, { showSymbol: false })}</p>
             </div>
           </div>
         </div>
@@ -527,15 +528,15 @@ export default function ReporteCuotas() {
                       </div>
                     </td>
                     <td className="px-6 py-3 text-right">
-                      <p className="font-medium text-gray-800">${cat.generado.toLocaleString('es-AR')}</p>
+                      <p className="font-medium text-gray-800">{formatCurrency(cat.generado, { showSymbol: false })}</p>
                       <p className="text-xs text-gray-400">{cat.cantGenerado} cuotas</p>
                     </td>
                     <td className="px-6 py-3 text-right">
-                      <p className="font-medium text-green-600">${cat.cobrado.toLocaleString('es-AR')}</p>
+                      <p className="font-medium text-green-600">{formatCurrency(cat.cobrado, { showSymbol: false })}</p>
                       <p className="text-xs text-gray-400">{cat.cantCobrado} cuotas</p>
                     </td>
                     <td className="px-6 py-3 text-right">
-                      <p className="font-medium text-yellow-600">${cat.pendiente.toLocaleString('es-AR')}</p>
+                      <p className="font-medium text-yellow-600">{formatCurrency(cat.pendiente, { showSymbol: false })}</p>
                       <p className="text-xs text-gray-400">{cat.cantPendiente} cuotas</p>
                     </td>
                     <td className="px-6 py-3">
@@ -584,15 +585,15 @@ export default function ReporteCuotas() {
                           </div>
                         </td>
                         <td className="px-6 py-3 text-right">
-                          <p className="text-gray-700">${act.generado.toLocaleString('es-AR')}</p>
+                          <p className="text-gray-700">{formatCurrency(act.generado, { showSymbol: false })}</p>
                           <p className="text-xs text-gray-400">{act.cantGenerado}</p>
                         </td>
                         <td className="px-6 py-3 text-right">
-                          <p className="text-green-600">${act.cobrado.toLocaleString('es-AR')}</p>
+                          <p className="text-green-600">{formatCurrency(act.cobrado, { showSymbol: false })}</p>
                           <p className="text-xs text-gray-400">{act.cantCobrado}</p>
                         </td>
                         <td className="px-6 py-3 text-right">
-                          <p className="text-yellow-600">${act.pendiente.toLocaleString('es-AR')}</p>
+                          <p className="text-yellow-600">{formatCurrency(act.pendiente, { showSymbol: false })}</p>
                           <p className="text-xs text-gray-400">{act.cantPendiente}</p>
                         </td>
                         <td className="px-6 py-3">
@@ -633,14 +634,14 @@ export default function ReporteCuotas() {
                             <span className="text-sm text-gray-600">{catAct.nombre}</span>
                           </td>
                           <td className="px-6 py-2 text-right">
-                            <p className="text-sm text-gray-600">${catAct.generado.toLocaleString('es-AR')}</p>
+                            <p className="text-sm text-gray-600">{formatCurrency(catAct.generado, { showSymbol: false })}</p>
                             <p className="text-xs text-gray-400">{catAct.cantGenerado}</p>
                           </td>
                           <td className="px-6 py-2 text-right">
-                            <p className="text-sm text-green-600">${catAct.cobrado.toLocaleString('es-AR')}</p>
+                            <p className="text-sm text-green-600">{formatCurrency(catAct.cobrado, { showSymbol: false })}</p>
                           </td>
                           <td className="px-6 py-2 text-right">
-                            <p className="text-sm text-yellow-600">${catAct.pendiente.toLocaleString('es-AR')}</p>
+                            <p className="text-sm text-yellow-600">{formatCurrency(catAct.pendiente, { showSymbol: false })}</p>
                           </td>
                           <td className="px-6 py-2">
                             <div className="flex items-center justify-center gap-2">
@@ -725,11 +726,11 @@ export default function ReporteCuotas() {
                     </div>
                     <div className="bg-yellow-50 rounded-lg p-3 text-center">
                       <p className="text-xs text-gray-500">Deuda total</p>
-                      <p className="text-lg font-bold text-yellow-600">${morososData.totales.totalDeuda.toLocaleString('es-AR')}</p>
+                      <p className="text-lg font-bold text-yellow-600">{formatCurrency(morososData.totales.totalDeuda, { showSymbol: false })}</p>
                     </div>
                     <div className="bg-orange-50 rounded-lg p-3 text-center">
                       <p className="text-xs text-gray-500">Recargo acum.</p>
-                      <p className="text-lg font-bold text-orange-600">${morososData.totales.totalRecargo.toLocaleString('es-AR')}</p>
+                      <p className="text-lg font-bold text-orange-600">{formatCurrency(morososData.totales.totalRecargo, { showSymbol: false })}</p>
                     </div>
                   </div>
 
@@ -757,9 +758,9 @@ export default function ReporteCuotas() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-bold text-yellow-600">${m.totalDeuda.toLocaleString('es-AR')}</p>
+                            <p className="font-bold text-yellow-600">{formatCurrency(m.totalDeuda, { showSymbol: false })}</p>
                             {m.totalRecargo > 0 && (
-                              <p className="text-xs text-orange-500">+${m.totalRecargo.toLocaleString('es-AR')} recargo</p>
+                              <p className="text-xs text-orange-500">+{formatCurrency(m.totalRecargo, { showSymbol: false })} recargo</p>
                             )}
                           </div>
                         </div>

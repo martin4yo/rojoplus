@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, X, Dumbbell, Building2, CreditCard, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Save, Plus, X, Dumbbell, Building2, CreditCard, ChevronDown, ChevronUp, User } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import StatusBadge from '../../components/StatusBadge'
+import ImageUpload from '../../components/ImageUpload'
+import { formatCurrency, formatDateForInput } from '../../utils/formatters'
+import { useApiData } from '../../hooks/useApiData'
 import api from '../../services/api'
 
 export default function EntrenadorForm() {
@@ -37,44 +41,49 @@ export default function EntrenadorForm() {
     banco: '',
     cbu: '',
     alias: '',
+    // Datos de Staff Público
+    mostrarEnWeb: false,
+    fotoStaff: '',
+    biografiaStaff: '',
+    emailPublico: '',
+    telefonoPublico: '',
+    ordenStaff: 0,
   })
 
-  // Cargos de personal (desde tabla configurable)
-  const [cargosPersonal, setCargosPersonal] = useState([])
+  // Cargar actividades y cargos con useApiData
+  const { data: actividades = [] } = useApiData('/admin/actividades', {
+    params: { activo: true },
+    initialData: []
+  })
+
+  const { data: cargosPersonal = [] } = useApiData('/admin/cargos-personal', {
+    params: { activo: true },
+    initialData: [],
+    transform: (response) => response?.data || []
+  })
 
   // Control para mostrar/ocultar secciones
   const [mostrarDatosPersonal, setMostrarDatosPersonal] = useState(false)
   const [mostrarDatosBancarios, setMostrarDatosBancarios] = useState(false)
+  const [mostrarDatosStaff, setMostrarDatosStaff] = useState(false)
+
+  // Upload foto
+  const [uploadingFoto, setUploadingFoto] = useState(false)
 
   // Categorías asignadas
   const [categoriasAsignadas, setCategoriasAsignadas] = useState([])
 
   // Para agregar categoría
-  const [actividades, setActividades] = useState([])
   const [actividadSeleccionada, setActividadSeleccionada] = useState('')
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('')
   const [rolSeleccionado, setRolSeleccionado] = useState('ENTRENADOR')
   const [agregandoCategoria, setAgregandoCategoria] = useState(false)
 
   useEffect(() => {
-    cargarDatosIniciales()
     if (isEditing) {
       cargarEntrenador()
     }
   }, [id])
-
-  async function cargarDatosIniciales() {
-    try {
-      const [actividadesData, cargosData] = await Promise.all([
-        api.get('/admin/actividades?activo=true'),
-        api.getFull('/admin/cargos-personal?activo=true').catch(() => ({ data: [] }))
-      ])
-      setActividades(actividadesData || [])
-      setCargosPersonal(cargosData?.data || [])
-    } catch (err) {
-      console.error('Error cargando datos iniciales:', err)
-    }
-  }
 
   async function cargarEntrenador() {
     setLoadingData(true)
@@ -93,7 +102,7 @@ export default function EntrenadorForm() {
         // Datos de Personal (desde Entidad)
         legajo: entidad.legajo || '',
         cargoPersonalId: entidad.cargoPersonalId || '',
-        fechaIngreso: entidad.fechaIngreso ? entidad.fechaIngreso.split('T')[0] : '',
+        fechaIngreso: formatDateForInput(entidad.fechaIngreso),
         sueldoBasico: entidad.sueldoBasico || '',
         direccion: entidad.direccion || '',
         ciudad: entidad.ciudad || '',
@@ -102,11 +111,19 @@ export default function EntrenadorForm() {
         banco: entidad.banco || '',
         cbu: entidad.cbu || '',
         alias: entidad.alias || '',
+        // Datos de Staff Público
+        mostrarEnWeb: data.mostrarEnWeb || false,
+        fotoStaff: data.fotoStaff || '',
+        biografiaStaff: data.biografiaStaff || '',
+        emailPublico: data.emailPublico || '',
+        telefonoPublico: data.telefonoPublico || '',
+        ordenStaff: data.ordenStaff || 0,
       })
       setCategoriasAsignadas(data.categorias?.filter(c => c.activo) || [])
       // Expandir secciones si tienen datos
       if (entidad.sueldoBasico || entidad.legajo) setMostrarDatosPersonal(true)
       if (entidad.banco || entidad.cbu) setMostrarDatosBancarios(true)
+      if (data.mostrarEnWeb || data.fotoStaff || data.biografiaStaff) setMostrarDatosStaff(true)
     } catch (err) {
       setError('Error al cargar entrenador')
     } finally {
@@ -184,6 +201,38 @@ export default function EntrenadorForm() {
     }
   }
 
+  async function handleUploadWithFile(file) {
+    if (!file || !isEditing) return
+
+    setUploadingFoto(true)
+    const formData = new FormData()
+    formData.append('foto', file)
+
+    try {
+      const response = await fetch('/api/admin/entrenadores/upload-foto', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setForm(prev => ({ ...prev, fotoStaff: result.data.preview }))
+        setSuccess('Foto subida correctamente')
+        setTimeout(() => setSuccess(null), 2000)
+      } else {
+        setError(result.message || 'Error al subir foto')
+      }
+    } catch (err) {
+      setError('Error al subir foto')
+    } finally {
+      setUploadingFoto(false)
+    }
+  }
+
   // Obtener categorías de la actividad seleccionada
   const categoriasDisponibles = actividadSeleccionada
     ? actividades.find(a => a.id === parseInt(actividadSeleccionada))?.categorias?.filter(
@@ -215,10 +264,15 @@ export default function EntrenadorForm() {
         >
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            {isEditing ? 'Editar Entrenador' : 'Nuevo Entrenador'}
-          </h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-800">
+              {isEditing ? 'Editar Entrenador' : 'Nuevo Entrenador'}
+            </h1>
+            {isEditing && (
+              <StatusBadge status={form.activo ? 'ACTIVO' : 'INACTIVO'} type="generic" />
+            )}
+          </div>
           <p className="text-gray-500 text-sm">
             {isEditing ? 'Modifica los datos y categorías del entrenador' : 'Completa los datos del nuevo entrenador'}
           </p>
@@ -399,6 +453,11 @@ export default function EntrenadorForm() {
                       placeholder="0.00"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
+                    {form.sueldoBasico > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formatCurrency(form.sueldoBasico)}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -502,6 +561,145 @@ export default function EntrenadorForm() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono"
                     />
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Seccion: Datos de Staff Público (colapsable) */}
+            <div className="border-t border-gray-200 pt-4 mt-4">
+              <button
+                type="button"
+                onClick={() => setMostrarDatosStaff(!mostrarDatosStaff)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <User className="w-5 h-5 text-gray-500" />
+                  <span className="text-lg font-semibold text-gray-800">Datos de Staff Público</span>
+                </div>
+                {mostrarDatosStaff ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
+              <p className="text-sm text-gray-500 mt-1 ml-7">Información que se mostrará en la página web pública</p>
+
+              {mostrarDatosStaff && (
+                <div className="space-y-4 mt-4">
+                  {/* Mostrar en web */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="mostrarEnWeb"
+                        checked={form.mostrarEnWeb}
+                        onChange={handleChange}
+                        className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div>
+                        <span className="block font-medium text-gray-900">Mostrar en la web pública</span>
+                        <span className="block text-sm text-gray-600">
+                          Este entrenador aparecerá en la sección de Staff de las actividades asignadas
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {form.mostrarEnWeb && (
+                    <div className="space-y-4 pl-4 border-l-2 border-blue-200">
+                      {/* Foto */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Foto del staff
+                        </label>
+                        {uploadingFoto && (
+                          <p className="text-xs text-blue-600 mb-2">Subiendo foto...</p>
+                        )}
+                        <ImageUpload
+                          value={form.fotoStaff}
+                          onChange={(file) => handleUploadWithFile(file)}
+                          maxSize={2 * 1024 * 1024}
+                          accept="image/*"
+                          previewSize="lg"
+                          placeholder="Subir foto del staff"
+                          disabled={uploadingFoto || !isEditing}
+                          onError={(error) => setError(error)}
+                        />
+                        {!isEditing && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Guarda el entrenador primero para poder subir una foto
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Biografía */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Biografía / Descripción
+                        </label>
+                        <textarea
+                          name="biografiaStaff"
+                          value={form.biografiaStaff}
+                          onChange={handleChange}
+                          rows={4}
+                          placeholder="Descripción breve para mostrar en la web. Ej: Experiencia, logros, especialidades..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Email público */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Email público
+                          </label>
+                          <input
+                            type="email"
+                            name="emailPublico"
+                            value={form.emailPublico}
+                            onChange={handleChange}
+                            placeholder="email@ejemplo.com"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Visible en la web (puede ser diferente al email interno)
+                          </p>
+                        </div>
+
+                        {/* Teléfono público */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Teléfono público
+                          </label>
+                          <input
+                            type="text"
+                            name="telefonoPublico"
+                            value={form.telefonoPublico}
+                            onChange={handleChange}
+                            placeholder="+54 9 11 1234-5678"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Visible en la web (puede ser diferente al teléfono interno)
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Orden de visualización */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Orden de visualización
+                        </label>
+                        <input
+                          type="number"
+                          name="ordenStaff"
+                          value={form.ordenStaff}
+                          onChange={handleChange}
+                          min="0"
+                          className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Menor número = aparece primero
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

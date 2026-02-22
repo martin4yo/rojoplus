@@ -1,10 +1,17 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Receipt, Search, CheckCircle, Clock, AlertTriangle, DollarSign, X, User, Users, ChevronDown, ChevronUp, Edit2, Plus, Trash2, CreditCard } from 'lucide-react'
+import { Receipt, CheckCircle, DollarSign, X, Users, ChevronDown, ChevronUp, Edit2, Plus, Trash2, CreditCard } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import Modal from '../../components/Modal'
+import { SearchInputWithDropdown } from '../../components/SearchInput'
 import { PlanPagosModal } from '../../components/PlanPagosModal'
 import AdjuntosComprobante from '../../components/AdjuntosComprobante'
+import SelectCentroCosto from '../../components/SelectCentroCosto'
+import Pagination from '../../components/Pagination'
+import StatusBadge from '../../components/StatusBadge'
+import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters'
+import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
 
 export default function Cuotas() {
@@ -15,19 +22,18 @@ export default function Cuotas() {
   const [periodos, setPeriodos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [pagination, setPagination] = useState(null)
 
   // Filtros
   const [periodoId, setPeriodoId] = useState(searchParams.get('periodoId') || '')
   const [estado, setEstado] = useState(searchParams.get('estado') || '')
-  const [page, setPage] = useState(1)
+
+  // Paginación
+  const { page, pagination, setPagination, goToPage } = usePagination()
 
   // Buscador de socios
   const [busquedaSocio, setBusquedaSocio] = useState('')
   const [resultadosSocio, setResultadosSocio] = useState([])
   const [buscandoSocio, setBuscandoSocio] = useState(false)
-  const [showResultados, setShowResultados] = useState(false)
-  const searchRef = useRef(null)
 
   // Modo cobranza
   const [modoCobranza, setModoCobranza] = useState(false)
@@ -42,6 +48,7 @@ export default function Cuotas() {
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [medioPagoId, setMedioPagoId] = useState('')
   const [cajaId, setCajaId] = useState('')
+  const [centroCostoId, setCentroCostoId] = useState('')
   const [registrandoPago, setRegistrandoPago] = useState(false)
   const [success, setSuccess] = useState(null)
   const [showPagoExitosoModal, setShowPagoExitosoModal] = useState(false)
@@ -60,6 +67,7 @@ export default function Cuotas() {
     montoRecargo: '',
     montoBonificacion: '',
     fechaVencimiento: '',
+    centroCostoId: '',
   })
 
   // Crear cargo manual
@@ -111,7 +119,6 @@ export default function Cuotas() {
       try {
         const data = await api.get(`/admin/socios?q=${encodeURIComponent(busquedaSocio)}&limit=10`)
         setResultadosSocio(data.socios || [])
-        setShowResultados(true)
       } catch (err) {
         console.error('Error buscando socios:', err)
       } finally {
@@ -121,17 +128,6 @@ export default function Cuotas() {
 
     return () => clearTimeout(timer)
   }, [busquedaSocio])
-
-  // Cerrar resultados al hacer click fuera
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setShowResultados(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   async function cargarDatosIniciales() {
     try {
@@ -182,6 +178,7 @@ export default function Cuotas() {
         montoRecargo: parseFloat(formCargo.montoRecargo) || 0,
         montoBonificacion: parseFloat(formCargo.montoBonificacion) || 0,
         fechaVencimiento: formCargo.fechaVencimiento,
+        centroCostoId: formCargo.centroCostoId ? parseInt(formCargo.centroCostoId) : null,
       })
       setSuccess('Cargo actualizado correctamente')
       setShowEditModal(false)
@@ -214,6 +211,7 @@ export default function Cuotas() {
       montoRecargo: '0',
       montoBonificacion: '0',
       fechaVencimiento: new Date().toISOString().split('T')[0],
+      centroCostoId: '',
     })
     setShowCrearCargoModal(true)
   }
@@ -233,6 +231,7 @@ export default function Cuotas() {
         montoRecargo: parseFloat(formCargo.montoRecargo) || 0,
         montoBonificacion: parseFloat(formCargo.montoBonificacion) || 0,
         fechaVencimiento: formCargo.fechaVencimiento,
+        centroCostoId: formCargo.centroCostoId ? parseInt(formCargo.centroCostoId) : null,
       })
       setSuccess('Cargo creado correctamente')
       setShowCrearCargoModal(false)
@@ -278,7 +277,6 @@ export default function Cuotas() {
 
   async function seleccionarSocioParaCobranza(socio) {
     setBusquedaSocio('')
-    setShowResultados(false)
     setModoCobranza(true)
     setCargandoCobranza(true)
     setSeleccionadas([])
@@ -379,6 +377,7 @@ export default function Cuotas() {
         cuotaIds: seleccionadas,
         medioPagoId: parseInt(medioPagoId),
         cajaId: parseInt(cajaId),
+        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       })
       setNumeroRecibo(result.numero)
       setPagoId(result.id)
@@ -494,45 +493,6 @@ export default function Cuotas() {
     return nombres[categoria] || categoria?.replace(/_/g, ' ') || 'Sin categoría'
   }
 
-  function getEstadoBadge(estado) {
-    switch (estado) {
-      case 'PAGADO':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            <CheckCircle className="w-3 h-3" />
-            Pagada
-          </span>
-        )
-      case 'VENCIDA':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-            <AlertTriangle className="w-3 h-3" />
-            Vencida
-          </span>
-        )
-      case 'FINANCIADA':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            <CreditCard className="w-3 h-3" />
-            Financiada
-          </span>
-        )
-      case 'ANULADO':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-            <X className="w-3 h-3" />
-            Anulada
-          </span>
-        )
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-            <Clock className="w-3 h-3" />
-            Pendiente
-          </span>
-        )
-    }
-  }
 
   // Vista de Cobranza
   if (modoCobranza) {
@@ -599,11 +559,11 @@ export default function Cuotas() {
                     </span>
                   </div>
                   <p className="text-3xl font-bold text-primary">
-                    ${calcularTotalSeleccionado().total.toLocaleString('es-AR')}
+                    {formatCurrency(calcularTotalSeleccionado().total)}
                   </p>
                   {calcularTotalSeleccionado().recargo > 0 && (
                     <p className="text-sm text-red-600">
-                      Incluye ${calcularTotalSeleccionado().recargo.toLocaleString('es-AR')} de recargo
+                      Incluye {formatCurrency(calcularTotalSeleccionado().recargo)} de recargo
                     </p>
                   )}
                   {cobranzaData?.esFamilia && (
@@ -628,7 +588,7 @@ export default function Cuotas() {
                     className="flex items-center gap-2"
                   >
                     <DollarSign className="w-4 h-4" />
-                    Cobrar ${calcularTotalSeleccionado().total.toLocaleString('es-AR')}
+                    Cobrar {formatCurrency(calcularTotalSeleccionado().total)}
                   </Button>
                 </div>
               </div>
@@ -665,7 +625,7 @@ export default function Cuotas() {
                         <p className="text-sm text-gray-500">#{grupo.socio.nroSocio} - {cuotasGrupo.length} cuota{cuotasGrupo.length > 1 ? 's' : ''}</p>
                       </div>
                       <div className="text-right mr-2">
-                        <p className="font-bold text-gray-800">${grupo.total.toLocaleString('es-AR')}</p>
+                        <p className="font-bold text-gray-800">{formatCurrency(grupo.total)}</p>
                       </div>
                       {expandido ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
                     </div>
@@ -707,11 +667,11 @@ export default function Cuotas() {
                             <div className="text-right">
                               {cuota.recargoCalculado > 0 ? (
                                 <>
-                                  <p className="font-semibold text-gray-800">${cuota.montoConRecargo?.toLocaleString('es-AR')}</p>
-                                  <p className="text-xs text-red-500">+${cuota.recargoCalculado?.toLocaleString('es-AR')} mora</p>
+                                  <p className="font-semibold text-gray-800">{formatCurrency(cuota.montoConRecargo)}</p>
+                                  <p className="text-xs text-red-500">+{formatCurrency(cuota.recargoCalculado)} mora</p>
                                 </>
                               ) : (
-                                <p className="font-semibold text-gray-800">${Number(cuota.montoTotal).toLocaleString('es-AR')}</p>
+                                <p className="font-semibold text-gray-800">{formatCurrency(cuota.montoTotal)}</p>
                               )}
                             </div>
                           </div>
@@ -726,125 +686,131 @@ export default function Cuotas() {
         )}
 
         {/* Modal de pago */}
-        {showPagoModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-800">Confirmar Pago</h2>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-600">Total a cobrar</p>
-                  <p className="text-3xl font-bold text-gray-800">
-                    ${calcularTotalSeleccionado().total.toLocaleString('es-AR')}
-                  </p>
-                  {calcularTotalSeleccionado().recargo > 0 && (
-                    <div className="text-sm mt-2 space-y-1">
-                      <div className="flex justify-between text-gray-600">
-                        <span>Cuotas:</span>
-                        <span>${calcularTotalSeleccionado().base.toLocaleString('es-AR')}</span>
-                      </div>
-                      <div className="flex justify-between text-red-600">
-                        <span>Recargo por mora:</span>
-                        <span>${calcularTotalSeleccionado().recargo.toLocaleString('es-AR')}</span>
-                      </div>
-                    </div>
-                  )}
-                  <p className="text-sm text-gray-500 mt-1">
-                    {seleccionadas.length} cuota{seleccionadas.length > 1 ? 's' : ''}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
-                  <select
-                    value={medioPagoId}
-                    onChange={e => setMedioPagoId(e.target.value)}
-                    className="input-field w-full"
-                    required
-                  >
-                    {mediosPago.map(mp => (
-                      <option key={mp.id} value={mp.id}>{mp.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Caja</label>
-                  <select
-                    value={cajaId}
-                    onChange={e => setCajaId(e.target.value)}
-                    className="input-field w-full"
-                    required
-                  >
-                    {cajas.map(caja => (
-                      <option key={caja.id} value={caja.id}>
-                        {caja.nombre} {caja.tipo ? `(${caja.tipo})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex gap-3 pt-4 border-t">
-                  <Button
-                    onClick={registrarPago}
-                    loading={registrandoPago}
-                    className="flex-1 flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Confirmar Pago
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setShowPagoModal(false)}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal de pago exitoso */}
-        {showPagoExitosoModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-              <div className="px-6 py-6 text-center">
-                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-                  <CheckCircle className="h-10 w-10 text-green-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Cobranza Registrada!</h2>
-                <p className="text-gray-600 mb-4">
-                  El pago se registró correctamente
-                </p>
-                {numeroRecibo && (
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-gray-600 mb-1">Número de Recibo</p>
-                    <p className="text-3xl font-bold text-primary">#{numeroRecibo}</p>
+        <Modal
+          isOpen={showPagoModal}
+          onClose={() => setShowPagoModal(false)}
+          title="Confirmar Pago"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm text-gray-600">Total a cobrar</p>
+              <p className="text-3xl font-bold text-gray-800">
+                {formatCurrency(calcularTotalSeleccionado().total)}
+              </p>
+              {calcularTotalSeleccionado().recargo > 0 && (
+                <div className="text-sm mt-2 space-y-1">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Cuotas:</span>
+                    <span>{formatCurrency(calcularTotalSeleccionado().base)}</span>
                   </div>
-                )}
-              </div>
-
-              {/* Sección de adjuntos */}
-              {pagoId && (
-                <div className="px-6 pb-4 border-t pt-4">
-                  <AdjuntosComprobante tipo="pago" comprobanteId={pagoId} />
+                  <div className="flex justify-between text-red-600">
+                    <span>Recargo por mora:</span>
+                    <span>{formatCurrency(calcularTotalSeleccionado().recargo)}</span>
+                  </div>
                 </div>
               )}
+              <p className="text-sm text-gray-500 mt-1">
+                {seleccionadas.length} cuota{seleccionadas.length > 1 ? 's' : ''}
+              </p>
+            </div>
 
-              <div className="px-6 pb-6">
-                <Button
-                  onClick={cerrarModalPagoExitoso}
-                  className="w-full flex items-center justify-center gap-2"
-                >
-                  Continuar
-                </Button>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
+              <select
+                value={medioPagoId}
+                onChange={e => setMedioPagoId(e.target.value)}
+                className="input-field w-full"
+                required
+              >
+                {mediosPago.map(mp => (
+                  <option key={mp.id} value={mp.id}>{mp.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Caja</label>
+              <select
+                value={cajaId}
+                onChange={e => setCajaId(e.target.value)}
+                className="input-field w-full"
+                required
+              >
+                {cajas.map(caja => (
+                  <option key={caja.id} value={caja.id}>
+                    {caja.nombre} {caja.tipo ? `(${caja.tipo})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo</label>
+              <SelectCentroCosto
+                value={centroCostoId}
+                onChange={(val) => setCentroCostoId(val)}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                onClick={registrarPago}
+                loading={registrandoPago}
+                className="flex-1 flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Confirmar Pago
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowPagoModal(false)}
+              >
+                Cancelar
+              </Button>
             </div>
           </div>
-        )}
+        </Modal>
+
+        {/* Modal de pago exitoso */}
+        <Modal
+          isOpen={showPagoExitosoModal}
+          onClose={cerrarModalPagoExitoso}
+          maxWidth="max-w-lg"
+        >
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+              <CheckCircle className="h-10 w-10 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Cobranza Registrada!</h2>
+            <p className="text-gray-600 mb-4">
+              El pago se registró correctamente
+            </p>
+            {numeroRecibo && (
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <p className="text-sm text-gray-600 mb-1">Número de Recibo</p>
+                <p className="text-3xl font-bold text-primary">#{numeroRecibo}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sección de adjuntos */}
+          {pagoId && (
+            <div className="border-t pt-4 mt-4">
+              <AdjuntosComprobante tipo="pago" comprobanteId={pagoId} />
+            </div>
+          )}
+
+          <Button
+            onClick={cerrarModalPagoExitoso}
+            className="w-full flex items-center justify-center gap-2 mt-4"
+          >
+            Continuar
+          </Button>
+        </Modal>
 
         {/* Modal de plan de pagos */}
         <PlanPagosModal
@@ -894,77 +860,49 @@ export default function Cuotas() {
       {success && <Alert type="success" className="mb-4" onClose={() => setSuccess(null)}>{success}</Alert>}
 
       {/* Buscador de socios para cobranza */}
-      <div className="mb-6" ref={searchRef}>
+      <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">Cobrar a socio/familia</label>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar socio por nombre, DNI o nro. socio..."
-            value={busquedaSocio}
-            onChange={e => setBusquedaSocio(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && resultadosSocio.length > 0) {
-                e.preventDefault()
-                seleccionarSocioParaCobranza(resultadosSocio[0])
-              }
-            }}
-            className="input-field w-full pl-10"
-          />
-          {buscandoSocio && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
-            </div>
-          )}
-
-          {/* Resultados de búsqueda */}
-          {showResultados && resultadosSocio.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-              {resultadosSocio.map(socio => (
-                <div
-                  key={socio.id}
-                  className="px-4 py-3 flex items-center gap-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => seleccionarSocioParaCobranza(socio)}
+        <SearchInputWithDropdown
+          value={busquedaSocio}
+          onChange={setBusquedaSocio}
+          results={resultadosSocio}
+          loading={buscandoSocio}
+          onSelectResult={seleccionarSocioParaCobranza}
+          renderResult={(socio) => (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary font-bold flex-shrink-0">
+                {socio.apellidoNombre?.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-800 truncate">{socio.apellidoNombre}</p>
+                <p className="text-sm text-gray-500">#{socio.nroSocio} - DNI: {socio.documento}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {socio.titularFamiliaId === null && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                    {socio.tipoSocio?.includes('Familia') ? 'Titular' : 'Unico'}
+                  </span>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); abrirCrearCargo(socio) }}
+                  className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
+                  title="Agregar Cargo"
                 >
-                  <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary font-bold">
-                    {socio.apellidoNombre?.charAt(0)}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{socio.apellidoNombre}</p>
-                    <p className="text-sm text-gray-500">#{socio.nroSocio} - DNI: {socio.documento}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {socio.titularFamiliaId === null && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                        {socio.tipoSocio?.includes('Familia') ? 'Titular' : 'Unico'}
-                      </span>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setShowResultados(false); abrirCrearCargo(socio) }}
-                      className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
-                      title="Agregar Cargo"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); seleccionarSocioParaCobranza(socio) }}
-                      className="p-2 text-primary hover:bg-primary-light rounded-lg transition"
-                      title="Cobrar"
-                    >
-                      <DollarSign className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           )}
-
-          {showResultados && busquedaSocio.length >= 2 && resultadosSocio.length === 0 && !buscandoSocio && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500">
-              No se encontraron socios
-            </div>
-          )}
-        </div>
+          placeholder="Buscar socio por nombre, DNI o nro. socio..."
+          minChars={2}
+          debounceMs={300}
+          emptyMessage="No se encontraron socios"
+          onEnter={() => {
+            if (resultadosSocio.length > 0) {
+              seleccionarSocioParaCobranza(resultadosSocio[0])
+            }
+          }}
+        />
       </div>
 
       {/* Filtros */}
@@ -974,7 +912,7 @@ export default function Cuotas() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Periodo</label>
             <select
               value={periodoId}
-              onChange={e => { setPeriodoId(e.target.value); setPage(1) }}
+              onChange={e => { setPeriodoId(e.target.value); goToPage(1) }}
               className="input-field w-full"
             >
               <option value="">Todos los periodos</option>
@@ -987,7 +925,7 @@ export default function Cuotas() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
             <select
               value={estado}
-              onChange={e => { setEstado(e.target.value); setPage(1) }}
+              onChange={e => { setEstado(e.target.value); goToPage(1) }}
               className="input-field w-full"
             >
               <option value="">Todos</option>
@@ -998,7 +936,7 @@ export default function Cuotas() {
           </div>
           <div className="flex items-end">
             <button
-              onClick={() => { setPeriodoId(''); setEstado(''); setPage(1) }}
+              onClick={() => { setPeriodoId(''); setEstado(''); goToPage(1) }}
               className="text-sm text-primary hover:underline"
             >
               Limpiar filtros
@@ -1033,18 +971,12 @@ export default function Cuotas() {
                       </span>
                     </div>
                     <p className="text-sm text-gray-600">
-                      Informado: {new Date(pago.fechaInformado).toLocaleDateString('es-AR', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      Informado: {formatDateTime(pago.fechaInformado, { dateFormat: 'long' })}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-gray-900">
-                      ${Number(pago.monto).toLocaleString('es-AR')}
+                      {formatCurrency(pago.monto)}
                     </p>
                   </div>
                 </div>
@@ -1061,7 +993,7 @@ export default function Cuotas() {
                           {cuota.categoriaActividad && ` - ${cuota.categoriaActividad.actividad.nombre}`}
                         </span>
                         <span className="font-medium text-gray-900">
-                          ${Number(cuota.montoTotal).toLocaleString('es-AR')}
+                          {formatCurrency(cuota.montoTotal)}
                         </span>
                       </div>
                     ))}
@@ -1162,14 +1094,14 @@ export default function Cuotas() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <p className="font-semibold text-gray-800">
-                          ${Number(cuota.montoTotal).toLocaleString('es-AR')}
+                          {formatCurrency(cuota.montoTotal)}
                         </p>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {getEstadoBadge(cuota.estado)}
+                        <StatusBadge status={cuota.estado} type="cuota" />
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {new Date(cuota.fechaVencimiento).toLocaleDateString('es-AR')}
+                        {formatDate(cuota.fechaVencimiento)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex justify-center gap-1">
@@ -1208,41 +1140,28 @@ export default function Cuotas() {
           </div>
 
           {/* Paginacion */}
-          {pagination && pagination.pages > 1 && (
-            <div className="flex justify-center gap-2 mt-6">
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-600 disabled:opacity-50 hover:bg-gray-200 transition"
-              >
-                Anterior
-              </button>
-              <span className="px-4 py-2 text-gray-600">
-                Página {page} de {pagination.pages}
-              </span>
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={page === pagination.pages}
-                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-600 disabled:opacity-50 hover:bg-gray-200 transition"
-              >
-                Siguiente
-              </button>
-            </div>
-          )}
+          <Pagination
+            pagination={pagination}
+            page={page}
+            onPageChange={goToPage}
+            className="mt-6"
+          />
         </>
       )}
 
       {/* Modal editar cargo */}
-      {showEditModal && cargoEditando && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">Editar Cargo</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {cargoEditando.socio?.apellidoNombre} - {formatCategoria(cargoEditando.categoria)}
-              </p>
-            </div>
-            <form onSubmit={guardarCargo} className="p-6 space-y-4">
+      <Modal
+        isOpen={showEditModal && cargoEditando}
+        onClose={() => setShowEditModal(false)}
+        title="Editar Cargo"
+        maxWidth="max-w-lg"
+      >
+        {cargoEditando && (
+          <>
+            <p className="text-sm text-gray-500 mb-4">
+              {cargoEditando.socio?.apellidoNombre} - {formatCategoria(cargoEditando.categoria)}
+            </p>
+            <form onSubmit={guardarCargo} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
                 <select
@@ -1306,7 +1225,7 @@ export default function Cuotas() {
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-sm text-gray-600">
                   Monto Total: <span className="font-bold text-gray-800">
-                    ${((parseFloat(formCargo.montoOriginal) || 0) + (parseFloat(formCargo.montoRecargo) || 0) - (parseFloat(formCargo.montoBonificacion) || 0)).toLocaleString('es-AR')}
+                    {formatCurrency((parseFloat(formCargo.montoOriginal) || 0) + (parseFloat(formCargo.montoRecargo) || 0) - (parseFloat(formCargo.montoBonificacion) || 0))}
                   </span>
                 </p>
               </div>
@@ -1322,6 +1241,15 @@ export default function Cuotas() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo</label>
+                <SelectCentroCosto
+                  value={formCargo.centroCostoId}
+                  onChange={(val) => setFormCargo({ ...formCargo, centroCostoId: val })}
+                  className="w-full"
+                />
+              </div>
+
               <div className="flex gap-3 pt-4 border-t">
                 <Button type="submit" loading={guardandoCargo} className="flex-1">
                   Guardar Cambios
@@ -1331,45 +1259,42 @@ export default function Cuotas() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Modal ver comprobante */}
-      {showComprobanteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-800">Comprobante de Pago</h2>
-              <button
-                onClick={() => setShowComprobanteModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6">
-              <img
-                src={comprobanteUrl}
-                alt="Comprobante"
-                className="w-full max-h-[70vh] object-contain rounded-lg"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showComprobanteModal}
+        onClose={() => setShowComprobanteModal(false)}
+        title="Comprobante de Pago"
+        maxWidth="max-w-4xl"
+      >
+        <img
+          src={comprobanteUrl}
+          alt="Comprobante"
+          className="w-full max-h-[70vh] object-contain rounded-lg"
+        />
+      </Modal>
 
       {/* Modal confirmar pago */}
-      {showConfirmarModal && pagoSeleccionado && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">Confirmar Pago</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {pagoSeleccionado.socio.apellidoNombre} - ${Number(pagoSeleccionado.monto).toLocaleString('es-AR')}
-              </p>
-            </div>
-            <div className="p-6 space-y-4">
+      <Modal
+        isOpen={showConfirmarModal && pagoSeleccionado}
+        onClose={() => {
+          setShowConfirmarModal(false)
+          setPagoSeleccionado(null)
+          setCajaId('')
+          setMedioPagoId('')
+        }}
+        title="Confirmar Pago"
+        maxWidth="max-w-lg"
+      >
+        {pagoSeleccionado && (
+          <>
+            <p className="text-sm text-gray-500 mb-4">
+              {pagoSeleccionado.socio.apellidoNombre} - {formatCurrency(pagoSeleccionado.monto)}
+            </p>
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Caja *</label>
                 <select
@@ -1428,21 +1353,27 @@ export default function Cuotas() {
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Modal rechazar pago */}
-      {showRechazarModal && pagoSeleccionado && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">Rechazar Pago</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {pagoSeleccionado.socio.apellidoNombre} - ${Number(pagoSeleccionado.monto).toLocaleString('es-AR')}
-              </p>
-            </div>
-            <div className="p-6 space-y-4">
+      <Modal
+        isOpen={showRechazarModal && pagoSeleccionado}
+        onClose={() => {
+          setShowRechazarModal(false)
+          setPagoSeleccionado(null)
+          setMotivoRechazo('')
+        }}
+        title="Rechazar Pago"
+        maxWidth="max-w-lg"
+      >
+        {pagoSeleccionado && (
+          <>
+            <p className="text-sm text-gray-500 mb-4">
+              {pagoSeleccionado.socio.apellidoNombre} - {formatCurrency(pagoSeleccionado.monto)}
+            </p>
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Motivo del rechazo *</label>
                 <textarea
@@ -1484,21 +1415,23 @@ export default function Cuotas() {
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Modal crear cargo */}
-      {showCrearCargoModal && socioParaCargo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">Nuevo Cargo</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Para: {socioParaCargo.apellidoNombre} (#{socioParaCargo.nroSocio})
-              </p>
-            </div>
-            <form onSubmit={crearCargo} className="p-6 space-y-4">
+      <Modal
+        isOpen={showCrearCargoModal && socioParaCargo}
+        onClose={() => setShowCrearCargoModal(false)}
+        title="Nuevo Cargo"
+        maxWidth="max-w-lg"
+      >
+        {socioParaCargo && (
+          <>
+            <p className="text-sm text-gray-500 mb-4">
+              Para: {socioParaCargo.apellidoNombre} (#{socioParaCargo.nroSocio})
+            </p>
+            <form onSubmit={crearCargo} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
                 <select
@@ -1570,6 +1503,15 @@ export default function Cuotas() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo</label>
+                <SelectCentroCosto
+                  value={formCargo.centroCostoId}
+                  onChange={(val) => setFormCargo({ ...formCargo, centroCostoId: val })}
+                  className="w-full"
+                />
+              </div>
+
               <div className="flex gap-3 pt-4 border-t">
                 <Button type="submit" loading={guardandoCargo} className="flex-1">
                   Crear Cargo
@@ -1579,9 +1521,9 @@ export default function Cuotas() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

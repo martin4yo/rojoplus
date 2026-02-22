@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { UtensilsCrossed, Users, Clock, DollarSign, ChefHat, ShoppingBag, Coffee, AlertCircle, RefreshCw, Settings, X, UserCheck, Trash2 } from 'lucide-react'
+import { UtensilsCrossed, Users, Clock, DollarSign, ChefHat, ShoppingBag, Coffee, AlertCircle, RefreshCw, Settings, UserCheck, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
+import Modal from '../../../components/Modal'
 
 export default function BuffetDashboard() {
   const [kpis, setKpis] = useState(null)
@@ -392,102 +393,95 @@ export default function BuffetDashboard() {
       </div>
 
       {/* Modal Asignación de Mozos */}
-      {modalAsignacion && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-bold">Asignar Mozos a Mesas</h2>
-              <button onClick={() => setModalAsignacion(false)} className="p-2 hover:bg-gray-100 rounded">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              {/* Mozos disponibles */}
-              <div className="mb-6">
-                <h3 className="font-medium text-gray-700 mb-2">Mozos disponibles</h3>
-                <div className="flex flex-wrap gap-2">
-                  {mozos.map(mozo => (
-                    <div key={mozo.id} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full text-sm">
-                      <UserCheck size={14} className="text-purple-600" />
-                      <span>{mozo.nombreCompleto}</span>
-                      <span className="text-xs text-gray-500">({mozo.mesasAsignadas} mesas)</span>
-                    </div>
-                  ))}
-                  {mozos.length === 0 && (
-                    <p className="text-gray-500 text-sm">No hay mozos con permiso BUFFET_MESAS</p>
-                  )}
-                </div>
+      <Modal
+        isOpen={modalAsignacion}
+        onClose={() => setModalAsignacion(false)}
+        title="Asignar Mozos a Mesas"
+        maxWidth="max-w-3xl"
+      >
+        {/* Mozos disponibles */}
+        <div className="mb-6">
+          <h3 className="font-medium text-gray-700 mb-2">Mozos disponibles</h3>
+          <div className="flex flex-wrap gap-2">
+            {mozos.map(mozo => (
+              <div key={mozo.id} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full text-sm">
+                <UserCheck size={14} className="text-purple-600" />
+                <span>{mozo.nombreCompleto}</span>
+                <span className="text-xs text-gray-500">({mozo.mesasAsignadas} mesas)</span>
               </div>
-
-              {/* Tabla de asignaciones */}
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Mesa</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Zona</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Mozo Asignado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {todasLasMesas.map(mesa => (
-                      <tr key={mesa.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2">
-                          <span className="font-medium">Mesa {mesa.numero}</span>
-                          {mesa.esComunal && (
-                            <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Comunal</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">{mesa.zona || '-'}</td>
-                        <td className="px-4 py-2">
-                          <select
-                            value={asignaciones[mesa.id] || ''}
-                            onChange={e => handleAsignacionChange(mesa.id, e.target.value)}
-                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                          >
-                            <option value="">Sin asignar</option>
-                            {mozos.map(mozo => (
-                              <option key={mozo.id} value={mozo.id}>{mozo.nombreCompleto}</option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {todasLasMesas.length === 0 && (
-                <p className="text-center text-gray-500 py-4">No hay mesas configuradas</p>
-              )}
-            </div>
-
-            <div className="p-4 border-t flex justify-between">
-              <button
-                onClick={limpiarAsignaciones}
-                className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-              >
-                <Trash2 size={18} />
-                Limpiar Turno
-              </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setModalAsignacion(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={guardarAsignaciones}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                >
-                  Guardar Asignaciones
-                </button>
-              </div>
-            </div>
+            ))}
+            {mozos.length === 0 && (
+              <p className="text-gray-500 text-sm">No hay mozos con permiso BUFFET_MESAS</p>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Tabla de asignaciones */}
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Mesa</th>
+                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Zona</th>
+                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Mozo Asignado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {todasLasMesas.map(mesa => (
+                <tr key={mesa.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2">
+                    <span className="font-medium">Mesa {mesa.numero}</span>
+                    {mesa.esComunal && (
+                      <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Comunal</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-600">{mesa.zona || '-'}</td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={asignaciones[mesa.id] || ''}
+                      onChange={e => handleAsignacionChange(mesa.id, e.target.value)}
+                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                    >
+                      <option value="">Sin asignar</option>
+                      {mozos.map(mozo => (
+                        <option key={mozo.id} value={mozo.id}>{mozo.nombreCompleto}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {todasLasMesas.length === 0 && (
+          <p className="text-center text-gray-500 py-4">No hay mesas configuradas</p>
+        )}
+
+        {/* Footer con botones */}
+        <div className="flex justify-between mt-6 pt-4 border-t">
+          <button
+            onClick={limpiarAsignaciones}
+            className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+          >
+            <Trash2 size={18} />
+            Limpiar Turno
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setModalAsignacion(false)}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={guardarAsignaciones}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Guardar Asignaciones
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

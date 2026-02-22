@@ -7,6 +7,15 @@ import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import { useTicket } from '../../../contexts/TicketContext'
+import SelectCentroCosto from '../../../components/SelectCentroCosto'
+import StatusBadge from '../../../components/StatusBadge'
+import { formatCurrency } from '../../../utils/formatters'
+import Modal from '../../../components/Modal'
+import CalculadoraVuelto from '../../../components/buffet/CalculadoraVuelto'
+import SelectorMedioPago from '../../../components/buffet/SelectorMedioPago'
+import PropinaSelector from '../../../components/buffet/PropinaSelector'
+import SplitCuenta from '../../../components/buffet/SplitCuenta'
+import PagoMultiple from '../../../components/buffet/PagoMultiple'
 
 export default function BuffetComanda() {
   const { mesaId } = useParams()
@@ -23,7 +32,6 @@ export default function BuffetComanda() {
   const [categoriaActiva, setCategoriaActiva] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [itemsNuevos, setItemsNuevos] = useState([])
-  const [modalCobrar, setModalCobrar] = useState(false)
   const [cobroData, setCobroData] = useState({ cajaId: '', medioPagoId: '', aplicarDescuento: true })
   const [descuentoInfo, setDescuentoInfo] = useState(null)
   const [cargandoDescuento, setCargandoDescuento] = useState(false)
@@ -31,7 +39,7 @@ export default function BuffetComanda() {
 
   // Modal nueva comanda
   const [modalNuevaComanda, setModalNuevaComanda] = useState(false)
-  const [nuevaComandaData, setNuevaComandaData] = useState({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '' })
+  const [nuevaComandaData, setNuevaComandaData] = useState({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '', centroCostoId: '' })
   const [sociosBusqueda, setSociosBusqueda] = useState([])
   const [buscandoSocio, setBuscandoSocio] = useState(false)
 
@@ -43,6 +51,14 @@ export default function BuffetComanda() {
   const [modalEditarComanda, setModalEditarComanda] = useState(false)
   const [comandaAEditar, setComandaAEditar] = useState(null)
   const [editarComandaData, setEditarComandaData] = useState({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '' })
+
+  // Estados para nuevas funcionalidades de cobro
+  const [datosVuelto, setDatosVuelto] = useState({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+  const [propinaData, setPropinaData] = useState({ porcentaje: 0, monto: 0, esCustom: false })
+  const [modalSplit, setModalSplit] = useState(false)
+  const [pagosParciales, setPagosParciales] = useState({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
+  const [usarPagosMultiples, setUsarPagosMultiples] = useState(false)
+  const [tabCobroActivo, setTabCobroActivo] = useState('cuenta') // 'cuenta' o 'finalizar'
 
   const cargarDatos = useCallback(async () => {
     try {
@@ -123,6 +139,39 @@ export default function BuffetComanda() {
     return () => clearInterval(interval)
   }, [cargarDatos])
 
+  // Atajos de teclado para tab de finalizar
+  useEffect(() => {
+    if (tabCobroActivo !== 'finalizar') return
+
+    function handleKeyPress(e) {
+      // Solo procesar si estamos en el tab finalizar y no hay otro modal abierto
+      if (tabCobroActivo !== 'finalizar' || modalSplit) return
+
+      // No procesar si estamos en un input/textarea/select
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return
+      }
+
+      switch(e.key) {
+        case 'Enter':
+          e.preventDefault()
+          cobrar()
+          break
+        case 'Escape':
+          e.preventDefault()
+          setTabCobroActivo('cuenta')
+          break
+        case 'F9':
+          e.preventDefault()
+          verPreviewCuenta()
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [tabCobroActivo, modalSplit, cobroData, datosVuelto, propinaData, usarPagosMultiples, pagosParciales])
+
   // Buscar socios para asignar a la comanda
   async function buscarSocios(texto) {
     if (!texto || texto.length < 2) {
@@ -164,7 +213,7 @@ export default function BuffetComanda() {
   }
 
   function abrirModalNuevaComanda() {
-    setNuevaComandaData({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '' })
+    setNuevaComandaData({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '', centroCostoId: '' })
     setSociosBusqueda([])
     setModalNuevaComanda(true)
   }
@@ -179,6 +228,9 @@ export default function BuffetComanda() {
       }
       if (nuevaComandaData.nombreGrupo) {
         payload.observaciones = nuevaComandaData.nombreGrupo
+      }
+      if (nuevaComandaData.centroCostoId) {
+        payload.centroCostoId = parseInt(nuevaComandaData.centroCostoId)
       }
 
       const res = await api.post('/admin/buffet/comandas', payload)
@@ -363,47 +415,83 @@ export default function BuffetComanda() {
     }
   }
 
-  async function abrirModalCobrar() {
-    setModalCobrar(true)
-    setDescuentoInfo(null)
-    setCobroData(prev => ({ ...prev, aplicarDescuento: true }))
+  // Cargar datos cuando se abre el tab de finalizar
+  useEffect(() => {
+    async function cargarDatosFinalizacion() {
+      if (tabCobroActivo === 'finalizar' && comandaActiva) {
+        setDescuentoInfo(null)
+        setCobroData(prev => ({ ...prev, aplicarDescuento: true }))
 
-    // Cargar información de descuento
-    if (comandaActiva?.socioId) {
-      setCargandoDescuento(true)
-      try {
-        const res = await api.get(`/admin/buffet/comandas/${comandaActiva.id}/descuento`)
-        const info = res.data || res
-        setDescuentoInfo(info)
-      } catch (err) {
-        console.error('Error cargando descuento:', err)
-      } finally {
-        setCargandoDescuento(false)
+        // Reset estados de cobro
+        setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+        setPropinaData({ porcentaje: 0, monto: 0, esCustom: false })
+        setUsarPagosMultiples(false)
+        setPagosParciales({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
+
+        // Cargar información de descuento
+        if (comandaActiva.socioId) {
+          setCargandoDescuento(true)
+          try {
+            const res = await api.get(`/admin/buffet/comandas/${comandaActiva.id}/descuento`)
+            const info = res.data || res
+            setDescuentoInfo(info)
+          } catch (err) {
+            console.error('Error cargando descuento:', err)
+          } finally {
+            setCargandoDescuento(false)
+          }
+        }
       }
     }
-  }
+
+    cargarDatosFinalizacion()
+  }, [tabCobroActivo, comandaActiva])
 
   async function cobrar() {
     if (!comandaActiva) return
+
+    // Calcular total final (con descuento y propina)
+    const totalComanda = Number(comandaActiva.subtotal || comandaActiva.total)
+    const montoDescuento = (cobroData.aplicarDescuento && descuentoInfo?.aplicable) ? Number(descuentoInfo.monto) : 0
+    const totalConDescuento = totalComanda - montoDescuento
+    const totalFinal = totalConDescuento + propinaData.monto
+
+    // Validar pago suficiente (solo si no usa pagos múltiples)
+    if (!usarPagosMultiples && !datosVuelto.esSuficiente && mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO') {
+      toast.error('El monto pagado es insuficiente')
+      return
+    }
+
+    // Validar pagos múltiples completos
+    if (usarPagosMultiples && !pagosParciales.esCompleto) {
+      toast.error('Debe completar el pago total')
+      return
+    }
+
     try {
       const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))
 
       await api.post(`/admin/buffet/comandas/${comandaActiva.id}/cobrar`, {
         cajaId: parseInt(cobroData.cajaId),
         medioPagoId: parseInt(cobroData.medioPagoId),
-        aplicarDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable
+        aplicarDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable,
+        propina: propinaData.monto > 0 ? propinaData.monto : undefined,
+        pagosParciales: usarPagosMultiples ? pagosParciales.pagos : undefined
       })
 
       // Generar y mostrar ticket
       const ticketData = generarTicketComanda({
         ...comandaActiva,
         medioPago: medioPagoSeleccionado,
-        descuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable ? descuentoInfo.montoDescuento : 0,
-        porcentajeDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable ? descuentoInfo.porcentaje : 0
+        descuento: montoDescuento,
+        porcentajeDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable ? descuentoInfo.porcentaje : 0,
+        propina: propinaData.monto,
+        totalFinal,
+        vuelto: !usarPagosMultiples && mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO' ? datosVuelto.vuelto : 0
       }, 'CUENTA')
       await imprimirTicket(ticketData)
 
-      setModalCobrar(false)
+      setTabCobroActivo('cuenta')
       toast.success('Cobro realizado exitosamente')
 
       // Si hay más comandas activas, quedarse en la mesa; sino, volver al dashboard
@@ -561,14 +649,8 @@ export default function BuffetComanda() {
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="text-right">
-                          <p className="text-lg font-bold text-green-600">${Number(c.total || 0).toLocaleString()}</p>
-                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                            c.estado === 'ABIERTA' ? 'bg-green-100 text-green-800' :
-                            c.estado === 'EN_PREPARACION' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {c.estado.replace('_', ' ')}
-                          </span>
+                          <p className="text-lg font-bold text-green-600">{formatCurrency(c.total || 0, { showSymbol: false })}</p>
+                          <StatusBadge status={c.estado} type="comanda" size="sm" />
                         </div>
                         <div className="flex flex-col gap-1">
                           <button
@@ -622,8 +704,6 @@ export default function BuffetComanda() {
             ← Volver al dashboard
           </button>
 
-          {/* Modal Nueva Comanda */}
-          {modalNuevaComanda && renderModalNuevaComanda()}
         </div>
       )
     }
@@ -676,7 +756,7 @@ export default function BuffetComanda() {
             Capacidad: {mesa.capacidad} personas
           </p>
           <button
-            onClick={abrirModalNuevaComanda}
+            onClick={mesa.esComunal ? abrirModalNuevaComanda : abrirComandaDirecta}
             className={`w-full px-6 py-4 text-white font-bold text-lg rounded-lg flex items-center justify-center gap-2 ${
               mesa.esComunal ? 'bg-purple-600 hover:bg-purple-700' : 'bg-red-600 hover:bg-red-700'
             }`}
@@ -691,124 +771,11 @@ export default function BuffetComanda() {
             ← Volver al dashboard
           </button>
         </div>
-
-        {/* Modal Nueva Comanda */}
-        {modalNuevaComanda && renderModalNuevaComanda()}
       </div>
     )
   }
 
   const cantidadItemsCarrito = itemsNuevos.reduce((sum, item) => sum + item.cantidad, 0) + (comandaActiva?.items?.length || 0)
-
-  // Renderizar modal de nueva comanda
-  function renderModalNuevaComanda() {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Users className="text-purple-600" size={24} />
-            Nueva Comanda - Mesa {mesa?.numero}
-          </h2>
-
-          {mesa?.esComunal && (
-            <p className="text-sm text-gray-500 mb-4">
-              Mesa comunal: puede identificar cada grupo por socio o nombre
-            </p>
-          )}
-
-          {/* Buscar Socio */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Asignar a Socio (opcional)
-            </label>
-            {nuevaComandaData.socioId ? (
-              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <User size={18} className="text-green-600" />
-                  <span className="font-medium">{nuevaComandaData.socioNombre}</span>
-                </div>
-                <button
-                  onClick={limpiarSocio}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <input
-                  type="text"
-                  value={nuevaComandaData.buscarSocio}
-                  onChange={e => {
-                    setNuevaComandaData({ ...nuevaComandaData, buscarSocio: e.target.value })
-                    buscarSocios(e.target.value)
-                  }}
-                  placeholder="Buscar por nombre o N° socio..."
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10"
-                />
-                {buscandoSocio && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                  </div>
-                )}
-                {sociosBusqueda.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                    {sociosBusqueda.map(socio => (
-                      <button
-                        key={socio.id}
-                        onClick={() => seleccionarSocio(socio)}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center justify-between"
-                      >
-                        <div>
-                          <span className="font-medium">{socio.apellidoNombre || `${socio.apellido}, ${socio.nombre}`}</span>
-                          <span className="text-sm text-gray-500 ml-2">#{socio.nroSocio}</span>
-                        </div>
-                        {!socio.tieneDeuda && (
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Al día</span>
-                        )}
-                        {socio.tieneDeuda && (
-                          <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Con deuda</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Nombre del grupo (alternativa) */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {mesa?.esComunal ? 'Nombre del Grupo (alternativa)' : 'Observaciones (opcional)'}
-            </label>
-            <input
-              type="text"
-              value={nuevaComandaData.nombreGrupo}
-              onChange={e => setNuevaComandaData({ ...nuevaComandaData, nombreGrupo: e.target.value })}
-              placeholder={mesa?.esComunal ? 'Ej: "Familia López", "Cumple Juan"' : 'Observaciones de la mesa'}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setModalNuevaComanda(false)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={confirmarNuevaComanda}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-              Abrir Comanda
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-100px)]">
@@ -842,14 +809,7 @@ export default function BuffetComanda() {
               <Clock size={14} />
               {tiempoAbierta}m
             </span>
-            <span className={`px-2 py-1 rounded text-xs font-medium ${
-              comandaActiva.estado === 'ABIERTA' ? 'bg-green-100 text-green-800' :
-              comandaActiva.estado === 'EN_PREPARACION' ? 'bg-yellow-100 text-yellow-800' :
-              comandaActiva.estado === 'CUENTA_PEDIDA' ? 'bg-blue-100 text-blue-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              {comandaActiva.estado.replace('_', ' ')}
-            </span>
+            <StatusBadge status={comandaActiva.estado} type="comanda" size="md" />
           </div>
           {!mesa.esComunal && (
             <div className="flex items-center gap-1 text-xs">
@@ -897,7 +857,7 @@ export default function BuffetComanda() {
                   </div>
                   <div className="flex items-center justify-between mt-0.5">
                     <span className={`text-xs font-bold ${esActiva ? 'text-red-600' : 'text-green-600'}`}>
-                      ${Number(c.total || 0).toLocaleString()}
+                      {formatCurrency(c.total || 0, { showSymbol: false })}
                     </span>
                     <div className="flex gap-0.5">
                       <button
@@ -1006,14 +966,7 @@ export default function BuffetComanda() {
                   {comandaActiva.observaciones}
                 </span>
               )}
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                comandaActiva.estado === 'ABIERTA' ? 'bg-green-100 text-green-800' :
-                comandaActiva.estado === 'EN_PREPARACION' ? 'bg-yellow-100 text-yellow-800' :
-                comandaActiva.estado === 'CUENTA_PEDIDA' ? 'bg-blue-100 text-blue-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {comandaActiva.estado.replace('_', ' ')}
-              </span>
+              <StatusBadge status={comandaActiva.estado} type="comanda" size="sm" />
             </div>
           </div>
 
@@ -1069,7 +1022,7 @@ export default function BuffetComanda() {
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs text-gray-500">#{c.numero}</span>
                       <span className={`text-sm font-bold ${esActiva ? 'text-red-600' : 'text-green-600'}`}>
-                        ${Number(c.total || 0).toLocaleString()}
+                        {formatCurrency(c.total || 0, { showSymbol: false })}
                       </span>
                     </div>
                   </div>
@@ -1167,7 +1120,7 @@ export default function BuffetComanda() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-xs md:text-sm line-clamp-2 leading-tight">{prod.nombre}</h3>
                   <p className="text-sm md:text-base font-bold text-green-600 mt-1">
-                    ${Number(prod.precio).toLocaleString()}
+                    {formatCurrency(prod.precio, { showSymbol: false })}
                   </p>
                 </div>
               </button>
@@ -1176,14 +1129,44 @@ export default function BuffetComanda() {
         </div>
       </div>
 
-      {/* Panel Derecho - Resumen (oculto en móvil cuando está en tab productos) */}
-      <div className={`md:w-96 bg-white md:border-l flex flex-col ${tabActivo === 'productos' ? 'hidden md:flex' : 'flex flex-1'}`}>
-        {/* Items de la comanda */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Items existentes */}
-          {comandaActiva.items?.length > 0 && (
-            <div className="p-3 md:p-4 border-b">
-              <h3 className="font-bold text-gray-700 mb-2 md:mb-3 text-sm md:text-base">Items pedidos</h3>
+      {/* Panel Derecho - Resumen con Tabs (oculto en móvil cuando está en tab productos) */}
+      <div className={`md:w-[480px] bg-white md:border-l flex flex-col ${tabActivo === 'productos' ? 'hidden md:flex' : 'flex flex-1'}`}>
+        {/* Tabs Navigation */}
+        <div className="flex border-b flex-shrink-0">
+          <button
+            onClick={() => setTabCobroActivo('cuenta')}
+            className={`flex-1 px-4 py-3 font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+              tabCobroActivo === 'cuenta'
+                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <FileText size={18} />
+            Cuenta
+          </button>
+          <button
+            onClick={() => setTabCobroActivo('finalizar')}
+            disabled={Number(comandaActiva.total) === 0}
+            className={`flex-1 px-4 py-3 font-medium text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+              tabCobroActivo === 'finalizar'
+                ? 'bg-white text-green-600 border-b-2 border-green-600'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <DollarSign size={18} />
+            Finalizar
+          </button>
+        </div>
+
+        {/* Tab Content: Cuenta */}
+        {tabCobroActivo === 'cuenta' && (
+          <>
+            {/* Items de la comanda */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Items existentes */}
+              {comandaActiva.items?.length > 0 && (
+                <div className="p-3 md:p-4 border-b">
+                  <h3 className="font-bold text-gray-700 mb-2 md:mb-3 text-sm md:text-base">Items pedidos</h3>
               <div className="space-y-2">
                 {comandaActiva.items.map(item => (
                   <div
@@ -1194,10 +1177,10 @@ export default function BuffetComanda() {
                       <span className="font-medium text-sm md:text-base flex-1 min-w-0 truncate">
                         {item.cantidad}x {item.productoBuffet?.nombre}
                       </span>
-                      <span className="text-sm md:text-base font-medium">${Number(item.subtotal).toLocaleString()}</span>
+                      <span className="text-sm md:text-base font-medium">{formatCurrency(item.subtotal, { showSymbol: false })}</span>
                     </div>
                     <div className="flex justify-between text-xs mt-1">
-                      <span>{item.estado.replace('_', ' ')}</span>
+                      <StatusBadge status={item.estado} type="itemComanda" size="sm" />
                       {item.observaciones && (
                         <span className="italic text-gray-600 truncate max-w-[150px]">{item.observaciones}</span>
                       )}
@@ -1218,7 +1201,7 @@ export default function BuffetComanda() {
                     <div className="flex justify-between items-center gap-2">
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-sm md:text-base block truncate">{item.nombre}</span>
-                        <p className="text-xs md:text-sm text-gray-500">${Number(item.precio).toLocaleString()}</p>
+                        <p className="text-xs md:text-sm text-gray-500">{formatCurrency(item.precio, { showSymbol: false })}</p>
                       </div>
                       <div className="flex items-center gap-1 md:gap-2">
                         <button
@@ -1236,7 +1219,7 @@ export default function BuffetComanda() {
                         </button>
                       </div>
                       <span className="w-16 md:w-20 text-right font-bold text-sm md:text-base">
-                        ${(Number(item.precio) * item.cantidad).toLocaleString()}
+                        {formatCurrency(Number(item.precio) * item.cantidad, { showSymbol: false })}
                       </span>
                     </div>
                     <div className="mt-2">
@@ -1271,19 +1254,19 @@ export default function BuffetComanda() {
             {Number(comandaActiva.total) > 0 && (
               <div className="flex justify-between">
                 <span>Subtotal comanda:</span>
-                <span className="font-medium">${Number(comandaActiva.total).toLocaleString()}</span>
+                <span className="font-medium">{formatCurrency(comandaActiva.total, { showSymbol: false })}</span>
               </div>
             )}
             {totalNuevos > 0 && (
               <div className="flex justify-between text-yellow-700">
                 <span>+ Nuevos items:</span>
-                <span className="font-medium">${totalNuevos.toLocaleString()}</span>
+                <span className="font-medium">{formatCurrency(totalNuevos, { showSymbol: false })}</span>
               </div>
             )}
             <div className="flex justify-between text-base md:text-lg font-bold pt-2 border-t">
               <span>TOTAL:</span>
               <span className="text-green-600">
-                ${(Number(comandaActiva.total) + totalNuevos).toLocaleString()}
+                {formatCurrency(Number(comandaActiva.total) + totalNuevos, { showSymbol: false })}
               </span>
             </div>
           </div>
@@ -1296,18 +1279,18 @@ export default function BuffetComanda() {
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600 active:bg-yellow-700 text-sm md:text-base"
               >
                 <Send size={18} />
-                Enviar a Cocina (${totalNuevos.toLocaleString()})
+                Enviar a Cocina ({formatCurrency(totalNuevos, { showSymbol: false })})
               </button>
             )}
 
             {comandaActiva.estado !== 'CERRADA' && tienePermiso(PERMISOS.BUFFET_COBRAR) && (
               <button
-                onClick={abrirModalCobrar}
+                onClick={() => setTabCobroActivo('finalizar')}
                 disabled={Number(comandaActiva.total) === 0}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 text-sm md:text-base"
               >
                 <DollarSign size={18} />
-                Cobrar (${Number(comandaActiva.total).toLocaleString()})
+                Ir a Finalizar ({formatCurrency(comandaActiva.total, { showSymbol: false })})
               </button>
             )}
 
@@ -1321,278 +1304,440 @@ export default function BuffetComanda() {
             )}
           </div>
         </div>
-      </div>
+          </>
+        )}
 
-      {/* Modal Cobrar */}
-      {modalCobrar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-4 md:p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">
-              Cobrar Mesa {mesa.numero}
-              {mesa.esComunal && <span className="text-sm font-normal text-gray-500"> - Comanda #{comandaActiva.numero}</span>}
-            </h2>
-
-            {/* Resumen del cobro */}
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg space-y-2">
-              <p className="text-sm text-gray-600">Comanda: #{comandaActiva.numero}</p>
-              {comandaActiva.socio && (
-                <p className="text-sm text-gray-800 font-medium flex items-center gap-1.5">
-                  <img src="/images/logo.png" alt="Socio" className="w-4 h-4 object-contain" title="Socio del club" />
-                  {comandaActiva.socio.apellidoNombre || `${comandaActiva.socio.apellido}, ${comandaActiva.socio.nombre}`}
-                </p>
-              )}
-
-              <div className="pt-2 border-t space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>${Number(comandaActiva.subtotal || comandaActiva.total).toLocaleString()}</span>
-                </div>
-
-                {/* Descuento de socio */}
-                {cargandoDescuento && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-600"></div>
-                    Verificando descuento...
-                  </div>
-                )}
-
-                {descuentoInfo && (
-                  <div className="py-2">
-                    {descuentoInfo.aplicable ? (
-                      <label className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={cobroData.aplicarDescuento}
-                            onChange={e => setCobroData({ ...cobroData, aplicarDescuento: e.target.checked })}
-                            className="rounded text-green-600 focus:ring-green-500"
-                          />
-                          <div className="flex items-center gap-1 text-green-700">
-                            <Percent size={14} />
-                            <span className="text-sm font-medium">{descuentoInfo.motivo}</span>
-                          </div>
-                        </div>
-                        <span className="text-green-700 font-bold">-${Number(descuentoInfo.monto).toLocaleString()}</span>
-                      </label>
-                    ) : comandaActiva.socioId && (
-                      <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-sm">
-                        <AlertCircle size={14} />
-                        {descuentoInfo.motivo || 'No hay descuento configurado'}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {cobroData.aplicarDescuento && descuentoInfo?.aplicable && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Descuento ({descuentoInfo.porcentaje}%):</span>
-                    <span>-${Number(descuentoInfo.monto).toLocaleString()}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                  <span>TOTAL A COBRAR:</span>
-                  <span className="text-green-600">
-                    ${(
-                      Number(comandaActiva.subtotal || comandaActiva.total) -
-                      (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)
-                    ).toLocaleString()}
-                  </span>
-                </div>
+        {/* Tab Content: Finalizar */}
+        {tabCobroActivo === 'finalizar' && (
+          <>
+            <div className="p-3 py-2 border-b bg-green-50 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Cobro - Mesa {mesa.numero}
+                </h3>
+                <button
+                  onClick={() => setTabCobroActivo('cuenta')}
+                  className="text-blue-600 text-xs hover:underline font-medium"
+                >
+                  ← Ver Cuenta
+                </button>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {/* Propina */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Caja</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Propina:</label>
+                <PropinaSelector
+                  subtotal={Number(comandaActiva.subtotal || comandaActiva.total) -
+                            (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)}
+                  onPropinaChange={(data) => setPropinaData(data)}
+                  compact={true}
+                />
+              </div>
+
+              {/* Total destacado */}
+              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-3 border-2 border-green-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-gray-700">Total a Cobrar:</span>
+                  <span className="text-2xl font-bold text-green-600 tabular-nums">
+                    ${((Number(comandaActiva.subtotal || comandaActiva.total) -
+                        (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
+                        propinaData.monto)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {comandaActiva.socio && (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <img src="/images/logo.png" alt="Socio" className="w-4 h-4 object-contain" />
+                    <span className="font-medium">
+                      {comandaActiva.socio.apellidoNombre || `${comandaActiva.socio.apellido}, ${comandaActiva.socio.nombre}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Resumen de descuentos */}
+              {descuentoInfo && descuentoInfo.aplicable && (
+                <label className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={cobroData.aplicarDescuento}
+                      onChange={e => setCobroData({ ...cobroData, aplicarDescuento: e.target.checked })}
+                      className="rounded text-green-600 focus:ring-green-500"
+                    />
+                    <div className="flex items-center gap-1 text-green-700">
+                      <Percent size={14} />
+                      <span className="text-xs font-medium">{descuentoInfo.motivo}</span>
+                    </div>
+                  </div>
+                  <span className="text-green-700 font-bold text-sm">-{formatCurrency(descuentoInfo.monto, { showSymbol: false })}</span>
+                </label>
+              )}
+
+              {/* Calculadora de Vuelto (solo para efectivo en modo pago simple) */}
+              {!usarPagosMultiples && mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO' && (
+                <CalculadoraVuelto
+                  total={Number(comandaActiva.subtotal || comandaActiva.total) -
+                        (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
+                        propinaData.monto}
+                  medioPagoSeleccionado={mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))}
+                  onVueltoCalculado={(datos) => setDatosVuelto(datos)}
+                  compact={true}
+                />
+              )}
+
+              {/* Selector de Caja */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
                 <select
                   value={cobroData.cajaId}
                   onChange={e => setCobroData({ ...cobroData, cajaId: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-200 outline-none"
                 >
                   {cajas.map(c => (
                     <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
                 </select>
               </div>
+
+              {/* Selector de Medio de Pago */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
-                <select
-                  value={cobroData.medioPagoId}
-                  onChange={e => setCobroData({ ...cobroData, medioPagoId: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                >
-                  {mediosPago.map(m => (
-                    <option key={m.id} value={m.id}>{m.nombre}</option>
-                  ))}
-                </select>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Medio de Pago:</label>
+                <SelectorMedioPago
+                  mediosPago={mediosPago}
+                  selectedId={cobroData.medioPagoId}
+                  onChange={(id) => setCobroData({ ...cobroData, medioPagoId: id })}
+                  compact={true}
+                />
               </div>
-            </div>
 
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={() => setModalCobrar(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={verPreviewCuenta}
-                className="px-4 py-2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center justify-center gap-2"
-              >
-                <FileText size={18} />
-                Ver Ticket
-              </button>
-              <button
-                onClick={cobrar}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
-              >
-                <CheckCircle size={18} />
-                Cobrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Nueva Comanda */}
-      {modalNuevaComanda && renderModalNuevaComanda()}
-
-      {/* Modal Confirmar Eliminar */}
-      {modalConfirmarEliminar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Trash2 size={24} className="text-red-600" />
-              </div>
-              <h2 className="text-lg font-bold text-gray-800">Eliminar Comanda</h2>
-              <p className="text-gray-600 mt-2">
-                ¿Eliminar la comanda #{comandaAEliminar?.numero}?
-              </p>
-              <p className="text-sm text-gray-500 mt-1">
-                Esta acción no se puede deshacer.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setModalConfirmarEliminar(false); setComandaAEliminar(null); }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmarEliminarComanda}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Editar Comanda */}
-      {modalEditarComanda && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Edit3 className="text-blue-600" size={24} />
-              Editar Comanda #{comandaAEditar?.numero}
-            </h2>
-
-            {/* Buscar Socio */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Socio asignado
-              </label>
-              {editarComandaData.socioId ? (
-                <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <User size={18} className="text-green-600" />
-                    <span className="font-medium">{editarComandaData.socioNombre}</span>
-                  </div>
-                  <button
-                    onClick={limpiarSocioEditar}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={editarComandaData.buscarSocio}
-                    onChange={e => {
-                      setEditarComandaData({ ...editarComandaData, buscarSocio: e.target.value })
-                      buscarSocios(e.target.value)
-                    }}
-                    placeholder="Buscar por nombre o N° socio..."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10"
-                  />
-                  {buscandoSocio && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                    </div>
-                  )}
-                  {sociosBusqueda.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                      {sociosBusqueda.map(socio => (
-                        <button
-                          key={socio.id}
-                          onClick={() => seleccionarSocioEditar(socio)}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center justify-between"
-                        >
-                          <div>
-                            <span className="font-medium">{socio.apellidoNombre || `${socio.apellido}, ${socio.nombre}`}</span>
-                            <span className="text-sm text-gray-500 ml-2">#{socio.nroSocio}</span>
-                          </div>
-                          {!socio.tieneDeuda && (
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Al día</span>
-                          )}
-                          {socio.tieneDeuda && (
-                            <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Con deuda</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {/* Pagos Múltiples */}
+              {usarPagosMultiples && (
+                <PagoMultiple
+                  total={Number(comandaActiva.subtotal || comandaActiva.total) -
+                        (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
+                        propinaData.monto}
+                  mediosPago={mediosPago}
+                  onPagosChange={(datos) => setPagosParciales(datos)}
+                />
               )}
             </div>
 
-            {/* Nombre del grupo */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre / Observaciones
-              </label>
+            {/* Footer - Botones de acción */}
+            <div className="border-t p-3 space-y-2 flex-shrink-0">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setModalSplit(true)}
+                  className="px-3 py-2 border-2 border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 font-medium transition flex items-center gap-2 text-xs"
+                >
+                  <Users size={16} />
+                  Dividir
+                </button>
+
+                <button
+                  onClick={() => setUsarPagosMultiples(!usarPagosMultiples)}
+                  className={`px-3 py-2 border-2 rounded-lg font-medium transition text-xs ${
+                    usarPagosMultiples
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-blue-300 text-blue-600 hover:bg-blue-50'
+                  }`}
+                >
+                  {usarPagosMultiples ? 'Simple' : 'Múltiple'}
+                </button>
+              </div>
+
+              <button
+                onClick={cobrar}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold transition active:scale-95"
+              >
+                <CheckCircle size={20} />
+                COBRAR ${((Number(comandaActiva.subtotal || comandaActiva.total) -
+                    (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
+                    propinaData.monto)).toLocaleString()}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+
+      {/* Modal Split Cuenta */}
+      <SplitCuenta
+        isOpen={modalSplit}
+        onClose={() => setModalSplit(false)}
+        comanda={comandaActiva}
+        onAplicar={(resultado) => {
+          console.log('Split aplicado:', resultado)
+          toast.success('División aplicada - Funcionalidad en desarrollo')
+          setModalSplit(false)
+        }}
+      />
+
+      {/* Modal Nueva Comanda */}
+      <Modal
+        isOpen={modalNuevaComanda}
+        onClose={() => setModalNuevaComanda(false)}
+        title={
+          <div className="flex items-center gap-2">
+            <Users className="text-purple-600" size={24} />
+            Nueva Comanda - Mesa {mesa?.numero}
+          </div>
+        }
+        maxWidth="max-w-md"
+      >
+        {mesa?.esComunal && (
+          <p className="text-sm text-gray-500 mb-4">
+            Mesa comunal: puede identificar cada grupo por socio o nombre
+          </p>
+        )}
+
+        {/* Buscar Socio */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Asignar a Socio (opcional)
+          </label>
+          {nuevaComandaData.socioId ? (
+            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <User size={18} className="text-green-600" />
+                <span className="font-medium">{nuevaComandaData.socioNombre}</span>
+              </div>
+              <button
+                onClick={limpiarSocio}
+                className="text-red-500 hover:text-red-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
               <input
                 type="text"
-                value={editarComandaData.nombreGrupo}
-                onChange={e => setEditarComandaData({ ...editarComandaData, nombreGrupo: e.target.value })}
-                placeholder='Ej: "Familia López", "Cumple Juan"'
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                value={nuevaComandaData.buscarSocio}
+                onChange={e => {
+                  setNuevaComandaData({ ...nuevaComandaData, buscarSocio: e.target.value })
+                  buscarSocios(e.target.value)
+                }}
+                placeholder="Buscar por nombre o N° socio..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10"
               />
+              {buscandoSocio && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                </div>
+              )}
+              {sociosBusqueda.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                  {sociosBusqueda.map(socio => (
+                    <button
+                      key={socio.id}
+                      onClick={() => seleccionarSocio(socio)}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-medium">{socio.apellidoNombre || `${socio.apellido}, ${socio.nombre}`}</span>
+                        <span className="text-sm text-gray-500 ml-2">#{socio.nroSocio}</span>
+                      </div>
+                      {!socio.tieneDeuda && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Al día</span>
+                      )}
+                      {socio.tieneDeuda && (
+                        <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Con deuda</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setModalEditarComanda(false); setComandaAEditar(null); }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmarEditarComanda}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Guardar Cambios
-              </button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+
+        {/* Nombre del grupo (alternativa) */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {mesa?.esComunal ? 'Nombre del Grupo (alternativa)' : 'Observaciones (opcional)'}
+          </label>
+          <input
+            type="text"
+            value={nuevaComandaData.nombreGrupo}
+            onChange={e => setNuevaComandaData({ ...nuevaComandaData, nombreGrupo: e.target.value })}
+            placeholder={mesa?.esComunal ? 'Ej: "Familia López", "Cumple Juan"' : 'Observaciones de la mesa'}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          />
+        </div>
+
+        {/* Centro de Costo */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Centro de Costo
+          </label>
+          <SelectCentroCosto
+            value={nuevaComandaData.centroCostoId}
+            onChange={(val) => setNuevaComandaData({ ...nuevaComandaData, centroCostoId: val })}
+            className="w-full"
+          />
+          <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setModalNuevaComanda(false)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmarNuevaComanda}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Abrir Comanda
+          </button>
+        </div>
+      </Modal>
+
+      {/* Modal Confirmar Eliminar */}
+      <Modal
+        isOpen={modalConfirmarEliminar}
+        onClose={() => {
+          setModalConfirmarEliminar(false)
+          setComandaAEliminar(null)
+        }}
+        maxWidth="max-w-sm"
+      >
+        <div className="text-center mb-4">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Trash2 size={24} className="text-red-600" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-800">Eliminar Comanda</h2>
+          <p className="text-gray-600 mt-2">
+            ¿Eliminar la comanda #{comandaAEliminar?.numero}?
+          </p>
+          <p className="text-sm text-gray-500 mt-1">
+            Esta acción no se puede deshacer.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setModalConfirmarEliminar(false); setComandaAEliminar(null); }}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmarEliminarComanda}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Eliminar
+          </button>
+        </div>
+      </Modal>
+
+      {/* Modal Editar Comanda */}
+      <Modal
+        isOpen={modalEditarComanda}
+        onClose={() => {
+          setModalEditarComanda(false)
+          setComandaAEditar(null)
+        }}
+        title={
+          <div className="flex items-center gap-2">
+            <Edit3 className="text-blue-600" size={24} />
+            Editar Comanda #{comandaAEditar?.numero}
+          </div>
+        }
+        maxWidth="max-w-md"
+      >
+        {/* Buscar Socio */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Socio asignado
+          </label>
+          {editarComandaData.socioId ? (
+            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <User size={18} className="text-green-600" />
+                <span className="font-medium">{editarComandaData.socioNombre}</span>
+              </div>
+              <button
+                onClick={limpiarSocioEditar}
+                className="text-red-500 hover:text-red-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                type="text"
+                value={editarComandaData.buscarSocio}
+                onChange={e => {
+                  setEditarComandaData({ ...editarComandaData, buscarSocio: e.target.value })
+                  buscarSocios(e.target.value)
+                }}
+                placeholder="Buscar por nombre o N° socio..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10"
+              />
+              {buscandoSocio && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                </div>
+              )}
+              {sociosBusqueda.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                  {sociosBusqueda.map(socio => (
+                    <button
+                      key={socio.id}
+                      onClick={() => seleccionarSocioEditar(socio)}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-medium">{socio.apellidoNombre || `${socio.apellido}, ${socio.nombre}`}</span>
+                        <span className="text-sm text-gray-500 ml-2">#{socio.nroSocio}</span>
+                      </div>
+                      {!socio.tieneDeuda && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Al día</span>
+                      )}
+                      {socio.tieneDeuda && (
+                        <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Con deuda</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Nombre del grupo */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nombre / Observaciones
+          </label>
+          <input
+            type="text"
+            value={editarComandaData.nombreGrupo}
+            onChange={e => setEditarComandaData({ ...editarComandaData, nombreGrupo: e.target.value })}
+            placeholder='Ej: "Familia López", "Cumple Juan"'
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setModalEditarComanda(false); setComandaAEditar(null); }}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmarEditarComanda}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Guardar Cambios
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

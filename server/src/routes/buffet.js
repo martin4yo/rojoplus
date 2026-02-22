@@ -378,6 +378,23 @@ router.get('/mesas/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, res)
       return res.status(404).json({ success: false, error: 'Mesa no encontrada' });
     }
 
+    // Recalcular estado de comandas según items
+    for (const comanda of mesa.comandas) {
+      if (comanda.estado === 'EN_PREPARACION' && comanda.items.length > 0) {
+        const todosProcesados = comanda.items.every(item =>
+          ['LISTO', 'ENTREGADO', 'ANULADO'].includes(item.estado)
+        );
+
+        if (todosProcesados) {
+          await prisma.comanda.update({
+            where: { id: comanda.id },
+            data: { estado: 'ABIERTA' }
+          });
+          comanda.estado = 'ABIERTA'; // Actualizar en el objeto de respuesta
+        }
+      }
+    }
+
     res.json({ success: true, data: mesa });
   } catch (error) {
     console.error('Error al obtener mesa:', error);
@@ -1498,7 +1515,7 @@ router.get('/comandas/:id/descuento', authAdmin, checkPermiso('BUFFET_COBRAR'), 
 router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { medioPagoId, cajaId, observaciones, aplicarDescuento } = req.body;
+    const { medioPagoId, cajaId, observaciones, aplicarDescuento, propina, pagosParciales } = req.body;
 
     const comanda = await prisma.comanda.findUnique({
       where: { id: parseInt(id) },
@@ -1540,19 +1557,9 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       }
     }
 
-    const totalFinal = Number(comanda.subtotal) - descuentoMonto;
-
-    // Obtener medio de pago
-    const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } });
-    if (!medioPago) {
-      return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' });
-    }
-
-    // Obtener caja y cuenta contable
-    const caja = await prisma.caja.findUnique({ where: { id: cajaId } });
-    if (!caja) {
-      return res.status(400).json({ success: false, error: 'Caja no encontrada' });
-    }
+    // Calcular total con descuento y propina
+    const propinaMonto = propina && propina > 0 ? parseFloat(propina) : 0;
+    const totalFinal = Number(comanda.subtotal) - descuentoMonto + propinaMonto;
 
     // Obtener cuenta contable de ventas buffet
     let cuentaContable = await prisma.cuentaContable.findFirst({
@@ -1570,27 +1577,91 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       where: { codigo: 'BUFFET' }
     });
 
-    // Generar número de movimiento
-    const ultimoMov = await prisma.movimientoCaja.findFirst({
-      orderBy: { id: 'desc' }
-    });
-    const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+    // Determinar si es pago múltiple o simple
+    const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0;
+    const movimientos = [];
 
-    // Crear movimiento de caja
-    const movimiento = await prisma.movimientoCaja.create({
-      data: {
-        numero: nuevoNumero,
-        cajaId,
-        tipo: 'INGRESO',
-        cuentaContableId: cuentaContable?.id || 1,
-        centroCostoId: centroCosto?.id,
-        monto: totalFinal,
-        concepto: `Venta Buffet - Comanda ${comanda.numero}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}`,
-        descripcion: observaciones,
-        comandaId: parseInt(id),
-        registradoPor: req.admin.id
+    if (usaPagosMultiples) {
+      // PAGOS MÚLTIPLES: Validar que la suma coincida con el total
+      const totalPagos = pagosParciales.reduce((sum, pago) => sum + parseFloat(pago.monto), 0);
+
+      if (Math.abs(totalPagos - totalFinal) > 0.01) {
+        return res.status(400).json({
+          success: false,
+          error: `La suma de pagos (${totalPagos}) no coincide con el total (${totalFinal})`
+        });
       }
-    });
+
+      // Crear un movimiento de caja por cada pago
+      for (const pago of pagosParciales) {
+        const medioPago = await prisma.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } });
+        if (!medioPago) {
+          return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` });
+        }
+
+        const caja = await prisma.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } });
+        if (!caja) {
+          return res.status(400).json({ success: false, error: `Caja ${pago.cajaId || cajaId} no encontrada` });
+        }
+
+        // Generar número de movimiento
+        const ultimoMov = await prisma.movimientoCaja.findFirst({
+          orderBy: { id: 'desc' }
+        });
+        const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+
+        const movimiento = await prisma.movimientoCaja.create({
+          data: {
+            numero: nuevoNumero,
+            cajaId: parseInt(pago.cajaId || cajaId),
+            tipo: 'INGRESO',
+            cuentaContableId: cuentaContable?.id || 1,
+            centroCostoId: centroCosto?.id,
+            monto: parseFloat(pago.monto),
+            concepto: `Venta Buffet - Comanda ${comanda.numero} - ${medioPago.nombre}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
+            descripcion: observaciones,
+            comandaId: parseInt(id),
+            registradoPor: req.admin.id
+          }
+        });
+
+        movimientos.push(movimiento);
+      }
+    } else {
+      // PAGO SIMPLE: Un solo medio de pago
+      const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } });
+      if (!medioPago) {
+        return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' });
+      }
+
+      const caja = await prisma.caja.findUnique({ where: { id: cajaId } });
+      if (!caja) {
+        return res.status(400).json({ success: false, error: 'Caja no encontrada' });
+      }
+
+      // Generar número de movimiento
+      const ultimoMov = await prisma.movimientoCaja.findFirst({
+        orderBy: { id: 'desc' }
+      });
+      const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+
+      const movimiento = await prisma.movimientoCaja.create({
+        data: {
+          numero: nuevoNumero,
+          cajaId,
+          tipo: 'INGRESO',
+          cuentaContableId: cuentaContable?.id || 1,
+          centroCostoId: centroCosto?.id,
+          monto: totalFinal,
+          concepto: `Venta Buffet - Comanda ${comanda.numero}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
+          descripcion: observaciones,
+          comandaId: parseInt(id),
+          registradoPor: req.admin.id
+        }
+      });
+
+      movimientos.push(movimiento);
+    }
 
     // Actualizar y cerrar comanda
     const comandaActualizada = await prisma.comanda.update({
@@ -1598,6 +1669,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       data: {
         estado: 'CERRADA',
         descuento: descuentoMonto,
+        propina: propinaMonto,
         total: totalFinal,
         horaCierre: new Date(),
         cerradoPor: req.admin.id
@@ -1619,11 +1691,12 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       success: true,
       data: {
         comanda: comandaActualizada,
-        movimiento,
+        movimientos,
         descuentoAplicado: descuentoMonto > 0 ? {
           porcentaje: descuentoPorcentaje,
           monto: descuentoMonto
-        } : null
+        } : null,
+        propinaAplicada: propinaMonto > 0 ? propinaMonto : null
       }
     });
   } catch (error) {
@@ -1903,7 +1976,7 @@ router.put('/takeaway/:id/listo', authAdmin, checkPermiso('BUFFET_COCINA'), asyn
 router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { medioPagoId, cajaId, observaciones } = req.body;
+    const { medioPagoId, cajaId, observaciones, propina, pagosParciales } = req.body;
 
     const pedido = await prisma.pedidoTakeAway.findUnique({
       where: { id: parseInt(id) }
@@ -1917,17 +1990,9 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       return res.status(400).json({ success: false, error: 'El pedido ya fue entregado' });
     }
 
-    // Obtener medio de pago
-    const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } });
-    if (!medioPago) {
-      return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' });
-    }
-
-    // Obtener caja
-    const caja = await prisma.caja.findUnique({ where: { id: cajaId } });
-    if (!caja) {
-      return res.status(400).json({ success: false, error: 'Caja no encontrada' });
-    }
+    // Calcular total con propina
+    const propinaMonto = propina && propina > 0 ? parseFloat(propina) : 0;
+    const totalFinal = Number(pedido.total) + propinaMonto;
 
     // Obtener cuenta contable
     let cuentaContable = await prisma.cuentaContable.findFirst({
@@ -1945,38 +2010,111 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       where: { codigo: 'BUFFET' }
     });
 
-    // Generar número de movimiento
-    const ultimoMov = await prisma.movimientoCaja.findFirst({
-      orderBy: { id: 'desc' }
-    });
-    const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+    // Determinar si es pago múltiple o simple
+    const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0;
+    const movimientos = [];
 
-    // Crear movimiento de caja
-    const movimiento = await prisma.movimientoCaja.create({
-      data: {
-        numero: nuevoNumero,
-        cajaId,
-        tipo: 'INGRESO',
-        cuentaContableId: cuentaContable?.id || 1,
-        centroCostoId: centroCosto?.id,
-        monto: pedido.total,
-        concepto: `Take Away - Pedido ${pedido.numero}`,
-        descripcion: observaciones,
-        pedidoTakeAwayId: parseInt(id),
-        registradoPor: req.admin.id
+    if (usaPagosMultiples) {
+      // PAGOS MÚLTIPLES: Validar que la suma coincida con el total
+      const totalPagos = pagosParciales.reduce((sum, pago) => sum + parseFloat(pago.monto), 0);
+
+      if (Math.abs(totalPagos - totalFinal) > 0.01) {
+        return res.status(400).json({
+          success: false,
+          error: `La suma de pagos (${totalPagos}) no coincide con el total (${totalFinal})`
+        });
       }
-    });
+
+      // Crear un movimiento de caja por cada pago
+      for (const pago of pagosParciales) {
+        const medioPago = await prisma.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } });
+        if (!medioPago) {
+          return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` });
+        }
+
+        const caja = await prisma.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } });
+        if (!caja) {
+          return res.status(400).json({ success: false, error: `Caja ${pago.cajaId || cajaId} no encontrada` });
+        }
+
+        // Generar número de movimiento
+        const ultimoMov = await prisma.movimientoCaja.findFirst({
+          orderBy: { id: 'desc' }
+        });
+        const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+
+        const movimiento = await prisma.movimientoCaja.create({
+          data: {
+            numero: nuevoNumero,
+            cajaId: parseInt(pago.cajaId || cajaId),
+            tipo: 'INGRESO',
+            cuentaContableId: cuentaContable?.id || 1,
+            centroCostoId: centroCosto?.id,
+            monto: parseFloat(pago.monto),
+            concepto: `Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
+            descripcion: observaciones,
+            pedidoTakeAwayId: parseInt(id),
+            registradoPor: req.admin.id
+          }
+        });
+
+        movimientos.push(movimiento);
+      }
+    } else {
+      // PAGO SIMPLE: Un solo medio de pago
+      const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } });
+      if (!medioPago) {
+        return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' });
+      }
+
+      const caja = await prisma.caja.findUnique({ where: { id: cajaId } });
+      if (!caja) {
+        return res.status(400).json({ success: false, error: 'Caja no encontrada' });
+      }
+
+      // Generar número de movimiento
+      const ultimoMov = await prisma.movimientoCaja.findFirst({
+        orderBy: { id: 'desc' }
+      });
+      const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+
+      const movimiento = await prisma.movimientoCaja.create({
+        data: {
+          numero: nuevoNumero,
+          cajaId,
+          tipo: 'INGRESO',
+          cuentaContableId: cuentaContable?.id || 1,
+          centroCostoId: centroCosto?.id,
+          monto: totalFinal,
+          concepto: `Take Away - Pedido ${pedido.numero}${propinaMonto > 0 ? ` + Propina` : ''}`,
+          descripcion: observaciones,
+          pedidoTakeAwayId: parseInt(id),
+          registradoPor: req.admin.id
+        }
+      });
+
+      movimientos.push(movimiento);
+    }
 
     // Actualizar pedido
-    await prisma.pedidoTakeAway.update({
+    const pedidoActualizado = await prisma.pedidoTakeAway.update({
       where: { id: parseInt(id) },
       data: {
         estado: 'ENTREGADO',
+        propina: propinaMonto,
+        total: totalFinal,
         horaEntregado: new Date()
       }
     });
 
-    res.json({ success: true, data: { pedido, movimiento } });
+    res.json({
+      success: true,
+      data: {
+        pedido: pedidoActualizado,
+        movimientos,
+        propinaAplicada: propinaMonto > 0 ? propinaMonto : null
+      }
+    });
   } catch (error) {
     console.error('Error al cobrar pedido:', error);
     res.status(500).json({ success: false, error: 'Error al cobrar pedido' });
@@ -1990,26 +2128,14 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 // Venta directa kiosco
 router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (req, res) => {
   try {
-    const { items, medioPagoId, cajaId, socioId, observaciones } = req.body;
+    const { items, medioPagoId, cajaId, socioId, observaciones, propina, pagosParciales } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, error: 'Debe agregar al menos un producto' });
     }
 
-    // Obtener medio de pago
-    const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } });
-    if (!medioPago) {
-      return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' });
-    }
-
-    // Obtener caja
-    const caja = await prisma.caja.findUnique({ where: { id: cajaId } });
-    if (!caja) {
-      return res.status(400).json({ success: false, error: 'Caja no encontrada' });
-    }
-
-    // Calcular total
-    let total = 0;
+    // Calcular total de items
+    let totalItems = 0;
     const detalleItems = [];
 
     for (const item of items) {
@@ -2017,9 +2143,13 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       if (!producto) continue;
 
       const subtotal = Number(producto.precio) * (item.cantidad || 1);
-      total += subtotal;
+      totalItems += subtotal;
       detalleItems.push(`${item.cantidad || 1}x ${producto.nombre}`);
     }
+
+    // Calcular total con propina
+    const propinaMonto = propina && propina > 0 ? parseFloat(propina) : 0;
+    const totalFinal = totalItems + propinaMonto;
 
     // Obtener cuenta contable
     let cuentaContable = await prisma.cuentaContable.findFirst({
@@ -2037,28 +2167,99 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       where: { codigo: 'BUFFET' }
     });
 
-    // Generar número de movimiento
-    const ultimoMov = await prisma.movimientoCaja.findFirst({
-      orderBy: { id: 'desc' }
-    });
-    const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+    // Determinar si es pago múltiple o simple
+    const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0;
+    const movimientos = [];
 
-    // Crear movimiento de caja
-    const movimiento = await prisma.movimientoCaja.create({
+    if (usaPagosMultiples) {
+      // PAGOS MÚLTIPLES: Validar que la suma coincida con el total
+      const totalPagos = pagosParciales.reduce((sum, pago) => sum + parseFloat(pago.monto), 0);
+
+      if (Math.abs(totalPagos - totalFinal) > 0.01) {
+        return res.status(400).json({
+          success: false,
+          error: `La suma de pagos (${totalPagos}) no coincide con el total (${totalFinal})`
+        });
+      }
+
+      // Crear un movimiento de caja por cada pago
+      for (const pago of pagosParciales) {
+        const medioPago = await prisma.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } });
+        if (!medioPago) {
+          return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` });
+        }
+
+        const caja = await prisma.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } });
+        if (!caja) {
+          return res.status(400).json({ success: false, error: `Caja ${pago.cajaId || cajaId} no encontrada` });
+        }
+
+        // Generar número de movimiento
+        const ultimoMov = await prisma.movimientoCaja.findFirst({
+          orderBy: { id: 'desc' }
+        });
+        const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+
+        const movimiento = await prisma.movimientoCaja.create({
+          data: {
+            numero: nuevoNumero,
+            cajaId: parseInt(pago.cajaId || cajaId),
+            tipo: 'INGRESO',
+            cuentaContableId: cuentaContable?.id || 1,
+            centroCostoId: centroCosto?.id,
+            monto: parseFloat(pago.monto),
+            concepto: `Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
+            descripcion: observaciones,
+            registradoPor: req.admin.id
+          }
+        });
+
+        movimientos.push(movimiento);
+      }
+    } else {
+      // PAGO SIMPLE: Un solo medio de pago
+      const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } });
+      if (!medioPago) {
+        return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' });
+      }
+
+      const caja = await prisma.caja.findUnique({ where: { id: cajaId } });
+      if (!caja) {
+        return res.status(400).json({ success: false, error: 'Caja no encontrada' });
+      }
+
+      // Generar número de movimiento
+      const ultimoMov = await prisma.movimientoCaja.findFirst({
+        orderBy: { id: 'desc' }
+      });
+      const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`;
+
+      const movimiento = await prisma.movimientoCaja.create({
+        data: {
+          numero: nuevoNumero,
+          cajaId,
+          tipo: 'INGRESO',
+          cuentaContableId: cuentaContable?.id || 1,
+          centroCostoId: centroCosto?.id,
+          monto: totalFinal,
+          concepto: `Kiosco - ${detalleItems.join(', ')}${propinaMonto > 0 ? ` + Propina` : ''}`,
+          descripcion: observaciones,
+          registradoPor: req.admin.id
+        }
+      });
+
+      movimientos.push(movimiento);
+    }
+
+    res.json({
+      success: true,
       data: {
-        numero: nuevoNumero,
-        cajaId,
-        tipo: 'INGRESO',
-        cuentaContableId: cuentaContable?.id || 1,
-        centroCostoId: centroCosto?.id,
-        monto: total,
-        concepto: `Kiosco - ${detalleItems.join(', ')}`,
-        descripcion: observaciones,
-        registradoPor: req.admin.id
+        movimientos,
+        total: totalFinal,
+        items: detalleItems,
+        propinaAplicada: propinaMonto > 0 ? propinaMonto : null
       }
     });
-
-    res.json({ success: true, data: { movimiento, total, items: detalleItems } });
   } catch (error) {
     console.error('Error en venta kiosco:', error);
     res.status(500).json({ success: false, error: 'Error en venta kiosco' });

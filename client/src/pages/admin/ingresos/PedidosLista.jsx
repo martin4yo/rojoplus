@@ -3,8 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Filter, ShoppingCart, Calendar, User, Building2, Eye, Edit, Trash2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
+import StatusBadge from '../../../components/StatusBadge'
+import Pagination from '../../../components/Pagination'
+import { usePagination } from '../../../hooks/usePagination'
+import { formatCurrency, formatDate } from '../../../utils/formatters'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import Table from '../../../components/Table'
 
 const ESTADOS = [
   { value: '', label: 'Todos' },
@@ -19,7 +24,7 @@ export default function PedidosLista() {
   const { showModal, ModalComponent } = useModal()
   const [loading, setLoading] = useState(true)
   const [pedidos, setPedidos] = useState([])
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const { page, limit, pagination, setPagination, goToPage } = usePagination(1, 20)
 
   const [filtros, setFiltros] = useState({
     estado: '',
@@ -31,14 +36,14 @@ export default function PedidosLista() {
 
   useEffect(() => {
     cargarPedidos()
-  }, [filtros, pagination.page])
+  }, [filtros, page])
 
   async function cargarPedidos() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      params.append('page', pagination.page)
-      params.append('limit', '20')
+      params.append('page', page)
+      params.append('limit', limit)
 
       if (filtros.estado) params.append('estado', filtros.estado)
       if (filtros.desde) params.append('desde', filtros.desde)
@@ -47,11 +52,7 @@ export default function PedidosLista() {
 
       const response = await api.getFull(`/admin/pedidos?${params}`)
       setPedidos(response.data || [])
-      setPagination(prev => ({
-        ...prev,
-        pages: response.pagination?.pages || 1,
-        total: response.pagination?.total || 0
-      }))
+      setPagination(response.pagination)
     } catch (err) {
       console.error('Error cargando pedidos:', err)
     } finally {
@@ -62,7 +63,7 @@ export default function PedidosLista() {
   function handleFiltroChange(e) {
     const { name, value } = e.target
     setFiltros(prev => ({ ...prev, [name]: value }))
-    setPagination(prev => ({ ...prev, page: 1 }))
+    goToPage(1)
   }
 
   function limpiarFiltros() {
@@ -72,7 +73,7 @@ export default function PedidosLista() {
       hasta: '',
       busqueda: ''
     })
-    setPagination(prev => ({ ...prev, page: 1 }))
+    goToPage(1)
   }
 
   async function handleEliminar(pedido) {
@@ -92,27 +93,6 @@ export default function PedidosLista() {
     })
   }
 
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
-  }
-
-  function formatFecha(fecha) {
-    return new Date(fecha).toLocaleDateString('es-AR')
-  }
-
-  function getEstadoBadge(estado) {
-    const estilos = {
-      PENDIENTE: 'bg-yellow-100 text-yellow-700',
-      PARCIAL: 'bg-blue-100 text-blue-700',
-      FACTURADO: 'bg-green-100 text-green-700',
-      CANCELADO: 'bg-red-100 text-red-700'
-    }
-    return estilos[estado] || 'bg-gray-100 text-gray-700'
-  }
-
   function getClienteInfo(pedido) {
     if (pedido.socio) {
       return {
@@ -130,6 +110,123 @@ export default function PedidosLista() {
     }
     return { tipo: '-', nombre: '-', icon: User }
   }
+
+  const columns = [
+    {
+      key: 'numero',
+      label: 'Número',
+      sortable: true,
+      render: (row) => (
+        <span className="font-mono text-sm font-medium text-primary">
+          {row.numero}
+        </span>
+      )
+    },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      sortable: true,
+      render: (row) => (
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Calendar className="w-4 h-4" />
+          {formatDate(row.fecha)}
+        </div>
+      )
+    },
+    {
+      key: 'cliente',
+      label: 'Cliente/Socio',
+      render: (row) => {
+        const cliente = getClienteInfo(row)
+        const IconCliente = cliente.icon
+        return (
+          <div className="flex items-center gap-2">
+            <IconCliente className="w-4 h-4 text-gray-400" />
+            <div>
+              <p className="text-sm text-gray-800">{cliente.nombre}</p>
+              <p className="text-xs text-gray-500">{cliente.tipo}</p>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      key: 'items',
+      label: 'Items',
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => (
+        <span className="text-sm text-gray-600">
+          {row.items?.length || 0}
+        </span>
+      )
+    },
+    {
+      key: 'total',
+      label: 'Total',
+      sortable: true,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (row) => (
+        <span className="font-semibold text-gray-800">
+          {formatCurrency(row.total)}
+        </span>
+      )
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      sortable: true,
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => <StatusBadge status={row.estado} type="pedido" />
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => (
+        <div className="flex items-center justify-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/ingresos/pedidos/${row.id}`)
+            }}
+            className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
+            title="Ver detalle"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          {row.estado === 'PENDIENTE' && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigate(`/admin/ingresos/pedidos/${row.id}/editar`)
+                }}
+                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-lg"
+                title="Editar"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleEliminar(row)
+                }}
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+                title="Eliminar"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
+      )
+    }
+  ]
 
   return (
     <div>
@@ -243,123 +340,21 @@ export default function PedidosLista() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Número</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Cliente/Socio</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Items</th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-600">Total</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Estado</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {pedidos.map((pedido) => {
-                    const cliente = getClienteInfo(pedido)
-                    const IconCliente = cliente.icon
-
-                    return (
-                      <tr key={pedido.id} className="hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-sm font-medium text-primary">
-                            {pedido.numero}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Calendar className="w-4 h-4" />
-                            {formatFecha(pedido.fecha)}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <IconCliente className="w-4 h-4 text-gray-400" />
-                            <div>
-                              <p className="text-sm text-gray-800">{cliente.nombre}</p>
-                              <p className="text-xs text-gray-500">{cliente.tipo}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className="text-sm text-gray-600">
-                            {pedido.items?.length || 0}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <span className="font-semibold text-gray-800">
-                            {formatMonto(pedido.total)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(pedido.estado)}`}>
-                            {pedido.estado}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => navigate(`/admin/ingresos/pedidos/${pedido.id}`)}
-                              className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
-                              title="Ver detalle"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            {pedido.estado === 'PENDIENTE' && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
-                              <>
-                                <button
-                                  onClick={() => navigate(`/admin/ingresos/pedidos/${pedido.id}/editar`)}
-                                  className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-lg"
-                                  title="Editar"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleEliminar(pedido)}
-                                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              columns={columns}
+              data={pedidos}
+              sortable
+              hoverable
+              onRowClick={(pedido) => navigate(`/admin/ingresos/pedidos/${pedido.id}`)}
+            />
 
             {/* Paginacion */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Mostrando página {pagination.page} de {pagination.pages} ({pagination.total} registros)
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page === 1}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page === pagination.pages}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              pagination={pagination}
+              page={page}
+              onPageChange={goToPage}
+              className="px-4 border-t border-gray-200"
+            />
           </>
         )}
       </div>

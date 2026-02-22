@@ -5,6 +5,10 @@ import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { useTicket } from '../../../contexts/TicketContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
+import SelectCentroCosto from '../../../components/SelectCentroCosto'
+import { formatCurrency, formatTime } from '../../../utils/formatters'
+import StatusBadge from '../../../components/StatusBadge'
+import Modal from '../../../components/Modal'
 
 export default function BuffetTakeAway() {
   const { generarTicketTakeAway, imprimirTicket } = useTicket()
@@ -21,7 +25,8 @@ export default function BuffetTakeAway() {
     telefono: '',
     horaEstimada: '',
     observaciones: '',
-    items: []
+    items: [],
+    centroCostoId: ''
   })
   const [cobroData, setCobroData] = useState({
     cajaId: '',
@@ -74,7 +79,8 @@ export default function BuffetTakeAway() {
       telefono: '',
       horaEstimada: '',
       observaciones: '',
-      items: []
+      items: [],
+      centroCostoId: ''
     })
     setModalNuevo(true)
   }
@@ -121,6 +127,7 @@ export default function BuffetTakeAway() {
         telefono: formData.telefono,
         horaEstimada: formData.horaEstimada || null,
         observaciones: formData.observaciones,
+        centroCostoId: formData.centroCostoId ? parseInt(formData.centroCostoId) : null,
         items: formData.items.map(i => ({
           productoBuffetId: i.productoBuffetId,
           cantidad: i.cantidad
@@ -181,17 +188,6 @@ export default function BuffetTakeAway() {
     }
   }
 
-  const getColorEstado = (estado) => {
-    switch (estado) {
-      case 'RECIBIDO': return 'bg-blue-100 text-blue-800'
-      case 'EN_PREPARACION': return 'bg-yellow-100 text-yellow-800'
-      case 'LISTO': return 'bg-green-100 text-green-800'
-      case 'ENTREGADO': return 'bg-gray-100 text-gray-800'
-      case 'CANCELADO': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
   const totalFormulario = formData.items.reduce((sum, item) => sum + Number(item.precio) * item.cantidad, 0)
 
   const pedidosPendientes = pedidos.filter(p => p.estado !== 'ENTREGADO' && p.estado !== 'CANCELADO')
@@ -234,14 +230,12 @@ export default function BuffetTakeAway() {
             <div className="p-4 border-b">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getColorEstado(pedido.estado)}`}>
-                    {pedido.estado.replace('_', ' ')}
-                  </span>
+                  <StatusBadge status={pedido.estado} type="pedido" />
                   <h3 className="font-bold text-lg mt-1">{pedido.numero}</h3>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-green-600">
-                    ${Number(pedido.total).toLocaleString()}
+                    {formatCurrency(pedido.total)}
                   </p>
                 </div>
               </div>
@@ -260,7 +254,7 @@ export default function BuffetTakeAway() {
                 {pedido.horaEstimada && (
                   <p className="flex items-center gap-2">
                     <Clock size={14} />
-                    Retira: {new Date(pedido.horaEstimada).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                    Retira: {formatTime(pedido.horaEstimada)}
                   </p>
                 )}
               </div>
@@ -272,7 +266,7 @@ export default function BuffetTakeAway() {
                 {pedido.items?.map((item, i) => (
                   <li key={i} className="flex justify-between">
                     <span>{item.cantidad}x {item.productoBuffet?.nombre}</span>
-                    <span className="text-gray-600">${Number(item.subtotal).toLocaleString()}</span>
+                    <span className="text-gray-600">{formatCurrency(item.subtotal)}</span>
                   </li>
                 ))}
               </ul>
@@ -319,199 +313,214 @@ export default function BuffetTakeAway() {
       )}
 
       {/* Modal Nuevo Pedido */}
-      {modalNuevo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b">
-              <h2 className="text-xl font-bold">Nuevo Pedido Take Away</h2>
+      <Modal
+        isOpen={modalNuevo}
+        onClose={() => setModalNuevo(false)}
+        title="Nuevo Pedido Take Away"
+        maxWidth="max-w-4xl"
+      >
+        <div className="flex flex-col md:flex-row gap-4 -mx-6 -my-6">
+          {/* Panel izquierdo - Productos */}
+          <div className="w-full md:w-1/2 border-r flex flex-col max-h-[70vh]">
+            <div className="p-2 bg-gray-100 flex gap-2 overflow-x-auto flex-shrink-0">
+              {categorias.map(cat => (
+                <button
+                  key={cat.id}
+                  className="px-3 py-1 bg-white rounded text-sm whitespace-nowrap hover:bg-gray-50"
+                  style={{ borderBottom: `3px solid ${cat.color || '#DC2626'}` }}
+                >
+                  {cat.nombre}
+                </button>
+              ))}
             </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              <div className="grid grid-cols-2 gap-2">
+                {productos.map(prod => (
+                  <button
+                    key={prod.id}
+                    onClick={() => agregarItem(prod)}
+                    className="p-3 bg-gray-50 rounded text-left hover:bg-gray-100"
+                    type="button"
+                  >
+                    <span className="font-medium text-sm block">{prod.nombre}</span>
+                    <span className="text-green-600 font-bold">{formatCurrency(prod.precio)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
-            <div className="flex-1 overflow-hidden flex">
-              {/* Panel izquierdo - Productos */}
-              <div className="w-1/2 border-r flex flex-col">
-                <div className="p-2 bg-gray-100 flex gap-2 overflow-x-auto">
-                  {categorias.map(cat => (
-                    <button
-                      key={cat.id}
-                      className="px-3 py-1 bg-white rounded text-sm whitespace-nowrap hover:bg-gray-50"
-                      style={{ borderBottom: `3px solid ${cat.color || '#DC2626'}` }}
-                    >
-                      {cat.nombre}
-                    </button>
-                  ))}
+          {/* Panel derecho - Datos y carrito */}
+          <div className="w-full md:w-1/2 flex flex-col max-h-[70vh]">
+            <form onSubmit={crearPedido} className="flex-1 flex flex-col">
+              <div className="p-4 space-y-3 flex-shrink-0">
+                <input
+                  type="text"
+                  value={formData.nombreCliente}
+                  onChange={e => setFormData({ ...formData, nombreCliente: e.target.value })}
+                  placeholder="Nombre del cliente *"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="tel"
+                    value={formData.telefono}
+                    onChange={e => setFormData({ ...formData, telefono: e.target.value })}
+                    placeholder="Teléfono"
+                    className="border border-gray-300 rounded-lg px-3 py-2"
+                  />
+                  <input
+                    type="time"
+                    value={formData.horaEstimada}
+                    onChange={e => setFormData({ ...formData, horaEstimada: e.target.value })}
+                    className="border border-gray-300 rounded-lg px-3 py-2"
+                  />
                 </div>
-                <div className="flex-1 overflow-y-auto p-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {productos.map(prod => (
-                      <button
-                        key={prod.id}
-                        onClick={() => agregarItem(prod)}
-                        className="p-3 bg-gray-50 rounded text-left hover:bg-gray-100"
-                      >
-                        <span className="font-medium text-sm block">{prod.nombre}</span>
-                        <span className="text-green-600 font-bold">${Number(prod.precio).toLocaleString()}</span>
-                      </button>
+                <input
+                  type="text"
+                  value={formData.observaciones}
+                  onChange={e => setFormData({ ...formData, observaciones: e.target.value })}
+                  placeholder="Observaciones"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Centro de Costo
+                  </label>
+                  <SelectCentroCosto
+                    value={formData.centroCostoId}
+                    onChange={(val) => setFormData({ ...formData, centroCostoId: val })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 border-t">
+                <h4 className="font-medium mb-2">Items ({formData.items.length})</h4>
+                {formData.items.length === 0 ? (
+                  <p className="text-gray-400 text-sm">Selecciona productos del menú</p>
+                ) : (
+                  <div className="space-y-2">
+                    {formData.items.map((item, i) => (
+                      <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                        <div className="flex-1">
+                          <span className="font-medium text-sm">{item.nombre}</span>
+                          <span className="text-gray-500 text-sm ml-2">
+                            {formatCurrency(item.precio)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => modificarCantidadItem(i, -1)}
+                            className="w-6 h-6 bg-gray-200 rounded text-sm"
+                          >
+                            -
+                          </button>
+                          <span className="w-6 text-center">{item.cantidad}</span>
+                          <button
+                            type="button"
+                            onClick={() => modificarCantidadItem(i, 1)}
+                            className="w-6 h-6 bg-gray-200 rounded text-sm"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="w-20 text-right font-bold">
+                          {formatCurrency(Number(item.precio) * item.cantidad)}
+                        </span>
+                      </div>
                     ))}
                   </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t flex-shrink-0">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="font-bold text-lg">Total:</span>
+                  <span className="text-2xl font-bold text-green-600">
+                    {formatCurrency(totalFormulario)}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalNuevo(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    Crear Pedido
+                  </button>
                 </div>
               </div>
-
-              {/* Panel derecho - Datos y carrito */}
-              <div className="w-1/2 flex flex-col">
-                <form onSubmit={crearPedido} className="flex-1 flex flex-col">
-                  <div className="p-4 space-y-3">
-                    <input
-                      type="text"
-                      value={formData.nombreCliente}
-                      onChange={e => setFormData({ ...formData, nombreCliente: e.target.value })}
-                      placeholder="Nombre del cliente *"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                      required
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="tel"
-                        value={formData.telefono}
-                        onChange={e => setFormData({ ...formData, telefono: e.target.value })}
-                        placeholder="Teléfono"
-                        className="border border-gray-300 rounded-lg px-3 py-2"
-                      />
-                      <input
-                        type="time"
-                        value={formData.horaEstimada}
-                        onChange={e => setFormData({ ...formData, horaEstimada: e.target.value })}
-                        className="border border-gray-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-4 border-t">
-                    <h4 className="font-medium mb-2">Items ({formData.items.length})</h4>
-                    {formData.items.length === 0 ? (
-                      <p className="text-gray-400 text-sm">Selecciona productos del menú</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {formData.items.map((item, i) => (
-                          <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                            <div className="flex-1">
-                              <span className="font-medium text-sm">{item.nombre}</span>
-                              <span className="text-gray-500 text-sm ml-2">
-                                ${Number(item.precio).toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => modificarCantidadItem(i, -1)}
-                                className="w-6 h-6 bg-gray-200 rounded text-sm"
-                              >
-                                -
-                              </button>
-                              <span className="w-6 text-center">{item.cantidad}</span>
-                              <button
-                                type="button"
-                                onClick={() => modificarCantidadItem(i, 1)}
-                                className="w-6 h-6 bg-gray-200 rounded text-sm"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <span className="w-20 text-right font-bold">
-                              ${(Number(item.precio) * item.cantidad).toLocaleString()}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-4 border-t">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="font-bold text-lg">Total:</span>
-                      <span className="text-2xl font-bold text-green-600">
-                        ${totalFormulario.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setModalNuevo(false)}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                      >
-                        Crear Pedido
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </div>
+            </form>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* Modal Cobrar */}
-      {modalCobrar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Cobrar Pedido {modalCobrar.numero}</h2>
+      <Modal
+        isOpen={!!modalCobrar}
+        onClose={() => setModalCobrar(null)}
+        title={`Cobrar Pedido ${modalCobrar?.numero || ''}`}
+        maxWidth="max-w-md"
+      >
+        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+          <p className="text-sm text-gray-600">Cliente: {modalCobrar?.nombreCliente}</p>
+          <p className="text-2xl font-bold text-green-600 mt-2">
+            Total: {formatCurrency(modalCobrar?.total || 0)}
+          </p>
+        </div>
 
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">Cliente: {modalCobrar.nombreCliente}</p>
-              <p className="text-2xl font-bold text-green-600 mt-2">
-                Total: ${Number(modalCobrar.total).toLocaleString()}
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Caja</label>
-                <select
-                  value={cobroData.cajaId}
-                  onChange={e => setCobroData({ ...cobroData, cajaId: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                >
-                  {cajas.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
-                <select
-                  value={cobroData.medioPagoId}
-                  onChange={e => setCobroData({ ...cobroData, medioPagoId: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                >
-                  {mediosPago.map(m => (
-                    <option key={m.id} value={m.id}>{m.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={() => setModalCobrar(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => cobrar(modalCobrar.id)}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                Confirmar Cobro
-              </button>
-            </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Caja</label>
+            <select
+              value={cobroData.cajaId}
+              onChange={e => setCobroData({ ...cobroData, cajaId: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            >
+              {cajas.map(c => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
+            <select
+              value={cobroData.medioPagoId}
+              onChange={e => setCobroData({ ...cobroData, medioPagoId: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            >
+              {mediosPago.map(m => (
+                <option key={m.id} value={m.id}>{m.nombre}</option>
+              ))}
+            </select>
           </div>
         </div>
-      )}
+
+        <div className="flex gap-2 mt-6">
+          <button
+            onClick={() => setModalCobrar(null)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => cobrar(modalCobrar.id)}
+            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Confirmar Cobro
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }

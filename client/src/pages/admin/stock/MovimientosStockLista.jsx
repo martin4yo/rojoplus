@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { ArrowUpDown, TrendingUp, TrendingDown, RefreshCw, Filter, Package } from 'lucide-react'
+import { ArrowUpDown, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { Button } from '../../../components/Button'
+import StatusBadge from '../../../components/StatusBadge'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
-const TIPO_CONFIG = {
-  INGRESO: { label: 'Ingreso', color: 'bg-green-100 text-green-700', icon: TrendingUp },
-  EGRESO: { label: 'Egreso', color: 'bg-red-100 text-red-700', icon: TrendingDown },
-  AJUSTE: { label: 'Ajuste', color: 'bg-blue-100 text-blue-700', icon: RefreshCw }
+const TIPO_ICONS = {
+  INGRESO: TrendingUp,
+  EGRESO: TrendingDown,
+  AJUSTE: RefreshCw
 }
 
 export default function MovimientosStockLista() {
@@ -18,14 +21,15 @@ export default function MovimientosStockLista() {
   const [movimientos, setMovimientos] = useState([])
   const [productos, setProductos] = useState([])
   const [loading, setLoading] = useState(true)
-  const [pagination, setPagination] = useState({ total: 0, pages: 1 })
+
+  // Paginación con hook centralizado
+  const { page, pagination, setPagination, goToPage } = usePagination(1, 50)
 
   // Filtros
   const [productoId, setProductoId] = useState(productoIdParam || '')
   const [tipo, setTipo] = useState('')
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
-  const [page, setPage] = useState(1)
 
   useEffect(() => {
     cargarProductos()
@@ -57,7 +61,7 @@ export default function MovimientosStockLista() {
 
       const res = await api.getFull(`/admin/movimientos-stock?${params}`)
       setMovimientos(res.data || [])
-      setPagination(res.pagination || { total: 0, pages: 1 })
+      setPagination(res.pagination)
     } catch (err) {
       console.error('Error cargando movimientos:', err)
     } finally {
@@ -70,13 +74,13 @@ export default function MovimientosStockLista() {
     setTipo('')
     setDesde('')
     setHasta('')
-    setPage(1)
+    goToPage(1)
     setSearchParams({})
   }
 
   function handleProductoChange(value) {
     setProductoId(value)
-    setPage(1)
+    goToPage(1)
     if (value) {
       setSearchParams({ productoId: value })
     } else {
@@ -127,7 +131,7 @@ export default function MovimientosStockLista() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
             <select
               value={tipo}
-              onChange={e => { setTipo(e.target.value); setPage(1) }}
+              onChange={e => { setTipo(e.target.value); goToPage(1) }}
               className="input-field"
             >
               <option value="">Todos</option>
@@ -141,7 +145,7 @@ export default function MovimientosStockLista() {
             <input
               type="date"
               value={desde}
-              onChange={e => { setDesde(e.target.value); setPage(1) }}
+              onChange={e => { setDesde(e.target.value); goToPage(1) }}
               className="input-field"
             />
           </div>
@@ -150,7 +154,7 @@ export default function MovimientosStockLista() {
             <input
               type="date"
               value={hasta}
-              onChange={e => { setHasta(e.target.value); setPage(1) }}
+              onChange={e => { setHasta(e.target.value); goToPage(1) }}
               className="input-field"
             />
           </div>
@@ -191,8 +195,7 @@ export default function MovimientosStockLista() {
                 </thead>
                 <tbody className="divide-y">
                   {movimientos.map(mov => {
-                    const config = TIPO_CONFIG[mov.tipo] || {}
-                    const Icon = config.icon || ArrowUpDown
+                    const Icon = TIPO_ICONS[mov.tipo] || ArrowUpDown
                     return (
                       <tr key={mov.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm">
@@ -220,10 +223,10 @@ export default function MovimientosStockLista() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                          <div className="inline-flex items-center gap-1">
                             <Icon className="w-3 h-3" />
-                            {config.label}
-                          </span>
+                            <StatusBadge status={mov.tipo} type="movimientoStock" size="sm" />
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right font-mono font-medium">
                           <span className={mov.tipo === 'INGRESO' ? 'text-green-600' : mov.tipo === 'EGRESO' ? 'text-red-600' : ''}>
@@ -244,29 +247,12 @@ export default function MovimientosStockLista() {
           </div>
 
           {/* Paginacion */}
-          {pagination.pages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-6">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm text-gray-600">
-                Pagina {page} de {pagination.pages}
-              </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page === pagination.pages}
-                onClick={() => setPage(p => p + 1)}
-              >
-                Siguiente
-              </Button>
-            </div>
-          )}
+          <Pagination
+            pagination={pagination}
+            page={page}
+            onPageChange={goToPage}
+            className="mt-6"
+          />
         </>
       )}
     </div>

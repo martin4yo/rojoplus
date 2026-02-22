@@ -4,6 +4,11 @@ import { Plus, Search, Filter, CreditCard, Calendar, Building2, Eye } from 'luci
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+import StatusBadge from '../../../components/StatusBadge'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
+import Table from '../../../components/Table'
 
 const ESTADOS = [
   { value: '', label: 'Todos' },
@@ -15,7 +20,7 @@ export default function OrdenesPagoLista() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [ordenes, setOrdenes] = useState([])
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const { page, pagination, setPagination, goToPage, reset } = usePagination(1, 20)
 
   const [filtros, setFiltros] = useState({
     estado: '',
@@ -33,7 +38,7 @@ export default function OrdenesPagoLista() {
 
   useEffect(() => {
     cargarOrdenes()
-  }, [filtros, pagination.page])
+  }, [filtros, page])
 
   async function cargarProveedores() {
     try {
@@ -49,7 +54,7 @@ export default function OrdenesPagoLista() {
     try {
       const params = new URLSearchParams()
       params.append('tipo', 'ORDEN_PAGO')
-      params.append('page', pagination.page)
+      params.append('page', page)
       params.append('limit', '20')
 
       if (filtros.estado) params.append('estado', filtros.estado)
@@ -59,11 +64,7 @@ export default function OrdenesPagoLista() {
 
       const response = await api.getFull(`/admin/movimientos-contables?${params}`)
       setOrdenes(response.data || [])
-      setPagination(prev => ({
-        ...prev,
-        pages: response.pagination?.pages || 1,
-        total: response.pagination?.total || 0
-      }))
+      setPagination(response.pagination)
     } catch (err) {
       console.error('Error cargando ordenes de pago:', err)
     } finally {
@@ -74,7 +75,7 @@ export default function OrdenesPagoLista() {
   function handleFiltroChange(e) {
     const { name, value } = e.target
     setFiltros(prev => ({ ...prev, [name]: value }))
-    setPagination(prev => ({ ...prev, page: 1 }))
+    reset()
   }
 
   function limpiarFiltros() {
@@ -85,38 +86,97 @@ export default function OrdenesPagoLista() {
       hasta: '',
       busqueda: ''
     })
-    setPagination(prev => ({ ...prev, page: 1 }))
+    reset()
   }
 
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
-  }
-
-  function formatFecha(fecha) {
-    return new Date(fecha).toLocaleDateString('es-AR')
-  }
-
-  function getEstadoBadge(estado) {
-    const estilos = {
-      CONFIRMADO: 'bg-green-100 text-green-700',
-      ANULADO: 'bg-red-100 text-red-700',
-      PENDIENTE: 'bg-yellow-100 text-yellow-700'
+  const columns = [
+    {
+      key: 'numero',
+      label: 'Número',
+      sortable: true,
+      render: (row) => (
+        <span className="font-mono text-sm font-medium text-primary">
+          {row.numero}
+        </span>
+      )
+    },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      sortable: true,
+      render: (row) => (
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Calendar className="w-4 h-4" />
+          {formatDate(row.fecha)}
+        </div>
+      )
+    },
+    {
+      key: 'proveedor',
+      label: 'Proveedor',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-800">
+            {row.entidad?.razonSocial || '-'}
+          </span>
+        </div>
+      )
+    },
+    {
+      key: 'medioPago',
+      label: 'Medio Pago',
+      render: (row) => (
+        row.medioPago ? <StatusBadge status={row.medioPago} type="pedido" /> : '-'
+      )
+    },
+    {
+      key: 'caja',
+      label: 'Caja',
+      render: (row) => (
+        <span className="text-sm text-gray-600">{row.caja?.nombre || '-'}</span>
+      )
+    },
+    {
+      key: 'montoTotal',
+      label: 'Monto',
+      sortable: true,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (row) => (
+        <span className="font-semibold text-gray-800">
+          {formatCurrency(row.montoTotal)}
+        </span>
+      )
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      sortable: true,
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => <StatusBadge status={row.estado} type="pago" />
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/admin/egresos/ordenes-pago/${row.id}`)
+          }}
+          className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
+          title="Ver detalle"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+      )
     }
-    return estilos[estado] || 'bg-gray-100 text-gray-700'
-  }
-
-  function getMedioPagoBadge(medioPago) {
-    const estilos = {
-      EFECTIVO: 'bg-green-50 text-green-600',
-      TRANSFERENCIA: 'bg-blue-50 text-blue-600',
-      CHEQUE: 'bg-orange-50 text-orange-600',
-      TARJETA: 'bg-purple-50 text-purple-600'
-    }
-    return estilos[medioPago] || 'bg-gray-50 text-gray-600'
-  }
+  ]
 
   return (
     <div>
@@ -245,103 +305,22 @@ export default function OrdenesPagoLista() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Número</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Proveedor</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Medio Pago</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Caja</th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-600">Monto</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Estado</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {ordenes.map((orden) => (
-                    <tr key={orden.id} className="hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <span className="font-mono text-sm font-medium text-primary">
-                          {orden.numero}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar className="w-4 h-4" />
-                          {formatFecha(orden.fecha)}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-800">
-                            {orden.entidad?.razonSocial || '-'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {orden.medioPago && (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getMedioPagoBadge(orden.medioPago)}`}>
-                            {orden.medioPago}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">
-                        {orden.caja?.nombre || '-'}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className="font-semibold text-gray-800">
-                          {formatMonto(orden.montoTotal)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(orden.estado)}`}>
-                          {orden.estado}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => navigate(`/admin/egresos/ordenes-pago/${orden.id}`)}
-                          className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
-                          title="Ver detalle"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              columns={columns}
+              data={ordenes}
+              sortable
+              hoverable
+              onRowClick={(orden) => navigate(`/admin/egresos/ordenes-pago/${orden.id}`)}
+            />
 
             {/* Paginacion */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Mostrando página {pagination.page} de {pagination.pages} ({pagination.total} registros)
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page === 1}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page === pagination.pages}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="border-t border-gray-200 px-4">
+              <Pagination
+                pagination={pagination}
+                page={page}
+                onPageChange={goToPage}
+              />
+            </div>
           </>
         )}
       </div>

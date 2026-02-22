@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Filter, CreditCard, Calendar, User, Building2, Eye } from 'lucide-react'
+import { Plus, Filter, CreditCard, Calendar, User, Building2, Eye } from 'lucide-react'
 import { Button } from '../../../components/Button'
+import Table from '../../../components/Table'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
 
 const MEDIOS_PAGO = [
   { value: '', label: 'Todos' },
@@ -17,7 +21,7 @@ export default function RecibosCobroLista() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [recibos, setRecibos] = useState([])
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const { page, pagination, setPagination, goToPage } = usePagination(1, 20)
 
   const [filtros, setFiltros] = useState({
     medioPago: '',
@@ -26,15 +30,107 @@ export default function RecibosCobroLista() {
   })
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
 
+  // Definición de columnas
+  const columns = [
+    {
+      key: 'numero',
+      label: 'Numero',
+      render: (recibo) => (
+        <span className="font-mono text-sm font-medium text-primary">
+          {recibo.numero}
+        </span>
+      )
+    },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      render: (recibo) => (
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Calendar className="w-4 h-4" />
+          {formatDate(recibo.fecha)}
+        </div>
+      )
+    },
+    {
+      key: 'cliente',
+      label: 'Cliente/Socio',
+      render: (recibo) => {
+        const cliente = getClienteInfo(recibo)
+        const IconCliente = cliente.icon
+        return (
+          <div className="flex items-center gap-2">
+            <IconCliente className="w-4 h-4 text-gray-400" />
+            <div>
+              <p className="text-sm text-gray-800">{cliente.nombre}</p>
+              <p className="text-xs text-gray-500">{cliente.tipo}</p>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      key: 'medioPago',
+      label: 'Medio',
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (recibo) => (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getMedioPagoBadge(recibo.medioPago)}`}>
+          {recibo.medioPago || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'caja',
+      label: 'Caja',
+      render: (recibo) => (
+        <span className="text-sm text-gray-600">
+          {recibo.caja?.nombre || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'montoTotal',
+      label: 'Monto',
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (recibo) => (
+        <span className="font-semibold text-green-600">
+          {formatCurrency(recibo.montoTotal)}
+        </span>
+      )
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      className: 'text-center',
+      cellClassName: 'text-center',
+      sortable: false,
+      render: (recibo) => (
+        <div className="flex items-center justify-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/ingresos/recibos/${recibo.id}`)
+            }}
+            className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
+            title="Ver detalle"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+        </div>
+      )
+    }
+  ]
+
   useEffect(() => {
     cargarRecibos()
-  }, [filtros, pagination.page])
+  }, [filtros, page])
 
   async function cargarRecibos() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      params.append('page', pagination.page)
+      params.append('page', page)
       params.append('limit', '20')
 
       if (filtros.desde) params.append('desde', filtros.desde)
@@ -42,11 +138,13 @@ export default function RecibosCobroLista() {
 
       const response = await api.getFull(`/admin/recibos-cobro?${params}`)
       setRecibos(response.data || [])
-      setPagination(prev => ({
-        ...prev,
-        pages: response.pagination?.pages || 1,
-        total: response.pagination?.total || 0
-      }))
+      setPagination({
+        page: response.pagination?.page || 1,
+        totalPages: response.pagination?.pages || 1,
+        total: response.pagination?.total || 0,
+        from: ((page - 1) * 20) + 1,
+        to: Math.min(page * 20, response.pagination?.total || 0)
+      })
     } catch (err) {
       console.error('Error cargando recibos:', err)
     } finally {
@@ -57,7 +155,7 @@ export default function RecibosCobroLista() {
   function handleFiltroChange(e) {
     const { name, value } = e.target
     setFiltros(prev => ({ ...prev, [name]: value }))
-    setPagination(prev => ({ ...prev, page: 1 }))
+    goToPage(1)
   }
 
   function limpiarFiltros() {
@@ -66,18 +164,7 @@ export default function RecibosCobroLista() {
       desde: '',
       hasta: ''
     })
-    setPagination(prev => ({ ...prev, page: 1 }))
-  }
-
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
-  }
-
-  function formatFecha(fecha) {
-    return new Date(fecha).toLocaleDateString('es-AR')
+    goToPage(1)
   }
 
   function getClienteInfo(recibo) {
@@ -207,103 +294,21 @@ export default function RecibosCobroLista() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Numero</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Cliente/Socio</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Medio</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Caja</th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-600">Monto</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {recibos.map((recibo) => {
-                    const cliente = getClienteInfo(recibo)
-                    const IconCliente = cliente.icon
-
-                    return (
-                      <tr key={recibo.id} className="hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-sm font-medium text-primary">
-                            {recibo.numero}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Calendar className="w-4 h-4" />
-                            {formatFecha(recibo.fecha)}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <IconCliente className="w-4 h-4 text-gray-400" />
-                            <div>
-                              <p className="text-sm text-gray-800">{cliente.nombre}</p>
-                              <p className="text-xs text-gray-500">{cliente.tipo}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getMedioPagoBadge(recibo.medioPago)}`}>
-                            {recibo.medioPago || '-'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-sm text-gray-600">
-                          {recibo.caja?.nombre || '-'}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <span className="font-semibold text-green-600">
-                            {formatMonto(recibo.montoTotal)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => navigate(`/admin/ingresos/recibos/${recibo.id}`)}
-                              className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
-                              title="Ver detalle"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              columns={columns}
+              data={recibos}
+              sortable
+              onRowClick={(recibo) => navigate(`/admin/ingresos/recibos/${recibo.id}`)}
+            />
 
             {/* Paginacion */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Mostrando pagina {pagination.page} de {pagination.pages} ({pagination.total} registros)
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page === 1}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page === pagination.pages}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="px-4 border-t border-gray-200">
+              <Pagination
+                pagination={pagination}
+                page={page}
+                onPageChange={goToPage}
+              />
+            </div>
           </>
         )}
       </div>

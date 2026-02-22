@@ -2256,4 +2256,160 @@ router.put('/:token/preferencias-notificaciones', asyncHandler(async (req, res) 
   })
 }))
 
+// GET /api/socio/:token/convocatorias - Listar convocatorias del socio
+router.get('/:token/convocatorias', asyncHandler(async (req, res) => {
+  const { token } = req.params
+  const { estado } = req.query // 'pendiente', 'confirmada', 'rechazada', 'todas'
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal: token },
+    select: { id: true }
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  const where = { socioId: socio.id }
+
+  // Filtrar por estado
+  if (estado && estado !== 'todas') {
+    if (estado === 'pendiente') {
+      where.confirmado = null
+    } else if (estado === 'confirmada') {
+      where.confirmado = true
+    } else if (estado === 'rechazada') {
+      where.confirmado = false
+    }
+  }
+
+  const convocatorias = await req.prisma.convocatoria.findMany({
+    where,
+    include: {
+      partido: {
+        include: {
+          categoriaActividad: {
+            include: {
+              actividad: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  codigo: true
+                }
+              }
+            }
+          },
+          espacio: {
+            select: {
+              id: true,
+              nombre: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: {
+      partido: {
+        fecha: 'asc'
+      }
+    }
+  })
+
+  // Formatear respuesta
+  const convocatoriasFormateadas = convocatorias.map(conv => ({
+    id: conv.id,
+    partidoId: conv.partidoId,
+    confirmado: conv.confirmado,
+    motivoRechazo: conv.motivoRechazo,
+    partido: {
+      id: conv.partido.id,
+      fecha: conv.partido.fecha,
+      hora: conv.partido.hora,
+      equipoLocal: conv.partido.equipoLocal,
+      equipoVisitante: conv.partido.equipoVisitante,
+      esLocal: conv.partido.esLocal,
+      lugar: conv.partido.espacio?.nombre || conv.partido.lugar,
+      estado: conv.partido.estado,
+      actividad: conv.partido.categoriaActividad.actividad.nombre,
+      categoria: conv.partido.categoriaActividad.nombre
+    },
+    fechaConvocatoria: conv.createdAt
+  }))
+
+  res.json({
+    success: true,
+    data: convocatoriasFormateadas
+  })
+}))
+
+// PUT /api/socio/:token/convocatorias/:partidoId - Confirmar o rechazar convocatoria
+router.put('/:token/convocatorias/:partidoId', asyncHandler(async (req, res) => {
+  const { token, partidoId } = req.params
+  const { confirmado, motivoRechazo } = req.body
+
+  if (typeof confirmado !== 'boolean') {
+    throw new AppError('El campo confirmado es requerido y debe ser booleano', 400)
+  }
+
+  const socio = await req.prisma.socio.findUnique({
+    where: { tokenPortal: token },
+    select: { id: true, apellidoNombre: true, nroSocio: true }
+  })
+
+  if (!socio) {
+    throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  // Buscar convocatoria
+  const convocatoria = await req.prisma.convocatoria.findUnique({
+    where: {
+      partidoId_socioId: {
+        partidoId: parseInt(partidoId),
+        socioId: socio.id
+      }
+    },
+    include: {
+      partido: {
+        include: {
+          categoriaActividad: {
+            include: {
+              actividad: true
+            }
+          }
+        }
+      }
+    }
+  })
+
+  if (!convocatoria) {
+    throw new AppError('Convocatoria no encontrada', 404)
+  }
+
+  // Verificar que el partido no haya pasado
+  const fechaPartido = new Date(convocatoria.partido.fecha)
+  if (fechaPartido < new Date()) {
+    throw new AppError('No se puede modificar la convocatoria de un partido que ya pasó', 400)
+  }
+
+  // Actualizar convocatoria
+  const convocatoriaActualizada = await req.prisma.convocatoria.update({
+    where: {
+      partidoId_socioId: {
+        partidoId: parseInt(partidoId),
+        socioId: socio.id
+      }
+    },
+    data: {
+      confirmado,
+      motivoRechazo: confirmado === false ? (motivoRechazo || null) : null
+    }
+  })
+
+  res.json({
+    success: true,
+    message: confirmado ? 'Confirmaste tu asistencia al partido' : 'Rechazaste la convocatoria',
+    data: convocatoriaActualizada
+  })
+}))
+
 export default router

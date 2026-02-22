@@ -1,0 +1,52 @@
+{
+  "name": "RojoPlus - Control de Accesos",
+  "short_name": "RojoPlus Accesos",
+  "description": "Sistema de control de accesos para Club Sportivo Pilar",
+  "start_url": "/admin/accesos/control-pwa",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#DC2626",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "security"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Escanear QR",
+      "short_name": "Escanear",
+      "description": "Abrir escáner QR",
+      "url": "/admin/accesos/control-pwa",
+      "icons": [
+        {
+          "src": "/logo192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Monitor",
+      "short_name": "Monitor",
+      "description": "Ver monitor de accesos",
+      "url": "/admin/accesos/monitor",
+      "icons": [
+        {
+          "src": "/logo192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

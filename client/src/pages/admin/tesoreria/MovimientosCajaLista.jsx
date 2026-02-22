@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, Filter, Calendar, ChevronLeft, ChevronRight, XCircle, Ban } from 'lucide-react'
+import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban } from 'lucide-react'
 import { Button } from '../../../components/Button'
+import Table from '../../../components/Table'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
+import { useApiData } from '../../../hooks/useApiData'
 
 export default function MovimientosCajaLista() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const cajaIdParam = searchParams.get('cajaId')
-
-  const [movimientos, setMovimientos] = useState([])
-  const [cajas, setCajas] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
 
   const [filtros, setFiltros] = useState({
     cajaId: cajaIdParam || '',
@@ -22,40 +22,42 @@ export default function MovimientosCajaLista() {
     hasta: ''
   })
 
-  useEffect(() => {
-    cargarCajas()
-  }, [])
+  // Hook de paginación centralizado
+  const { page, pagination, setPagination, goToPage, reset } = usePagination(1, 30)
+
+  // Cargar cajas con useApiData
+  const { data: cajas = [] } = useApiData('/admin/cajas', {
+    initialData: [],
+    transform: (res) => res?.data || []
+  })
+
+  // Cargar movimientos
+  const [movimientos, setMovimientos] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     cargarMovimientos()
-  }, [filtros, pagination.page])
-
-  async function cargarCajas() {
-    try {
-      const res = await api.getFull('/admin/cajas')
-      setCajas(res.data || [])
-    } catch (err) {
-      console.error('Error cargando cajas:', err)
-    }
-  }
+  }, [filtros, page])
 
   async function cargarMovimientos() {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ page: pagination.page, limit: 30 })
-      if (filtros.cajaId) params.append('cajaId', filtros.cajaId)
-      if (filtros.tipo) params.append('tipo', filtros.tipo)
-      if (filtros.desde) params.append('desde', filtros.desde)
-      if (filtros.hasta) params.append('hasta', filtros.hasta)
+      const params = { page, limit: 30 }
+      if (filtros.cajaId) params.cajaId = filtros.cajaId
+      if (filtros.tipo) params.tipo = filtros.tipo
+      if (filtros.desde) params.desde = filtros.desde
+      if (filtros.hasta) params.hasta = filtros.hasta
 
-      const res = await api.getFull(`/admin/movimientos-caja?${params}`)
+      const res = await api.getFull('/admin/movimientos-caja', { params })
       setMovimientos(res.data || [])
       if (res.pagination) {
-        setPagination(prev => ({
-          ...prev,
-          pages: res.pagination.pages,
-          total: res.pagination.total
-        }))
+        setPagination({
+          page: res.pagination.page || page,
+          totalPages: res.pagination.pages || 1,
+          total: res.pagination.total || 0,
+          from: ((page - 1) * 30) + 1,
+          to: Math.min(page * 30, res.pagination.total || 0)
+        })
       }
     } catch (err) {
       console.error('Error cargando movimientos:', err)
@@ -66,7 +68,7 @@ export default function MovimientosCajaLista() {
 
   function handleFiltroChange(campo, valor) {
     setFiltros(prev => ({ ...prev, [campo]: valor }))
-    setPagination(prev => ({ ...prev, page: 1 }))
+    reset() // Resetear a página 1
   }
 
   async function handleAnular(id) {
@@ -81,6 +83,112 @@ export default function MovimientosCajaLista() {
   }
 
   const cajaSeleccionada = cajas.find(c => c.id === parseInt(filtros.cajaId))
+
+  // Definición de columnas para la tabla
+  const columns = [
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      render: (mov) => formatDate(mov.fecha),
+      className: 'text-left'
+    },
+    {
+      key: 'numero',
+      label: 'Numero',
+      render: (mov) => <span className="font-mono text-sm text-gray-600">{mov.numero}</span>,
+      className: 'text-left'
+    },
+    {
+      key: 'caja',
+      label: 'Caja',
+      render: (mov) => mov.caja?.nombre || '-',
+      className: 'text-left'
+    },
+    {
+      key: 'tipo',
+      label: 'Tipo',
+      render: (mov) => (
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+          mov.tipo === 'INGRESO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        }`}>
+          {mov.tipo === 'INGRESO' ? (
+            <TrendingUp className="w-3 h-3" />
+          ) : (
+            <TrendingDown className="w-3 h-3" />
+          )}
+          {mov.tipo}
+        </span>
+      ),
+      className: 'text-center',
+      cellClassName: 'text-center'
+    },
+    {
+      key: 'concepto',
+      label: 'Concepto',
+      render: (mov) => (
+        <div>
+          <p className="text-gray-800">{mov.concepto || mov.descripcion || '-'}</p>
+          {mov.cuentaContable && (
+            <p className="text-xs text-gray-500">{mov.cuentaContable.codigo} - {mov.cuentaContable.nombre}</p>
+          )}
+          {mov.pago?.socio && (
+            <p className="text-xs text-blue-600">
+              Socio #{mov.pago.socio.nroSocio} - {mov.pago.socio.apellidoNombre}
+            </p>
+          )}
+        </div>
+      ),
+      className: 'text-left',
+      cellClassName: 'whitespace-normal'
+    },
+    {
+      key: 'monto',
+      label: 'Monto',
+      render: (mov) => (
+        <span className={`font-bold ${mov.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
+          {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.monto, { showSymbol: false })}
+        </span>
+      ),
+      className: 'text-right',
+      cellClassName: 'text-right'
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      render: (mov) => (
+        mov.anulado ? (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+            <Ban className="w-3 h-3" />
+            Anulado
+          </span>
+        ) : (
+          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+            Activo
+          </span>
+        )
+      ),
+      className: 'text-center',
+      cellClassName: 'text-center'
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      render: (mov) => (
+        !mov.anulado && !mov.pagoId && tienePermiso(PERMISOS.CAJA_ANULAR) && (
+          <button
+            onClick={() => handleAnular(mov.id)}
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+            title="Anular movimiento"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        )
+      ),
+      className: 'text-right',
+      cellClassName: 'text-right'
+    }
+  ]
 
   return (
     <div>
@@ -165,115 +273,19 @@ export default function MovimientosCajaLista() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Fecha</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Numero</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Caja</th>
-                    <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600">Tipo</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Concepto</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600">Monto</th>
-                    <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600">Estado</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {movimientos.map((mov) => (
-                    <tr key={mov.id} className={`hover:bg-gray-50 ${mov.anulado ? 'bg-gray-50 opacity-60' : ''}`}>
-                      <td className="px-4 py-3 text-sm">
-                        {new Date(mov.fecha).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-sm text-gray-600">{mov.numero}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-800">
-                        {mov.caja?.nombre || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          mov.tipo === 'INGRESO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {mov.tipo === 'INGRESO' ? (
-                            <TrendingUp className="w-3 h-3" />
-                          ) : (
-                            <TrendingDown className="w-3 h-3" />
-                          )}
-                          {mov.tipo}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div>
-                          <p className="text-gray-800">{mov.concepto || mov.descripcion || '-'}</p>
-                          {mov.cuentaContable && (
-                            <p className="text-xs text-gray-500">{mov.cuentaContable.codigo} - {mov.cuentaContable.nombre}</p>
-                          )}
-                          {mov.pago?.socio && (
-                            <p className="text-xs text-blue-600">
-                              Socio #{mov.pago.socio.nroSocio} - {mov.pago.socio.apellidoNombre}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`font-bold ${mov.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
-                          {mov.tipo === 'INGRESO' ? '+' : '-'}${mov.monto.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {mov.anulado ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            <Ban className="w-3 h-3" />
-                            Anulado
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                            Activo
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {!mov.anulado && !mov.pagoId && tienePermiso(PERMISOS.CAJA_ANULAR) && (
-                          <button
-                            onClick={() => handleAnular(mov.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                            title="Anular movimiento"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              columns={columns}
+              data={movimientos}
+              keyField="id"
+              emptyMessage="No hay movimientos registrados"
+            />
 
-            {/* Paginacion */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                <span className="text-sm text-gray-600">
-                  Pagina {pagination.page} de {pagination.pages}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                    disabled={pagination.page <= 1}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                    disabled={pagination.page >= pagination.pages}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              pagination={pagination}
+              page={page}
+              onPageChange={goToPage}
+              className="px-4 border-t border-gray-200 bg-gray-50"
+            />
           </>
         )}
       </div>

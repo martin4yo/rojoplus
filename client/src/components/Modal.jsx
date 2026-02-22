@@ -82,26 +82,45 @@ export function Modal({
         tabIndex={0}
       >
         <div
-          className={`bg-white rounded-xl shadow-2xl ${maxWidth} w-full p-6 relative max-h-[90vh] overflow-y-auto`}
+          className={`bg-white rounded-xl shadow-2xl ${maxWidth} w-full relative max-h-[90vh] flex flex-col`}
           onClick={e => e.stopPropagation()}
         >
-          {/* Close button */}
-          <button
-            onClick={handleCancel}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
+            {title && (
+              <h3 className="text-xl font-bold text-gray-800">
+                {title}
+              </h3>
+            )}
+            <button
+              onClick={handleCancel}
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100 ml-auto"
+              type="button"
+            >
+              <X size={20} />
+            </button>
+          </div>
 
-          {/* Title */}
-          {title && (
-            <h3 className="text-xl font-bold text-gray-800 mb-4 pr-8">
-              {title}
-            </h3>
+          {/* Content */}
+          <div className="p-6 overflow-y-auto flex-1">
+            {children}
+          </div>
+
+          {/* Footer (optional) */}
+          {(onConfirm || showCancel) && (
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
+              {showCancel && (
+                <Button variant="secondary" onClick={handleCancel}>
+                  {cancelText}
+                </Button>
+              )}
+              {onConfirm && (
+                <Button onClick={handleConfirm}>
+                  {confirmText}
+                </Button>
+              )}
+            </div>
           )}
-
-          {/* Children content */}
-          {children}
         </div>
       </div>
     )

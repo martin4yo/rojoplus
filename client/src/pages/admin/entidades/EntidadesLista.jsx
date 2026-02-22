@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Building2, UserCheck, Briefcase, Eye, Edit, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Search, Building2, UserCheck, Briefcase, Eye, Edit } from 'lucide-react'
 import { Button } from '../../../components/Button'
-import api from '../../../services/api'
-import { tienePermiso, tieneAlgunPermiso, PERMISOS } from '../../../services/permisos'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
 
 const TIPO_CONFIG = {
   PROVEEDOR: {
@@ -41,46 +42,55 @@ export default function EntidadesLista({ tipo }) {
   const Icon = config.icon
 
   const [entidades, setEntidades] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [soloActivos, setSoloActivos] = useState(true)
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
 
+  const { page, limit, pagination, setPagination, goToPage } = usePagination(1, 20)
+
+  // Cargar entidades
   useEffect(() => {
-    cargarEntidades()
-  }, [tipo, soloActivos, pagination.page])
+    const cargarEntidades = async () => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams({
+          tipo,
+          page: page.toString(),
+          limit: limit.toString()
+        })
 
-  async function cargarEntidades() {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        tipo,
-        page: pagination.page,
-        limit: 20
-      })
-      if (soloActivos) params.append('activo', 'true')
-      if (busqueda) params.append('busqueda', busqueda)
+        if (soloActivos) params.append('activo', 'true')
+        if (busqueda) params.append('busqueda', busqueda)
 
-      const res = await api.getFull(`/admin/entidades?${params}`)
-      setEntidades(res.data || [])
-      if (res.pagination) {
-        setPagination(prev => ({
-          ...prev,
-          pages: res.pagination.pages,
-          total: res.pagination.total
-        }))
+        const response = await fetch(`/api/admin/entidades?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        const data = await response.json()
+
+        if (data.success) {
+          setEntidades(data.data || [])
+          if (data.pagination) {
+            setPagination(data.pagination)
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando entidades:', error)
+        setEntidades([])
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      console.error('Error cargando entidades:', err)
-    } finally {
-      setLoading(false)
     }
-  }
+
+    cargarEntidades()
+  }, [tipo, page, limit, soloActivos, busqueda, setPagination])
 
   function handleBuscar(e) {
     e.preventDefault()
-    setPagination(prev => ({ ...prev, page: 1 }))
-    cargarEntidades()
+    goToPage(1)
   }
 
   return (
@@ -93,7 +103,7 @@ export default function EntidadesLista({ tipo }) {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">{config.titulo}</h1>
-            <p className="text-gray-500 text-sm">{pagination.total} registros</p>
+            <p className="text-gray-500 text-sm">{pagination?.total || 0} registros</p>
           </div>
         </div>
         {tienePermiso(config.permiso) && (
@@ -223,29 +233,13 @@ export default function EntidadesLista({ tipo }) {
             </div>
 
             {/* Paginacion */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                <span className="text-sm text-gray-600">
-                  Pagina {pagination.page} de {pagination.pages}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                    disabled={pagination.page <= 1}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                    disabled={pagination.page >= pagination.pages}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="border-t border-gray-200 bg-gray-50 px-4">
+              <Pagination
+                pagination={pagination}
+                page={page}
+                onPageChange={goToPage}
+              />
+            </div>
           </>
         )}
       </div>

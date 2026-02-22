@@ -4,6 +4,8 @@ import { ArrowLeft, FileText, Calendar, User, Building2, Package, CreditCard, Sh
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
+import StatusBadge from '../../../components/StatusBadge'
+import { formatCurrency, formatDate, formatDateTime } from '../../../utils/formatters'
 import api from '../../../services/api'
 
 export default function FacturaVentaDetalle() {
@@ -55,41 +57,6 @@ export default function FacturaVentaDetalle() {
     })
   }
 
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
-  }
-
-  function formatFecha(fecha) {
-    return new Date(fecha).toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
-  }
-
-  function formatFechaHora(fecha) {
-    return new Date(fecha).toLocaleString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  function getEstadoBadge(estado) {
-    const estilos = {
-      PENDIENTE: 'bg-yellow-100 text-yellow-700',
-      PAGADO: 'bg-green-100 text-green-700',
-      CONFIRMADO: 'bg-blue-100 text-blue-700',
-      ANULADO: 'bg-red-100 text-red-700'
-    }
-    return estilos[estado] || 'bg-gray-100 text-gray-700'
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -134,9 +101,7 @@ export default function FacturaVentaDetalle() {
               <h1 className="text-2xl font-bold text-gray-800">
                 Factura {factura.numero}
               </h1>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(factura.estado)}`}>
-                {factura.estado}
-              </span>
+              <StatusBadge status={factura.estado} type="generic" />
             </div>
           </div>
         </div>
@@ -180,13 +145,13 @@ export default function FacturaVentaDetalle() {
                 <p className="text-sm text-gray-500">Fecha</p>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-400" />
-                  <span>{formatFecha(factura.fecha)}</span>
+                  <span>{formatDate(factura.fecha)}</span>
                 </div>
               </div>
               {factura.fechaVencimiento && (
                 <div>
                   <p className="text-sm text-gray-500">Vencimiento</p>
-                  <span>{formatFecha(factura.fechaVencimiento)}</span>
+                  <span>{formatDate(factura.fechaVencimiento)}</span>
                 </div>
               )}
               {factura.concepto && (
@@ -289,8 +254,8 @@ export default function FacturaVentaDetalle() {
                           </div>
                         </td>
                         <td className="py-3 px-2 text-center">{item.cantidad}</td>
-                        <td className="py-3 px-2 text-right">{formatMonto(item.precioUnitario)}</td>
-                        <td className="py-3 px-2 text-right font-medium">{formatMonto(item.subtotal)}</td>
+                        <td className="py-3 px-2 text-right">{formatCurrency(item.precioUnitario)}</td>
+                        <td className="py-3 px-2 text-right font-medium">{formatCurrency(item.subtotal)}</td>
                       </tr>
                     )
                   })}
@@ -315,10 +280,10 @@ export default function FacturaVentaDetalle() {
                   >
                     <div>
                       <p className="font-medium text-gray-800">{cobro.numero}</p>
-                      <p className="text-sm text-gray-500">{formatFecha(cobro.fecha)}</p>
+                      <p className="text-sm text-gray-500">{formatDate(cobro.fecha)}</p>
                     </div>
                     <span className="font-semibold text-green-600">
-                      {formatMonto(cobro.montoTotal)}
+                      {formatCurrency(cobro.montoTotal)}
                     </span>
                   </div>
                 ))}
@@ -336,23 +301,23 @@ export default function FacturaVentaDetalle() {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium">{formatMonto(factura.subtotal)}</span>
+                <span className="font-medium">{formatCurrency(factura.subtotal)}</span>
               </div>
               {factura.iva21 > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">IVA 21%:</span>
-                  <span className="font-medium">{formatMonto(factura.iva21)}</span>
+                  <span className="font-medium">{formatCurrency(factura.iva21)}</span>
                 </div>
               )}
               {factura.iva105 > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">IVA 10.5%:</span>
-                  <span className="font-medium">{formatMonto(factura.iva105)}</span>
+                  <span className="font-medium">{formatCurrency(factura.iva105)}</span>
                 </div>
               )}
               <div className="flex justify-between text-xl font-bold border-t pt-3">
                 <span>Total:</span>
-                <span className="text-green-600">{formatMonto(factura.montoTotal)}</span>
+                <span className="text-green-600">{formatCurrency(factura.montoTotal)}</span>
               </div>
             </div>
           </div>
@@ -364,12 +329,12 @@ export default function FacturaVentaDetalle() {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Cobrado:</span>
-                <span className="font-medium text-green-600">{formatMonto(factura.montoPagado)}</span>
+                <span className="font-medium text-green-600">{formatCurrency(factura.montoPagado)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Pendiente:</span>
                 <span className={`font-medium ${factura.saldoPendiente > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
-                  {formatMonto(factura.saldoPendiente)}
+                  {formatCurrency(factura.saldoPendiente)}
                 </span>
               </div>
 
@@ -397,7 +362,7 @@ export default function FacturaVentaDetalle() {
 
           {/* Informacion de registro */}
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-            <p>Registrada: {formatFechaHora(factura.createdAt)}</p>
+            <p>Registrada: {formatDateTime(factura.createdAt)}</p>
           </div>
         </div>
       </div>

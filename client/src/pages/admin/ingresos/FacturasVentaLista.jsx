@@ -5,6 +5,11 @@ import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+import StatusBadge from '../../../components/StatusBadge'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
+import Table from '../../../components/Table'
 
 const ESTADOS = [
   { value: '', label: 'Todos' },
@@ -19,7 +24,7 @@ export default function FacturasVentaLista() {
   const { showModal, ModalComponent } = useModal()
   const [loading, setLoading] = useState(true)
   const [facturas, setFacturas] = useState([])
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const { page, pagination, setPagination, goToPage } = usePagination(1, 20)
 
   const [filtros, setFiltros] = useState({
     estado: '',
@@ -31,13 +36,13 @@ export default function FacturasVentaLista() {
 
   useEffect(() => {
     cargarFacturas()
-  }, [filtros, pagination.page])
+  }, [filtros, page])
 
   async function cargarFacturas() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      params.append('page', pagination.page)
+      params.append('page', page)
       params.append('limit', '20')
 
       if (filtros.estado) params.append('estado', filtros.estado)
@@ -46,11 +51,7 @@ export default function FacturasVentaLista() {
 
       const response = await api.getFull(`/admin/facturas-venta?${params}`)
       setFacturas(response.data || [])
-      setPagination(prev => ({
-        ...prev,
-        pages: response.pagination?.pages || 1,
-        total: response.pagination?.total || 0
-      }))
+      setPagination(response.pagination)
     } catch (err) {
       console.error('Error cargando facturas:', err)
     } finally {
@@ -61,7 +62,7 @@ export default function FacturasVentaLista() {
   function handleFiltroChange(e) {
     const { name, value } = e.target
     setFiltros(prev => ({ ...prev, [name]: value }))
-    setPagination(prev => ({ ...prev, page: 1 }))
+    goToPage(1)
   }
 
   function limpiarFiltros() {
@@ -71,7 +72,7 @@ export default function FacturasVentaLista() {
       hasta: '',
       busqueda: ''
     })
-    setPagination(prev => ({ ...prev, page: 1 }))
+    goToPage(1)
   }
 
   async function handleAnular(factura) {
@@ -91,27 +92,6 @@ export default function FacturasVentaLista() {
     })
   }
 
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
-  }
-
-  function formatFecha(fecha) {
-    return new Date(fecha).toLocaleDateString('es-AR')
-  }
-
-  function getEstadoBadge(estado) {
-    const estilos = {
-      PENDIENTE: 'bg-yellow-100 text-yellow-700',
-      PAGADO: 'bg-green-100 text-green-700',
-      CONFIRMADO: 'bg-blue-100 text-blue-700',
-      ANULADO: 'bg-red-100 text-red-700'
-    }
-    return estilos[estado] || 'bg-gray-100 text-gray-700'
-  }
-
   function getClienteInfo(factura) {
     if (factura.socio) {
       return {
@@ -129,6 +109,122 @@ export default function FacturasVentaLista() {
     }
     return { tipo: '-', nombre: '-', icon: User }
   }
+
+  const columns = [
+    {
+      key: 'numero',
+      label: 'Número',
+      sortable: true,
+      render: (row) => (
+        <span className="font-mono text-sm font-medium text-primary">
+          {row.numero}
+        </span>
+      )
+    },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      sortable: true,
+      render: (row) => (
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Calendar className="w-4 h-4" />
+          {formatDate(row.fecha)}
+        </div>
+      )
+    },
+    {
+      key: 'comprobante',
+      label: 'Comprobante',
+      render: (row) => {
+        const comprobante = row.tipoComprobante
+          ? `${row.tipoComprobante} ${row.puntoVenta}-${row.numeroComprobante}`
+          : '-'
+        return <span className="text-sm text-gray-600">{comprobante}</span>
+      }
+    },
+    {
+      key: 'cliente',
+      label: 'Cliente/Socio',
+      render: (row) => {
+        const cliente = getClienteInfo(row)
+        const IconCliente = cliente.icon
+        return (
+          <div className="flex items-center gap-2">
+            <IconCliente className="w-4 h-4 text-gray-400" />
+            <div>
+              <p className="text-sm text-gray-800">{cliente.nombre}</p>
+              <p className="text-xs text-gray-500">{cliente.tipo}</p>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      key: 'montoTotal',
+      label: 'Total',
+      sortable: true,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (row) => (
+        <span className="font-semibold text-gray-800">
+          {formatCurrency(row.montoTotal)}
+        </span>
+      )
+    },
+    {
+      key: 'saldoPendiente',
+      label: 'Saldo',
+      sortable: true,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (row) => (
+        <span className={row.saldoPendiente > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}>
+          {formatCurrency(row.saldoPendiente)}
+        </span>
+      )
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      sortable: true,
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => <StatusBadge status={row.estado} type="generic" />
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => (
+        <div className="flex items-center justify-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/ingresos/facturas/${row.id}`)
+            }}
+            className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
+            title="Ver detalle"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          {row.estado !== 'ANULADO' && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleAnular(row)
+              }}
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+              title="Anular"
+            >
+              <Ban className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )
+    }
+  ]
 
   return (
     <div>
@@ -242,121 +338,22 @@ export default function FacturasVentaLista() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Número</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Fecha</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Comprobante</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Cliente/Socio</th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-600">Total</th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-600">Saldo</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Estado</th>
-                    <th className="text-center py-3 px-4 font-medium text-gray-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {facturas.map((factura) => {
-                    const cliente = getClienteInfo(factura)
-                    const IconCliente = cliente.icon
-                    const comprobante = factura.tipoComprobante
-                      ? `${factura.tipoComprobante} ${factura.puntoVenta}-${factura.numeroComprobante}`
-                      : '-'
-
-                    return (
-                      <tr key={factura.id} className="hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-sm font-medium text-primary">
-                            {factura.numero}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Calendar className="w-4 h-4" />
-                            {formatFecha(factura.fecha)}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-sm text-gray-600">
-                          {comprobante}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <IconCliente className="w-4 h-4 text-gray-400" />
-                            <div>
-                              <p className="text-sm text-gray-800">{cliente.nombre}</p>
-                              <p className="text-xs text-gray-500">{cliente.tipo}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <span className="font-semibold text-gray-800">
-                            {formatMonto(factura.montoTotal)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <span className={factura.saldoPendiente > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}>
-                            {formatMonto(factura.saldoPendiente)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(factura.estado)}`}>
-                            {factura.estado}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => navigate(`/admin/ingresos/facturas/${factura.id}`)}
-                              className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
-                              title="Ver detalle"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            {factura.estado !== 'ANULADO' && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
-                              <button
-                                onClick={() => handleAnular(factura)}
-                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
-                                title="Anular"
-                              >
-                                <Ban className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              columns={columns}
+              data={facturas}
+              sortable
+              hoverable
+              onRowClick={(factura) => navigate(`/admin/ingresos/facturas/${factura.id}`)}
+            />
 
             {/* Paginacion */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Mostrando página {pagination.page} de {pagination.pages} ({pagination.total} registros)
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page === 1}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page === pagination.pages}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="border-t border-gray-200 px-4">
+              <Pagination
+                pagination={pagination}
+                page={page}
+                onPageChange={goToPage}
+              />
+            </div>
           </>
         )}
       </div>

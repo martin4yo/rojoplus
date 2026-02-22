@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -6,8 +6,9 @@ import 'leaflet/dist/leaflet.css'
 import { Button } from '../../components/Button'
 import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
+import ImageUpload from '../../components/ImageUpload'
 import api from '../../services/api'
-import { Upload, MapPin, X, ChevronLeft, ChevronRight, Check, ArrowLeft } from 'lucide-react'
+import { MapPin, ChevronLeft, ChevronRight, Check, ArrowLeft } from 'lucide-react'
 
 // Fix para el icono de Leaflet
 delete L.Icon.Default.prototype._getIconUrl
@@ -43,7 +44,6 @@ const DIAS = [
 export default function ComercioEditar() {
   const { token } = useParams()
   const navigate = useNavigate()
-  const fileInputRef = useRef(null)
 
   // Estado del wizard
   const [paso, setPaso] = useState(1)
@@ -133,38 +133,15 @@ export default function ComercioEditar() {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  function handleLogoChange(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Validar tipo
-    if (!file.type.startsWith('image/')) {
-      setError('El archivo debe ser una imagen')
-      return
-    }
-
-    // Validar tamaño (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setError('La imagen no puede superar los 2MB')
-      return
-    }
-
-    // Crear preview
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setLogoPreview(reader.result)
-      setLogoBase64(reader.result)
+  function handleLogoChange(base64) {
+    if (base64) {
+      setLogoPreview(base64)
+      setLogoBase64(base64)
       setLogoChanged(true)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  function removeLogo() {
-    setLogoPreview(null)
-    setLogoBase64(null)
-    setLogoChanged(true)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+    } else {
+      setLogoPreview(null)
+      setLogoBase64(null)
+      setLogoChanged(true)
     }
   }
 
@@ -403,52 +380,20 @@ export default function ComercioEditar() {
                 <label className="block text-gray-700 text-sm font-semibold mb-2">
                   Logo del comercio
                 </label>
-                <div className="flex items-center gap-4">
-                  {logoPreview ? (
-                    <div className="relative">
-                      <img
-                        src={logoPreview}
-                        alt="Preview"
-                        className="w-24 h-24 object-contain rounded-lg border border-gray-300"
-                      />
-                      <button
-                        type="button"
-                        onClick={removeLogo}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-primary hover:text-primary transition"
-                    >
-                      <Upload className="w-6 h-6" />
-                      <span className="text-xs">Subir</span>
-                    </button>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoChange}
-                    className="hidden"
-                  />
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">
-                      Formato JPG, PNG o GIF. Máx 2MB.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      {logoPreview ? 'Cambiar logo' : 'Subir logo'}
-                    </button>
-                  </div>
-                </div>
+                <ImageUpload
+                  value={logoPreview}
+                  onChange={handleLogoChange}
+                  returnBase64={true}
+                  returnFile={false}
+                  maxSize={2 * 1024 * 1024}
+                  accept="image/*"
+                  placeholder="Subir logo del comercio"
+                  previewSize="sm"
+                  onError={(error) => setError(error)}
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Formato JPG, PNG o GIF. Máx 2MB.
+                </p>
               </div>
 
               {/* Ubicación en mapa */}

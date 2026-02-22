@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, FileText, Eye, XCircle, ChevronLeft, ChevronRight, Filter, CreditCard, Package } from 'lucide-react'
+import { Plus, Search, FileText, Eye, XCircle, Filter, CreditCard, Package } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
-
-const ESTADOS = {
-  PENDIENTE: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
-  PAGADO: { label: 'Pagado', color: 'bg-green-100 text-green-700' },
-  ANULADO: { label: 'Anulado', color: 'bg-red-100 text-red-600' }
-}
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+import StatusBadge from '../../../components/StatusBadge'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
+import Table from '../../../components/Table'
 
 const TIPOS = {
   FACTURA_COMPRA: { label: 'Factura', color: 'bg-blue-100 text-blue-700' },
@@ -21,6 +20,7 @@ const TIPOS = {
 export default function FacturasCompraLista() {
   const navigate = useNavigate()
   const { showModal, ModalComponent } = useModal()
+  const { page, pagination, setPagination, goToPage } = usePagination(1, 20)
 
   const [facturas, setFacturas] = useState([])
   const [proveedores, setProveedores] = useState([])
@@ -29,7 +29,6 @@ export default function FacturasCompraLista() {
   const [filtroProveedor, setFiltroProveedor] = useState('')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
 
   useEffect(() => {
     cargarProveedores()
@@ -37,7 +36,7 @@ export default function FacturasCompraLista() {
 
   useEffect(() => {
     cargarFacturas()
-  }, [filtroEstado, filtroProveedor, pagination.page])
+  }, [filtroEstado, filtroProveedor, page])
 
   async function cargarProveedores() {
     try {
@@ -51,7 +50,7 @@ export default function FacturasCompraLista() {
   async function cargarFacturas() {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ page: pagination.page, limit: 20 })
+      const params = new URLSearchParams({ page, limit: 20 })
       if (filtroEstado) params.append('estado', filtroEstado)
       if (filtroProveedor) params.append('entidadId', filtroProveedor)
       if (fechaDesde) params.append('desde', fechaDesde)
@@ -60,11 +59,13 @@ export default function FacturasCompraLista() {
       const res = await api.getFull(`/admin/facturas-compra?${params}`)
       setFacturas(res.data || [])
       if (res.pagination) {
-        setPagination(prev => ({
-          ...prev,
-          pages: res.pagination.pages,
-          total: res.pagination.total
-        }))
+        setPagination({
+          page: res.pagination.page,
+          totalPages: res.pagination.pages,
+          total: res.pagination.total,
+          from: ((res.pagination.page - 1) * 20) + 1,
+          to: Math.min(res.pagination.page * 20, res.pagination.total)
+        })
       }
     } catch (err) {
       console.error('Error cargando facturas:', err)
@@ -75,7 +76,7 @@ export default function FacturasCompraLista() {
 
   function handleBuscar(e) {
     e.preventDefault()
-    setPagination(prev => ({ ...prev, page: 1 }))
+    goToPage(1)
     cargarFacturas()
   }
 
@@ -84,7 +85,7 @@ export default function FacturasCompraLista() {
     setFiltroProveedor('')
     setFechaDesde('')
     setFechaHasta('')
-    setPagination(prev => ({ ...prev, page: 1 }))
+    goToPage(1)
   }
 
   function handleAnular(factura) {
@@ -112,20 +113,135 @@ export default function FacturasCompraLista() {
     })
   }
 
-  function formatFecha(fecha) {
-    return new Date(fecha).toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
-  }
-
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
-  }
+  const columns = [
+    {
+      key: 'numero',
+      label: 'Numero',
+      sortable: true,
+      render: (row) => (
+        <span className="font-mono text-sm font-medium text-primary">{row.numero}</span>
+      )
+    },
+    {
+      key: 'tipo',
+      label: 'Tipo',
+      render: (row) => (
+        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${TIPOS[row.tipo]?.color || 'bg-gray-100'}`}>
+          {TIPOS[row.tipo]?.label || row.tipo}
+        </span>
+      )
+    },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      sortable: true,
+      render: (row) => (
+        <div>
+          <span className="text-sm text-gray-600">{formatDate(row.fecha)}</span>
+          {row.fechaVencimiento && (
+            <p className="text-xs text-gray-400">
+              Vence: {formatDate(row.fechaVencimiento)}
+            </p>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'proveedor',
+      label: 'Proveedor',
+      render: (row) => (
+        <p className="font-medium text-gray-800">{row.entidad?.razonSocial}</p>
+      )
+    },
+    {
+      key: 'comprobante',
+      label: 'Comprobante',
+      className: 'hidden md:table-cell',
+      cellClassName: 'hidden md:table-cell',
+      render: (row) => {
+        if (row.tipoComprobante && row.numeroComprobante) {
+          return (
+            <span className="text-sm text-gray-600 font-mono">
+              {row.tipoComprobante} {row.puntoVenta}-{row.numeroComprobante}
+            </span>
+          )
+        }
+        return <span className="text-sm text-gray-400">-</span>
+      }
+    },
+    {
+      key: 'montoTotal',
+      label: 'Total',
+      sortable: true,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (row) => (
+        <span className="font-semibold text-gray-800">{formatCurrency(row.montoTotal)}</span>
+      )
+    },
+    {
+      key: 'saldoPendiente',
+      label: 'Saldo',
+      sortable: true,
+      className: 'text-right hidden lg:table-cell',
+      cellClassName: 'text-right hidden lg:table-cell',
+      render: (row) => {
+        if (row.saldoPendiente > 0) {
+          return <span className="font-medium text-red-600">{formatCurrency(row.saldoPendiente)}</span>
+        }
+        return <span className="text-gray-400">-</span>
+      }
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      sortable: true,
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => <StatusBadge status={row.estado} type="generic" />
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (row) => (
+        <div className="flex items-center justify-end gap-1">
+          <Link
+            to={`/admin/egresos/facturas/${row.id}`}
+            className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
+            title="Ver detalle"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Eye className="w-4 h-4" />
+          </Link>
+          {row.estado === 'PENDIENTE' && tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (
+            <>
+              <Link
+                to={`/admin/egresos/facturas/${row.id}/pagar`}
+                className="p-2 text-gray-500 hover:text-green-600 hover:bg-gray-100 rounded-lg"
+                title="Registrar pago"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <CreditCard className="w-4 h-4" />
+              </Link>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleAnular(row)
+                }}
+                className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+                title="Anular factura"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
+      )
+    }
+  ]
 
   return (
     <div>
@@ -159,9 +275,9 @@ export default function FacturasCompraLista() {
               className="input-field w-full lg:w-40"
             >
               <option value="">Todos los estados</option>
-              {Object.entries(ESTADOS).map(([key, val]) => (
-                <option key={key} value={key}>{val.label}</option>
-              ))}
+              <option value="PENDIENTE">Pendiente</option>
+              <option value="PAGADO">Pagado</option>
+              <option value="ANULADO">Anulado</option>
             </select>
             <select
               value={filtroProveedor}
@@ -224,126 +340,20 @@ export default function FacturasCompraLista() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Numero</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Tipo</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Fecha</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Proveedor</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 hidden md:table-cell">Comprobante</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600">Total</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600 hidden lg:table-cell">Saldo</th>
-                    <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600">Estado</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {facturas.map((factura) => (
-                    <tr key={factura.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-sm font-medium text-primary">{factura.numero}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${TIPOS[factura.tipo]?.color || 'bg-gray-100'}`}>
-                          {TIPOS[factura.tipo]?.label || factura.tipo}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-600">{formatFecha(factura.fecha)}</span>
-                        {factura.fechaVencimiento && (
-                          <p className="text-xs text-gray-400">
-                            Vence: {formatFecha(factura.fechaVencimiento)}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-800">{factura.entidad?.razonSocial}</p>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        {factura.tipoComprobante && factura.numeroComprobante ? (
-                          <span className="text-sm text-gray-600 font-mono">
-                            {factura.tipoComprobante} {factura.puntoVenta}-{factura.numeroComprobante}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-semibold text-gray-800">{formatMonto(factura.montoTotal)}</span>
-                      </td>
-                      <td className="px-4 py-3 text-right hidden lg:table-cell">
-                        {factura.saldoPendiente > 0 ? (
-                          <span className="font-medium text-red-600">{formatMonto(factura.saldoPendiente)}</span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${ESTADOS[factura.estado]?.color || 'bg-gray-100'}`}>
-                          {ESTADOS[factura.estado]?.label || factura.estado}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <Link
-                            to={`/admin/egresos/facturas/${factura.id}`}
-                            className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
-                            title="Ver detalle"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                          {factura.estado === 'PENDIENTE' && tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (
-                            <>
-                              <Link
-                                to={`/admin/egresos/facturas/${factura.id}/pagar`}
-                                className="p-2 text-gray-500 hover:text-green-600 hover:bg-gray-100 rounded-lg"
-                                title="Registrar pago"
-                              >
-                                <CreditCard className="w-4 h-4" />
-                              </Link>
-                              <button
-                                onClick={() => handleAnular(factura)}
-                                className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg"
-                                title="Anular factura"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              columns={columns}
+              data={facturas}
+              sortable
+              hoverable
+              onRowClick={(factura) => navigate(`/admin/egresos/facturas/${factura.id}`)}
+            />
 
             {/* Paginacion */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                <span className="text-sm text-gray-600">
-                  Pagina {pagination.page} de {pagination.pages}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                    disabled={pagination.page <= 1}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                    disabled={pagination.page >= pagination.pages}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              pagination={pagination}
+              page={page}
+              onPageChange={goToPage}
+            />
           </>
         )}
       </div>

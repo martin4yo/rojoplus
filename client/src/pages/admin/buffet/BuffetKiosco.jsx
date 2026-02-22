@@ -4,6 +4,9 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { useTicket } from '../../../contexts/TicketContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
+import SearchInput from '../../../components/SearchInput'
+import CalculadoraVuelto from '../../../components/buffet/CalculadoraVuelto'
+import SelectorMedioPago from '../../../components/buffet/SelectorMedioPago'
 
 export default function BuffetKiosco() {
   const { generarTicketKiosco, imprimirTicket } = useTicket()
@@ -19,22 +22,66 @@ export default function BuffetKiosco() {
   const [procesando, setProcesando] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [buscando, setBuscando] = useState(false)
-  const inputBusquedaRef = useRef(null)
   const ultimoInputRef = useRef(Date.now())
-  const barcodeBufferRef = useRef('')
   const barcodeTimeoutRef = useRef(null)
+  const searchInputRef = useRef(null) // Ref para el search input
   const [ultimoNumeroVenta, setUltimoNumeroVenta] = useState(null)
+  const [datosVuelto, setDatosVuelto] = useState({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+  const [ultimasVentas, setUltimasVentas] = useState([])
+  const [mostrarUltimasVentas, setMostrarUltimasVentas] = useState(false)
+  const [tabActivo, setTabActivo] = useState('carrito') // 'carrito' o 'finalizar'
 
   useEffect(() => {
     cargarDatos()
   }, [])
 
-  // Auto-focus en el campo de búsqueda para escaneo de código de barras
+  // Atajos de teclado
   useEffect(() => {
-    if (inputBusquedaRef.current) {
-      inputBusquedaRef.current.focus()
+    function handleKeyPress(e) {
+      // Solo si no está en un input/textarea/select
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+        return
+      }
+
+      switch(e.key) {
+        case 'F2': // Cobrar
+          e.preventDefault()
+          if (carrito.length > 0 && cajaId && medioPagoId && !procesando) {
+            cobrar()
+          }
+          break
+        case 'F4': // Limpiar carrito
+          e.preventDefault()
+          if (carrito.length > 0) {
+            const confirmar = window.confirm('¿Limpiar el carrito?')
+            if (confirmar) limpiarCarrito()
+          }
+          break
+        case 'F5': // Efectivo
+          e.preventDefault()
+          const efectivo = mediosPago.find(m => m.codigo === 'EFECTIVO')
+          if (efectivo) setMedioPagoId(efectivo.id)
+          break
+        case 'F6': // Tarjeta
+          e.preventDefault()
+          const tarjeta = mediosPago.find(m => m.codigo === 'TARJETA' || m.codigo === 'TARJETA_DEBITO' || m.codigo === 'TARJETA_CREDITO')
+          if (tarjeta) setMedioPagoId(tarjeta.id)
+          break
+        case 'Escape': // Cancelar
+          e.preventDefault()
+          if (carrito.length > 0) {
+            const confirmar = window.confirm('¿Limpiar el carrito?')
+            if (confirmar) limpiarCarrito()
+          }
+          break
+      }
     }
-  }, [])
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [carrito, mediosPago, procesando, cajaId, medioPagoId])
+
+  // Auto-focus ya se maneja con la prop autoFocus de SearchInput
 
   async function cargarDatos(mantenerCategoria = false) {
     try {
@@ -126,26 +173,11 @@ export default function BuffetKiosco() {
     }
   }
 
-  function handleBusquedaKeyDown(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      // Limpiar timeout si existe
-      if (barcodeTimeoutRef.current) {
-        clearTimeout(barcodeTimeoutRef.current)
-        barcodeTimeoutRef.current = null
-      }
-      buscarProducto(busqueda)
-    }
-  }
-
-  // Detectar entrada rápida de código de barras
-  function handleBusquedaChange(e) {
-    const valor = e.target.value
+  // Manejar entrada rápida de código de barras (detectar escáner)
+  function handleBusquedaChange(valor) {
     const ahora = Date.now()
     const tiempoDesdeUltimoInput = ahora - ultimoInputRef.current
     ultimoInputRef.current = ahora
-
-    setBusqueda(valor)
 
     // Limpiar timeout anterior
     if (barcodeTimeoutRef.current) {
@@ -153,16 +185,22 @@ export default function BuffetKiosco() {
     }
 
     // Si el input es rápido (< 50ms entre caracteres), es probablemente un escáner
-    // Los escáneres típicamente envían caracteres muy rápido
     if (tiempoDesdeUltimoInput < 50 && valor.length > 3) {
-      // Esperar un momento para ver si hay más caracteres
       barcodeTimeoutRef.current = setTimeout(() => {
-        // Si el valor parece un código de barras (solo números o alfanumérico sin espacios)
         if (valor.length >= 6 && /^[A-Za-z0-9]+$/.test(valor)) {
           buscarProducto(valor)
         }
       }, 100)
     }
+  }
+
+  function handleEnterBusqueda() {
+    // Limpiar timeout si existe
+    if (barcodeTimeoutRef.current) {
+      clearTimeout(barcodeTimeoutRef.current)
+      barcodeTimeoutRef.current = null
+    }
+    buscarProducto(busqueda)
   }
 
   function limpiarBusqueda() {
@@ -171,6 +209,9 @@ export default function BuffetKiosco() {
   }
 
   function agregarAlCarrito(producto) {
+    // Reproducir sonido al agregar
+    playSound('scan')
+
     setCarrito(prev => {
       const existe = prev.find(item => item.id === producto.id)
       if (existe) {
@@ -211,6 +252,16 @@ export default function BuffetKiosco() {
       return
     }
 
+    // Validar pago suficiente solo si es efectivo
+    const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(medioPagoId))
+    if (medioPagoSeleccionado?.codigo === 'EFECTIVO' && !datosVuelto.esSuficiente) {
+      toast.error('El monto pagado es insuficiente')
+      return
+    }
+
+    // Reproducir sonido de éxito
+    playSound('success')
+
     setProcesando(true)
     try {
       const items = carrito.map(item => ({
@@ -224,8 +275,6 @@ export default function BuffetKiosco() {
         medioPagoId: parseInt(medioPagoId)
       })
 
-      const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(medioPagoId))
-
       // Generar y mostrar ticket
       const ticketData = generarTicketKiosco({
         numero: res.data?.numero || res?.numero || `K${Date.now()}`,
@@ -236,21 +285,54 @@ export default function BuffetKiosco() {
         })),
         subtotal: total,
         total: total,
-        medioPagoNombre: medioPagoSeleccionado?.nombre || 'Efectivo'
+        medioPagoNombre: medioPagoSeleccionado?.nombre || 'Efectivo',
+        montoPagado: datosVuelto.montoPagado,
+        vuelto: datosVuelto.vuelto
       })
       await imprimirTicket(ticketData)
 
+      // Guardar en historial de últimas ventas
+      setUltimasVentas(prev => [{
+        id: res.data?.id || Date.now(),
+        numero: res.data?.numero || `K${Date.now()}`,
+        fecha: new Date(),
+        total: total,
+        items: carrito.length
+      }, ...prev.slice(0, 9)]) // Mantener solo las últimas 10
+
       toast.success(`Venta registrada: $${total.toLocaleString()}`)
       limpiarCarrito()
-      // Refocus para siguiente escaneo
-      if (inputBusquedaRef.current) {
-        inputBusquedaRef.current.focus()
-      }
+      setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+
+      // Volver al tab carrito y hacer focus en el search input
+      setTabActivo('carrito')
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus()
+        }
+      }, 100)
     } catch (err) {
+      playSound('error')
       console.error('Error en venta:', err)
       toast.error(err.response?.data?.error || 'Error al procesar venta')
     } finally {
       setProcesando(false)
+    }
+  }
+
+  // Función para reproducir sonidos (opcional)
+  const playSound = (type) => {
+    try {
+      const sounds = {
+        success: '/sounds/beep-success.mp3',
+        error: '/sounds/beep-error.mp3',
+        scan: '/sounds/beep-scan.mp3'
+      }
+      const audio = new Audio(sounds[type])
+      audio.volume = 0.3
+      audio.play().catch(() => {}) // Ignorar si falla
+    } catch (error) {
+      // Silenciar errores de audio
     }
   }
 
@@ -272,35 +354,45 @@ export default function BuffetKiosco() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Barra de búsqueda + Notificaciones */}
         <div className="p-4 bg-white border-b flex items-center gap-4">
-          <div className="relative flex-1">
-            <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              ref={inputBusquedaRef}
-              type="text"
-              value={busqueda}
-              onChange={handleBusquedaChange}
-              onKeyDown={handleBusquedaKeyDown}
-              placeholder="Escanear código de barras o buscar producto..."
-              className="w-full pl-10 pr-20 py-3 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-              autoComplete="off"
-            />
-            {busqueda && (
-              <button
-                onClick={limpiarBusqueda}
-                className="absolute right-12 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-              >
-                <X size={20} />
-              </button>
-            )}
+          <div className="relative flex-1 flex items-center gap-2">
+            <Barcode className="text-gray-400 flex-shrink-0" size={24} />
+            <div className="flex-1">
+              <SearchInput
+                ref={searchInputRef}
+                value={busqueda}
+                onChange={setBusqueda}
+                onImmediateChange={handleBusquedaChange}
+                onEnter={handleEnterBusqueda}
+                onClear={limpiarBusqueda}
+                placeholder="Escanear código de barras o buscar producto..."
+                autoFocus={true}
+                debounceMs={0}
+                className="text-lg"
+              />
+            </div>
             <button
               onClick={() => buscarProducto(busqueda)}
               disabled={!busqueda || buscando}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
             >
               <Search size={20} />
             </button>
           </div>
           <NotificacionBuffet />
+
+          {/* Botón últimas ventas */}
+          <button
+            onClick={() => setMostrarUltimasVentas(!mostrarUltimasVentas)}
+            className="p-2 hover:bg-gray-100 rounded-lg relative transition"
+            title="Últimas ventas"
+          >
+            <FileText size={20} />
+            {ultimasVentas.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                {ultimasVentas.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Categorías */}
@@ -334,34 +426,57 @@ export default function BuffetKiosco() {
         {/* Grid de Productos */}
         <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {productosFiltrados.map(prod => (
-              <button
-                key={prod.id}
-                onClick={() => agregarAlCarrito(prod)}
-                className="bg-white rounded-lg p-3 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 hover:scale-[1.02] flex gap-3"
-              >
-                {prod.imagen ? (
-                  <img
-                    src={prod.imagen}
-                    alt={prod.nombre}
-                    className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-14 h-14 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
-                    <Coffee size={24} className="text-gray-400" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm line-clamp-2 leading-tight">{prod.nombre}</h3>
-                  {prod.codigoBarras && (
-                    <p className="text-xs text-gray-400 truncate">{prod.codigoBarras}</p>
+            {productosFiltrados.map(prod => {
+              const sinStock = prod.stock !== undefined && prod.stock === 0
+              const stockBajo = prod.stock !== undefined && prod.stock > 0 && prod.stock <= 5
+
+              return (
+                <button
+                  key={prod.id}
+                  onClick={() => agregarAlCarrito(prod)}
+                  disabled={sinStock}
+                  className={`bg-white rounded-lg p-3 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 hover:scale-[1.02] flex gap-3 ${
+                    sinStock ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {prod.imagen ? (
+                    <img
+                      src={prod.imagen}
+                      alt={prod.nombre}
+                      className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
+                      <Coffee size={24} className="text-gray-400" />
+                    </div>
                   )}
-                  <p className="text-base font-bold text-green-600 mt-1">
-                    ${Number(prod.precio).toLocaleString()}
-                  </p>
-                </div>
-              </button>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-sm line-clamp-2 leading-tight">{prod.nombre}</h3>
+                    {prod.codigoBarras && (
+                      <p className="text-xs text-gray-400 truncate">{prod.codigoBarras}</p>
+                    )}
+                    <p className="text-base font-bold text-green-600 mt-1">
+                      ${Number(prod.precio).toLocaleString()}
+                    </p>
+
+                    {/* Badge de stock */}
+                    {prod.stock !== undefined && (
+                      <div className="mt-1">
+                        {sinStock ? (
+                          <span className="inline-block text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
+                            Sin stock
+                          </span>
+                        ) : stockBajo ? (
+                          <span className="inline-block text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">
+                            Quedan {prod.stock}
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
           </div>
 
           {productosFiltrados.length === 0 && (
@@ -372,120 +487,284 @@ export default function BuffetKiosco() {
         </div>
       </div>
 
-      {/* Panel Derecho - Carrito */}
-      <div className="w-96 bg-white border-l flex flex-col">
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <ShoppingCart size={20} />
-              Venta Rápida
-            </h2>
-            {carrito.length > 0 && (
-              <button
-                onClick={limpiarCarrito}
-                className="text-red-600 text-sm hover:underline"
-              >
-                Limpiar
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Items del carrito */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {carrito.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400">
-              <Coffee size={48} className="mb-2" />
-              <p>Carrito vacío</p>
-              <p className="text-sm">Escanea o selecciona productos</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {carrito.map(item => (
-                <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-sm">{item.nombre}</h4>
-                    <p className="text-green-600 font-bold">
-                      ${Number(item.precio).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => modificarCantidad(item.id, -1)}
-                      className="p-1 bg-gray-200 rounded hover:bg-gray-300"
-                    >
-                      <Minus size={16} />
-                    </button>
-                    <span className="w-8 text-center font-bold">{item.cantidad}</span>
-                    <button
-                      onClick={() => modificarCantidad(item.id, 1)}
-                      className="p-1 bg-gray-200 rounded hover:bg-gray-300"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                  <div className="w-20 text-right font-bold">
-                    ${(Number(item.precio) * item.cantidad).toLocaleString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer - Cobro */}
-        <div className="border-t p-4 space-y-4">
-          {/* Selección de caja y medio de pago */}
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              value={cajaId}
-              onChange={e => setCajaId(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Caja</option>
-              {cajas.map(c => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
-            <select
-              value={medioPagoId}
-              onChange={e => setMedioPagoId(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Medio de pago</option>
-              {mediosPago.map(m => (
-                <option key={m.id} value={m.id}>{m.nombre}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Total y botón de cobro */}
-          <div className="flex items-center justify-between py-3 border-t">
-            <span className="text-lg font-bold">Total:</span>
-            <span className="text-2xl font-bold text-green-600">
-              ${total.toLocaleString()}
-            </span>
-          </div>
-
+      {/* Panel Derecho - Carrito con Tabs - Ancho dinámico */}
+      <div className={`bg-white border-l flex flex-col transition-all duration-300 ${
+        tabActivo === 'finalizar' ? 'w-[480px]' : 'w-96'
+      }`}>
+        {/* Tabs Navigation */}
+        <div className="flex border-b">
           <button
-            onClick={cobrar}
-            disabled={carrito.length === 0 || procesando}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white font-bold text-lg rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setTabActivo('carrito')}
+            className={`flex-1 px-4 py-3 font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+              tabActivo === 'carrito'
+                ? 'bg-white text-red-600 border-b-2 border-red-600'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
           >
-            {procesando ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Procesando...
-              </>
-            ) : (
-              <>
-                <DollarSign size={24} />
-                COBRAR ${total.toLocaleString()}
-              </>
+            <ShoppingCart size={18} />
+            Carrito
+            {carrito.length > 0 && (
+              <span className="bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {carrito.length}
+              </span>
             )}
           </button>
+          <button
+            onClick={() => setTabActivo('finalizar')}
+            className={`flex-1 px-4 py-3 font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+              tabActivo === 'finalizar'
+                ? 'bg-white text-green-600 border-b-2 border-green-600'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <DollarSign size={18} />
+            Finalizar
+          </button>
         </div>
+
+        {/* Tab Content: Carrito */}
+        {tabActivo === 'carrito' && (
+          <>
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Items en la venta
+                </h3>
+                {carrito.length > 0 && (
+                  <button
+                    onClick={limpiarCarrito}
+                    className="text-red-600 text-sm hover:underline font-medium"
+                  >
+                    Limpiar todo
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Items del carrito */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {carrito.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                  <Coffee size={48} className="mb-2" />
+                  <p>Carrito vacío</p>
+                  <p className="text-sm">Escanea o selecciona productos</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {carrito.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm">{item.nombre}</h4>
+                        <p className="text-green-600 font-bold">
+                          ${Number(item.precio).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => modificarCantidad(item.id, -1)}
+                          className="p-1 bg-gray-200 rounded hover:bg-gray-300 active:scale-95 transition"
+                        >
+                          <Minus size={16} />
+                        </button>
+                        <span className="w-8 text-center font-bold">{item.cantidad}</span>
+                        <button
+                          onClick={() => modificarCantidad(item.id, 1)}
+                          className="p-1 bg-gray-200 rounded hover:bg-gray-300 active:scale-95 transition"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                      <div className="w-20 text-right font-bold">
+                        ${(Number(item.precio) * item.cantidad).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Subtotal en carrito */}
+            <div className="border-t p-4 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-base font-medium text-gray-700">Subtotal:</span>
+                <span className="text-2xl font-bold text-gray-900 tabular-nums">
+                  ${total.toLocaleString()}
+                </span>
+              </div>
+              {carrito.length > 0 && (
+                <button
+                  onClick={() => setTabActivo('finalizar')}
+                  className="w-full mt-3 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  Continuar al Pago
+                  <DollarSign size={18} />
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Tab Content: Finalizar */}
+        {tabActivo === 'finalizar' && (
+          <>
+            <div className="px-3 py-2 border-b bg-green-50 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Cobro de venta
+                </h3>
+                <button
+                  onClick={() => setTabActivo('carrito')}
+                  className="text-blue-600 text-xs hover:underline font-medium"
+                >
+                  ← Volver al carrito
+                </button>
+              </div>
+            </div>
+
+            {carrito.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                <ShoppingCart size={48} className="mb-2" />
+                <p>No hay items en el carrito</p>
+                <p className="text-sm">Agrega productos para continuar</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {/* Total destacado - Más compacto */}
+                <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-3 border-2 border-green-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-700">Total a Cobrar:</span>
+                    <span className="text-3xl font-bold text-green-600 tabular-nums">
+                      ${total.toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">{carrito.length} {carrito.length === 1 ? 'item' : 'items'}</p>
+                </div>
+
+                {/* Selección de caja - Más compacto */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                  <select
+                    value={cajaId}
+                    onChange={e => setCajaId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-200 outline-none"
+                  >
+                    <option value="">Seleccionar caja...</option>
+                    {cajas.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Selector de medio de pago VISUAL - Más compacto */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Medio de Pago:</label>
+                  <SelectorMedioPago
+                    mediosPago={mediosPago}
+                    selectedId={medioPagoId}
+                    onChange={setMedioPagoId}
+                    compact={true}
+                  />
+                </div>
+
+                {/* Calculadora de vuelto (solo si es efectivo) */}
+                <CalculadoraVuelto
+                  total={total}
+                  onVueltoCalculado={setDatosVuelto}
+                  medioPagoSeleccionado={mediosPago.find(m => m.id === medioPagoId)}
+                  showTeclado={true}
+                  autoFocus={false}
+                  compact={true}
+                />
+              </div>
+            )}
+
+            {/* Footer - Botón de cobro - Más compacto */}
+            <div className="border-t p-3 space-y-2 flex-shrink-0">
+              {/* Botón de cobro */}
+              <button
+                onClick={cobrar}
+                disabled={carrito.length === 0 || procesando || !cajaId || !medioPagoId}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white font-bold text-base rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+              >
+                {procesando ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign size={20} />
+                    COBRAR ${total.toLocaleString()}
+                  </>
+                )}
+              </button>
+
+              {/* Atajos de teclado (hints) */}
+              <div className="text-xs text-gray-500 flex flex-wrap gap-2 justify-center pt-1 border-t">
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F2</kbd> Cobrar</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F4</kbd> Limpiar</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F5</kbd> Efectivo</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">ESC</kbd> Cancelar</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Panel de últimas ventas (deslizable) */}
+      {mostrarUltimasVentas && (
+        <div className="absolute right-0 top-0 h-full w-80 bg-white border-l shadow-2xl z-50 flex flex-col animate-slide-in">
+          <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 className="font-bold text-lg">Últimas Ventas</h3>
+            <button
+              onClick={() => setMostrarUltimasVentas(false)}
+              className="p-1 hover:bg-gray-200 rounded transition"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {ultimasVentas.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <FileText size={48} className="mb-2" />
+                <p className="text-sm">No hay ventas recientes</p>
+              </div>
+            ) : (
+              ultimasVentas.map(venta => (
+                <div
+                  key={venta.id}
+                  className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-medium">Venta #{venta.numero}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(venta.fecha).toLocaleTimeString('es-AR', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">{venta.items} items</p>
+                    </div>
+                    <p className="font-bold text-green-600 tabular-nums">
+                      ${venta.total.toLocaleString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      toast.info('Reimprimiendo ticket...')
+                      // Aquí iría la lógica de reimpresión si se implementa
+                    }}
+                    className="mt-2 text-xs text-blue-600 hover:underline w-full text-left"
+                  >
+                    Reimprimir ticket
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

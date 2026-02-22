@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ArrowRightLeft, ChevronLeft, ChevronRight, Ban, XCircle } from 'lucide-react'
+import { Plus, ArrowRightLeft, Ban, XCircle } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { formatDate, formatCurrency } from '../../../utils/formatters'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
+import Table from '../../../components/Table'
 
 export default function TransferenciasLista() {
   const navigate = useNavigate()
   const [transferencias, setTransferencias] = useState([])
   const [loading, setLoading] = useState(true)
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const { page, pagination, setPagination, goToPage } = usePagination(1, 30)
 
   const [filtros, setFiltros] = useState({
     desde: '',
@@ -18,23 +22,19 @@ export default function TransferenciasLista() {
 
   useEffect(() => {
     cargarTransferencias()
-  }, [filtros, pagination.page])
+  }, [filtros, page])
 
   async function cargarTransferencias() {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ page: pagination.page, limit: 30 })
+      const params = new URLSearchParams({ page, limit: 30 })
       if (filtros.desde) params.append('desde', filtros.desde)
       if (filtros.hasta) params.append('hasta', filtros.hasta)
 
       const res = await api.getFull(`/admin/transferencias?${params}`)
       setTransferencias(res.data || [])
       if (res.pagination) {
-        setPagination(prev => ({
-          ...prev,
-          pages: res.pagination.pages,
-          total: res.pagination.total
-        }))
+        setPagination(res.pagination)
       }
     } catch (err) {
       console.error('Error cargando transferencias:', err)
@@ -45,7 +45,7 @@ export default function TransferenciasLista() {
 
   function handleFiltroChange(campo, valor) {
     setFiltros(prev => ({ ...prev, [campo]: valor }))
-    setPagination(prev => ({ ...prev, page: 1 }))
+    goToPage(1)
   }
 
   async function handleAnular(id) {
@@ -58,6 +58,106 @@ export default function TransferenciasLista() {
       alert(err.message || 'Error al anular')
     }
   }
+
+  const columns = [
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      render: (row) => formatDate(row.fecha)
+    },
+    {
+      key: 'numero',
+      label: 'Numero',
+      render: (row) => (
+        <span className="font-mono text-sm text-gray-600">{row.numero}</span>
+      )
+    },
+    {
+      key: 'origen',
+      label: 'Origen',
+      render: (row) => (
+        <div className="text-sm">
+          <p className="font-medium text-gray-800">{row.cajaOrigen?.nombre}</p>
+          <p className="text-xs text-gray-500">{row.cajaOrigen?.codigo}</p>
+        </div>
+      )
+    },
+    {
+      key: 'flecha',
+      label: '',
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: () => <ArrowRightLeft className="w-4 h-4 text-blue-500 mx-auto" />
+    },
+    {
+      key: 'destino',
+      label: 'Destino',
+      render: (row) => (
+        <div className="text-sm">
+          <p className="font-medium text-gray-800">{row.cajaDestino?.nombre}</p>
+          <p className="text-xs text-gray-500">{row.cajaDestino?.codigo}</p>
+        </div>
+      )
+    },
+    {
+      key: 'monto',
+      label: 'Monto',
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (row) => (
+        <span className="font-bold text-blue-600">
+          {formatCurrency(row.monto)}
+        </span>
+      )
+    },
+    {
+      key: 'concepto',
+      label: 'Concepto',
+      render: (row) => (
+        <div>
+          {row.concepto?.nombre || '-'}
+          {row.descripcion && (
+            <p className="text-xs text-gray-400">{row.descripcion}</p>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      className: 'text-center',
+      cellClassName: 'text-center',
+      render: (row) => (
+        row.estado === 'ANULADO' ? (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+            <Ban className="w-3 h-3" />
+            Anulado
+          </span>
+        ) : (
+          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+            Confirmado
+          </span>
+        )
+      )
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (row) => (
+        row.estado !== 'ANULADO' && tienePermiso(PERMISOS.CAJA_ANULAR) && (
+          <button
+            onClick={() => handleAnular(row.id)}
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+            title="Anular transferencia"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        )
+      )
+    }
+  ]
 
   return (
     <div>
@@ -99,7 +199,7 @@ export default function TransferenciasLista() {
         />
         {(filtros.desde || filtros.hasta) && (
           <button
-            onClick={() => { setFiltros({ desde: '', hasta: '' }); setPagination(prev => ({ ...prev, page: 1 })) }}
+            onClick={() => { setFiltros({ desde: '', hasta: '' }); goToPage(1) }}
             className="text-xs text-gray-500 hover:text-primary"
           >
             Limpiar
@@ -120,111 +220,20 @@ export default function TransferenciasLista() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Fecha</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Numero</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Origen</th>
-                    <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600"></th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Destino</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600">Monto</th>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Concepto</th>
-                    <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600">Estado</th>
-                    <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {transferencias.map((t) => (
-                    <tr key={t.id} className={`hover:bg-gray-50 ${t.estado === 'ANULADO' ? 'bg-gray-50 opacity-60' : ''}`}>
-                      <td className="px-4 py-3 text-sm">
-                        {new Date(t.fecha).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-sm text-gray-600">{t.numero}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm">
-                          <p className="font-medium text-gray-800">{t.cajaOrigen?.nombre}</p>
-                          <p className="text-xs text-gray-500">{t.cajaOrigen?.codigo}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <ArrowRightLeft className="w-4 h-4 text-blue-500 mx-auto" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm">
-                          <p className="font-medium text-gray-800">{t.cajaDestino?.nombre}</p>
-                          <p className="text-xs text-gray-500">{t.cajaDestino?.codigo}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-bold text-blue-600">
-                          ${t.monto.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        <div>
-                          {t.concepto?.nombre || '-'}
-                          {t.descripcion && (
-                            <p className="text-xs text-gray-400">{t.descripcion}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {t.estado === 'ANULADO' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            <Ban className="w-3 h-3" />
-                            Anulado
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                            Confirmado
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {t.estado !== 'ANULADO' && tienePermiso(PERMISOS.CAJA_ANULAR) && (
-                          <button
-                            onClick={() => handleAnular(t.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                            title="Anular transferencia"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table
+              columns={columns}
+              data={transferencias}
+              emptyMessage="No hay transferencias registradas"
+            />
 
             {/* Paginacion */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                <span className="text-sm text-gray-600">
-                  Pagina {pagination.page} de {pagination.pages}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                    disabled={pagination.page <= 1}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                    disabled={pagination.page >= pagination.pages}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="px-4 border-t border-gray-200 bg-gray-50">
+              <Pagination
+                pagination={pagination}
+                page={page}
+                onPageChange={goToPage}
+              />
+            </div>
           </>
         )}
       </div>

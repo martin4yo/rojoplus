@@ -393,7 +393,7 @@ router.get('/actividades/:id', asyncHandler(async (req, res) => {
       categorias: {
         where: { activo: true },
         include: {
-          horarios: {
+          horariosRecurrentes: {
             orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }]
           },
           _count: {
@@ -425,11 +425,12 @@ router.get('/actividades/:id', asyncHandler(async (req, res) => {
       edadMaxima: cat.edadMaxima,
       cupoMaximo: cat.cupoMaximo,
       genero: cat.genero,
-      horarios: cat.horarios.map(h => ({
+      horarios: cat.horariosRecurrentes.map(h => ({
         diaSemana: h.diaSemana,
         horaInicio: h.horaInicio,
         horaFin: h.horaFin
-      }))
+      })),
+      _count: cat._count
     }))
   })
 }))
@@ -547,6 +548,494 @@ router.get('/galeria/album/:id', asyncHandler(async (req, res) => {
   // })
 
   res.json({ fotos: [] })
+}))
+
+// =============================================================================
+// ACTIVIDADES DEPORTIVAS
+// =============================================================================
+
+/**
+ * Helper: Generar instancias de entrenamientos recurrentes en un rango de fechas
+ */
+function generarInstanciasEntrenamientos(horarios, fechaDesde, fechaHasta) {
+  const instancias = []
+
+  for (const horario of horarios) {
+    let fecha = new Date(fechaDesde)
+
+    // Avanzar hasta el primer día de la semana que coincida
+    // diaSemana: 1=Lunes, 2=Martes, ..., 7=Domingo
+    // getDay(): 0=Domingo, 1=Lunes, ..., 6=Sábado
+    const diaObjetivo = horario.diaSemana === 7 ? 0 : horario.diaSemana
+
+    while (fecha.getDay() !== diaObjetivo) {
+      fecha.setDate(fecha.getDate() + 1)
+    }
+
+    // Generar instancias hasta la fecha final
+    while (fecha <= fechaHasta) {
+      instancias.push({
+        id: `entrenamiento-${horario.id}-${fecha.toISOString().split('T')[0]}`,
+        tipo: 'entrenamiento',
+        fecha: new Date(fecha),
+        hora: horario.horaInicio,
+        horaInicio: horario.horaInicio,
+        horaFin: horario.horaFin,
+        titulo: `Entrenamiento ${horario.categoriaActividad.nombre}`,
+        actividad: horario.categoriaActividad.actividad.nombre,
+        actividadId: horario.categoriaActividad.actividadId,
+        categoria: horario.categoriaActividad.nombre,
+        categoriaId: horario.categoriaActividadId,
+        diaSemana: horario.diaSemana
+      })
+
+      fecha.setDate(fecha.getDate() + 7) // Siguiente semana
+    }
+  }
+
+  return instancias.sort((a, b) => a.fecha - b.fecha)
+}
+
+/**
+ * Helper: Calcular rango de fechas según preset
+ */
+function calcularRangoFecha(preset) {
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+
+  switch (preset) {
+    case 'hoy':
+      return {
+        desde: new Date(hoy),
+        hasta: new Date(hoy)
+      }
+
+    case 'esta-semana': {
+      const desde = new Date(hoy)
+      const diaActual = desde.getDay()
+      const diasHastaLunes = diaActual === 0 ? -6 : 1 - diaActual
+      desde.setDate(desde.getDate() + diasHastaLunes)
+
+      const hasta = new Date(desde)
+      hasta.setDate(hasta.getDate() + 6)
+
+      return { desde, hasta }
+    }
+
+    case 'proxima-semana': {
+      const desde = new Date(hoy)
+      const diaActual = desde.getDay()
+      const diasHastaLunes = diaActual === 0 ? 1 : 8 - diaActual
+      desde.setDate(desde.getDate() + diasHastaLunes)
+
+      const hasta = new Date(desde)
+      hasta.setDate(hasta.getDate() + 6)
+
+      return { desde, hasta }
+    }
+
+    case 'este-mes': {
+      const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+      const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)
+
+      return { desde, hasta }
+    }
+
+    case 'proximo-mes': {
+      const desde = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1)
+      const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0)
+
+      return { desde, hasta }
+    }
+
+    default:
+      // Por defecto: próximos 7 días
+      return {
+        desde: new Date(hoy),
+        hasta: new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000)
+      }
+  }
+}
+
+/**
+ * GET /api/public/cronograma
+ * Cronograma general de entrenamientos y partidos
+ *
+ * Query params:
+ *   - actividadIds: "1,2,3" (IDs de actividades a filtrar)
+ *   - categoriaIds: "5,8,12" (IDs de categorías a filtrar)
+ *   - desde: "2026-02-10" (fecha inicio)
+ *   - hasta: "2026-02-17" (fecha fin)
+ *   - preset: "hoy|esta-semana|proxima-semana|este-mes|proximo-mes"
+ *   - tipos: "entrenamientos,partidos,eventos" (tipos a incluir)
+ */
+router.get('/cronograma', asyncHandler(async (req, res) => {
+  const {
+    actividadIds,
+    categoriaIds,
+    desde,
+    hasta,
+    preset,
+    tipos = 'entrenamientos,partidos'
+  } = req.query
+
+  // Parsear arrays de IDs
+  const actividades = actividadIds ? actividadIds.split(',').map(Number).filter(Boolean) : []
+  const categorias = categoriaIds ? categoriaIds.split(',').map(Number).filter(Boolean) : []
+  const tiposArray = tipos.split(',').map(t => t.trim())
+
+  // Calcular rango de fechas
+  let fechaDesde, fechaHasta
+
+  if (preset) {
+    const rango = calcularRangoFecha(preset)
+    fechaDesde = rango.desde
+    fechaHasta = rango.hasta
+  } else {
+    fechaDesde = desde ? new Date(desde) : new Date()
+    fechaHasta = hasta ? new Date(hasta) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // +30 días
+  }
+
+  fechaDesde.setHours(0, 0, 0, 0)
+  fechaHasta.setHours(23, 59, 59, 999)
+
+  const resultado = {
+    entrenamientos: [],
+    partidos: [],
+    eventos: []
+  }
+
+  // 1. ENTRENAMIENTOS (horarios recurrentes)
+  if (tiposArray.includes('entrenamientos')) {
+    const whereEntrenamientos = { activo: true }
+
+    if (categorias.length > 0) {
+      whereEntrenamientos.categoriaActividadId = { in: categorias }
+    }
+
+    let horarios = await req.prisma.horarioRecurrente.findMany({
+      where: whereEntrenamientos,
+      include: {
+        categoriaActividad: {
+          include: {
+            actividad: true
+          }
+        }
+      },
+      orderBy: [
+        { diaSemana: 'asc' },
+        { horaInicio: 'asc' }
+      ]
+    })
+
+    // Filtrar por actividades si se especificó
+    if (actividades.length > 0) {
+      horarios = horarios.filter(h =>
+        actividades.includes(h.categoriaActividad.actividadId)
+      )
+    }
+
+    // Generar instancias de entrenamientos en el rango de fechas
+    resultado.entrenamientos = generarInstanciasEntrenamientos(
+      horarios,
+      fechaDesde,
+      fechaHasta
+    )
+  }
+
+  // 2. PARTIDOS
+  if (tiposArray.includes('partidos')) {
+    const wherePartidos = {
+      fecha: {
+        gte: fechaDesde,
+        lte: fechaHasta
+      }
+    }
+
+    if (categorias.length > 0) {
+      wherePartidos.categoriaActividadId = { in: categorias }
+    }
+
+    let partidos = await req.prisma.partido.findMany({
+      where: wherePartidos,
+      include: {
+        categoriaActividad: {
+          include: {
+            actividad: true
+          }
+        },
+        espacio: true
+      },
+      orderBy: [
+        { fecha: 'asc' },
+        { hora: 'asc' }
+      ]
+    })
+
+    // Filtrar por actividades
+    if (actividades.length > 0) {
+      partidos = partidos.filter(p =>
+        actividades.includes(p.categoriaActividad.actividadId)
+      )
+    }
+
+    resultado.partidos = partidos.map(p => ({
+      id: p.id,
+      tipo: 'partido',
+      fecha: p.fecha,
+      hora: p.hora,
+      titulo: `${p.categoriaActividad.nombre} vs ${p.rival}`,
+      actividad: p.categoriaActividad.actividad.nombre,
+      actividadId: p.categoriaActividad.actividadId,
+      categoria: p.categoriaActividad.nombre,
+      categoriaId: p.categoriaActividadId,
+      rival: p.rival,
+      condicion: p.condicion,
+      tipoPartido: p.tipo,
+      ubicacion: p.ubicacion,
+      espacio: p.espacio?.nombre,
+      estado: p.estado,
+      resultado: p.estado === 'FINALIZADO' ? {
+        golesLocal: p.golesLocal,
+        golesVisitante: p.golesVisitante
+      } : null
+    }))
+  }
+
+  res.json({
+    success: true,
+    filtros: {
+      actividades,
+      categorias,
+      desde: fechaDesde,
+      hasta: fechaHasta,
+      tipos: tiposArray
+    },
+    data: resultado
+  })
+}))
+
+/**
+ * GET /api/public/actividades/:id/staff
+ * Obtener staff técnico de una actividad (desde entrenadores)
+ */
+router.get('/actividades/:id/staff', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { categoriaId } = req.query
+
+  // Buscar entrenadores que:
+  // 1. Tienen mostrarEnWeb = true
+  // 2. Están asignados a categorías de esta actividad
+  const whereCategoria = {
+    activo: true
+  }
+
+  if (categoriaId) {
+    whereCategoria.categoriaActividadId = parseInt(categoriaId)
+  } else {
+    // Obtener todas las categorías de esta actividad
+    const categorias = await req.prisma.categoriaActividad.findMany({
+      where: { actividadId: parseInt(id), activo: true },
+      select: { id: true }
+    })
+    whereCategoria.categoriaActividadId = {
+      in: categorias.map(c => c.id)
+    }
+  }
+
+  const asignaciones = await req.prisma.entrenadorCategoria.findMany({
+    where: whereCategoria,
+    include: {
+      entrenador: {
+        where: {
+          mostrarEnWeb: true,
+          activo: true
+        }
+      },
+      categoriaActividad: {
+        select: {
+          id: true,
+          nombre: true,
+          codigo: true
+        }
+      }
+    },
+    orderBy: [
+      { entrenador: { ordenStaff: 'asc' } },
+      { entrenador: { apellido: 'asc' } }
+    ]
+  })
+
+  // Filtrar solo las asignaciones donde el entrenador existe y está visible
+  const staffVisible = asignaciones
+    .filter(a => a.entrenador && a.entrenador.mostrarEnWeb)
+    .map(a => ({
+      id: a.entrenador.id,
+      nombre: a.entrenador.nombre,
+      apellido: a.entrenador.apellido || '',
+      nombreCompleto: `${a.entrenador.nombre} ${a.entrenador.apellido || ''}`.trim(),
+      rol: a.rol,
+      foto: a.entrenador.fotoStaff,
+      email: a.entrenador.emailPublico,
+      telefono: a.entrenador.telefonoPublico,
+      biografia: a.entrenador.biografiaStaff,
+      categoria: {
+        id: a.categoriaActividad.id,
+        nombre: a.categoriaActividad.nombre,
+        codigo: a.categoriaActividad.codigo
+      }
+    }))
+
+  res.json({
+    success: true,
+    data: staffVisible
+  })
+}))
+
+/**
+ * GET /api/public/actividades/:id/noticias
+ * Obtener noticias de una actividad
+ */
+router.get('/actividades/:id/noticias', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { limit = 10, offset = 0, categoriaId } = req.query
+
+  const where = {
+    actividadId: parseInt(id),
+    activo: true
+  }
+
+  if (categoriaId) {
+    where.categoriaId = parseInt(categoriaId)
+  }
+
+  const noticias = await req.prisma.noticiaDeportiva.findMany({
+    where,
+    include: {
+      categoria: {
+        select: {
+          id: true,
+          nombre: true
+        }
+      }
+    },
+    orderBy: [
+      { destacada: 'desc' },
+      { fechaPublicacion: 'desc' }
+    ],
+    take: parseInt(limit),
+    skip: parseInt(offset)
+  })
+
+  const total = await req.prisma.noticiaDeportiva.count({ where })
+
+  res.json({
+    success: true,
+    data: noticias,
+    pagination: {
+      total,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      hasMore: total > parseInt(offset) + parseInt(limit)
+    }
+  })
+}))
+
+/**
+ * GET /api/public/partidos/proximos
+ * Obtener próximos partidos
+ */
+router.get('/partidos/proximos', asyncHandler(async (req, res) => {
+  const { actividadId, categoriaId, limit = 10 } = req.query
+
+  const where = {
+    fecha: {
+      gte: new Date()
+    },
+    estado: 'PROGRAMADO'
+  }
+
+  if (actividadId) {
+    const actividad = await req.prisma.actividad.findUnique({
+      where: { id: parseInt(actividadId) },
+      include: {
+        categorias: {
+          select: { id: true }
+        }
+      }
+    })
+
+    if (actividad) {
+      where.categoriaActividadId = {
+        in: actividad.categorias.map(c => c.id)
+      }
+    }
+  }
+
+  if (categoriaId) {
+    where.categoriaActividadId = parseInt(categoriaId)
+  }
+
+  const partidos = await req.prisma.partido.findMany({
+    where,
+    include: {
+      categoriaActividad: {
+        include: {
+          actividad: true
+        }
+      },
+      espacio: true
+    },
+    orderBy: [
+      { fecha: 'asc' },
+      { hora: 'asc' }
+    ],
+    take: parseInt(limit)
+  })
+
+  res.json({
+    success: true,
+    data: partidos.map(p => ({
+      id: p.id,
+      fecha: p.fecha,
+      hora: p.hora,
+      actividad: p.categoriaActividad.actividad.nombre,
+      categoria: p.categoriaActividad.nombre,
+      rival: p.rival,
+      condicion: p.condicion,
+      tipo: p.tipo,
+      ubicacion: p.condicion === 'VISITANTE' ? p.ubicacion : (p.espacio?.nombre || 'A confirmar'),
+      espacio: p.espacio
+    }))
+  })
+}))
+
+/**
+ * GET /api/public/reglamento
+ * Obtener reglamento de convivencia
+ */
+router.get('/reglamento', asyncHandler(async (req, res) => {
+  const articulos = await req.prisma.articuloReglamento.findMany({
+    where: { activo: true },
+    orderBy: [
+      { seccion: 'asc' },
+      { orden: 'asc' }
+    ]
+  })
+
+  // Agrupar por sección
+  const porSeccion = articulos.reduce((acc, art) => {
+    if (!acc[art.seccion]) {
+      acc[art.seccion] = []
+    }
+    acc[art.seccion].push(art)
+    return acc
+  }, {})
+
+  res.json({
+    success: true,
+    data: porSeccion
+  })
 }))
 
 export default router

@@ -132,6 +132,9 @@ const permisos = [
   // Sistema
   { codigo: 'USUARIOS_GESTIONAR', nombre: 'Gestionar Usuarios', modulo: 'SISTEMA' },
   { codigo: 'COMERCIOS_GESTIONAR', nombre: 'Gestionar Comercios', modulo: 'SISTEMA' },
+  // Control de Accesos
+  { codigo: 'ACCESOS_VER', nombre: 'Ver Control de Accesos', modulo: 'ACCESOS' },
+  { codigo: 'ACCESOS_GESTIONAR', nombre: 'Gestionar Control de Accesos', modulo: 'ACCESOS' },
 ];
 
 const conceptosTesoreria = [

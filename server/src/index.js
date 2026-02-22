@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename)
 import rubrosRoutes from './routes/rubros.js'
 import comerciosRoutes from './routes/comercios.js'
 import comercioRoutes from './routes/comercio.js'
-import adminRoutes from './routes/admin.js'
+import adminRoutes from './routes/admin/index.js'
 import socioRoutes from './routes/socio.js'
 import pagosRoutes from './routes/pagos.js'
 import contabilidadRoutes from './routes/contabilidad.js'
@@ -42,6 +42,10 @@ import pasajeCategoriaRoutes from './routes/pasajeCategoria.js'
 import conciliacionBancariaRoutes from './routes/conciliacionBancaria.js'
 import buffetRoutes from './routes/buffet.js'
 import adjuntosRoutes from './routes/adjuntos.js'
+import staffTecnicoRoutes from './routes/staffTecnico.js'
+import noticiasDeportivasRoutes from './routes/noticiasDeportivas.js'
+import reglamentoRoutes from './routes/reglamento.js'
+import accesosRoutes from './routes/accesos.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -106,6 +110,10 @@ app.use('/api/admin/categorias/pasaje', pasajeCategoriaRoutes)
 app.use('/api/admin/conciliacion', conciliacionBancariaRoutes)
 app.use('/api/admin/buffet', buffetRoutes)
 app.use('/api/admin/adjuntos', adjuntosRoutes)
+app.use('/api/admin/staff-tecnico', staffTecnicoRoutes)
+app.use('/api/admin/noticias-deportivas', noticiasDeportivasRoutes)
+app.use('/api/admin/reglamento', reglamentoRoutes)
+app.use('/api/accesos', accesosRoutes)
 app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
 
 // Health check
@@ -143,3 +151,4 @@ process.on('SIGINT', async () => {
   console.log('✅ Servidor cerrado correctamente\n')
   process.exit()
 })
+

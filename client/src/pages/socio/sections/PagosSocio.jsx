@@ -17,6 +17,8 @@ import {
 } from '@heroicons/react/24/outline'
 // import { Smartphone } from 'lucide-react' // MODO temporalmente oculto
 import { useModal } from '../../../components/Modal'
+import { formatDate, formatCurrency } from '../../../utils/formatters'
+import StatusBadge from '../../../components/StatusBadge'
 
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [cuotas, setCuotas] = useState([])
@@ -280,30 +282,6 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
     }
   }
 
-  const formatMonto = (monto) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-      minimumFractionDigits: 0,
-    }).format(monto)
-  }
-
-  const formatFecha = (fecha) => {
-    return new Date(fecha).toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    })
-  }
-
-  const getEstadoLabel = (estado) => {
-    const estados = {
-      PENDIENTE: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800' },
-      PAGADO: { label: 'Pagado', color: 'bg-green-100 text-green-800' },
-      VENCIDO: { label: 'Vencido', color: 'bg-red-100 text-red-800' },
-    }
-    return estados[estado] || estados.PENDIENTE
-  }
 
   if (loading) {
     return (
@@ -347,7 +325,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
             </div>
           </div>
           <h3 className="text-sm font-medium text-gray-600 mb-1">Total a Pagar</h3>
-          <p className="text-2xl font-bold text-blue-600">{formatMonto(totalPendiente)}</p>
+          <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalPendiente, { minimumFractionDigits: 0 })}</p>
         </div>
       </div>
 
@@ -407,7 +385,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">Opciones de pago</h3>
-                      <span className="text-sm font-medium text-gray-600">Total: {formatMonto(totalPendiente)}</span>
+                      <span className="text-sm font-medium text-gray-600">Total: {formatCurrency(totalPendiente, { minimumFractionDigits: 0 })}</span>
                     </div>
 
                     {!modoTransferencia ? (
@@ -591,7 +569,6 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
 
               {/* Lista de cuotas */}
               {cuotas.map((cuota) => {
-                const estado = getEstadoLabel(cuota.estado)
                 return (
                   <div key={cuota.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-6">
@@ -601,20 +578,20 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                           <p className="text-gray-600 mt-1">
                             Periodo: {cuota.periodo} {cuota.anio}
                           </p>
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mt-2 ${estado.color}`}>
-                            {estado.label}
-                          </span>
+                          <div className="mt-2">
+                            <StatusBadge status={cuota.estado} type="cuota" />
+                          </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-gray-900">{formatMonto(cuota.montoTotal)}</p>
-                          <p className="text-sm text-gray-500 mt-1">Vence: {formatFecha(cuota.fechaVencimiento)}</p>
+                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(cuota.montoTotal, { minimumFractionDigits: 0 })}</p>
+                          <p className="text-sm text-gray-500 mt-1">Vence: {formatDate(cuota.fechaVencimiento, { format: 'long' })}</p>
                         </div>
                       </div>
 
                       {cuota.recargo > 0 && (
                         <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-3 mb-4">
                           <p className="text-sm text-orange-800">
-                            Incluye recargo por mora: {formatMonto(cuota.recargo)}
+                            Incluye recargo por mora: {formatCurrency(cuota.recargo, { minimumFractionDigits: 0 })}
                           </p>
                         </div>
                       )}
@@ -668,14 +645,14 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <h4 className="font-semibold text-gray-900">{pago.concepto}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{formatFecha(pago.fecha)}</p>
+                      <p className="text-sm text-gray-600 mt-1">{formatDate(pago.fecha, { format: 'long' })}</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {pago.metodoPago} - {pago.comprobante}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-lg font-bold text-green-600">{formatMonto(pago.monto)}</p>
+                        <p className="text-lg font-bold text-green-600">{formatCurrency(pago.monto, { minimumFractionDigits: 0 })}</p>
                         <CheckCircleIcon className="h-5 w-5 text-green-500 inline ml-2" />
                       </div>
                       <button
@@ -721,13 +698,13 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                   <div className="bg-red-50 rounded-lg p-4">
                     <p className="text-sm text-gray-600 mb-1">Total Debe</p>
                     <p className="text-2xl font-bold text-red-600">
-                      {formatMonto(cuentaCorriente.resumen.totalDebe)}
+                      {formatCurrency(cuentaCorriente.resumen.totalDebe)}
                     </p>
                   </div>
                   <div className="bg-green-50 rounded-lg p-4">
                     <p className="text-sm text-gray-600 mb-1">Total Haber</p>
                     <p className="text-2xl font-bold text-green-600">
-                      {formatMonto(cuentaCorriente.resumen.totalHaber)}
+                      {formatCurrency(cuentaCorriente.resumen.totalHaber)}
                     </p>
                   </div>
                   <div className={`rounded-lg p-4 ${
@@ -737,13 +714,13 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                     <p className={`text-2xl font-bold ${
                       parseFloat(cuentaCorriente.resumen.saldoFinal) > 0 ? 'text-orange-600' : 'text-blue-600'
                     }`}>
-                      {formatMonto(cuentaCorriente.resumen.saldoFinal)}
+                      {formatCurrency(cuentaCorriente.resumen.saldoFinal)}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-sm text-gray-600 mb-1">Pendiente de Pago</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {formatMonto(cuentaCorriente.resumen.totalPendiente)}
+                      {formatCurrency(cuentaCorriente.resumen.totalPendiente)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
                       {cuentaCorriente.resumen.cargosPendientes} cuota(s)
@@ -794,13 +771,13 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                             }`}
                           >
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {formatFecha(mov.fecha)}
+                              {formatDate(mov.fecha, { format: 'long' })}
                             </td>
                             <td className="px-6 py-4 text-sm font-medium text-gray-900">
                               {mov.concepto}
                               {mov.estado === 'PENDIENTE' && (
-                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                                  Pendiente
+                                <span className="ml-2">
+                                  <StatusBadge status="PENDIENTE" type="cuota" size="sm" />
                                 </span>
                               )}
                             </td>
@@ -808,15 +785,15 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                               {mov.detalle}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600 font-medium">
-                              {mov.debe > 0 ? formatMonto(mov.debe) : '-'}
+                              {mov.debe > 0 ? formatCurrency(mov.debe) : '-'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-medium">
-                              {mov.haber > 0 ? formatMonto(mov.haber) : '-'}
+                              {mov.haber > 0 ? formatCurrency(mov.haber) : '-'}
                             </td>
                             <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
                               parseFloat(mov.saldo) > 0 ? 'text-orange-600' : 'text-blue-600'
                             }`}>
-                              {formatMonto(mov.saldo)}
+                              {formatCurrency(mov.saldo)}
                             </td>
                           </tr>
                         ))

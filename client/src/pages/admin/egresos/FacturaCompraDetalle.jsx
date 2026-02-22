@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, CreditCard, XCircle, Building2, Calendar, Package, Clock, CheckCircle, Plus, Trash2, Wallet, AlertCircle } from 'lucide-react'
+import { ArrowLeft, FileText, CreditCard, XCircle, Building2, Package, Plus, Trash2, Wallet, AlertCircle } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
+import StatusBadge from '../../../components/StatusBadge'
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+import { useApiData } from '../../../hooks/useApiData'
 import api from '../../../services/api'
-
-const ESTADOS = {
-  PENDIENTE: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
-  PAGADO: { label: 'Pagado', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-  ANULADO: { label: 'Anulado', color: 'bg-red-100 text-red-600', icon: XCircle }
-}
 
 const TIPOS = {
   FACTURA_COMPRA: { label: 'Factura de Compra', color: 'bg-blue-100 text-blue-700' },
@@ -23,10 +20,24 @@ export default function FacturaCompraDetalle() {
   const navigate = useNavigate()
   const { showModal, ModalComponent } = useModal()
 
-  const [factura, setFactura] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [cajas, setCajas] = useState([])
-  const [mediosPago, setMediosPago] = useState([])
+  // Usar useApiData para cargar datos
+  const { data: factura, loading: loadingFactura, refetch: refetchFactura } = useApiData(
+    `/admin/movimientos-contables/${id}`,
+    {
+      onError: (error) => {
+        showModal({ type: 'error', message: 'Error al cargar la factura' })
+        navigate('/admin/egresos/facturas')
+      }
+    }
+  )
+
+  const { data: cajas = [] } = useApiData('/admin/cajas', {
+    params: { activo: true }
+  })
+
+  const { data: mediosPago = [] } = useApiData('/admin/medios-pago', {
+    params: { activo: true }
+  })
 
   // Estado para múltiples pagos
   const [mostrarPago, setMostrarPago] = useState(false)
@@ -38,41 +49,21 @@ export default function FacturaCompraDetalle() {
   }])
   const [saving, setSaving] = useState(false)
 
+  // Inicializar primer pago cuando cambia la factura o cajas
   useEffect(() => {
-    cargarDatos()
-  }, [id])
-
-  async function cargarDatos() {
-    setLoading(true)
-    try {
-      const [facturaRes, cajasRes, mediosRes] = await Promise.all([
-        api.getFull(`/admin/movimientos-contables/${id}`),
-        api.getFull('/admin/cajas?activo=true'),
-        api.getFull('/admin/medios-pago?activo=true')
-      ])
-      setFactura(facturaRes.data)
-      setCajas(cajasRes.data || [])
-      setMediosPago(mediosRes.data || mediosRes || [])
-
-      // Inicializar primer pago con saldo pendiente y primera caja
-      if (facturaRes.data.saldoPendiente > 0 && cajasRes.data?.length) {
-        const primeraCaja = cajasRes.data[0]
-        const primerMedio = primeraCaja.mediosPagoPermitidos?.[0] || 'TRANSFERENCIA'
-        setPagos([{
-          cajaId: primeraCaja.id.toString(),
-          medioPago: primerMedio,
-          monto: facturaRes.data.saldoPendiente.toString(),
-          nroOperacion: ''
-        }])
-      }
-    } catch (err) {
-      console.error('Error cargando factura:', err)
-      showModal({ type: 'error', message: 'Error al cargar la factura' })
-      navigate('/admin/egresos/facturas')
-    } finally {
-      setLoading(false)
+    if (factura?.saldoPendiente > 0 && cajas?.length) {
+      const primeraCaja = cajas[0]
+      const primerMedio = primeraCaja.mediosPagoPermitidos?.[0] || 'TRANSFERENCIA'
+      setPagos([{
+        cajaId: primeraCaja.id.toString(),
+        medioPago: primerMedio,
+        monto: factura.saldoPendiente.toString(),
+        nroOperacion: ''
+      }])
     }
-  }
+  }, [factura?.id, cajas?.length])
+
+  const loading = loadingFactura
 
   // Obtener medios de pago permitidos para una caja
   function getMediosPermitidos(cajaId) {
@@ -93,7 +84,7 @@ export default function FacturaCompraDetalle() {
       onConfirm: async () => {
         try {
           await api.post(`/admin/movimientos-contables/${id}/anular`)
-          await cargarDatos()
+          await refetchFactura()
           showModal({ type: 'success', message: 'Factura anulada correctamente' })
         } catch (err) {
           showModal({ type: 'error', message: err.message || 'Error al anular factura' })
@@ -173,7 +164,7 @@ export default function FacturaCompraDetalle() {
       if (caja && parseFloat(pago.monto) > caja.saldoActual) {
         showModal({
           type: 'warning',
-          message: `Saldo insuficiente en caja ${caja.nombre}. Disponible: ${formatMonto(caja.saldoActual)}`
+          message: `Saldo insuficiente en caja ${caja.nombre}. Disponible: ${formatCurrency(caja.saldoActual)}`
         })
         return
       }
@@ -204,7 +195,7 @@ export default function FacturaCompraDetalle() {
         }))
       })
 
-      await cargarDatos()
+      await refetchFactura()
       setMostrarPago(false)
       showModal({ type: 'success', message: 'Pago registrado correctamente' })
     } catch (err) {
@@ -212,21 +203,6 @@ export default function FacturaCompraDetalle() {
     } finally {
       setSaving(false)
     }
-  }
-
-  function formatFecha(fecha) {
-    return new Date(fecha).toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
-  }
-
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
   }
 
   if (loading) {
@@ -239,9 +215,7 @@ export default function FacturaCompraDetalle() {
 
   if (!factura) return null
 
-  const estadoConfig = ESTADOS[factura.estado]
   const tipoConfig = TIPOS[factura.tipo]
-  const EstadoIcon = estadoConfig?.icon || FileText
 
   return (
     <div>
@@ -265,10 +239,7 @@ export default function FacturaCompraDetalle() {
                 <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${tipoConfig?.color}`}>
                   {tipoConfig?.label || factura.tipo}
                 </span>
-                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${estadoConfig?.color}`}>
-                  <EstadoIcon className="w-3 h-3" />
-                  {estadoConfig?.label || factura.estado}
-                </span>
+                <StatusBadge status={factura.estado} type="pago" />
               </div>
             </div>
           </div>
@@ -330,12 +301,12 @@ export default function FacturaCompraDetalle() {
             )}
             <div className="flex justify-between">
               <span className="text-sm text-gray-600">Fecha:</span>
-              <span className="font-medium">{formatFecha(factura.fecha)}</span>
+              <span className="font-medium">{formatDate(factura.fecha)}</span>
             </div>
             {factura.fechaVencimiento && (
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Vencimiento:</span>
-                <span className="font-medium">{formatFecha(factura.fechaVencimiento)}</span>
+                <span className="font-medium">{formatDate(factura.fechaVencimiento)}</span>
               </div>
             )}
             {factura.concepto && (
@@ -356,33 +327,33 @@ export default function FacturaCompraDetalle() {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-sm text-gray-600">Subtotal:</span>
-              <span className="font-medium">{formatMonto(factura.subtotal)}</span>
+              <span className="font-medium">{formatCurrency(factura.subtotal)}</span>
             </div>
             {factura.iva21 > 0 && (
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">IVA 21%:</span>
-                <span className="font-medium">{formatMonto(factura.iva21)}</span>
+                <span className="font-medium">{formatCurrency(factura.iva21)}</span>
               </div>
             )}
             {factura.iva105 > 0 && (
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">IVA 10.5%:</span>
-                <span className="font-medium">{formatMonto(factura.iva105)}</span>
+                <span className="font-medium">{formatCurrency(factura.iva105)}</span>
               </div>
             )}
             <div className="flex justify-between border-t pt-2">
               <span className="font-semibold text-gray-800">Total:</span>
-              <span className="font-bold text-primary text-lg">{formatMonto(factura.montoTotal)}</span>
+              <span className="font-bold text-primary text-lg">{formatCurrency(factura.montoTotal)}</span>
             </div>
             {factura.estado === 'PENDIENTE' && (
               <>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Pagado:</span>
-                  <span className="font-medium text-green-600">{formatMonto(factura.montoPagado)}</span>
+                  <span className="font-medium text-green-600">{formatCurrency(factura.montoPagado)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-semibold text-gray-800">Saldo pendiente:</span>
-                  <span className="font-bold text-red-600">{formatMonto(factura.saldoPendiente)}</span>
+                  <span className="font-bold text-red-600">{formatCurrency(factura.saldoPendiente)}</span>
                 </div>
               </>
             )}
@@ -425,7 +396,7 @@ export default function FacturaCompraDetalle() {
                         <option value="">Seleccionar...</option>
                         {cajas.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {c.nombre} ({formatMonto(c.saldoActual)})
+                            {c.nombre} ({formatCurrency(c.saldoActual)})
                           </option>
                         ))}
                       </select>
@@ -491,7 +462,7 @@ export default function FacturaCompraDetalle() {
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">Saldo pendiente:</span>
-                <span className="font-medium text-gray-800">{formatMonto(factura.saldoPendiente)}</span>
+                <span className="font-medium text-gray-800">{formatCurrency(factura.saldoPendiente)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total en pagos:</span>
@@ -502,14 +473,14 @@ export default function FacturaCompraDetalle() {
                       ? 'text-red-600'
                       : 'text-yellow-600'
                 }`}>
-                  {formatMonto(calcularTotalPagos())}
+                  {formatCurrency(calcularTotalPagos())}
                 </span>
               </div>
               {calcularTotalPagos() !== factura.saldoPendiente && calcularTotalPagos() > 0 && (
                 <div className="text-sm text-right mt-1">
                   {calcularTotalPagos() < factura.saldoPendiente ? (
                     <span className="text-yellow-600">
-                      Pago parcial: quedará saldo de {formatMonto(factura.saldoPendiente - calcularTotalPagos())}
+                      Pago parcial: quedará saldo de {formatCurrency(factura.saldoPendiente - calcularTotalPagos())}
                     </span>
                   ) : (
                     <span className="text-red-600">
@@ -526,7 +497,7 @@ export default function FacturaCompraDetalle() {
                 Cancelar
               </Button>
               <Button type="submit" disabled={saving || calcularTotalPagos() <= 0 || calcularTotalPagos() > factura.saldoPendiente}>
-                {saving ? 'Guardando...' : `Confirmar Pago (${formatMonto(calcularTotalPagos())})`}
+                {saving ? 'Guardando...' : `Confirmar Pago (${formatCurrency(calcularTotalPagos())})`}
               </Button>
             </div>
           </form>
@@ -573,10 +544,10 @@ export default function FacturaCompraDetalle() {
                       <span className="font-medium">{item.cantidad}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-gray-600">{formatMonto(item.precioUnitario)}</span>
+                      <span className="text-gray-600">{formatCurrency(item.precioUnitario)}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="font-semibold text-gray-800">{formatMonto(item.subtotal)}</span>
+                      <span className="font-semibold text-gray-800">{formatCurrency(item.subtotal)}</span>
                     </td>
                   </tr>
                 ))}
@@ -613,11 +584,11 @@ export default function FacturaCompraDetalle() {
                       <span className="font-mono text-sm font-medium text-primary">{pago.numero}</span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {formatFecha(pago.fecha)}
+                      {formatDate(pago.fecha)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{pago.tipo}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className="font-semibold text-green-600">{formatMonto(pago.montoTotal)}</span>
+                      <span className="font-semibold text-green-600">{formatCurrency(pago.montoTotal)}</span>
                     </td>
                   </tr>
                 ))}

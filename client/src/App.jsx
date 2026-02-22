@@ -17,6 +17,7 @@ import AutoridadesPublic from './pages/public/Autoridades'
 import MisionPublic from './pages/public/Mision'
 import ActividadDetallePublic from './pages/public/ActividadDetalle'
 import CalendarioPublic from './pages/public/Calendario'
+import CronogramaPublic from './pages/public/Cronograma'
 import GaleriaPublic from './pages/public/Galeria'
 import NotFoundPublic from './pages/public/NotFound'
 
@@ -183,6 +184,12 @@ import BuffetTakeAway from './pages/admin/buffet/BuffetTakeAway'
 import BuffetImpresoras from './pages/admin/buffet/BuffetImpresoras'
 import MenuBuffet from './pages/public/MenuBuffet'
 
+// Control de Accesos
+import MonitorAccesos from './pages/admin/accesos/MonitorAccesos'
+import IntentosDenegados from './pages/admin/accesos/IntentosDenegados'
+import Habilitaciones from './pages/admin/accesos/Habilitaciones'
+import ControlPWA from './pages/admin/accesos/ControlPWA'
+
 // Layout admin
 import AdminLayout from './components/AdminLayout'
 
@@ -199,6 +206,7 @@ function App() {
           <Route path="actividades" element={<ActividadesPublic />} />
           <Route path="actividades/:id" element={<ActividadDetallePublic />} />
           <Route path="calendario" element={<CalendarioPublic />} />
+          <Route path="cronograma" element={<CronogramaPublic />} />
           <Route path="galeria" element={<GaleriaPublic />} />
           <Route path="historia" element={<HistoriaPublic />} />
           <Route path="mision" element={<MisionPublic />} />
@@ -391,6 +399,12 @@ function App() {
         <Route path="buffet/kiosco" element={<BuffetKiosco />} />
         <Route path="buffet/takeaway" element={<BuffetTakeAway />} />
         <Route path="buffet/impresoras" element={<BuffetImpresoras />} />
+
+        {/* Control de Accesos */}
+        <Route path="accesos/monitor" element={<MonitorAccesos />} />
+        <Route path="accesos/intentos-denegados" element={<IntentosDenegados />} />
+        <Route path="accesos/habilitaciones" element={<Habilitaciones />} />
+        <Route path="accesos/control-pwa" element={<ControlPWA />} />
       </Route>
       </Routes>
       </NotificacionBuffetProvider>

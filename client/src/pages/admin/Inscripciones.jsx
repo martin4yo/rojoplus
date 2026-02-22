@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Plus, Edit2, X, Search, Filter, UserMinus, Download } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import Modal from '../../components/Modal'
+import { SearchInputWithDropdown } from '../../components/SearchInput'
+import Pagination from '../../components/Pagination'
+import StatusBadge from '../../components/StatusBadge'
+import SelectCentroCosto from '../../components/SelectCentroCosto'
+import { formatDate } from '../../utils/formatters'
+import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 
@@ -24,9 +31,8 @@ export default function Inscripciones() {
   const [estado, setEstado] = useState('')
   const [search, setSearch] = useState('')
 
-  // Paginación
-  const [page, setPage] = useState(1)
-  const [pagination, setPagination] = useState(null)
+  // Paginación usando hook
+  const { page, pagination, setPagination, goToPage } = usePagination()
 
   // Modales
   const [modalNueva, setModalNueva] = useState(false)
@@ -41,18 +47,21 @@ export default function Inscripciones() {
     categoriaActividadId: '',
     exentoCuota: false,
     porcentajeCuota: 100,
-    observaciones: ''
+    observaciones: '',
+    centroCostoId: ''
   })
 
   // Búsqueda de socio
   const [busquedaSocio, setBusquedaSocio] = useState('')
   const [buscandoSocio, setBuscandoSocio] = useState(false)
+  const [socioSeleccionado, setSocioSeleccionado] = useState(null)
 
   // Formulario editar
   const [formEditar, setFormEditar] = useState({
     exentoCuota: false,
     porcentajeCuota: 100,
-    observaciones: ''
+    observaciones: '',
+    centroCostoId: ''
   })
 
   // Formulario baja
@@ -85,7 +94,6 @@ export default function Inscripciones() {
       if (estado) params.append('estado', estado)
       if (search) params.append('q', search)
 
-      // Usar getFull para obtener data + pagination
       const response = await api.getFull(`/admin/inscripciones?${params}`)
       setInscripciones(response?.data || [])
       setPagination(response?.pagination || null)
@@ -123,7 +131,6 @@ export default function Inscripciones() {
 
     setBuscandoSocio(true)
     try {
-      // Solo buscar socios activos o vigentes para inscripciones
       const data = await api.get(`/admin/socios?q=${encodeURIComponent(query)}&limit=10&estadosValidos=ACTIVO,VIGENTE`)
       setSociosBuscados(data?.socios || [])
     } catch (err) {
@@ -133,9 +140,29 @@ export default function Inscripciones() {
     }
   }
 
+  useEffect(() => {
+    if (busquedaSocio.length < 2) {
+      setSociosBuscados([])
+      return
+    }
+
+    const timer = setTimeout(() => {
+      buscarSocio(busquedaSocio)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [busquedaSocio])
+
+  function handleSeleccionarSocio(socio) {
+    setSocioSeleccionado(socio)
+    setFormNueva(prev => ({ ...prev, socioId: socio.id }))
+    setBusquedaSocio('')
+    setSociosBuscados([])
+  }
+
   function handleBuscar(e) {
     e.preventDefault()
-    setPage(1)
+    goToPage(1)
     cargarInscripciones()
   }
 
@@ -144,7 +171,23 @@ export default function Inscripciones() {
     setCategoriaActividadId('')
     setEstado('')
     setSearch('')
-    setPage(1)
+    goToPage(1)
+  }
+
+  function cerrarModalNueva() {
+    setModalNueva(false)
+    setFormNueva({
+      socioId: '',
+      actividadId: '',
+      categoriaActividadId: '',
+      exentoCuota: false,
+      porcentajeCuota: 100,
+      observaciones: '',
+      centroCostoId: ''
+    })
+    setSocioSeleccionado(null)
+    setBusquedaSocio('')
+    setSociosBuscados([])
   }
 
   async function crearInscripcion(e) {
@@ -156,21 +199,15 @@ export default function Inscripciones() {
       return
     }
 
-    console.log('Enviando inscripción:', formNueva)
+    const payload = {
+      ...formNueva,
+      centroCostoId: formNueva.centroCostoId ? parseInt(formNueva.centroCostoId) : null
+    }
+
     try {
-      await api.post('/admin/inscripciones', formNueva)
+      await api.post('/admin/inscripciones', payload)
       setSuccess('Inscripción creada exitosamente')
-      setModalNueva(false)
-      setFormNueva({
-        socioId: '',
-        actividadId: '',
-        categoriaActividadId: '',
-        exentoCuota: false,
-        porcentajeCuota: 100,
-        observaciones: ''
-      })
-      setSociosBuscados([])
-      setBusquedaSocio('')
+      cerrarModalNueva()
       cargarInscripciones()
     } catch (err) {
       console.error('Error al crear inscripción:', err)
@@ -182,8 +219,13 @@ export default function Inscripciones() {
     e.preventDefault()
     setError(null)
 
+    const payload = {
+      ...formEditar,
+      centroCostoId: formEditar.centroCostoId ? parseInt(formEditar.centroCostoId) : null
+    }
+
     try {
-      await api.put(`/admin/inscripciones/${inscripcionSeleccionada.id}`, formEditar)
+      await api.put(`/admin/inscripciones/${inscripcionSeleccionada.id}`, payload)
       setSuccess('Inscripción actualizada')
       setModalEditar(false)
       cargarInscripciones()
@@ -219,7 +261,8 @@ export default function Inscripciones() {
     setFormEditar({
       exentoCuota: inscripcion.exentoCuota || false,
       porcentajeCuota: inscripcion.porcentajeCuota || 100,
-      observaciones: inscripcion.observaciones || ''
+      observaciones: inscripcion.observaciones || '',
+      centroCostoId: inscripcion.centroCostoId || ''
     })
     setModalEditar(true)
   }
@@ -325,7 +368,7 @@ export default function Inscripciones() {
             </label>
             <select
               value={actividadId}
-              onChange={(e) => { setActividadId(e.target.value); setPage(1) }}
+              onChange={(e) => { setActividadId(e.target.value); goToPage(1) }}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todas las actividades</option>
@@ -342,7 +385,7 @@ export default function Inscripciones() {
             </label>
             <select
               value={categoriaActividadId}
-              onChange={(e) => { setCategoriaActividadId(e.target.value); setPage(1) }}
+              onChange={(e) => { setCategoriaActividadId(e.target.value); goToPage(1) }}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
               disabled={!actividadId}
             >
@@ -360,7 +403,7 @@ export default function Inscripciones() {
             </label>
             <select
               value={estado}
-              onChange={(e) => { setEstado(e.target.value); setPage(1) }}
+              onChange={(e) => { setEstado(e.target.value); goToPage(1) }}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos los estados</option>
@@ -442,16 +485,10 @@ export default function Inscripciones() {
                       {inscripcion.categoriaActividad.nombre}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        inscripcion.estado === 'ACTIVA'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {inscripcion.estado}
-                      </span>
+                      <StatusBadge status={inscripcion.estado} type="inscripcion" />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(inscripcion.fechaInicio).toLocaleDateString()}
+                      {formatDate(inscripcion.fechaInicio)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {inscripcion.exentoCuota ? (
@@ -490,380 +527,324 @@ export default function Inscripciones() {
         </div>
 
         {/* Paginación */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Mostrando {(page - 1) * 50 + 1} a {Math.min(page * 50, pagination.total)} de {pagination.total} inscripciones
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm text-gray-500">
-                Página {page} de {pagination.totalPages}
-              </span>
-              <Button
-                variant="outline"
-                onClick={() => setPage(page + 1)}
-                disabled={page === pagination.totalPages}
-              >
-                Siguiente
-              </Button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          pagination={pagination}
+          page={page}
+          onPageChange={goToPage}
+        />
       </div>
 
       {/* Modal Nueva Inscripción */}
-      {modalNueva && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-800">Nueva Inscripción</h2>
-              <button
-                onClick={() => {
-                  setModalNueva(false)
-                  setFormNueva({
-                    socioId: '',
-                    actividadId: '',
-                    categoriaActividadId: '',
-                    exentoCuota: false,
-                    porcentajeCuota: 100,
-                    observaciones: ''
-                  })
-                  setSociosBuscados([])
-                  setBusquedaSocio('')
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={crearInscripcion} className="p-6 space-y-4">
-              {/* Buscar Socio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Socio *
-                </label>
-                <input
-                  type="text"
-                  value={busquedaSocio}
-                  onChange={(e) => {
-                    setBusquedaSocio(e.target.value)
-                    buscarSocio(e.target.value)
-                  }}
-                  placeholder="Buscar por nombre o documento..."
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  disabled={!!formNueva.socioId}
-                />
-
-                {/* Resultados búsqueda */}
-                {sociosBuscados.length > 0 && !formNueva.socioId && (
-                  <div className="mt-2 border rounded-lg max-h-48 overflow-y-auto">
-                    {sociosBuscados.map(socio => (
-                      <button
-                        key={socio.id}
-                        type="button"
-                        onClick={() => {
-                          setFormNueva(prev => ({ ...prev, socioId: socio.id }))
-                          setBusquedaSocio(`${socio.apellidoNombre} (${socio.documento || socio.nroSocio})`)
-                          setSociosBuscados([])
-                        }}
-                        className="w-full px-3 py-2 text-left hover:bg-gray-100 border-b last:border-b-0"
-                      >
-                        <div className="font-medium">{socio.apellidoNombre}</div>
-                        <div className="text-sm text-gray-500">#{socio.nroSocio} - DNI: {socio.documento || '-'}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Socio seleccionado */}
-                {formNueva.socioId && (
-                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                    <span className="text-sm text-blue-800">{busquedaSocio}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormNueva(prev => ({ ...prev, socioId: '' }))
-                        setBusquedaSocio('')
-                      }}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Actividad */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Actividad *
-                </label>
-                <select
-                  value={formNueva.actividadId}
-                  onChange={(e) => {
-                    const actId = e.target.value
-                    setFormNueva(prev => ({
-                      ...prev,
-                      actividadId: actId,
-                      categoriaActividadId: ''
-                    }))
-                    if (actId) cargarCategorias(actId)
-                  }}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Seleccionar actividad</option>
-                  {actividades.map(act => (
-                    <option key={act.id} value={act.id}>{act.nombre}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Categoría */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Categoría *
-                </label>
-                <select
-                  value={formNueva.categoriaActividadId}
-                  onChange={(e) => setFormNueva(prev => ({ ...prev, categoriaActividadId: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                  disabled={!formNueva.actividadId}
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {categorias.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nombre}
-                      {cat.edadMinima || cat.edadMaxima ? ` (${cat.edadMinima || 0}-${cat.edadMaxima || '+'} años)` : ''}
-                      {cat.cupoMaximo ? ` - Cupo: ${cat.cupoMaximo}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Exento Cuota */}
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formNueva.exentoCuota}
-                    onChange={(e) => setFormNueva(prev => ({ ...prev, exentoCuota: e.target.checked }))}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Exento de cuota</span>
-                </label>
-              </div>
-
-              {/* Porcentaje Cuota */}
-              {!formNueva.exentoCuota && (
+      <Modal
+        isOpen={modalNueva}
+        onClose={cerrarModalNueva}
+        title="Nueva Inscripción"
+        maxWidth="max-w-2xl"
+      >
+        <form onSubmit={crearInscripcion} className="space-y-4">
+          {/* Buscar Socio */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Socio *
+            </label>
+            {socioSeleccionado ? (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Porcentaje de Cuota (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formNueva.porcentajeCuota}
-                    onChange={(e) => setFormNueva(prev => ({ ...prev, porcentajeCuota: parseInt(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="font-medium text-blue-800">{socioSeleccionado.apellidoNombre}</div>
+                  <div className="text-sm text-blue-600">#{socioSeleccionado.nroSocio} - DNI: {socioSeleccionado.documento || '-'}</div>
                 </div>
-              )}
-
-              {/* Observaciones */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observaciones
-                </label>
-                <textarea
-                  value={formNueva.observaciones}
-                  onChange={(e) => setFormNueva(prev => ({ ...prev, observaciones: e.target.value }))}
-                  rows="3"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Observaciones opcionales..."
-                />
-              </div>
-
-              {/* Botones */}
-              <div className="flex gap-3 pt-4">
-                <Button
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => {
-                    setModalNueva(false)
-                    setFormNueva({
-                      socioId: '',
-                      actividadId: '',
-                      categoriaActividadId: '',
-                      exentoCuota: false,
-                      porcentajeCuota: 100,
-                      observaciones: ''
-                    })
-                    setSociosBuscados([])
-                    setBusquedaSocio('')
+                    setSocioSeleccionado(null)
+                    setFormNueva(prev => ({ ...prev, socioId: '' }))
                   }}
-                  className="flex-1"
+                  className="text-blue-600 hover:text-blue-800"
                 >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="flex-1">
-                  Crear Inscripción
-                </Button>
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-            </form>
+            ) : (
+              <SearchInputWithDropdown
+                value={busquedaSocio}
+                onChange={setBusquedaSocio}
+                results={sociosBuscados}
+                loading={buscandoSocio}
+                onSelectResult={handleSeleccionarSocio}
+                renderResult={(socio) => (
+                  <div>
+                    <div className="font-medium">{socio.apellidoNombre}</div>
+                    <div className="text-sm text-gray-500">#{socio.nroSocio} - DNI: {socio.documento || '-'}</div>
+                  </div>
+                )}
+                placeholder="Buscar por nombre o documento..."
+                minChars={2}
+                emptyMessage="No se encontraron socios"
+              />
+            )}
           </div>
-        </div>
-      )}
+
+          {/* Actividad */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Actividad *
+            </label>
+            <select
+              value={formNueva.actividadId}
+              onChange={(e) => {
+                const actId = e.target.value
+                setFormNueva(prev => ({
+                  ...prev,
+                  actividadId: actId,
+                  categoriaActividadId: ''
+                }))
+                if (actId) cargarCategorias(actId)
+              }}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Seleccionar actividad</option>
+              {actividades.map(act => (
+                <option key={act.id} value={act.id}>{act.nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Categoría */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Categoría *
+            </label>
+            <select
+              value={formNueva.categoriaActividadId}
+              onChange={(e) => setFormNueva(prev => ({ ...prev, categoriaActividadId: e.target.value }))}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+              disabled={!formNueva.actividadId}
+            >
+              <option value="">Seleccionar categoría</option>
+              {categorias.map(cat => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.nombre}
+                  {cat.edadMinima || cat.edadMaxima ? ` (${cat.edadMinima || 0}-${cat.edadMaxima || '+'} años)` : ''}
+                  {cat.cupoMaximo ? ` - Cupo: ${cat.cupoMaximo}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Exento Cuota */}
+          <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={formNueva.exentoCuota}
+                onChange={(e) => setFormNueva(prev => ({ ...prev, exentoCuota: e.target.checked }))}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Exento de cuota</span>
+            </label>
+          </div>
+
+          {/* Porcentaje Cuota */}
+          {!formNueva.exentoCuota && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Porcentaje de Cuota (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={formNueva.porcentajeCuota}
+                onChange={(e) => setFormNueva(prev => ({ ...prev, porcentajeCuota: parseInt(e.target.value) || 0 }))}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+
+          {/* Observaciones */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Observaciones
+            </label>
+            <textarea
+              value={formNueva.observaciones}
+              onChange={(e) => setFormNueva(prev => ({ ...prev, observaciones: e.target.value }))}
+              rows="3"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Observaciones opcionales..."
+            />
+          </div>
+
+          {/* Centro de Costo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Centro de Costo
+            </label>
+            <SelectCentroCosto
+              value={formNueva.centroCostoId}
+              onChange={(val) => setFormNueva(prev => ({ ...prev, centroCostoId: val }))}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
+          </div>
+
+          {/* Botones */}
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={cerrarModalNueva}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" className="flex-1">
+              Crear Inscripción
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal Editar Inscripción */}
-      {modalEditar && inscripcionSeleccionada && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-800">Editar Inscripción</h2>
-              <button
-                onClick={() => setModalEditar(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      <Modal
+        isOpen={modalEditar && inscripcionSeleccionada}
+        onClose={() => setModalEditar(false)}
+        title="Editar Inscripción"
+        maxWidth="max-w-md"
+      >
+        {inscripcionSeleccionada && (
+          <form onSubmit={editarInscripcion} className="space-y-4">
+            <div className="p-3 bg-gray-50 rounded-lg mb-4">
+              <div className="text-sm text-gray-600">Socio:</div>
+              <div className="font-medium">{inscripcionSeleccionada.socio?.apellidoNombre || `${inscripcionSeleccionada.socio?.apellidos}, ${inscripcionSeleccionada.socio?.nombres}`}</div>
+              <div className="text-sm text-gray-600 mt-1">Actividad:</div>
+              <div className="font-medium">{inscripcionSeleccionada.categoriaActividad?.actividad?.nombre} - {inscripcionSeleccionada.categoriaActividad?.nombre}</div>
             </div>
 
-            <form onSubmit={editarInscripcion} className="p-6 space-y-4">
-              <div className="p-3 bg-gray-50 rounded-lg mb-4">
-                <div className="text-sm text-gray-600">Socio:</div>
-                <div className="font-medium">{inscripcionSeleccionada.socio?.apellidoNombre || `${inscripcionSeleccionada.socio?.apellidos}, ${inscripcionSeleccionada.socio?.nombres}`}</div>
-                <div className="text-sm text-gray-600 mt-1">Actividad:</div>
-                <div className="font-medium">{inscripcionSeleccionada.categoriaActividad?.actividad?.nombre} - {inscripcionSeleccionada.categoriaActividad?.nombre}</div>
-              </div>
+            {/* Exento Cuota */}
+            <div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formEditar.exentoCuota}
+                  onChange={(e) => setFormEditar(prev => ({ ...prev, exentoCuota: e.target.checked }))}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Exento de cuota</span>
+              </label>
+            </div>
 
-              {/* Exento Cuota */}
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formEditar.exentoCuota}
-                    onChange={(e) => setFormEditar(prev => ({ ...prev, exentoCuota: e.target.checked }))}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Exento de cuota</span>
-                </label>
-              </div>
-
-              {/* Porcentaje Cuota */}
-              {!formEditar.exentoCuota && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Porcentaje de Cuota (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formEditar.porcentajeCuota}
-                    onChange={(e) => setFormEditar(prev => ({ ...prev, porcentajeCuota: parseInt(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              )}
-
-              {/* Observaciones */}
+            {/* Porcentaje Cuota */}
+            {!formEditar.exentoCuota && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observaciones
+                  Porcentaje de Cuota (%)
                 </label>
-                <textarea
-                  value={formEditar.observaciones}
-                  onChange={(e) => setFormEditar(prev => ({ ...prev, observaciones: e.target.value }))}
-                  rows="3"
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formEditar.porcentajeCuota}
+                  onChange={(e) => setFormEditar(prev => ({ ...prev, porcentajeCuota: parseInt(e.target.value) || 0 }))}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Observaciones opcionales..."
                 />
               </div>
+            )}
 
-              {/* Botones */}
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setModalEditar(false)}
-                  className="flex-1"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="flex-1">
-                  Guardar Cambios
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            {/* Observaciones */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observaciones
+              </label>
+              <textarea
+                value={formEditar.observaciones}
+                onChange={(e) => setFormEditar(prev => ({ ...prev, observaciones: e.target.value }))}
+                rows="3"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Observaciones opcionales..."
+              />
+            </div>
+
+            {/* Centro de Costo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Centro de Costo
+              </label>
+              <SelectCentroCosto
+                value={formEditar.centroCostoId}
+                onChange={(val) => setFormEditar(prev => ({ ...prev, centroCostoId: val }))}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setModalEditar(false)}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="flex-1">
+                Guardar Cambios
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {/* Modal Dar de Baja */}
-      {modalBaja && inscripcionSeleccionada && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-800">Dar de Baja</h2>
-              <button
-                onClick={() => setModalBaja(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      <Modal
+        isOpen={modalBaja && inscripcionSeleccionada}
+        onClose={() => setModalBaja(false)}
+        title="Dar de Baja"
+        maxWidth="max-w-md"
+      >
+        {inscripcionSeleccionada && (
+          <form onSubmit={darDeBaja} className="space-y-4">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="text-sm text-red-800">
+                ¿Está seguro de dar de baja esta inscripción?
+              </div>
+              <div className="font-medium mt-2">{inscripcionSeleccionada.socio?.apellidoNombre || `${inscripcionSeleccionada.socio?.apellidos}, ${inscripcionSeleccionada.socio?.nombres}`}</div>
+              <div className="text-sm text-gray-600">{inscripcionSeleccionada.categoriaActividad?.actividad?.nombre} - {inscripcionSeleccionada.categoriaActividad?.nombre}</div>
             </div>
 
-            <form onSubmit={darDeBaja} className="p-6 space-y-4">
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <div className="text-sm text-red-800">
-                  ¿Está seguro de dar de baja esta inscripción?
-                </div>
-                <div className="font-medium mt-2">{inscripcionSeleccionada.socio?.apellidoNombre || `${inscripcionSeleccionada.socio?.apellidos}, ${inscripcionSeleccionada.socio?.nombres}`}</div>
-                <div className="text-sm text-gray-600">{inscripcionSeleccionada.categoriaActividad?.actividad?.nombre} - {inscripcionSeleccionada.categoriaActividad?.nombre}</div>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Motivo de Baja *
+              </label>
+              <textarea
+                value={motivoBaja}
+                onChange={(e) => setMotivoBaja(e.target.value)}
+                rows="3"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                placeholder="Ingrese el motivo de la baja..."
+                required
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Motivo de Baja *
-                </label>
-                <textarea
-                  value={motivoBaja}
-                  onChange={(e) => setMotivoBaja(e.target.value)}
-                  rows="3"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
-                  placeholder="Ingrese el motivo de la baja..."
-                  required
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setModalBaja(false)}
-                  className="flex-1"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700">
-                  Confirmar Baja
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setModalBaja(false)}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700">
+                Confirmar Baja
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   )
 }

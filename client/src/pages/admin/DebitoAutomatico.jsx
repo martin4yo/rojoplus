@@ -9,6 +9,8 @@ import {
 import { Button } from '../../components/Button'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { formatCurrency, formatDate } from '../../utils/formatters'
+import StatusBadge from '../../components/StatusBadge'
 
 export default function DebitoAutomatico() {
   const [activeTab, setActiveTab] = useState('adhesiones')
@@ -524,16 +526,10 @@ export default function DebitoAutomatico() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                              socio.estadoAdhesion === 'ACTIVO' ? 'bg-green-100 text-green-700' :
-                              socio.estadoAdhesion === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>
-                              {socio.estadoAdhesion}
-                            </span>
+                            <StatusBadge status={socio.estadoAdhesion} type="generic" />
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-500">
-                            {new Date(socio.updatedAt).toLocaleDateString('es-AR')}
+                            {formatDate(socio.updatedAt)}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
@@ -662,7 +658,7 @@ export default function DebitoAutomatico() {
                       <div>
                         <span className="text-sm text-gray-500">Monto total:</span>
                         <span className="ml-2 font-bold text-green-600">
-                          ${resumenSocios.montoTotal?.toLocaleString('es-AR')}
+                          {formatCurrency(resumenSocios.montoTotal)}
                         </span>
                       </div>
                     </div>
@@ -731,7 +727,7 @@ export default function DebitoAutomatico() {
                             {socio.cantidadCargos}
                           </td>
                           <td className="px-4 py-3 text-right font-medium text-gray-900">
-                            ${socio.totalDebitar?.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            {formatCurrency(socio.totalDebitar)}
                           </td>
                         </tr>
                       ))}
@@ -803,7 +799,7 @@ export default function DebitoAutomatico() {
                             <span>{archivo.cantidadRegistros} registros</span>
                             <span>•</span>
                             <span className="font-medium text-gray-700">
-                              ${parseFloat(archivo.montoTotal).toLocaleString('es-AR')}
+                              {formatCurrency(archivo.montoTotal)}
                             </span>
                           </div>
 
@@ -898,7 +894,7 @@ export default function DebitoAutomatico() {
                     <option value="">Seleccionar archivo...</option>
                     {archivos.filter(a => a.estado !== 'PROCESADO').map(a => (
                       <option key={a.id} value={a.id}>
-                        {a.numero} - {a.cantidadRegistros} registros (${parseFloat(a.montoTotal).toLocaleString('es-AR')})
+                        {a.numero} - {a.cantidadRegistros} registros ({formatCurrency(a.montoTotal)})
                       </option>
                     ))}
                   </select>
@@ -950,7 +946,7 @@ export default function DebitoAutomatico() {
                     <div>
                       <span className="text-gray-600">Monto cobrado:</span>
                       <span className="ml-2 font-bold text-green-600">
-                        ${resultadoImportacion.resumen.montoCobrado?.toLocaleString('es-AR')}
+                        {formatCurrency(resultadoImportacion.resumen.montoCobrado)}
                       </span>
                     </div>
                   </div>
@@ -982,7 +978,7 @@ export default function DebitoAutomatico() {
                     <div className="flex justify-between border-t pt-2">
                       <span className="text-gray-800 font-medium">Monto Total</span>
                       <span className="font-bold text-primary">
-                        ${estadisticas.archivos.montoTotal?.toLocaleString('es-AR')}
+                        {formatCurrency(estadisticas.archivos.montoTotal)}
                       </span>
                     </div>
                   </div>
@@ -1007,7 +1003,7 @@ export default function DebitoAutomatico() {
                     <div className="flex justify-between border-t pt-2">
                       <span className="text-gray-800 font-medium">Monto Cobrado</span>
                       <span className="font-bold text-green-600">
-                        ${estadisticas.detalles.montoCobrado?.toLocaleString('es-AR')}
+                        {formatCurrency(estadisticas.detalles.montoCobrado)}
                       </span>
                     </div>
                   </div>
@@ -1119,7 +1115,7 @@ export default function DebitoAutomatico() {
                   <p className="text-2xl font-bold text-green-600">{archivoSeleccionado.estadisticas?.cobrados || 0}</p>
                   <p className="text-sm text-green-800">Cobrados</p>
                   <p className="text-xs text-green-600 mt-1">
-                    ${archivoSeleccionado.estadisticas?.montoCobrado?.toLocaleString('es-AR')}
+                    {formatCurrency(archivoSeleccionado.estadisticas?.montoCobrado)}
                   </p>
                 </div>
                 <div className="bg-red-50 rounded-lg p-3 text-center">
@@ -1151,16 +1147,10 @@ export default function DebitoAutomatico() {
                           {d.cbuEnviado?.slice(-8) || '****'}
                         </td>
                         <td className="px-4 py-2 text-right text-sm font-medium">
-                          ${parseFloat(d.importeEnviado).toLocaleString('es-AR')}
+                          {formatCurrency(d.importeEnviado)}
                         </td>
                         <td className="px-4 py-2">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            d.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-800' :
-                            d.estado === 'COBRADO' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {d.estado}
-                          </span>
+                          <StatusBadge status={d.estado} type="pago" size="sm" />
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">
                           {d.codigoRechazo && (

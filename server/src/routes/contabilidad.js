@@ -417,8 +417,8 @@ router.get('/entidades/:id', asyncHandler(async (req, res) => {
 router.post('/entidades', asyncHandler(async (req, res) => {
   const {
     codigo, tipo, razonSocial, nombreFantasia, tipoDocumento, documento,
-    email, telefono, direccion, ciudad, condicionIva, banco, cbu, alias,
-    legajo, cargo, sueldoBasico
+    email, telefono, direccion, ciudad, provincia, codigoPostal, condicionIva,
+    banco, cbu, alias, legajo, cargoPersonalId, sueldoBasico, fechaIngreso, observaciones
   } = req.body
 
   if (!codigo || !tipo || !razonSocial) {
@@ -446,13 +446,17 @@ router.post('/entidades', asyncHandler(async (req, res) => {
       telefono,
       direccion,
       ciudad,
+      provincia,
+      codigoPostal,
       condicionIva,
       banco,
       cbu,
       alias,
       legajo: tipo === 'PERSONAL' ? legajo : null,
-      cargo: tipo === 'PERSONAL' ? cargo : null,
-      sueldoBasico: tipo === 'PERSONAL' && sueldoBasico ? parseFloat(sueldoBasico) : null
+      cargoPersonalId: tipo === 'PERSONAL' && cargoPersonalId ? parseInt(cargoPersonalId) : null,
+      sueldoBasico: tipo === 'PERSONAL' && sueldoBasico ? parseFloat(sueldoBasico) : null,
+      fechaIngreso: tipo === 'PERSONAL' && fechaIngreso ? new Date(fechaIngreso) : null,
+      observaciones
     }
   })
 
@@ -464,8 +468,8 @@ router.put('/entidades/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const {
     codigo, razonSocial, nombreFantasia, tipoDocumento, documento,
-    email, telefono, direccion, ciudad, condicionIva, banco, cbu, alias,
-    legajo, cargo, sueldoBasico, activo
+    email, telefono, direccion, ciudad, provincia, codigoPostal, condicionIva,
+    banco, cbu, alias, legajo, cargoPersonalId, sueldoBasico, fechaIngreso, observaciones, activo
   } = req.body
 
   const existente = await prisma.entidad.findUnique({ where: { id: parseInt(id) } })
@@ -493,13 +497,23 @@ router.put('/entidades/:id', asyncHandler(async (req, res) => {
       telefono: telefono !== undefined ? telefono : existente.telefono,
       direccion: direccion !== undefined ? direccion : existente.direccion,
       ciudad: ciudad !== undefined ? ciudad : existente.ciudad,
+      provincia: provincia !== undefined ? provincia : existente.provincia,
+      codigoPostal: codigoPostal !== undefined ? codigoPostal : existente.codigoPostal,
       condicionIva: condicionIva !== undefined ? condicionIva : existente.condicionIva,
       banco: banco !== undefined ? banco : existente.banco,
       cbu: cbu !== undefined ? cbu : existente.cbu,
       alias: alias !== undefined ? alias : existente.alias,
       legajo: existente.tipo === 'PERSONAL' ? (legajo !== undefined ? legajo : existente.legajo) : null,
-      cargo: existente.tipo === 'PERSONAL' ? (cargo !== undefined ? cargo : existente.cargo) : null,
-      sueldoBasico: existente.tipo === 'PERSONAL' && sueldoBasico !== undefined ? parseFloat(sueldoBasico) : existente.sueldoBasico,
+      cargoPersonalId: existente.tipo === 'PERSONAL' && cargoPersonalId !== undefined
+        ? (cargoPersonalId ? parseInt(cargoPersonalId) : null)
+        : existente.cargoPersonalId,
+      sueldoBasico: existente.tipo === 'PERSONAL' && sueldoBasico !== undefined
+        ? (sueldoBasico ? parseFloat(sueldoBasico) : null)
+        : existente.sueldoBasico,
+      fechaIngreso: existente.tipo === 'PERSONAL' && fechaIngreso !== undefined
+        ? (fechaIngreso ? new Date(fechaIngreso) : null)
+        : existente.fechaIngreso,
+      observaciones: observaciones !== undefined ? observaciones : existente.observaciones,
       activo: activo !== undefined ? activo : existente.activo
     }
   })

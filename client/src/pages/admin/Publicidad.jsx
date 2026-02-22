@@ -17,6 +17,8 @@ import {
   InformationCircleIcon
 } from '@heroicons/react/24/outline'
 import { BANNER_SIZES } from '../../components/public/BannerPublicitario'
+import Modal from '../../components/Modal'
+import ImageUpload from '../../components/ImageUpload'
 
 export default function Publicidad() {
   const [tab, setTab] = useState('banners') // 'banners' | 'sponsors' | 'estadisticas'
@@ -464,28 +466,38 @@ export default function Publicidad() {
       </div>
 
       {/* Modal Banner */}
-      {modalBanner.open && (
-        <ModalBanner
+      <Modal
+        isOpen={modalBanner.open}
+        onClose={() => setModalBanner({ open: false, data: null })}
+        title={modalBanner.data ? 'Editar Banner' : 'Nuevo Banner'}
+        maxWidth="max-w-2xl"
+      >
+        <ModalBannerContent
           data={modalBanner.data}
           sponsors={sponsors}
           onClose={() => setModalBanner({ open: false, data: null })}
           onSave={handleSaveBanner}
         />
-      )}
+      </Modal>
 
       {/* Modal Sponsor */}
-      {modalSponsor.open && (
-        <ModalSponsor
+      <Modal
+        isOpen={modalSponsor.open}
+        onClose={() => setModalSponsor({ open: false, data: null })}
+        title={modalSponsor.data ? 'Editar Sponsor' : 'Nuevo Sponsor'}
+        maxWidth="max-w-xl"
+      >
+        <ModalSponsorContent
           data={modalSponsor.data}
           onClose={() => setModalSponsor({ open: false, data: null })}
           onSave={handleSaveSponsor}
         />
-      )}
+      </Modal>
     </div>
   )
 }
 
-// ============ MODAL BANNER ============
+// ============ MODAL BANNER CONTENT ============
 const UBICACIONES_DISPONIBLES = [
   { value: 'HOME', label: 'Home' },
   { value: 'ACTIVIDADES', label: 'Actividades' },
@@ -496,7 +508,7 @@ const UBICACIONES_DISPONIBLES = [
   { value: 'COMERCIOS', label: 'Comercios' },
 ]
 
-function ModalBanner({ data, sponsors, onClose, onSave }) {
+function ModalBannerContent({ data, sponsors, onClose, onSave }) {
   const [form, setForm] = useState({
     id: data?.id || null,
     titulo: data?.titulo || '',
@@ -593,18 +605,7 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
-
-        <div className="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-white border-b px-6 py-4 rounded-t-2xl">
-            <h2 className="text-xl font-bold text-gray-900">
-              {data ? 'Editar Banner' : 'Nuevo Banner'}
-            </h2>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -700,70 +701,74 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Imagen Desktop *
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={e => handleUpload(e.target.files[0], 'desktop')}
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:bg-red-50 file:text-red-700 file:cursor-pointer"
-                    disabled={uploading.desktop}
-                  />
-                  {uploading.desktop && (
-                    <div className="flex items-center text-gray-500">
-                      <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
-                    </div>
-                  )}
-                </div>
-                {!form.imagenDesktop && (
-                  <p className="mt-1 text-xs text-gray-500">Formatos: JPG, PNG, GIF, WebP (máx. 5MB)</p>
-                )}
-                {/* Preview con aspect ratio correcto */}
-                {form.imagenDesktop && (
-                  <div className="mt-3">
-                    <p className="text-xs text-gray-500 mb-2">Preview (así se verá el banner):</p>
-                    <div
-                      className="relative bg-gray-100 rounded-lg overflow-hidden border-2 border-dashed border-gray-300"
-                      style={{
-                        aspectRatio: `${BANNER_SIZES[form.tipo]?.width} / ${BANNER_SIZES[form.tipo]?.height}`,
-                        maxWidth: form.tipo === 'HERO' ? '100%' : `${Math.min(BANNER_SIZES[form.tipo]?.width, 400)}px`
-                      }}
-                    >
-                      <img
-                        src={form.imagenDesktop}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-green-600 truncate">{form.imagenDesktop}</p>
+                {uploading.desktop ? (
+                  <div className="flex items-center justify-center gap-2 p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                    <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                    <span className="text-gray-500">Subiendo imagen...</span>
                   </div>
+                ) : (
+                  <>
+                    <ImageUpload
+                      value={form.imagenDesktop}
+                      onChange={(file) => handleUpload(file, 'desktop')}
+                      accept="image/*"
+                      maxSize={5 * 1024 * 1024}
+                      placeholder="Haz click o arrastra la imagen desktop aquí"
+                      showPreview={false}
+                      onError={(error) => toast.error(error)}
+                    />
+                    {form.imagenDesktop && (
+                      <div className="mt-3">
+                        <p className="text-xs text-gray-500 mb-2">Preview (así se verá el banner):</p>
+                        <div
+                          className="relative bg-gray-100 rounded-lg overflow-hidden border-2 border-dashed border-gray-300"
+                          style={{
+                            aspectRatio: `${BANNER_SIZES[form.tipo]?.width} / ${BANNER_SIZES[form.tipo]?.height}`,
+                            maxWidth: form.tipo === 'HERO' ? '100%' : `${Math.min(BANNER_SIZES[form.tipo]?.width, 400)}px`
+                          }}
+                        >
+                          <img
+                            src={form.imagenDesktop}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-green-600 truncate">{form.imagenDesktop}</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Imagen Mobile (opcional)
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={e => handleUpload(e.target.files[0], 'mobile')}
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:bg-gray-50 file:text-gray-700 file:cursor-pointer"
-                    disabled={uploading.mobile}
-                  />
-                  {uploading.mobile && (
-                    <div className="flex items-center text-gray-500">
-                      <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
-                    </div>
-                  )}
-                </div>
-                {form.imagenMobile && (
-                  <p className="mt-1 text-xs text-green-600 truncate">
-                    {form.imagenMobile}
-                  </p>
+                {uploading.mobile ? (
+                  <div className="flex items-center justify-center gap-2 p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                    <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                    <span className="text-gray-500">Subiendo imagen...</span>
+                  </div>
+                ) : (
+                  <>
+                    <ImageUpload
+                      value={form.imagenMobile}
+                      onChange={(file) => handleUpload(file, 'mobile')}
+                      accept="image/*"
+                      maxSize={5 * 1024 * 1024}
+                      placeholder="Haz click o arrastra la imagen mobile aquí"
+                      showPreview={false}
+                      onError={(error) => toast.error(error)}
+                    />
+                    {form.imagenMobile && (
+                      <p className="mt-1 text-xs text-green-600 truncate">
+                        {form.imagenMobile}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -867,31 +872,28 @@ function ModalBanner({ data, sponsors, onClose, onSave }) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
-          </form>
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
         </div>
-      </div>
-    </div>
+    </form>
   )
 }
 
-// ============ MODAL SPONSOR ============
-function ModalSponsor({ data, onClose, onSave }) {
+// ============ MODAL SPONSOR CONTENT ============
+function ModalSponsorContent({ data, onClose, onSave }) {
   const [form, setForm] = useState({
     id: data?.id || null,
     nombre: data?.nombre || '',
@@ -949,18 +951,7 @@ function ModalSponsor({ data, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
-
-        <div className="relative bg-white rounded-2xl shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-white border-b px-6 py-4 rounded-t-2xl">
-            <h2 className="text-xl font-bold text-gray-900">
-              {data ? 'Editar Sponsor' : 'Nuevo Sponsor'}
-            </h2>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1049,28 +1040,30 @@ function ModalSponsor({ data, onClose, onSave }) {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Logo
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={e => handleUploadLogo(e.target.files[0])}
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:bg-red-50 file:text-red-700 file:cursor-pointer"
-                    disabled={uploading}
-                  />
-                  {uploading && (
-                    <div className="flex items-center text-gray-500">
-                      <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
-                    </div>
-                  )}
-                </div>
-                {form.logo && (
-                  <p className="mt-1 text-xs text-green-600 truncate">{form.logo}</p>
-                )}
-                {!form.logo && (
-                  <p className="mt-1 text-xs text-gray-500">Formatos: JPG, PNG, GIF, WebP (máx. 2MB)</p>
+                {uploading ? (
+                  <div className="flex items-center justify-center gap-2 p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                    <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                    <span className="text-gray-500">Subiendo logo...</span>
+                  </div>
+                ) : (
+                  <>
+                    <ImageUpload
+                      value={form.logo}
+                      onChange={handleUploadLogo}
+                      accept="image/*"
+                      maxSize={2 * 1024 * 1024}
+                      placeholder="Haz click o arrastra el logo aquí"
+                      showPreview={true}
+                      previewSize="sm"
+                      onError={(error) => toast.error(error)}
+                    />
+                    {form.logo && (
+                      <p className="mt-1 text-xs text-green-600 truncate">{form.logo}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -1112,38 +1105,22 @@ function ModalSponsor({ data, onClose, onSave }) {
               </div>
             </div>
 
-            {/* Preview logo */}
-            {form.logo && (
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-500 mb-2">Logo:</p>
-                <img
-                  src={form.logo}
-                  alt="Logo preview"
-                  className="h-16 mx-auto"
-                  onError={e => e.target.style.display = 'none'}
-                />
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
-          </form>
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
         </div>
-      </div>
-    </div>
+    </form>
   )
 }

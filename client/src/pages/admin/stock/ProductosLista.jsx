@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Package, Search, Eye, Edit, AlertTriangle, Image, LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react'
+import { Plus, Package, Search, Eye, Edit, AlertTriangle, Image, LayoutGrid, List, ArrowUpDown, Download } from 'lucide-react'
 import { Button } from '../../../components/Button'
+import Table from '../../../components/Table'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { formatCurrency } from '../../../utils/formatters'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/Pagination'
 
 export default function ProductosLista() {
   const navigate = useNavigate()
@@ -23,12 +27,7 @@ export default function ProductosLista() {
   const [soloActivos, setSoloActivos] = useState(true)
   const [soloConStock, setSoloConStock] = useState(false)
   const [soloBajoMinimo, setSoloBajoMinimo] = useState(false)
-  const [page, setPage] = useState(1)
-  const [pagination, setPagination] = useState({ total: 0, pages: 1 })
-
-  // Ordenamiento para vista lista
-  const [sortBy, setSortBy] = useState('codigo')
-  const [sortDir, setSortDir] = useState('asc')
+  const { page, pagination, setPagination, goToPage } = usePagination(1, vista === 'shop' ? 24 : 50)
 
   useEffect(() => {
     cargarCategorias()
@@ -37,11 +36,11 @@ export default function ProductosLista() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setPage(1)
+      goToPage(1)
       cargarProductos()
     }, 300)
     return () => clearTimeout(timer)
-  }, [busqueda, categoriaId, soloActivos, soloConStock, soloBajoMinimo])
+  }, [busqueda, categoriaId, soloActivos, soloConStock, soloBajoMinimo, goToPage])
 
   useEffect(() => {
     cargarProductos()
@@ -73,7 +72,7 @@ export default function ProductosLista() {
       }
 
       setProductos(data)
-      setPagination(res.pagination || { total: 0, pages: 1 })
+      setPagination(res.pagination || { total: 0, totalPages: 1 })
     } catch (err) {
       console.error('Error cargando productos:', err)
     } finally {
@@ -99,68 +98,16 @@ export default function ProductosLista() {
     }
   }
 
-  // Ordenar productos para vista lista
-  function getProductosOrdenados() {
-    return [...productos].sort((a, b) => {
-      let valorA, valorB
-      switch (sortBy) {
-        case 'codigo':
-          valorA = a.codigo.toLowerCase()
-          valorB = b.codigo.toLowerCase()
-          break
-        case 'nombre':
-          valorA = a.nombre.toLowerCase()
-          valorB = b.nombre.toLowerCase()
-          break
-        case 'categoria':
-          valorA = a.categoria?.nombre?.toLowerCase() || ''
-          valorB = b.categoria?.nombre?.toLowerCase() || ''
-          break
-        case 'stock':
-          valorA = parseFloat(a.stockTotal) || 0
-          valorB = parseFloat(b.stockTotal) || 0
-          break
-        case 'precio':
-          valorA = parseFloat(a.precioVenta) || 0
-          valorB = parseFloat(b.precioVenta) || 0
-          break
-        case 'valor':
-          valorA = (parseFloat(a.precioVenta) || 0) * (parseFloat(a.stockTotal) || 0)
-          valorB = (parseFloat(b.precioVenta) || 0) * (parseFloat(b.stockTotal) || 0)
-          break
-        default:
-          return 0
-      }
-      if (valorA < valorB) return sortDir === 'asc' ? -1 : 1
-      if (valorA > valorB) return sortDir === 'asc' ? 1 : -1
-      return 0
-    })
-  }
-
-  function handleSort(column) {
-    if (sortBy === column) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(column)
-      setSortDir('asc')
-    }
-  }
-
-  function SortIcon({ column }) {
-    if (sortBy !== column) return <ArrowUpDown className="w-3 h-3 opacity-30" />
-    return sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-  }
 
   function exportarCSV() {
-    const data = getProductosOrdenados()
     const headers = ['Codigo', 'Nombre', 'Categoria', 'Stock', 'Precio Venta', 'Valor Stock']
-    const rows = data.map(p => [
+    const rows = productos.map(p => [
       p.codigo,
       p.nombre,
       p.categoria?.nombre || '',
       p.stockTotal,
-      p.precioVenta || 0,
-      ((parseFloat(p.precioVenta) || 0) * (parseFloat(p.stockTotal) || 0)).toFixed(2)
+      formatCurrency(p.precioVenta || 0, { showSymbol: false }),
+      formatCurrency((parseFloat(p.precioVenta) || 0) * (parseFloat(p.stockTotal) || 0), { showSymbol: false })
     ])
 
     const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
@@ -173,7 +120,153 @@ export default function ProductosLista() {
     URL.revokeObjectURL(url)
   }
 
-  const productosOrdenados = vista === 'lista' ? getProductosOrdenados() : productos
+  // Define columns for Table component
+  const columns = [
+    {
+      key: 'fotoPrincipal',
+      label: 'Foto',
+      sortable: false,
+      className: 'w-16',
+      render: (producto) => (
+        <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden">
+          {producto.fotoPrincipal ? (
+            <img
+              src={producto.fotoPrincipal}
+              alt={producto.nombre}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Image className="w-6 h-6 text-gray-300" />
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'codigo',
+      label: 'Codigo',
+      sortable: true,
+      render: (producto) => (
+        <span className="font-mono text-sm text-gray-600">{producto.codigo}</span>
+      )
+    },
+    {
+      key: 'nombre',
+      label: 'Nombre',
+      sortable: true,
+      render: (producto) => (
+        <div>
+          <p className="font-medium text-gray-800">{producto.nombre}</p>
+          {!producto.activo && (
+            <span className="text-xs text-gray-400">(Inactivo)</span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'categoriaNombre',
+      label: 'Categoria',
+      sortable: true,
+      className: 'hidden md:table-cell',
+      cellClassName: 'hidden md:table-cell',
+      render: (producto) => (
+        producto.categoria ? (
+          <span className="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+            {producto.categoria.nombre}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      )
+    },
+    {
+      key: 'stockTotal',
+      label: 'Stock',
+      sortable: true,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (producto) => {
+        const bajoMinimo = producto.variantes?.some(v => parseFloat(v.stockActual) < parseFloat(v.stockMinimo))
+        return (
+          <div className="flex items-center justify-end gap-1">
+            <span className={`font-semibold ${producto.stockTotal <= 0 ? 'text-red-500' : bajoMinimo ? 'text-orange-500' : 'text-gray-800'}`}>
+              {producto.stockTotal}
+            </span>
+            {bajoMinimo && (
+              <AlertTriangle className="w-4 h-4 text-orange-500" />
+            )}
+          </div>
+        )
+      }
+    },
+    {
+      key: 'precioVenta',
+      label: 'Precio',
+      sortable: true,
+      className: 'text-right hidden sm:table-cell',
+      cellClassName: 'text-right hidden sm:table-cell',
+      render: (producto) => (
+        <span className="text-gray-800">{formatCurrency(parseFloat(producto.precioVenta) || 0)}</span>
+      )
+    },
+    {
+      key: 'valorStock',
+      label: 'Valor Stock',
+      sortable: true,
+      className: 'text-right hidden lg:table-cell',
+      cellClassName: 'text-right hidden lg:table-cell',
+      render: (producto) => {
+        const valorStock = (parseFloat(producto.precioVenta) || 0) * (parseFloat(producto.stockTotal) || 0)
+        return (
+          <span className="font-semibold text-green-600">{formatCurrency(valorStock)}</span>
+        )
+      }
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      className: 'text-center w-24',
+      cellClassName: 'text-center',
+      render: (producto) => (
+        <div className="flex items-center justify-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/stock/productos/${producto.id}`)
+            }}
+            className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
+            title="Ver detalle"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/stock/movimientos?productoId=${producto.id}`)
+            }}
+            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+            title="Ver movimientos"
+          >
+            <ArrowUpDown className="w-4 h-4" />
+          </button>
+          {tienePermiso(PERMISOS.STOCK_GESTIONAR) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(`/admin/stock/productos/${producto.id}?editar=true`)
+              }}
+              className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
+              title="Editar"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )
+    }
+  ]
 
   return (
     <div>
@@ -217,7 +310,7 @@ export default function ProductosLista() {
           </div>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <p className="text-sm text-gray-500">Valor Stock (Venta)</p>
-            <p className="text-2xl font-bold text-green-600">${resumen.valorStockVenta?.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-green-600">{formatCurrency(resumen.valorStockVenta)}</p>
           </div>
           <div className={`bg-white rounded-lg shadow-sm border p-4 ${resumen.variantesBajoMinimo > 0 ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
             <p className="text-sm text-gray-500">Bajo Stock</p>
@@ -328,174 +421,34 @@ export default function ProductosLista() {
       ) : vista === 'lista' ? (
         /* Vista Lista/Tabla */
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-16">
-                    Foto
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('codigo')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Codigo <SortIcon column="codigo" />
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('nombre')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Nombre <SortIcon column="nombre" />
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 hidden md:table-cell"
-                    onClick={() => handleSort('categoria')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Categoria <SortIcon column="categoria" />
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('stock')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      Stock <SortIcon column="stock" />
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 hidden sm:table-cell"
-                    onClick={() => handleSort('precio')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      Precio <SortIcon column="precio" />
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 hidden lg:table-cell"
-                    onClick={() => handleSort('valor')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      Valor Stock <SortIcon column="valor" />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {productosOrdenados.map((producto) => {
-                  const valorStock = ((parseFloat(producto.precioVenta) || 0) * (parseFloat(producto.stockTotal) || 0))
-                  const bajoMinimo = producto.variantes?.some(v => parseFloat(v.stockActual) < parseFloat(v.stockMinimo))
-
-                  return (
-                    <tr key={producto.id} className={`hover:bg-gray-50 ${!producto.activo ? 'opacity-50' : ''}`}>
-                      <td className="px-4 py-2">
-                        <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden">
-                          {producto.fotoPrincipal ? (
-                            <img
-                              src={producto.fotoPrincipal}
-                              alt={producto.nombre}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Image className="w-6 h-6 text-gray-300" />
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className="font-mono text-sm text-gray-600">{producto.codigo}</span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div>
-                          <p className="font-medium text-gray-800">{producto.nombre}</p>
-                          {!producto.activo && (
-                            <span className="text-xs text-gray-400">(Inactivo)</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 hidden md:table-cell">
-                        {producto.categoria ? (
-                          <span className="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
-                            {producto.categoria.nombre}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <span className={`font-semibold ${producto.stockTotal <= 0 ? 'text-red-500' : bajoMinimo ? 'text-orange-500' : 'text-gray-800'}`}>
-                            {producto.stockTotal}
-                          </span>
-                          {bajoMinimo && (
-                            <AlertTriangle className="w-4 h-4 text-orange-500" />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-right hidden sm:table-cell">
-                        <span className="text-gray-800">${(parseFloat(producto.precioVenta) || 0).toLocaleString()}</span>
-                      </td>
-                      <td className="px-4 py-2 text-right hidden lg:table-cell">
-                        <span className="font-semibold text-green-600">${valorStock.toLocaleString()}</span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => navigate(`/admin/stock/productos/${producto.id}`)}
-                            className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
-                            title="Ver detalle"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => navigate(`/admin/stock/movimientos?productoId=${producto.id}`)}
-                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                            title="Ver movimientos"
-                          >
-                            <ArrowUpDown className="w-4 h-4" />
-                          </button>
-                          {tienePermiso(PERMISOS.STOCK_GESTIONAR) && (
-                            <button
-                              onClick={() => navigate(`/admin/stock/productos/${producto.id}?editar=true`)}
-                              className="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded"
-                              title="Editar"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Table
+            columns={columns}
+            data={productos.map(p => ({
+              ...p,
+              // Add computed fields for sorting
+              categoriaNombre: p.categoria?.nombre || '',
+              valorStock: (parseFloat(p.precioVenta) || 0) * (parseFloat(p.stockTotal) || 0)
+            }))}
+            sortable
+            emptyMessage="No hay productos que coincidan con la busqueda"
+          />
 
           {/* Totales */}
           <div className="bg-gray-50 border-t px-4 py-3 flex flex-wrap gap-4 justify-end text-sm">
             <div>
               <span className="text-gray-500">Total Items: </span>
-              <span className="font-semibold">{productosOrdenados.length}</span>
+              <span className="font-semibold">{productos.length}</span>
             </div>
             <div>
               <span className="text-gray-500">Stock Total: </span>
               <span className="font-semibold">
-                {productosOrdenados.reduce((sum, p) => sum + (parseFloat(p.stockTotal) || 0), 0).toLocaleString()}
+                {productos.reduce((sum, p) => sum + (parseFloat(p.stockTotal) || 0), 0)}
               </span>
             </div>
             <div>
               <span className="text-gray-500">Valor Total: </span>
               <span className="font-semibold text-green-600">
-                ${productosOrdenados.reduce((sum, p) => sum + ((parseFloat(p.precioVenta) || 0) * (parseFloat(p.stockTotal) || 0)), 0).toLocaleString()}
+                {formatCurrency(productos.reduce((sum, p) => sum + ((parseFloat(p.precioVenta) || 0) * (parseFloat(p.stockTotal) || 0)), 0))}
               </span>
             </div>
           </div>
@@ -553,7 +506,7 @@ export default function ProductosLista() {
                   <div className="flex items-center justify-between mt-2">
                     <div>
                       {producto.precioVenta && (
-                        <p className="text-lg font-bold text-primary">${producto.precioVenta.toLocaleString()}</p>
+                        <p className="text-lg font-bold text-primary">{formatCurrency(producto.precioVenta)}</p>
                       )}
                     </div>
                     <div className="text-right">
@@ -624,29 +577,12 @@ export default function ProductosLista() {
           </div>
 
           {/* Paginacion */}
-          {pagination.pages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-6">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm text-gray-600">
-                Pagina {page} de {pagination.pages}
-              </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page === pagination.pages}
-                onClick={() => setPage(p => p + 1)}
-              >
-                Siguiente
-              </Button>
-            </div>
-          )}
+          <Pagination
+            pagination={pagination}
+            page={page}
+            onPageChange={goToPage}
+            className="mt-6"
+          />
         </>
       )}
     </div>

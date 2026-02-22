@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
   UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User,
-  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink
+  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone
 } from 'lucide-react'
 import api from '../services/api'
 import { cargarPermisos, limpiarPermisos, tieneAlgunPermiso, getPermisos, PERMISOS } from '../services/permisos'
@@ -188,6 +188,15 @@ export default function AdminLayout() {
         { path: '/admin/buffet/productos', label: 'Productos', icon: Package, permisos: [PERMISOS.BUFFET_CONFIG] },
         { path: '/admin/buffet/categorias', label: 'Categorías', icon: Tag, permisos: [PERMISOS.BUFFET_CONFIG] },
         { path: '/admin/buffet/impresoras', label: 'Impresoras', icon: Printer, permisos: [PERMISOS.BUFFET_CONFIG] },
+      ]
+    },
+    {
+      label: 'Control de Accesos', icon: Activity, permisos: [PERMISOS.ACCESOS_VER],
+      submenu: [
+        { path: '/admin/accesos/monitor', label: 'Monitor en Vivo', icon: Activity, permisos: [PERMISOS.ACCESOS_VER] },
+        { path: '/admin/accesos/intentos-denegados', label: 'DNIs Denegados', icon: AlertTriangle, permisos: [PERMISOS.ACCESOS_GESTIONAR] },
+        { path: '/admin/accesos/habilitaciones', label: 'Habilitaciones', icon: UserPlus, permisos: [PERMISOS.ACCESOS_GESTIONAR] },
+        { path: '/admin/accesos/control-pwa', label: 'Control Móvil', icon: Smartphone, permisos: [PERMISOS.ACCESOS_GESTIONAR] },
       ]
     },
     {

@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
-import { useModal } from '../../components/Modal'
+import Modal, { useModal } from '../../components/Modal'
+import ImageUpload from '../../components/ImageUpload'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { formatDate } from '../../utils/formatters'
+import StatusBadge from '../../components/StatusBadge'
 import {
   PlusIcon,
   PencilSquareIcon,
@@ -127,15 +130,6 @@ export default function Noticias() {
     return cat?.color || 'bg-gray-100 text-gray-700'
   }
 
-  const formatFecha = (fecha) => {
-    if (!fecha) return '-'
-    return new Date(fecha).toLocaleDateString('es-AR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -250,20 +244,14 @@ export default function Noticias() {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getCategoriaColor(noticia.categoria)}`}>
                       {CATEGORIAS.find(c => c.value === noticia.categoria)?.label || noticia.categoria}
                     </span>
-                    {noticia.publicada ? (
-                      <span className="text-green-600 flex items-center gap-1">
-                        <EyeIcon className="w-4 h-4" />
-                        Publicada
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 flex items-center gap-1">
-                        <EyeSlashIcon className="w-4 h-4" />
-                        Borrador
-                      </span>
-                    )}
+                    <StatusBadge
+                      status={noticia.publicada ? 'PUBLICADA' : 'BORRADOR'}
+                      type="generic"
+                      size="sm"
+                    />
                     <span className="text-gray-400 flex items-center gap-1">
                       <CalendarIcon className="w-4 h-4" />
-                      {formatFecha(noticia.fechaPublicacion || noticia.createdAt)}
+                      {formatDate(noticia.fechaPublicacion || noticia.createdAt, { format: 'short' })}
                     </span>
                   </div>
                   {noticia.extracto && (
@@ -314,16 +302,24 @@ export default function Noticias() {
       </div>
 
       {/* Modal Edición */}
-      {modalOpen && (
-        <ModalNoticia
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false)
+          setNoticiaEditando(null)
+        }}
+        title={noticiaEditando ? 'Editar Noticia' : 'Nueva Noticia'}
+        maxWidth="max-w-4xl"
+      >
+        <FormNoticia
           noticia={noticiaEditando}
+          onSave={handleSave}
           onClose={() => {
             setModalOpen(false)
             setNoticiaEditando(null)
           }}
-          onSave={handleSave}
         />
-      )}
+      </Modal>
 
       {/* Modal Confirmación */}
       {ModalComponent}
@@ -331,8 +327,8 @@ export default function Noticias() {
   )
 }
 
-// ============ MODAL NOTICIA ============
-function ModalNoticia({ noticia, onClose, onSave }) {
+// ============ FORM NOTICIA ============
+function FormNoticia({ noticia, onClose, onSave }) {
   const [form, setForm] = useState({
     id: noticia?.id || null,
     titulo: noticia?.titulo || '',
@@ -344,16 +340,50 @@ function ModalNoticia({ noticia, onClose, onSave }) {
     publicada: noticia?.publicada || false,
     fechaPublicacion: noticia?.fechaPublicacion
       ? new Date(noticia.fechaPublicacion).toISOString().substring(0, 16)
-      : ''
+      : '',
+    actividadId: noticia?.actividadId || null,
+    categoriaActividadId: noticia?.categoriaActividadId || null
   })
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [tab, setTab] = useState('contenido') // 'contenido' | 'preview'
+  const [tab, setTab] = useState('contenido')
+  const [actividades, setActividades] = useState([])
+  const [categorias, setCategorias] = useState([])
 
-  const handleUpload = async (file) => {
+  useEffect(() => {
+    fetchActividades()
+  }, [])
+
+  useEffect(() => {
+    if (form.actividadId) {
+      fetchCategorias(form.actividadId)
+    } else {
+      setCategorias([])
+      setForm(prev => ({ ...prev, categoriaActividadId: null }))
+    }
+  }, [form.actividadId])
+
+  const fetchActividades = async () => {
+    try {
+      const data = await api.get('/admin/actividades?activo=true')
+      setActividades(data || [])
+    } catch (err) {
+      console.error('Error cargando actividades:', err)
+    }
+  }
+
+  const fetchCategorias = async (actividadId) => {
+    try {
+      const data = await api.get(`/admin/actividades/${actividadId}`)
+      setCategorias(data?.categorias || [])
+    } catch (err) {
+      console.error('Error cargando categorías:', err)
+      setCategorias([])
+    }
+  }
+
+  const handleImageUpload = async (file) => {
     if (!file) return
 
-    setUploading(true)
     const formData = new FormData()
     formData.append('imagen', file)
 
@@ -376,8 +406,6 @@ function ModalNoticia({ noticia, onClose, onSave }) {
       }
     } catch (err) {
       toast.error('Error al subir imagen')
-    } finally {
-      setUploading(false)
     }
   }
 
@@ -403,238 +431,256 @@ function ModalNoticia({ noticia, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
+    <>
+      {/* Tabs */}
+      <div className="flex items-center justify-center gap-2 mb-4 border-b pb-2">
+        <button
+          type="button"
+          onClick={() => setTab('contenido')}
+          className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+            tab === 'contenido' ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Editar
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('preview')}
+          className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+            tab === 'preview' ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Vista previa
+        </button>
+      </div>
 
-        <div className="relative bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">
-              {noticia ? 'Editar Noticia' : 'Nueva Noticia'}
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setTab('contenido')}
-                className={`px-3 py-1.5 text-sm rounded-lg ${
-                  tab === 'contenido' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('preview')}
-                className={`px-3 py-1.5 text-sm rounded-lg ${
-                  tab === 'preview' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Vista previa
-              </button>
+      <form onSubmit={handleSubmit}>
+        {tab === 'contenido' ? (
+          <div className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Título */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Título *
+                </label>
+                <input
+                  type="text"
+                  value={form.titulo}
+                  onChange={e => setForm({ ...form, titulo: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  placeholder="Título de la noticia"
+                  required
+                />
+              </div>
+
+              {/* Extracto */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Extracto (resumen)
+                </label>
+                <textarea
+                  value={form.extracto}
+                  onChange={e => setForm({ ...form, extracto: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  rows={2}
+                  placeholder="Breve descripción que aparece en el listado..."
+                />
+              </div>
+
+              {/* Contenido */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contenido *
+                </label>
+                <textarea
+                  value={form.contenido}
+                  onChange={e => setForm({ ...form, contenido: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 font-mono text-sm"
+                  rows={10}
+                  placeholder="Contenido de la noticia (puede usar HTML básico)..."
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Podés usar etiquetas HTML como &lt;p&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;ul&gt;, &lt;li&gt;
+                </p>
+              </div>
+
+              {/* Imagen */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Imagen principal
+                </label>
+                <ImageUpload
+                  value={form.imagen}
+                  onChange={handleImageUpload}
+                  placeholder="Subir imagen de la noticia"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  maxSize={5 * 1024 * 1024}
+                  previewSize="lg"
+                  onError={(error) => toast.error(error)}
+                  returnFile={true}
+                />
+              </div>
+
+              {/* Categoría */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Categoría
+                </label>
+                <select
+                  value={form.categoria}
+                  onChange={e => setForm({ ...form, categoria: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                >
+                  {CATEGORIAS.map(cat => (
+                    <option key={cat.value} value={cat.value}>{cat.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Actividad Deportiva (opcional) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Actividad Deportiva
+                  <span className="text-xs text-gray-500 ml-1">(opcional)</span>
+                </label>
+                <select
+                  value={form.actividadId || ''}
+                  onChange={e => setForm({ ...form, actividadId: e.target.value ? parseInt(e.target.value) : null })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">-- Ninguna --</option>
+                  {actividades.map(act => (
+                    <option key={act.id} value={act.id}>{act.nombre}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Asociar esta noticia a un deporte específico
+                </p>
+              </div>
+
+              {/* Categoría de Actividad (si hay actividad seleccionada) */}
+              {form.actividadId && categorias.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Categoría
+                    <span className="text-xs text-gray-500 ml-1">(opcional)</span>
+                  </label>
+                  <select
+                    value={form.categoriaActividadId || ''}
+                    onChange={e => setForm({ ...form, categoriaActividadId: e.target.value ? parseInt(e.target.value) : null })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  >
+                    <option value="">-- Todas las categorías --</option>
+                    {categorias.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Ej: Sub 10, Sub 12, etc.
+                  </p>
+                </div>
+              )}
+
+              {/* Fecha publicación */}
+              <div className={form.actividadId && categorias.length > 0 ? '' : 'md:col-start-2'}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha de publicación
+                </label>
+                <input
+                  type="datetime-local"
+                  value={form.fechaPublicacion}
+                  onChange={e => setForm({ ...form, fechaPublicacion: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Dejar vacío para publicar inmediatamente
+                </p>
+              </div>
+
+              {/* Opciones */}
+              <div className="md:col-span-2 flex flex-wrap gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.destacada}
+                    onChange={e => setForm({ ...form, destacada: e.target.checked })}
+                    className="rounded border-gray-300 text-yellow-500 focus:ring-yellow-500"
+                  />
+                  <StarIcon className="w-5 h-5 text-yellow-500" />
+                  <span className="text-sm text-gray-700">Destacar en home</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.publicada}
+                    onChange={e => setForm({ ...form, publicada: e.target.checked })}
+                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <EyeIcon className="w-5 h-5 text-green-600" />
+                  <span className="text-sm text-gray-700">Publicar ahora</span>
+                </label>
+              </div>
             </div>
           </div>
-
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-            {tab === 'contenido' ? (
-              <div className="p-6 space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  {/* Título */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Título *
-                    </label>
-                    <input
-                      type="text"
-                      value={form.titulo}
-                      onChange={e => setForm({ ...form, titulo: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
-                      placeholder="Título de la noticia"
-                      required
-                    />
-                  </div>
-
-                  {/* Extracto */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Extracto (resumen)
-                    </label>
-                    <textarea
-                      value={form.extracto}
-                      onChange={e => setForm({ ...form, extracto: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
-                      rows={2}
-                      placeholder="Breve descripción que aparece en el listado..."
-                    />
-                  </div>
-
-                  {/* Contenido */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Contenido *
-                    </label>
-                    <textarea
-                      value={form.contenido}
-                      onChange={e => setForm({ ...form, contenido: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 font-mono text-sm"
-                      rows={10}
-                      placeholder="Contenido de la noticia (puede usar HTML básico)..."
-                      required
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Podés usar etiquetas HTML como &lt;p&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;ul&gt;, &lt;li&gt;
-                    </p>
-                  </div>
-
-                  {/* Imagen */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Imagen principal
-                    </label>
-                    <div className="flex gap-4 items-start">
-                      <div className="flex-1">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={e => handleUpload(e.target.files[0])}
-                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:bg-red-50 file:text-red-700 file:cursor-pointer"
-                          disabled={uploading}
-                        />
-                        {form.imagen && (
-                          <p className="mt-1 text-xs text-green-600 truncate">{form.imagen}</p>
-                        )}
-                      </div>
-                      {form.imagen && (
-                        <div className="w-32 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                          <img
-                            src={form.imagen}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Categoría */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Categoría
-                    </label>
-                    <select
-                      value={form.categoria}
-                      onChange={e => setForm({ ...form, categoria: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
-                    >
-                      {CATEGORIAS.map(cat => (
-                        <option key={cat.value} value={cat.value}>{cat.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Fecha publicación */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fecha de publicación
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={form.fechaPublicacion}
-                      onChange={e => setForm({ ...form, fechaPublicacion: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Dejar vacío para publicar inmediatamente
-                    </p>
-                  </div>
-
-                  {/* Opciones */}
-                  <div className="md:col-span-2 flex flex-wrap gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.destacada}
-                        onChange={e => setForm({ ...form, destacada: e.target.checked })}
-                        className="rounded border-gray-300 text-yellow-500 focus:ring-yellow-500"
-                      />
-                      <StarIcon className="w-5 h-5 text-yellow-500" />
-                      <span className="text-sm text-gray-700">Destacar en home</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.publicada}
-                        onChange={e => setForm({ ...form, publicada: e.target.checked })}
-                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                      />
-                      <EyeIcon className="w-5 h-5 text-green-600" />
-                      <span className="text-sm text-gray-700">Publicar ahora</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Preview */
-              <div className="p-6">
-                <div className="max-w-3xl mx-auto">
-                  {form.imagen && (
-                    <img
-                      src={form.imagen}
-                      alt={form.titulo}
-                      className="w-full h-64 object-cover rounded-xl mb-6"
-                    />
-                  )}
-                  <div className="mb-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      CATEGORIAS.find(c => c.value === form.categoria)?.color || 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {CATEGORIAS.find(c => c.value === form.categoria)?.label || form.categoria}
-                    </span>
-                  </div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                    {form.titulo || 'Sin título'}
-                  </h1>
-                  {form.extracto && (
-                    <p className="text-lg text-gray-600 mb-6">{form.extracto}</p>
-                  )}
-                  <div
-                    className="prose prose-lg max-w-none"
-                    dangerouslySetInnerHTML={{ __html: form.contenido || '<p class="text-gray-400">Sin contenido</p>' }}
-                  />
-                </div>
-              </div>
+        ) : (
+          /* Preview */
+          <div className="max-w-3xl mx-auto">
+            {form.imagen && (
+              <img
+                src={form.imagen}
+                alt={form.titulo}
+                className="w-full h-64 object-cover rounded-xl mb-6"
+              />
             )}
-
-            {/* Footer */}
-            <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-between items-center">
-              <div className="text-sm text-gray-500">
-                {form.publicada ? (
-                  <span className="text-green-600">Se publicará al guardar</span>
-                ) : (
-                  <span>Se guardará como borrador</span>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                >
-                  {saving ? 'Guardando...' : (form.id ? 'Actualizar' : 'Crear')}
-                </button>
-              </div>
+            <div className="mb-4">
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                CATEGORIAS.find(c => c.value === form.categoria)?.color || 'bg-gray-100 text-gray-700'
+              }`}>
+                {CATEGORIAS.find(c => c.value === form.categoria)?.label || form.categoria}
+              </span>
             </div>
-          </form>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              {form.titulo || 'Sin título'}
+            </h1>
+            {form.extracto && (
+              <p className="text-lg text-gray-600 mb-6">{form.extracto}</p>
+            )}
+            <div
+              className="prose prose-lg max-w-none"
+              dangerouslySetInnerHTML={{ __html: form.contenido || '<p class="text-gray-400">Sin contenido</p>' }}
+            />
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-6 pt-4 border-t flex justify-between items-center">
+          <div className="text-sm text-gray-500">
+            {form.publicada ? (
+              <span className="text-green-600">Se publicará al guardar</span>
+            ) : (
+              <span>Se guardará como borrador</span>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Guardando...' : (form.id ? 'Actualizar' : 'Crear')}
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      </form>
+    </>
   )
 }

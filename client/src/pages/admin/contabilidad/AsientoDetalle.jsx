@@ -4,6 +4,8 @@ import { ArrowLeft, BookOpen, Calendar, User, XCircle, Edit, Printer } from 'luc
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
+import StatusBadge from '../../../components/StatusBadge'
+import { formatCurrency, formatDateTime } from '../../../utils/formatters'
 import api from '../../../services/api'
 
 export default function AsientoDetalle() {
@@ -58,35 +60,6 @@ export default function AsientoDetalle() {
     })
   }
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  const formatMoney = (amount) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(amount || 0)
-  }
-
-  const getEstadoBadge = (estado) => {
-    const estilos = {
-      BORRADOR: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      CONFIRMADO: 'bg-green-100 text-green-800 border-green-200',
-      ANULADO: 'bg-red-100 text-red-800 border-red-200'
-    }
-    return (
-      <span className={`px-3 py-1 rounded-full text-sm font-medium border ${estilos[estado] || 'bg-gray-100 text-gray-800'}`}>
-        {estado}
-      </span>
-    )
-  }
 
   if (loading) {
     return (
@@ -128,7 +101,7 @@ export default function AsientoDetalle() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-gray-900">{asiento.numero}</h1>
-                {getEstadoBadge(asiento.estado)}
+                <StatusBadge status={asiento.estado} type="generic" size="md" />
               </div>
               <p className="text-sm text-gray-500">{asiento.concepto}</p>
             </div>
@@ -165,7 +138,7 @@ export default function AsientoDetalle() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Fecha</p>
-              <p className="font-medium">{formatDate(asiento.fecha)}</p>
+              <p className="font-medium">{formatDateTime(asiento.fecha)}</p>
             </div>
           </div>
         </div>
@@ -198,7 +171,7 @@ export default function AsientoDetalle() {
         <div className="bg-red-50 border border-red-200 rounded-xl p-4">
           <h3 className="font-semibold text-red-800 mb-2">Asiento Anulado</h3>
           <div className="text-sm text-red-700 space-y-1">
-            <p><strong>Fecha:</strong> {formatDate(asiento.fechaAnulacion)}</p>
+            <p><strong>Fecha:</strong> {formatDateTime(asiento.fechaAnulacion)}</p>
             <p><strong>Motivo:</strong> {asiento.motivoAnulacion}</p>
             {asiento.anulador && <p><strong>Anulado por:</strong> {asiento.anulador.nombre}</p>}
           </div>
@@ -247,14 +220,14 @@ export default function AsientoDetalle() {
                   <td className="px-4 py-3 text-right">
                     {Number(linea.debe) > 0 && (
                       <span className="font-mono text-green-600 font-medium">
-                        {formatMoney(linea.debe)}
+                        {formatCurrency(linea.debe)}
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {Number(linea.haber) > 0 && (
                       <span className="font-mono text-red-600 font-medium">
-                        {formatMoney(linea.haber)}
+                        {formatCurrency(linea.haber)}
                       </span>
                     )}
                   </td>
@@ -267,10 +240,10 @@ export default function AsientoDetalle() {
                   Totales:
                 </td>
                 <td className="px-4 py-3 text-right text-green-600 font-mono">
-                  {formatMoney(totalDebe)}
+                  {formatCurrency(totalDebe)}
                 </td>
                 <td className="px-4 py-3 text-right text-red-600 font-mono">
-                  {formatMoney(totalHaber)}
+                  {formatCurrency(totalHaber)}
                 </td>
               </tr>
             </tfoot>
@@ -285,9 +258,9 @@ export default function AsientoDetalle() {
 
       {/* Timestamps */}
       <div className="text-xs text-gray-400 text-right">
-        Creado: {formatDate(asiento.createdAt)}
+        Creado: {formatDateTime(asiento.createdAt)}
         {asiento.updatedAt !== asiento.createdAt && (
-          <> | Modificado: {formatDate(asiento.updatedAt)}</>
+          <> | Modificado: {formatDateTime(asiento.updatedAt)}</>
         )}
       </div>
 

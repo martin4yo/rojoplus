@@ -4,6 +4,11 @@ import { ArrowLeft, Save, Plus, Trash2, Search, ShoppingCart, Package } from 'lu
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import SelectCentroCosto from '../../../components/SelectCentroCosto'
+import SearchInput from '../../../components/SearchInput'
+import { formatCurrency, formatDateForInput } from '../../../utils/formatters'
+import { useApiData } from '../../../hooks/useApiData'
+import StatusBadge from '../../../components/StatusBadge'
 
 export default function OrdenCompraForm() {
   const { id } = useParams()
@@ -11,57 +16,56 @@ export default function OrdenCompraForm() {
   const { showModal, ModalComponent } = useModal()
   const isEditing = !!id
 
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [proveedores, setProveedores] = useState([])
-  const [productos, setProductos] = useState([])
   const [busquedaProducto, setBusquedaProducto] = useState('')
   const [mostrarBuscador, setMostrarBuscador] = useState(false)
+
+  // Cargar datos iniciales con useApiData
+  const { data: proveedores = [], loading: loadingProveedores } = useApiData('/admin/entidades', {
+    params: { tipo: 'PROVEEDOR', activo: true, limit: 500 }
+  })
+
+  const { data: productos = [], loading: loadingProductos } = useApiData('/admin/productos', {
+    params: { activo: true, limit: 500 }
+  })
 
   const [form, setForm] = useState({
     entidadId: '',
     fechaEntrega: '',
     observaciones: '',
+    centroCostoId: '',
     items: []
   })
 
+  // Cargar orden si estamos editando
   useEffect(() => {
-    cargarDatosIniciales()
+    if (isEditing) {
+      cargarOrden()
+    }
   }, [id])
 
-  async function cargarDatosIniciales() {
-    setLoading(true)
+  async function cargarOrden() {
     try {
-      const [provRes, prodRes] = await Promise.all([
-        api.getFull('/admin/entidades?tipo=PROVEEDOR&activo=true&limit=500'),
-        api.getFull('/admin/productos?activo=true&limit=500')
-      ])
-      setProveedores(provRes.data || [])
-      setProductos(prodRes.data || [])
-
-      if (isEditing) {
-        const ordenRes = await api.getFull(`/admin/ordenes-compra/${id}`)
-        const orden = ordenRes.data
-        setForm({
-          entidadId: orden.entidadId?.toString() || '',
-          fechaEntrega: orden.fechaEntrega ? orden.fechaEntrega.split('T')[0] : '',
-          observaciones: orden.observaciones || '',
-          items: orden.items.map(item => ({
-            id: item.id,
-            productoVarianteId: item.productoVarianteId?.toString() || '',
-            descripcion: item.descripcion || '',
-            cantidad: item.cantidad?.toString() || '',
-            precioUnitario: item.precioUnitario?.toString() || '',
-            producto: item.productoVariante?.producto || null,
-            variante: item.productoVariante || null
-          }))
-        })
-      }
+      const ordenRes = await api.getFull(`/admin/ordenes-compra/${id}`)
+      const orden = ordenRes.data
+      setForm({
+        entidadId: orden.entidadId?.toString() || '',
+        fechaEntrega: formatDateForInput(orden.fechaEntrega),
+        observaciones: orden.observaciones || '',
+        centroCostoId: orden.centroCostoId?.toString() || '',
+        items: orden.items.map(item => ({
+          id: item.id,
+          productoVarianteId: item.productoVarianteId?.toString() || '',
+          descripcion: item.descripcion || '',
+          cantidad: item.cantidad?.toString() || '',
+          precioUnitario: item.precioUnitario?.toString() || '',
+          producto: item.productoVariante?.producto || null,
+          variante: item.productoVariante || null
+        }))
+      })
     } catch (err) {
       console.error('Error cargando datos:', err)
       showModal({ type: 'error', message: 'Error al cargar los datos' })
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -162,6 +166,7 @@ export default function OrdenCompraForm() {
         entidadId: parseInt(form.entidadId),
         fechaEntrega: form.fechaEntrega || null,
         observaciones: form.observaciones || null,
+        centroCostoId: form.centroCostoId ? parseInt(form.centroCostoId) : null,
         items: form.items.map(item => ({
           productoVarianteId: item.productoVarianteId ? parseInt(item.productoVarianteId) : null,
           descripcion: item.descripcion || null,
@@ -184,17 +189,13 @@ export default function OrdenCompraForm() {
     }
   }
 
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
-  }
 
   const productosFiltrados = productos.filter(p =>
     p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
     p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
   )
+
+  const loading = loadingProveedores || loadingProductos
 
   if (loading) {
     return (
@@ -277,6 +278,18 @@ export default function OrdenCompraForm() {
                 className="input-field w-full"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Centro de Costo
+              </label>
+              <SelectCentroCosto
+                value={form.centroCostoId}
+                onChange={(val) => setForm(prev => ({ ...prev, centroCostoId: val }))}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
+            </div>
           </div>
         </div>
 
@@ -303,15 +316,13 @@ export default function OrdenCompraForm() {
           {/* Buscador de productos */}
           {mostrarBuscador && (
             <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
+              <div className="mb-3">
+                <SearchInput
                   value={busquedaProducto}
-                  onChange={(e) => setBusquedaProducto(e.target.value)}
+                  onChange={setBusquedaProducto}
                   placeholder="Buscar producto por nombre o codigo..."
-                  className="input-field w-full pl-10"
-                  autoFocus
+                  autoFocus={true}
+                  debounceMs={300}
                 />
               </div>
               <div className="max-h-60 overflow-y-auto space-y-2">
@@ -323,7 +334,7 @@ export default function OrdenCompraForm() {
                         <p className="font-medium text-gray-800">{producto.nombre}</p>
                         {producto.precioCompra && (
                           <p className="text-sm text-gray-600">
-                            Precio compra: {formatMonto(producto.precioCompra)}
+                            Precio compra: {formatCurrency(producto.precioCompra)}
                           </p>
                         )}
                       </div>
@@ -401,7 +412,7 @@ export default function OrdenCompraForm() {
                   </div>
                   <div className="text-right pt-5">
                     <p className="text-sm font-semibold text-gray-800">
-                      {formatMonto((parseFloat(item.cantidad) || 0) * (parseFloat(item.precioUnitario) || 0))}
+                      {formatCurrency((parseFloat(item.cantidad) || 0) * (parseFloat(item.precioUnitario) || 0))}
                     </p>
                   </div>
                   <button
@@ -423,15 +434,15 @@ export default function OrdenCompraForm() {
                 <div className="w-64 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">{formatMonto(subtotal)}</span>
+                    <span className="font-medium">{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">IVA (21%):</span>
-                    <span className="font-medium">{formatMonto(iva)}</span>
+                    <span className="font-medium">{formatCurrency(iva)}</span>
                   </div>
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total:</span>
-                    <span className="text-primary">{formatMonto(total)}</span>
+                    <span className="text-primary">{formatCurrency(total)}</span>
                   </div>
                 </div>
               </div>

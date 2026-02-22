@@ -1,0 +1,74 @@
+{
+  "apiUrl": "http://localhost:3001/api",
+  "dispositivoId": 1,
+  "puerto": 3002,
+  "puertoWebSocket": 3003,
+
+  "lectorUSB": {
+    "tipo": "HID",
+    "vendorId": "0x05FE",
+    "productId": "0x1010",
+    "habilitado": true,
+    "descripcion": "Lector de código de barras USB (keyboard wedge)"
+  },
+
+  "lectorRFID": {
+    "tipo": "SERIAL",
+    "puerto": "COM3",
+    "baudRate": 9600,
+    "habilitado": true,
+    "descripcion": "Lector RFID por puerto serial"
+  },
+
+  "molinete": {
+    "tipo": "USB_RELAY",
+    "puerto": "COM4",
+    "baudRate": 9600,
+    "comandoON": "A0:01:01",
+    "comandoOFF": "A0:01:00",
+    "tiempoApertura": 3000,
+    "descripcion": "Relay USB para control de molinete"
+  },
+
+  "señalizacion": {
+    "ledVerde": {
+      "tipo": "GPIO",
+      "pin": 17,
+      "descripcion": "LED verde para acceso permitido"
+    },
+    "ledRojo": {
+      "tipo": "GPIO",
+      "pin": 27,
+      "descripcion": "LED rojo para acceso denegado"
+    },
+    "buzzer": {
+      "tipo": "GPIO",
+      "pin": 22,
+      "descripcion": "Buzzer para señales sonoras"
+    }
+  },
+
+  "habilitacion": {
+    "modalAutomatico": false,
+    "soloListaRemota": true,
+    "descripcion": "Si modalAutomatico=true muestra modal en PC del molinete. Si soloListaRemota=true solo registra en lista remota"
+  },
+
+  "sync": {
+    "intervalo": 5,
+    "autoSync": true,
+    "descripcion": "Intervalo de sincronización en minutos"
+  },
+
+  "offline": {
+    "habilitado": true,
+    "descripcion": "Permite validación offline con cache SQLite"
+  },
+
+  "logging": {
+    "nivel": "info",
+    "archivo": "logs/molinete.log",
+    "maxSize": "10m",
+    "maxFiles": 5
+  }
+}

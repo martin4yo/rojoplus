@@ -3,13 +3,16 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Edit, QrCode, Users, CreditCard, Activity,
   Phone, Mail, MapPin, Calendar, User, AlertCircle,
-  Heart, Shield, FileText, Clock, DollarSign, X, Copy, Check, RefreshCw, ExternalLink, List
+  Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import Modal from '../../components/Modal'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { formatDate } from '../../utils/formatters'
+import StatusBadge from '../../components/StatusBadge'
 
 export default function SocioDetalle() {
   const { id } = useParams()
@@ -89,17 +92,6 @@ export default function SocioDetalle() {
     }
   }, [mostrarCtaCte, incluirFamilia])
 
-  function getEstadoColor(estado) {
-    const upper = estado?.toUpperCase() || ''
-    if (upper.includes('VIGENT') || upper.includes('ACTIV')) {
-      return 'bg-green-100 text-green-800'
-    }
-    if (upper.includes('BAJA') || upper.includes('INACTIV')) {
-      return 'bg-red-100 text-red-800'
-    }
-    return 'bg-yellow-100 text-yellow-800'
-  }
-
   function calcularEdad(fechaNacimiento) {
     if (!fechaNacimiento) return null
     const hoy = new Date()
@@ -110,11 +102,6 @@ export default function SocioDetalle() {
       edad--
     }
     return edad
-  }
-
-  function formatFecha(fecha) {
-    if (!fecha) return '-'
-    return new Date(fecha).toLocaleDateString('es-AR')
   }
 
   function formatMonto(monto) {
@@ -357,9 +344,7 @@ export default function SocioDetalle() {
 
       {/* Estado y badges */}
       <div className="flex flex-wrap gap-2 mb-6">
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getEstadoColor(socio.estado)}`}>
-          {socio.estado}
-        </span>
+        <StatusBadge status={socio.estado} type="socio" size="md" />
         {(socio.tipoSocio?.toLowerCase().includes('titular') || socio.miembrosFamilia?.length > 0) && (
           <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 flex items-center gap-1">
             <Users className="w-4 h-4" />
@@ -431,7 +416,7 @@ export default function SocioDetalle() {
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Fecha de nacimiento</dt>
                   <dd className="text-gray-800">
-                    {formatFecha(socio.fechaNacimiento)}
+                    {formatDate(socio.fechaNacimiento)}
                     {socio.fechaNacimiento && ` (${calcularEdad(socio.fechaNacimiento)} años)`}
                   </dd>
                 </div>
@@ -470,7 +455,7 @@ export default function SocioDetalle() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Fecha de alta</dt>
-                  <dd className="text-gray-800">{formatFecha(socio.fechaAlta)}</dd>
+                  <dd className="text-gray-800">{formatDate(socio.fechaAlta)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Zona</dt>
@@ -764,7 +749,7 @@ export default function SocioDetalle() {
                   <dt className="text-gray-500">Apta fisica</dt>
                   <dd className={socio.aptaFisicaVigente ? 'text-green-600' : 'text-red-600'}>
                     {socio.aptaFisicaVigente ? 'Vigente' : 'Vencida/Sin presentar'}
-                    {socio.aptaFisicaVence && ` (vence ${formatFecha(socio.aptaFisicaVence)})`}
+                    {socio.aptaFisicaVence && ` (vence ${formatDate(socio.aptaFisicaVence)})`}
                   </dd>
                 </div>
               </dl>
@@ -922,8 +907,8 @@ export default function SocioDetalle() {
                         </p>
                         <div className="text-sm text-gray-500 mt-1 space-y-0.5">
                           <p>
-                            Desde {formatFecha(insc.fechaInicio)}
-                            {insc.fechaFin && ` hasta ${formatFecha(insc.fechaFin)}`}
+                            Desde {formatDate(insc.fechaInicio)}
+                            {insc.fechaFin && ` hasta ${formatDate(insc.fechaFin)}`}
                           </p>
                           {(insc.becado || insc.federado || insc.exentoCuota) && (
                             <p className="flex gap-2 flex-wrap">
@@ -975,7 +960,7 @@ export default function SocioDetalle() {
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">Ultimo pago</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  {resumenPagos?.ultimoPago ? formatFecha(resumenPagos.ultimoPago.fecha) : '-'}
+                  {resumenPagos?.ultimoPago ? formatDate(resumenPagos.ultimoPago.fecha) : '-'}
                 </p>
               </div>
             </div>
@@ -1099,7 +1084,7 @@ export default function SocioDetalle() {
                           <tbody className="divide-y divide-gray-200">
                             {cuentaCorriente.movimientos.map((mov, idx) => (
                               <tr key={idx} className={mov.tipo === 'CARGO' ? 'bg-white' : 'bg-green-50'}>
-                                <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{formatFecha(mov.fecha)}</td>
+                                <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{formatDate(mov.fecha)}</td>
                                 <td className="px-3 py-2 text-gray-800">{mov.concepto}</td>
                                 {incluirFamilia && (
                                   <td className="px-3 py-2 text-gray-600 text-xs">{mov.socio?.apellidoNombre || mov.socioNombre}</td>
@@ -1131,110 +1116,95 @@ export default function SocioDetalle() {
       </div>
 
       {/* Modal QR */}
-      {qrModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-              <span className="font-semibold text-gray-800">QR del Socio</span>
-              <button onClick={() => setQrModal(false)} className="p-1 rounded-full hover:bg-gray-100">
-                <X className="w-5 h-5 text-gray-500" />
+      <Modal
+        isOpen={qrModal}
+        onClose={() => setQrModal(false)}
+        title="QR del Socio"
+        maxWidth="max-w-md"
+      >
+        <div className="text-center">
+          <p className="text-gray-800 font-semibold text-lg mb-1">{socio.apellidoNombre}</p>
+          <p className="text-sm text-gray-500 mb-4">#{socio.nroSocio}</p>
+          <div className="inline-block bg-white p-4 rounded-lg border border-gray-200 mb-4">
+            <QRCodeSVG value={getQrUrl()} size={180} level="H" includeMargin={true} />
+          </div>
+          <div className="mb-4">
+            <p className="text-gray-500 text-sm mb-2">Link del portal:</p>
+            <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+              <input type="text" readOnly value={getQrUrl()} className="flex-1 bg-transparent text-sm text-gray-600 outline-none truncate" />
+              <button onClick={copiarLink} className="p-2 rounded hover:bg-gray-200 transition">
+                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-500" />}
               </button>
-            </div>
-            <div className="p-6 text-center">
-              <p className="text-gray-800 font-semibold text-lg mb-1">{socio.apellidoNombre}</p>
-              <p className="text-sm text-gray-500 mb-4">#{socio.nroSocio}</p>
-              <div className="inline-block bg-white p-4 rounded-lg border border-gray-200 mb-4">
-                <QRCodeSVG value={getQrUrl()} size={180} level="H" includeMargin={true} />
-              </div>
-              <div className="mb-4">
-                <p className="text-gray-500 text-sm mb-2">Link del portal:</p>
-                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
-                  <input type="text" readOnly value={getQrUrl()} className="flex-1 bg-transparent text-sm text-gray-600 outline-none truncate" />
-                  <button onClick={copiarLink} className="p-2 rounded hover:bg-gray-200 transition">
-                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-500" />}
-                  </button>
-                  <a href={getQrUrl()} target="_blank" rel="noopener noreferrer" className="p-2 rounded hover:bg-gray-200 transition">
-                    <ExternalLink className="w-4 h-4 text-gray-500" />
-                  </a>
-                </div>
-              </div>
-              <Button variant="secondary" onClick={regenerarToken} loading={regenerando} className="inline-flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" />
-                Regenerar Token
-              </Button>
-              <p className="text-gray-400 text-xs mt-3">Regenerar invalidara el QR actual</p>
+              <a href={getQrUrl()} target="_blank" rel="noopener noreferrer" className="p-2 rounded hover:bg-gray-200 transition">
+                <ExternalLink className="w-4 h-4 text-gray-500" />
+              </a>
             </div>
           </div>
+          <Button variant="secondary" onClick={regenerarToken} loading={regenerando} className="inline-flex items-center gap-2">
+            <RefreshCw className="w-4 h-4" />
+            Regenerar Token
+          </Button>
+          <p className="text-gray-400 text-xs mt-3">Regenerar invalidara el QR actual</p>
         </div>
-      )}
+      </Modal>
 
       {/* Modal Parentesco */}
-      {parentescoModal.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-              <span className="font-semibold text-gray-800">Seleccionar Parentesco</span>
-              <button
-                onClick={() => {
-                  setParentescoModal({ open: false, titular: null, socioAAgregar: null, modo: 'asignar' })
-                  setParentescoSeleccionado('')
-                }}
-                className="p-1 rounded-full hover:bg-gray-100"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-4">
-              {parentescoModal.modo === 'asignar' ? (
-                <p className="text-sm text-gray-500 mb-3">
-                  Asignando a familia de: <span className="font-medium text-gray-800">{parentescoModal.titular?.apellidoNombre}</span>
-                </p>
-              ) : (
-                <p className="text-sm text-gray-500 mb-3">
-                  Agregando a: <span className="font-medium text-gray-800">{parentescoModal.socioAAgregar?.apellidoNombre}</span>
-                </p>
-              )}
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Parentesco con el titular
-              </label>
-              <select
-                value={parentescoSeleccionado}
-                onChange={(e) => setParentescoSeleccionado(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Seleccionar...</option>
-                {parentescoOptions.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setParentescoModal({ open: false, titular: null, socioAAgregar: null, modo: 'asignar' })
-                    setParentescoSeleccionado('')
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (parentescoModal.modo === 'asignar') {
-                      asignarTitular(parentescoModal.titular, parentescoSeleccionado)
-                    } else {
-                      agregarMiembro(parentescoModal.socioAAgregar, parentescoSeleccionado)
-                    }
-                  }}
-                  disabled={!parentescoSeleccionado || asignandoFamilia}
-                  loading={asignandoFamilia}
-                >
-                  {parentescoModal.modo === 'asignar' ? 'Asignar' : 'Agregar'}
-                </Button>
-              </div>
-            </div>
-          </div>
+      <Modal
+        isOpen={parentescoModal.open}
+        onClose={() => {
+          setParentescoModal({ open: false, titular: null, socioAAgregar: null, modo: 'asignar' })
+          setParentescoSeleccionado('')
+        }}
+        title="Seleccionar Parentesco"
+        maxWidth="max-w-md"
+      >
+        {parentescoModal.modo === 'asignar' ? (
+          <p className="text-sm text-gray-500 mb-3">
+            Asignando a familia de: <span className="font-medium text-gray-800">{parentescoModal.titular?.apellidoNombre}</span>
+          </p>
+        ) : (
+          <p className="text-sm text-gray-500 mb-3">
+            Agregando a: <span className="font-medium text-gray-800">{parentescoModal.socioAAgregar?.apellidoNombre}</span>
+          </p>
+        )}
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Parentesco con el titular
+        </label>
+        <select
+          value={parentescoSeleccionado}
+          onChange={(e) => setParentescoSeleccionado(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">Seleccionar...</option>
+          {parentescoOptions.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setParentescoModal({ open: false, titular: null, socioAAgregar: null, modo: 'asignar' })
+              setParentescoSeleccionado('')
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => {
+              if (parentescoModal.modo === 'asignar') {
+                asignarTitular(parentescoModal.titular, parentescoSeleccionado)
+              } else {
+                agregarMiembro(parentescoModal.socioAAgregar, parentescoSeleccionado)
+              }
+            }}
+            disabled={!parentescoSeleccionado || asignandoFamilia}
+            loading={asignandoFamilia}
+          >
+            {parentescoModal.modo === 'asignar' ? 'Asignar' : 'Agregar'}
+          </Button>
         </div>
-      )}
+      </Modal>
     </div>
   )
 }

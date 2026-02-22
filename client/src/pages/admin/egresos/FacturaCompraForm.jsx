@@ -11,6 +11,9 @@ import {
   calcularTotalesFactura,
   getColorComprobante
 } from '../../../utils/fiscalHelper'
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+import { useApiData } from '../../../hooks/useApiData'
+import SelectCentroCosto from '../../../components/SelectCentroCosto'
 
 const MEDIOS_PAGO = [
   { value: 'EFECTIVO', label: 'Efectivo' },
@@ -28,13 +31,24 @@ export default function FacturaCompraForm() {
   const navigate = useNavigate()
   const { showModal, ModalComponent } = useModal()
 
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [proveedores, setProveedores] = useState([])
-  const [productos, setProductos] = useState([])
-  const [conceptos, setConceptos] = useState([])
   const [busquedaProducto, setBusquedaProducto] = useState('')
   const [mostrarBuscador, setMostrarBuscador] = useState(false)
+
+  // Cargar datos con useApiData
+  const { data: proveedores = [], loading: loadingProveedores } = useApiData('/admin/entidades', {
+    params: { tipo: 'PROVEEDOR', activo: true, limit: 500 }
+  })
+  const { data: productos = [], loading: loadingProductos } = useApiData('/admin/productos', {
+    params: { activo: true, limit: 500 }
+  })
+  const { data: conceptos = [], loading: loadingConceptos } = useApiData('/admin/conceptos-tesoreria', {
+    params: { activo: true },
+    initialData: []
+  })
+  const { data: cajas = [], loading: loadingCajas } = useApiData('/admin/cajas', {
+    params: { activo: true }
+  })
 
   // Ordenes de Compra del proveedor
   const [ordenesCompra, setOrdenesCompra] = useState([])
@@ -53,6 +67,7 @@ export default function FacturaCompraForm() {
     numeroComprobante: '',
     conceptoId: '',
     observaciones: '',
+    centroCostoId: '',
     items: []
   })
 
@@ -70,7 +85,6 @@ export default function FacturaCompraForm() {
   const [cajaId, setCajaId] = useState('')
   const [medioPago, setMedioPago] = useState('TRANSFERENCIA')
   const [nroOperacion, setNroOperacion] = useState('')
-  const [cajas, setCajas] = useState([])
 
   // Configuración fiscal
   const [configFiscal, setConfigFiscal] = useState({
@@ -80,9 +94,33 @@ export default function FacturaCompraForm() {
   })
   const [condicionIvaProveedor, setCondicionIvaProveedor] = useState('INSCRIPTO') // Condición IVA del PROVEEDOR (emisor)
 
+  // Cargar configuración fiscal
   useEffect(() => {
-    cargarDatosIniciales()
+    async function cargarConfigFiscal() {
+      try {
+        const [configCondIva, configCuit, configRazonSocial] = await Promise.all([
+          api.get('/admin/sistema/configuracion/FISCAL_CONDICION_IVA').catch(() => null),
+          api.get('/admin/sistema/configuracion/FISCAL_CUIT').catch(() => null),
+          api.get('/admin/sistema/configuracion/FISCAL_RAZON_SOCIAL').catch(() => null)
+        ])
+        setConfigFiscal({
+          condicionIva: configCondIva?.valor || 'INSCRIPTO',
+          cuit: configCuit?.valor || '',
+          razonSocial: configRazonSocial?.valor || ''
+        })
+      } catch (err) {
+        console.error('Error cargando configuración fiscal:', err)
+      }
+    }
+    cargarConfigFiscal()
   }, [])
+
+  // Preseleccionar primera caja cuando se cargan las cajas
+  useEffect(() => {
+    if (cajas.length > 0 && !cajaId) {
+      setCajaId(cajas[0].id.toString())
+    }
+  }, [cajas, cajaId])
 
   useEffect(() => {
     calcularTotales()
@@ -98,42 +136,6 @@ export default function FacturaCompraForm() {
       setForm(prev => ({ ...prev, ordenCompraId: '' }))
     }
   }, [form.entidadId])
-
-  async function cargarDatosIniciales() {
-    setLoading(true)
-    try {
-      const [provRes, prodRes, concRes, cajasRes, configCondIva, configCuit, configRazonSocial] = await Promise.all([
-        api.getFull('/admin/entidades?tipo=PROVEEDOR&activo=true&limit=500'),
-        api.getFull('/admin/productos?activo=true&limit=500'),
-        api.getFull('/admin/conceptos-tesoreria?activo=true').catch(() => ({ data: [] })),
-        api.getFull('/admin/cajas?activo=true'),
-        api.get('/admin/sistema/configuracion/FISCAL_CONDICION_IVA').catch(() => null),
-        api.get('/admin/sistema/configuracion/FISCAL_CUIT').catch(() => null),
-        api.get('/admin/sistema/configuracion/FISCAL_RAZON_SOCIAL').catch(() => null)
-      ])
-      setProveedores(provRes.data || [])
-      setProductos(prodRes.data || [])
-      setConceptos(concRes.data || [])
-      setCajas(cajasRes.data || [])
-
-      // Configuración fiscal del club (receptor)
-      setConfigFiscal({
-        condicionIva: configCondIva?.valor || 'INSCRIPTO',
-        cuit: configCuit?.valor || '',
-        razonSocial: configRazonSocial?.valor || ''
-      })
-
-      // Preseleccionar primera caja si existe
-      if (cajasRes.data?.length > 0) {
-        setCajaId(cajasRes.data[0].id.toString())
-      }
-    } catch (err) {
-      console.error('Error cargando datos:', err)
-      showModal({ type: 'error', message: 'Error al cargar los datos' })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function cargarOrdenesCompra(entidadId) {
     setCargandoOC(true)
@@ -397,6 +399,7 @@ export default function FacturaCompraForm() {
         numeroComprobante: form.numeroComprobante.padStart(8, '0'),
         conceptoId: form.conceptoId ? parseInt(form.conceptoId) : null,
         observaciones: form.observaciones || null,
+        centroCostoId: form.centroCostoId ? parseInt(form.centroCostoId) : null,
         subtotal: totales.subtotal,
         iva21: discriminaIVA ? totales.iva21 : 0,
         iva105: discriminaIVA ? totales.iva105 : 0,
@@ -443,21 +446,13 @@ export default function FacturaCompraForm() {
     }
   }
 
-  function formatMonto(monto) {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
-    }).format(monto || 0)
-  }
-
-  function formatFecha(fecha) {
-    return new Date(fecha).toLocaleDateString('es-AR')
-  }
 
   const productosFiltrados = productos.filter(p =>
     p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
     p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
   )
+
+  const loading = loadingProveedores || loadingProductos || loadingConceptos || loadingCajas
 
   if (loading) {
     return (
@@ -593,7 +588,7 @@ export default function FacturaCompraForm() {
                   <option value="">Sin vincular a OC</option>
                   {ordenesCompra.map((oc) => (
                     <option key={oc.id} value={oc.id}>
-                      {oc.numero} - {formatFecha(oc.fecha)} ({oc.estado})
+                      {oc.numero} - {formatDate(oc.fecha)} ({oc.estado})
                     </option>
                   ))}
                 </select>
@@ -680,18 +675,32 @@ export default function FacturaCompraForm() {
             </div>
           </div>
 
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Observaciones
-            </label>
-            <input
-              type="text"
-              name="observaciones"
-              value={form.observaciones}
-              onChange={handleChange}
-              placeholder="Notas adicionales..."
-              className="input-field w-full"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observaciones
+              </label>
+              <input
+                type="text"
+                name="observaciones"
+                value={form.observaciones}
+                onChange={handleChange}
+                placeholder="Notas adicionales..."
+                className="input-field w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Centro de Costo
+              </label>
+              <SelectCentroCosto
+                value={form.centroCostoId}
+                onChange={(val) => setForm(prev => ({ ...prev, centroCostoId: val }))}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
+            </div>
           </div>
         </div>
 
@@ -749,7 +758,7 @@ export default function FacturaCompraForm() {
                             {cantidadPendiente}
                           </span>
                         </td>
-                        <td className="py-2 px-2 text-right">{formatMonto(itemOC.precioUnitario)}</td>
+                        <td className="py-2 px-2 text-right">{formatCurrency(itemOC.precioUnitario)}</td>
                         <td className="py-2 px-2 text-center">
                           {cantidadPendiente > 0 && !yaAgregado ? (
                             <button
@@ -817,7 +826,7 @@ export default function FacturaCompraForm() {
                         <p className="font-medium text-gray-800">{producto.nombre}</p>
                         {producto.precioCompra && (
                           <p className="text-sm text-gray-600">
-                            Precio compra: {formatMonto(producto.precioCompra)}
+                            Precio compra: {formatCurrency(producto.precioCompra)}
                           </p>
                         )}
                       </div>
@@ -928,7 +937,7 @@ export default function FacturaCompraForm() {
                   </div>
                   <div className="text-right pt-5">
                     <p className="text-sm font-semibold text-gray-800">
-                      {formatMonto((parseFloat(item.cantidad) || 0) * (parseFloat(item.precioUnitario) || 0))}
+                      {formatCurrency((parseFloat(item.cantidad) || 0) * (parseFloat(item.precioUnitario) || 0))}
                     </p>
                   </div>
                   <button
@@ -956,18 +965,18 @@ export default function FacturaCompraForm() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">{discriminaIVA ? 'Subtotal (Neto):' : 'Subtotal:'}</span>
-                    <span className="font-medium">{formatMonto(totales.subtotal)}</span>
+                    <span className="font-medium">{formatCurrency(totales.subtotal)}</span>
                   </div>
                   {discriminaIVA && totales.iva21 > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">IVA 21%:</span>
-                      <span className="font-medium">{formatMonto(totales.iva21)}</span>
+                      <span className="font-medium">{formatCurrency(totales.iva21)}</span>
                     </div>
                   )}
                   {discriminaIVA && totales.iva105 > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">IVA 10.5%:</span>
-                      <span className="font-medium">{formatMonto(totales.iva105)}</span>
+                      <span className="font-medium">{formatCurrency(totales.iva105)}</span>
                     </div>
                   )}
                   {!discriminaIVA && (
@@ -977,7 +986,7 @@ export default function FacturaCompraForm() {
                   )}
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total:</span>
-                    <span className="text-primary">{formatMonto(totales.montoTotal)}</span>
+                    <span className="text-primary">{formatCurrency(totales.montoTotal)}</span>
                   </div>
                 </div>
               </div>
@@ -1022,7 +1031,7 @@ export default function FacturaCompraForm() {
                       <option value="">Seleccionar caja...</option>
                       {cajas.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.nombre} ({formatMonto(c.saldoActual)})
+                          {c.nombre} ({formatCurrency(c.saldoActual)})
                         </option>
                       ))}
                     </select>
@@ -1061,7 +1070,7 @@ export default function FacturaCompraForm() {
                   <div className="w-full p-3 bg-white rounded-lg border border-red-300">
                     <p className="text-xs text-gray-500">Total a Pagar</p>
                     <p className="text-xl font-bold text-red-600">
-                      {formatMonto(totales.montoTotal)}
+                      {formatCurrency(totales.montoTotal)}
                     </p>
                   </div>
                 </div>
