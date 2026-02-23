@@ -1,4 +1,4 @@
-const API_URL = '/api'
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 // Función para manejar token inválido
 function handleInvalidToken() {
