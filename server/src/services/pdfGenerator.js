@@ -2,10 +2,34 @@ import puppeteer from 'puppeteer'
 import Handlebars from 'handlebars'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { existsSync } from 'fs'
 
 const handlebars = Handlebars
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+// Buscar Chrome en las ubicaciones comunes
+function findChrome() {
+  const possiblePaths = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  ]
+
+  for (const chromePath of possiblePaths) {
+    if (chromePath && existsSync(chromePath)) {
+      console.log(`✅ Chrome encontrado en: ${chromePath}`)
+      return chromePath
+    }
+  }
+
+  console.log('⚠️  Chrome no encontrado en ubicaciones comunes, usando Puppeteer por defecto')
+  return undefined
+}
 
 /**
  * Genera un PDF a partir de un template guardado en la base de datos
@@ -44,16 +68,17 @@ export async function generatePDF(prisma, tipo, data) {
     `
 
     // 4. Generar PDF con Puppeteer
+    const chromePath = findChrome()
     const browser = await puppeteer.launch({
       headless: 'new',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-software-rasterizer'
       ],
-      // Intentar usar Chrome del sistema si está disponible
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+      executablePath: chromePath
     })
 
     const page = await browser.newPage()
