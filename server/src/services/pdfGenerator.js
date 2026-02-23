@@ -46,7 +46,14 @@ export async function generatePDF(prisma, tipo, data) {
     // 4. Generar PDF con Puppeteer
     const browser = await puppeteer.launch({
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ],
+      // Intentar usar Chrome del sistema si está disponible
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
     })
 
     const page = await browser.newPage()
