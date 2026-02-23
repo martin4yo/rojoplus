@@ -76,9 +76,18 @@ export async function generatePDF(prisma, tipo, data) {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--disable-software-rasterizer'
+        '--disable-software-rasterizer',
+        '--disable-features=IsolateOrigins',
+        '--disable-site-isolation-trials',
+        '--disable-web-security',
+        '--disable-blink-features=AutomationControlled',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions'
       ],
-      executablePath: chromePath
+      executablePath: chromePath,
+      ignoreDefaultArgs: ['--disable-extensions']
     })
 
     const page = await browser.newPage()
