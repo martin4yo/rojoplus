@@ -1,12 +1,7 @@
-import pdf from 'pdf-creator-node'
+import htmlPdf from 'html-pdf'
 import Handlebars from 'handlebars'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
 
 const handlebars = Handlebars
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 /**
  * Genera un PDF a partir de un template guardado en la base de datos
@@ -53,34 +48,22 @@ export async function generatePDF(prisma, tipo, data) {
         right: '10mm',
         bottom: '10mm',
         left: '10mm'
-      }
+      },
+      type: 'pdf'
     }
 
-    // 5. Preparar documento para pdf-creator-node
-    const document = {
-      html: htmlWithStyles,
-      data: {},
-      path: path.join(__dirname, '../../temp', `${tipo}_${Date.now()}.pdf`),
-      type: ''
-    }
-
-    // 6. Crear directorio temp si no existe
-    const tempDir = path.join(__dirname, '../../temp')
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true })
-    }
-
-    // 7. Generar PDF
-    const result = await pdf.create(document, options)
-
-    // 8. Leer el archivo generado como buffer
-    const pdfBuffer = fs.readFileSync(result.filename)
-
-    // 9. Eliminar archivo temporal
-    fs.unlinkSync(result.filename)
-
-    console.log(`✅ PDF generado: ${tipo}`)
-    return pdfBuffer
+    // 5. Generar PDF usando html-pdf (PhantomJS)
+    return new Promise((resolve, reject) => {
+      htmlPdf.create(htmlWithStyles, options).toBuffer((err, buffer) => {
+        if (err) {
+          console.error(`❌ Error generando PDF tipo "${tipo}":`, err)
+          reject(err)
+        } else {
+          console.log(`✅ PDF generado: ${tipo}`)
+          resolve(buffer)
+        }
+      })
+    })
 
   } catch (error) {
     console.error(`❌ Error generando PDF tipo "${tipo}":`, error)
