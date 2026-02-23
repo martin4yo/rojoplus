@@ -126,6 +126,8 @@ router.get('/:id', authAdmin, checkPermiso('EVENTOS_VER'), async (req, res) => {
         categorias: {
           orderBy: { orden: 'asc' }
         },
+        conceptoTesoreria: true,
+        centroCosto: true,
         creador: {
           select: {
             id: true,
@@ -184,7 +186,9 @@ router.post('/', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res) 
       permiteSobreventa,
       ventasHabilitadas,
       partidoId,
-      imagen
+      imagen,
+      conceptoTesoreriaId,
+      centroCostoId
     } = req.body
 
     // Validaciones
@@ -240,11 +244,15 @@ router.post('/', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res) 
         ventasHabilitadas: ventasHabilitadas !== false,
         partidoId: partidoId ? parseInt(partidoId) : null,
         imagen,
+        conceptoTesoreriaId: conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null,
+        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
         creadoPor: req.admin.id
       },
       include: {
         espacio: true,
         partido: true,
+        conceptoTesoreria: true,
+        centroCosto: true,
         creador: {
           select: {
             id: true,
@@ -286,7 +294,9 @@ router.put('/:id', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res
       permiteSobreventa,
       ventasHabilitadas,
       partidoId,
-      imagen
+      imagen,
+      conceptoTesoreriaId,
+      centroCostoId
     } = req.body
 
     const eventoExistente = await prisma.evento.findUnique({
@@ -334,6 +344,8 @@ router.put('/:id', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res
     if (ventasHabilitadas !== undefined) dataUpdate.ventasHabilitadas = ventasHabilitadas
     if (partidoId !== undefined) dataUpdate.partidoId = partidoId ? parseInt(partidoId) : null
     if (imagen !== undefined) dataUpdate.imagen = imagen
+    if (conceptoTesoreriaId !== undefined) dataUpdate.conceptoTesoreriaId = conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null
+    if (centroCostoId !== undefined) dataUpdate.centroCostoId = centroCostoId ? parseInt(centroCostoId) : null
 
     const eventoActualizado = await prisma.evento.update({
       where: { id: parseInt(id) },
@@ -342,6 +354,8 @@ router.put('/:id', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res
         espacio: true,
         partido: true,
         categorias: true,
+        conceptoTesoreria: true,
+        centroCosto: true,
         creador: {
           select: {
             id: true,
