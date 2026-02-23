@@ -131,11 +131,11 @@ export default function VentaEntradas() {
     try {
       // Verificar si tiene deudas
       const cuentaCorriente = await api.get(`/admin/socios/${socio.id}/cuenta-corriente?incluirFamilia=false`)
-      const saldo = parseFloat(cuentaCorriente?.saldo || 0)
+      const saldo = parseFloat(cuentaCorriente?.resumen?.saldoActual || 0)
 
       const socioConDeuda = {
         ...socio,
-        tieneDeuda: saldo < 0,
+        tieneDeuda: saldo > 0, // Saldo positivo = debe plata
         saldo
       }
 
@@ -144,7 +144,7 @@ export default function VentaEntradas() {
       setDocumentoComprador(socio.documento || socio.dni || '')
       setBusquedaSocio('')
 
-      if (saldo < 0) {
+      if (saldo > 0) {
         toast.error(`Socio con deuda de ${formatCurrency(Math.abs(saldo))}. No se aplicará precio socio.`)
       } else {
         toast.success('Socio encontrado - Se aplicará precio socio')
