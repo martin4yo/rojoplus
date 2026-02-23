@@ -113,6 +113,5 @@ export default defineConfig({
   preview: {
     port: 8090,
     host: true,
-    allowedHosts: ['sportivo.axiomacloud.com', 'sportivodemo.axiomacloud.com'],
   },
 })
