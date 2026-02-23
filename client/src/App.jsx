@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import ScrollToTop from './components/ScrollToTop'
+import ErrorBoundary from './components/ErrorBoundary'
 import { TicketProvider } from './contexts/TicketContext'
 import { NotificacionBuffetProvider } from './contexts/NotificacionBuffetContext'
 
@@ -177,6 +178,7 @@ import BuffetDashboard from './pages/admin/buffet/BuffetDashboard'
 import BuffetMesas from './pages/admin/buffet/BuffetMesas'
 import BuffetCategorias from './pages/admin/buffet/BuffetCategorias'
 import BuffetProductos from './pages/admin/buffet/BuffetProductos'
+import ImportarProductos from './pages/admin/buffet/ImportarProductos'
 import BuffetComanda from './pages/admin/buffet/BuffetComanda'
 import BuffetCocina from './pages/admin/buffet/BuffetCocina'
 import BuffetKiosco from './pages/admin/buffet/BuffetKiosco'
@@ -190,16 +192,23 @@ import IntentosDenegados from './pages/admin/accesos/IntentosDenegados'
 import Habilitaciones from './pages/admin/accesos/Habilitaciones'
 import ControlPWA from './pages/admin/accesos/ControlPWA'
 
+// Eventos
+import EventosLista from './pages/admin/eventos/EventosLista'
+import EventoForm from './pages/admin/eventos/EventoForm'
+import EventoDetalle from './pages/admin/eventos/EventoDetalle'
+import VentaEntradas from './pages/admin/eventos/VentaEntradas'
+
 // Layout admin
 import AdminLayout from './components/AdminLayout'
 
 function App() {
   return (
-    <TicketProvider>
-      <NotificacionBuffetProvider>
-        <ScrollToTop />
-        <Toaster position="top-right" />
-        <Routes>
+    <ErrorBoundary>
+      <TicketProvider>
+        <NotificacionBuffetProvider>
+          <ScrollToTop />
+          <Toaster position="top-right" />
+          <Routes>
         {/* Sitio web público del club */}
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<HomePublic />} />
@@ -392,6 +401,7 @@ function App() {
         <Route path="buffet/mesas" element={<BuffetMesas />} />
         <Route path="buffet/categorias" element={<BuffetCategorias />} />
         <Route path="buffet/productos" element={<BuffetProductos />} />
+        <Route path="buffet/productos/importar" element={<ImportarProductos />} />
         <Route path="buffet/comanda/:mesaId" element={<BuffetComanda />} />
         <Route path="buffet/kds" element={<BuffetCocina />} />
         <Route path="buffet/kds/:sector" element={<BuffetCocina />} />
@@ -405,10 +415,18 @@ function App() {
         <Route path="accesos/intentos-denegados" element={<IntentosDenegados />} />
         <Route path="accesos/habilitaciones" element={<Habilitaciones />} />
         <Route path="accesos/control-pwa" element={<ControlPWA />} />
+
+        {/* Eventos */}
+        <Route path="eventos" element={<EventosLista />} />
+        <Route path="eventos/vender" element={<VentaEntradas />} />
+        <Route path="eventos/nuevo" element={<EventoForm />} />
+        <Route path="eventos/:id" element={<EventoDetalle />} />
+        <Route path="eventos/:id/editar" element={<EventoForm />} />
       </Route>
-      </Routes>
-      </NotificacionBuffetProvider>
-    </TicketProvider>
+        </Routes>
+        </NotificacionBuffetProvider>
+      </TicketProvider>
+    </ErrorBoundary>
   )
 }
 

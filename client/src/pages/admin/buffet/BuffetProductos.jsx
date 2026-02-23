@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Image, Search, Check, X, Package } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Edit, Trash2, Image, Search, Check, X, Package, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 export default function BuffetProductos() {
+  const navigate = useNavigate()
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [categoriasStock, setCategoriasStock] = useState([])
@@ -247,13 +249,22 @@ export default function BuffetProductos() {
           <p className="text-gray-600">Gestiona los productos disponibles en el buffet</p>
         </div>
         {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
-          <button
-            onClick={() => abrirModal()}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            <Plus size={18} />
-            Agregar Producto
-          </button>
+          <>
+            <button
+              onClick={() => navigate('/admin/buffet/productos/importar')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Upload size={18} />
+              Importar
+            </button>
+            <button
+              onClick={() => abrirModal()}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              <Plus size={18} />
+              Agregar Producto
+            </button>
+          </>
         )}
       </div>
 
@@ -314,6 +325,21 @@ export default function BuffetProductos() {
               className="rounded text-blue-600 focus:ring-blue-500"
             />
             <span className="text-sm font-medium text-blue-700">Kiosco</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filtroTiposVenta.includes('TAKEAWAY')}
+              onChange={e => {
+                if (e.target.checked) {
+                  setFiltroTiposVenta([...filtroTiposVenta, 'TAKEAWAY'])
+                } else {
+                  setFiltroTiposVenta(filtroTiposVenta.filter(t => t !== 'TAKEAWAY'))
+                }
+              }}
+              className="rounded text-green-600 focus:ring-green-500"
+            />
+            <span className="text-sm font-medium text-green-700">TakeAway</span>
           </label>
         </div>
       </div>
@@ -378,6 +404,11 @@ export default function BuffetProductos() {
                   {prod.tiposVenta?.includes('KIOSCO') && (
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
                       Kiosco
+                    </span>
+                  )}
+                  {prod.tiposVenta?.includes('TAKEAWAY') && (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                      TakeAway
                     </span>
                   )}
                 </div>
@@ -606,7 +637,7 @@ export default function BuffetProductos() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Disponible en *</label>
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap gap-4">
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input
                           type="checkbox"
@@ -636,6 +667,21 @@ export default function BuffetProductos() {
                           className="rounded text-blue-600 focus:ring-blue-500"
                         />
                         <span className="text-sm font-medium text-blue-700">Kiosco</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.tiposVenta.includes('TAKEAWAY')}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, tiposVenta: [...formData.tiposVenta, 'TAKEAWAY'] })
+                            } else {
+                              setFormData({ ...formData, tiposVenta: formData.tiposVenta.filter(t => t !== 'TAKEAWAY') })
+                            }
+                          }}
+                          className="rounded text-green-600 focus:ring-green-500"
+                        />
+                        <span className="text-sm font-medium text-green-700">TakeAway</span>
                       </label>
                     </div>
                   </div>

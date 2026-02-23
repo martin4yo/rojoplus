@@ -153,7 +153,7 @@ export default function OrdenesCompraLista() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Ordenes de Compra</h1>
-            <p className="text-gray-500 text-sm">{pagination.total} ordenes</p>
+            <p className="text-gray-500 text-sm">{pagination?.total || 0} ordenes</p>
           </div>
         </div>
         {tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (

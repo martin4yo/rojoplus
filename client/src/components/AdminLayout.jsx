@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
   UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User,
-  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone
+  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone, Ticket
 } from 'lucide-react'
 import api from '../services/api'
 import { cargarPermisos, limpiarPermisos, tieneAlgunPermiso, getPermisos, PERMISOS } from '../services/permisos'
@@ -197,6 +197,13 @@ export default function AdminLayout() {
         { path: '/admin/accesos/intentos-denegados', label: 'DNIs Denegados', icon: AlertTriangle, permisos: [PERMISOS.ACCESOS_GESTIONAR] },
         { path: '/admin/accesos/habilitaciones', label: 'Habilitaciones', icon: UserPlus, permisos: [PERMISOS.ACCESOS_GESTIONAR] },
         { path: '/admin/accesos/control-pwa', label: 'Control Móvil', icon: Smartphone, permisos: [PERMISOS.ACCESOS_GESTIONAR] },
+      ]
+    },
+    {
+      label: 'Eventos', icon: Ticket, permisos: [PERMISOS.EVENTOS_VER],
+      submenu: [
+        { path: '/admin/eventos', label: 'Gestión de Eventos', icon: Ticket, permisos: [PERMISOS.EVENTOS_VER] },
+        { path: '/admin/eventos/vender', label: 'Vender Entradas', icon: ShoppingCart, permisos: [PERMISOS.EVENTOS_VENDER] },
       ]
     },
     {

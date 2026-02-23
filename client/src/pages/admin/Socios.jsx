@@ -409,7 +409,7 @@ export default function AdminSocios() {
       {/* Contador si no hay filtros abiertos */}
       {!showFilters && pagination && (
         <div className="mb-4 text-sm text-gray-500">
-          {pagination.total} socios encontrados
+          {pagination?.total || 0} socios encontrados
         </div>
       )}
 

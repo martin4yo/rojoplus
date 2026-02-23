@@ -20,7 +20,8 @@ router.post('/validar', async (req, res) => {
   try {
     const { dispositivoId, tipoLectura, valorLeido } = req.body
 
-    if (!dispositivoId || !tipoLectura || !valorLeido) {
+    // Solo tipoLectura y valorLeido son obligatorios, dispositivoId es opcional
+    if (!tipoLectura || !valorLeido) {
       return res.status(400).json({
         success: false,
         error: 'Faltan datos requeridos'
@@ -31,11 +32,12 @@ router.post('/validar', async (req, res) => {
     let permitido = false
     let motivo = ''
     let mensaje = ''
-    let tipo = '' // 'SOCIO' o 'HABILITACION'
+    let tipo = '' // 'SOCIO', 'HABILITACION', o 'ENTRADA_EVENTO'
+    let entrada = null // Para entradas de eventos
 
     // 1. Buscar según el tipo de lectura
     if (tipoLectura === 'QR') {
-      // Buscar por tokenPortal
+      // Primero buscar por tokenPortal (Socios)
       persona = await prisma.socio.findUnique({
         where: { tokenPortal: valorLeido },
         select: {
@@ -48,7 +50,24 @@ router.post('/validar', async (req, res) => {
           tokenPortal: true
         }
       })
-      tipo = 'SOCIO'
+
+      if (persona) {
+        tipo = 'SOCIO'
+      } else {
+        // Si no es un socio, buscar en entradas de eventos
+        entrada = await prisma.entrada.findUnique({
+          where: { codigo: valorLeido },
+          include: {
+            evento: true,
+            categoria: true,
+            ingreso: true
+          }
+        })
+
+        if (entrada) {
+          tipo = 'ENTRADA_EVENTO'
+        }
+      }
     } else if (tipoLectura === 'DNI') {
       // Buscar por documento en Socios
       persona = await prisma.socio.findFirst({
@@ -98,14 +117,14 @@ router.post('/validar', async (req, res) => {
       tipo = 'SOCIO'
     }
 
-    // 2. Si no se encontró la persona
-    if (!persona) {
+    // 2. Si no se encontró ni persona ni entrada
+    if (!persona && !entrada) {
       return res.json({
         success: true,
         data: {
           permitido: false,
           motivo: 'NO_ENCONTRADO',
-          mensaje: 'DNI no registrado - Diríjase a Recepción',
+          mensaje: 'Código no registrado - Diríjase a Recepción',
           persona: null,
           tipo: null
         }
@@ -113,6 +132,54 @@ router.post('/validar', async (req, res) => {
     }
 
     // 3. Validar según el tipo
+    if (tipo === 'ENTRADA_EVENTO') {
+      // Validar estado de la entrada
+      if (entrada.estado === 'ANULADA') {
+        permitido = false
+        motivo = 'ENTRADA_ANULADA'
+        mensaje = 'Entrada anulada - No válida'
+      } else if (entrada.estado === 'USADA' || entrada.ingreso) {
+        permitido = false
+        motivo = 'ENTRADA_USADA'
+        mensaje = 'Esta entrada ya fue utilizada'
+      } else if (entrada.estado === 'VALIDA') {
+        // Validar fecha del evento (solo el día) - usar UTC para evitar problemas de timezone
+        const ahora = new Date()
+        const fechaEvento = new Date(entrada.evento.fecha)
+
+        // Extraer día actual en UTC
+        const hoy = new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()))
+
+        // Extraer día del evento en UTC
+        const diaEvento = new Date(Date.UTC(
+          fechaEvento.getUTCFullYear(),
+          fechaEvento.getUTCMonth(),
+          fechaEvento.getUTCDate()
+        ))
+
+        if (hoy.getTime() !== diaEvento.getTime()) {
+          permitido = false
+          motivo = 'FECHA_INVALIDA'
+          // Formatear fecha del evento usando UTC
+          const dia = String(fechaEvento.getUTCDate()).padStart(2, '0')
+          const mes = String(fechaEvento.getUTCMonth() + 1).padStart(2, '0')
+          const anio = fechaEvento.getUTCFullYear()
+          mensaje = `Entrada válida para ${dia}/${mes}/${anio}`
+        } else {
+          permitido = true
+          motivo = 'ENTRADA_VALIDA'
+          mensaje = `${entrada.evento.nombre} - ${entrada.categoria.nombre}`
+        }
+      }
+
+      persona = {
+        id: entrada.id,
+        nombre: entrada.nombreComprador,
+        evento: entrada.evento.nombre,
+        categoria: entrada.categoria.nombre,
+        codigo: entrada.codigo
+      }
+    } else
     if (tipo === 'SOCIO') {
       // Validar estado VIGENTE
       if (persona.estado === 'VIGENTE') {
@@ -800,6 +867,89 @@ router.post('/abrir-molinete', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), asy
     res.status(500).json({
       success: false,
       error: 'Error abriendo molinete'
+    })
+  }
+})
+
+/**
+ * POST /api/accesos/registrar-ingreso-entrada
+ * Registra el ingreso de una entrada de evento
+ */
+router.post('/registrar-ingreso-entrada', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+  try {
+    const { entradaId, dispositivoId, codigoEntrada } = req.body
+    const adminId = req.admin?.id || 1
+
+    // Obtener la entrada
+    const entrada = await prisma.entrada.findUnique({
+      where: { id: entradaId },
+      include: { evento: true }
+    })
+
+    if (!entrada) {
+      return res.status(404).json({
+        success: false,
+        error: 'Entrada no encontrada'
+      })
+    }
+
+    // Verificar que no haya sido usada
+    const ingresoExistente = await prisma.ingresoEntrada.findUnique({
+      where: { entradaId }
+    })
+
+    if (ingresoExistente) {
+      return res.status(400).json({
+        success: false,
+        error: 'Esta entrada ya fue utilizada'
+      })
+    }
+
+    // Registrar el ingreso
+    await prisma.ingresoEntrada.create({
+      data: {
+        entradaId,
+        eventoId: entrada.eventoId,
+        dispositivoId: dispositivoId || null,
+        validadoPor: adminId,
+        modoValidacion: 'MANUAL_PWA'
+      }
+    })
+
+    // Actualizar estado de la entrada
+    await prisma.entrada.update({
+      where: { id: entradaId },
+      data: { estado: 'USADA' }
+    })
+
+    // Registrar en log de accesos (si existe la tabla)
+    try {
+      await prisma.registroAcceso.create({
+        data: {
+          dispositivoId: dispositivoId || null,
+          socioId: entrada.socioId || null,
+          tipoLectura: 'QR',
+          valorLeido: codigoEntrada,
+          resultado: 'PERMITIDO',
+          motivoRechazo: null,
+          modoValidacion: 'MANUAL_PWA'
+        }
+      })
+    } catch (err) {
+      // Si no existe la tabla o hay error, continuar
+      console.log('No se pudo registrar en RegistroAcceso:', err.message)
+    }
+
+    res.json({
+      success: true,
+      message: 'Ingreso registrado correctamente'
+    })
+
+  } catch (error) {
+    console.error('Error registrando ingreso:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error registrando ingreso'
     })
   }
 })

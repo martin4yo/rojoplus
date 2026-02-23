@@ -219,6 +219,12 @@ router.get('/mesas/estado', authAdmin, checkPermiso('BUFFET_VER'), async (req, r
             horaApertura: true,
             total: true,
             socio: { select: { nroSocio: true, apellidoNombre: true } },
+            items: {
+              select: {
+                id: true,
+                estado: true
+              }
+            },
             _count: { select: { items: true } }
           }
         }
@@ -429,11 +435,11 @@ router.post('/mesas', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res)
   }
 });
 
-// Actualizar mesa
-router.put('/mesas/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
+// Actualizar mesa (BUFFET_MESAS permite cambiar estado, BUFFET_CONFIG permite cambiar configuración)
+router.put('/mesas/:id', authAdmin, checkPermiso('BUFFET_CONFIG', 'BUFFET_MESAS'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { numero, nombre, capacidad, zona, activo, esComunal } = req.body;
+    const { numero, nombre, capacidad, zona, activo, esComunal, estado } = req.body;
 
     const updateData = {};
     if (numero !== undefined) updateData.numero = numero;
@@ -442,6 +448,22 @@ router.put('/mesas/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, r
     if (zona !== undefined) updateData.zona = zona;
     if (activo !== undefined) updateData.activo = activo;
     if (esComunal !== undefined) updateData.esComunal = esComunal;
+    if (estado !== undefined) updateData.estado = estado;
+
+    // Si se pasa a LIBRE, cerrar todas las comandas activas
+    if (estado === 'LIBRE') {
+      await prisma.comanda.updateMany({
+        where: {
+          mesaId: parseInt(id),
+          estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] }
+        },
+        data: {
+          estado: 'CERRADA',
+          horaCierre: new Date(),
+          cerradoPor: req.admin.id
+        }
+      });
+    }
 
     const mesa = await prisma.mesa.update({
       where: { id: parseInt(id) },
@@ -487,6 +509,21 @@ router.put('/mesas/:id/estado', authAdmin, checkPermiso('BUFFET_MESAS'), async (
     const estadosValidos = ['LIBRE', 'OCUPADA', 'CUENTA_PEDIDA', 'LIMPIEZA'];
     if (!estadosValidos.includes(estado)) {
       return res.status(400).json({ success: false, error: 'Estado inválido' });
+    }
+
+    // Si se pasa a LIBRE, cerrar todas las comandas activas
+    if (estado === 'LIBRE') {
+      await prisma.comanda.updateMany({
+        where: {
+          mesaId: parseInt(id),
+          estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] }
+        },
+        data: {
+          estado: 'CERRADA',
+          horaCierre: new Date(),
+          cerradoPor: req.admin.id
+        }
+      });
     }
 
     const mesa = await prisma.mesa.update({
@@ -1152,7 +1189,7 @@ router.get('/comandas/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, r
 // Abrir comanda en mesa
 router.post('/comandas', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
   try {
-    const { mesaId, socioId, observaciones } = req.body;
+    const { mesaId, socioId, observaciones, centroCostoId } = req.body;
 
     // Verificar mesa
     const mesa = await prisma.mesa.findUnique({ where: { id: mesaId } });
@@ -1179,6 +1216,7 @@ router.post('/comandas', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
         mesaId,
         socioId,
         observaciones,
+        centroCostoId,
         atendidoPor: req.admin.id
       },
       include: { mesa: true, socio: true }
@@ -1258,8 +1296,29 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     const itemsCreados = [];
 
     for (const item of items) {
-      const producto = await prisma.productoBuffet.findUnique({ where: { id: item.productoBuffetId } });
+      const producto = await prisma.productoBuffet.findUnique({
+        where: { id: item.productoBuffetId },
+        include: { categoriaMenu: true }
+      });
       if (!producto) continue;
+
+      // Determinar estado inicial según destino de impresión
+      let estadoInicial = 'PENDIENTE';
+      if (producto.categoriaMenuId) {
+        const destino = await prisma.destinoImpresion.findFirst({
+          where: { categoriaMenuId: producto.categoriaMenuId },
+          include: { impresora: { include: { sector: true } } }
+        });
+
+        if (destino && destino.impresora) {
+          const codigoSector = destino.impresora.sector?.codigo;
+          if (codigoSector === 'COCINA') {
+            estadoInicial = 'ENVIADO_COCINA';
+          } else if (codigoSector === 'BARRA') {
+            estadoInicial = 'ENVIADO_BARRA';
+          }
+        }
+      }
 
       const itemCreado = await prisma.itemComanda.create({
         data: {
@@ -1268,7 +1327,8 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
           cantidad: item.cantidad || 1,
           precioUnitario: producto.precio,
           subtotal: Number(producto.precio) * (item.cantidad || 1),
-          observaciones: item.observaciones
+          observaciones: item.observaciones,
+          estado: estadoInicial
         },
         include: { productoBuffet: true }
       });
@@ -1349,6 +1409,44 @@ router.delete('/comandas/:comandaId/items/:itemId', authAdmin, checkPermiso('BUF
   } catch (error) {
     console.error('Error al anular item:', error);
     res.status(500).json({ success: false, error: 'Error al anular item' });
+  }
+});
+
+// Marcar item como entregado
+router.post('/comandas/:comandaId/items/:itemId/entregar', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
+  try {
+    const { comandaId, itemId } = req.params;
+
+    const item = await prisma.itemComanda.findUnique({
+      where: { id: parseInt(itemId) },
+      include: { comanda: true }
+    });
+
+    if (!item || item.comandaId !== parseInt(comandaId)) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado' });
+    }
+
+    if (item.estado === 'ANULADO') {
+      return res.status(400).json({ success: false, error: 'No se pueden entregar items anulados' });
+    }
+
+    if (item.estado === 'ENTREGADO') {
+      return res.status(400).json({ success: false, error: 'El item ya fue entregado' });
+    }
+
+    const itemActualizado = await prisma.itemComanda.update({
+      where: { id: parseInt(itemId) },
+      data: {
+        estado: 'ENTREGADO',
+        entregadoAt: new Date()
+      },
+      include: { productoBuffet: true }
+    });
+
+    res.json({ success: true, data: itemActualizado });
+  } catch (error) {
+    console.error('Error al marcar item como entregado:', error);
+    res.status(500).json({ success: false, error: 'Error al marcar item como entregado' });
   }
 });
 
@@ -1719,11 +1817,31 @@ router.post('/comandas/:id/cerrar', authAdmin, checkPermiso('BUFFET_MESAS'), asy
       return res.status(404).json({ success: false, error: 'Comanda no encontrada' });
     }
 
-    // Liberar mesa
-    await prisma.mesa.update({
-      where: { id: comanda.mesaId },
-      data: { estado: 'LIBRE' }
+    // Cerrar la comanda
+    await prisma.comanda.update({
+      where: { id: parseInt(id) },
+      data: {
+        estado: 'CERRADA',
+        horaCierre: new Date(),
+        cerradoPor: req.admin.id
+      }
     });
+
+    // Verificar si hay otras comandas activas en la mesa (mesas comunales)
+    const comandasActivas = await prisma.comanda.count({
+      where: {
+        mesaId: comanda.mesaId,
+        estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] }
+      }
+    });
+
+    // Solo liberar mesa si no hay otras comandas activas
+    if (comandasActivas === 0) {
+      await prisma.mesa.update({
+        where: { id: comanda.mesaId },
+        data: { estado: 'LIBRE' }
+      });
+    }
 
     res.json({ success: true, message: 'Mesa liberada' });
   } catch (error) {
@@ -1821,7 +1939,7 @@ router.get('/takeaway', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) 
 // Crear pedido take away
 router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
   try {
-    const { nombreCliente, telefono, socioId, horaEstimada, observaciones, items } = req.body;
+    const { nombreCliente, telefono, socioId, horaEstimada, observaciones, items, tipo, centroCostoId } = req.body;
 
     const numero = await generarNumeroPedido();
 
@@ -1831,6 +1949,8 @@ router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
         nombreCliente,
         telefono,
         socioId,
+        tipo: tipo || 'RETIRO',
+        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
         horaEstimada: horaEstimada ? new Date(horaEstimada) : null,
         observaciones,
         atendidoPor: req.admin.id
@@ -1888,8 +2008,29 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     const itemsCreados = [];
 
     for (const item of items) {
-      const producto = await prisma.productoBuffet.findUnique({ where: { id: item.productoBuffetId } });
+      const producto = await prisma.productoBuffet.findUnique({
+        where: { id: item.productoBuffetId },
+        include: { categoriaMenu: true }
+      });
       if (!producto) continue;
+
+      // Determinar estado inicial según destino de impresión
+      let estadoInicial = 'PENDIENTE';
+      if (producto.categoriaMenuId) {
+        const destino = await prisma.destinoImpresion.findFirst({
+          where: { categoriaMenuId: producto.categoriaMenuId },
+          include: { impresora: { include: { sector: true } } }
+        });
+
+        if (destino && destino.impresora) {
+          const codigoSector = destino.impresora.sector?.codigo;
+          if (codigoSector === 'COCINA') {
+            estadoInicial = 'ENVIADO_COCINA';
+          } else if (codigoSector === 'BARRA') {
+            estadoInicial = 'ENVIADO_BARRA';
+          }
+        }
+      }
 
       const itemCreado = await prisma.itemPedidoTakeAway.create({
         data: {
@@ -1898,7 +2039,8 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
           cantidad: item.cantidad || 1,
           precioUnitario: producto.precio,
           subtotal: Number(producto.precio) * (item.cantidad || 1),
-          observaciones: item.observaciones
+          observaciones: item.observaciones,
+          estado: estadoInicial
         },
         include: { productoBuffet: true }
       });
@@ -1912,6 +2054,169 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
   } catch (error) {
     console.error('Error al agregar items:', error);
     res.status(500).json({ success: false, error: 'Error al agregar items' });
+  }
+});
+
+// Obtener pedido individual
+router.get('/takeaway/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const pedido = await prisma.pedidoTakeAway.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        items: {
+          include: {
+            productoBuffet: {
+              include: { categoriaMenu: true }
+            }
+          }
+        },
+        socio: {
+          select: {
+            id: true,
+            nroSocio: true,
+            apellido: true,
+            nombre: true,
+            apellidoNombre: true
+          }
+        },
+        centroCosto: true
+      }
+    });
+
+    if (!pedido) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado' });
+    }
+
+    // Recalcular estado según items si está EN_PREPARACION
+    if (pedido.estado === 'EN_PREPARACION' && pedido.items.length > 0) {
+      const todosProcesados = pedido.items.every(item =>
+        ['LISTO', 'ENTREGADO', 'ANULADO'].includes(item.estado)
+      );
+
+      if (todosProcesados) {
+        await prisma.pedidoTakeAway.update({
+          where: { id: pedido.id },
+          data: { estado: 'LISTO', horaListo: new Date() }
+        });
+        pedido.estado = 'LISTO';
+        pedido.horaListo = new Date();
+      }
+    }
+
+    res.json({ success: true, data: pedido });
+  } catch (error) {
+    console.error('Error al obtener pedido:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener pedido' });
+  }
+});
+
+// Modificar cantidad de item
+router.put('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const { cantidad } = req.body;
+
+    const item = await prisma.itemPedidoTakeAway.findUnique({
+      where: { id: parseInt(itemId) },
+      include: { productoBuffet: true }
+    });
+
+    if (!item || item.pedidoId !== parseInt(id)) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado' });
+    }
+
+    if (item.estado !== 'PENDIENTE') {
+      return res.status(400).json({ success: false, error: 'Solo se pueden modificar items pendientes' });
+    }
+
+    const nuevoSubtotal = Number(item.precioUnitario) * parseInt(cantidad);
+
+    const itemActualizado = await prisma.itemPedidoTakeAway.update({
+      where: { id: parseInt(itemId) },
+      data: {
+        cantidad: parseInt(cantidad),
+        subtotal: nuevoSubtotal
+      },
+      include: { productoBuffet: true }
+    });
+
+    await recalcularTotalesPedido(parseInt(id));
+
+    res.json({ success: true, data: itemActualizado });
+  } catch (error) {
+    console.error('Error al modificar item:', error);
+    res.status(500).json({ success: false, error: 'Error al modificar item' });
+  }
+});
+
+// Anular item
+router.delete('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+
+    const item = await prisma.itemPedidoTakeAway.findUnique({
+      where: { id: parseInt(itemId) }
+    });
+
+    if (!item || item.pedidoId !== parseInt(id)) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado' });
+    }
+
+    if (item.estado === 'ENTREGADO') {
+      return res.status(400).json({ success: false, error: 'No se pueden anular items entregados' });
+    }
+
+    await prisma.itemPedidoTakeAway.update({
+      where: { id: parseInt(itemId) },
+      data: { estado: 'ANULADO' }
+    });
+
+    await recalcularTotalesPedido(parseInt(id));
+
+    res.json({ success: true, message: 'Item anulado' });
+  } catch (error) {
+    console.error('Error al anular item:', error);
+    res.status(500).json({ success: false, error: 'Error al anular item' });
+  }
+});
+
+// Marcar item de takeaway como entregado
+router.post('/takeaway/:id/items/:itemId/entregar', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+
+    const item = await prisma.itemPedidoTakeAway.findUnique({
+      where: { id: parseInt(itemId) },
+      include: { pedido: true }
+    });
+
+    if (!item || item.pedidoId !== parseInt(id)) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado' });
+    }
+
+    if (item.estado === 'ANULADO') {
+      return res.status(400).json({ success: false, error: 'No se pueden entregar items anulados' });
+    }
+
+    if (item.estado === 'ENTREGADO') {
+      return res.status(400).json({ success: false, error: 'El item ya fue entregado' });
+    }
+
+    const itemActualizado = await prisma.itemPedidoTakeAway.update({
+      where: { id: parseInt(itemId) },
+      data: {
+        estado: 'ENTREGADO',
+        entregadoAt: new Date()
+      },
+      include: { productoBuffet: true }
+    });
+
+    res.json({ success: true, data: itemActualizado });
+  } catch (error) {
+    console.error('Error al marcar item como entregado:', error);
+    res.status(500).json({ success: false, error: 'Error al marcar item como entregado' });
   }
 });
 
@@ -1972,7 +2277,7 @@ router.put('/takeaway/:id/listo', authAdmin, checkPermiso('BUFFET_COCINA'), asyn
   }
 });
 
-// Cobrar y entregar (take away)
+// Cobrar pedido (take away)
 router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -1986,8 +2291,16 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       return res.status(404).json({ success: false, error: 'Pedido no encontrado' });
     }
 
+    if (pedido.estado === 'PAGADO') {
+      return res.status(400).json({ success: false, error: 'El pedido ya fue cobrado' });
+    }
+
     if (pedido.estado === 'ENTREGADO') {
       return res.status(400).json({ success: false, error: 'El pedido ya fue entregado' });
+    }
+
+    if (pedido.estado === 'CANCELADO') {
+      return res.status(400).json({ success: false, error: 'No se puede cobrar un pedido cancelado' });
     }
 
     // Calcular total con propina
@@ -2096,14 +2409,14 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       movimientos.push(movimiento);
     }
 
-    // Actualizar pedido
+    // Actualizar pedido a PAGADO (no ENTREGADO)
     const pedidoActualizado = await prisma.pedidoTakeAway.update({
       where: { id: parseInt(id) },
       data: {
-        estado: 'ENTREGADO',
+        estado: 'PAGADO',
         propina: propinaMonto,
         total: totalFinal,
-        horaEntregado: new Date()
+        horaPagado: new Date()
       }
     });
 
@@ -2118,6 +2431,43 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
   } catch (error) {
     console.error('Error al cobrar pedido:', error);
     res.status(500).json({ success: false, error: 'Error al cobrar pedido' });
+  }
+});
+
+// Marcar pedido como entregado
+router.post('/takeaway/:id/entregar', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const pedido = await prisma.pedidoTakeAway.findUnique({
+      where: { id: parseInt(id) },
+      include: { items: true }
+    });
+
+    if (!pedido) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado' });
+    }
+
+    if (pedido.estado === 'ENTREGADO') {
+      return res.status(400).json({ success: false, error: 'El pedido ya fue entregado' });
+    }
+
+    if (pedido.estado !== 'PAGADO') {
+      return res.status(400).json({ success: false, error: 'Solo se pueden entregar pedidos pagados' });
+    }
+
+    const pedidoActualizado = await prisma.pedidoTakeAway.update({
+      where: { id: parseInt(id) },
+      data: {
+        estado: 'ENTREGADO',
+        horaEntregado: new Date()
+      }
+    });
+
+    res.json({ success: true, data: pedidoActualizado });
+  } catch (error) {
+    console.error('Error al marcar como entregado:', error);
+    res.status(500).json({ success: false, error: 'Error al marcar como entregado' });
   }
 });
 
@@ -2300,10 +2650,21 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
+    // Determinar estados según el sector
+    let estadosPendientes = [];
+    if (sectorData.codigo === 'BARRA') {
+      estadosPendientes = ['ENVIADO_BARRA', 'EN_PREPARACION'];
+    } else if (sectorData.codigo === 'COCINA') {
+      estadosPendientes = ['ENVIADO_COCINA', 'EN_PREPARACION'];
+    } else {
+      // Para otros sectores, incluir ambos por si acaso
+      estadosPendientes = ['ENVIADO_COCINA', 'ENVIADO_BARRA', 'EN_PREPARACION'];
+    }
+
     // Items de comandas - solo los que van a este sector
     const itemsComanda = await prisma.itemComanda.findMany({
       where: {
-        estado: { in: ['ENVIADO_COCINA', 'EN_PREPARACION'] },
+        estado: { in: estadosPendientes },
         productoBuffet: {
           categoriaMenuId: { in: categoriasIds }
         }
@@ -2318,7 +2679,7 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
     // Items de take away - solo los que van a este sector
     const itemsTakeAway = await prisma.itemPedidoTakeAway.findMany({
       where: {
-        estado: { in: ['EN_PREPARACION'] },
+        estado: { in: estadosPendientes },
         productoBuffet: {
           categoriaMenuId: { in: categoriasIds }
         }

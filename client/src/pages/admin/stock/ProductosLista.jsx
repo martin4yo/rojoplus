@@ -278,7 +278,7 @@ export default function ProductosLista() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Productos</h1>
-            <p className="text-gray-500 text-sm">{pagination.total} productos en catalogo</p>
+            <p className="text-gray-500 text-sm">{pagination?.total || 0} productos en catalogo</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

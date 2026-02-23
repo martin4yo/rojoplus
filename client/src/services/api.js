@@ -27,22 +27,43 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
     config.headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(url, config)
-  const data = await response.json()
+  try {
+    const response = await fetch(url, config)
 
-  if (!response.ok) {
-    // Si el token es inválido o expiró, redirigir al login
-    if (response.status === 401) {
-      handleInvalidToken()
+    // Verificar si la respuesta es JSON
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('La respuesta no es JSON:', url, 'Content-Type:', contentType)
+      const text = await response.text()
+      console.error('Contenido recibido:', text.substring(0, 200))
+      throw new Error('El servidor no devolvió JSON. Verifique que el backend esté corriendo correctamente.')
     }
-    // Manejar error como string o como objeto con message
-    const errorMessage = typeof data.error === 'string'
-      ? data.error
-      : (data.error?.message || data.message || 'Error en la solicitud')
-    throw new Error(errorMessage)
-  }
 
-  return returnFullResponse ? data : data.data
+    const data = await response.json()
+
+    if (!response.ok) {
+      // Si el token es inválido o expiró, redirigir al login
+      if (response.status === 401) {
+        handleInvalidToken()
+      }
+      // Manejar error como string o como objeto con message
+      const errorMessage = typeof data.error === 'string'
+        ? data.error
+        : (data.error?.message || data.message || 'Error en la solicitud')
+      throw new Error(errorMessage)
+    }
+
+    return returnFullResponse ? data : data.data
+  } catch (error) {
+    // Manejar errores de red (servidor no responde)
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      const networkError = new Error('No se pudo conectar con el servidor. Verifica tu conexión a internet.')
+      networkError.code = 'ERR_NETWORK'
+      throw networkError
+    }
+    // Re-lanzar otros errores
+    throw error
+  }
 }
 
 const api = {
@@ -68,61 +89,109 @@ const api = {
 
   delete: (endpoint) => request(endpoint, { method: 'DELETE' }),
 
-  // Para upload de archivos
-  upload: async (endpoint, file) => {
-    const formData = new FormData()
-    formData.append('file', file)
-
+  // Para descargar archivos binarios (PDF, etc.)
+  downloadFile: async (endpoint, body) => {
+    const url = `${API_URL}${endpoint}`
     const token = localStorage.getItem('adminToken')
-    const headers = {}
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
-    }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(url, {
       method: 'POST',
-      headers,
-      body: formData,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: JSON.stringify(body)
     })
 
-    const data = await response.json()
     if (!response.ok) {
-      if (response.status === 401) {
-        handleInvalidToken()
+      // Intentar leer el error como JSON
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json()
+        const errorMessage = typeof data.error === 'string'
+          ? data.error
+          : (data.error?.message || data.message || 'Error al descargar archivo')
+        throw new Error(errorMessage)
       }
-      const errorMessage = typeof data.error === 'string'
-        ? data.error
-        : (data.error?.message || data.message || 'Error en la solicitud')
-      throw new Error(errorMessage)
+      throw new Error('Error al descargar archivo')
     }
-    return data.data
+
+    return response
+  },
+
+  // Para upload de archivos
+  upload: async (endpoint, file) => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const token = localStorage.getItem('adminToken')
+      const headers = {}
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleInvalidToken()
+        }
+        const errorMessage = typeof data.error === 'string'
+          ? data.error
+          : (data.error?.message || data.message || 'Error en la solicitud')
+        throw new Error(errorMessage)
+      }
+      return data.data
+    } catch (error) {
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        const networkError = new Error('No se pudo conectar con el servidor. Verifica tu conexión a internet.')
+        networkError.code = 'ERR_NETWORK'
+        throw networkError
+      }
+      throw error
+    }
   },
 
   // Para enviar FormData generico (sin Content-Type para que el browser lo maneje)
   postFormData: async (endpoint, formData) => {
-    const token = localStorage.getItem('adminToken')
-    const headers = {}
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
-    }
-
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    })
-
-    const data = await response.json()
-    if (!response.ok) {
-      if (response.status === 401) {
-        handleInvalidToken()
+    try {
+      const token = localStorage.getItem('adminToken')
+      const headers = {}
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
       }
-      const errorMessage = typeof data.error === 'string'
-        ? data.error
-        : (data.error?.message || data.message || 'Error en la solicitud')
-      throw new Error(errorMessage)
+
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleInvalidToken()
+        }
+        const errorMessage = typeof data.error === 'string'
+          ? data.error
+          : (data.error?.message || data.message || 'Error en la solicitud')
+        throw new Error(errorMessage)
+      }
+      return data
+    } catch (error) {
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        const networkError = new Error('No se pudo conectar con el servidor. Verifica tu conexión a internet.')
+        networkError.code = 'ERR_NETWORK'
+        throw networkError
+      }
+      throw error
     }
-    return data
   },
 }
 

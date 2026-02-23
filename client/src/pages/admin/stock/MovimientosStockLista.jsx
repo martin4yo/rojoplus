@@ -98,7 +98,7 @@ export default function MovimientosStockLista() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Movimientos de Stock</h1>
-            <p className="text-gray-500 text-sm">{pagination.total} movimientos</p>
+            <p className="text-gray-500 text-sm">{pagination?.total || 0} movimientos</p>
           </div>
         </div>
 {tienePermiso(PERMISOS.STOCK_GESTIONAR) && (

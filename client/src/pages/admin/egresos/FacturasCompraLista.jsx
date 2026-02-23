@@ -254,7 +254,7 @@ export default function FacturasCompraLista() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Facturas de Compra</h1>
-            <p className="text-gray-500 text-sm">{pagination.total} facturas</p>
+            <p className="text-gray-500 text-sm">{pagination?.total || 0} facturas</p>
           </div>
         </div>
         {tienePermiso(PERMISOS.EGRESOS_GESTIONAR) && (

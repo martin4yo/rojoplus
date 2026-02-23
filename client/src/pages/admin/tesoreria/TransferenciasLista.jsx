@@ -169,7 +169,7 @@ export default function TransferenciasLista() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Transferencias</h1>
-            <p className="text-gray-500 text-sm">{pagination.total} transferencias</p>
+            <p className="text-gray-500 text-sm">{pagination?.total || 0} transferencias</p>
           </div>
         </div>
 {tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (

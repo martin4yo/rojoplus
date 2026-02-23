@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Camera, QrCode, CheckCircle, XCircle, Smartphone, Wifi, WifiOff } from 'lucide-react'
 import { Button } from '../../../components/Button'
+import { Scanner } from '@yudiel/react-qr-scanner'
 
 export default function ControlPWA() {
   const [scanning, setScanning] = useState(false)
   const [resultado, setResultado] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [stream, setStream] = useState(null)
-  const [dispositivoId, setDispositivoId] = useState(1)
+  const [dispositivoId, setDispositivoId] = useState(null)
   const [online, setOnline] = useState(navigator.onLine)
 
   useEffect(() => {
@@ -21,30 +21,33 @@ export default function ControlPWA() {
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
-      detenerCamara()
     }
   }, [])
 
-  const iniciarEscaneo = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      })
-      setStream(mediaStream)
-      setScanning(true)
-      setResultado(null)
-    } catch (error) {
-      console.error('Error accediendo a cámara:', error)
-      alert('No se pudo acceder a la cámara. Verifique los permisos.')
-    }
+  const iniciarEscaneo = () => {
+    setScanning(true)
+    setResultado(null)
   }
 
   const detenerCamara = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop())
-      setStream(null)
-    }
     setScanning(false)
+  }
+
+  const handleScan = (result) => {
+    if (result && result.length > 0) {
+      const qrCode = result[0].rawValue
+      if (qrCode) {
+        procesarQR(qrCode)
+      }
+    }
+  }
+
+  const handleError = (error) => {
+    console.error('Error en escáner QR:', error)
+    if (error?.name === 'NotAllowedError') {
+      alert('Permiso de cámara denegado. Por favor, habilite el acceso a la cámara.')
+      detenerCamara()
+    }
   }
 
   const procesarQR = async (qrCode) => {
@@ -77,19 +80,38 @@ export default function ControlPWA() {
       const validacion = dataValidar.data
 
       if (validacion.permitido) {
-        // 2. Si está permitido, abrir molinete
-        const responseAbrir = await fetch('/api/accesos/abrir-molinete', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            dispositivoId,
-            valorLeido: qrCode,
-            socioId: validacion.persona?.id
+        // 2. Si está permitido, registrar el acceso
+        let responseAbrir
+
+        if (validacion.tipo === 'ENTRADA_EVENTO') {
+          // Registrar ingreso de entrada
+          responseAbrir = await fetch('/api/accesos/registrar-ingreso-entrada', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              entradaId: validacion.persona?.id,
+              dispositivoId,
+              codigoEntrada: qrCode
+            })
           })
-        })
+        } else {
+          // Abrir molinete para socios/habilitaciones
+          responseAbrir = await fetch('/api/accesos/abrir-molinete', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              dispositivoId,
+              valorLeido: qrCode,
+              socioId: validacion.persona?.id
+            })
+          })
+        }
 
         const dataAbrir = await responseAbrir.json()
 
@@ -101,8 +123,12 @@ export default function ControlPWA() {
 
           setResultado({
             tipo: 'PERMITIDO',
-            mensaje: validacion.mensaje,
-            persona: validacion.persona
+            mensaje: validacion.tipo === 'ENTRADA_EVENTO'
+              ? 'Ingreso registrado correctamente'
+              : validacion.mensaje,
+            submensaje: validacion.mensaje,
+            persona: validacion.persona,
+            tipoValidacion: validacion.tipo
           })
 
           // Auto-cerrar después de 3 segundos
@@ -110,7 +136,7 @@ export default function ControlPWA() {
             setResultado(null)
           }, 3000)
         } else {
-          throw new Error(dataAbrir.error || 'Error abriendo molinete')
+          throw new Error(dataAbrir.error || 'Error registrando acceso')
         }
       } else {
         // Acceso denegado
@@ -186,16 +212,20 @@ export default function ControlPWA() {
         {/* Configuración dispositivo */}
         <div className="bg-gray-800/50 backdrop-blur rounded-xl p-4 mb-6 border border-gray-700">
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Dispositivo
+            Punto de Control <span className="text-xs text-gray-500">(Opcional)</span>
           </label>
           <select
             value={dispositivoId}
-            onChange={(e) => setDispositivoId(Number(e.target.value))}
+            onChange={(e) => setDispositivoId(Number(e.target.value) || null)}
             className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white"
           >
+            <option value="">Sin especificar</option>
             <option value={1}>Molinete Principal</option>
             {/* Más dispositivos se cargarían dinámicamente */}
           </select>
+          <p className="text-xs text-gray-500 mt-2">
+            Para eventos: identifica desde qué puerta/tablet se validó
+          </p>
         </div>
 
         {/* Resultado de validación */}
@@ -229,16 +259,36 @@ export default function ControlPWA() {
                     ? 'text-red-400'
                     : 'text-orange-400'
                 }`}>
-                  {resultado.tipo === 'PERMITIDO' ? '✅ Acceso Permitido' : '❌ Acceso Denegado'}
+                  {resultado.tipo === 'PERMITIDO'
+                    ? (resultado.tipoValidacion === 'ENTRADA_EVENTO' ? '✅ Ingreso Registrado' : '✅ Acceso Permitido')
+                    : '❌ Acceso Denegado'
+                  }
                 </h3>
                 {resultado.persona && (
-                  <p className="text-white font-medium mb-1">
-                    {resultado.persona.nombre}
-                  </p>
+                  <>
+                    <p className="text-white font-medium mb-1">
+                      {resultado.persona.nombre}
+                    </p>
+                    {resultado.tipoValidacion === 'ENTRADA_EVENTO' && (
+                      <>
+                        <p className="text-sm text-green-300 font-medium">
+                          🎫 {resultado.persona.evento}
+                        </p>
+                        <p className="text-xs text-gray-300">
+                          {resultado.persona.categoria}
+                        </p>
+                      </>
+                    )}
+                  </>
                 )}
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-gray-300 mt-2">
                   {resultado.mensaje}
                 </p>
+                {resultado.submensaje && resultado.mensaje !== resultado.submensaje && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {resultado.submensaje}
+                  </p>
+                )}
                 {resultado.motivo && (
                   <p className="text-xs text-gray-400 mt-2">
                     Motivo: {resultado.motivo}
@@ -298,12 +348,21 @@ export default function ControlPWA() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Simulación de visor de cámara */}
-            <div className="aspect-square bg-black rounded-xl overflow-hidden border-4 border-primary flex items-center justify-center">
-              <div className="text-center">
-                <QrCode className="w-16 h-16 mx-auto mb-4 text-primary animate-pulse" />
-                <p className="text-sm text-gray-400">Apunte al código QR</p>
-              </div>
+            {/* Escáner QR real */}
+            <div className="aspect-square bg-black rounded-xl overflow-hidden border-4 border-primary">
+              <Scanner
+                onScan={handleScan}
+                onError={handleError}
+                constraints={{
+                  facingMode: 'environment'
+                }}
+                styles={{
+                  container: {
+                    width: '100%',
+                    height: '100%'
+                  }
+                }}
+              />
             </div>
 
             <button
@@ -314,7 +373,7 @@ export default function ControlPWA() {
             </button>
 
             <p className="text-xs text-center text-gray-400">
-              💡 En producción, integrar librería de escaneo QR como @yudiel/react-qr-scanner
+              📷 Apunte la cámara al código QR
             </p>
           </div>
         )}
@@ -323,9 +382,11 @@ export default function ControlPWA() {
         <div className="mt-8 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
           <h3 className="text-sm font-semibold text-gray-300 mb-2">ℹ️ Instrucciones</h3>
           <ul className="text-xs text-gray-400 space-y-1">
-            <li>• Escanee el QR del carnet del socio</li>
+            <li>• Escanee el QR del carnet del socio o entrada de evento</li>
             <li>• El sistema validará automáticamente</li>
-            <li>• Si está habilitado, abrirá el molinete</li>
+            <li>• <strong className="text-gray-300">Socios:</strong> Abre molinete si está habilitado</li>
+            <li>• <strong className="text-gray-300">Entradas:</strong> Solo registra ingreso (sin molinete)</li>
+            <li>• El punto de control es opcional (identifica la tablet/puerta)</li>
             <li>• Requiere conexión a internet</li>
           </ul>
         </div>

@@ -25,6 +25,7 @@ model ConceptoTesoreria {
   actividades          Actividad[]          @relation("ActividadConcepto")
   categoriasActividad  CategoriaActividad[]
   cuentaContable       CuentaContable?      @relation(fields: [cuentaContableId], references: [id])
+  eventos              Evento[]
   lineasPresupuesto    LineaPresupuesto[]
   movimientosContables MovimientoContable[]
   productosCompra      Producto[]           @relation("ProductoConceptoCompra")
@@ -751,13 +752,37 @@ model Caja {
   cuentaBancaria       CuentaBancaria?
   echeqsDestino        ECheq[]              @relation("ECheqCajaDestino")
   echeqsOrigen         ECheq[]              @relation("ECheqCajaOrigen")
-  extractos            ExtractoBancario[]
-  movimientos          MovimientoCaja[]
-  movimientosContables MovimientoContable[]
-  pagos                Pago[]
+  extractos              ExtractoBancario[]
+  movimientos            MovimientoCaja[]
+  movimientosContables   MovimientoContable[]
+  pagos                  Pago[]
+  transferenciasOrigen   TransferenciaCaja[]  @relation("CajaOrigen")
+  transferenciasDestino  TransferenciaCaja[]  @relation("CajaDestino")
 
   @@index([cuentaContableId])
   @@map("cajas")
+}
+
+model TransferenciaCaja {
+  id              Int      @id @default(autoincrement())
+  numero          String   @unique
+  cajaOrigenId    Int      @map("caja_origen_id")
+  cajaDestinoId   Int      @map("caja_destino_id")
+  monto           Decimal  @db.Decimal(12, 2)
+  concepto        String?
+  descripcion     String?  @db.Text
+  fecha           DateTime @default(now())
+  registradoPor   Int      @map("registrado_por")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  cajaOrigen      Caja     @relation("CajaOrigen", fields: [cajaOrigenId], references: [id])
+  cajaDestino     Caja     @relation("CajaDestino", fields: [cajaDestinoId], references: [id])
+  registrador     Admin    @relation(fields: [registradoPor], references: [id])
+
+  @@index([cajaOrigenId])
+  @@index([cajaDestinoId])
+  @@index([fecha])
+  @@map("transferencias_caja")
 }
 
 model CuentaBancaria {
@@ -885,7 +910,7 @@ model MovimientoCaja {
   pago                    Pago?                @relation(fields: [pagoId], references: [id])
   pedidoTakeAway          PedidoTakeAway?      @relation(fields: [pedidoTakeAwayId], references: [id])
   registrador             Admin                @relation(fields: [registradoPor], references: [id])
-  entrada                 Entrada?
+  entradas                Entrada[]
 
   @@index([cajaId])
   @@index([fecha])
@@ -1094,6 +1119,7 @@ model Admin {
   eventosCreados          Evento[]             @relation("EventoCreador")
   entradasVendidas        Entrada[]            @relation("EntradaVendedor")
   ingresosValidados       IngresoEntrada[]     @relation("IngresoValidador")
+  transferenciasRegistradas TransferenciaCaja[]
 
   @@map("admins")
 }
@@ -1654,6 +1680,7 @@ model EspacioDeportivo {
   horariosDisponibilidad HorarioDisponibilidad[]
   partidos               Partido[]
   actividades            Actividad[]             @relation("ActividadToEspacioDeportivo")
+  eventos                Evento[]
 
   @@map("espacios_deportivos")
 }
@@ -1849,6 +1876,7 @@ model CentroCosto {
   asientoLineas        AsientoLinea[]
   cargos               Cargo[]
   comandas             Comanda[]
+  eventos              Evento[]
   inscripciones        Inscripcion[]
   itemsMovimiento      ItemMovimiento[]
   movimientosCaja      MovimientoCaja[]
@@ -2318,9 +2346,11 @@ model PedidoTakeAway {
   socioId         Int?                 @map("socio_id")
   centroCostoId   Int?                 @map("centro_costo_id")
   estado          String               @default("RECIBIDO")
+  tipo            String               @default("RETIRO")
   horaRecibido    DateTime             @default(now()) @map("hora_recibido")
   horaEstimada    DateTime?            @map("hora_estimada")
   horaListo       DateTime?            @map("hora_listo")
+  horaPagado      DateTime?            @map("hora_pagado")
   horaEntregado   DateTime?            @map("hora_entregado")
   subtotal        Decimal              @default(0) @db.Decimal(12, 2)
   descuento       Decimal              @default(0) @db.Decimal(12, 2)
@@ -2338,6 +2368,7 @@ model PedidoTakeAway {
 
   @@index([socioId])
   @@index([estado])
+  @@index([tipo])
   @@index([horaRecibido])
   @@index([centroCostoId])
   @@map("pedidos_takeaway")
@@ -2697,9 +2728,13 @@ model Evento {
   ventasHabilitadas   Boolean              @default(true) @map("ventas_habilitadas")
   partidoId           Int?                 @unique @map("partido_id")
   imagen              String?
+  conceptoTesoreriaId Int?                 @map("concepto_tesoreria_id")
+  centroCostoId       Int?                 @map("centro_costo_id")
   creadoPor           Int                  @map("creado_por")
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @updatedAt @map("updated_at")
+  centroCosto         CentroCosto?         @relation(fields: [centroCostoId], references: [id])
+  conceptoTesoreria   ConceptoTesoreria?   @relation(fields: [conceptoTesoreriaId], references: [id])
   espacio             EspacioDeportivo?    @relation(fields: [espacioId], references: [id])
   partido             Partido?             @relation(fields: [partidoId], references: [id])
   creador             Admin                @relation("EventoCreador", fields: [creadoPor], references: [id])
@@ -2712,6 +2747,8 @@ model Evento {
   @@index([estado])
   @@index([partidoId])
   @@index([espacioId])
+  @@index([conceptoTesoreriaId])
+  @@index([centroCostoId])
   @@map("eventos")
 }
 
@@ -2754,7 +2791,7 @@ model Entrada {
   motivoAnulacion     String?            @map("motivo_anulacion")
   canalVenta          String             @map("canal_venta") // ADMIN, PORTAL_SOCIO, SITIO_WEB, BUFFET
   vendidoPor          Int?               @map("vendido_por")
-  movimientoCajaId    Int?               @unique @map("movimiento_caja_id")
+  movimientoCajaId    Int?               @map("movimiento_caja_id")
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
   evento              Evento             @relation(fields: [eventoId], references: [id])
@@ -2770,6 +2807,7 @@ model Entrada {
   @@index([codigo])
   @@index([categoriaId])
   @@index([fechaVenta])
+  @@index([movimientoCajaId])
   @@map("entradas")
 }
 

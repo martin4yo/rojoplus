@@ -52,7 +52,6 @@ export async function crearPreferenciaPago(data) {
         failure: data.failureUrl,
         pending: data.pendingUrl,
       },
-      // auto_return: 'approved', // Solo funciona con URLs públicas (no localhost)
       statement_descriptor: 'CLUB SPORTIVO PILAR',
       payment_methods: {
         excluded_payment_methods: [],
@@ -67,6 +66,14 @@ export async function crearPreferenciaPago(data) {
       console.log('✅ Webhook habilitado:', data.notificationUrl)
     } else {
       console.log('⚠️  Webhook deshabilitado (localhost). En producción se habilitará automáticamente.')
+    }
+
+    // Solo agregar auto_return si NO es localhost (MP no lo permite con localhost)
+    if (!data.successUrl.includes('localhost')) {
+      preferenceBody.auto_return = 'approved'
+      console.log('✅ Auto-retorno habilitado')
+    } else {
+      console.log('⚠️  Auto-retorno deshabilitado (localhost). El usuario deberá usar el botón "Volver" de Mercado Pago.')
     }
 
     console.log('🔷 Creando preferencia MercadoPago:', JSON.stringify(preferenceBody, null, 2))

@@ -1,220 +1,266 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Clock, Check, Phone, User, ChefHat, DollarSign, RefreshCw, ShoppingBag, FileText } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Clock, Phone, Truck, ShoppingBag, X, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
-import { useTicket } from '../../../contexts/TicketContext'
-import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import SelectCentroCosto from '../../../components/SelectCentroCosto'
-import { formatCurrency, formatTime } from '../../../utils/formatters'
+import { formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
 import Modal from '../../../components/Modal'
+import GestionPedido from '../../../components/buffet/GestionPedido'
 
 export default function BuffetTakeAway() {
-  const { generarTicketTakeAway, imprimirTicket } = useTicket()
+  const navigate = useNavigate()
+
+  // Estados principales
+  const [modoVista, setModoVista] = useState('dashboard') // 'dashboard' | 'detalle'
+  const [pedidoActivo, setPedidoActivo] = useState(null)
   const [pedidos, setPedidos] = useState([])
-  const [productos, setProductos] = useState([])
-  const [categorias, setCategorias] = useState([])
-  const [cajas, setCajas] = useState([])
-  const [mediosPago, setMediosPago] = useState([])
   const [loading, setLoading] = useState(true)
-  const [modalNuevo, setModalNuevo] = useState(false)
-  const [modalCobrar, setModalCobrar] = useState(null)
-  const [formData, setFormData] = useState({
+
+  // Modales
+  const [modalNuevoPedido, setModalNuevoPedido] = useState(false)
+
+  // Filtro dashboard
+  const [filtroEstado, setFiltroEstado] = useState('EN_CURSO') // 'TODOS' | 'EN_CURSO' | 'PAGADOS' | 'ENTREGADOS_HOY'
+
+  // Form nuevo pedido
+  const [nuevoPedidoData, setNuevoPedidoData] = useState({
     nombreCliente: '',
     telefono: '',
+    tipo: 'RETIRO',
     horaEstimada: '',
     observaciones: '',
-    items: [],
-    centroCostoId: ''
+    centroCostoId: '',
+    socioId: null,
+    socioNombre: '',
+    buscarSocio: ''
   })
-  const [cobroData, setCobroData] = useState({
-    cajaId: '',
-    medioPagoId: ''
-  })
+  const [sociosBusqueda, setSociosBusqueda] = useState([])
+  const [buscandoSocio, setBuscandoSocio] = useState(false)
 
-  const cargarDatos = useCallback(async () => {
+  const cargarPedidos = useCallback(async () => {
     try {
-      const [pedRes, prodRes, catRes, cajasRes, mediosRes] = await Promise.all([
-        api.get('/admin/buffet/takeaway'),
-        api.get('/admin/buffet/productos?disponible=true&activo=true'),
-        api.get('/admin/buffet/categorias?activo=true'),
-        api.get('/admin/buffet/config/cajas/takeaway'),
-        api.get('/admin/buffet/config/medios-pago/takeaway')
-      ])
-      setPedidos(pedRes.data || pedRes || [])
-      setProductos(prodRes.data || prodRes || [])
-      setCategorias(catRes.data || catRes || [])
-      setCajas(cajasRes.data || cajasRes || [])
-      setMediosPago(mediosRes.data || mediosRes || [])
-
-      // Valores por defecto para cobro
-      const cajasData = cajasRes.data || cajasRes || []
-      if (cajasData.length > 0) {
-        setCobroData(prev => ({ ...prev, cajaId: cajasData[0].id }))
-      }
-      const mediosData = mediosRes.data || mediosRes || []
-      const efectivo = mediosData.find(m => m.codigo === 'EFECTIVO')
-      if (efectivo) {
-        setCobroData(prev => ({ ...prev, medioPagoId: efectivo.id }))
-      } else if (mediosData.length > 0) {
-        setCobroData(prev => ({ ...prev, medioPagoId: mediosData[0].id }))
-      }
+      const res = await api.get('/admin/buffet/takeaway')
+      setPedidos(res.data || res || [])
     } catch (err) {
-      console.error('Error cargando datos:', err)
+      console.error('Error cargando pedidos:', err)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    cargarDatos()
-    const interval = setInterval(cargarDatos, 30000)
+    cargarPedidos()
+    const interval = setInterval(cargarPedidos, 30000)
     return () => clearInterval(interval)
-  }, [cargarDatos])
+  }, [cargarPedidos])
 
-  function abrirModalNuevo() {
-    setFormData({
-      nombreCliente: '',
-      telefono: '',
-      horaEstimada: '',
-      observaciones: '',
-      items: [],
-      centroCostoId: ''
-    })
-    setModalNuevo(true)
+  function abrirPedido(pedido) {
+    setPedidoActivo(pedido)
+    setModoVista('detalle')
   }
 
-  function agregarItem(producto) {
-    setFormData(prev => {
-      const items = [...prev.items]
-      const existe = items.find(i => i.productoBuffetId === producto.id)
-      if (existe) {
-        existe.cantidad++
-      } else {
-        items.push({
-          productoBuffetId: producto.id,
-          nombre: producto.nombre,
-          precio: producto.precio,
-          cantidad: 1
-        })
-      }
-      return { ...prev, items }
-    })
+  function volverADashboard() {
+    setModoVista('dashboard')
+    setPedidoActivo(null)
+    cargarPedidos()
   }
 
-  function modificarCantidadItem(index, delta) {
-    setFormData(prev => {
-      const items = [...prev.items]
-      items[index].cantidad += delta
-      if (items[index].cantidad <= 0) {
-        items.splice(index, 1)
-      }
-      return { ...prev, items }
-    })
-  }
-
-  async function crearPedido(e) {
-    e.preventDefault()
-    if (formData.items.length === 0) {
-      toast.error('Agrega al menos un producto')
+  async function buscarSocios(query) {
+    if (!query || query.length < 2) {
+      setSociosBusqueda([])
       return
     }
 
     try {
-      await api.post('/admin/buffet/takeaway', {
-        nombreCliente: formData.nombreCliente,
-        telefono: formData.telefono,
-        horaEstimada: formData.horaEstimada || null,
-        observaciones: formData.observaciones,
-        centroCostoId: formData.centroCostoId ? parseInt(formData.centroCostoId) : null,
-        items: formData.items.map(i => ({
-          productoBuffetId: i.productoBuffetId,
-          cantidad: i.cantidad
-        }))
+      setBuscandoSocio(true)
+      const res = await api.get(`/admin/socios?busqueda=${encodeURIComponent(query)}&activo=true&limit=10`)
+      setSociosBusqueda(res.data || res || [])
+    } catch (err) {
+      console.error('Error buscando socios:', err)
+    } finally {
+      setBuscandoSocio(false)
+    }
+  }
+
+  function seleccionarSocio(socio) {
+    setNuevoPedidoData({
+      ...nuevoPedidoData,
+      socioId: socio.id,
+      socioNombre: socio.apellidoNombre || `${socio.apellido}, ${socio.nombre}`,
+      buscarSocio: ''
+    })
+    setSociosBusqueda([])
+  }
+
+  function limpiarSocio() {
+    setNuevoPedidoData({
+      ...nuevoPedidoData,
+      socioId: null,
+      socioNombre: '',
+      buscarSocio: ''
+    })
+  }
+
+  async function crearNuevoPedido(e) {
+    e.preventDefault()
+
+    try {
+      const res = await api.post('/admin/buffet/takeaway', {
+        nombreCliente: nuevoPedidoData.nombreCliente,
+        telefono: nuevoPedidoData.telefono || null,
+        tipo: nuevoPedidoData.tipo,
+        socioId: nuevoPedidoData.socioId,
+        centroCostoId: nuevoPedidoData.centroCostoId ? parseInt(nuevoPedidoData.centroCostoId) : null,
+        horaEstimada: nuevoPedidoData.horaEstimada ? new Date(nuevoPedidoData.horaEstimada).toISOString() : null,
+        observaciones: nuevoPedidoData.observaciones || null,
+        items: []
       })
-      setModalNuevo(false)
-      cargarDatos()
+
+      toast.success('Pedido creado')
+      setModalNuevoPedido(false)
+      setNuevoPedidoData({
+        nombreCliente: '',
+        telefono: '',
+        tipo: 'RETIRO',
+        horaEstimada: '',
+        observaciones: '',
+        centroCostoId: '',
+        socioId: null,
+        socioNombre: '',
+        buscarSocio: ''
+      })
+
+      await cargarPedidos()
+
+      // Abrir el pedido recién creado
+      const pedidoCreado = res.data || res
+      abrirPedido(pedidoCreado)
     } catch (err) {
       console.error('Error creando pedido:', err)
       toast.error(err.response?.data?.error || 'Error al crear pedido')
     }
   }
 
-  async function enviarACocina(pedidoId) {
-    try {
-      await api.post(`/admin/buffet/takeaway/${pedidoId}/enviar-cocina`)
-      cargarDatos()
-    } catch (err) {
-      console.error('Error:', err)
-      toast.error(err.response?.data?.error || 'Error al enviar a cocina')
+  // Filtrar pedidos según filtro
+  const pedidosFiltrados = pedidos.filter(p => {
+    if (filtroEstado === 'EN_CURSO') {
+      return ['RECIBIDO', 'PENDIENTE', 'EN_PREPARACION', 'LISTO'].includes(p.estado)
     }
+    if (filtroEstado === 'PAGADOS') {
+      return p.estado === 'PAGADO'
+    }
+    if (filtroEstado === 'ENTREGADOS_HOY') {
+      if (p.estado !== 'ENTREGADO') return false
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      const horaEntregado = new Date(p.horaEntregado)
+      return horaEntregado >= hoy
+    }
+    return true // TODOS
+  })
+
+  function getTipoIcon(tipo) {
+    if (tipo === 'DELIVERY') return <Truck size={16} />
+    if (tipo === 'PEDIDOSYA') return <ShoppingBag size={16} />
+    if (tipo === 'RAPPI') return <ShoppingBag size={16} />
+    return <ShoppingBag size={16} />
   }
 
-  async function marcarListo(pedidoId) {
-    try {
-      await api.put(`/admin/buffet/takeaway/${pedidoId}/listo`)
-      cargarDatos()
-    } catch (err) {
-      console.error('Error:', err)
-    }
+  function getTipoLabel(tipo) {
+    if (tipo === 'DELIVERY') return 'Delivery'
+    if (tipo === 'PEDIDOSYA') return 'PedidosYa'
+    if (tipo === 'RAPPI') return 'Rappi'
+    return 'Retiro'
   }
 
-  async function cobrar(pedidoId) {
-    try {
-      const pedido = pedidos.find(p => p.id === pedidoId)
-      const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))
-
-      await api.post(`/admin/buffet/takeaway/${pedidoId}/cobrar`, {
-        cajaId: parseInt(cobroData.cajaId),
-        medioPagoId: parseInt(cobroData.medioPagoId)
-      })
-
-      // Generar y mostrar ticket
-      if (pedido) {
-        const ticketData = generarTicketTakeAway({
-          ...pedido,
-          medioPago: medioPagoSeleccionado
-        }, 'TAKEAWAY')
-        await imprimirTicket(ticketData)
-      }
-
-      toast.success('Pedido cobrado y entregado')
-      setModalCobrar(null)
-      cargarDatos()
-    } catch (err) {
-      console.error('Error:', err)
-      toast.error(err.response?.data?.error || 'Error al cobrar')
-    }
+  function tiempoTranscurrido(pedido) {
+    if (!pedido.horaRecibido) return 0
+    const ahora = new Date()
+    const recibido = new Date(pedido.horaRecibido)
+    return Math.floor((ahora - recibido) / 60000) // minutos
   }
 
-  const totalFormulario = formData.items.reduce((sum, item) => sum + Number(item.precio) * item.cantidad, 0)
-
-  const pedidosPendientes = pedidos.filter(p => p.estado !== 'ENTREGADO' && p.estado !== 'CANCELADO')
+  function tiempoColor(pedido) {
+    const mins = tiempoTranscurrido(pedido)
+    if (mins < 15) return 'text-green-600'
+    if (mins < 30) return 'text-yellow-600'
+    return 'text-red-600'
+  }
 
   if (loading) {
     return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>
   }
 
+  // ==================== VISTA DETALLE ====================
+  // Usar componente unificado GestionPedido
+
+  if (modoVista === 'detalle' && pedidoActivo) {
+    return (
+      <GestionPedido
+        tipo="takeaway"
+        id={pedidoActivo.id}
+        onVolver={volverADashboard}
+        onActualizar={(pedidoActualizado) => {
+          setPedidoActivo(pedidoActualizado)
+        }}
+      />
+    )
+  }
+
+  // ==================== VISTA DASHBOARD ====================
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Pedidos Take Away</h1>
-          <p className="text-gray-600">{pedidosPendientes.length} pedidos pendientes</p>
+          <p className="text-gray-600">{pedidosFiltrados.length} pedidos</p>
         </div>
         <div className="flex items-center gap-2">
-          <NotificacionBuffet />
-          <button
-            onClick={cargarDatos}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
-          >
-            <RefreshCw size={18} />
-          </button>
+          {/* Filtros */}
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setFiltroEstado('EN_CURSO')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                filtroEstado === 'EN_CURSO' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              En Curso
+            </button>
+            <button
+              onClick={() => setFiltroEstado('PAGADOS')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                filtroEstado === 'PAGADOS' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Pagados
+            </button>
+            <button
+              onClick={() => setFiltroEstado('ENTREGADOS_HOY')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                filtroEstado === 'ENTREGADOS_HOY' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Entregados Hoy
+            </button>
+            <button
+              onClick={() => setFiltroEstado('TODOS')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                filtroEstado === 'TODOS' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Todos
+            </button>
+          </div>
+
           {tienePermiso(PERMISOS.BUFFET_MESAS) && (
             <button
-              onClick={abrirModalNuevo}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              onClick={() => setModalNuevoPedido(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
             >
               <Plus size={18} />
               Nuevo Pedido
@@ -224,302 +270,267 @@ export default function BuffetTakeAway() {
       </div>
 
       {/* Grid de Pedidos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {pedidosPendientes.map(pedido => (
-          <div key={pedido.id} className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="p-4 border-b">
-              <div className="flex justify-between items-start">
-                <div>
-                  <StatusBadge status={pedido.estado} type="pedido" />
-                  <h3 className="font-bold text-lg mt-1">{pedido.numero}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {pedidosFiltrados.map(pedido => (
+          <div
+            key={pedido.id}
+            onClick={() => abrirPedido(pedido)}
+            className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-green-500"
+          >
+            {/* Header del pedido */}
+            <div className="p-4 border-b bg-gradient-to-r from-green-50 to-white">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-bold text-lg text-gray-900">#{pedido.numero}</h3>
+                    <StatusBadge status={pedido.estado} type="pedidoTakeAway" size="sm" />
+                  </div>
+                  <p className="font-medium text-gray-700">{pedido.nombreCliente}</p>
+                  {pedido.socio && (
+                    <div className="flex items-center gap-1 text-xs text-gray-600 mt-1">
+                      <img src="/images/logo.png" alt="Socio" className="w-4 h-4 object-contain" />
+                      <span>Socio #{pedido.socio.nroSocio}</span>
+                    </div>
+                  )}
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-green-600">
-                    {formatCurrency(pedido.total)}
-                  </p>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg border border-gray-200">
+                    {getTipoIcon(pedido.tipo)}
+                    <span className="text-xs font-medium text-gray-700">
+                      {getTipoLabel(pedido.tipo)}
+                    </span>
+                  </div>
+                  {pedido.telefono && (
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <Phone size={12} />
+                      <span>{pedido.telefono}</span>
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              <div className="mt-3 space-y-1 text-sm text-gray-600">
-                <p className="flex items-center gap-2">
-                  <User size={14} />
-                  {pedido.nombreCliente}
-                </p>
-                {pedido.telefono && (
-                  <p className="flex items-center gap-2">
-                    <Phone size={14} />
-                    {pedido.telefono}
-                  </p>
-                )}
-                {pedido.horaEstimada && (
-                  <p className="flex items-center gap-2">
+            {/* Info del pedido */}
+            <div className="p-4">
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Items:</span>
+                  <span className="font-medium">{pedido.items?.length || 0}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Total:</span>
+                  <span className="text-lg font-bold text-green-600">
+                    {formatCurrency(pedido.total || 0, { showSymbol: false })}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center gap-1 text-gray-500">
                     <Clock size={14} />
-                    Retira: {formatTime(pedido.horaEstimada)}
-                  </p>
+                    <span className="text-xs">Hace {tiempoTranscurrido(pedido)} min</span>
+                  </div>
+                  {pedido.horaEstimada && (
+                    <span className="text-xs text-gray-600">
+                      Estimado: {new Date(pedido.horaEstimada).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+
+                {pedido.observaciones && (
+                  <div className="pt-2 border-t">
+                    <p className="text-xs text-gray-600 italic truncate" title={pedido.observaciones}>
+                      {pedido.observaciones}
+                    </p>
+                  </div>
                 )}
               </div>
-            </div>
-
-            <div className="p-4 bg-gray-50">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Items:</h4>
-              <ul className="space-y-1 text-sm">
-                {pedido.items?.map((item, i) => (
-                  <li key={i} className="flex justify-between">
-                    <span>{item.cantidad}x {item.productoBuffet?.nombre}</span>
-                    <span className="text-gray-600">{formatCurrency(item.subtotal)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="p-4 border-t flex gap-2">
-              {pedido.estado === 'RECIBIDO' && (
-                <button
-                  onClick={() => enviarACocina(pedido.id)}
-                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                >
-                  <ChefHat size={16} />
-                  A Cocina
-                </button>
-              )}
-              {pedido.estado === 'EN_PREPARACION' && tienePermiso(PERMISOS.BUFFET_COCINA) && (
-                <button
-                  onClick={() => marcarListo(pedido.id)}
-                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                >
-                  <Check size={16} />
-                  Listo
-                </button>
-              )}
-              {pedido.estado === 'LISTO' && tienePermiso(PERMISOS.BUFFET_COBRAR) && (
-                <button
-                  onClick={() => setModalCobrar(pedido)}
-                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                >
-                  <DollarSign size={16} />
-                  Cobrar
-                </button>
-              )}
             </div>
           </div>
         ))}
       </div>
 
-      {pedidosPendientes.length === 0 && (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-          <ShoppingBag size={48} className="mx-auto mb-4 opacity-30" />
-          <p>No hay pedidos Take Away pendientes</p>
+      {pedidosFiltrados.length === 0 && (
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <ShoppingBag size={48} className="mx-auto mb-4 text-gray-300" />
+          <p className="text-gray-500 text-lg mb-2">No hay pedidos {filtroEstado !== 'TODOS' && `en "${
+            filtroEstado === 'EN_CURSO' ? 'En Curso' :
+            filtroEstado === 'PAGADOS' ? 'Pagados' :
+            'Entregados Hoy'
+          }"`}</p>
+          <p className="text-gray-400 text-sm">
+            {filtroEstado !== 'TODOS' ? 'Prueba cambiando el filtro' : 'Crea un nuevo pedido para comenzar'}
+          </p>
         </div>
       )}
 
       {/* Modal Nuevo Pedido */}
       <Modal
-        isOpen={modalNuevo}
-        onClose={() => setModalNuevo(false)}
         title="Nuevo Pedido Take Away"
-        maxWidth="max-w-4xl"
+        isOpen={modalNuevoPedido}
+        onClose={() => setModalNuevoPedido(false)}
       >
-        <div className="flex flex-col md:flex-row gap-4 -mx-6 -my-6">
-          {/* Panel izquierdo - Productos */}
-          <div className="w-full md:w-1/2 border-r flex flex-col max-h-[70vh]">
-            <div className="p-2 bg-gray-100 flex gap-2 overflow-x-auto flex-shrink-0">
-              {categorias.map(cat => (
+        <form onSubmit={crearNuevoPedido} className="space-y-4">
+          {/* Buscar Socio */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Buscar Socio (opcional)
+            </label>
+            {nuevoPedidoData.socioId ? (
+              <div className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <img src="/images/logo.png" alt="Socio" className="w-5 h-5 object-contain" />
+                  <span className="font-medium">{nuevoPedidoData.socioNombre}</span>
+                </div>
                 <button
-                  key={cat.id}
-                  className="px-3 py-1 bg-white rounded text-sm whitespace-nowrap hover:bg-gray-50"
-                  style={{ borderBottom: `3px solid ${cat.color || '#DC2626'}` }}
+                  type="button"
+                  onClick={limpiarSocio}
+                  className="text-red-500 hover:text-red-700"
                 >
-                  {cat.nombre}
+                  <X size={18} />
                 </button>
-              ))}
-            </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              <div className="grid grid-cols-2 gap-2">
-                {productos.map(prod => (
-                  <button
-                    key={prod.id}
-                    onClick={() => agregarItem(prod)}
-                    className="p-3 bg-gray-50 rounded text-left hover:bg-gray-100"
-                    type="button"
-                  >
-                    <span className="font-medium text-sm block">{prod.nombre}</span>
-                    <span className="text-green-600 font-bold">{formatCurrency(prod.precio)}</span>
-                  </button>
-                ))}
               </div>
-            </div>
-          </div>
-
-          {/* Panel derecho - Datos y carrito */}
-          <div className="w-full md:w-1/2 flex flex-col max-h-[70vh]">
-            <form onSubmit={crearPedido} className="flex-1 flex flex-col">
-              <div className="p-4 space-y-3 flex-shrink-0">
+            ) : (
+              <div className="relative">
                 <input
                   type="text"
-                  value={formData.nombreCliente}
-                  onChange={e => setFormData({ ...formData, nombreCliente: e.target.value })}
-                  placeholder="Nombre del cliente *"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  required
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="tel"
-                    value={formData.telefono}
-                    onChange={e => setFormData({ ...formData, telefono: e.target.value })}
-                    placeholder="Teléfono"
-                    className="border border-gray-300 rounded-lg px-3 py-2"
-                  />
-                  <input
-                    type="time"
-                    value={formData.horaEstimada}
-                    onChange={e => setFormData({ ...formData, horaEstimada: e.target.value })}
-                    className="border border-gray-300 rounded-lg px-3 py-2"
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={formData.observaciones}
-                  onChange={e => setFormData({ ...formData, observaciones: e.target.value })}
-                  placeholder="Observaciones"
+                  value={nuevoPedidoData.buscarSocio}
+                  onChange={e => {
+                    setNuevoPedidoData({ ...nuevoPedidoData, buscarSocio: e.target.value })
+                    buscarSocios(e.target.value)
+                  }}
+                  placeholder="Buscar por nombre o N° socio..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Centro de Costo
-                  </label>
-                  <SelectCentroCosto
-                    value={formData.centroCostoId}
-                    onChange={(val) => setFormData({ ...formData, centroCostoId: val })}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 border-t">
-                <h4 className="font-medium mb-2">Items ({formData.items.length})</h4>
-                {formData.items.length === 0 ? (
-                  <p className="text-gray-400 text-sm">Selecciona productos del menú</p>
-                ) : (
-                  <div className="space-y-2">
-                    {formData.items.map((item, i) => (
-                      <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                        <div className="flex-1">
-                          <span className="font-medium text-sm">{item.nombre}</span>
-                          <span className="text-gray-500 text-sm ml-2">
-                            {formatCurrency(item.precio)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => modificarCantidadItem(i, -1)}
-                            className="w-6 h-6 bg-gray-200 rounded text-sm"
-                          >
-                            -
-                          </button>
-                          <span className="w-6 text-center">{item.cantidad}</span>
-                          <button
-                            type="button"
-                            onClick={() => modificarCantidadItem(i, 1)}
-                            className="w-6 h-6 bg-gray-200 rounded text-sm"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="w-20 text-right font-bold">
-                          {formatCurrency(Number(item.precio) * item.cantidad)}
-                        </span>
-                      </div>
+                {buscandoSocio && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                  </div>
+                )}
+                {sociosBusqueda.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                    {sociosBusqueda.map(socio => (
+                      <button
+                        key={socio.id}
+                        type="button"
+                        onClick={() => seleccionarSocio(socio)}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50"
+                      >
+                        <span className="font-medium">{socio.apellidoNombre || `${socio.apellido}, ${socio.nombre}`}</span>
+                        <span className="text-sm text-gray-500 ml-2">#{socio.nroSocio}</span>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
-
-              <div className="p-4 border-t flex-shrink-0">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="font-bold text-lg">Total:</span>
-                  <span className="text-2xl font-bold text-green-600">
-                    {formatCurrency(totalFormulario)}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModalNuevo(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                  >
-                    Crear Pedido
-                  </button>
-                </div>
-              </div>
-            </form>
+            )}
           </div>
-        </div>
-      </Modal>
 
-      {/* Modal Cobrar */}
-      <Modal
-        isOpen={!!modalCobrar}
-        onClose={() => setModalCobrar(null)}
-        title={`Cobrar Pedido ${modalCobrar?.numero || ''}`}
-        maxWidth="max-w-md"
-      >
-        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600">Cliente: {modalCobrar?.nombreCliente}</p>
-          <p className="text-2xl font-bold text-green-600 mt-2">
-            Total: {formatCurrency(modalCobrar?.total || 0)}
-          </p>
-        </div>
-
-        <div className="space-y-4">
+          {/* Nombre Cliente */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Caja</label>
-            <select
-              value={cobroData.cajaId}
-              onChange={e => setCobroData({ ...cobroData, cajaId: e.target.value })}
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre del Cliente *
+            </label>
+            <input
+              type="text"
+              required
+              value={nuevoPedidoData.nombreCliente}
+              onChange={e => setNuevoPedidoData({ ...nuevoPedidoData, nombreCliente: e.target.value })}
               className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            >
-              {cajas.map(c => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
+              placeholder="Nombre completo"
+            />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
-            <select
-              value={cobroData.medioPagoId}
-              onChange={e => setCobroData({ ...cobroData, medioPagoId: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            >
-              {mediosPago.map(m => (
-                <option key={m.id} value={m.id}>{m.nombre}</option>
-              ))}
-            </select>
-          </div>
-        </div>
 
-        <div className="flex gap-2 mt-6">
+          {/* Teléfono */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Teléfono
+            </label>
+            <input
+              type="tel"
+              value={nuevoPedidoData.telefono}
+              onChange={e => setNuevoPedidoData({ ...nuevoPedidoData, telefono: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              placeholder="1234567890"
+            />
+          </div>
+
+          {/* Tipo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Pedido *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {['RETIRO', 'DELIVERY', 'PEDIDOSYA', 'RAPPI'].map(tipo => (
+                <label
+                  key={tipo}
+                  className={`flex items-center justify-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition ${
+                    nuevoPedidoData.tipo === tipo
+                      ? 'border-green-500 bg-green-50 text-green-700'
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="tipo"
+                    value={tipo}
+                    checked={nuevoPedidoData.tipo === tipo}
+                    onChange={e => setNuevoPedidoData({ ...nuevoPedidoData, tipo: e.target.value })}
+                    className="sr-only"
+                  />
+                  {getTipoIcon(tipo)}
+                  <span className="font-medium">{getTipoLabel(tipo)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Hora Estimada */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hora Estimada de Entrega
+            </label>
+            <input
+              type="datetime-local"
+              value={nuevoPedidoData.horaEstimada}
+              onChange={e => setNuevoPedidoData({ ...nuevoPedidoData, horaEstimada: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            />
+          </div>
+
+          {/* Centro de Costo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Centro de Costo
+            </label>
+            <SelectCentroCosto
+              value={nuevoPedidoData.centroCostoId}
+              onChange={value => setNuevoPedidoData({ ...nuevoPedidoData, centroCostoId: value })}
+              className="w-full"
+            />
+          </div>
+
+          {/* Observaciones */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Observaciones
+            </label>
+            <textarea
+              value={nuevoPedidoData.observaciones}
+              onChange={e => setNuevoPedidoData({ ...nuevoPedidoData, observaciones: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              rows="2"
+              placeholder="Notas adicionales..."
+            />
+          </div>
+
           <button
-            onClick={() => setModalCobrar(null)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            type="submit"
+            className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-medium"
           >
-            Cancelar
+            Crear Pedido
           </button>
-          <button
-            onClick={() => cobrar(modalCobrar.id)}
-            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Confirmar Cobro
-          </button>
-        </div>
+        </form>
       </Modal>
     </div>
   )

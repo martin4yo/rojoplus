@@ -1,0 +1,11 @@
+codigo,nombre,descripcion,categoria_menu,precio,codigo_barras,activo,disponible,destacado,venta_buffet,venta_kiosco,venta_takeaway,orden
+CAFE001,Café Espresso,Café espresso tradicional,BEBIDAS_CALIENTES,150.00,7790001001234,SI,SI,NO,SI,SI,SI,1
+CAFE002,Café con Leche,Café con leche cremoso,BEBIDAS_CALIENTES,180.00,7790001001241,SI,SI,SI,SI,SI,NO,2
+MEDIALUNAS,Medialunas (x3),3 Medialunas recién horneadas,PANADERIA,200.00,7790001001258,SI,SI,NO,SI,SI,NO,3
+AGUA500,Agua Mineral 500ml,Agua mineral sin gas,BEBIDAS_FRIAS,120.00,7790001001265,SI,SI,NO,NO,SI,NO,10
+SANDWICH01,Sandwich de Jamón y Queso,Pan francés con jamón cocido y queso,SANDWICHES,350.00,,SI,SI,NO,SI,NO,SI,5
+PIZZA01,Pizza Muzzarella,Pizza muzzarella porción,COMIDAS,400.00,,SI,SI,SI,SI,NO,NO,1
+CERVEZA01,Cerveza Quilmes 1L,Cerveza Quilmes litro,BEBIDAS_ALCOHOLICAS,600.00,7790001001272,SI,SI,NO,SI,SI,NO,15
+GASEOSA01,Coca Cola 500ml,Coca Cola sabor original 500ml,BEBIDAS_FRIAS,250.00,7790001001289,SI,SI,NO,NO,SI,NO,11
+EMPANADA01,Empanada de Carne,Empanada de carne criolla,COMIDAS,180.00,,SI,SI,NO,SI,NO,SI,6
+ALFAJOR01,Alfajor Jorgito,Alfajor de chocolate,GOLOSINAS,100.00,7790001001296,SI,SI,NO,NO,SI,NO,20

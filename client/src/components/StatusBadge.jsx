@@ -87,6 +87,17 @@ const STATUS_CONFIGS = {
     default: { color: 'gray' }
   },
 
+  pedidoTakeAway: {
+    recibido: { color: 'yellow', label: 'RECIBIDO', keywords: ['recibid'] },
+    pendiente: { color: 'yellow', label: 'PENDIENTE', keywords: ['pendiente'] },
+    en_preparacion: { color: 'blue', label: 'EN PREPARACIÓN', keywords: ['preparacion'] },
+    listo: { color: 'green', label: 'LISTO', keywords: ['list'] },
+    pagado: { color: 'green', label: 'PAGADO', keywords: ['pagad'] },
+    entregado: { color: 'gray', label: 'ENTREGADO', keywords: ['entregad'] },
+    cancelado: { color: 'red', label: 'CANCELADO', keywords: ['cancelad'] },
+    default: { color: 'gray' }
+  },
+
   inscripcion: {
     activa: { color: 'green', label: 'ACTIVA', keywords: ['activ', 'vigent'] },
     finalizada: { color: 'gray', label: 'FINALIZADA', keywords: ['finalizad', 'completad'] },

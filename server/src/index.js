@@ -46,6 +46,8 @@ import staffTecnicoRoutes from './routes/staffTecnico.js'
 import noticiasDeportivasRoutes from './routes/noticiasDeportivas.js'
 import reglamentoRoutes from './routes/reglamento.js'
 import accesosRoutes from './routes/accesos.js'
+import eventosRoutes from './routes/eventos.js'
+import importacionRoutes from './routes/importacion.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -70,6 +72,9 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }))
 
 // Servir archivos estáticos (fotos de socios)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
+
+// Servir archivos públicos (plantillas, etc)
+app.use('/public', express.static(path.join(__dirname, '../public')))
 
 // Pasar prisma a las rutas
 app.use((req, res, next) => {
@@ -114,7 +119,9 @@ app.use('/api/admin/staff-tecnico', staffTecnicoRoutes)
 app.use('/api/admin/noticias-deportivas', noticiasDeportivasRoutes)
 app.use('/api/admin/reglamento', reglamentoRoutes)
 app.use('/api/accesos', accesosRoutes)
+app.use('/api/eventos', eventosRoutes)
 app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
+app.use('/api/importacion', importacionRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

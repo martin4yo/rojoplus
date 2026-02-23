@@ -109,24 +109,84 @@ export default function BuffetDashboard() {
     }
   }
 
-  const getColorEstadoMesa = (estado) => {
-    switch (estado) {
-      case 'LIBRE': return 'bg-green-500'
-      case 'OCUPADA': return 'bg-red-500'
-      case 'CUENTA_PEDIDA': return 'bg-yellow-500'
-      case 'LIMPIEZA': return 'bg-gray-400'
-      default: return 'bg-gray-300'
+  const getColorEstadoMesa = (mesa) => {
+    // Mesa disponible - verde
+    if (mesa.estado === 'LIBRE') {
+      return 'bg-green-500'
     }
+
+    // Mesa en limpieza - gris
+    if (mesa.estado === 'LIMPIEZA') {
+      return 'bg-gray-400'
+    }
+
+    // Mesa ocupada - analizar items de comandas activas
+    const comandasActivas = mesa.comandas?.filter(c =>
+      ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'].includes(c.estado)
+    ) || []
+
+    // Si no hay comandas activas pero está ocupada, retornar gris
+    if (comandasActivas.length === 0) {
+      return 'bg-gray-300'
+    }
+
+    // Obtener todos los items de todas las comandas activas
+    const todosLosItems = comandasActivas.flatMap(c => c.items || [])
+
+    // Mesa abierta sin items - amarillo
+    if (todosLosItems.length === 0) {
+      return 'bg-yellow-500'
+    }
+
+    // Contar items por estado
+    const hayItemsListos = todosLosItems.some(item => item.estado === 'LISTO')
+    const hayItemsEnProceso = todosLosItems.some(item =>
+      ['PENDIENTE', 'ENVIADO_COCINA', 'ENVIADO_BARRA', 'EN_PREPARACION'].includes(item.estado)
+    )
+    const todosEntregadosOAnulados = todosLosItems.every(item =>
+      ['ENTREGADO', 'ANULADO'].includes(item.estado)
+    )
+
+    // Prioridad 1: Items listos para entregar - rojo
+    if (hayItemsListos) {
+      return 'bg-red-500'
+    }
+
+    // Prioridad 2: Items en proceso (cocina/barra/pendientes) - naranja
+    if (hayItemsEnProceso) {
+      return 'bg-orange-500'
+    }
+
+    // Prioridad 3: Todos los items entregados pero mesa no cerrada - celeste
+    if (todosEntregadosOAnulados) {
+      return 'bg-cyan-500'
+    }
+
+    // Default - gris
+    return 'bg-gray-300'
   }
 
-  const getTextoEstado = (estado) => {
-    switch (estado) {
-      case 'LIBRE': return 'Libre'
-      case 'OCUPADA': return 'Ocupada'
-      case 'CUENTA_PEDIDA': return 'Cuenta'
-      case 'LIMPIEZA': return 'Limpieza'
-      default: return estado
-    }
+  const getTextoEstado = (mesa) => {
+    if (mesa.estado === 'LIBRE') return 'Libre'
+    if (mesa.estado === 'LIMPIEZA') return 'Limpieza'
+
+    const comandasActivas = mesa.comandas?.filter(c =>
+      ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'].includes(c.estado)
+    ) || []
+
+    const todosLosItems = comandasActivas.flatMap(c => c.items || [])
+
+    if (todosLosItems.length === 0) return 'Sin items'
+
+    const hayItemsListos = todosLosItems.some(item => item.estado === 'LISTO')
+    const hayItemsEnProceso = todosLosItems.some(item =>
+      ['PENDIENTE', 'ENVIADO_COCINA', 'ENVIADO_BARRA', 'EN_PREPARACION'].includes(item.estado)
+    )
+
+    if (hayItemsListos) return 'Para entregar'
+    if (hayItemsEnProceso) return 'En proceso'
+
+    return 'Lista'
   }
 
   if (loading) {
@@ -305,18 +365,26 @@ export default function BuffetDashboard() {
         </div>
 
         {/* Leyenda */}
-        <div className="flex flex-wrap gap-4 mb-4 text-sm">
+        <div className="flex flex-wrap gap-3 mb-4 text-xs">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             <span>Libre</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <span>Ocupada</span>
+            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+            <span>Sin items</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <span>Cuenta</span>
+            <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+            <span>En proceso</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+            <span>Para entregar</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-cyan-500 rounded-full"></div>
+            <span>Lista</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
@@ -340,7 +408,7 @@ export default function BuffetDashboard() {
               <Link
                 key={mesa.id}
                 to={`/admin/buffet/comanda/${mesa.id}`}
-                className={`${getColorEstadoMesa(mesa.estado)} text-white p-3 md:p-4 rounded-lg text-center hover:opacity-90 transition-opacity relative`}
+                className={`${getColorEstadoMesa(mesa)} text-white p-3 md:p-4 rounded-lg text-center hover:opacity-90 transition-opacity relative`}
               >
                 {mesa.esComunal && (
                   <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center text-[10px]" title="Mesa Comunal">
@@ -348,7 +416,7 @@ export default function BuffetDashboard() {
                   </div>
                 )}
                 <div className="font-bold text-lg">{mesa.numero}</div>
-                <div className="text-xs opacity-90">{getTextoEstado(mesa.estado)}</div>
+                <div className="text-xs opacity-90">{getTextoEstado(mesa)}</div>
                 {mesa.mozoAsignado && (
                   <div className="text-[10px] opacity-75 truncate" title={`Mozo: ${mesa.mozoAsignado.nombre}`}>
                     {mesa.mozoAsignado.nombre.split(' ')[0]}

@@ -135,6 +135,11 @@ const permisos = [
   // Control de Accesos
   { codigo: 'ACCESOS_VER', nombre: 'Ver Control de Accesos', modulo: 'ACCESOS' },
   { codigo: 'ACCESOS_GESTIONAR', nombre: 'Gestionar Control de Accesos', modulo: 'ACCESOS' },
+  // Eventos
+  { codigo: 'EVENTOS_VER', nombre: 'Ver Eventos', modulo: 'EVENTOS' },
+  { codigo: 'EVENTOS_GESTIONAR', nombre: 'Gestionar Eventos', modulo: 'EVENTOS' },
+  { codigo: 'EVENTOS_VENDER', nombre: 'Vender Entradas', modulo: 'EVENTOS' },
+  { codigo: 'EVENTOS_VALIDAR', nombre: 'Validar Entradas', modulo: 'EVENTOS' },
 ];
 
 const conceptosTesoreria = [

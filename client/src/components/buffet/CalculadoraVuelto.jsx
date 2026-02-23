@@ -27,7 +27,14 @@ export default function CalculadoraVuelto({
     })
   }, [montoNumerico, vuelto, esSuficiente, onVueltoCalculado])
 
-  // Auto-llenar con exacto si es pago electrónico
+  // Auto-llenar con el total al montar o cuando cambia el total
+  useEffect(() => {
+    if (total && !montoPagado) {
+      setMontoPagado(total.toString())
+    }
+  }, [total])
+
+  // Auto-llenar cuando cambia el medio de pago a electrónico
   useEffect(() => {
     if (medioPagoSeleccionado && ['TARJETA', 'QR', 'TRANSFERENCIA'].includes(medioPagoSeleccionado.codigo)) {
       setMontoPagado(total.toString())

@@ -50,25 +50,29 @@ export function formatDate(date, options = {}) {
     if (isNaN(d.getTime())) return '-'
 
     if (format === 'short') {
-      const day = String(d.getDate()).padStart(2, '0')
-      const month = String(d.getMonth() + 1).padStart(2, '0')
-      const year = d.getFullYear()
+      // Usar UTC para evitar problemas de timezone
+      const day = String(d.getUTCDate()).padStart(2, '0')
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0')
+      const year = d.getUTCFullYear()
       return `${day}${separator}${month}${separator}${year}`
     }
 
     if (format === 'long') {
+      // Para formato largo, usar UTC también
       return d.toLocaleDateString('es-AR', {
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'UTC'
       })
     }
 
-    // numeric (default Intl)
+    // numeric (default Intl) - usar UTC
     return d.toLocaleDateString('es-AR', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit'
+      day: '2-digit',
+      timeZone: 'UTC'
     })
   } catch (error) {
     console.error('Error formateando fecha:', error)

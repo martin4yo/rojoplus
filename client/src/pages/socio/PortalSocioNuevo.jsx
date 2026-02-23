@@ -11,6 +11,8 @@ import {
   TagIcon,
   BanknotesIcon,
   BellIcon,
+  TicketIcon,
+  EllipsisHorizontalIcon,
 } from '@heroicons/react/24/outline'
 import {
   HomeIcon as HomeIconSolid,
@@ -21,6 +23,8 @@ import {
   TagIcon as TagIconSolid,
   BanknotesIcon as BanknotesIconSolid,
   BellIcon as BellIconSolid,
+  TicketIcon as TicketIconSolid,
+  EllipsisHorizontalIcon as EllipsisHorizontalIconSolid,
 } from '@heroicons/react/24/solid'
 import { useModal } from '../../components/Modal'
 import PushNotificationBanner from '../../components/PushNotificationBanner'
@@ -35,6 +39,7 @@ import PagosSocio from './sections/PagosSocio'
 import BeneficiosSocio from './sections/BeneficiosSocio'
 import DebitoAutomaticoSocio from './sections/DebitoAutomaticoSocio'
 import NotificacionesSocio from './sections/NotificacionesSocio'
+import EventosSocio from './sections/EventosSocio'
 
 export default function PortalSocioNuevo() {
   const { tokenPortal } = useParams()
@@ -46,6 +51,7 @@ export default function PortalSocioNuevo() {
   const [error, setError] = useState(null)
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
   const [cuotasPendientes, setCuotasPendientes] = useState(0)
+  const [mostrarMenuMas, setMostrarMenuMas] = useState(false)
 
   useEffect(() => {
     cargarDatosSocio()
@@ -54,18 +60,28 @@ export default function PortalSocioNuevo() {
   // Detectar respuesta de MercadoPago
   useEffect(() => {
     const pagoStatus = searchParams.get('pago')
+    const seccion = searchParams.get('seccion')
+
     if (pagoStatus) {
       // Limpiar el query param
       setSearchParams({})
+
+      // Navegar a la sección correcta
+      if (seccion === 'eventos') {
+        setActiveTab('eventos')
+      } else if (seccion === 'pagos') {
+        setActiveTab('pagos')
+      }
 
       // Mostrar mensaje según el resultado
       if (pagoStatus === 'exito') {
         showModal({
           type: 'success',
-          title: 'Pago exitoso',
-          message: 'Tu pago ha sido procesado correctamente. En breve se verá reflejado en tu cuenta.',
+          title: seccion === 'eventos' ? 'Compra exitosa' : 'Pago exitoso',
+          message: seccion === 'eventos'
+            ? 'Tu compra de entradas ha sido procesada correctamente. Recibirás las entradas por email en breve.'
+            : 'Tu pago ha sido procesado correctamente. En breve se verá reflejado en tu cuenta.',
           onConfirm: () => {
-            setActiveTab('pagos')
             cargarDatosSocio() // Recargar datos
           }
         })
@@ -109,7 +125,8 @@ export default function PortalSocioNuevo() {
     }
   }
 
-  const tabs = [
+  // Tabs principales (mostrar en barra de navegación)
+  const tabsPrincipales = [
     {
       id: 'inicio',
       label: 'Inicio',
@@ -118,15 +135,15 @@ export default function PortalSocioNuevo() {
       badge: null,
     },
     {
-      id: 'beneficios',
-      label: 'Beneficios',
-      icon: TagIcon,
-      iconSolid: TagIconSolid,
+      id: 'eventos',
+      label: 'Eventos',
+      icon: TicketIcon,
+      iconSolid: TicketIconSolid,
       badge: null,
     },
     {
       id: 'actividades',
-      label: 'Actividades',
+      label: 'Deportes',
       icon: TrophyIcon,
       iconSolid: TrophyIconSolid,
       badge: null,
@@ -138,12 +155,17 @@ export default function PortalSocioNuevo() {
       iconSolid: CreditCardIconSolid,
       badge: cuotasPendientes > 0 ? cuotasPendientes : null,
     },
+  ]
+
+  // Tabs secundarias (mostrar en menú "Más")
+  const tabsSecundarias = [
     {
-      id: 'debito',
-      label: 'Débito',
-      icon: BanknotesIcon,
-      iconSolid: BanknotesIconSolid,
+      id: 'beneficios',
+      label: 'Beneficios',
+      icon: TagIcon,
+      iconSolid: TagIconSolid,
       badge: null,
+      descripcion: 'Descuentos en comercios adheridos',
     },
     {
       id: 'notificaciones',
@@ -151,15 +173,22 @@ export default function PortalSocioNuevo() {
       icon: BellIcon,
       iconSolid: BellIconSolid,
       badge: null,
+      descripcion: 'Notificaciones y anuncios del club',
     },
     {
       id: 'perfil',
-      label: 'Perfil',
+      label: 'Mi Perfil',
       icon: UserIcon,
       iconSolid: UserIconSolid,
       badge: null,
+      descripcion: 'Datos personales y código QR',
     },
   ]
+
+  const handleTabSecundariaClick = (tabId) => {
+    setActiveTab(tabId)
+    setMostrarMenuMas(false)
+  }
 
   if (loading) {
     return (
@@ -212,10 +241,10 @@ export default function PortalSocioNuevo() {
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === 'inicio' && <DashboardSocio socio={socio} tokenPortal={tokenPortal} onNavigate={setActiveTab} />}
+        {activeTab === 'eventos' && <EventosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'beneficios' && <BeneficiosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'actividades' && <MisActividadesSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'pagos' && <PagosSocio socio={socio} tokenPortal={tokenPortal} onPagoRealizado={cargarDatosSocio} />}
-        {activeTab === 'debito' && <DebitoAutomaticoSocio tokenPortal={tokenPortal} />}
         {activeTab === 'notificaciones' && <NotificacionesSocio tokenPortal={tokenPortal} />}
         {activeTab === 'perfil' && <MiPerfilSocio socio={socio} tokenPortal={tokenPortal} onUpdate={cargarDatosSocio} />}
       </main>
@@ -223,8 +252,9 @@ export default function PortalSocioNuevo() {
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-6 gap-1">
-            {tabs.map((tab) => {
+          <div className="grid grid-cols-5 gap-1">
+            {/* Tabs principales */}
+            {tabsPrincipales.map((tab) => {
               const Icon = activeTab === tab.id ? tab.iconSolid : tab.icon
               const isActive = activeTab === tab.id
 
@@ -255,9 +285,109 @@ export default function PortalSocioNuevo() {
                 </button>
               )
             })}
+
+            {/* Botón "Más" */}
+            <button
+              onClick={() => setMostrarMenuMas(true)}
+              className={`relative flex flex-col items-center justify-center py-3 px-2 transition-all duration-200 ${
+                tabsSecundarias.some((t) => t.id === activeTab)
+                  ? 'text-red-600'
+                  : 'text-gray-500 hover:text-gray-700 active:bg-gray-100'
+              }`}
+            >
+              <div className="relative">
+                <EllipsisHorizontalIcon
+                  className={`h-6 w-6 transition-transform ${
+                    tabsSecundarias.some((t) => t.id === activeTab) ? 'scale-110' : ''
+                  }`}
+                />
+              </div>
+              <span
+                className={`text-xs mt-1 font-medium ${
+                  tabsSecundarias.some((t) => t.id === activeTab) ? 'font-semibold' : ''
+                }`}
+              >
+                Más
+              </span>
+              {tabsSecundarias.some((t) => t.id === activeTab) && (
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-12 h-1 bg-red-600 rounded-t-full" />
+              )}
+            </button>
           </div>
         </div>
       </nav>
+
+      {/* Menú "Más" (Modal Sheet) */}
+      {mostrarMenuMas && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end"
+          onClick={() => setMostrarMenuMas(false)}
+        >
+          <div
+            className="bg-white w-full rounded-t-3xl shadow-2xl animate-slide-up pb-safe"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Más opciones</h3>
+              <button
+                onClick={() => setMostrarMenuMas(false)}
+                className="text-gray-400 hover:text-gray-600 p-2"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Opciones secundarias */}
+            <div className="p-4 space-y-2">
+              {tabsSecundarias.map((tab) => {
+                const Icon = activeTab === tab.id ? tab.iconSolid : tab.icon
+                const isActive = activeTab === tab.id
+
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabSecundariaClick(tab.id)}
+                    className={`w-full flex items-center space-x-4 p-4 rounded-xl transition-all ${
+                      isActive
+                        ? 'bg-red-50 border-2 border-red-500'
+                        : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                    }`}
+                  >
+                    <div
+                      className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                        isActive ? 'bg-red-100' : 'bg-white'
+                      }`}
+                    >
+                      <Icon
+                        className={`h-6 w-6 ${isActive ? 'text-red-600' : 'text-gray-600'}`}
+                      />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div
+                        className={`font-semibold ${
+                          isActive ? 'text-red-600' : 'text-gray-900'
+                        }`}
+                      >
+                        {tab.label}
+                      </div>
+                      <div className="text-sm text-gray-500">{tab.descripcion}</div>
+                    </div>
+                    {isActive && (
+                      <div className="flex-shrink-0">
+                        <div className="w-2 h-2 rounded-full bg-red-600"></div>
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Espacio adicional para botón home en iOS */}
+            <div className="h-8"></div>
+          </div>
+        </div>
+      )}
 
       {ModalComponent}
 

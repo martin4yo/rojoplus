@@ -1,0 +1,4 @@
+codigo,nombre,descripcion,categoria_menu,precio,codigo_barras,activo,disponible,destacado,venta_buffet,venta_kiosco,venta_takeaway,orden
+TEST001,Café Americano TEST,Café americano de prueba,BEBIDAS,180.00,7790001001234,SI,SI,NO,SI,SI,SI,10
+TEST002,Hamburguesa TEST,Hamburguesa completa de prueba,MINUTAS,650.00,7790001001241,SI,SI,SI,SI,NO,SI,20
+TEST003,Cerveza Quilmes TEST,Cerveza Quilmes 1L de prueba,BEBIDAC,700.00,7790001001258,SI,SI,NO,SI,SI,NO,30
