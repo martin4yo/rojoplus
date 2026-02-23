@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { v4 as uuidv4 } from 'uuid'
-import puppeteer from 'puppeteer'
+import htmlPdf from 'html-pdf'
 import nodemailer from 'nodemailer'
 import fs from 'fs/promises'
 import path from 'path'
@@ -2078,27 +2078,21 @@ router.post('/generar-pdf-entradas', authAdmin, checkPermiso('EVENTOS_VENDER'), 
     // Generar HTML para el PDF
     const html = await generarHTMLTickets(entradas, nombreComprador)
 
-    // Generar PDF con puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    // Generar PDF con html-pdf
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      htmlPdf.create(html, {
+        format: 'A4',
+        border: {
+          top: '5mm',
+          right: '5mm',
+          bottom: '5mm',
+          left: '5mm'
+        }
+      }).toBuffer((err, buffer) => {
+        if (err) reject(err)
+        else resolve(buffer)
+      })
     })
-
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
-
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '5mm',
-        right: '5mm',
-        bottom: '5mm',
-        left: '5mm'
-      }
-    })
-
-    await browser.close()
 
     // Enviar PDF como respuesta
     res.setHeader('Content-Type', 'application/pdf')
@@ -2147,27 +2141,21 @@ router.post('/enviar-entradas', authAdmin, checkPermiso('EVENTOS_VENDER'), async
     // Generar HTML para el PDF
     const html = await generarHTMLTickets(entradas, nombreComprador)
 
-    // Generar PDF con puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    // Generar PDF con html-pdf
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      htmlPdf.create(html, {
+        format: 'A4',
+        border: {
+          top: '10mm',
+          right: '10mm',
+          bottom: '10mm',
+          left: '10mm'
+        }
+      }).toBuffer((err, buffer) => {
+        if (err) reject(err)
+        else resolve(buffer)
+      })
     })
-
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
-
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '10mm',
-        right: '10mm',
-        bottom: '10mm',
-        left: '10mm'
-      }
-    })
-
-    await browser.close()
 
     // Configurar transporter de email
     const transporter = nodemailer.createTransport({
