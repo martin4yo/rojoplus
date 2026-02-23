@@ -1,35 +1,7 @@
-import puppeteer from 'puppeteer'
+import htmlPdf from 'html-pdf-node'
 import Handlebars from 'handlebars'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { existsSync } from 'fs'
 
 const handlebars = Handlebars
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-// Buscar Chrome en las ubicaciones comunes
-function findChrome() {
-  const possiblePaths = [
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-  ]
-
-  for (const chromePath of possiblePaths) {
-    if (chromePath && existsSync(chromePath)) {
-      console.log(`✅ Chrome encontrado en: ${chromePath}`)
-      return chromePath
-    }
-  }
-
-  console.log('⚠️  Chrome no encontrado en ubicaciones comunes, usando Puppeteer por defecto')
-  return undefined
-}
 
 /**
  * Genera un PDF a partir de un template guardado en la base de datos
@@ -67,33 +39,10 @@ export async function generatePDF(prisma, tipo, data) {
       </html>
     `
 
-    // 4. Generar PDF con Puppeteer
-    const chromePath = findChrome()
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-software-rasterizer',
-        '--disable-features=IsolateOrigins',
-        '--disable-site-isolation-trials',
-        '--disable-web-security',
-        '--disable-blink-features=AutomationControlled',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions'
-      ],
-      executablePath: chromePath,
-      ignoreDefaultArgs: ['--disable-extensions']
-    })
+    // 4. Generar PDF con html-pdf-node
+    const file = { content: htmlWithStyles }
 
-    const page = await browser.newPage()
-    await page.setContent(htmlWithStyles, { waitUntil: 'networkidle0' })
-
-    const pdfBuffer = await page.pdf({
+    const options = {
       format: template.pageFormat || 'A4',
       landscape: template.orientation === 'landscape',
       printBackground: true,
@@ -102,10 +51,11 @@ export async function generatePDF(prisma, tipo, data) {
         right: '10mm',
         bottom: '10mm',
         left: '10mm'
-      }
-    })
+      },
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
 
-    await browser.close()
+    const pdfBuffer = await htmlPdf.generatePdf(file, options)
 
     console.log(`✅ PDF generado: ${tipo}`)
     return pdfBuffer
