@@ -2217,14 +2217,19 @@ async function generarPDFEntradas(entradas, nombreComprador) {
         const startY = doc.y
 
         // Dibujar borde del ticket
-        doc.roundedRect(20, startY, 555, 150, 5)
+        const ticketX = 20
+        const ticketWidth = 555
+        const ticketHeight = 150
+        const ticketPadding = 10
+
+        doc.roundedRect(ticketX, startY, ticketWidth, ticketHeight, 5)
            .lineWidth(2)
            .strokeColor('#DC2626')
            .stroke()
 
-        // Columna 1: Logo (90px de ancho)
-        const col1X = 30
-        const col1Width = 90
+        // Columna 1: Logo (70px de ancho)
+        const col1X = ticketX + ticketPadding
+        const col1Width = 70
 
         if (logoPath) {
           try {
@@ -2252,15 +2257,16 @@ async function generarPDFEntradas(entradas, nombreComprador) {
         }
 
         // Línea divisoria después del logo
-        doc.moveTo(col1X + col1Width + 10, startY + 10)
-           .lineTo(col1X + col1Width + 10, startY + 140)
+        const divider1X = col1X + col1Width + 10
+        doc.moveTo(divider1X, startY + 10)
+           .lineTo(divider1X, startY + ticketHeight - 10)
            .strokeColor('#DC2626')
            .lineWidth(2)
            .stroke()
 
-        // Columna 2: Información del evento
-        const col2X = col1X + col1Width + 20
-        const col2Width = 320
+        // Columna 2: Información del evento (310px de ancho)
+        const col2X = divider1X + 10
+        const col2Width = 310
         let infoY = startY + 15
 
         // Título del evento
@@ -2366,24 +2372,26 @@ async function generarPDFEntradas(entradas, nombreComprador) {
              .text(nombreComprador, col2X, infoY + 7)
         }
 
-        // Columna 3: QR Code
-        const col3X = col2X + col2Width + 10
-        const col3Width = 120
+        // Columna 3: QR Code (105px de ancho)
+        const divider2X = col2X + col2Width + 10
+        const col3X = divider2X + 10
+        const col3Width = ticketX + ticketWidth - col3X - ticketPadding
 
         // Línea divisoria antes del QR
-        doc.moveTo(col3X - 10, startY + 10)
-           .lineTo(col3X - 10, startY + 140)
+        doc.moveTo(divider2X, startY + 10)
+           .lineTo(divider2X, startY + ticketHeight - 10)
            .strokeColor('#DC2626')
            .lineWidth(2)
            .stroke()
 
         // Fondo gris para el QR
-        doc.rect(col3X, startY + 10, col3Width, 130)
+        doc.rect(col3X, startY + 10, col3Width, ticketHeight - 20)
            .fillColor('#f9fafb')
            .fill()
 
         // QR Code (usando la API externa)
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(entrada.codigo)}`
+        const qrSize = Math.min(col3Width - 20, 85) // QR de máximo 85px
 
         try {
           // Descargar el QR
@@ -2397,8 +2405,10 @@ async function generarPDFEntradas(entradas, nombreComprador) {
             })
           })
 
-          doc.image(qrBuffer, col3X + 15, startY + 25, {
-            fit: [90, 90],
+          // Centrar el QR en la columna
+          const qrX = col3X + (col3Width - qrSize) / 2
+          doc.image(qrBuffer, qrX, startY + 20, {
+            fit: [qrSize, qrSize],
             align: 'center'
           })
         } catch (err) {
@@ -2409,8 +2419,8 @@ async function generarPDFEntradas(entradas, nombreComprador) {
         doc.fontSize(6)
            .fillColor('#374151')
            .font('Courier-Bold')
-           .text(entrada.codigo, col3X + 5, startY + 125, {
-             width: col3Width - 10,
+           .text(entrada.codigo, col3X, startY + 115, {
+             width: col3Width,
              align: 'center',
              lineBreak: true
            })
