@@ -761,11 +761,6 @@ export default function VentaEntradas() {
                           <div className="text-sm text-gray-500 flex items-center gap-4 mt-1">
                             <span>Nro: {socio.nroSocio}</span>
                             <span>DNI: {socio.documento}</span>
-                            {socio.tieneDeuda && (
-                              <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                                Con deuda
-                              </span>
-                            )}
                           </div>
                         </div>
                       )}

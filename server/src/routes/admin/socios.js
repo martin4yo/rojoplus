@@ -177,10 +177,6 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
         enviaDebito: true,
         zona: true,
         createdAt: true,
-        cargos: {
-          where: { estado: 'PENDIENTE' },
-          select: { id: true },
-        },
       },
     }),
     req.prisma.socio.count({ where }),
@@ -190,17 +186,10 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
     req.prisma.socio.groupBy({ by: ['zona'], _count: true }),
   ])
 
-  // Agregar campo tieneDeuda a cada socio
-  const sociosConDeuda = socios.map(socio => ({
-    ...socio,
-    tieneDeuda: socio.cargos && socio.cargos.length > 0,
-    cargos: undefined, // Remover del response
-  }))
-
   res.json({
     success: true,
     data: {
-      socios: sociosConDeuda,
+      socios,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
