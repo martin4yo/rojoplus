@@ -1,7 +1,12 @@
-import htmlPdf from 'html-pdf-node'
+import pdf from 'pdf-creator-node'
 import Handlebars from 'handlebars'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 const handlebars = Handlebars
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 /**
  * Genera un PDF a partir de un template guardado en la base de datos
@@ -25,7 +30,7 @@ export async function generatePDF(prisma, tipo, data) {
     const htmlTemplate = handlebars.compile(template.htmlContent)
     const htmlCompiled = htmlTemplate(data)
 
-    // 3. Inyectar CSS en el HTML
+    // 3. Preparar el HTML completo con CSS
     const htmlWithStyles = `
       <!DOCTYPE html>
       <html>
@@ -39,23 +44,40 @@ export async function generatePDF(prisma, tipo, data) {
       </html>
     `
 
-    // 4. Generar PDF con html-pdf-node
-    const file = { content: htmlWithStyles }
-
+    // 4. Configurar opciones del PDF
     const options = {
       format: template.pageFormat || 'A4',
-      landscape: template.orientation === 'landscape',
-      printBackground: true,
-      margin: {
+      orientation: template.orientation || 'portrait',
+      border: {
         top: '10mm',
         right: '10mm',
         bottom: '10mm',
         left: '10mm'
-      },
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      }
     }
 
-    const pdfBuffer = await htmlPdf.generatePdf(file, options)
+    // 5. Preparar documento para pdf-creator-node
+    const document = {
+      html: htmlWithStyles,
+      data: {},
+      path: path.join(__dirname, '../../temp', `${tipo}_${Date.now()}.pdf`),
+      type: ''
+    }
+
+    // 6. Crear directorio temp si no existe
+    const tempDir = path.join(__dirname, '../../temp')
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true })
+    }
+
+    // 7. Generar PDF
+    const result = await pdf.create(document, options)
+
+    // 8. Leer el archivo generado como buffer
+    const pdfBuffer = fs.readFileSync(result.filename)
+
+    // 9. Eliminar archivo temporal
+    fs.unlinkSync(result.filename)
 
     console.log(`✅ PDF generado: ${tipo}`)
     return pdfBuffer
