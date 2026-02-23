@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { v4 as uuidv4 } from 'uuid'
-import htmlPdf from 'html-pdf'
+import PDFDocument from 'pdfkit'
 import nodemailer from 'nodemailer'
 import fs from 'fs/promises'
 import path from 'path'
@@ -2075,24 +2075,8 @@ router.post('/generar-pdf-entradas', authAdmin, checkPermiso('EVENTOS_VENDER'), 
       return res.status(404).json({ error: 'No se encontraron entradas' })
     }
 
-    // Generar HTML para el PDF
-    const html = await generarHTMLTickets(entradas, nombreComprador)
-
-    // Generar PDF con html-pdf
-    const pdfBuffer = await new Promise((resolve, reject) => {
-      htmlPdf.create(html, {
-        format: 'A4',
-        border: {
-          top: '5mm',
-          right: '5mm',
-          bottom: '5mm',
-          left: '5mm'
-        }
-      }).toBuffer((err, buffer) => {
-        if (err) reject(err)
-        else resolve(buffer)
-      })
-    })
+    // Generar PDF con PDFKit
+    const pdfBuffer = await generarPDFEntradas(entradas, nombreComprador)
 
     // Enviar PDF como respuesta
     res.setHeader('Content-Type', 'application/pdf')
@@ -2138,24 +2122,8 @@ router.post('/enviar-entradas', authAdmin, checkPermiso('EVENTOS_VENDER'), async
       return res.status(404).json({ error: 'No se encontraron entradas' })
     }
 
-    // Generar HTML para el PDF
-    const html = await generarHTMLTickets(entradas, nombreComprador)
-
-    // Generar PDF con html-pdf
-    const pdfBuffer = await new Promise((resolve, reject) => {
-      htmlPdf.create(html, {
-        format: 'A4',
-        border: {
-          top: '10mm',
-          right: '10mm',
-          bottom: '10mm',
-          left: '10mm'
-        }
-      }).toBuffer((err, buffer) => {
-        if (err) reject(err)
-        else resolve(buffer)
-      })
-    })
+    // Generar PDF con PDFKit
+    const pdfBuffer = await generarPDFEntradas(entradas, nombreComprador)
 
     // Configurar transporter de email
     const transporter = nodemailer.createTransport({
@@ -2212,6 +2180,261 @@ router.post('/enviar-entradas', authAdmin, checkPermiso('EVENTOS_VENDER'), async
     res.status(500).json({ error: error.message || 'Error al enviar entradas' })
   }
 })
+
+// Función para generar PDF de entradas con PDFKit
+async function generarPDFEntradas(entradas, nombreComprador) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 20,
+        bufferPages: true
+      })
+
+      const buffers = []
+      doc.on('data', buffers.push.bind(buffers))
+      doc.on('end', () => resolve(Buffer.concat(buffers)))
+      doc.on('error', reject)
+
+      // Cargar logo del club si existe
+      let logoPath = null
+      try {
+        logoPath = path.join(__dirname, '../../../client/public/images/logo.png')
+        await fs.access(logoPath)
+      } catch (error) {
+        logoPath = null
+      }
+
+      // Generar cada entrada
+      for (let i = 0; i < entradas.length; i++) {
+        const entrada = entradas[i]
+        const evento = entrada.evento
+
+        if (i > 0) {
+          doc.moveDown(2)
+        }
+
+        const startY = doc.y
+
+        // Dibujar borde del ticket
+        doc.roundedRect(20, startY, 555, 150, 5)
+           .lineWidth(2)
+           .strokeColor('#DC2626')
+           .stroke()
+
+        // Columna 1: Logo (90px de ancho)
+        const col1X = 30
+        const col1Width = 90
+
+        if (logoPath) {
+          try {
+            doc.image(logoPath, col1X + 10, startY + 40, {
+              fit: [70, 70],
+              align: 'center',
+              valign: 'center'
+            })
+          } catch (err) {
+            // Si falla la imagen, mostrar texto
+            doc.fontSize(24)
+               .fillColor('#DC2626')
+               .text('CSP', col1X, startY + 60, {
+                 width: col1Width,
+                 align: 'center'
+               })
+          }
+        } else {
+          doc.fontSize(24)
+             .fillColor('#DC2626')
+             .text('CSP', col1X, startY + 60, {
+               width: col1Width,
+               align: 'center'
+             })
+        }
+
+        // Línea divisoria después del logo
+        doc.moveTo(col1X + col1Width + 10, startY + 10)
+           .lineTo(col1X + col1Width + 10, startY + 140)
+           .strokeColor('#DC2626')
+           .lineWidth(2)
+           .stroke()
+
+        // Columna 2: Información del evento
+        const col2X = col1X + col1Width + 20
+        const col2Width = 320
+        let infoY = startY + 15
+
+        // Título del evento
+        doc.fontSize(12)
+           .fillColor('#DC2626')
+           .font('Helvetica-Bold')
+           .text(`ENTRADA - ${evento.nombre.toUpperCase()}`, col2X, infoY, {
+             width: col2Width,
+             lineBreak: false
+           })
+
+        infoY += 20
+
+        // Fecha
+        const fechaFormateada = new Date(evento.fecha).toLocaleDateString('es-AR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        })
+
+        doc.fontSize(7)
+           .fillColor('#6b7280')
+           .font('Helvetica-Bold')
+           .text('FECHA', col2X, infoY)
+
+        doc.fontSize(10)
+           .fillColor('#111827')
+           .font('Helvetica-Bold')
+           .text(fechaFormateada, col2X, infoY + 8)
+
+        infoY += 25
+
+        // Hora
+        doc.fontSize(7)
+           .fillColor('#6b7280')
+           .font('Helvetica-Bold')
+           .text('HORA', col2X, infoY)
+
+        doc.fontSize(10)
+           .fillColor('#111827')
+           .font('Helvetica-Bold')
+           .text(evento.hora || '-', col2X, infoY + 8)
+
+        infoY += 25
+
+        // Ubicación (si existe)
+        if (evento.ubicacion) {
+          doc.fontSize(7)
+             .fillColor('#6b7280')
+             .font('Helvetica-Bold')
+             .text('UBICACIÓN', col2X, infoY)
+
+          doc.fontSize(9)
+             .fillColor('#111827')
+             .font('Helvetica-Bold')
+             .text(evento.ubicacion, col2X, infoY + 8, { width: col2Width })
+
+          infoY += 22
+        }
+
+        // Categoría y Precio en la misma línea
+        doc.fontSize(7)
+           .fillColor('#6b7280')
+           .font('Helvetica-Bold')
+           .text('CATEGORÍA', col2X, infoY)
+
+        doc.fontSize(7)
+           .fillColor('#6b7280')
+           .font('Helvetica-Bold')
+           .text('PRECIO', col2X + 150, infoY)
+
+        doc.fontSize(9)
+           .fillColor('#111827')
+           .font('Helvetica-Bold')
+           .text(entrada.categoria.nombre, col2X, infoY + 8)
+
+        doc.fontSize(11)
+           .fillColor('#DC2626')
+           .font('Helvetica-Bold')
+           .text(`$${Number(entrada.precio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, col2X + 150, infoY + 8)
+
+        infoY += 25
+
+        // Comprador (si existe)
+        if (nombreComprador) {
+          // Línea punteada
+          doc.moveTo(col2X, infoY - 5)
+             .lineTo(col2X + col2Width, infoY - 5)
+             .dash(2, { space: 2 })
+             .strokeColor('#e5e7eb')
+             .lineWidth(1)
+             .stroke()
+             .undash()
+
+          doc.fontSize(6)
+             .fillColor('#6b7280')
+             .font('Helvetica-Bold')
+             .text('COMPRADOR', col2X, infoY)
+
+          doc.fontSize(8)
+             .fillColor('#111827')
+             .font('Helvetica-Bold')
+             .text(nombreComprador, col2X, infoY + 7)
+        }
+
+        // Columna 3: QR Code
+        const col3X = col2X + col2Width + 10
+        const col3Width = 120
+
+        // Línea divisoria antes del QR
+        doc.moveTo(col3X - 10, startY + 10)
+           .lineTo(col3X - 10, startY + 140)
+           .strokeColor('#DC2626')
+           .lineWidth(2)
+           .stroke()
+
+        // Fondo gris para el QR
+        doc.rect(col3X, startY + 10, col3Width, 130)
+           .fillColor('#f9fafb')
+           .fill()
+
+        // QR Code (usando la API externa)
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(entrada.codigo)}`
+
+        try {
+          // Descargar el QR
+          const https = await import('https')
+          const qrBuffer = await new Promise((resolve, reject) => {
+            https.default.get(qrUrl, (response) => {
+              const chunks = []
+              response.on('data', (chunk) => chunks.push(chunk))
+              response.on('end', () => resolve(Buffer.concat(chunks)))
+              response.on('error', reject)
+            })
+          })
+
+          doc.image(qrBuffer, col3X + 15, startY + 25, {
+            fit: [90, 90],
+            align: 'center'
+          })
+        } catch (err) {
+          console.error('Error cargando QR:', err)
+        }
+
+        // Código de la entrada debajo del QR
+        doc.fontSize(6)
+           .fillColor('#374151')
+           .font('Courier-Bold')
+           .text(entrada.codigo, col3X + 5, startY + 125, {
+             width: col3Width - 10,
+             align: 'center',
+             lineBreak: true
+           })
+
+        // Nota al pie
+        doc.fontSize(7)
+           .fillColor('#6b7280')
+           .font('Helvetica')
+           .text('Presente este código QR al ingresar al evento', 20, startY + 160, {
+             width: 555,
+             align: 'center'
+           })
+
+        // Actualizar posición Y para la siguiente entrada
+        doc.y = startY + 180
+      }
+
+      doc.end()
+
+    } catch (error) {
+      reject(error)
+    }
+  })
+}
 
 // Función para generar HTML de tickets con diseño horizontal compacto
 async function generarHTMLTickets(entradas, nombreComprador) {
