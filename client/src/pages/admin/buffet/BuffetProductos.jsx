@@ -339,7 +339,7 @@ export default function BuffetProductos() {
               }}
               className="rounded text-green-600 focus:ring-green-500"
             />
-            <span className="text-sm font-medium text-green-700">TakeAway</span>
+            <span className="text-sm font-medium text-green-700">Pedidos</span>
           </label>
         </div>
       </div>
@@ -408,7 +408,7 @@ export default function BuffetProductos() {
                   )}
                   {prod.tiposVenta?.includes('TAKEAWAY') && (
                     <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                      TakeAway
+                      Pedidos
                     </span>
                   )}
                 </div>
@@ -681,7 +681,7 @@ export default function BuffetProductos() {
                           }}
                           className="rounded text-green-600 focus:ring-green-500"
                         />
-                        <span className="text-sm font-medium text-green-700">TakeAway</span>
+                        <span className="text-sm font-medium text-green-700">Pedidos</span>
                       </label>
                     </div>
                   </div>

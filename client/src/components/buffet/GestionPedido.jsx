@@ -913,7 +913,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 )}
                 {tipo === 'takeaway' && (
                   <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">
-                    TakeAway
+                    Pedidos
                   </span>
                 )}
               </h1>
@@ -1035,7 +1035,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                     )}
                     {tipo === 'takeaway' && (
                       <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">
-                        TakeAway
+                        Pedidos
                       </span>
                     )}
                   </h1>

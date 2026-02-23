@@ -283,7 +283,7 @@ export default function BuffetDashboard() {
             <div className="flex items-center gap-3">
               <ShoppingBag className="text-purple-500" size={24} />
               <div>
-                <p className="text-sm text-gray-600">Take Away</p>
+                <p className="text-sm text-gray-600">Pedidos</p>
                 <p className="text-2xl font-bold">{kpis.takeAway?.pendientes || 0}</p>
               </div>
             </div>
@@ -335,7 +335,7 @@ export default function BuffetDashboard() {
           className="bg-purple-600 hover:bg-purple-700 text-white p-6 rounded-lg text-center transition-colors"
         >
           <ShoppingBag size={32} className="mx-auto mb-2" />
-          <span className="font-medium">Take Away</span>
+          <span className="font-medium">Pedidos</span>
         </Link>
         <Link
           to="/admin/buffet/kiosco"

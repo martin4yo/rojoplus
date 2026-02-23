@@ -182,7 +182,7 @@ export default function AdminLayout() {
       submenu: [
         { path: '/admin/buffet', label: 'Dashboard', icon: LayoutDashboard, permisos: [PERMISOS.BUFFET_VER] },
         { path: '/admin/buffet/mesas', label: 'Mesas', icon: UtensilsCrossed, permisos: [PERMISOS.BUFFET_MESAS] },
-        { path: '/admin/buffet/takeaway', label: 'Take Away', icon: ShoppingBag, permisos: [PERMISOS.BUFFET_MESAS] },
+        { path: '/admin/buffet/takeaway', label: 'Pedidos', icon: ShoppingBag, permisos: [PERMISOS.BUFFET_MESAS] },
         { path: '/admin/buffet/kiosco', label: 'Kiosco', icon: Coffee, permisos: [PERMISOS.BUFFET_KIOSCO] },
         { path: '/admin/buffet/cocina', label: 'Cocina (KDS)', icon: ChefHat, permisos: [PERMISOS.BUFFET_COCINA] },
         { path: '/admin/buffet/productos', label: 'Productos', icon: Package, permisos: [PERMISOS.BUFFET_CONFIG] },

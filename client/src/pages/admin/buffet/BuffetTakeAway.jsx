@@ -217,7 +217,7 @@ export default function BuffetTakeAway() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pedidos Take Away</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
           <p className="text-gray-600">{pedidosFiltrados.length} pedidos</p>
         </div>
         <div className="flex items-center gap-2">
@@ -366,7 +366,7 @@ export default function BuffetTakeAway() {
 
       {/* Modal Nuevo Pedido */}
       <Modal
-        title="Nuevo Pedido Take Away"
+        title="Nuevo Pedido"
         isOpen={modalNuevoPedido}
         onClose={() => setModalNuevoPedido(false)}
       >

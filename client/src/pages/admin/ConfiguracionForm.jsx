@@ -564,7 +564,7 @@ export default function ConfiguracionForm() {
                       onChange={e => setForm({ ...form, paraTakeaway: e.target.checked })}
                       className="rounded border-gray-300 text-primary"
                     />
-                    <span className="text-sm text-gray-700">Take Away</span>
+                    <span className="text-sm text-gray-700">Pedidos</span>
                   </label>
                 </div>
               </div>

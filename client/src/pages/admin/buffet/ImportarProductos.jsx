@@ -344,7 +344,7 @@ export default function ImportarProductos() {
               <tr>
                 <td className="px-4 py-2 text-sm font-mono text-gray-900">venta_takeaway</td>
                 <td className="px-4 py-2 text-sm"><span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">NO</span></td>
-                <td className="px-4 py-2 text-sm text-gray-600">Se vende en TakeAway (SI/NO, defecto SI)</td>
+                <td className="px-4 py-2 text-sm text-gray-600">Se vende en Pedidos (SI/NO, defecto SI)</td>
                 <td className="px-4 py-2 text-sm font-mono text-gray-500">NO</td>
               </tr>
               <tr>
