@@ -2219,7 +2219,7 @@ async function generarPDFEntradas(entradas, nombreComprador) {
         // Dibujar borde del ticket
         const ticketX = 20
         const ticketWidth = 555
-        const ticketHeight = 150
+        const ticketHeight = 180
         const ticketPadding = 10
 
         doc.roundedRect(ticketX, startY, ticketWidth, ticketHeight, 5)
@@ -2227,30 +2227,32 @@ async function generarPDFEntradas(entradas, nombreComprador) {
            .strokeColor('#DC2626')
            .stroke()
 
+        // --- PARTE SUPERIOR: Logo + Info del evento ---
+
         // Columna 1: Logo (70px de ancho)
         const col1X = ticketX + ticketPadding
         const col1Width = 70
 
         if (logoPath) {
           try {
-            doc.image(logoPath, col1X + 10, startY + 40, {
-              fit: [70, 70],
+            doc.image(logoPath, col1X + 10, startY + 15, {
+              fit: [60, 60],
               align: 'center',
               valign: 'center'
             })
           } catch (err) {
             // Si falla la imagen, mostrar texto
-            doc.fontSize(24)
+            doc.fontSize(20)
                .fillColor('#DC2626')
-               .text('CSP', col1X, startY + 60, {
+               .text('CSP', col1X, startY + 30, {
                  width: col1Width,
                  align: 'center'
                })
           }
         } else {
-          doc.fontSize(24)
+          doc.fontSize(20)
              .fillColor('#DC2626')
-             .text('CSP', col1X, startY + 60, {
+             .text('CSP', col1X, startY + 30, {
                width: col1Width,
                align: 'center'
              })
@@ -2259,14 +2261,14 @@ async function generarPDFEntradas(entradas, nombreComprador) {
         // Línea divisoria después del logo
         const divider1X = col1X + col1Width + 10
         doc.moveTo(divider1X, startY + 10)
-           .lineTo(divider1X, startY + ticketHeight - 10)
+           .lineTo(divider1X, startY + 90)
            .strokeColor('#DC2626')
            .lineWidth(2)
            .stroke()
 
-        // Columna 2: Información del evento (310px de ancho)
+        // Columna 2: Información del evento (ocupa todo el ancho restante)
         const col2X = divider1X + 10
-        const col2Width = 310
+        const col2Width = ticketWidth - (col2X - ticketX) - ticketPadding
         let infoY = startY + 15
 
         // Título del evento
@@ -2336,7 +2338,7 @@ async function generarPDFEntradas(entradas, nombreComprador) {
         doc.fontSize(7)
            .fillColor('#6b7280')
            .font('Helvetica-Bold')
-           .text('PRECIO', col2X + 150, infoY)
+           .text('PRECIO', col2X + 200, infoY)
 
         doc.fontSize(9)
            .fillColor('#111827')
@@ -2346,52 +2348,38 @@ async function generarPDFEntradas(entradas, nombreComprador) {
         doc.fontSize(11)
            .fillColor('#DC2626')
            .font('Helvetica-Bold')
-           .text(`$${Number(entrada.precio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, col2X + 150, infoY + 8)
+           .text(`$${Number(entrada.precio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, col2X + 200, infoY + 8)
 
-        infoY += 25
-
-        // Comprador (si existe)
+        // Comprador a la derecha si existe
         if (nombreComprador) {
-          // Línea punteada
-          doc.moveTo(col2X, infoY - 5)
-             .lineTo(col2X + col2Width, infoY - 5)
-             .dash(2, { space: 2 })
-             .strokeColor('#e5e7eb')
-             .lineWidth(1)
-             .stroke()
-             .undash()
-
-          doc.fontSize(6)
+          doc.fontSize(7)
              .fillColor('#6b7280')
              .font('Helvetica-Bold')
-             .text('COMPRADOR', col2X, infoY)
+             .text('COMPRADOR', col2X + 340, infoY)
 
           doc.fontSize(8)
              .fillColor('#111827')
              .font('Helvetica-Bold')
-             .text(nombreComprador, col2X, infoY + 7)
+             .text(nombreComprador, col2X + 340, infoY + 8, {
+               width: 140,
+               lineBreak: false,
+               ellipsis: true
+             })
         }
 
-        // Columna 3: QR Code (105px de ancho)
-        const divider2X = col2X + col2Width + 10
-        const col3X = divider2X + 10
-        const col3Width = ticketX + ticketWidth - col3X - ticketPadding
+        // --- PARTE INFERIOR: Línea divisoria + QR centrado ---
 
-        // Línea divisoria antes del QR
-        doc.moveTo(divider2X, startY + 10)
-           .lineTo(divider2X, startY + ticketHeight - 10)
+        const dividerY = startY + 100
+        doc.moveTo(ticketX + 10, dividerY)
+           .lineTo(ticketX + ticketWidth - 10, dividerY)
            .strokeColor('#DC2626')
            .lineWidth(2)
            .stroke()
 
-        // Fondo gris para el QR
-        doc.rect(col3X, startY + 10, col3Width, ticketHeight - 20)
-           .fillColor('#f9fafb')
-           .fill()
-
-        // QR Code (usando la API externa)
+        // QR Code centrado
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(entrada.codigo)}`
-        const qrSize = Math.min(col3Width - 20, 85) // QR de máximo 85px
+        const qrSize = 65
+        const qrCenterX = ticketX + (ticketWidth - qrSize) / 2
 
         try {
           // Descargar el QR
@@ -2405,9 +2393,7 @@ async function generarPDFEntradas(entradas, nombreComprador) {
             })
           })
 
-          // Centrar el QR en la columna
-          const qrX = col3X + (col3Width - qrSize) / 2
-          doc.image(qrBuffer, qrX, startY + 20, {
+          doc.image(qrBuffer, qrCenterX, dividerY + 10, {
             fit: [qrSize, qrSize],
             align: 'center'
           })
@@ -2415,27 +2401,26 @@ async function generarPDFEntradas(entradas, nombreComprador) {
           console.error('Error cargando QR:', err)
         }
 
-        // Código de la entrada debajo del QR
+        // Código de la entrada debajo del QR (centrado)
         doc.fontSize(6)
            .fillColor('#374151')
            .font('Courier-Bold')
-           .text(entrada.codigo, col3X, startY + 115, {
-             width: col3Width,
-             align: 'center',
-             lineBreak: true
+           .text(entrada.codigo, ticketX + 10, dividerY + qrSize + 15, {
+             width: ticketWidth - 20,
+             align: 'center'
            })
 
-        // Nota al pie
+        // Nota al pie (fuera del ticket)
         doc.fontSize(7)
            .fillColor('#6b7280')
            .font('Helvetica')
-           .text('Presente este código QR al ingresar al evento', 20, startY + 160, {
-             width: 555,
+           .text('Presente este código QR al ingresar al evento', ticketX, startY + ticketHeight + 5, {
+             width: ticketWidth,
              align: 'center'
            })
 
         // Actualizar posición Y para la siguiente entrada
-        doc.y = startY + 180
+        doc.y = startY + ticketHeight + 25
       }
 
       doc.end()
