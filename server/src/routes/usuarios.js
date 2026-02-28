@@ -31,6 +31,9 @@ router.get('/mis-permisos', asyncHandler(async (req, res) => {
           esSuperAdmin: true,
           permisos: {
             include: { permiso: true }
+          },
+          cajas: {
+            include: { caja: { select: { id: true, codigo: true, nombre: true } } }
           }
         }
       }
@@ -42,15 +45,18 @@ router.get('/mis-permisos', asyncHandler(async (req, res) => {
   }
 
   let permisos = []
+  let cajasPermitidas = []
   let esSuperAdmin = false
 
   if (admin.rol) {
     esSuperAdmin = admin.rol.esSuperAdmin
     if (esSuperAdmin) {
-      // Super admin tiene todos los permisos
+      // Super admin tiene todos los permisos y todas las cajas
       permisos = ['*']
+      cajasPermitidas = ['*']
     } else {
       permisos = admin.rol.permisos.map(pr => pr.permiso.codigo)
+      cajasPermitidas = admin.rol.cajas.map(cr => cr.caja.id)
     }
   }
 
@@ -69,7 +75,8 @@ router.get('/mis-permisos', asyncHandler(async (req, res) => {
         nombre: admin.rol.nombre
       } : null,
       esSuperAdmin,
-      permisos
+      permisos,
+      cajasPermitidas
     }
   })
 }))
@@ -231,6 +238,124 @@ router.get('/permisos', asyncHandler(async (req, res) => {
   }, {})
 
   res.json({ success: true, data: permisos, agrupados })
+}))
+
+// =============================================================================
+// CAJAS POR ROL
+// =============================================================================
+
+// GET /api/admin/roles/:id/cajas - Obtener cajas asignadas a un rol
+router.get('/roles/:id/cajas', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const rol = await prisma.rol.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      cajas: {
+        include: {
+          caja: {
+            select: {
+              id: true,
+              codigo: true,
+              nombre: true,
+              tipo: true,
+              activo: true,
+              paraBuffet: true,
+              paraCaja: true,
+              paraKiosco: true,
+              paraTakeaway: true,
+              puntoVentaAfip: true
+            }
+          }
+        }
+      }
+    }
+  })
+
+  if (!rol) {
+    throw new AppError('Rol no encontrado', 404)
+  }
+
+  const cajas = rol.cajas.map(cr => cr.caja)
+  res.json({ success: true, data: cajas })
+}))
+
+// PUT /api/admin/roles/:id/cajas - Actualizar cajas asignadas a un rol
+router.put('/roles/:id/cajas', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { cajaIds } = req.body // Array de IDs de cajas
+
+  const rol = await prisma.rol.findUnique({ where: { id: parseInt(id) } })
+  if (!rol) {
+    throw new AppError('Rol no encontrado', 404)
+  }
+
+  // No permitir modificar cajas del rol SUPERADMIN (tiene acceso a todas)
+  if (rol.esSuperAdmin) {
+    throw new AppError('El rol Super Admin tiene acceso a todas las cajas', 400)
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Eliminar asignaciones actuales
+    await tx.cajaRol.deleteMany({ where: { rolId: parseInt(id) } })
+
+    // Crear nuevas asignaciones
+    if (cajaIds && cajaIds.length > 0) {
+      await tx.cajaRol.createMany({
+        data: cajaIds.map(cajaId => ({
+          rolId: parseInt(id),
+          cajaId: parseInt(cajaId)
+        }))
+      })
+    }
+  })
+
+  // Obtener cajas actualizadas
+  const cajasActualizadas = await prisma.cajaRol.findMany({
+    where: { rolId: parseInt(id) },
+    include: {
+      caja: {
+        select: {
+          id: true,
+          codigo: true,
+          nombre: true,
+          tipo: true,
+          activo: true,
+          puntoVentaAfip: true
+        }
+      }
+    }
+  })
+
+  // Invalidar cache de permisos
+  invalidarCachePermisos()
+
+  res.json({
+    success: true,
+    data: cajasActualizadas.map(cr => cr.caja),
+    message: `Se asignaron ${cajaIds?.length || 0} cajas al rol`
+  })
+}))
+
+// GET /api/admin/cajas-disponibles - Obtener todas las cajas disponibles para asignar
+router.get('/cajas-disponibles', asyncHandler(async (req, res) => {
+  const cajas = await prisma.caja.findMany({
+    where: { activo: true },
+    select: {
+      id: true,
+      codigo: true,
+      nombre: true,
+      tipo: true,
+      paraBuffet: true,
+      paraCaja: true,
+      paraKiosco: true,
+      paraTakeaway: true,
+      puntoVentaAfip: true
+    },
+    orderBy: { nombre: 'asc' }
+  })
+
+  res.json({ success: true, data: cajas })
 }))
 
 // =============================================================================

@@ -48,6 +48,8 @@ import reglamentoRoutes from './routes/reglamento.js'
 import accesosRoutes from './routes/accesos.js'
 import eventosRoutes from './routes/eventos.js'
 import importacionRoutes from './routes/importacion.js'
+import facturacionRoutes from './routes/facturacion.js'
+import menuRoutes from './routes/menu.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -122,6 +124,8 @@ app.use('/api/accesos', accesosRoutes)
 app.use('/api/eventos', eventosRoutes)
 app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
 app.use('/api/importacion', importacionRoutes)
+app.use('/api/admin/facturacion', facturacionRoutes)
+app.use('/api/admin/menu', menuRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

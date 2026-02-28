@@ -82,11 +82,47 @@ async function actualizarStockPorItems(tx, items, tipo, movimientoContableId, re
       }
     })
 
-    // Actualizar stock de variante
+    // Preparar datos para actualizar
+    const updateData = { stockActual: nuevoStock }
+
+    // Si es una compra, actualizar precio costo con el precio de esta compra
+    if (['FACTURA_COMPRA', 'NOTA_DEBITO_PROVEEDOR'].includes(tipo) && item.precioUnitario) {
+      updateData.precioCosto = Number(item.precioUnitario)
+
+      // Si la variante tiene margen configurado, calcular precio venta automáticamente
+      if (variante.margen) {
+        const margenDecimal = Number(variante.margen) / 100
+        updateData.precioVenta = Number(item.precioUnitario) * (1 + margenDecimal)
+      }
+    }
+
+    // Actualizar stock y precios de variante
     await tx.productoVariante.update({
       where: { id: item.productoVarianteId },
-      data: { stockActual: nuevoStock }
+      data: updateData
     })
+
+    // También actualizar precio compra del producto base
+    if (['FACTURA_COMPRA', 'NOTA_DEBITO_PROVEEDOR'].includes(tipo) && item.precioUnitario) {
+      const producto = await tx.producto.findUnique({
+        where: { id: variante.productoId }
+      })
+
+      if (producto) {
+        const updateProductoData = { precioCompra: Number(item.precioUnitario) }
+
+        // Si el producto tiene margen, actualizar precio venta
+        if (producto.margen) {
+          const margenDecimal = Number(producto.margen) / 100
+          updateProductoData.precioVenta = Number(item.precioUnitario) * (1 + margenDecimal)
+        }
+
+        await tx.producto.update({
+          where: { id: variante.productoId },
+          data: updateProductoData
+        })
+      }
+    }
   }
 }
 

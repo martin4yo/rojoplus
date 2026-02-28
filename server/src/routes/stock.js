@@ -131,7 +131,8 @@ router.get('/productos', asyncHandler(async (req, res) => {
   if (busqueda) {
     where.OR = [
       { codigo: { contains: busqueda, mode: 'insensitive' } },
-      { nombre: { contains: busqueda, mode: 'insensitive' } }
+      { nombre: { contains: busqueda, mode: 'insensitive' } },
+      { variantes: { some: { sku: { contains: busqueda, mode: 'insensitive' } } } }
     ]
   }
 
@@ -153,7 +154,7 @@ router.get('/productos', asyncHandler(async (req, res) => {
         },
         variantes: {
           where: { activo: true },
-          select: { id: true, talle: true, color: true, stockActual: true }
+          select: { id: true, talle: true, color: true, sku: true, stockActual: true, stockMinimo: true }
         },
         _count: { select: { variantes: true } }
       }
@@ -174,6 +175,10 @@ router.get('/productos', asyncHandler(async (req, res) => {
     fotoPrincipal: p.fotos[0]?.url || null
   }))
 
+  const totalPages = Math.ceil(total / parseInt(limit))
+  const from = total > 0 ? skip + 1 : 0
+  const to = Math.min(skip + parseInt(limit), total)
+
   res.json({
     success: true,
     data: productosFormateados,
@@ -181,7 +186,9 @@ router.get('/productos', asyncHandler(async (req, res) => {
       page: parseInt(page),
       limit: parseInt(limit),
       total,
-      pages: Math.ceil(total / parseInt(limit))
+      totalPages,
+      from,
+      to
     }
   })
 }))

@@ -18,6 +18,7 @@ router.use(authAdmin)
 /**
  * GET /api/admin/cierres-caja/pendientes
  * Obtener cajas que aún no han sido cerradas hoy
+ * Filtradas por las cajas permitidas para el rol del usuario
  */
 router.get('/pendientes', asyncHandler(async (req, res) => {
   const hoy = new Date()
@@ -26,12 +27,42 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
   const mañana = new Date(hoy)
   mañana.setDate(mañana.getDate() + 1)
 
-  // Obtener todas las cajas activas de tipo EFECTIVO
+  // Obtener el rol del usuario desde la BD (el JWT solo tiene id y email)
+  const admin = await req.prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    select: { rolId: true, rol: { select: { esSuperAdmin: true } } }
+  })
+
+  // Obtener cajas permitidas para el rol del usuario
+  let cajasPermitidasIds = null
+
+  // Super Admin ve todas las cajas
+  const esSuperAdmin = admin?.rol?.esSuperAdmin || false
+
+  if (!esSuperAdmin && admin?.rolId) {
+    const cajasRol = await req.prisma.cajaRol.findMany({
+      where: { rolId: admin.rolId },
+      select: { cajaId: true }
+    })
+    // Si el rol tiene cajas asignadas, filtrar por ellas
+    if (cajasRol.length > 0) {
+      cajasPermitidasIds = cajasRol.map(cr => cr.cajaId)
+    }
+  }
+
+  // Obtener cajas activas de tipo EFECTIVO (filtradas por rol si aplica)
+  const whereClause = {
+    activo: true,
+    tipo: 'EFECTIVO'
+  }
+
+  // Si hay cajas específicas del rol, filtrar por ellas
+  if (cajasPermitidasIds) {
+    whereClause.id = { in: cajasPermitidasIds }
+  }
+
   const cajasEfectivo = await req.prisma.caja.findMany({
-    where: {
-      activo: true,
-      tipo: 'EFECTIVO'
-    },
+    where: whereClause,
     orderBy: { nombre: 'asc' }
   })
 
@@ -113,6 +144,28 @@ router.post('/', asyncHandler(async (req, res) => {
 
   if (!caja.activo) {
     throw new AppError('La caja no está activa', 400)
+  }
+
+  // Verificar que el usuario tiene acceso a esta caja
+  const admin = await req.prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    select: { rolId: true, rol: { select: { esSuperAdmin: true } } }
+  })
+
+  const esSuperAdmin = admin?.rol?.esSuperAdmin || false
+
+  if (!esSuperAdmin && admin?.rolId) {
+    const cajasRol = await req.prisma.cajaRol.findMany({
+      where: { rolId: admin.rolId },
+      select: { cajaId: true }
+    })
+    // Si el rol tiene cajas asignadas, verificar que esta caja esté entre ellas
+    if (cajasRol.length > 0) {
+      const cajasPermitidasIds = cajasRol.map(cr => cr.cajaId)
+      if (!cajasPermitidasIds.includes(parseInt(cajaId))) {
+        throw new AppError('No tiene permiso para cerrar esta caja', 403)
+      }
+    }
   }
 
   // Fecha del cierre (si no se especifica, usar hoy)
@@ -199,6 +252,7 @@ router.post('/', asyncHandler(async (req, res) => {
 /**
  * GET /api/admin/cierres-caja
  * Listar histórico de cierres con filtros
+ * Filtrado por cajas permitidas del rol
  */
 router.get('/', asyncHandler(async (req, res) => {
   const {
@@ -209,10 +263,34 @@ router.get('/', asyncHandler(async (req, res) => {
     limit = 50
   } = req.query
 
+  // Obtener el rol del usuario desde la BD
+  const admin = await req.prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    select: { rolId: true, rol: { select: { esSuperAdmin: true } } }
+  })
+
+  const esSuperAdmin = admin?.rol?.esSuperAdmin || false
+
+  // Obtener cajas permitidas para el rol del usuario
+  let cajasPermitidasIds = null
+  if (!esSuperAdmin && admin?.rolId) {
+    const cajasRol = await req.prisma.cajaRol.findMany({
+      where: { rolId: admin.rolId },
+      select: { cajaId: true }
+    })
+    if (cajasRol.length > 0) {
+      cajasPermitidasIds = cajasRol.map(cr => cr.cajaId)
+    }
+  }
+
   const where = {}
 
+  // Filtrar por caja específica si se pidió
   if (cajaId) {
     where.cajaId = parseInt(cajaId)
+  } else if (cajasPermitidasIds) {
+    // Si no se pidió caja específica, filtrar por cajas permitidas
+    where.cajaId = { in: cajasPermitidasIds }
   }
 
   if (fechaDesde || fechaHasta) {

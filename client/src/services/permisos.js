@@ -15,6 +15,7 @@
 
 // Cache local de permisos del usuario actual
 let permisosUsuario = []
+let cajasPermitidas = []
 let esSuperAdmin = false
 let usuarioActual = null
 let rolActual = null
@@ -45,6 +46,7 @@ export async function cargarPermisos() {
     const data = await res.json()
     if (data.success && data.data) {
       permisosUsuario = data.data.permisos || []
+      cajasPermitidas = data.data.cajasPermitidas || []
       esSuperAdmin = data.data.esSuperAdmin || false
       usuarioActual = data.data.usuario
       rolActual = data.data.rol
@@ -64,6 +66,7 @@ export async function cargarPermisos() {
  */
 export function limpiarPermisos() {
   permisosUsuario = []
+  cajasPermitidas = []
   esSuperAdmin = false
   usuarioActual = null
   rolActual = null
@@ -139,6 +142,44 @@ export function getRolActual() {
  */
 export function getPermisos() {
   return [...permisosUsuario]
+}
+
+/**
+ * Verificar si el usuario tiene acceso a una caja específica
+ * @param {number} cajaId - ID de la caja a verificar
+ * @returns {boolean}
+ */
+export function tieneCajaPermitida(cajaId) {
+  // Super admin tiene acceso a todas las cajas
+  if (esSuperAdmin || cajasPermitidas.includes('*')) {
+    return true
+  }
+
+  // Si no hay cajas asignadas al rol, permitir todas (comportamiento por defecto)
+  if (cajasPermitidas.length === 0) {
+    return true
+  }
+
+  return cajasPermitidas.includes(cajaId)
+}
+
+/**
+ * Obtener lista de IDs de cajas permitidas
+ * @returns {(number|string)[]} Array de IDs o ['*'] si tiene acceso a todas
+ */
+export function getCajasPermitidas() {
+  if (esSuperAdmin || cajasPermitidas.includes('*')) {
+    return ['*']
+  }
+  return [...cajasPermitidas]
+}
+
+/**
+ * Verificar si el usuario tiene restricción de cajas
+ * @returns {boolean}
+ */
+export function tieneRestriccionCajas() {
+  return !esSuperAdmin && !cajasPermitidas.includes('*') && cajasPermitidas.length > 0
 }
 
 // Códigos de permisos disponibles (para referencia)
@@ -230,4 +271,13 @@ export const PERMISOS = {
   EVENTOS_GESTIONAR: 'EVENTOS_GESTIONAR',
   EVENTOS_VENDER: 'EVENTOS_VENDER',
   EVENTOS_VALIDAR: 'EVENTOS_VALIDAR',
+
+  // Facturación
+  FACTURACION_EMITIR: 'FACTURACION_EMITIR',
+  FACTURACION_ANULAR: 'FACTURACION_ANULAR',
+  FACTURACION_CONFIG: 'FACTURACION_CONFIG',
+
+  // Dashboard
+  DASHBOARD_VER: 'DASHBOARD_VER',
+  DASHBOARD_EJECUTIVO: 'DASHBOARD_EJECUTIVO',
 }

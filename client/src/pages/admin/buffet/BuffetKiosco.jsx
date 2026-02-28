@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Coffee, Plus, Minus, DollarSign, ShoppingCart, Search, X, Barcode, FileText } from 'lucide-react'
+import { Coffee, Plus, Minus, DollarSign, ShoppingCart, Search, X, Barcode, FileText, LayoutGrid, List, Receipt } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { useTicket } from '../../../contexts/TicketContext'
@@ -30,48 +30,111 @@ export default function BuffetKiosco() {
   const [ultimasVentas, setUltimasVentas] = useState([])
   const [mostrarUltimasVentas, setMostrarUltimasVentas] = useState(false)
   const [tabActivo, setTabActivo] = useState('carrito') // 'carrito' o 'finalizar'
+  const [cantidadAgregar, setCantidadAgregar] = useState(1)
+  const [vistaProductos, setVistaProductos] = useState(() => {
+    return localStorage.getItem('kioscoVistaProductos') || 'shop'
+  })
+
+  // Facturación
+  const [tipoComprobante, setTipoComprobante] = useState('interno') // 'interno', 'facturaB', 'facturaC'
+  const [configFiscal, setConfigFiscal] = useState(null)
 
   useEffect(() => {
     cargarDatos()
   }, [])
 
+  useEffect(() => {
+    localStorage.setItem('kioscoVistaProductos', vistaProductos)
+  }, [vistaProductos])
+
   // Atajos de teclado
   useEffect(() => {
     function handleKeyPress(e) {
-      // Solo si no está en un input/textarea/select
+      // Permitir Enter en inputs para cobrar
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT' && tabActivo === 'finalizar') {
+        e.preventDefault()
+        if (carrito.length > 0 && cajaId && medioPagoId && !procesando) {
+          const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(medioPagoId))
+          if (medioPagoSeleccionado?.codigo !== 'EFECTIVO' || datosVuelto.esSuficiente) {
+            cobrar()
+          }
+        }
+        return
+      }
+
+      // Permitir ESC siempre para volver
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (tabActivo === 'finalizar') {
+          setTabActivo('carrito')
+          // Hacer focus en el search input después de volver
+          setTimeout(() => {
+            if (searchInputRef.current) {
+              searchInputRef.current.focus()
+            }
+          }, 100)
+        } else if (carrito.length > 0) {
+          const confirmar = window.confirm('¿Limpiar el carrito?')
+          if (confirmar) limpiarCarrito()
+        }
+        return
+      }
+
+      // Solo procesar otros atajos si NO está en un input/textarea/select
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
         return
       }
 
       switch(e.key) {
-        case 'F2': // Cobrar
+        case 'F2': // Ir a cobrar / Cobrar
           e.preventDefault()
-          if (carrito.length > 0 && cajaId && medioPagoId && !procesando) {
-            cobrar()
+          if (carrito.length === 0) {
+            toast.error('El carrito está vacío')
+            return
+          }
+          if (!cajaId || !medioPagoId) {
+            toast.error('Selecciona caja y medio de pago')
+            return
+          }
+
+          // Si está en carrito, ir al tab finalizar
+          if (tabActivo === 'carrito') {
+            setTabActivo('finalizar')
+            toast.info('Presiona F2 nuevamente para cobrar')
+          } else {
+            // Si ya está en finalizar, cobrar directamente
+            const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(medioPagoId))
+            if (medioPagoSeleccionado?.codigo === 'EFECTIVO' && !datosVuelto.esSuficiente) {
+              toast.error('El monto pagado es insuficiente')
+            } else {
+              cobrar()
+            }
           }
           break
         case 'F4': // Limpiar carrito
           e.preventDefault()
           if (carrito.length > 0) {
             const confirmar = window.confirm('¿Limpiar el carrito?')
-            if (confirmar) limpiarCarrito()
+            if (confirmar) {
+              limpiarCarrito()
+              setTabActivo('carrito')
+            }
           }
           break
         case 'F5': // Efectivo
           e.preventDefault()
           const efectivo = mediosPago.find(m => m.codigo === 'EFECTIVO')
-          if (efectivo) setMedioPagoId(efectivo.id)
+          if (efectivo) {
+            setMedioPagoId(efectivo.id)
+            toast.success('Medio de pago: Efectivo')
+          }
           break
         case 'F6': // Tarjeta
           e.preventDefault()
           const tarjeta = mediosPago.find(m => m.codigo === 'TARJETA' || m.codigo === 'TARJETA_DEBITO' || m.codigo === 'TARJETA_CREDITO')
-          if (tarjeta) setMedioPagoId(tarjeta.id)
-          break
-        case 'Escape': // Cancelar
-          e.preventDefault()
-          if (carrito.length > 0) {
-            const confirmar = window.confirm('¿Limpiar el carrito?')
-            if (confirmar) limpiarCarrito()
+          if (tarjeta) {
+            setMedioPagoId(tarjeta.id)
+            toast.success('Medio de pago: Tarjeta')
           }
           break
       }
@@ -79,18 +142,25 @@ export default function BuffetKiosco() {
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [carrito, mediosPago, procesando, cajaId, medioPagoId])
+  }, [carrito, mediosPago, procesando, cajaId, medioPagoId, tabActivo, datosVuelto])
 
   // Auto-focus ya se maneja con la prop autoFocus de SearchInput
 
   async function cargarDatos(mantenerCategoria = false) {
     try {
-      const [prodRes, catRes, cajasRes, mediosRes] = await Promise.all([
+      const [prodRes, catRes, cajasRes, mediosRes, configRes] = await Promise.all([
         api.get('/admin/buffet/productos?disponible=true&activo=true&tipoVenta=KIOSCO'),
         api.get('/admin/buffet/categorias?activo=true'),
         api.get('/admin/buffet/config/cajas/kiosco'),
-        api.get('/admin/buffet/config/medios-pago/kiosco')
+        api.get('/admin/buffet/config/medios-pago/kiosco'),
+        api.get('/admin/facturacion/config').catch(() => null)
       ])
+
+      // Configuración fiscal
+      const configData = configRes?.data || configRes
+      if (configData && configData.certificadoPath) {
+        setConfigFiscal(configData)
+      }
       const productosData = prodRes.data || prodRes || []
       const categoriasData = catRes.data || catRes || []
 
@@ -212,17 +282,22 @@ export default function BuffetKiosco() {
     // Reproducir sonido al agregar
     playSound('scan')
 
+    const cantidad = parseInt(cantidadAgregar) || 1
+
     setCarrito(prev => {
       const existe = prev.find(item => item.id === producto.id)
       if (existe) {
         return prev.map(item =>
           item.id === producto.id
-            ? { ...item, cantidad: item.cantidad + 1 }
+            ? { ...item, cantidad: item.cantidad + cantidad }
             : item
         )
       }
-      return [...prev, { ...producto, cantidad: 1 }]
+      return [...prev, { ...producto, cantidad }]
     })
+
+    // Resetear cantidad a 1 después de agregar
+    setCantidadAgregar(1)
   }
 
   function modificarCantidad(productoId, delta) {
@@ -236,6 +311,24 @@ export default function BuffetKiosco() {
           return item
         })
         .filter(Boolean)
+    })
+  }
+
+  function cambiarCantidadDirecta(productoId, nuevaCantidad) {
+    const cantidad = parseInt(nuevaCantidad)
+    if (isNaN(cantidad) || cantidad < 1) {
+      // Si es inválido o menor a 1, eliminar del carrito
+      setCarrito(prev => prev.filter(item => item.id !== productoId))
+      return
+    }
+
+    setCarrito(prev => {
+      return prev.map(item => {
+        if (item.id === productoId) {
+          return { ...item, cantidad }
+        }
+        return item
+      })
     })
   }
 
@@ -269,11 +362,28 @@ export default function BuffetKiosco() {
         cantidad: item.cantidad
       }))
 
-      const res = await api.post('/admin/buffet/kiosco/venta', {
+      // Preparar datos de facturación
+      const datosVenta = {
         items,
         cajaId: parseInt(cajaId),
         medioPagoId: parseInt(medioPagoId)
-      })
+      }
+
+      // Si se solicita factura
+      if (tipoComprobante !== 'interno' && configFiscal) {
+        datosVenta.emitirFactura = true
+        datosVenta.tipoComprobante = tipoComprobante === 'facturaB' ? 6 : 11 // 6=FB, 11=FC
+        datosVenta.datosCliente = {
+          tipoDoc: 99, // Consumidor Final
+          documento: '',
+          nombre: 'Consumidor Final',
+          condicionIva: 5 // Consumidor Final
+        }
+      } else {
+        datosVenta.esVentaInterna = true
+      }
+
+      const res = await api.post('/admin/buffet/kiosco/venta', datosVenta)
 
       // Generar y mostrar ticket
       const ticketData = generarTicketKiosco({
@@ -353,7 +463,21 @@ export default function BuffetKiosco() {
       {/* Panel Izquierdo - Productos */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Barra de búsqueda + Notificaciones */}
-        <div className="p-4 bg-white border-b flex items-center gap-4">
+        <div className="p-4 bg-white border-b flex items-center gap-3">
+          {/* Campo de Cantidad */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Cant:</label>
+            <input
+              type="number"
+              min="1"
+              value={cantidadAgregar}
+              onChange={(e) => setCantidadAgregar(Math.max(1, parseInt(e.target.value) || 1))}
+              onFocus={(e) => e.target.select()}
+              className="w-16 text-center text-lg font-bold border-2 border-gray-300 rounded-lg px-2 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+              title="Cantidad a agregar (usar +/- para modificar)"
+            />
+          </div>
+
           <div className="relative flex-1 flex items-center gap-2">
             <Barcode className="text-gray-400 flex-shrink-0" size={24} />
             <div className="flex-1">
@@ -378,6 +502,25 @@ export default function BuffetKiosco() {
               <Search size={20} />
             </button>
           </div>
+
+          {/* Toggle Vista */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setVistaProductos('shop')}
+              className={`p-2 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              title="Vista Tarjetas"
+            >
+              <LayoutGrid className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setVistaProductos('lista')}
+              className={`p-2 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              title="Vista Lista"
+            >
+              <List className="w-5 h-5" />
+            </button>
+          </div>
+
           <NotificacionBuffet />
 
           {/* Botón últimas ventas */}
@@ -395,77 +538,53 @@ export default function BuffetKiosco() {
           </button>
         </div>
 
-        {/* Categorías */}
-        <div className="flex gap-2 p-4 bg-white border-b overflow-x-auto">
-          <button
-            onClick={() => setCategoriaActiva(null)}
-            className={`px-4 py-2 rounded-lg whitespace-nowrap font-medium transition-colors ${
-              categoriaActiva === null
-                ? 'bg-gray-800 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Todos
-          </button>
-          {categorias.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setCategoriaActiva(cat.id)}
-              className={`px-4 py-2 rounded-lg whitespace-nowrap font-medium transition-colors ${
-                categoriaActiva === cat.id
-                  ? 'text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              style={categoriaActiva === cat.id ? { backgroundColor: cat.color || '#DC2626' } : {}}
-            >
-              {cat.nombre}
-            </button>
-          ))}
-        </div>
+        {/* Categorías - Ocultas en Kiosco */}
 
-        {/* Grid de Productos */}
+        {/* Grid/Lista de Productos */}
         <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {productosFiltrados.map(prod => {
-              const sinStock = prod.stock !== undefined && prod.stock === 0
-              const stockBajo = prod.stock !== undefined && prod.stock > 0 && prod.stock <= 5
+          {vistaProductos === 'shop' ? (
+            /* Vista Shop - Tarjetas */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              {productosFiltrados.map(prod => {
+                const sinStock = prod.stock !== undefined && prod.stock === 0
+                const stockBajo = prod.stock !== undefined && prod.stock > 0 && prod.stock <= 5
 
-              return (
-                <button
-                  key={prod.id}
-                  onClick={() => agregarAlCarrito(prod)}
-                  disabled={sinStock}
-                  className={`bg-white rounded-lg p-3 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 hover:scale-[1.02] flex gap-3 ${
-                    sinStock ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {prod.imagen ? (
-                    <img
-                      src={prod.imagen}
-                      alt={prod.nombre}
-                      className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
-                      <Coffee size={24} className="text-gray-400" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm line-clamp-2 leading-tight">{prod.nombre}</h3>
-                    {prod.codigoBarras && (
-                      <p className="text-xs text-gray-400 truncate">{prod.codigoBarras}</p>
+                return (
+                  <button
+                    key={prod.id}
+                    onClick={() => agregarAlCarrito(prod)}
+                    disabled={sinStock}
+                    className={`bg-white rounded-lg p-4 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 hover:scale-[1.02] flex gap-4 ${
+                      sinStock ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {prod.imagen ? (
+                      <img
+                        src={prod.imagen}
+                        alt={prod.nombre}
+                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
+                        <Coffee size={32} className="text-gray-400" />
+                      </div>
                     )}
-                    <p className="text-base font-bold text-green-600 mt-1">
-                      ${Number(prod.precio).toLocaleString()}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-base line-clamp-2 leading-snug">{prod.nombre}</h3>
+                      {prod.codigoBarras && (
+                        <p className="text-xs text-gray-400 truncate mt-1">{prod.codigoBarras}</p>
+                      )}
+                      <p className="text-lg font-bold text-green-600 mt-1.5">
+                        ${Number(prod.precio).toLocaleString()}
+                      </p>
 
-                    {/* Badge de stock */}
-                    {prod.stock !== undefined && (
-                      <div className="mt-1">
-                        {sinStock ? (
-                          <span className="inline-block text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
-                            Sin stock
-                          </span>
+                      {/* Badge de stock */}
+                      {prod.stock !== undefined && (
+                        <div className="mt-1.5">
+                          {sinStock ? (
+                            <span className="inline-block text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
+                              Sin stock
+                            </span>
                         ) : stockBajo ? (
                           <span className="inline-block text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">
                             Quedan {prod.stock}
@@ -473,11 +592,99 @@ export default function BuffetKiosco() {
                         ) : null}
                       </div>
                     )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            /* Vista Lista - Tabla */
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                      Foto
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Producto
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                      Código
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                      Stock
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Precio
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {productosFiltrados.map(prod => {
+                    const sinStock = prod.stock !== undefined && prod.stock === 0
+                    const stockBajo = prod.stock !== undefined && prod.stock > 0 && prod.stock <= 5
+
+                    return (
+                      <tr
+                        key={prod.id}
+                        onClick={() => !sinStock && agregarAlCarrito(prod)}
+                        className={`transition-colors ${
+                          sinStock
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'hover:bg-gray-100 cursor-pointer'
+                        }`}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden">
+                            {prod.imagen ? (
+                              <img
+                                src={prod.imagen}
+                                alt={prod.nombre}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Coffee className="w-6 h-6 text-gray-300" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="font-medium text-gray-800">{prod.nombre}</p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono hidden sm:table-cell">
+                          {prod.codigoBarras || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center hidden md:table-cell">
+                          {prod.stock !== undefined ? (
+                            sinStock ? (
+                              <span className="inline-block text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
+                                Sin stock
+                              </span>
+                            ) : stockBajo ? (
+                              <span className="inline-block text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">
+                                {prod.stock}
+                              </span>
+                            ) : (
+                              <span className="text-gray-800 font-semibold">{prod.stock}</span>
+                            )
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <span className="text-lg font-bold text-green-600">
+                            ${Number(prod.precio).toLocaleString()}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {productosFiltrados.length === 0 && (
             <div className="flex items-center justify-center h-48 text-gray-500">
@@ -566,7 +773,13 @@ export default function BuffetKiosco() {
                         >
                           <Minus size={16} />
                         </button>
-                        <span className="w-8 text-center font-bold">{item.cantidad}</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.cantidad}
+                          onChange={(e) => cambiarCantidadDirecta(item.id, e.target.value)}
+                          className="w-14 text-center font-bold border border-gray-300 rounded px-1 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none"
+                        />
                         <button
                           onClick={() => modificarCantidad(item.id, 1)}
                           className="p-1 bg-gray-200 rounded hover:bg-gray-300 active:scale-95 transition"
@@ -592,13 +805,23 @@ export default function BuffetKiosco() {
                 </span>
               </div>
               {carrito.length > 0 && (
-                <button
-                  onClick={() => setTabActivo('finalizar')}
-                  className="w-full mt-3 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  Continuar al Pago
-                  <DollarSign size={18} />
-                </button>
+                <>
+                  <button
+                    onClick={() => setTabActivo('finalizar')}
+                    className="w-full mt-3 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    Continuar al Pago
+                    <DollarSign size={18} />
+                  </button>
+
+                  {/* Atajos de teclado (hints) */}
+                  <div className="text-xs text-gray-500 flex flex-wrap gap-2 justify-center pt-3 border-t mt-3">
+                    <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F2</kbd> Ir a Pago</span>
+                    <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F4</kbd> Limpiar</span>
+                    <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F5</kbd> Efectivo</span>
+                    <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F6</kbd> Tarjeta</span>
+                  </div>
+                </>
               )}
             </div>
           </>
@@ -672,9 +895,60 @@ export default function BuffetKiosco() {
                   onVueltoCalculado={setDatosVuelto}
                   medioPagoSeleccionado={mediosPago.find(m => m.id === medioPagoId)}
                   showTeclado={true}
-                  autoFocus={false}
+                  autoFocus={true}
                   compact={true}
                 />
+
+                {/* Tipo de Comprobante */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Comprobante:</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setTipoComprobante('interno')}
+                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                        tipoComprobante === 'interno'
+                          ? 'bg-gray-700 text-white border-gray-700'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      Sin Factura
+                    </button>
+                    {configFiscal && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setTipoComprobante('facturaB')}
+                          className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                            tipoComprobante === 'facturaB'
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+                          }`}
+                        >
+                          <Receipt size={12} className="inline mr-1" />
+                          Fact. B
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTipoComprobante('facturaC')}
+                          className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                            tipoComprobante === 'facturaC'
+                              ? 'bg-green-600 text-white border-green-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-green-400'
+                          }`}
+                        >
+                          <Receipt size={12} className="inline mr-1" />
+                          Fact. C
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {!configFiscal && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Configurar AFIP para emitir facturas
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -689,12 +963,15 @@ export default function BuffetKiosco() {
                 {procesando ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Procesando...
+                    {tipoComprobante !== 'interno' ? 'Emitiendo factura...' : 'Procesando...'}
                   </>
                 ) : (
                   <>
-                    <DollarSign size={20} />
-                    COBRAR ${total.toLocaleString()}
+                    {tipoComprobante !== 'interno' ? <Receipt size={20} /> : <DollarSign size={20} />}
+                    {tipoComprobante !== 'interno'
+                      ? `FACTURAR ${tipoComprobante === 'facturaB' ? 'B' : 'C'} $${total.toLocaleString()}`
+                      : `COBRAR $${total.toLocaleString()}`
+                    }
                   </>
                 )}
               </button>
@@ -702,9 +979,10 @@ export default function BuffetKiosco() {
               {/* Atajos de teclado (hints) */}
               <div className="text-xs text-gray-500 flex flex-wrap gap-2 justify-center pt-1 border-t">
                 <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F2</kbd> Cobrar</span>
-                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F4</kbd> Limpiar</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">Enter</kbd> Confirmar</span>
                 <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F5</kbd> Efectivo</span>
-                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">ESC</kbd> Cancelar</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">F6</kbd> Tarjeta</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">ESC</kbd> Volver</span>
               </div>
             </div>
           </>

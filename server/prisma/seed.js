@@ -140,6 +140,10 @@ const permisos = [
   { codigo: 'EVENTOS_GESTIONAR', nombre: 'Gestionar Eventos', modulo: 'EVENTOS' },
   { codigo: 'EVENTOS_VENDER', nombre: 'Vender Entradas', modulo: 'EVENTOS' },
   { codigo: 'EVENTOS_VALIDAR', nombre: 'Validar Entradas', modulo: 'EVENTOS' },
+  // Facturación Electrónica
+  { codigo: 'FACTURACION_EMITIR', nombre: 'Emitir Facturas', modulo: 'FACTURACION', descripcion: 'Permite emitir facturas electrónicas con CAE' },
+  { codigo: 'FACTURACION_ANULAR', nombre: 'Anular Facturas', modulo: 'FACTURACION', descripcion: 'Permite anular comprobantes mediante notas de crédito' },
+  { codigo: 'FACTURACION_CONFIG', nombre: 'Configurar Facturación', modulo: 'FACTURACION', descripcion: 'Configurar certificados AFIP y datos fiscales' },
 ];
 
 const conceptosTesoreria = [

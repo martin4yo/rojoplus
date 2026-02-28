@@ -108,10 +108,28 @@ router.get('/config/cajas/:puntoVenta', authAdmin, checkPermiso('BUFFET_VER'), a
         break;
     }
 
+    // Filtrar por cajas asignadas al rol del usuario (si no es super admin)
+    const admin = await prisma.admin.findUnique({
+      where: { id: req.admin.id },
+      include: {
+        rol: {
+          include: {
+            cajas: { select: { cajaId: true } }
+          }
+        }
+      }
+    });
+
+    // Si el usuario tiene rol y no es super admin, filtrar por cajas asignadas
+    if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas.length > 0) {
+      const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId);
+      where.id = { in: cajasPermitidas };
+    }
+
     const cajas = await prisma.caja.findMany({
       where,
       orderBy: { nombre: 'asc' },
-      select: { id: true, codigo: true, nombre: true, tipo: true }
+      select: { id: true, codigo: true, nombre: true, tipo: true, puntoVentaAfip: true }
     });
 
     res.json({ success: true, data: cajas });
@@ -800,6 +818,32 @@ router.post('/productos', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, 
   } catch (error) {
     console.error('Error al crear producto:', error);
     res.status(500).json({ success: false, error: 'Error al crear producto' });
+  }
+});
+
+// Actualizar precios masivamente (DEBE IR ANTES de /productos/:id)
+router.put('/productos/precios', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const { productos } = req.body; // [{ id, precio }, { id, precio }, ...]
+
+    if (!productos || !Array.isArray(productos) || productos.length === 0) {
+      return res.status(400).json({ success: false, error: 'Debe enviar un array de productos con id y precio' });
+    }
+
+    // Actualizar en transacción
+    const actualizaciones = await prisma.$transaction(
+      productos.map(({ id, precio }) =>
+        prisma.productoBuffet.update({
+          where: { id: parseInt(id) },
+          data: { precio: parseFloat(precio) }
+        })
+      )
+    );
+
+    res.json({ success: true, data: actualizaciones, count: actualizaciones.length });
+  } catch (error) {
+    console.error('Error al actualizar precios:', error);
+    res.status(500).json({ success: false, error: 'Error al actualizar precios' });
   }
 });
 
@@ -1505,10 +1549,18 @@ router.post('/comandas/:id/enviar-cocina', authAdmin, checkPermiso('BUFFET_MESAS
 router.post('/comandas/:id/pedir-cuenta', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
   try {
     const { id } = req.params;
+    const { imprimirTicket } = req.body; // Opcional: generar ticket de pre-cuenta
 
     const comanda = await prisma.comanda.findUnique({
       where: { id: parseInt(id) },
-      include: { mesa: true }
+      include: {
+        mesa: true,
+        socio: true,
+        items: {
+          where: { estado: { not: 'ANULADO' } },
+          include: { producto: true }
+        }
+      }
     });
 
     if (!comanda) {
@@ -1519,11 +1571,38 @@ router.post('/comandas/:id/pedir-cuenta', authAdmin, checkPermiso('BUFFET_MESAS'
       return res.status(400).json({ success: false, error: 'La comanda ya está cerrada' });
     }
 
+    // Calcular descuento si el socio está al día
+    let descuentoInfo = { porcentaje: 0, monto: 0 };
+    if (comanda.socioId) {
+      const configDescuento = await prisma.configuracion.findUnique({
+        where: { clave: 'BUFFET_DESCUENTO_SOCIO' }
+      });
+      const descuentoPorcentaje = configDescuento ? parseFloat(configDescuento.valor) : 0;
+
+      if (descuentoPorcentaje > 0) {
+        // Verificar si el socio está al día
+        const cargoPendiente = await prisma.cargo.findFirst({
+          where: {
+            socioId: comanda.socioId,
+            estado: 'PENDIENTE',
+            fechaVencimiento: { lt: new Date() }
+          }
+        });
+
+        if (!cargoPendiente) {
+          descuentoInfo = {
+            porcentaje: descuentoPorcentaje,
+            monto: (Number(comanda.subtotal) * descuentoPorcentaje) / 100
+          };
+        }
+      }
+    }
+
     // Actualizar estado de comanda
     const comandaActualizada = await prisma.comanda.update({
       where: { id: parseInt(id) },
       data: { estado: 'CUENTA_PEDIDA' },
-      include: { mesa: true }
+      include: { mesa: true, socio: true }
     });
 
     // Actualizar estado de mesa
@@ -1532,12 +1611,53 @@ router.post('/comandas/:id/pedir-cuenta', authAdmin, checkPermiso('BUFFET_MESAS'
       data: { estado: 'CUENTA_PEDIDA' }
     });
 
+    // Generar ticket de pre-cuenta si se solicita
+    let ticketBase64 = null;
+    if (imprimirTicket !== false) {
+      try {
+        const { renderTicketPreCuenta, toBase64 } = await import('../services/ticketService.js');
+
+        // Obtener nombre del mozo
+        let mozoNombre = null;
+        if (comanda.creadoPorId) {
+          const mozo = await prisma.admin.findUnique({
+            where: { id: comanda.creadoPorId },
+            select: { nombre: true, apellido: true }
+          });
+          if (mozo) mozoNombre = `${mozo.nombre} ${mozo.apellido || ''}`.trim();
+        }
+
+        const ticketData = renderTicketPreCuenta({
+          comanda: {
+            ...comanda,
+            mozo: mozoNombre
+          },
+          items: comanda.items,
+          descuento: descuentoInfo,
+          socio: comanda.socio
+        });
+
+        ticketBase64 = toBase64(ticketData);
+      } catch (ticketError) {
+        console.error('Error generando ticket pre-cuenta:', ticketError);
+      }
+    }
+
     // Notificar al cajero
     notificarCuentaPedida(comandaActualizada).catch(err =>
       console.error('Error notificando cuenta pedida:', err)
     );
 
-    res.json({ success: true, message: 'Cuenta solicitada', data: comandaActualizada });
+    res.json({
+      success: true,
+      message: 'Cuenta solicitada',
+      data: {
+        comanda: comandaActualizada,
+        descuento: descuentoInfo,
+        totalEstimado: Number(comanda.subtotal) - descuentoInfo.monto,
+        ticket: ticketBase64
+      }
+    });
   } catch (error) {
     console.error('Error al pedir cuenta:', error);
     res.status(500).json({ success: false, error: 'Error al pedir cuenta' });
@@ -1613,11 +1733,23 @@ router.get('/comandas/:id/descuento', authAdmin, checkPermiso('BUFFET_COBRAR'), 
 router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { medioPagoId, cajaId, observaciones, aplicarDescuento, propina, pagosParciales } = req.body;
+    const {
+      medioPagoId,
+      cajaId,
+      observaciones,
+      aplicarDescuento,
+      propina,
+      pagosParciales,
+      // Nuevos parámetros para facturación
+      emitirFactura,
+      esVentaInterna,
+      tipoComprobante, // 11=FC (default), 6=FB, 1=FA
+      datosCliente // { tipoDoc, documento, nombre, condicionIva }
+    } = req.body;
 
     const comanda = await prisma.comanda.findUnique({
       where: { id: parseInt(id) },
-      include: { mesa: true, socio: true }
+      include: { mesa: true, socio: true, items: { include: { productoBuffet: true } } }
     });
 
     if (!comanda) {
@@ -1626,6 +1758,30 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 
     if (comanda.estado === 'CERRADA') {
       return res.status(400).json({ success: false, error: 'La comanda ya fue cobrada' });
+    }
+
+    // Validar acceso a la caja según el rol del usuario
+    const admin = await prisma.admin.findUnique({
+      where: { id: req.admin.id },
+      include: {
+        rol: {
+          include: {
+            cajas: { select: { cajaId: true } }
+          }
+        }
+      }
+    });
+
+    if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas.length > 0) {
+      const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId);
+      const cajaIdPrincipal = cajaId || (pagosParciales?.[0]?.cajaId);
+
+      if (cajaIdPrincipal && !cajasPermitidas.includes(parseInt(cajaIdPrincipal))) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tiene permiso para cobrar en esta caja'
+        });
+      }
     }
 
     // Calcular descuento si aplica
@@ -1770,9 +1926,198 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         propina: propinaMonto,
         total: totalFinal,
         horaCierre: new Date(),
-        cerradoPor: req.admin.id
+        cerradoPor: req.admin.id,
+        esVentaInterna: esVentaInterna || false
       }
     });
+
+    // Variables para facturación
+    let comprobanteFiscal = null;
+    let ticketBase64 = null;
+    let qrUrl = null;
+
+    // Emitir factura si se solicita y no es venta interna
+    if (emitirFactura && !esVentaInterna) {
+      try {
+        // Importar servicios de facturación dinámicamente
+        const { requestCAE, getLastAuthorizedNumber } = await import('../services/afipWSFEService.js');
+        const { getConfiguracionFiscal } = await import('../services/afipWSAAService.js');
+        const { generateQRData } = await import('../services/afipQRService.js');
+        const { renderTicketFiscal, toBase64 } = await import('../services/ticketService.js');
+
+        const config = await getConfiguracionFiscal();
+
+        // Obtener punto de venta de la caja
+        const cajaUsada = await prisma.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } });
+        const puntoVenta = cajaUsada?.puntoVentaAfip || 1;
+
+        // Determinar tipo de comprobante automáticamente según condición IVA del cliente
+        // RI (1) o Monotributo (6) → Factura A (1)
+        // CF (5), Exento (4), otros → Factura B (6)
+        let tipoAfip;
+        if (datosCliente?.condicionIva === 1 || datosCliente?.condicionIva === 6) {
+          tipoAfip = 1; // Factura A
+        } else {
+          tipoAfip = 6; // Factura B (para CF, Exentos, etc.)
+        }
+
+        // Obtener siguiente número
+        const ultimoNumero = await getLastAuthorizedNumber(puntoVenta, tipoAfip);
+        const numeroComprobante = ultimoNumero + 1;
+
+        // Preparar items para AFIP
+        const itemsFactura = comanda.items.map(item => ({
+          descripcion: item.productoBuffet?.nombre || item.nombre || 'Producto',
+          cantidad: item.cantidad,
+          precioUnitario: parseFloat(item.precioUnitario),
+          subtotal: parseFloat(item.subtotal),
+          ivaRate: 21,
+          ivaAmount: tipoAfip === 6 ? 0 : (parseFloat(item.subtotal) * 21) / 121 // Factura B no discrimina IVA
+        }));
+
+        // Calcular totales
+        // Factura A discrimina IVA, Factura B no discrimina (igual que C)
+        const discriminaIva = tipoAfip === 1;
+        const subtotalNeto = discriminaIva ? itemsFactura.reduce((sum, i) => sum + (i.subtotal - i.ivaAmount), 0) : totalFinal;
+        const ivaTotal = discriminaIva ? itemsFactura.reduce((sum, i) => sum + i.ivaAmount, 0) : 0;
+
+        // Solicitar CAE
+        const resultadoCAE = await requestCAE({
+          puntoVenta,
+          tipoComprobante: tipoAfip,
+          numeroComprobante,
+          fecha: new Date(),
+          tipoDocCliente: datosCliente?.tipoDoc || 99,
+          docCliente: datosCliente?.documento || '',
+          condicionIvaCliente: datosCliente?.condicionIva || 5,
+          subtotal: subtotalNeto,
+          iva: ivaTotal,
+          total: totalFinal,
+          items: itemsFactura
+        });
+
+        // Determinar nombre del tipo de comprobante
+        const tiposNombre = {
+          1: 'FACTURA A', 6: 'FACTURA B', 11: 'FACTURA C',
+          2: 'NOTA DE DEBITO A', 7: 'NOTA DE DEBITO B', 12: 'NOTA DE DEBITO C',
+          3: 'NOTA DE CREDITO A', 8: 'NOTA DE CREDITO B', 13: 'NOTA DE CREDITO C'
+        };
+
+        // Guardar comprobante en base de datos
+        comprobanteFiscal = await prisma.comprobanteElectronico.create({
+          data: {
+            tipo: tiposNombre[tipoAfip] || 'FACTURA C',
+            tipoAfip,
+            puntoVenta,
+            numero: numeroComprobante,
+            fecha: new Date(),
+            cae: resultadoCAE.cae,
+            fechaVtoCae: resultadoCAE.caeExpiration,
+            cuitReceptor: datosCliente?.tipoDoc === 80 ? datosCliente.documento : null,
+            nombreReceptor: datosCliente?.nombre || 'Consumidor Final',
+            condicionIvaReceptor: datosCliente?.condicionIva === 1 ? 'IVA Responsable Inscripto' :
+              datosCliente?.condicionIva === 6 ? 'Responsable Monotributo' : 'Consumidor Final',
+            subtotal: subtotalNeto,
+            iva21: ivaTotal,
+            iva105: 0,
+            total: totalFinal,
+            metodoPago: 'VARIOS',
+            comandaId: parseInt(id),
+            cajaId: cajaId || movimientos[0]?.cajaId,
+            creadoPorId: req.admin.id,
+            estado: 'EMITIDO'
+          }
+        });
+
+        // Generar URL del QR
+        qrUrl = generateQRData({
+          cuit: config.cuit,
+          tipoComprobante: tipoAfip,
+          puntoVenta,
+          numeroComprobante,
+          importe: totalFinal,
+          fecha: new Date(),
+          tipoDocCliente: datosCliente?.tipoDoc || 99,
+          docCliente: datosCliente?.documento || '',
+          cae: resultadoCAE.cae
+        });
+
+        // Generar ticket para impresión
+        const ticketData = renderTicketFiscal({
+          empresa: {
+            razonSocial: config.razonSocial,
+            domicilio: config.domicilioFiscal,
+            cuit: config.cuit,
+            condicionIva: config.condicionIva
+          },
+          comprobante: {
+            tipo: tiposNombre[tipoAfip],
+            tipoAfip,
+            puntoVenta,
+            numero: numeroComprobante,
+            fecha: new Date(),
+            cae: resultadoCAE.cae,
+            fechaVtoCae: resultadoCAE.caeExpiration,
+            cuit: config.cuit,
+            nombreCliente: datosCliente?.nombre || 'Consumidor Final',
+            tipoDocCliente: datosCliente?.tipoDoc || 99,
+            docCliente: datosCliente?.documento,
+            subtotal: subtotalNeto,
+            iva: ivaTotal,
+            total: totalFinal
+          },
+          comanda: comandaActualizada,
+          items: itemsFactura
+        });
+
+        ticketBase64 = toBase64(ticketData);
+
+        console.log(`[Buffet] Factura emitida: ${tiposNombre[tipoAfip]} ${puntoVenta}-${numeroComprobante} CAE: ${resultadoCAE.cae}`);
+      } catch (facError) {
+        console.error('Error emitiendo factura:', facError);
+        // No fallamos el cobro si falla la facturación, pero informamos
+      }
+    } else if (esVentaInterna || !emitirFactura) {
+      // Generar ticket NO fiscal para venta interna
+      try {
+        const { renderTicketNoFiscal, toBase64 } = await import('../services/ticketService.js');
+
+        // Preparar items
+        const itemsTicket = comanda.items.map(item => ({
+          nombre: item.productoBuffet?.nombre || item.nombre || 'Producto',
+          cantidad: item.cantidad,
+          precioUnitario: parseFloat(item.precioUnitario),
+          subtotal: parseFloat(item.subtotal)
+        }));
+
+        // Obtener nombre del cajero
+        let cajeroNombre = null;
+        if (req.admin?.id) {
+          const cajero = await prisma.admin.findUnique({
+            where: { id: req.admin.id },
+            select: { nombre: true, apellido: true }
+          });
+          if (cajero) cajeroNombre = `${cajero.nombre} ${cajero.apellido || ''}`.trim();
+        }
+
+        const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId || pagosParciales?.[0]?.medioPagoId } });
+
+        const ticketData = renderTicketNoFiscal({
+          empresa: { razonSocial: 'CLUB SPORTIVO PILAR' },
+          comanda: {
+            ...comandaActualizada,
+            metodoPago: medioPago?.nombre || 'VARIOS',
+            cobradoPor: cajeroNombre
+          },
+          items: itemsTicket
+        });
+
+        ticketBase64 = toBase64(ticketData);
+        console.log(`[Buffet] Ticket no fiscal generado para comanda ${comanda.numero}`);
+      } catch (ticketError) {
+        console.error('Error generando ticket no fiscal:', ticketError);
+      }
+    }
 
     // Liberar mesa
     const mesaActualizada = await prisma.mesa.update({
@@ -1794,7 +2139,11 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           porcentaje: descuentoPorcentaje,
           monto: descuentoMonto
         } : null,
-        propinaAplicada: propinaMonto > 0 ? propinaMonto : null
+        propinaAplicada: propinaMonto > 0 ? propinaMonto : null,
+        // Datos de facturación
+        comprobante: comprobanteFiscal,
+        ticket: ticketBase64,
+        qrUrl
       }
     });
   } catch (error) {
@@ -2281,10 +2630,24 @@ router.put('/takeaway/:id/listo', authAdmin, checkPermiso('BUFFET_COCINA'), asyn
 router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { medioPagoId, cajaId, observaciones, propina, pagosParciales } = req.body;
+    const {
+      medioPagoId,
+      cajaId,
+      observaciones,
+      propina,
+      pagosParciales,
+      // Parámetros de facturación
+      emitirFactura,
+      esVentaInterna,
+      tipoComprobante,
+      datosCliente
+    } = req.body;
 
     const pedido = await prisma.pedidoTakeAway.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: parseInt(id) },
+      include: {
+        items: { include: { producto: true } }
+      }
     });
 
     if (!pedido) {
@@ -2416,16 +2779,137 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         estado: 'PAGADO',
         propina: propinaMonto,
         total: totalFinal,
-        horaPagado: new Date()
+        horaPagado: new Date(),
+        esVentaInterna: esVentaInterna || false
       }
     });
+
+    // Variables para facturación
+    let comprobanteFiscal = null;
+    let ticketBase64 = null;
+    let qrUrl = null;
+
+    // Emitir factura o ticket según corresponda
+    if (emitirFactura && !esVentaInterna) {
+      try {
+        const { requestCAE, getLastAuthorizedNumber } = await import('../services/afipWSFEService.js');
+        const { getConfiguracionFiscal } = await import('../services/afipWSAAService.js');
+        const { generateQRData } = await import('../services/afipQRService.js');
+        const { renderTicketFiscal, toBase64 } = await import('../services/ticketService.js');
+
+        const config = await getConfiguracionFiscal();
+        const cajaUsada = await prisma.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } });
+        const puntoVenta = cajaUsada?.puntoVentaAfip || 1;
+        const tipoAfip = tipoComprobante || 11;
+
+        const ultimoNumero = await getLastAuthorizedNumber(puntoVenta, tipoAfip);
+        const numeroComprobante = ultimoNumero + 1;
+
+        const itemsFactura = pedido.items.map(item => ({
+          descripcion: item.productoBuffet?.nombre || 'Producto',
+          cantidad: item.cantidad,
+          precioUnitario: parseFloat(item.precioUnitario),
+          subtotal: parseFloat(item.subtotal),
+          ivaRate: 21,
+          ivaAmount: tipoAfip === 11 ? 0 : (parseFloat(item.subtotal) * 21) / 121
+        }));
+
+        const subtotalNeto = tipoAfip === 11 ? totalFinal : itemsFactura.reduce((sum, i) => sum + (i.subtotal - i.ivaAmount), 0);
+        const ivaTotal = tipoAfip === 11 ? 0 : itemsFactura.reduce((sum, i) => sum + i.ivaAmount, 0);
+
+        const resultadoCAE = await requestCAE({
+          puntoVenta,
+          tipoComprobante: tipoAfip,
+          numeroComprobante,
+          fecha: new Date(),
+          tipoDocCliente: datosCliente?.tipoDoc || 99,
+          docCliente: datosCliente?.documento || '',
+          condicionIvaCliente: datosCliente?.condicionIva || 5,
+          subtotal: subtotalNeto,
+          iva: ivaTotal,
+          total: totalFinal,
+          items: itemsFactura
+        });
+
+        const tiposNombre = { 1: 'FACTURA A', 6: 'FACTURA B', 11: 'FACTURA C' };
+
+        comprobanteFiscal = await prisma.comprobanteElectronico.create({
+          data: {
+            tipo: tiposNombre[tipoAfip] || 'FACTURA C',
+            tipoAfip,
+            puntoVenta,
+            numero: numeroComprobante,
+            fecha: new Date(),
+            cae: resultadoCAE.cae,
+            fechaVtoCae: resultadoCAE.caeExpiration,
+            nombreReceptor: datosCliente?.nombre || 'Consumidor Final',
+            subtotal: subtotalNeto,
+            iva21: ivaTotal,
+            iva105: 0,
+            total: totalFinal,
+            metodoPago: 'VARIOS',
+            pedidoTakeAwayId: parseInt(id),
+            cajaId: cajaId || movimientos[0]?.cajaId,
+            creadoPorId: req.admin.id,
+            estado: 'EMITIDO'
+          }
+        });
+
+        qrUrl = generateQRData({
+          cuit: config.cuit,
+          tipoComprobante: tipoAfip,
+          puntoVenta,
+          numeroComprobante,
+          importe: totalFinal,
+          fecha: new Date(),
+          tipoDocCliente: datosCliente?.tipoDoc || 99,
+          docCliente: datosCliente?.documento || '',
+          cae: resultadoCAE.cae
+        });
+
+        const ticketData = renderTicketFiscal({
+          empresa: { razonSocial: config.razonSocial, domicilio: config.domicilioFiscal, cuit: config.cuit, condicionIva: config.condicionIva },
+          comprobante: { tipo: tiposNombre[tipoAfip], tipoAfip, puntoVenta, numero: numeroComprobante, fecha: new Date(), cae: resultadoCAE.cae, fechaVtoCae: resultadoCAE.caeExpiration, cuit: config.cuit, nombreCliente: datosCliente?.nombre || 'Consumidor Final', total: totalFinal },
+          comanda: pedidoActualizado,
+          items: itemsFactura
+        });
+        ticketBase64 = toBase64(ticketData);
+
+        console.log(`[TakeAway] Factura emitida: ${tiposNombre[tipoAfip]} ${puntoVenta}-${numeroComprobante}`);
+      } catch (facError) {
+        console.error('Error emitiendo factura takeaway:', facError);
+      }
+    } else {
+      // Ticket no fiscal
+      try {
+        const { renderTicketNoFiscal, toBase64 } = await import('../services/ticketService.js');
+        const itemsTicket = pedido.items.map(item => ({
+          nombre: item.productoBuffet?.nombre || 'Producto',
+          cantidad: item.cantidad,
+          precioUnitario: parseFloat(item.precioUnitario),
+          subtotal: parseFloat(item.subtotal)
+        }));
+
+        const ticketData = renderTicketNoFiscal({
+          empresa: { razonSocial: 'CLUB SPORTIVO PILAR' },
+          comanda: { ...pedidoActualizado, origen: 'TAKEAWAY', metodoPago: 'VARIOS' },
+          items: itemsTicket
+        });
+        ticketBase64 = toBase64(ticketData);
+      } catch (ticketError) {
+        console.error('Error generando ticket takeaway:', ticketError);
+      }
+    }
 
     res.json({
       success: true,
       data: {
         pedido: pedidoActualizado,
         movimientos,
-        propinaAplicada: propinaMonto > 0 ? propinaMonto : null
+        propinaAplicada: propinaMonto > 0 ? propinaMonto : null,
+        comprobante: comprobanteFiscal,
+        ticket: ticketBase64,
+        qrUrl
       }
     });
   } catch (error) {
@@ -2478,23 +2962,45 @@ router.post('/takeaway/:id/entregar', authAdmin, checkPermiso('BUFFET_MESAS'), a
 // Venta directa kiosco
 router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (req, res) => {
   try {
-    const { items, medioPagoId, cajaId, socioId, observaciones, propina, pagosParciales } = req.body;
+    const {
+      items,
+      medioPagoId,
+      cajaId,
+      socioId,
+      observaciones,
+      propina,
+      pagosParciales,
+      // Parámetros de facturación
+      emitirFactura,
+      esVentaInterna,
+      tipoComprobante,
+      datosCliente
+    } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, error: 'Debe agregar al menos un producto' });
     }
 
-    // Calcular total de items
+    // Calcular total de items y guardar productos para facturación
     let totalItems = 0;
     const detalleItems = [];
+    const productosVenta = []; // Para facturación
 
     for (const item of items) {
       const producto = await prisma.productoBuffet.findUnique({ where: { id: item.productoBuffetId } });
       if (!producto) continue;
 
-      const subtotal = Number(producto.precio) * (item.cantidad || 1);
+      const cantidad = item.cantidad || 1;
+      const subtotal = Number(producto.precio) * cantidad;
       totalItems += subtotal;
-      detalleItems.push(`${item.cantidad || 1}x ${producto.nombre}`);
+      detalleItems.push(`${cantidad}x ${producto.nombre}`);
+
+      productosVenta.push({
+        nombre: producto.nombre,
+        cantidad,
+        precioUnitario: Number(producto.precio),
+        subtotal
+      });
     }
 
     // Calcular total con propina
@@ -2601,13 +3107,126 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       movimientos.push(movimiento);
     }
 
+    // Variables para facturación
+    let comprobanteFiscal = null;
+    let ticketBase64 = null;
+    let qrUrl = null;
+
+    // Emitir factura o ticket según corresponda
+    if (emitirFactura && !esVentaInterna) {
+      try {
+        const { requestCAE, getLastAuthorizedNumber } = await import('../services/afipWSFEService.js');
+        const { getConfiguracionFiscal } = await import('../services/afipWSAAService.js');
+        const { generateQRData } = await import('../services/afipQRService.js');
+        const { renderTicketFiscal, toBase64 } = await import('../services/ticketService.js');
+
+        const config = await getConfiguracionFiscal();
+        const cajaUsada = await prisma.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } });
+        const puntoVenta = cajaUsada?.puntoVentaAfip || 1;
+        const tipoAfip = tipoComprobante || 11;
+
+        const ultimoNumero = await getLastAuthorizedNumber(puntoVenta, tipoAfip);
+        const numeroComprobante = ultimoNumero + 1;
+
+        const itemsFactura = productosVenta.map(item => ({
+          descripcion: item.nombre,
+          cantidad: item.cantidad,
+          precioUnitario: item.precioUnitario,
+          subtotal: item.subtotal,
+          ivaRate: 21,
+          ivaAmount: tipoAfip === 11 ? 0 : (item.subtotal * 21) / 121
+        }));
+
+        const subtotalNeto = tipoAfip === 11 ? totalFinal : itemsFactura.reduce((sum, i) => sum + (i.subtotal - i.ivaAmount), 0);
+        const ivaTotal = tipoAfip === 11 ? 0 : itemsFactura.reduce((sum, i) => sum + i.ivaAmount, 0);
+
+        const resultadoCAE = await requestCAE({
+          puntoVenta,
+          tipoComprobante: tipoAfip,
+          numeroComprobante,
+          fecha: new Date(),
+          tipoDocCliente: datosCliente?.tipoDoc || 99,
+          docCliente: datosCliente?.documento || '',
+          condicionIvaCliente: datosCliente?.condicionIva || 5,
+          subtotal: subtotalNeto,
+          iva: ivaTotal,
+          total: totalFinal,
+          items: itemsFactura
+        });
+
+        const tiposNombre = { 1: 'FACTURA A', 6: 'FACTURA B', 11: 'FACTURA C' };
+
+        comprobanteFiscal = await prisma.comprobanteElectronico.create({
+          data: {
+            tipo: tiposNombre[tipoAfip] || 'FACTURA C',
+            tipoAfip,
+            puntoVenta,
+            numero: numeroComprobante,
+            fecha: new Date(),
+            cae: resultadoCAE.cae,
+            fechaVtoCae: resultadoCAE.caeExpiration,
+            nombreReceptor: datosCliente?.nombre || 'Consumidor Final',
+            subtotal: subtotalNeto,
+            iva21: ivaTotal,
+            iva105: 0,
+            total: totalFinal,
+            metodoPago: 'VARIOS',
+            cajaId: cajaId || movimientos[0]?.cajaId,
+            creadoPorId: req.admin.id,
+            estado: 'EMITIDO'
+          }
+        });
+
+        qrUrl = generateQRData({
+          cuit: config.cuit,
+          tipoComprobante: tipoAfip,
+          puntoVenta,
+          numeroComprobante,
+          importe: totalFinal,
+          fecha: new Date(),
+          tipoDocCliente: datosCliente?.tipoDoc || 99,
+          docCliente: datosCliente?.documento || '',
+          cae: resultadoCAE.cae
+        });
+
+        const ticketData = renderTicketFiscal({
+          empresa: { razonSocial: config.razonSocial, domicilio: config.domicilioFiscal, cuit: config.cuit, condicionIva: config.condicionIva },
+          comprobante: { tipo: tiposNombre[tipoAfip], tipoAfip, puntoVenta, numero: numeroComprobante, fecha: new Date(), cae: resultadoCAE.cae, fechaVtoCae: resultadoCAE.caeExpiration, cuit: config.cuit, nombreCliente: datosCliente?.nombre || 'Consumidor Final', total: totalFinal },
+          comanda: { numero: `K-${movimientos[0]?.id || Date.now()}` },
+          items: itemsFactura
+        });
+        ticketBase64 = toBase64(ticketData);
+
+        console.log(`[Kiosco] Factura emitida: ${tiposNombre[tipoAfip]} ${puntoVenta}-${numeroComprobante}`);
+      } catch (facError) {
+        console.error('Error emitiendo factura kiosco:', facError);
+      }
+    } else {
+      // Ticket no fiscal
+      try {
+        const { renderTicketNoFiscal, toBase64 } = await import('../services/ticketService.js');
+
+        const ticketData = renderTicketNoFiscal({
+          empresa: { razonSocial: 'CLUB SPORTIVO PILAR' },
+          comanda: { numero: `K-${movimientos[0]?.id || Date.now()}`, origen: 'KIOSCO', metodoPago: 'VARIOS', total: totalFinal },
+          items: productosVenta
+        });
+        ticketBase64 = toBase64(ticketData);
+      } catch (ticketError) {
+        console.error('Error generando ticket kiosco:', ticketError);
+      }
+    }
+
     res.json({
       success: true,
       data: {
         movimientos,
         total: totalFinal,
         items: detalleItems,
-        propinaAplicada: propinaMonto > 0 ? propinaMonto : null
+        propinaAplicada: propinaMonto > 0 ? propinaMonto : null,
+        comprobante: comprobanteFiscal,
+        ticket: ticketBase64,
+        qrUrl
       }
     });
   } catch (error) {

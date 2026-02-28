@@ -77,6 +77,12 @@ const api = {
     body: JSON.stringify(body),
   }),
 
+  // Devuelve la respuesta completa del POST
+  postFull: (endpoint, body) => request(endpoint, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }, true),
+
   patch: (endpoint, body) => request(endpoint, {
     method: 'PATCH',
     body: JSON.stringify(body),

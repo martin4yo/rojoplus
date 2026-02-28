@@ -887,7 +887,7 @@ export async function verificarPartidosProximos() {
       include: {
         convocados: {
           where: {
-            estado: 'CONFIRMADO'
+            confirmado: true
           },
           include: {
             socio: true

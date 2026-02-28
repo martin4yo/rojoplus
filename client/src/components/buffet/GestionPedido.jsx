@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Plus, Minus, Send, DollarSign, Clock, User, ShoppingCart, UtensilsCrossed, Coffee, Search, X, Users, Percent, CheckCircle, AlertCircle, Trash2, Edit3, FileText, Package, Check } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, Send, DollarSign, Clock, User, ShoppingCart, UtensilsCrossed, Coffee, Search, X, Users, Percent, CheckCircle, AlertCircle, Trash2, Edit3, FileText, Package, Check, LayoutGrid, List } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
@@ -39,6 +39,9 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   const [categoriaActiva, setCategoriaActiva] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [itemsNuevos, setItemsNuevos] = useState([])
+  const [vistaProductos, setVistaProductos] = useState(() => {
+    return localStorage.getItem('buffetVistaProductos') || 'shop'
+  })
   const [cobroData, setCobroData] = useState({ cajaId: '', medioPagoId: '', aplicarDescuento: true })
   const [descuentoInfo, setDescuentoInfo] = useState(null)
   const [cargandoDescuento, setCargandoDescuento] = useState(false)
@@ -66,6 +69,16 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   const [pagosParciales, setPagosParciales] = useState({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
   const [usarPagosMultiples, setUsarPagosMultiples] = useState(false)
   const [tabCobroActivo, setTabCobroActivo] = useState('cuenta') // 'cuenta' o 'finalizar'
+
+  // Estados para facturación electrónica
+  const [emitirFactura, setEmitirFactura] = useState(false)
+  const [datosCliente, setDatosCliente] = useState({
+    tipoDoc: 99, // 99=CF, 96=DNI, 80=CUIT
+    documento: '',
+    nombre: '',
+    condicionIva: 5 // 5=CF, 1=RI, 6=Monotributo
+  })
+  const [validandoCuit, setValidandoCuit] = useState(false)
 
   // Configuración según tipo
   const config = {
@@ -96,6 +109,11 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   }
 
   const cfg = config[tipo]
+
+  // Guardar preferencia de vista en localStorage
+  useEffect(() => {
+    localStorage.setItem('buffetVistaProductos', vistaProductos)
+  }, [vistaProductos])
 
   // ==================== CARGA DE DATOS ====================
 
@@ -319,6 +337,13 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           propina: propinaData.monto,
           aplicarDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable
         }
+      }
+
+      // Agregar datos de facturación si corresponde
+      if (emitirFactura) {
+        requestData.emitirFactura = true
+        requestData.datosCliente = datosCliente
+        // El tipo de comprobante se determina automáticamente en el backend según condición IVA
       }
 
       const endpoint = tipo === 'mesa'
@@ -1137,25 +1162,45 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
             )}
           </div>
 
-          {/* Barra de búsqueda */}
+          {/* Barra de búsqueda y toggle vista */}
           <div className="p-3 md:p-4 bg-white border-b">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="text"
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                placeholder="Buscar producto..."
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
-              />
-              {busqueda && (
+            <div className="flex gap-3 items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  placeholder="Buscar producto..."
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                />
+                {busqueda && (
+                  <button
+                    onClick={() => setBusqueda('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Toggle Vista */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => setBusqueda('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                  onClick={() => setVistaProductos('shop')}
+                  className={`p-2 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  title="Vista Tarjetas"
                 >
-                  <X size={16} />
+                  <LayoutGrid className="w-5 h-5" />
                 </button>
-              )}
+                <button
+                  onClick={() => setVistaProductos('lista')}
+                  className={`p-2 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  title="Vista Lista"
+                >
+                  <List className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1187,40 +1232,100 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
             ))}
           </div>
 
-          {/* Grid de Productos */}
+          {/* Grid/Lista de Productos */}
           <div className="flex-1 overflow-y-auto p-3 md:p-4 bg-gray-100">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-3">
-              {productosFiltrados.map(prod => (
-                <button
-                  key={prod.id}
-                  onClick={() => {
-                    agregarItem(prod)
-                    if (window.innerWidth < 768) {
-                      toast.success(`+1 ${prod.nombre}`, { duration: 1000, position: 'bottom-center' })
-                    }
-                  }}
-                  className="bg-white rounded-lg p-2 md:p-3 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 active:scale-95 flex gap-2 md:gap-3"
-                >
-                  {prod.imagen ? (
-                    <img
-                      src={prod.imagen}
-                      alt={prod.nombre}
-                      className="w-12 h-12 md:w-14 md:h-14 object-cover rounded-lg flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 md:w-14 md:h-14 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
-                      <Coffee size={20} className="text-gray-400" />
+            {vistaProductos === 'shop' ? (
+              /* Vista Shop - Tarjetas */
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-3">
+                {productosFiltrados.map(prod => (
+                  <button
+                    key={prod.id}
+                    onClick={() => {
+                      agregarItem(prod)
+                      if (window.innerWidth < 768) {
+                        toast.success(`+1 ${prod.nombre}`, { duration: 1000, position: 'bottom-center' })
+                      }
+                    }}
+                    className="bg-white rounded-lg p-2 md:p-3 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 active:scale-95 flex gap-2 md:gap-3"
+                  >
+                    {prod.imagen ? (
+                      <img
+                        src={prod.imagen}
+                        alt={prod.nombre}
+                        className="w-12 h-12 md:w-14 md:h-14 object-cover rounded-lg flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 md:w-14 md:h-14 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
+                        <Coffee size={20} className="text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-xs md:text-sm line-clamp-2 leading-tight">{prod.nombre}</h3>
+                      <p className="text-sm md:text-base font-bold text-green-600 mt-1">
+                        {formatCurrency(prod.precio, { showSymbol: false })}
+                      </p>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-xs md:text-sm line-clamp-2 leading-tight">{prod.nombre}</h3>
-                    <p className="text-sm md:text-base font-bold text-green-600 mt-1">
-                      {formatCurrency(prod.precio, { showSymbol: false })}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              /* Vista Lista - Tabla */
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                        Foto
+                      </th>
+                      <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Producto
+                      </th>
+                      <th className="px-4 md:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Precio
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {productosFiltrados.map(prod => (
+                      <tr
+                        key={prod.id}
+                        onClick={() => {
+                          agregarItem(prod)
+                          if (window.innerWidth < 768) {
+                            toast.success(`+1 ${prod.nombre}`, { duration: 1000, position: 'bottom-center' })
+                          }
+                        }}
+                        className="hover:bg-gray-100 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded bg-gray-100 overflow-hidden">
+                            {prod.imagen ? (
+                              <img
+                                src={prod.imagen}
+                                alt={prod.nombre}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Coffee className="w-5 h-5 md:w-6 md:h-6 text-gray-300" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                          <p className="font-medium text-sm md:text-base text-gray-800">{prod.nombre}</p>
+                        </td>
+                        <td className="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap text-right">
+                          <span className="text-base md:text-lg font-bold text-green-600">
+                            {formatCurrency(prod.precio, { showSymbol: false })}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1274,7 +1379,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                       {comandaActiva.items.map(item => (
                         <div
                           key={item.id}
-                          className={`p-2 md:p-3 rounded-lg ${getColorEstadoItem(item.estado)}`}
+                          className={`p-2 md:p-3 rounded-lg ${item.observaciones ? 'border-2 border-yellow-500 shadow-md' : ''} ${getColorEstadoItem(item.estado)}`}
                         >
                           <div className="flex justify-between gap-2 items-start">
                             <span className="font-medium text-sm md:text-base flex-1 min-w-0 truncate">
@@ -1294,10 +1399,13 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                               )}
                             </div>
                           </div>
-                          <div className="flex justify-between text-xs mt-1">
+                          <div className="flex justify-between items-start text-xs mt-1 gap-2">
                             <StatusBadge status={item.estado} type="itemComanda" size="sm" />
                             {item.observaciones && (
-                              <span className="italic text-gray-600 truncate max-w-[150px]">{item.observaciones}</span>
+                              <div className="bg-yellow-100 border border-yellow-400 text-yellow-900 px-2 py-1 rounded font-medium flex-1 text-right flex items-center justify-end gap-1">
+                                <FileText size={14} className="flex-shrink-0" />
+                                <span className="truncate">{item.observaciones}</span>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1312,7 +1420,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                     <h3 className="font-bold text-yellow-800 mb-2 md:mb-3 text-sm md:text-base">Por enviar a cocina</h3>
                     <div className="space-y-2">
                       {itemsNuevos.map((item, index) => (
-                        <div key={index} className="p-2 md:p-3 bg-white rounded-lg border border-yellow-200">
+                        <div key={index} className={`p-2 md:p-3 bg-white rounded-lg border ${item.observaciones ? 'border-yellow-500 border-2 shadow-md' : 'border-yellow-200'}`}>
                           <div className="flex justify-between items-center gap-2">
                             <div className="flex-1 min-w-0">
                               <span className="font-medium text-sm md:text-base block truncate">{item.nombre}</span>
@@ -1337,14 +1445,21 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                               {formatCurrency(Number(item.precio) * item.cantidad, { showSymbol: false })}
                             </span>
                           </div>
-                          <div className="mt-2">
-                            <input
-                              type="text"
-                              value={item.observaciones}
-                              onChange={e => setObservacion(index, e.target.value)}
-                              placeholder="Observaciones..."
-                              className="w-full text-sm border border-gray-200 rounded px-2 py-1.5"
-                            />
+                          <div className="mt-2 relative">
+                            <div className="flex items-center gap-2">
+                              <FileText size={16} className="text-yellow-700 flex-shrink-0" />
+                              <input
+                                type="text"
+                                value={item.observaciones}
+                                onChange={e => setObservacion(index, e.target.value)}
+                                placeholder="Agrega observaciones importantes (sin cebolla, bien cocido, etc.)"
+                                className={`flex-1 text-sm rounded px-3 py-2 focus:outline-none focus:ring-2 ${
+                                  item.observaciones
+                                    ? 'border-2 border-yellow-500 bg-yellow-50 text-yellow-900 font-medium focus:ring-yellow-300'
+                                    : 'border border-gray-300 bg-white focus:ring-blue-300'
+                                }`}
+                              />
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1545,6 +1660,90 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                     onPagosChange={(datos) => setPagosParciales(datos)}
                   />
                 )}
+
+                {/* Facturación Electrónica */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={emitirFactura}
+                      onChange={e => {
+                        setEmitirFactura(e.target.checked)
+                        if (!e.target.checked) {
+                          setDatosCliente({ tipoDoc: 99, documento: '', nombre: '', condicionIva: 5 })
+                        }
+                      }}
+                      className="rounded text-blue-600"
+                    />
+                    <span className="text-sm font-medium text-blue-900 flex items-center gap-1">
+                      <FileText size={16} />
+                      Emitir Factura con CAE
+                    </span>
+                  </label>
+
+                  {emitirFactura && (
+                    <div className="space-y-2 pt-2 border-t border-blue-200">
+                      {/* Selector de condición IVA */}
+                      <div>
+                        <label className="block text-xs font-medium text-blue-800 mb-1">Condición IVA del cliente:</label>
+                        <select
+                          value={datosCliente.condicionIva}
+                          onChange={e => {
+                            const cond = parseInt(e.target.value)
+                            setDatosCliente({
+                              ...datosCliente,
+                              condicionIva: cond,
+                              tipoDoc: cond === 5 ? 99 : 80, // CF=99, otros=CUIT
+                              documento: cond === 5 ? '' : datosCliente.documento
+                            })
+                          }}
+                          className="w-full px-2 py-1.5 text-sm border rounded-lg"
+                        >
+                          <option value={5}>Consumidor Final → Factura B</option>
+                          <option value={1}>Responsable Inscripto → Factura A</option>
+                          <option value={6}>Monotributista → Factura A</option>
+                          <option value={4}>Exento → Factura B</option>
+                        </select>
+                      </div>
+
+                      {/* CUIT/DNI solo si no es CF */}
+                      {datosCliente.condicionIva !== 5 && (
+                        <>
+                          <div>
+                            <label className="block text-xs font-medium text-blue-800 mb-1">CUIT:</label>
+                            <input
+                              type="text"
+                              value={datosCliente.documento}
+                              onChange={e => setDatosCliente({ ...datosCliente, documento: e.target.value.replace(/\D/g, '') })}
+                              placeholder="20-12345678-9"
+                              maxLength={13}
+                              className="w-full px-2 py-1.5 text-sm border rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-blue-800 mb-1">Razón Social:</label>
+                            <input
+                              type="text"
+                              value={datosCliente.nombre}
+                              onChange={e => setDatosCliente({ ...datosCliente, nombre: e.target.value })}
+                              placeholder="Nombre o Razón Social"
+                              className="w-full px-2 py-1.5 text-sm border rounded-lg"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* Indicador de tipo de factura */}
+                      <div className={`text-xs font-medium p-2 rounded ${
+                        [1, 6].includes(datosCliente.condicionIva)
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        Se emitirá: Factura {[1, 6].includes(datosCliente.condicionIva) ? 'A' : 'B'}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Descuento socio (solo mesas) */}
                 {tipo === 'mesa' && comandaActiva.socio && descuentoInfo && (

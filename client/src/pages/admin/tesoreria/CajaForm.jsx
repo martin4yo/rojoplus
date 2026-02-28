@@ -33,7 +33,13 @@ export default function CajaForm() {
     cuentaContableId: '',
     requiereConciliacion: false,
     activo: true,
-    mediosPagoPermitidos: ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA']
+    mediosPagoPermitidos: ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'],
+    // Campos de facturación y uso
+    puntoVentaAfip: '',
+    paraBuffet: false,
+    paraKiosco: false,
+    paraTakeaway: false,
+    paraCaja: true
   })
 
   useEffect(() => {
@@ -77,7 +83,13 @@ export default function CajaForm() {
         cuentaContableId: caja.cuentaContableId ? String(caja.cuentaContableId) : '',
         requiereConciliacion: caja.requiereConciliacion || false,
         activo: caja.activo,
-        mediosPagoPermitidos: caja.mediosPagoPermitidos || []
+        mediosPagoPermitidos: caja.mediosPagoPermitidos || [],
+        // Campos de facturación y uso
+        puntoVentaAfip: caja.puntoVentaAfip ? String(caja.puntoVentaAfip) : '',
+        paraBuffet: caja.paraBuffet || false,
+        paraKiosco: caja.paraKiosco || false,
+        paraTakeaway: caja.paraTakeaway || false,
+        paraCaja: caja.paraCaja !== false
       })
     } catch (err) {
       setError('Error al cargar la caja')
@@ -122,7 +134,13 @@ export default function CajaForm() {
         cuentaContableId: form.cuentaContableId ? parseInt(form.cuentaContableId) : null,
         requiereConciliacion: form.requiereConciliacion,
         activo: form.activo,
-        mediosPagoPermitidos: form.mediosPagoPermitidos
+        mediosPagoPermitidos: form.mediosPagoPermitidos,
+        // Campos de facturación y uso
+        puntoVentaAfip: form.puntoVentaAfip ? parseInt(form.puntoVentaAfip) : null,
+        paraBuffet: form.paraBuffet,
+        paraKiosco: form.paraKiosco,
+        paraTakeaway: form.paraTakeaway,
+        paraCaja: form.paraCaja
       }
 
       if (!isEditing && form.saldoInicial) {
@@ -313,6 +331,91 @@ export default function CajaForm() {
               ⚠️ Debes seleccionar al menos un medio de pago
             </p>
           )}
+        </div>
+
+        {/* Facturación y Uso */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Facturación y Uso</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Punto de Venta AFIP
+              </label>
+              <input
+                type="number"
+                name="puntoVentaAfip"
+                value={form.puntoVentaAfip}
+                onChange={handleChange}
+                className="input-field w-full"
+                min="1"
+                max="99999"
+                placeholder="Ej: 1"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Numero de punto de venta asignado por AFIP para facturación electronica
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Usar esta caja en:
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                form.paraCaja ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  name="paraCaja"
+                  checked={form.paraCaja}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-gray-700 font-medium">Caja General</span>
+              </label>
+              <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                form.paraBuffet ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  name="paraBuffet"
+                  checked={form.paraBuffet}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-gray-700 font-medium">Buffet</span>
+              </label>
+              <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                form.paraKiosco ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  name="paraKiosco"
+                  checked={form.paraKiosco}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-gray-700 font-medium">Kiosco</span>
+              </label>
+              <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                form.paraTakeaway ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  name="paraTakeaway"
+                  checked={form.paraTakeaway}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-gray-700 font-medium">TakeAway</span>
+              </label>
+            </div>
+            <p className="text-sm text-gray-500 mt-3">
+              Define donde estará disponible esta caja para registrar ventas
+            </p>
+          </div>
         </div>
 
         {/* Conciliación */}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Shield, Save, Check } from 'lucide-react'
+import { ArrowLeft, Shield, Save, Check, Wallet } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 
@@ -10,6 +10,7 @@ export default function RolForm() {
   const isEdit = Boolean(id)
 
   const [permisosDisponibles, setPermisosDisponibles] = useState({})
+  const [cajasDisponibles, setCajasDisponibles] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -20,11 +21,13 @@ export default function RolForm() {
     descripcion: '',
     esSuperAdmin: false,
     activo: true,
-    permisos: []
+    permisos: [],
+    cajas: []
   })
 
   useEffect(() => {
     cargarPermisos()
+    cargarCajasDisponibles()
     if (isEdit) {
       cargarRol()
     }
@@ -39,18 +42,32 @@ export default function RolForm() {
     }
   }
 
+  async function cargarCajasDisponibles() {
+    try {
+      const res = await api.get('/admin/cajas-disponibles')
+      setCajasDisponibles(res?.data || res || [])
+    } catch (err) {
+      console.error('Error cargando cajas:', err)
+    }
+  }
+
   async function cargarRol() {
     setLoading(true)
     try {
-      const res = await api.get(`/admin/roles/${id}`)
-      const r = res?.data || res
+      const [rolRes, cajasRes] = await Promise.all([
+        api.get(`/admin/roles/${id}`),
+        api.get(`/admin/roles/${id}/cajas`)
+      ])
+      const r = rolRes?.data || rolRes
+      const cajas = cajasRes?.data || cajasRes || []
       setForm({
         codigo: r.codigo || '',
         nombre: r.nombre || '',
         descripcion: r.descripcion || '',
         esSuperAdmin: r.esSuperAdmin ?? false,
         activo: r.activo ?? true,
-        permisos: r.permisos?.map(p => p.permisoId) || []
+        permisos: r.permisos?.map(p => p.permisoId) || [],
+        cajas: cajas.map(c => c.id)
       })
     } catch (err) {
       console.error('Error cargando rol:', err)
@@ -89,6 +106,24 @@ export default function RolForm() {
     }))
   }
 
+  function toggleCaja(cajaId) {
+    setForm(prev => ({
+      ...prev,
+      cajas: prev.cajas.includes(cajaId)
+        ? prev.cajas.filter(c => c !== cajaId)
+        : [...prev.cajas, cajaId]
+    }))
+  }
+
+  function toggleTodasCajas() {
+    const todasIds = cajasDisponibles.map(c => c.id)
+    const todasSeleccionadas = todasIds.every(id => form.cajas.includes(id))
+    setForm(prev => ({
+      ...prev,
+      cajas: todasSeleccionadas ? [] : todasIds
+    }))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
@@ -109,10 +144,17 @@ export default function RolForm() {
         permisos: form.permisos
       }
 
+      let rolId = id
       if (isEdit) {
         await api.put(`/admin/roles/${id}`, data)
       } else {
-        await api.post('/admin/roles', data)
+        const res = await api.post('/admin/roles', data)
+        rolId = res?.data?.id || res?.id
+      }
+
+      // Guardar cajas asignadas (solo si no es super admin)
+      if (!form.esSuperAdmin && rolId) {
+        await api.put(`/admin/roles/${rolId}/cajas`, { cajaIds: form.cajas })
       }
 
       navigate('/admin/configuracion/roles')
@@ -309,6 +351,69 @@ export default function RolForm() {
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {/* Cajas Permitidas */}
+        {!form.esSuperAdmin && cajasDisponibles.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Wallet className="w-5 h-5 text-gray-600" />
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">Cajas Permitidas</h2>
+                <p className="text-sm text-gray-500">
+                  Selecciona las cajas a las que este rol tendrá acceso. Si no seleccionas ninguna, tendrá acceso a todas.
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={toggleTodasCajas}
+                className="text-sm text-primary hover:underline"
+              >
+                {cajasDisponibles.every(c => form.cajas.includes(c.id)) ? 'Deseleccionar todas' : 'Seleccionar todas'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {cajasDisponibles.map(caja => (
+                <label
+                  key={caja.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    form.cajas.includes(caja.id)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.cajas.includes(caja.id)}
+                    onChange={() => toggleCaja(caja.id)}
+                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-gray-700 truncate">{caja.nombre}</span>
+                    <span className="block text-xs text-gray-500">
+                      {caja.tipo}
+                      {caja.puntoVentaAfip && ` • PV ${caja.puntoVentaAfip}`}
+                    </span>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {caja.paraBuffet && <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Buffet</span>}
+                      {caja.paraKiosco && <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Kiosco</span>}
+                      {caja.paraTakeaway && <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">TakeAway</span>}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {form.cajas.length === 0 && (
+              <p className="mt-3 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                Sin cajas seleccionadas: el rol tendrá acceso a todas las cajas por defecto.
+              </p>
+            )}
           </div>
         )}
 

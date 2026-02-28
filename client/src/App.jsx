@@ -107,6 +107,8 @@ import ConciliacionDetalle from './pages/admin/tesoreria/ConciliacionDetalle'
 import PlanCuentasLista from './pages/admin/contabilidad/PlanCuentasLista'
 import CuentaContableForm from './pages/admin/contabilidad/CuentaContableForm'
 import CentrosCostoLista from './pages/admin/configuracion/CentrosCostoLista'
+import ConfiguracionFiscal from './pages/admin/configuracion/ConfiguracionFiscal'
+import MenuAdmin from './pages/admin/configuracion/MenuAdmin'
 import AsientosLista from './pages/admin/contabilidad/AsientosLista'
 import AsientoForm from './pages/admin/contabilidad/AsientoForm'
 import AsientoDetalle from './pages/admin/contabilidad/AsientoDetalle'
@@ -178,6 +180,7 @@ import BuffetDashboard from './pages/admin/buffet/BuffetDashboard'
 import BuffetMesas from './pages/admin/buffet/BuffetMesas'
 import BuffetCategorias from './pages/admin/buffet/BuffetCategorias'
 import BuffetProductos from './pages/admin/buffet/BuffetProductos'
+import BuffetPrecios from './pages/admin/buffet/BuffetPrecios'
 import ImportarProductos from './pages/admin/buffet/ImportarProductos'
 import BuffetComanda from './pages/admin/buffet/BuffetComanda'
 import BuffetCocina from './pages/admin/buffet/BuffetCocina'
@@ -279,6 +282,8 @@ function App() {
         <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
         <Route path="configuracion/autoridades" element={<AdminAutoridades />} />
         <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
+        <Route path="configuracion/fiscal" element={<ConfiguracionFiscal />} />
+        <Route path="configuracion/menu" element={<MenuAdmin />} />
         <Route path="configuracion/templates/email" element={<EmailTemplates />} />
         <Route path="configuracion/templates/pdf" element={<PdfTemplates />} />
         <Route path="configuracion/:tabla" element={<AdminConfiguracionLista />} />
@@ -402,6 +407,7 @@ function App() {
         <Route path="buffet/categorias" element={<BuffetCategorias />} />
         <Route path="buffet/productos" element={<BuffetProductos />} />
         <Route path="buffet/productos/importar" element={<ImportarProductos />} />
+        <Route path="buffet/precios" element={<BuffetPrecios />} />
         <Route path="buffet/comanda/:mesaId" element={<BuffetComanda />} />
         <Route path="buffet/kds" element={<BuffetCocina />} />
         <Route path="buffet/kds/:sector" element={<BuffetCocina />} />

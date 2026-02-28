@@ -58,7 +58,11 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/cajas - Crear caja
 router.post('/cajas', asyncHandler(async (req, res) => {
-  const { codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId, requiereConciliacion, mediosPagoPermitidos } = req.body
+  const {
+    codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId,
+    requiereConciliacion, mediosPagoPermitidos,
+    puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja
+  } = req.body
 
   if (!codigo || !nombre || !tipo) {
     throw new AppError('Codigo, nombre y tipo son requeridos', 400)
@@ -82,6 +86,11 @@ router.post('/cajas', asyncHandler(async (req, res) => {
       saldoActual: saldoInicial ? parseFloat(saldoInicial) : 0,
       requiereConciliacion: requiereConciliacion === true,
       mediosPagoPermitidos: mediosPagoPermitidos || [],
+      puntoVentaAfip: puntoVentaAfip ? parseInt(puntoVentaAfip) : null,
+      paraBuffet: paraBuffet !== undefined ? paraBuffet : true,
+      paraKiosco: paraKiosco !== undefined ? paraKiosco : true,
+      paraTakeaway: paraTakeaway !== undefined ? paraTakeaway : true,
+      paraCaja: paraCaja !== undefined ? paraCaja : true,
       ...(cuentaContableId && {
         cuentaContable: { connect: { id: parseInt(cuentaContableId) } }
       })
@@ -97,7 +106,11 @@ router.post('/cajas', asyncHandler(async (req, res) => {
 // PUT /api/admin/cajas/:id - Actualizar caja
 router.put('/cajas/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, tipo, descripcion, activo, cuentaContableId, requiereConciliacion, mediosPagoPermitidos } = req.body
+  const {
+    codigo, nombre, tipo, descripcion, activo, cuentaContableId,
+    requiereConciliacion, mediosPagoPermitidos,
+    puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja
+  } = req.body
 
   const existente = await prisma.caja.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
@@ -120,7 +133,12 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
     descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
     activo: activo !== undefined ? activo : existente.activo,
     requiereConciliacion: requiereConciliacion !== undefined ? requiereConciliacion : existente.requiereConciliacion,
-    mediosPagoPermitidos: mediosPagoPermitidos !== undefined ? mediosPagoPermitidos : existente.mediosPagoPermitidos
+    mediosPagoPermitidos: mediosPagoPermitidos !== undefined ? mediosPagoPermitidos : existente.mediosPagoPermitidos,
+    puntoVentaAfip: puntoVentaAfip !== undefined ? (puntoVentaAfip ? parseInt(puntoVentaAfip) : null) : existente.puntoVentaAfip,
+    paraBuffet: paraBuffet !== undefined ? paraBuffet : existente.paraBuffet,
+    paraKiosco: paraKiosco !== undefined ? paraKiosco : existente.paraKiosco,
+    paraTakeaway: paraTakeaway !== undefined ? paraTakeaway : existente.paraTakeaway,
+    paraCaja: paraCaja !== undefined ? paraCaja : existente.paraCaja
   }
 
   // Manejar la relación con cuenta contable

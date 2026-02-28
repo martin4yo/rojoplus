@@ -36,23 +36,30 @@ export default function ProductosLista() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      goToPage(1)
-      cargarProductos()
+      goToPage(1) // Solo resetear la página, el otro useEffect cargará los datos
     }, 300)
     return () => clearTimeout(timer)
-  }, [busqueda, categoriaId, soloActivos, soloConStock, soloBajoMinimo, goToPage])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busqueda, categoriaId, soloActivos, soloConStock, soloBajoMinimo])
+
+  // Resetear a página 1 cuando cambia la vista
+  useEffect(() => {
+    goToPage(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vista])
 
   useEffect(() => {
     cargarProductos()
-  }, [page])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, busqueda, categoriaId, soloActivos, soloConStock, soloBajoMinimo, vista])
 
   useEffect(() => {
     localStorage.setItem('productosVista', vista)
   }, [vista])
 
   async function cargarProductos() {
-    setLoading(true)
     try {
+      setLoading(true)
       const params = new URLSearchParams()
       if (busqueda) params.append('busqueda', busqueda)
       if (categoriaId) params.append('categoriaId', categoriaId)
@@ -75,6 +82,8 @@ export default function ProductosLista() {
       setPagination(res.pagination || { total: 0, totalPages: 1 })
     } catch (err) {
       console.error('Error cargando productos:', err)
+      setProductos([])
+      setPagination({ total: 0, totalPages: 1 })
     } finally {
       setLoading(false)
     }

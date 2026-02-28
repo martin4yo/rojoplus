@@ -747,6 +747,7 @@ model Caja {
   paraKiosco           Boolean              @default(true) @map("para_kiosco")
   paraTakeaway         Boolean              @default(true) @map("para_takeaway")
   mediosPagoPermitidos String[]             @default(["EFECTIVO", "TRANSFERENCIA", "CHEQUE", "TARJETA"]) @map("medios_pago_permitidos")
+  puntoVentaAfip       Int?                 @map("punto_venta_afip")
   cuentaContable       CuentaContable?      @relation(fields: [cuentaContableId], references: [id])
   cierres              CierreCaja[]
   cuentaBancaria       CuentaBancaria?
@@ -758,6 +759,8 @@ model Caja {
   pagos                  Pago[]
   transferenciasOrigen   TransferenciaCaja[]  @relation("CajaOrigen")
   transferenciasDestino  TransferenciaCaja[]  @relation("CajaDestino")
+  roles                  CajaRol[]
+  comprobantes           ComprobanteElectronico[]
 
   @@index([cuentaContableId])
   @@map("cajas")
@@ -1120,19 +1123,22 @@ model Admin {
   entradasVendidas        Entrada[]            @relation("EntradaVendedor")
   ingresosValidados       IngresoEntrada[]     @relation("IngresoValidador")
   transferenciasRegistradas TransferenciaCaja[]
+  comprobantesEmitidos    ComprobanteElectronico[]
 
   @@map("admins")
 }
 
 model Rol {
-  id           Int          @id @default(autoincrement())
-  codigo       String       @unique
+  id           Int           @id @default(autoincrement())
+  codigo       String        @unique
   nombre       String
   descripcion  String?
-  esSuperAdmin Boolean      @default(false) @map("es_super_admin")
-  activo       Boolean      @default(true)
+  esSuperAdmin Boolean       @default(false) @map("es_super_admin")
+  activo       Boolean       @default(true)
   admins       Admin[]
   permisos     PermisoRol[]
+  cajas        CajaRol[]
+  menuItems    MenuItemRol[]
 
   @@map("roles")
 }
@@ -1156,6 +1162,53 @@ model PermisoRol {
 
   @@id([rolId, permisoId])
   @@map("permisos_roles")
+}
+
+model CajaRol {
+  cajaId Int  @map("caja_id")
+  rolId  Int  @map("rol_id")
+  caja   Caja @relation(fields: [cajaId], references: [id], onDelete: Cascade)
+  rol    Rol  @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@id([cajaId, rolId])
+  @@map("cajas_roles")
+}
+
+// ============================================================================
+// MENU ADMINISTRABLE
+// ============================================================================
+
+model MenuItem {
+  id              Int           @id @default(autoincrement())
+  parentId        Int?          @map("parent_id")
+  titulo          String        @db.VarChar(100)
+  icono           String        @db.VarChar(50)
+  url             String?       @db.VarChar(255)
+  descripcion     String?       @db.VarChar(500)
+  orden           Int           @default(0)
+  activo          Boolean       @default(true)
+  soloSuperAdmin  Boolean       @default(false) @map("solo_super_admin")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  parent          MenuItem?     @relation("MenuHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children        MenuItem[]    @relation("MenuHierarchy")
+  roles           MenuItemRol[]
+
+  @@index([activo])
+  @@index([orden])
+  @@index([parentId])
+  @@map("menu_items")
+}
+
+model MenuItemRol {
+  menuItemId Int      @map("menu_item_id")
+  rolId      Int      @map("rol_id")
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  rol        Rol      @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, rolId])
+  @@map("menu_items_roles")
 }
 
 model Comercio {
@@ -1437,6 +1490,7 @@ model Producto {
   categoriaId      Int?               @map("categoria_id")
   precioCompra     Decimal?           @map("precio_compra") @db.Decimal(12, 2)
   precioVenta      Decimal?           @map("precio_venta") @db.Decimal(12, 2)
+  margen           Decimal?           @db.Decimal(5, 2)
   activo           Boolean            @default(true)
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
@@ -1463,6 +1517,9 @@ model ProductoVariante {
   sku              String?           @unique
   stockActual      Decimal           @default(0) @map("stock_actual") @db.Decimal(12, 2)
   stockMinimo      Decimal           @default(0) @map("stock_minimo") @db.Decimal(12, 2)
+  precioCosto      Decimal?          @map("precio_costo") @db.Decimal(12, 2)
+  margen           Decimal?          @db.Decimal(5, 2)
+  precioVenta      Decimal?          @map("precio_venta") @db.Decimal(12, 2)
   activo           Boolean           @default(true)
   createdAt        DateTime          @default(now()) @map("created_at")
   itemsMovimiento  ItemMovimiento[]
@@ -2298,6 +2355,7 @@ model Comanda {
   observaciones   String?
   atendidoPor     Int?             @map("atendido_por")
   cerradoPor      Int?             @map("cerrado_por")
+  esVentaInterna  Boolean          @default(false) @map("es_venta_interna")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   atendedor       Admin?           @relation("ComandaAtendedor", fields: [atendidoPor], references: [id])
@@ -2307,6 +2365,7 @@ model Comanda {
   socio           Socio?           @relation(fields: [socioId], references: [id])
   items           ItemComanda[]
   movimientosCaja MovimientoCaja[]
+  comprobantes    ComprobanteElectronico[]
 
   @@index([mesaId])
   @@index([socioId])
@@ -2358,6 +2417,7 @@ model PedidoTakeAway {
   total           Decimal              @default(0) @db.Decimal(12, 2)
   observaciones   String?
   atendidoPor     Int?                 @map("atendido_por")
+  esVentaInterna  Boolean              @default(false) @map("es_venta_interna")
   createdAt       DateTime             @default(now()) @map("created_at")
   updatedAt       DateTime             @updatedAt @map("updated_at")
   atendedor       Admin?               @relation(fields: [atendidoPor], references: [id])
@@ -2365,6 +2425,7 @@ model PedidoTakeAway {
   items           ItemPedidoTakeAway[]
   movimientosCaja MovimientoCaja[]
   socio           Socio?               @relation(fields: [socioId], references: [id])
+  comprobantes    ComprobanteElectronico[]
 
   @@index([socioId])
   @@index([estado])
@@ -2829,4 +2890,77 @@ model IngresoEntrada {
   @@index([fecha])
   @@index([dispositivoId])
   @@map("ingresos_entradas")
+}
+
+// ==============================
+// FACTURACIÓN ELECTRÓNICA (ARCA/AFIP)
+// ==============================
+
+model ConfiguracionFiscal {
+  id               Int      @id @default(autoincrement())
+  cuit             String   @unique
+  razonSocial      String   @map("razon_social")
+  condicionIva     String   @map("condicion_iva")
+  domicilioFiscal  String   @map("domicilio_fiscal")
+  iibb             String?
+  inicioActividad  DateTime? @map("inicio_actividad") @db.Date
+  certificadoPath  String?  @map("certificado_path")
+  clavePrivadaPath String?  @map("clave_privada_path")
+  modoProduccion   Boolean  @default(false) @map("modo_produccion")
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("configuracion_fiscal")
+}
+
+model ComprobanteElectronico {
+  id                   Int       @id @default(autoincrement())
+  tipo                 String    // FACTURA_A, FACTURA_B, FACTURA_C, NOTA_CREDITO_A, etc.
+  tipoAfip             Int       @map("tipo_afip") // Código AFIP: 1=Factura A, 6=Factura B, 11=Factura C, etc.
+  puntoVenta           Int       @map("punto_venta")
+  numero               Int
+  fecha                DateTime  @db.Date
+  cae                  String?
+  fechaVtoCae          DateTime? @map("fecha_vto_cae") @db.Date
+  cuitReceptor         String?   @map("cuit_receptor")
+  nombreReceptor       String?   @map("nombre_receptor")
+  domicilioReceptor    String?   @map("domicilio_receptor")
+  condicionIvaReceptor String?   @map("condicion_iva_receptor")
+  neto                 Decimal   @default(0) @db.Decimal(12, 2)
+  netoNoGravado        Decimal   @default(0) @map("neto_no_gravado") @db.Decimal(12, 2)
+  exento               Decimal   @default(0) @db.Decimal(12, 2)
+  iva21                Decimal   @default(0) @db.Decimal(12, 2)
+  iva105               Decimal   @default(0) @db.Decimal(12, 2)
+  iva27                Decimal   @default(0) @db.Decimal(12, 2)
+  percepcionesIva      Decimal   @default(0) @map("percepciones_iva") @db.Decimal(12, 2)
+  percepcionesIibb     Decimal   @default(0) @map("percepciones_iibb") @db.Decimal(12, 2)
+  otrosImpuestos       Decimal   @default(0) @map("otros_impuestos") @db.Decimal(12, 2)
+  total                Decimal   @db.Decimal(12, 2)
+  moneda               String    @default("PES")
+  cotizacion           Decimal   @default(1) @db.Decimal(10, 4)
+  cajaId               Int?      @map("caja_id")
+  comandaId            Int?      @map("comanda_id")
+  pedidoTakeawayId     Int?      @map("pedido_takeaway_id")
+  movimientoContableId Int?      @map("movimiento_contable_id")
+  estado               String    @default("EMITIDO") // EMITIDO, ANULADO
+  emitidoPor           Int       @map("emitido_por")
+  observaciones        String?
+  respuestaAfip        Json?     @map("respuesta_afip")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  caja                 Caja?     @relation(fields: [cajaId], references: [id])
+  comanda              Comanda?  @relation(fields: [comandaId], references: [id])
+  pedidoTakeaway       PedidoTakeAway? @relation(fields: [pedidoTakeawayId], references: [id])
+  emitidor             Admin     @relation(fields: [emitidoPor], references: [id])
+
+  @@unique([puntoVenta, tipo, numero])
+  @@index([fecha])
+  @@index([cae])
+  @@index([cuitReceptor])
+  @@index([cajaId])
+  @@index([comandaId])
+  @@index([pedidoTakeawayId])
+  @@index([estado])
+  @@map("comprobantes_electronicos")
 }

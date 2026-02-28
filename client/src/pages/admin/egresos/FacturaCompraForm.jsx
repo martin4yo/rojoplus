@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Search, FileText, Package, ClipboardList, Check, CreditCard, Wallet, Info } from 'lucide-react'
 import { Button } from '../../../components/Button'
@@ -33,7 +33,9 @@ export default function FacturaCompraForm() {
 
   const [saving, setSaving] = useState(false)
   const [busquedaProducto, setBusquedaProducto] = useState('')
-  const [mostrarBuscador, setMostrarBuscador] = useState(false)
+  const [indiceSeleccionado, setIndiceSeleccionado] = useState(0)
+  const searchInputRef = useRef(null)
+  const cantidadInputRefs = useRef({})
 
   // Cargar datos con useApiData
   const { data: proveedores = [], loading: loadingProveedores } = useApiData('/admin/entidades', {
@@ -115,9 +117,65 @@ export default function FacturaCompraForm() {
     cargarConfigFiscal()
   }, [])
 
+  // Resetear índice cuando cambia la búsqueda
+  useEffect(() => {
+    setIndiceSeleccionado(0)
+  }, [busquedaProducto])
+
+  // Navegación por teclado
+  useEffect(() => {
+    function handleKeyDown(e) {
+      // ESC desde cualquier input de cantidad vuelve al buscador
+      if (e.key === 'Escape' && document.activeElement.type === 'number') {
+        e.preventDefault()
+        if (searchInputRef.current) {
+          searchInputRef.current.focus()
+        }
+        return
+      }
+
+      // Solo si el foco está en el input de búsqueda
+      if (document.activeElement !== searchInputRef.current) return
+      if (!busquedaProducto) return
+
+      const productosFiltrados = (productos || []).filter(p => {
+        const search = busquedaProducto.toLowerCase()
+        return (
+          p.nombre.toLowerCase().includes(search) ||
+          p.codigo.toLowerCase().includes(search) ||
+          p.variantes?.some(v => v.sku?.toLowerCase().includes(search))
+        )
+      })
+
+      if (productosFiltrados.length === 0) return
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setIndiceSeleccionado(prev => Math.min(prev + 1, productosFiltrados.length - 1))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setIndiceSeleccionado(prev => Math.max(prev - 1, 0))
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        const productoSeleccionado = productosFiltrados[indiceSeleccionado]
+        if (productoSeleccionado) {
+          // Si tiene variantes, agregar la primera variante
+          if (productoSeleccionado.variantes && productoSeleccionado.variantes.length > 0) {
+            agregarProducto(productoSeleccionado, productoSeleccionado.variantes[0])
+          } else {
+            agregarProductoSinVariante(productoSeleccionado)
+          }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [busquedaProducto, indiceSeleccionado, productos])
+
   // Preseleccionar primera caja cuando se cargan las cajas
   useEffect(() => {
-    if (cajas.length > 0 && !cajaId) {
+    if (cajas && cajas.length > 0 && !cajaId) {
       setCajaId(cajas[0].id.toString())
     }
   }, [cajas, cajaId])
@@ -164,7 +222,7 @@ export default function FacturaCompraForm() {
     setForm(prev => ({ ...prev, [name]: value }))
 
     // Si cambia el proveedor, actualizar su condición IVA
-    if (name === 'entidadId' && value) {
+    if (name === 'entidadId' && value && proveedores) {
       const proveedor = proveedores.find(p => p.id === parseInt(value))
       if (proveedor) {
         setCondicionIvaProveedor(proveedor.condicionIva || 'INSCRIPTO')
@@ -217,6 +275,7 @@ export default function FacturaCompraForm() {
   }
 
   function agregarProducto(producto, variante) {
+    const nuevoIndex = form.items.length
     setForm(prev => ({
       ...prev,
       items: [...prev.items, {
@@ -231,8 +290,45 @@ export default function FacturaCompraForm() {
         cantidadPendienteOC: null
       }]
     }))
-    setMostrarBuscador(false)
     setBusquedaProducto('')
+    setIndiceSeleccionado(0)
+
+    // Hacer focus en el campo cantidad del nuevo item
+    setTimeout(() => {
+      if (cantidadInputRefs.current[nuevoIndex]) {
+        cantidadInputRefs.current[nuevoIndex].focus()
+        cantidadInputRefs.current[nuevoIndex].select()
+      }
+    }, 100)
+  }
+
+  // Agregar producto sin variante (sin control de stock)
+  function agregarProductoSinVariante(producto) {
+    const nuevoIndex = form.items.length
+    setForm(prev => ({
+      ...prev,
+      items: [...prev.items, {
+        productoVarianteId: null,
+        itemOrdenCompraId: null,
+        descripcion: producto.nombre,
+        cantidad: '1',
+        precioUnitario: producto.precioCompra?.toString() || '',
+        iva: '21',
+        producto: producto,
+        variante: null,
+        cantidadPendienteOC: null
+      }]
+    }))
+    setBusquedaProducto('')
+    setIndiceSeleccionado(0)
+
+    // Hacer focus en el campo cantidad del nuevo item
+    setTimeout(() => {
+      if (cantidadInputRefs.current[nuevoIndex]) {
+        cantidadInputRefs.current[nuevoIndex].focus()
+        cantidadInputRefs.current[nuevoIndex].select()
+      }
+    }, 100)
   }
 
   // Agregar item desde Orden de Compra
@@ -447,10 +543,14 @@ export default function FacturaCompraForm() {
   }
 
 
-  const productosFiltrados = productos.filter(p =>
-    p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-    p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
-  )
+  const productosFiltrados = (productos || []).filter(p => {
+    const search = busquedaProducto.toLowerCase()
+    return (
+      p.nombre.toLowerCase().includes(search) ||
+      p.codigo.toLowerCase().includes(search) ||
+      p.variantes?.some(v => v.sku?.toLowerCase().includes(search))
+    )
+  })
 
   const loading = loadingProveedores || loadingProductos || loadingConceptos || loadingCajas
 
@@ -538,7 +638,7 @@ export default function FacturaCompraForm() {
                 className="input-field w-full"
               >
                 <option value="">Seleccionar proveedor...</option>
-                {proveedores.map((p) => (
+                {(proveedores || []).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.razonSocial} {p.nombreFantasia ? `(${p.nombreFantasia})` : ''}
                   </option>
@@ -668,7 +768,7 @@ export default function FacturaCompraForm() {
                 className="input-field w-full"
               >
                 <option value="">Sin concepto</option>
-                {conceptos.map((c) => (
+                {(conceptos || []).map((c) => (
                   <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
@@ -787,39 +887,36 @@ export default function FacturaCompraForm() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-800">Items de la Factura</h2>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setMostrarBuscador(!mostrarBuscador)}
-              >
-                <Package className="w-4 h-4 mr-2" />
-                Agregar Producto
-              </Button>
-              <Button type="button" variant="secondary" onClick={agregarItemManual}>
-                <Plus className="w-4 h-4 mr-2" />
-                Item Manual
-              </Button>
-            </div>
+            <Button type="button" variant="secondary" onClick={agregarItemManual}>
+              <Plus className="w-4 h-4 mr-2" />
+              Item Manual
+            </Button>
           </div>
 
-          {/* Buscador de productos */}
-          {mostrarBuscador && (
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={busquedaProducto}
-                  onChange={(e) => setBusquedaProducto(e.target.value)}
-                  placeholder="Buscar producto por nombre o codigo..."
-                  className="input-field w-full pl-10"
-                  autoFocus
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto space-y-2">
-                {productosFiltrados.slice(0, 10).map((producto) => (
-                  <div key={producto.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+          {/* Buscador de productos - Siempre visible */}
+          <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={busquedaProducto}
+                onChange={(e) => setBusquedaProducto(e.target.value)}
+                placeholder="Buscar producto por nombre, código o código de barras (SKU)... Use ↑↓ para navegar, Enter para agregar"
+                className="input-field w-full pl-10 text-base"
+              />
+            </div>
+            {busquedaProducto && (
+              <div className="max-h-64 overflow-y-auto space-y-1 bg-white rounded-lg border border-gray-200 p-2">
+                {productosFiltrados.slice(0, 10).map((producto, index) => (
+                  <div
+                    key={producto.id}
+                    className={`border rounded-lg p-3 transition-colors ${
+                      index === indiceSeleccionado
+                        ? 'border-blue-500 bg-blue-50 shadow-md'
+                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }`}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <span className="font-mono text-xs text-gray-500">{producto.codigo}</span>
@@ -830,18 +927,44 @@ export default function FacturaCompraForm() {
                           </p>
                         )}
                       </div>
+                      {index === indiceSeleccionado && (
+                        <span className="text-xs bg-blue-500 text-white px-3 py-1 rounded font-medium flex-shrink-0">
+                          ↵ Enter
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {producto.variantes?.map((variante) => (
+                      {producto.variantes && producto.variantes.length > 0 ? (
+                        producto.variantes.map((variante) => (
+                          <button
+                            key={variante.id}
+                            type="button"
+                            onClick={() => agregarProducto(producto, variante)}
+                            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-primary hover:text-white rounded-lg transition flex flex-col items-start"
+                            title={variante.sku ? `SKU: ${variante.sku}` : ''}
+                          >
+                            <span className="font-medium">
+                              {variante.talle}{variante.color ? ` - ${variante.color}` : ''}
+                            </span>
+                            {variante.sku && (
+                              <span className="text-xs opacity-75 font-mono">
+                                {variante.sku}
+                              </span>
+                            )}
+                            <span className="text-xs opacity-75">
+                              Stock: {variante.stockActual}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
                         <button
-                          key={variante.id}
                           type="button"
-                          onClick={() => agregarProducto(producto, variante)}
-                          className="px-3 py-1 text-sm bg-gray-100 hover:bg-primary hover:text-white rounded-lg transition"
+                          onClick={() => agregarProductoSinVariante(producto)}
+                          className="px-4 py-2 text-sm bg-primary text-white hover:bg-primary-dark rounded-lg transition font-medium"
                         >
-                          {variante.talle}{variante.color ? ` - ${variante.color}` : ''}
+                          Agregar producto
                         </button>
-                      ))}
+                      )}
                     </div>
                   </div>
                 ))}
@@ -849,8 +972,8 @@ export default function FacturaCompraForm() {
                   <p className="text-center text-gray-500 py-4">No se encontraron productos</p>
                 )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Lista de items */}
           {form.items.length === 0 ? (
@@ -896,6 +1019,7 @@ export default function FacturaCompraForm() {
                         )}
                       </label>
                       <input
+                        ref={(el) => (cantidadInputRefs.current[index] = el)}
                         type="number"
                         value={item.cantidad}
                         onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)}
@@ -1029,7 +1153,7 @@ export default function FacturaCompraForm() {
                       className="input-field w-full pl-10"
                     >
                       <option value="">Seleccionar caja...</option>
-                      {cajas.map((c) => (
+                      {(cajas || []).map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.nombre} ({formatCurrency(c.saldoActual)})
                         </option>

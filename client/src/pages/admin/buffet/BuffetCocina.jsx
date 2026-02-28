@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChefHat, Clock, Check, Play, AlertCircle, RefreshCw, Coffee, Flame, Package, UtensilsCrossed } from 'lucide-react'
+import { ChefHat, Clock, Check, Play, AlertCircle, RefreshCw, Coffee, Flame, Package, UtensilsCrossed, FileText } from 'lucide-react'
 import api from '../../../services/api'
 import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
@@ -243,8 +243,15 @@ export default function BuffetCocina() {
               )}
 
               {item.observaciones && (
-                <div className="bg-yellow-900/50 text-yellow-300 text-sm p-2 rounded mt-2">
-                  <strong>Nota:</strong> {item.observaciones}
+                <div className="bg-yellow-500 text-yellow-950 text-sm p-3 rounded-lg mt-2 border-2 border-yellow-600 font-bold shadow-lg flex items-start gap-2">
+                  <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-xs uppercase tracking-wide mb-1 flex items-center gap-1">
+                      <FileText size={14} />
+                      OBSERVACIONES IMPORTANTES
+                    </div>
+                    <div className="text-base">{item.observaciones}</div>
+                  </div>
                 </div>
               )}
             </div>
