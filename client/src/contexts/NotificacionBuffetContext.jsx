@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import api from '../services/api';
 
@@ -13,6 +14,7 @@ const SONIDOS = {
 };
 
 export function NotificacionBuffetProvider({ children }) {
+  const location = useLocation();
   const [socket, setSocket] = useState(null);
   const [conectado, setConectado] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
@@ -51,10 +53,23 @@ export function NotificacionBuffetProvider({ children }) {
     if (!token) return;
 
     // Verificar si estamos en una página del buffet
-    const esBuffet = window.location.pathname.includes('/admin/buffet');
-    if (!esBuffet) return;
+    const esBuffet = location.pathname.includes('/admin/buffet');
+    if (!esBuffet) {
+      // Si no estamos en buffet y hay socket, desconectar
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+        setConectado(false);
+      }
+      return;
+    }
 
-    const socketInstance = io(import.meta.env.VITE_API_URL || 'http://localhost:3001', {
+    // Si ya hay socket conectado, no crear otro
+    if (socket?.connected) return;
+
+    // El socket se conecta al mismo puerto del backend (3000)
+    const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
+    const socketInstance = io(backendUrl, {
       auth: { token },
       transports: ['websocket', 'polling']
     });
@@ -92,7 +107,7 @@ export function NotificacionBuffetProvider({ children }) {
     return () => {
       socketInstance.disconnect();
     };
-  }, [cargarNotificaciones, reproducirSonido]);
+  }, [location.pathname, cargarNotificaciones, reproducirSonido]);
 
   // Marcar notificación como vista
   const marcarVista = useCallback(async (notificacionId) => {

@@ -26,8 +26,9 @@ router.use(authAdmin)
 /**
  * GET /api/admin/facturacion/config
  * Obtener configuración fiscal activa
+ * Permitido para quienes pueden cobrar en buffet/kiosco o configurar facturación
  */
-router.get('/config', checkPermiso('FACTURACION_CONFIG'), asyncHandler(async (req, res) => {
+router.get('/config', checkPermiso('FACTURACION_CONFIG', 'BUFFET_COBRAR', 'BUFFET_KIOSCO', 'COBRANZAS_COBRAR'), asyncHandler(async (req, res) => {
   const config = await prisma.configuracionFiscal.findFirst({
     where: { activo: true }
   })

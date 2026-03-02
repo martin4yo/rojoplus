@@ -14,30 +14,83 @@ router.use(authAdmin)
 // CAJAS
 // =============================================================================
 
-// GET /api/admin/cajas - Listar cajas
+// GET /api/admin/cajas - Listar cajas (filtradas por rol del usuario)
 router.get('/cajas', asyncHandler(async (req, res) => {
   const { activo } = req.query
 
   const where = {}
   if (activo !== undefined) where.activo = activo === 'true'
 
+  // Filtrar por cajas asignadas al rol del usuario (si no es super admin)
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  // Si el usuario tiene rol y no es super admin, filtrar por cajas asignadas
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    where.id = { in: cajasPermitidas }
+  }
+
   const cajas = await prisma.caja.findMany({
     where,
     orderBy: { nombre: 'asc' }
   })
 
-  // Convertir Decimal a Number
-  const cajasFormateadas = cajas.map(c => ({
-    ...c,
-    saldoActual: Number(c.saldoActual)
+  // Calcular saldo real desde movimientos para cada caja
+  const cajasConSaldo = await Promise.all(cajas.map(async (caja) => {
+    // Sumar ingresos
+    const ingresos = await prisma.movimientoCaja.aggregate({
+      where: { cajaId: caja.id, tipo: 'INGRESO', anulado: false },
+      _sum: { monto: true }
+    })
+    // Sumar egresos
+    const egresos = await prisma.movimientoCaja.aggregate({
+      where: { cajaId: caja.id, tipo: 'EGRESO', anulado: false },
+      _sum: { monto: true }
+    })
+
+    const saldoCalculado = (Number(ingresos._sum.monto) || 0) - (Number(egresos._sum.monto) || 0)
+
+    return {
+      ...caja,
+      saldoActual: saldoCalculado
+    }
   }))
 
-  res.json({ success: true, data: cajasFormateadas })
+  res.json({ success: true, data: cajasConSaldo })
 }))
 
 // GET /api/admin/cajas/:id - Detalle de caja
 router.get('/cajas/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
+
+  // Verificar acceso del usuario a esta caja
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  // Si no es super admin y tiene cajas asignadas, verificar acceso
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    if (!cajasPermitidas.includes(parseInt(id))) {
+      throw new AppError('No tenés acceso a esta caja', 403)
+    }
+  }
 
   const caja = await prisma.caja.findUnique({
     where: { id: parseInt(id) }
@@ -47,11 +100,23 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
     throw new AppError('Caja no encontrada', 404)
   }
 
+  // Calcular saldo real desde movimientos
+  const ingresos = await prisma.movimientoCaja.aggregate({
+    where: { cajaId: caja.id, tipo: 'INGRESO', anulado: false },
+    _sum: { monto: true }
+  })
+  const egresos = await prisma.movimientoCaja.aggregate({
+    where: { cajaId: caja.id, tipo: 'EGRESO', anulado: false },
+    _sum: { monto: true }
+  })
+
+  const saldoCalculado = (Number(ingresos._sum.monto) || 0) - (Number(egresos._sum.monto) || 0)
+
   res.json({
     success: true,
     data: {
       ...caja,
-      saldoActual: Number(caja.saldoActual)
+      saldoActual: saldoCalculado
     }
   })
 }))
@@ -189,7 +254,31 @@ async function generarNumeroMovimiento() {
 router.get('/movimientos-caja', asyncHandler(async (req, res) => {
   const { cajaId, tipo, desde, hasta, page = 1, limit = 50 } = req.query
 
+  // Obtener cajas permitidas según rol del usuario
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
   const where = {}
+
+  // Filtrar por cajas asignadas al rol (si no es super admin)
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    where.cajaId = { in: cajasPermitidas }
+
+    // Si pide una caja específica, verificar que tenga acceso
+    if (cajaId && !cajasPermitidas.includes(parseInt(cajaId))) {
+      throw new AppError('No tenés acceso a esta caja', 403)
+    }
+  }
+
   if (cajaId) where.cajaId = parseInt(cajaId)
   if (tipo) where.tipo = tipo
 
@@ -259,6 +348,25 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
     throw new AppError('Movimiento no encontrado', 404)
   }
 
+  // Verificar acceso del usuario a la caja del movimiento
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    if (!cajasPermitidas.includes(movimiento.cajaId)) {
+      throw new AppError('No tenés acceso a este movimiento', 403)
+    }
+  }
+
   res.json({
     success: true,
     data: { ...movimiento, monto: Number(movimiento.monto) }
@@ -287,6 +395,25 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
 
   if (!caja.activo) {
     throw new AppError('La caja no esta activa', 400)
+  }
+
+  // Verificar acceso del usuario a esta caja
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    if (!cajasPermitidas.includes(parseInt(cajaId))) {
+      throw new AppError('No tenés acceso a esta caja', 403)
+    }
   }
 
   // Cargar cuenta contable
@@ -365,6 +492,25 @@ router.post('/movimientos-caja/:id/anular', asyncHandler(async (req, res) => {
     throw new AppError('Movimiento no encontrado', 404)
   }
 
+  // Verificar acceso del usuario a la caja del movimiento
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    if (!cajasPermitidas.includes(movimiento.cajaId)) {
+      throw new AppError('No tenés acceso a este movimiento', 403)
+    }
+  }
+
   if (movimiento.anulado) {
     throw new AppError('El movimiento ya esta anulado', 400)
   }
@@ -423,7 +569,29 @@ async function generarNumeroTransferencia() {
 router.get('/transferencias', asyncHandler(async (req, res) => {
   const { desde, hasta, page = 1, limit = 50 } = req.query
 
+  // Obtener cajas permitidas según rol del usuario
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
   const where = {}
+
+  // Filtrar transferencias donde el usuario tenga acceso a alguna de las cajas
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    where.OR = [
+      { cajaOrigenId: { in: cajasPermitidas } },
+      { cajaDestinoId: { in: cajasPermitidas } }
+    ]
+  }
+
   if (desde || hasta) {
     where.fecha = {}
     if (desde) where.fecha.gte = new Date(desde)
@@ -479,6 +647,27 @@ router.get('/transferencias/:id', asyncHandler(async (req, res) => {
     throw new AppError('Transferencia no encontrada', 404)
   }
 
+  // Verificar acceso del usuario a alguna de las cajas
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    const tieneAcceso = cajasPermitidas.includes(transferencia.cajaOrigenId) ||
+                        cajasPermitidas.includes(transferencia.cajaDestinoId)
+    if (!tieneAcceso) {
+      throw new AppError('No tenés acceso a esta transferencia', 403)
+    }
+  }
+
   res.json({
     success: true,
     data: { ...transferencia, monto: Number(transferencia.monto) }
@@ -519,6 +708,28 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
   }
   if (!cajaDestino.activo) {
     throw new AppError('La caja destino no esta activa', 400)
+  }
+
+  // Verificar acceso del usuario a ambas cajas
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    if (!cajasPermitidas.includes(parseInt(cajaOrigenId))) {
+      throw new AppError('No tenés acceso a la caja origen', 403)
+    }
+    if (!cajasPermitidas.includes(parseInt(cajaDestinoId))) {
+      throw new AppError('No tenés acceso a la caja destino', 403)
+    }
   }
 
   // Verificar saldo suficiente
@@ -618,6 +829,27 @@ router.post('/transferencias/:id/anular', asyncHandler(async (req, res) => {
     throw new AppError('Transferencia no encontrada', 404)
   }
 
+  // Verificar acceso del usuario a alguna de las cajas
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    const tieneAcceso = cajasPermitidas.includes(transferencia.cajaOrigenId) ||
+                        cajasPermitidas.includes(transferencia.cajaDestinoId)
+    if (!tieneAcceso) {
+      throw new AppError('No tenés acceso a esta transferencia', 403)
+    }
+  }
+
   if (transferencia.estado === 'ANULADO') {
     throw new AppError('La transferencia ya esta anulada', 400)
   }
@@ -665,6 +897,25 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
 
   if (!caja) {
     throw new AppError('Caja no encontrada', 404)
+  }
+
+  // Verificar acceso del usuario a esta caja
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: {
+      rol: {
+        include: {
+          cajas: { select: { cajaId: true } }
+        }
+      }
+    }
+  })
+
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    if (!cajasPermitidas.includes(parseInt(id))) {
+      throw new AppError('No tenés acceso a esta caja', 403)
+    }
   }
 
   const whereMovimientos = {

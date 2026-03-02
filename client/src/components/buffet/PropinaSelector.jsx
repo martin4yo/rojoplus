@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Percent } from 'lucide-react'
 
 export default function PropinaSelector({
@@ -9,6 +9,7 @@ export default function PropinaSelector({
 }) {
   const [porcentajeSeleccionado, setPorcentajeSeleccionado] = useState(0)
   const [montoCustom, setMontoCustom] = useState('')
+  const prevValuesRef = useRef({ porcentaje: 0, monto: 0, esCustom: false })
 
   const porcentajes = [0, 10, 15, 20]
 
@@ -17,14 +18,24 @@ export default function PropinaSelector({
     ? parseFloat(montoCustom) || 0
     : (subtotal * porcentajeSeleccionado / 100)
 
-  // Notificar cambios al padre
+  // Notificar cambios al padre solo cuando los valores realmente cambien
   useEffect(() => {
-    onPropinaChange?.({
+    const newValues = {
       porcentaje: porcentajeSeleccionado,
       monto: montoPropina,
       esCustom: !!montoCustom
-    })
-  }, [montoPropina, porcentajeSeleccionado, montoCustom, onPropinaChange])
+    }
+
+    // Solo notificar si los valores cambiaron
+    if (
+      prevValuesRef.current.porcentaje !== newValues.porcentaje ||
+      prevValuesRef.current.monto !== newValues.monto ||
+      prevValuesRef.current.esCustom !== newValues.esCustom
+    ) {
+      prevValuesRef.current = newValues
+      onPropinaChange?.(newValues)
+    }
+  }, [montoPropina, porcentajeSeleccionado, montoCustom]) // Quitamos onPropinaChange de las dependencias
 
   const handlePorcentajeClick = (porcentaje) => {
     setPorcentajeSeleccionado(porcentaje)

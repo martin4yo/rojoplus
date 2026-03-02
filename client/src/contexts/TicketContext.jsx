@@ -97,6 +97,82 @@ export function TicketProvider({ children }) {
   }, [])
 
   /**
+   * Genera un ticket FISCAL con CAE y QR de ARCA
+   * @param {Object} params - Datos del ticket fiscal
+   * @param {Object} params.comprobante - Datos del comprobante fiscal (CAE, tipo, numero, etc)
+   * @param {Array} params.items - Items de la venta
+   * @param {string} params.qrUrl - URL del QR de ARCA
+   * @param {Object} params.empresa - Datos de la empresa emisora
+   */
+  const generarTicketFiscal = useCallback((params) => {
+    const { comprobante, items, qrUrl, empresa, medioPago, montoPagado, vuelto } = params
+
+    // Mapear tipo de comprobante AFIP a nombre
+    const tiposNombre = {
+      1: 'FACTURA A',
+      6: 'FACTURA B',
+      11: 'FACTURA C'
+    }
+
+    // Mapear condición IVA del cliente
+    const condicionesIva = {
+      1: 'IVA Responsable Inscripto',
+      4: 'IVA Exento',
+      5: 'Consumidor Final',
+      6: 'Responsable Monotributo'
+    }
+
+    return {
+      tipo: 'FISCAL',
+      // Datos de la empresa emisora
+      empresa: {
+        razonSocial: empresa?.razonSocial || 'CLUB SPORTIVO PILAR',
+        domicilio: empresa?.domicilio || empresa?.domicilioFiscal || '',
+        cuit: empresa?.cuit || '',
+        condicionIva: empresa?.condicionIva || 'IVA Responsable Inscripto',
+        iibb: empresa?.iibb || 'EXENTO',
+        inicioActividades: empresa?.inicioActividades || ''
+      },
+      // Datos del comprobante
+      comprobante: {
+        tipo: tiposNombre[comprobante?.tipoAfip] || comprobante?.tipo || 'FACTURA C',
+        tipoAfip: comprobante?.tipoAfip || 11,
+        puntoVenta: comprobante?.puntoVenta || 1,
+        numero: comprobante?.numero || 0,
+        fecha: comprobante?.fecha ? new Date(comprobante.fecha) : new Date(),
+        cae: comprobante?.cae || '',
+        fechaVtoCae: comprobante?.fechaVtoCae ? new Date(comprobante.fechaVtoCae) : null
+      },
+      // Datos del cliente
+      cliente: {
+        nombre: comprobante?.nombreReceptor || 'Consumidor Final',
+        documento: comprobante?.cuitReceptor || '',
+        tipoDoc: comprobante?.tipoDocCliente || 99,
+        condicionIva: condicionesIva[comprobante?.condicionIvaReceptor] || 'Consumidor Final'
+      },
+      // Items
+      items: items?.map(item => ({
+        cantidad: item.cantidad || 1,
+        nombre: item.nombre || item.descripcion || 'Producto',
+        precio: Number(item.precioUnitario || item.precio || 0),
+        subtotal: Number(item.subtotal || (item.cantidad * (item.precioUnitario || item.precio || 0)))
+      })) || [],
+      // Totales
+      subtotal: Number(comprobante?.neto || comprobante?.subtotal || 0),
+      iva: Number(comprobante?.iva || 0),
+      total: Number(comprobante?.total || 0),
+      // Discrimina IVA solo para Factura A
+      discriminaIva: comprobante?.tipoAfip === 1,
+      // Medio de pago
+      medioPago: medioPago || 'EFECTIVO',
+      montoPagado: montoPagado || null,
+      vuelto: vuelto || null,
+      // QR de ARCA
+      qrUrl: qrUrl || null
+    }
+  }, [])
+
+  /**
    * Imprime o muestra preview de un ticket
    */
   const imprimirTicket = useCallback(async (ticket, impresoraId = null) => {
@@ -135,6 +211,7 @@ export function TicketProvider({ children }) {
       generarTicketCocina,
       generarTicketTakeAway,
       generarTicketKiosco,
+      generarTicketFiscal,
       imprimirTicket,
       cerrarPreview
     }}>

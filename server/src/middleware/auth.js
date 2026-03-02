@@ -52,7 +52,7 @@ export function authAdmin(req, res, next) {
   const authHeader = req.headers.authorization
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new AppError('Token no proporcionado', 401, 'AUTH_REQUIRED')
+    return next(new AppError('Token no proporcionado', 401, 'AUTH_REQUIRED'))
   }
 
   const token = authHeader.split(' ')[1]
@@ -62,7 +62,7 @@ export function authAdmin(req, res, next) {
     req.admin = decoded
     next()
   } catch (err) {
-    throw new AppError('Token inválido', 401, 'AUTH_INVALID')
+    return next(new AppError('Token inválido', 401, 'AUTH_INVALID'))
   }
 }
 
@@ -78,12 +78,12 @@ export function checkPermiso(...permisosRequeridos) {
       })
 
       if (!admin || !admin.activo) {
-        throw new AppError('Usuario no encontrado o inactivo', 401)
+        return next(new AppError('Usuario no encontrado o inactivo', 401))
       }
 
       // Sin rol asignado = sin permisos
       if (!admin.rolId) {
-        throw new AppError('No tiene permisos para esta acción', 403, 'FORBIDDEN')
+        return next(new AppError('No tiene permisos para esta acción', 403, 'FORBIDDEN'))
       }
 
       const permisosRol = await getPermisosRol(admin.rolId)
@@ -97,13 +97,13 @@ export function checkPermiso(...permisosRequeridos) {
       const tienePermiso = permisosRequeridos.some(p => permisosRol.includes(p))
 
       if (!tienePermiso) {
-        throw new AppError('No tiene permisos para esta acción', 403, 'FORBIDDEN')
+        return next(new AppError('No tiene permisos para esta acción', 403, 'FORBIDDEN'))
       }
 
       next()
     } catch (err) {
-      if (err instanceof AppError) throw err
-      throw new AppError('Error verificando permisos', 500)
+      if (err instanceof AppError) return next(err)
+      next(new AppError('Error verificando permisos', 500))
     }
   }
 }

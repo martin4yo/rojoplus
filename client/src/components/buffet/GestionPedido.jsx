@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Plus, Minus, Send, DollarSign, Clock, User, ShoppingCart, UtensilsCrossed, Coffee, Search, X, Users, Percent, CheckCircle, AlertCircle, Trash2, Edit3, FileText, Package, Check, LayoutGrid, List } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, Send, DollarSign, Clock, User, ShoppingCart, UtensilsCrossed, Coffee, Search, X, Users, Percent, CheckCircle, AlertCircle, Trash2, Edit3, FileText, Package, Check, LayoutGrid, List, Receipt, RotateCcw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
@@ -13,6 +13,7 @@ import SelectorMedioPago from './SelectorMedioPago'
 import PropinaSelector from './PropinaSelector'
 import SplitCuenta from './SplitCuenta'
 import PagoMultiple from './PagoMultiple'
+import ClienteSelector from './ClienteSelector'
 
 /**
  * Componente universal para gestión de pedidos
@@ -25,7 +26,7 @@ import PagoMultiple from './PagoMultiple'
  * @param {Function} props.onActualizar - Callback opcional cuando hay cambios
  */
 export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualizar }) {
-  const { generarTicketComanda, imprimirTicket } = useTicket()
+  const { generarTicketComanda, generarTicketFiscal, imprimirTicket } = useTicket()
 
   // Estados principales
   const [entidad, setEntidad] = useState(null) // Mesa o Pedido
@@ -69,9 +70,12 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   const [pagosParciales, setPagosParciales] = useState({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
   const [usarPagosMultiples, setUsarPagosMultiples] = useState(false)
   const [tabCobroActivo, setTabCobroActivo] = useState('cuenta') // 'cuenta' o 'finalizar'
+  const puedeCobrar = tienePermiso(PERMISOS.BUFFET_COBRAR)
+  const puedeGestionarMesas = tienePermiso(PERMISOS.BUFFET_MESAS)
 
   // Estados para facturación electrónica
   const [emitirFactura, setEmitirFactura] = useState(false)
+  const [configFiscal, setConfigFiscal] = useState(null) // Configuración AFIP
   const [datosCliente, setDatosCliente] = useState({
     tipoDoc: 99, // 99=CF, 96=DNI, 80=CUIT
     documento: '',
@@ -79,6 +83,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
     condicionIva: 5 // 5=CF, 1=RI, 6=Monotributo
   })
   const [validandoCuit, setValidandoCuit] = useState(false)
+  // Cliente seleccionado para MovimientoContable
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
 
   // Configuración según tipo
   const config = {
@@ -168,18 +174,25 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         setComandaActiva(null)
       }
 
-      // Cargar productos, categorías, cajas y medios de pago
-      const [prodRes, catRes, cajasRes, mediosRes] = await Promise.all([
+      // Cargar productos, categorías, cajas, medios de pago y config fiscal
+      const [prodRes, catRes, cajasRes, mediosRes, configRes] = await Promise.all([
         api.get(`/admin/buffet/productos?disponible=true&activo=true&tipoVenta=${cfg.tipoVenta}`),
         api.get('/admin/buffet/categorias?activo=true'),
         api.get(cfg.configCajas),
-        api.get(cfg.configMediosPago)
+        api.get(cfg.configMediosPago),
+        api.get('/admin/configuracion/fiscal').catch(() => null) // No fallar si no hay config
       ])
 
       const productos = prodRes.data || prodRes || []
       const categorias = catRes.data || catRes || []
       const cajas = cajasRes.data || cajasRes || []
       const medios = mediosRes.data || mediosRes || []
+
+      // Cargar configuración fiscal si existe
+      const configData = configRes?.data || configRes
+      if (configData && configData.certificadoPath) {
+        setConfigFiscal(configData)
+      }
 
       setProductos(productos)
 
@@ -344,6 +357,12 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         requestData.emitirFactura = true
         requestData.datosCliente = datosCliente
         // El tipo de comprobante se determina automáticamente en el backend según condición IVA
+
+        // Agregar cliente seleccionado para MovimientoContable
+        if (clienteSeleccionado) {
+          requestData.clienteId = clienteSeleccionado.id
+          requestData.tipoCliente = clienteSeleccionado.tipo
+        }
       }
 
       const endpoint = tipo === 'mesa'
@@ -354,10 +373,54 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
       toast.success(tipo === 'mesa' ? 'Comanda cobrada' : 'Pedido cobrado')
 
-      // Generar e imprimir ticket
-      if (res.data?.ticket || res.data?.data?.ticket) {
-        const ticketData = res.data?.ticket || res.data?.data?.ticket
-        imprimirTicket(ticketData)
+      const data = res.data?.data || res.data
+
+      // DEBUG: Ver qué devuelve el backend
+      console.log('[DEBUG Cobro] Respuesta completa:', res.data)
+      console.log('[DEBUG Cobro] Data extraída:', data)
+      console.log('[DEBUG Cobro] Comprobante:', data?.comprobante)
+      console.log('[DEBUG Cobro] QR URL:', data?.qrUrl)
+
+      // Determinar si se emitió factura fiscal
+      const comprobanteRecibido = data?.comprobante
+      const qrUrlRecibido = data?.qrUrl
+      const esFiscal = comprobanteRecibido && comprobanteRecibido.cae
+      console.log('[DEBUG Cobro] Es fiscal:', esFiscal, 'CAE:', comprobanteRecibido?.cae)
+
+      if (esFiscal) {
+        // Generar ticket FISCAL con CAE y QR para el preview
+        const ticketFiscalData = generarTicketFiscal({
+          comprobante: comprobanteRecibido,
+          items: comandaActiva.items?.map(item => ({
+            cantidad: item.cantidad,
+            nombre: item.productoBuffet?.nombre || item.nombre,
+            precio: Number(item.precioUnitario),
+            subtotal: Number(item.precioUnitario) * item.cantidad
+          })) || [],
+          qrUrl: qrUrlRecibido,
+          empresa: configFiscal ? {
+            razonSocial: configFiscal.razonSocial,
+            domicilio: configFiscal.domicilioFiscal,
+            cuit: configFiscal.cuit,
+            condicionIva: configFiscal.condicionIva,
+            iibb: configFiscal.iibb || 'EXENTO',
+            inicioActividades: configFiscal.inicioActividades
+          } : null,
+          medioPago: mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.nombre || 'Efectivo',
+          montoPagado: datosVuelto.montoPagado || null,
+          vuelto: datosVuelto.vuelto || null
+        })
+        await imprimirTicket(ticketFiscalData)
+      } else {
+        // Ticket NO fiscal - generar ticket de comanda para el cliente
+        const ticketComandaData = generarTicketComanda({
+          ...comandaActiva,
+          items: comandaActiva.items,
+          subtotal: comandaActiva.subtotal,
+          total: totalConPropina,
+          medioPago: mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))
+        }, 'CUENTA')
+        await imprimirTicket(ticketComandaData)
       }
 
       // Reset estados
@@ -366,15 +429,14 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       setUsarPagosMultiples(false)
       setPagosParciales({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
       setTabCobroActivo('cuenta')
+      setClienteSeleccionado(null)
+      setEmitirFactura(false)
+      setDatosCliente({ tipoDoc: 99, documento: '', nombre: '', condicionIva: 5 })
 
-      await cargarDatos()
-
-      // Para TakeAway cobrado, volver al dashboard
-      if (tipo === 'takeaway') {
-        setTimeout(() => {
-          if (onVolver) onVolver()
-        }, 1500)
-      }
+      // Volver al dashboard después del cobro exitoso
+      setTimeout(() => {
+        if (onVolver) onVolver()
+      }, 1500)
     } catch (err) {
       console.error('Error al cobrar:', err)
       toast.error(err.response?.data?.error || 'Error al procesar el cobro')
@@ -413,6 +475,50 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
     } catch (err) {
       console.error('Error cerrando comanda:', err)
       toast.error(err.response?.data?.error || 'Error al cerrar')
+    }
+  }
+
+  async function pedirCuenta() {
+    if (!comandaActiva) return
+    if (tipo === 'takeaway') return // Solo para mesas
+
+    try {
+      const res = await api.post(`/admin/buffet/comandas/${comandaActiva.id}/pedir-cuenta`)
+      toast.success('Cuenta solicitada')
+
+      // Mostrar preview del ticket de pre-cuenta
+      const data = res.data?.data || res.data || res
+      if (data?.comanda || comandaActiva) {
+        const comanda = data.comanda || comandaActiva
+        const ticketData = generarTicketComanda({
+          ...comanda,
+          items: comandaActiva.items,
+          subtotal: comanda.subtotal || comandaActiva.subtotal,
+          total: data.totalEstimado || comanda.total || comandaActiva.total,
+          descuento: data.descuento?.monto || 0,
+          porcentajeDescuento: data.descuento?.porcentaje || 0
+        }, 'CUENTA')
+        imprimirTicket(ticketData)
+      }
+
+      await cargarDatos()
+    } catch (err) {
+      console.error('Error pidiendo cuenta:', err)
+      toast.error(err.response?.data?.error || 'Error al pedir cuenta')
+    }
+  }
+
+  async function reabrirComanda() {
+    if (!comandaActiva) return
+    if (tipo === 'takeaway') return // Solo para mesas
+
+    try {
+      await api.post(`/admin/buffet/comandas/${comandaActiva.id}/reabrir`)
+      toast.success('Comanda reabierta')
+      await cargarDatos()
+    } catch (err) {
+      console.error('Error reabriendo comanda:', err)
+      toast.error(err.response?.data?.error || 'Error al reabrir comanda')
     }
   }
 
@@ -605,6 +711,9 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   })
 
   const totalNuevos = itemsNuevos.reduce((sum, item) => sum + (Number(item.precio) * item.cantidad), 0)
+
+  // Verificar si la comanda está esperando cobro (cuenta pedida)
+  const esCuentaPedida = tipo === 'mesa' && comandaActiva?.estado === 'CUENTA_PEDIDA'
 
   const tiempoAbierta = comandaActiva?.horaApertura
     ? Math.floor((new Date() - new Date(comandaActiva.horaApertura)) / 60000)
@@ -1241,12 +1350,21 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   <button
                     key={prod.id}
                     onClick={() => {
+                      if (esCuentaPedida) {
+                        toast.error('No se pueden agregar items, la cuenta ya fue pedida')
+                        return
+                      }
                       agregarItem(prod)
                       if (window.innerWidth < 768) {
                         toast.success(`+1 ${prod.nombre}`, { duration: 1000, position: 'bottom-center' })
                       }
                     }}
-                    className="bg-white rounded-lg p-2 md:p-3 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 active:scale-95 flex gap-2 md:gap-3"
+                    disabled={esCuentaPedida}
+                    className={`bg-white rounded-lg p-2 md:p-3 text-left transition-all border-2 border-transparent flex gap-2 md:gap-3 ${
+                      esCuentaPedida
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:shadow-lg hover:border-red-500 active:scale-95'
+                    }`}
                   >
                     {prod.imagen ? (
                       <img
@@ -1290,12 +1408,20 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                       <tr
                         key={prod.id}
                         onClick={() => {
+                          if (esCuentaPedida) {
+                            toast.error('No se pueden agregar items, la cuenta ya fue pedida')
+                            return
+                          }
                           agregarItem(prod)
                           if (window.innerWidth < 768) {
                             toast.success(`+1 ${prod.nombre}`, { duration: 1000, position: 'bottom-center' })
                           }
                         }}
-                        className="hover:bg-gray-100 cursor-pointer transition-colors"
+                        className={`transition-colors ${
+                          esCuentaPedida
+                            ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                            : 'hover:bg-gray-100 cursor-pointer'
+                        }`}
                       >
                         <td className="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
                           <div className="w-10 h-10 md:w-12 md:h-12 rounded bg-gray-100 overflow-hidden">
@@ -1349,8 +1475,13 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               <FileText size={18} />
               Cuenta
             </button>
-            {/* Ocultar tab Finalizar si es takeaway y ya está pagado/entregado/cancelado */}
-            {!(tipo === 'takeaway' && ['PAGADO', 'ENTREGADO', 'CANCELADO'].includes(entidad.estado)) && (
+            {/* Tab Finalizar - Solo si tiene permiso BUFFET_COBRAR y:
+                - Para mesas: solo si la cuenta fue pedida (CUENTA_PEDIDA)
+                - Para takeaway: si no está pagado/entregado/cancelado */}
+            {puedeCobrar && (
+              (tipo === 'mesa' && esCuentaPedida) ||
+              (tipo === 'takeaway' && !['PAGADO', 'ENTREGADO', 'CANCELADO'].includes(entidad.estado))
+            ) && (
               <button
                 onClick={() => setTabCobroActivo('finalizar')}
                 disabled={Number(comandaActiva.total) === 0}
@@ -1369,6 +1500,16 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           {/* Tab Content: Cuenta */}
           {tabCobroActivo === 'cuenta' && (
             <>
+              {/* Banner de cuenta pedida */}
+              {esCuentaPedida && (
+                <div className="bg-orange-100 border-b border-orange-200 px-4 py-2 flex items-center gap-2">
+                  <Receipt size={18} className="text-orange-600" />
+                  <span className="text-sm font-medium text-orange-800">
+                    Cuenta solicitada - Esperando cobro
+                  </span>
+                </div>
+              )}
+
               {/* Items de la comanda */}
               <div className="flex-1 overflow-y-auto">
                 {/* Items existentes */}
@@ -1503,7 +1644,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
                 {/* Botones */}
                 <div className="space-y-2">
-                  {itemsNuevos.length > 0 && (
+                  {/* Enviar a cocina - Solo si hay items nuevos y NO está cuenta pedida */}
+                  {itemsNuevos.length > 0 && !esCuentaPedida && (
                     <button
                       onClick={enviarACocina}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600 active:bg-yellow-700 text-sm md:text-base"
@@ -1513,10 +1655,36 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                     </button>
                   )}
 
-                  {/* Botón Finalizar/Cobrar - Solo si hay total */}
-                  {((tipo === 'mesa' && comandaActiva.estado !== 'CERRADA') ||
-                    (tipo === 'takeaway' && !['PAGADO', 'ENTREGADO', 'CANCELADO'].includes(entidad.estado))) &&
-                    tienePermiso(PERMISOS.BUFFET_COBRAR) && (
+                  {/* Botón Pedir Cuenta - Para mesas que NO tienen cuenta pedida */}
+                  {tipo === 'mesa' && puedeGestionarMesas && !esCuentaPedida &&
+                    comandaActiva.estado !== 'CERRADA' && Number(comandaActiva.total) > 0 && (
+                    <button
+                      onClick={pedirCuenta}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 text-white font-bold rounded-lg hover:bg-orange-600 active:bg-orange-700 text-sm md:text-base"
+                    >
+                      <Receipt size={18} />
+                      Pedir Cuenta ({formatCurrency(comandaActiva.total, { showSymbol: false })})
+                    </button>
+                  )}
+
+                  {/* Botón Reabrir Comanda - Para mesas con cuenta pedida */}
+                  {tipo === 'mesa' && puedeGestionarMesas && esCuentaPedida && (
+                    <button
+                      onClick={reabrirComanda}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 active:bg-blue-700 text-sm md:text-base"
+                    >
+                      <RotateCcw size={18} />
+                      Reabrir Comanda
+                    </button>
+                  )}
+
+                  {/* Botón Finalizar/Cobrar - Solo si tiene permiso BUFFET_COBRAR y:
+                      - Para mesas: solo si la cuenta fue pedida
+                      - Para takeaway: si no está pagado/entregado/cancelado */}
+                  {puedeCobrar && (
+                    (tipo === 'mesa' && esCuentaPedida) ||
+                    (tipo === 'takeaway' && !['PAGADO', 'ENTREGADO', 'CANCELADO'].includes(entidad.estado))
+                  ) && (
                     <button
                       onClick={() => setTabCobroActivo('finalizar')}
                       disabled={Number(comandaActiva.total) === 0}
@@ -1527,7 +1695,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                     </button>
                   )}
 
-                  {/* Botón Cerrar Comanda (mesa) */}
+                  {/* Botón Cerrar Comanda (mesa) - Solo después de cobrar */}
                   {tipo === 'mesa' && comandaActiva.estado === 'CERRADA' && (
                     <button
                       onClick={cerrarComanda}
@@ -1622,13 +1790,37 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   </button>
                 </div>
 
+                {/* Selector de Caja */}
+                {cajas.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                    <select
+                      value={cobroData.cajaId}
+                      onChange={(e) => setCobroData({ ...cobroData, cajaId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    >
+                      {cajas.map(caja => (
+                        <option key={caja.id} value={caja.id}>
+                          {caja.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {cajas.length === 0 && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    No hay cajas disponibles para tu rol. Contactá al administrador.
+                  </div>
+                )}
+
                 {/* Pago Simple */}
                 {!usarPagosMultiples && (
                   <div className="space-y-3">
                     {/* Selector Medio de Pago */}
                     <SelectorMedioPago
                       mediosPago={mediosPago}
-                      medioPagoId={cobroData.medioPagoId}
+                      selectedId={cobroData.medioPagoId}
                       onChange={(id) => {
                         setCobroData({ ...cobroData, medioPagoId: id })
                         setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
@@ -1644,7 +1836,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                           propinaData.monto}
                         onVueltoCalculado={(datos) => setDatosVuelto(datos)}
                         medioPagoSeleccionado={mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))}
-                        compact={true}
                       />
                     )}
                   </div>
@@ -1683,6 +1874,28 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
                   {emitirFactura && (
                     <div className="space-y-2 pt-2 border-t border-blue-200">
+                      {/* Selector de cliente (Socio o Entidad) */}
+                      <div>
+                        <label className="block text-xs font-medium text-blue-800 mb-1">
+                          Buscar cliente (opcional - para registrar en Ingresos):
+                        </label>
+                        <ClienteSelector
+                          value={clienteSeleccionado}
+                          onChange={(cliente) => {
+                            setClienteSeleccionado(cliente)
+                            // Autocompletar datos fiscales si hay cliente seleccionado
+                            if (cliente) {
+                              setDatosCliente({
+                                tipoDoc: cliente.tipoDoc || 99,
+                                documento: cliente.documento || '',
+                                nombre: cliente.nombre || '',
+                                condicionIva: cliente.condicionIva || 5
+                              })
+                            }
+                          }}
+                        />
+                      </div>
+
                       {/* Selector de condición IVA */}
                       <div>
                         <label className="block text-xs font-medium text-blue-800 mb-1">Condición IVA del cliente:</label>
@@ -1776,6 +1989,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 <button
                   onClick={cobrar}
                   disabled={
+                    cajas.length === 0 ||
                     (mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO' &&
                       !usarPagosMultiples &&
                       !datosVuelto.esSuficiente) ||

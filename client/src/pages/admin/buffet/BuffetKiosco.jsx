@@ -7,9 +7,10 @@ import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import SearchInput from '../../../components/SearchInput'
 import CalculadoraVuelto from '../../../components/buffet/CalculadoraVuelto'
 import SelectorMedioPago from '../../../components/buffet/SelectorMedioPago'
+import ClienteSelector from '../../../components/buffet/ClienteSelector'
 
 export default function BuffetKiosco() {
-  const { generarTicketKiosco, imprimirTicket } = useTicket()
+  const { generarTicketKiosco, generarTicketFiscal, imprimirTicket } = useTicket()
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [carrito, setCarrito] = useState([])
@@ -38,6 +39,14 @@ export default function BuffetKiosco() {
   // Facturación
   const [tipoComprobante, setTipoComprobante] = useState('interno') // 'interno', 'facturaB', 'facturaC'
   const [configFiscal, setConfigFiscal] = useState(null)
+  // Cliente seleccionado para MovimientoContable
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+  const [datosCliente, setDatosCliente] = useState({
+    tipoDoc: 99,
+    documento: '',
+    nombre: '',
+    condicionIva: 5
+  })
 
   useEffect(() => {
     cargarDatos()
@@ -373,46 +382,91 @@ export default function BuffetKiosco() {
       if (tipoComprobante !== 'interno' && configFiscal) {
         datosVenta.emitirFactura = true
         datosVenta.tipoComprobante = tipoComprobante === 'facturaB' ? 6 : 11 // 6=FB, 11=FC
-        datosVenta.datosCliente = {
-          tipoDoc: 99, // Consumidor Final
+        datosVenta.datosCliente = clienteSeleccionado ? {
+          tipoDoc: clienteSeleccionado.tipoDoc || 99,
+          documento: clienteSeleccionado.documento || '',
+          nombre: clienteSeleccionado.nombre || 'Consumidor Final',
+          condicionIva: clienteSeleccionado.condicionIva || 5
+        } : {
+          tipoDoc: 99,
           documento: '',
           nombre: 'Consumidor Final',
-          condicionIva: 5 // Consumidor Final
+          condicionIva: 5
+        }
+        // Agregar cliente seleccionado para MovimientoContable
+        if (clienteSeleccionado) {
+          datosVenta.clienteId = clienteSeleccionado.id
+          datosVenta.tipoCliente = clienteSeleccionado.tipo
         }
       } else {
         datosVenta.esVentaInterna = true
       }
 
       const res = await api.post('/admin/buffet/kiosco/venta', datosVenta)
+      const responseData = res.data?.data || res.data || res
 
-      // Generar y mostrar ticket
-      const ticketData = generarTicketKiosco({
-        numero: res.data?.numero || res?.numero || `K${Date.now()}`,
-        items: carrito.map(item => ({
-          cantidad: item.cantidad,
-          nombre: item.nombre,
-          precio: Number(item.precio)
-        })),
-        subtotal: total,
-        total: total,
-        medioPagoNombre: medioPagoSeleccionado?.nombre || 'Efectivo',
-        montoPagado: datosVuelto.montoPagado,
-        vuelto: datosVuelto.vuelto
-      })
+      // Determinar si se emitió factura fiscal
+      const comprobanteRecibido = responseData.comprobante
+      const qrUrlRecibido = responseData.qrUrl
+      const esFiscal = comprobanteRecibido && comprobanteRecibido.cae
+
+      let ticketData
+      if (esFiscal) {
+        // Ticket FISCAL con CAE y QR
+        ticketData = generarTicketFiscal({
+          comprobante: comprobanteRecibido,
+          items: carrito.map(item => ({
+            cantidad: item.cantidad,
+            nombre: item.nombre,
+            precio: Number(item.precio),
+            subtotal: Number(item.precio) * item.cantidad
+          })),
+          qrUrl: qrUrlRecibido,
+          empresa: configFiscal ? {
+            razonSocial: configFiscal.razonSocial,
+            domicilio: configFiscal.domicilioFiscal,
+            cuit: configFiscal.cuit,
+            condicionIva: configFiscal.condicionIva,
+            iibb: configFiscal.iibb || 'EXENTO',
+            inicioActividades: configFiscal.inicioActividades
+          } : null,
+          medioPago: medioPagoSeleccionado?.nombre || 'Efectivo',
+          montoPagado: datosVuelto.montoPagado,
+          vuelto: datosVuelto.vuelto
+        })
+      } else {
+        // Ticket NO fiscal
+        ticketData = generarTicketKiosco({
+          numero: responseData.numero || `K${Date.now()}`,
+          items: carrito.map(item => ({
+            cantidad: item.cantidad,
+            nombre: item.nombre,
+            precio: Number(item.precio)
+          })),
+          subtotal: total,
+          total: total,
+          medioPagoNombre: medioPagoSeleccionado?.nombre || 'Efectivo',
+          montoPagado: datosVuelto.montoPagado,
+          vuelto: datosVuelto.vuelto
+        })
+      }
       await imprimirTicket(ticketData)
 
       // Guardar en historial de últimas ventas
       setUltimasVentas(prev => [{
-        id: res.data?.id || Date.now(),
-        numero: res.data?.numero || `K${Date.now()}`,
+        id: responseData.id || Date.now(),
+        numero: responseData.numero || `K${Date.now()}`,
         fecha: new Date(),
         total: total,
-        items: carrito.length
+        items: carrito.length,
+        esFiscal: esFiscal
       }, ...prev.slice(0, 9)]) // Mantener solo las últimas 10
 
       toast.success(`Venta registrada: $${total.toLocaleString()}`)
       limpiarCarrito()
       setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+      setClienteSeleccionado(null)
+      setTipoComprobante('interno')
 
       // Volver al tab carrito y hacer focus en el search input
       setTabActivo('carrito')
@@ -894,9 +948,6 @@ export default function BuffetKiosco() {
                   total={total}
                   onVueltoCalculado={setDatosVuelto}
                   medioPagoSeleccionado={mediosPago.find(m => m.id === medioPagoId)}
-                  showTeclado={true}
-                  autoFocus={true}
-                  compact={true}
                 />
 
                 {/* Tipo de Comprobante */}
@@ -949,6 +1000,19 @@ export default function BuffetKiosco() {
                     </p>
                   )}
                 </div>
+
+                {/* Selector de cliente para facturación */}
+                {tipoComprobante !== 'interno' && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Cliente (opcional):
+                    </label>
+                    <ClienteSelector
+                      value={clienteSeleccionado}
+                      onChange={setClienteSeleccionado}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

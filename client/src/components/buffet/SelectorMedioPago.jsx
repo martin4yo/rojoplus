@@ -60,7 +60,7 @@ export default function SelectorMedioPago({
       )}
       <div className={`grid grid-cols-2 ${compact ? 'gap-1.5' : 'gap-2'}`}>
         {mediosPago.map(medio => {
-          const isSelected = selectedId === medio.id
+          const isSelected = selectedId == medio.id || parseInt(selectedId) === medio.id
           const colorClasses = getColor(medio.codigo, isSelected)
           const iconSize = compact ? 18 : 24
 
