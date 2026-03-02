@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { useTicket } from '../../contexts/TicketContext'
+import { usePrompt } from '../../hooks/usePrompt.jsx'
 import SelectCentroCosto from '../SelectCentroCosto'
 import StatusBadge from '../StatusBadge'
 import { formatCurrency } from '../../utils/formatters'
@@ -27,6 +28,7 @@ import ClienteSelector from './ClienteSelector'
  */
 export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualizar }) {
   const { generarTicketComanda, generarTicketFiscal, imprimirTicket } = useTicket()
+  const { prompt, PromptDialog } = usePrompt()
 
   // Estados principales
   const [entidad, setEntidad] = useState(null) // Mesa o Pedido
@@ -308,6 +310,19 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
     } catch (err) {
       console.error('Error marcando item:', err)
       toast.error(err.response?.data?.error || 'Error al marcar item')
+    }
+  }
+
+  async function devolverItemACocina(itemId, motivo = '') {
+    try {
+      const tipoItem = tipo === 'mesa' ? 'COMANDA' : 'TAKEAWAY'
+      await api.put(`/admin/buffet/kds/items/${itemId}/revertir`, { tipo: tipoItem, motivo })
+
+      toast.success('Item devuelto a cocina')
+      await cargarDatos()
+    } catch (err) {
+      console.error('Error devolviendo item:', err)
+      toast.error(err.response?.data?.error || 'Error al devolver item')
     }
   }
 
@@ -1538,6 +1553,23 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                                   <Check size={16} />
                                 </button>
                               )}
+                              {/* Botón para devolver a cocina - Solo si está ENTREGADO */}
+                              {item.estado === 'ENTREGADO' && (
+                                <button
+                                  onClick={async () => {
+                                    const motivo = await prompt(
+                                      'Devolver a cocina',
+                                      'Ingrese el motivo de la devolución',
+                                      { placeholder: 'ej: recalentar, rehacer, muy frío...' }
+                                    )
+                                    if (motivo !== null) devolverItemACocina(item.id, motivo)
+                                  }}
+                                  className="p-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors active:scale-95"
+                                  title="Devolver a cocina"
+                                >
+                                  <RotateCcw size={16} />
+                                </button>
+                              )}
                             </div>
                           </div>
                           <div className="flex justify-between items-start text-xs mt-1 gap-2">
@@ -1791,7 +1823,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 </div>
 
                 {/* Selector de Caja */}
-                {cajas.length > 0 && (
+                {cajas.length > 1 && (
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
                     <select
@@ -1805,6 +1837,13 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                         </option>
                       ))}
                     </select>
+                  </div>
+                )}
+
+                {cajas.length === 1 && (
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg">
+                    <span className="text-xs font-medium text-gray-500">Caja:</span>
+                    <span className="text-sm font-semibold text-gray-800">{cajas[0].nombre}</span>
                   </div>
                 )}
 
@@ -2228,6 +2267,9 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           />
         </Modal>
       )}
+
+      {/* Dialog de prompt para devoluciones */}
+      <PromptDialog />
     </>
   )
 }

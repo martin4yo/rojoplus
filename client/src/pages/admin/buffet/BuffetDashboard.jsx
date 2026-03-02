@@ -240,6 +240,9 @@ export default function BuffetDashboard() {
       return 'bg-gray-300'
     }
 
+    // Verificar si alguna comanda está esperando cobro
+    const hayComandaEsperandoCobro = comandasActivas.some(c => c.estado === 'CUENTA_PEDIDA')
+
     // Obtener todos los items de todas las comandas activas
     const todosLosItems = comandasActivas.flatMap(c => c.items || [])
 
@@ -267,7 +270,12 @@ export default function BuffetDashboard() {
       return 'bg-orange-500'
     }
 
-    // Prioridad 3: Todos los items entregados pero mesa no cerrada - celeste
+    // Prioridad 3: Comanda esperando cobro - naranja
+    if (hayComandaEsperandoCobro) {
+      return 'bg-orange-500'
+    }
+
+    // Prioridad 4: Todos los items entregados pero mesa no cerrada - celeste
     if (todosEntregadosOAnulados) {
       return 'bg-cyan-500'
     }
@@ -285,6 +293,7 @@ export default function BuffetDashboard() {
     ) || []
 
     const todosLosItems = comandasActivas.flatMap(c => c.items || [])
+    const hayComandaEsperandoCobro = comandasActivas.some(c => c.estado === 'CUENTA_PEDIDA')
 
     if (todosLosItems.length === 0) return 'Sin items'
 
@@ -295,8 +304,27 @@ export default function BuffetDashboard() {
 
     if (hayItemsListos) return 'Para entregar'
     if (hayItemsEnProceso) return 'En proceso'
+    if (hayComandaEsperandoCobro) return 'Esperando cobro'
 
     return 'Lista'
+  }
+
+  // Determina si la mesa necesita efecto de parpadeo (atención urgente)
+  const necesitaAnimacion = (mesa) => {
+    if (mesa.estado === 'LIBRE' || mesa.estado === 'LIMPIEZA') return false
+
+    const comandasActivas = mesa.comandas?.filter(c =>
+      ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'].includes(c.estado)
+    ) || []
+
+    if (comandasActivas.length === 0) return false
+
+    const todosLosItems = comandasActivas.flatMap(c => c.items || [])
+    const hayComandaEsperandoCobro = comandasActivas.some(c => c.estado === 'CUENTA_PEDIDA')
+    const hayItemsListos = todosLosItems.some(item => item.estado === 'LISTO')
+
+    // Parpadea si hay items listos para entregar O si está esperando cobro
+    return hayItemsListos || hayComandaEsperandoCobro
   }
 
   if (loading) {
@@ -489,7 +517,7 @@ export default function BuffetDashboard() {
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-            <span>En proceso</span>
+            <span>En proceso / Cobro</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 bg-red-500 rounded-full"></div>
@@ -515,36 +543,35 @@ export default function BuffetDashboard() {
             const comandasActivas = mesa.comandas?.filter(c =>
               ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'].includes(c.estado)
             ) || []
-            const totalMesa = comandasActivas.reduce((sum, c) => sum + Number(c.total || 0), 0)
+            const animar = necesitaAnimacion(mesa)
+
+            // Obtener nombre del cliente (socio o nombre ingresado)
+            const primerComanda = comandasActivas[0]
+            const nombreCliente = primerComanda?.socio?.apellidoNombre
+              || primerComanda?.observaciones
+              || null
 
             return (
               <Link
                 key={mesa.id}
                 to={`/admin/buffet/comanda/${mesa.id}`}
                 className={`${getColorEstadoMesa(mesa)} text-white p-3 md:p-4 rounded-lg text-center hover:opacity-90 transition-opacity relative`}
+                style={animar ? { animation: 'blink 1.5s ease-in-out infinite' } : undefined}
               >
                 {mesa.esComunal && (
                   <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center text-[10px]" title="Mesa Comunal">
                     C
                   </div>
                 )}
-                <div className="font-bold text-lg">{mesa.numero}</div>
-                <div className="text-xs opacity-90">{getTextoEstado(mesa)}</div>
-                {mesa.mozoAsignado && (
-                  <div className="text-[10px] opacity-75 truncate" title={`Mozo: ${mesa.mozoAsignado.nombre}`}>
-                    {mesa.mozoAsignado.nombre.split(' ')[0]}
+                <div className="font-bold text-xl">{mesa.numero}</div>
+                <div className="text-sm font-semibold">{getTextoEstado(mesa)}</div>
+                {nombreCliente && (
+                  <div className="text-[11px] mt-1 opacity-90 truncate" title={nombreCliente}>
+                    {nombreCliente.length > 12 ? nombreCliente.substring(0, 12) + '...' : nombreCliente}
                   </div>
                 )}
-                {mesa.tiempoOcupada && (
-                  <div className="text-xs mt-1">{mesa.tiempoOcupada} min</div>
-                )}
-                {comandasActivas.length > 0 && (
-                  <div className="text-xs mt-1 font-medium">
-                    ${totalMesa.toLocaleString()}
-                    {mesa.esComunal && comandasActivas.length > 1 && (
-                      <span className="block text-[10px] opacity-75">({comandasActivas.length} grupos)</span>
-                    )}
-                  </div>
+                {mesa.esComunal && comandasActivas.length > 1 && (
+                  <div className="text-[10px] opacity-75 mt-0.5">({comandasActivas.length} grupos)</div>
                 )}
               </Link>
             )

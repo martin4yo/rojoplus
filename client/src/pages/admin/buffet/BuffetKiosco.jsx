@@ -3,6 +3,7 @@ import { Coffee, Plus, Minus, DollarSign, ShoppingCart, Search, X, Barcode, File
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { useTicket } from '../../../contexts/TicketContext'
+import { useConfirm } from '../../../hooks/useConfirm.jsx'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import SearchInput from '../../../components/SearchInput'
 import CalculadoraVuelto from '../../../components/buffet/CalculadoraVuelto'
@@ -11,6 +12,7 @@ import ClienteSelector from '../../../components/buffet/ClienteSelector'
 
 export default function BuffetKiosco() {
   const { generarTicketKiosco, generarTicketFiscal, imprimirTicket } = useTicket()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [carrito, setCarrito] = useState([])
@@ -83,8 +85,8 @@ export default function BuffetKiosco() {
             }
           }, 100)
         } else if (carrito.length > 0) {
-          const confirmar = window.confirm('¿Limpiar el carrito?')
-          if (confirmar) limpiarCarrito()
+          confirm('¿Limpiar el carrito?', 'Se eliminarán todos los productos del carrito', { variant: 'warning', confirmText: 'Limpiar' })
+            .then(confirmar => { if (confirmar) limpiarCarrito() })
         }
         return
       }
@@ -123,11 +125,13 @@ export default function BuffetKiosco() {
         case 'F4': // Limpiar carrito
           e.preventDefault()
           if (carrito.length > 0) {
-            const confirmar = window.confirm('¿Limpiar el carrito?')
-            if (confirmar) {
-              limpiarCarrito()
-              setTabActivo('carrito')
-            }
+            confirm('¿Limpiar el carrito?', 'Se eliminarán todos los productos del carrito', { variant: 'warning', confirmText: 'Limpiar' })
+              .then(confirmar => {
+                if (confirmar) {
+                  limpiarCarrito()
+                  setTabActivo('carrito')
+                }
+              })
           }
           break
         case 'F5': // Efectivo
@@ -918,19 +922,31 @@ export default function BuffetKiosco() {
                 </div>
 
                 {/* Selección de caja - Más compacto */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
-                  <select
-                    value={cajaId}
-                    onChange={e => setCajaId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-200 outline-none"
-                  >
-                    <option value="">Seleccionar caja...</option>
-                    {cajas.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
-                  </select>
-                </div>
+                {cajas.length > 1 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Caja:</label>
+                    <select
+                      value={cajaId}
+                      onChange={e => setCajaId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-200 outline-none"
+                    >
+                      {cajas.map(c => (
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {cajas.length === 1 && (
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg">
+                    <span className="text-xs font-medium text-gray-500">Caja:</span>
+                    <span className="text-sm font-semibold text-gray-800">{cajas[0].nombre}</span>
+                  </div>
+                )}
+                {cajas.length === 0 && (
+                  <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    No hay cajas disponibles para tu rol
+                  </div>
+                )}
 
                 {/* Selector de medio de pago VISUAL - Más compacto */}
                 <div>
@@ -1107,6 +1123,9 @@ export default function BuffetKiosco() {
           </div>
         </div>
       )}
+
+      {/* Dialog de confirmación */}
+      <ConfirmDialog />
     </div>
   )
 }

@@ -69,3 +69,13 @@ body {
     transform: scale(1);
   }
 }
+
+/* Animación de parpadeo para mesas que requieren atención */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
