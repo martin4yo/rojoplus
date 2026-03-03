@@ -1,0 +1,16 @@
+{
+  "name": "rojoplus-print-agent",
+  "version": "1.0.0",
+  "description": "Agente de impresión para RojoPlus - Conecta impresoras locales con el servidor en la nube",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.2"
+  },
+  "author": "RojoPlus",
+  "license": "MIT"
+}

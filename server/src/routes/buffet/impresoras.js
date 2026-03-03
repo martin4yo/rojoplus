@@ -3,12 +3,17 @@
  * - CRUD de sectores (cocina, barra, etc)
  * - CRUD de impresoras térmicas
  * - Configuración de destinos de impresión
+ * - Gestión de puestos de impresión (print-agents)
  */
 import express from 'express'
 import prisma from '../../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../../middleware/auth.js'
+import { getIO } from '../../services/socketService.js'
 
 const router = express.Router()
+
+// Almacén temporal de puestos conectados y sus impresoras detectadas
+const puestosConectados = new Map() // puestoId -> { socketId, impresoras, ultimaConexion }
 
 // ============================================================================
 // SECTORES DE BUFFET
@@ -149,10 +154,29 @@ router.get('/impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, 
  */
 router.post('/impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
-    const { nombre, sectorId, ip, puerto } = req.body
+    const { nombre, sectorId, tipoConexion, ip, puerto, destino, puestoId } = req.body
+
+    // Validaciones según tipo de conexión
+    if (tipoConexion === 'IP' && !ip) {
+      return res.status(400).json({ success: false, error: 'IP requerida para conexión de red' })
+    }
+    if ((tipoConexion === 'USB' || tipoConexion === 'CUPS') && !destino) {
+      return res.status(400).json({ success: false, error: 'Destino requerido para USB/CUPS' })
+    }
+    if ((tipoConexion === 'USB' || tipoConexion === 'CUPS') && !puestoId) {
+      return res.status(400).json({ success: false, error: 'Debe seleccionar un puesto para USB/CUPS' })
+    }
 
     const impresora = await prisma.impresoraTermica.create({
-      data: { nombre, sectorId: sectorId ? parseInt(sectorId) : null, ip, puerto: puerto || 9100 },
+      data: {
+        nombre,
+        sectorId: sectorId ? parseInt(sectorId) : null,
+        tipoConexion: tipoConexion || 'IP',
+        ip: tipoConexion === 'IP' ? ip : null,
+        puerto: tipoConexion === 'IP' ? (puerto || 9100) : 9100,
+        destino: tipoConexion !== 'IP' ? destino : null,
+        puestoId: tipoConexion !== 'IP' ? puestoId : null
+      },
       include: { sector: true }
     })
 
@@ -170,15 +194,18 @@ router.post('/impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req,
 router.put('/impresoras/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
     const { id } = req.params
-    const { nombre, sectorId, ip, puerto, activo } = req.body
+    const { nombre, sectorId, tipoConexion, ip, puerto, destino, puestoId, activo } = req.body
 
     const impresora = await prisma.impresoraTermica.update({
       where: { id: parseInt(id) },
       data: {
         nombre,
         sectorId: sectorId !== undefined ? (sectorId ? parseInt(sectorId) : null) : undefined,
+        tipoConexion,
         ip,
         puerto,
+        destino,
+        puestoId,
         activo
       },
       include: { sector: true }
@@ -298,4 +325,202 @@ router.delete('/destinos-impresion/:id', authAdmin, checkPermiso('BUFFET_CONFIG'
   }
 })
 
+// ============================================================================
+// PUESTOS DE IMPRESIÓN (PRINT-AGENTS)
+// ============================================================================
+
+/**
+ * GET /puestos
+ * Listar puestos conectados con sus impresoras detectadas
+ */
+router.get('/puestos', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const puestos = []
+    const ahora = Date.now()
+
+    for (const [puestoId, datos] of puestosConectados.entries()) {
+      // Considerar desconectado si no reportó en los últimos 30 segundos
+      const conectado = (ahora - datos.ultimaConexion) < 30000
+      puestos.push({
+        puestoId,
+        nombre: datos.nombre || puestoId,
+        conectado,
+        impresoras: datos.impresoras || [],
+        ultimaConexion: new Date(datos.ultimaConexion)
+      })
+    }
+
+    res.json({ success: true, data: puestos })
+  } catch (error) {
+    console.error('Error al listar puestos:', error)
+    res.status(500).json({ success: false, error: 'Error al listar puestos' })
+  }
+})
+
+/**
+ * POST /puestos/registrar
+ * Registrar un puesto de impresión (llamado desde print-agent)
+ * No requiere autenticación admin, usa token de puesto
+ */
+router.post('/puestos/registrar', async (req, res) => {
+  try {
+    const { puestoId, nombre, impresoras, token } = req.body
+
+    // Validar token de puesto (simple para no complicar)
+    const tokenEsperado = process.env.PRINT_AGENT_TOKEN || 'rojoplus-print-agent'
+    if (token !== tokenEsperado) {
+      return res.status(401).json({ success: false, error: 'Token inválido' })
+    }
+
+    if (!puestoId) {
+      return res.status(400).json({ success: false, error: 'puestoId requerido' })
+    }
+
+    // Registrar o actualizar puesto
+    puestosConectados.set(puestoId, {
+      nombre: nombre || puestoId,
+      impresoras: impresoras || [],
+      ultimaConexion: Date.now()
+    })
+
+    console.log(`[PrintAgent] Puesto registrado: ${puestoId} con ${impresoras?.length || 0} impresoras`)
+
+    res.json({ success: true, message: 'Puesto registrado' })
+  } catch (error) {
+    console.error('Error al registrar puesto:', error)
+    res.status(500).json({ success: false, error: 'Error al registrar puesto' })
+  }
+})
+
+/**
+ * POST /puestos/heartbeat
+ * Heartbeat de puesto (mantener conexión activa)
+ */
+router.post('/puestos/heartbeat', async (req, res) => {
+  try {
+    const { puestoId, token } = req.body
+
+    const tokenEsperado = process.env.PRINT_AGENT_TOKEN || 'rojoplus-print-agent'
+    if (token !== tokenEsperado) {
+      return res.status(401).json({ success: false, error: 'Token inválido' })
+    }
+
+    if (puestosConectados.has(puestoId)) {
+      const datos = puestosConectados.get(puestoId)
+      datos.ultimaConexion = Date.now()
+      puestosConectados.set(puestoId, datos)
+    }
+
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Error en heartbeat' })
+  }
+})
+
+// ============================================================================
+// FUNCIONES DE IMPRESIÓN
+// ============================================================================
+
+/**
+ * Enviar trabajo de impresión a una impresora
+ * @param {number} impresoraId - ID de la impresora
+ * @param {string} datosBase64 - Datos ESC/POS en base64
+ * @param {string} tipo - Tipo de ticket (COMANDA, CUENTA, FISCAL)
+ */
+export async function enviarImpresion(impresoraId, datosBase64, tipo = 'TICKET') {
+  try {
+    const impresora = await prisma.impresoraTermica.findUnique({
+      where: { id: impresoraId },
+      include: { sector: true }
+    })
+
+    if (!impresora || !impresora.activo) {
+      console.log(`[Print] Impresora ${impresoraId} no encontrada o inactiva`)
+      return { success: false, error: 'Impresora no disponible' }
+    }
+
+    const io = getIO()
+    const trabajo = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      tipo,
+      tipoConexion: impresora.tipoConexion,
+      destino: impresora.tipoConexion === 'IP'
+        ? `${impresora.ip}:${impresora.puerto}`
+        : impresora.destino,
+      datos: datosBase64,
+      timestamp: new Date().toISOString()
+    }
+
+    if (impresora.tipoConexion === 'IP') {
+      // Para IP, emitir a todos los puestos (cualquiera puede imprimir)
+      io.to('print-agents').emit('imprimir', trabajo)
+      console.log(`[Print] Trabajo ${trabajo.id} enviado a print-agents (IP: ${impresora.ip})`)
+    } else {
+      // Para USB/CUPS, emitir solo al puesto específico
+      if (!impresora.puestoId) {
+        return { success: false, error: 'Impresora sin puesto asignado' }
+      }
+      io.to(`puesto:${impresora.puestoId}`).emit('imprimir', trabajo)
+      console.log(`[Print] Trabajo ${trabajo.id} enviado a puesto:${impresora.puestoId}`)
+    }
+
+    return { success: true, trabajoId: trabajo.id }
+  } catch (error) {
+    console.error('[Print] Error enviando impresión:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Registrar eventos de Socket.io para print-agents
+ * Llamar desde socketService después de inicializar io
+ */
+export function registrarEventosPrintAgent(io) {
+  io.on('connection', (socket) => {
+    // Evento para que un print-agent se registre
+    socket.on('print-agent:registrar', (data) => {
+      const { puestoId, nombre, impresoras, token } = data
+
+      const tokenEsperado = process.env.PRINT_AGENT_TOKEN || 'rojoplus-print-agent'
+      if (token !== tokenEsperado) {
+        socket.emit('print-agent:error', { error: 'Token inválido' })
+        return
+      }
+
+      // Unir a salas
+      socket.join('print-agents')
+      socket.join(`puesto:${puestoId}`)
+
+      // Registrar puesto
+      puestosConectados.set(puestoId, {
+        socketId: socket.id,
+        nombre: nombre || puestoId,
+        impresoras: impresoras || [],
+        ultimaConexion: Date.now()
+      })
+
+      console.log(`[PrintAgent] Conectado via Socket: ${puestoId}`)
+      socket.emit('print-agent:registrado', { success: true })
+    })
+
+    // Evento de confirmación de impresión
+    socket.on('print-agent:impreso', (data) => {
+      const { trabajoId, success, error } = data
+      console.log(`[PrintAgent] Trabajo ${trabajoId}: ${success ? 'OK' : error}`)
+    })
+
+    // Actualizar impresoras detectadas
+    socket.on('print-agent:impresoras', (data) => {
+      const { puestoId, impresoras } = data
+      if (puestosConectados.has(puestoId)) {
+        const datos = puestosConectados.get(puestoId)
+        datos.impresoras = impresoras
+        datos.ultimaConexion = Date.now()
+        puestosConectados.set(puestoId, datos)
+      }
+    })
+  })
+}
+
+export { puestosConectados }
 export default router

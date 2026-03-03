@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Printer, Wifi, WifiOff, TestTube2, ChefHat, Coffee, Flame, Package, UtensilsCrossed, Layers } from 'lucide-react'
+import { Plus, Edit, Trash2, Printer, Wifi, WifiOff, TestTube2, ChefHat, Coffee, Flame, Package, UtensilsCrossed, Layers, Monitor, Usb, Cloud, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -13,9 +13,21 @@ const ICONOS_DISPONIBLES = [
   { value: 'UtensilsCrossed', label: 'Restaurante', icon: UtensilsCrossed },
 ]
 
+// Tipos de conexión de impresora
+const TIPOS_CONEXION = [
+  { value: 'IP', label: 'Red (IP)', icon: Wifi, descripcion: 'Impresora con dirección IP propia' },
+  { value: 'USB', label: 'USB', icon: Usb, descripcion: 'Impresora conectada por USB al puesto' },
+  { value: 'CUPS', label: 'CUPS/Sistema', icon: Cloud, descripcion: 'Impresora configurada en el sistema (Linux CUPS)' },
+]
+
 const getIconoComponent = (iconoNombre) => {
   const found = ICONOS_DISPONIBLES.find(i => i.value === iconoNombre)
   return found?.icon || ChefHat
+}
+
+const getTipoConexionIcon = (tipo) => {
+  const found = TIPOS_CONEXION.find(t => t.value === tipo)
+  return found?.icon || Wifi
 }
 
 export default function BuffetImpresoras() {
@@ -23,6 +35,7 @@ export default function BuffetImpresoras() {
   const [impresoras, setImpresoras] = useState([])
   const [categorias, setCategorias] = useState([])
   const [destinos, setDestinos] = useState([])
+  const [puestos, setPuestos] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Modal sectores
@@ -42,8 +55,11 @@ export default function BuffetImpresoras() {
   const [formData, setFormData] = useState({
     nombre: '',
     sectorId: '',
+    tipoConexion: 'IP',
     ip: '',
-    puerto: 9100
+    puerto: 9100,
+    destino: '',
+    puestoId: ''
   })
 
   const [testResult, setTestResult] = useState({})
@@ -54,20 +70,32 @@ export default function BuffetImpresoras() {
 
   async function cargarDatos() {
     try {
-      const [secRes, impRes, catRes, destRes] = await Promise.all([
+      const [secRes, impRes, catRes, destRes, puestosRes] = await Promise.all([
         api.get('/admin/buffet/sectores'),
         api.get('/admin/buffet/impresoras'),
         api.get('/admin/buffet/categorias'),
-        api.get('/admin/buffet/destinos-impresion')
+        api.get('/admin/buffet/destinos-impresion'),
+        api.get('/admin/buffet/puestos').catch(() => ({ data: [] }))
       ])
       setSectores(secRes.data || secRes || [])
       setImpresoras(impRes.data || impRes || [])
       setCategorias(catRes.data || catRes || [])
       setDestinos(destRes.data || destRes || [])
+      setPuestos(puestosRes.data || puestosRes || [])
     } catch (err) {
       console.error('Error cargando datos:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function refrescarPuestos() {
+    try {
+      const res = await api.get('/admin/buffet/puestos')
+      setPuestos(res.data || res || [])
+      toast.success('Puestos actualizados')
+    } catch (err) {
+      console.error('Error refrescando puestos:', err)
     }
   }
 
@@ -141,19 +169,31 @@ export default function BuffetImpresoras() {
       setFormData({
         nombre: impresora.nombre,
         sectorId: impresora.sectorId || '',
-        ip: impresora.ip,
-        puerto: impresora.puerto
+        tipoConexion: impresora.tipoConexion || 'IP',
+        ip: impresora.ip || '',
+        puerto: impresora.puerto || 9100,
+        destino: impresora.destino || '',
+        puestoId: impresora.puestoId || ''
       })
     } else {
       setEditando(null)
       setFormData({
         nombre: '',
         sectorId: sectores.length > 0 ? sectores[0].id : '',
+        tipoConexion: 'IP',
         ip: '',
-        puerto: 9100
+        puerto: 9100,
+        destino: '',
+        puestoId: ''
       })
     }
     setModalOpen(true)
+  }
+
+  // Obtener impresoras detectadas del puesto seleccionado
+  function getImpresorasDelPuesto(puestoId) {
+    const puesto = puestos.find(p => p.puestoId === puestoId)
+    return puesto?.impresoras || []
   }
 
   async function guardar(e) {
@@ -341,6 +381,7 @@ export default function BuffetImpresoras() {
           {impresoras.map(imp => {
             const sector = imp.sector
             const IconoSector = sector ? getIconoComponent(sector.icono) : Printer
+            const IconoConexion = getTipoConexionIcon(imp.tipoConexion || 'IP')
             return (
               <div
                 key={imp.id}
@@ -356,18 +397,24 @@ export default function BuffetImpresoras() {
                     </div>
                     <div>
                       <h3 className="font-bold">{imp.nombre}</h3>
-                      {sector ? (
-                        <span
-                          className="text-xs px-2 py-1 rounded"
-                          style={{ backgroundColor: (sector.color || '#6B7280') + '20', color: sector.color || '#6B7280' }}
-                        >
-                          {sector.nombre}
+                      <div className="flex items-center gap-2">
+                        {sector ? (
+                          <span
+                            className="text-xs px-2 py-1 rounded"
+                            style={{ backgroundColor: (sector.color || '#6B7280') + '20', color: sector.color || '#6B7280' }}
+                          >
+                            {sector.nombre}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">
+                            Sin sector
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 flex items-center gap-1">
+                          <IconoConexion size={12} />
+                          {imp.tipoConexion || 'IP'}
                         </span>
-                      ) : (
-                        <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">
-                          Sin sector
-                        </span>
-                      )}
+                      </div>
                     </div>
                   </div>
                   <button
@@ -379,7 +426,16 @@ export default function BuffetImpresoras() {
                 </div>
 
                 <div className="text-sm text-gray-600 mb-3">
-                  <p>IP: {imp.ip}:{imp.puerto}</p>
+                  {imp.tipoConexion === 'IP' || !imp.tipoConexion ? (
+                    <p>IP: {imp.ip}:{imp.puerto}</p>
+                  ) : (
+                    <>
+                      <p>Destino: {imp.destino}</p>
+                      {imp.puestoId && (
+                        <p className="text-xs text-gray-500">Puesto: {imp.puestoId}</p>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 {/* Categorías asignadas */}
@@ -609,7 +665,7 @@ export default function BuffetImpresoras() {
       {/* Modal Impresora */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">
               {editando ? 'Editar Impresora' : 'Nueva Impresora'}
             </h2>
@@ -627,6 +683,7 @@ export default function BuffetImpresoras() {
                   required
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Sector
@@ -642,32 +699,150 @@ export default function BuffetImpresoras() {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dirección IP *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.ip}
-                    onChange={e => setFormData({ ...formData, ip: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    placeholder="192.168.1.100"
-                    required
-                  />
+
+              {/* Tipo de conexión */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo de Conexión *
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {TIPOS_CONEXION.map(tipo => {
+                    const IconoTipo = tipo.icon
+                    return (
+                      <button
+                        key={tipo.value}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, tipoConexion: tipo.value, ip: '', destino: '', puestoId: '' })}
+                        className={`p-3 border rounded-lg flex flex-col items-center gap-1 transition-colors ${
+                          formData.tipoConexion === tipo.value
+                            ? 'border-red-500 bg-red-50 text-red-700'
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <IconoTipo size={20} />
+                        <span className="text-xs font-medium">{tipo.label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Puerto
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.puerto}
-                    onChange={e => setFormData({ ...formData, puerto: parseInt(e.target.value) })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  />
-                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {TIPOS_CONEXION.find(t => t.value === formData.tipoConexion)?.descripcion}
+                </p>
               </div>
+
+              {/* Campos para IP */}
+              {formData.tipoConexion === 'IP' && (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Dirección IP *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ip}
+                      onChange={e => setFormData({ ...formData, ip: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                      placeholder="192.168.1.100"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Puerto
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.puerto}
+                      onChange={e => setFormData({ ...formData, puerto: parseInt(e.target.value) })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Campos para USB/CUPS */}
+              {(formData.tipoConexion === 'USB' || formData.tipoConexion === 'CUPS') && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Puesto de Trabajo *
+                      <button
+                        type="button"
+                        onClick={refrescarPuestos}
+                        className="ml-2 text-blue-600 hover:text-blue-700"
+                        title="Refrescar puestos"
+                      >
+                        <RefreshCw size={14} className="inline" />
+                      </button>
+                    </label>
+                    {puestos.length === 0 ? (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                        <p className="font-medium">No hay puestos conectados</p>
+                        <p className="text-xs mt-1">
+                          Instale el agente de impresión (print-agent) en el puesto de trabajo.
+                          Ver documentación en /docs/print-agent.md
+                        </p>
+                      </div>
+                    ) : (
+                      <select
+                        value={formData.puestoId}
+                        onChange={e => setFormData({ ...formData, puestoId: e.target.value, destino: '' })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        required
+                      >
+                        <option value="">Seleccionar puesto...</option>
+                        {puestos.map(p => (
+                          <option key={p.puestoId} value={p.puestoId}>
+                            {p.nombre} {p.conectado ? '🟢' : '🔴'} ({p.impresoras?.length || 0} impresoras)
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {formData.puestoId && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {formData.tipoConexion === 'USB' ? 'Dispositivo USB *' : 'Impresora CUPS *'}
+                      </label>
+                      {getImpresorasDelPuesto(formData.puestoId).length > 0 ? (
+                        <select
+                          value={formData.destino}
+                          onChange={e => setFormData({ ...formData, destino: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                          required
+                        >
+                          <option value="">Seleccionar impresora...</option>
+                          {getImpresorasDelPuesto(formData.puestoId)
+                            .filter(imp => formData.tipoConexion === 'USB' ? imp.tipo === 'USB' : imp.tipo === 'CUPS')
+                            .map((imp, idx) => (
+                              <option key={idx} value={imp.destino}>
+                                {imp.nombre} ({imp.destino})
+                              </option>
+                            ))}
+                        </select>
+                      ) : (
+                        <div>
+                          <input
+                            type="text"
+                            value={formData.destino}
+                            onChange={e => setFormData({ ...formData, destino: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                            placeholder={formData.tipoConexion === 'USB' ? '/dev/usb/lp0' : 'EPSON_TM_T20'}
+                            required
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            {formData.tipoConexion === 'USB'
+                              ? 'Ruta del dispositivo USB (ej: /dev/usb/lp0)'
+                              : 'Nombre de la impresora en CUPS (usar: lpstat -p)'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
               <div className="flex justify-end gap-2 pt-4">
                 <button
                   type="button"

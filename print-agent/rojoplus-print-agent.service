@@ -1,0 +1,26 @@
+[Unit]
+Description=RojoPlus Print Agent
+Documentation=https://github.com/rojoplus/print-agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rojoplus-print-agent
+ExecStart=/usr/bin/node /opt/rojoplus-print-agent/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rojoplus-print-agent
+
+# Variables de entorno
+Environment=NODE_ENV=production
+Environment=ROJOPLUS_SERVER_URL=https://tu-servidor.com
+Environment=ROJOPLUS_PRINT_TOKEN=rojoplus-print-agent
+# Descomenta y personaliza:
+# Environment=ROJOPLUS_PUESTO_ID=cocina-01
+# Environment=ROJOPLUS_PUESTO_NOMBRE=Puesto Cocina
+
+[Install]
+WantedBy=multi-user.target

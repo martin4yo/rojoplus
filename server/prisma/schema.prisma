@@ -2472,8 +2472,11 @@ model SectorBuffet {
 model ImpresoraTermica {
   id                Int                @id @default(autoincrement())
   nombre            String             @unique
-  ip                String
-  puerto            Int                @default(9100)
+  tipoConexion      String             @default("IP") @map("tipo_conexion") // IP, USB, CUPS
+  ip                String?            // Para tipo IP (ej: 192.168.1.100)
+  puerto            Int                @default(9100) // Para tipo IP
+  destino           String?            // Para USB (/dev/usb/lp0) o CUPS (nombre impresora)
+  puestoId          String?            @map("puesto_id") // Identificador del puesto que maneja esta impresora
   activo            Boolean            @default(true)
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")

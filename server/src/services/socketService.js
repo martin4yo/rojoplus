@@ -5,6 +5,20 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 let io = null
 
+// Importar registro de eventos de print-agent
+let registrarEventosPrintAgent = null
+import('./socketService.js').then(() => {
+  // Importación dinámica para evitar dependencia circular
+  import('../routes/buffet/impresoras.js').then(mod => {
+    registrarEventosPrintAgent = mod.registrarEventosPrintAgent
+    if (io && registrarEventosPrintAgent) {
+      registrarEventosPrintAgent(io)
+    }
+  }).catch(() => {
+    console.log('[Socket] Print-agent module not loaded')
+  })
+})
+
 // Inicializar Socket.io
 export function initSocket(httpServer) {
   io = new Server(httpServer, {
@@ -108,6 +122,11 @@ export function initSocket(httpServer) {
       }
     })
   })
+
+  // Registrar eventos de print-agent si el módulo está cargado
+  if (registrarEventosPrintAgent) {
+    registrarEventosPrintAgent(io)
+  }
 
   console.log('[Socket.io] Inicializado')
   return io
