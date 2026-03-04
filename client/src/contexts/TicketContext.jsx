@@ -83,7 +83,7 @@ export function TicketProvider({ children }) {
     return {
       tipo: 'KIOSCO',
       numero: venta.numero,
-      cliente: venta.socio?.apellidoNombre || null,
+      cliente: venta.socio?.apellidoNombre || venta.cliente || null,
       fecha: new Date(),
       items: venta.items?.map(item => ({
         cantidad: item.cantidad,
@@ -94,7 +94,9 @@ export function TicketProvider({ children }) {
       descuento: Number(venta.descuento || 0),
       descuentoPorcentaje: venta.porcentajeDescuento || 0,
       total: Number(venta.total || 0),
-      medioPago: venta.medioPago?.nombre || venta.medioPagoNombre || null
+      medioPago: venta.medioPago?.nombre || venta.medioPagoNombre || null,
+      montoPagado: venta.montoPagado || null,
+      vuelto: venta.vuelto || null
     }
   }, [])
 

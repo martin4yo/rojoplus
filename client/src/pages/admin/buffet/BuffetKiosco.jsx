@@ -37,6 +37,7 @@ export default function BuffetKiosco() {
   const [vistaProductos, setVistaProductos] = useState(() => {
     return localStorage.getItem('kioscoVistaProductos') || 'shop'
   })
+  const [mostrarCarritoMobile, setMostrarCarritoMobile] = useState(false)
 
   // Facturación
   const [tipoComprobante, setTipoComprobante] = useState('interno') // 'interno', 'facturaB', 'facturaC'
@@ -509,11 +510,11 @@ export default function BuffetKiosco() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-100px)]">
+    <div className="flex h-[calc(100vh-100px)] relative">
       {/* Panel Izquierdo - Productos */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Barra de búsqueda + Notificaciones */}
-        <div className="p-4 bg-white border-b flex items-center gap-3">
+        {/* Barra de búsqueda + Notificaciones - Desktop */}
+        <div className="hidden md:flex p-4 bg-white border-b items-center gap-3">
           {/* Campo de Cantidad */}
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Cant:</label>
@@ -588,13 +589,86 @@ export default function BuffetKiosco() {
           </button>
         </div>
 
+        {/* Barra de búsqueda - Mobile */}
+        <div className="md:hidden p-3 bg-white border-b space-y-2">
+          {/* Fila 1: Búsqueda */}
+          <div className="flex items-center gap-2">
+            <Barcode className="text-gray-400 flex-shrink-0" size={20} />
+            <div className="flex-1">
+              <SearchInput
+                value={busqueda}
+                onChange={setBusqueda}
+                onImmediateChange={handleBusquedaChange}
+                onEnter={handleEnterBusqueda}
+                onClear={limpiarBusqueda}
+                placeholder="Buscar producto..."
+                autoFocus={false}
+                debounceMs={0}
+                className="text-base"
+              />
+            </div>
+            <button
+              onClick={() => buscarProducto(busqueda)}
+              disabled={!busqueda || buscando}
+              className="p-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
+            >
+              <Search size={18} />
+            </button>
+          </div>
+
+          {/* Fila 2: Cantidad + Vista + Notificaciones */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-600">Cant:</label>
+              <input
+                type="number"
+                min="1"
+                value={cantidadAgregar}
+                onChange={(e) => setCantidadAgregar(Math.max(1, parseInt(e.target.value) || 1))}
+                onFocus={(e) => e.target.select()}
+                className="w-14 text-center text-base font-bold border-2 border-gray-300 rounded-lg px-1 py-1.5 focus:border-blue-500 outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setVistaProductos('shop')}
+                className={`p-1.5 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setVistaProductos('lista')}
+                className={`p-1.5 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <NotificacionBuffet />
+              <button
+                onClick={() => setMostrarUltimasVentas(!mostrarUltimasVentas)}
+                className="p-1.5 hover:bg-gray-100 rounded-lg relative transition"
+              >
+                <FileText size={18} />
+                {ultimasVentas.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+                    {ultimasVentas.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Categorías - Ocultas en Kiosco */}
 
         {/* Grid/Lista de Productos */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
+        <div className="flex-1 overflow-y-auto p-2 md:p-4 bg-gray-100 pb-20 md:pb-4">
           {vistaProductos === 'shop' ? (
             /* Vista Shop - Tarjetas */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
               {productosFiltrados.map(prod => {
                 const sinStock = prod.stock !== undefined && prod.stock === 0
                 const stockBajo = prod.stock !== undefined && prod.stock > 0 && prod.stock <= 5
@@ -604,39 +678,40 @@ export default function BuffetKiosco() {
                     key={prod.id}
                     onClick={() => agregarAlCarrito(prod)}
                     disabled={sinStock}
-                    className={`bg-white rounded-lg p-4 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 hover:scale-[1.02] flex gap-4 ${
+                    className={`bg-white rounded-lg p-2 md:p-4 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 active:scale-95 md:hover:scale-[1.02] flex flex-col md:flex-row gap-2 md:gap-4 ${
                       sinStock ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
+                    {/* Imagen - más pequeña en mobile */}
                     {prod.imagen ? (
                       <img
                         src={prod.imagen}
                         alt={prod.nombre}
-                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+                        className="w-full h-20 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0"
                       />
                     ) : (
-                      <div className="w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
-                        <Coffee size={32} className="text-gray-400" />
+                      <div className="w-full h-20 md:w-20 md:h-20 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
+                        <Coffee size={24} className="text-gray-400 md:w-8 md:h-8" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-base line-clamp-2 leading-snug">{prod.nombre}</h3>
+                      <h3 className="font-medium text-xs md:text-base line-clamp-2 leading-snug">{prod.nombre}</h3>
                       {prod.codigoBarras && (
-                        <p className="text-xs text-gray-400 truncate mt-1">{prod.codigoBarras}</p>
+                        <p className="text-[10px] md:text-xs text-gray-400 truncate mt-0.5 md:mt-1 hidden md:block">{prod.codigoBarras}</p>
                       )}
-                      <p className="text-lg font-bold text-green-600 mt-1.5">
+                      <p className="text-sm md:text-lg font-bold text-green-600 mt-1 md:mt-1.5">
                         ${Number(prod.precio).toLocaleString()}
                       </p>
 
                       {/* Badge de stock */}
                       {prod.stock !== undefined && (
-                        <div className="mt-1.5">
+                        <div className="mt-1 md:mt-1.5">
                           {sinStock ? (
-                            <span className="inline-block text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
+                            <span className="inline-block text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
                               Sin stock
                             </span>
                         ) : stockBajo ? (
-                          <span className="inline-block text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">
+                          <span className="inline-block text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">
                             Quedan {prod.stock}
                           </span>
                         ) : null}
@@ -744,8 +819,143 @@ export default function BuffetKiosco() {
         </div>
       </div>
 
-      {/* Panel Derecho - Carrito con Tabs - Ancho dinámico */}
-      <div className={`bg-white border-l flex flex-col transition-all duration-300 ${
+      {/* Botón flotante carrito - Mobile */}
+      {carrito.length > 0 && !mostrarCarritoMobile && (
+        <button
+          onClick={() => setMostrarCarritoMobile(true)}
+          className="md:hidden fixed bottom-4 right-4 z-40 flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 active:scale-95 transition-all"
+        >
+          <ShoppingCart size={20} />
+          <span className="font-bold">${total.toLocaleString()}</span>
+          <span className="bg-white text-green-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+            {carrito.reduce((sum, item) => sum + item.cantidad, 0)}
+          </span>
+        </button>
+      )}
+
+      {/* Overlay del carrito - Mobile */}
+      {mostrarCarritoMobile && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setMostrarCarritoMobile(false)}>
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[85vh] flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle para cerrar */}
+            <div className="flex justify-center py-2">
+              <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+            </div>
+
+            {/* Header del drawer */}
+            <div className="flex items-center justify-between px-4 pb-3 border-b">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <ShoppingCart size={20} />
+                Carrito
+                {carrito.length > 0 && (
+                  <span className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                    {carrito.reduce((sum, item) => sum + item.cantidad, 0)} items
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={() => setMostrarCarritoMobile(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Items del carrito - Mobile */}
+            <div className="flex-1 overflow-y-auto p-4 max-h-[40vh]">
+              {carrito.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                  <Coffee size={48} className="mb-2" />
+                  <p>Carrito vacío</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {carrito.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm truncate">{item.nombre}</h4>
+                        <p className="text-green-600 font-bold text-sm">
+                          ${Number(item.precio).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => modificarCantidad(item.id, -1)}
+                          className="p-1.5 bg-gray-200 rounded-lg hover:bg-gray-300 active:scale-95"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <span className="w-8 text-center font-bold text-sm">{item.cantidad}</span>
+                        <button
+                          onClick={() => modificarCantidad(item.id, 1)}
+                          className="p-1.5 bg-gray-200 rounded-lg hover:bg-gray-300 active:scale-95"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                      <div className="w-16 text-right font-bold text-sm">
+                        ${(Number(item.precio) * item.cantidad).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Opciones de pago - Mobile */}
+            {carrito.length > 0 && (
+              <div className="border-t p-4 space-y-3 bg-gray-50">
+                {/* Total */}
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-bold">Total:</span>
+                  <span className="text-2xl font-bold text-green-600">${total.toLocaleString()}</span>
+                </div>
+
+                {/* Selector medio de pago compacto */}
+                <SelectorMedioPago
+                  mediosPago={mediosPago}
+                  selectedId={medioPagoId}
+                  onChange={setMedioPagoId}
+                  compact={true}
+                />
+
+                {/* Botones de acción */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={limpiarCarrito}
+                    className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300"
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMostrarCarritoMobile(false)
+                      cobrar()
+                    }}
+                    disabled={procesando || !cajaId || !medioPagoId}
+                    className="flex-[2] px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {procesando ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                    ) : (
+                      <>
+                        <DollarSign size={18} />
+                        COBRAR ${total.toLocaleString()}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Panel Derecho - Carrito con Tabs - Ancho dinámico (Desktop only) */}
+      <div className={`hidden md:flex bg-white border-l flex-col transition-all duration-300 ${
         tabActivo === 'finalizar' ? 'w-[480px]' : 'w-96'
       }`}>
         {/* Tabs Navigation */}

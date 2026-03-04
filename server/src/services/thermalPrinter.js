@@ -448,7 +448,12 @@ export async function generarTicketCuenta(datos) {
   // ========== TIPO DE TICKET ==========
   ticket += commands.bold.on
   ticket += commands.size.doubleHeight
-  ticket += (datos.tipo === 'CUENTA' ? 'CUENTA' : 'TICKET') + commands.newLine
+  // Mostrar tipo según origen
+  const tipoTicket = datos.tipo === 'CUENTA' ? 'CUENTA'
+    : datos.tipo === 'KIOSCO' ? 'KIOSCO'
+    : datos.tipo === 'TAKEAWAY' ? 'TAKE AWAY'
+    : 'TICKET'
+  ticket += tipoTicket + commands.newLine
   ticket += commands.size.normal
   ticket += commands.bold.off
 

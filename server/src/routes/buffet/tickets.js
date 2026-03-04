@@ -558,11 +558,12 @@ router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async 
         where: { id: parseInt(impresoraId) }
       })
     } else {
-      // Buscar en configuración según tipo de ticket
+      // Buscar en configuración según tipo de ticket (del parámetro o del ticket.tipo)
+      const tipo = tipoTicket || ticket.tipo
       let configKey = 'BUFFET_IMPRESORA_TICKETS'
-      if (tipoTicket === 'KIOSCO') {
+      if (tipo === 'KIOSCO') {
         configKey = 'BUFFET_IMPRESORA_KIOSCO'
-      } else if (tipoTicket === 'TAKEAWAY') {
+      } else if (tipo === 'TAKEAWAY') {
         configKey = 'BUFFET_IMPRESORA_TAKEAWAY'
       }
 
