@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Printer, Wifi, WifiOff, TestTube2, ChefHat, Coffee, Flame, Package, UtensilsCrossed, Layers, Monitor, Usb, Cloud, RefreshCw } from 'lucide-react'
+import { Plus, Edit, Trash2, Printer, Wifi, WifiOff, TestTube2, ChefHat, Coffee, Flame, Package, UtensilsCrossed, Layers, Monitor, Usb, Cloud, RefreshCw, Laptop } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -18,6 +18,7 @@ const TIPOS_CONEXION = [
   { value: 'IP', label: 'Red (IP)', icon: Wifi, descripcion: 'Impresora con dirección IP propia' },
   { value: 'USB', label: 'USB', icon: Usb, descripcion: 'Impresora conectada por USB al puesto' },
   { value: 'CUPS', label: 'CUPS/Sistema', icon: Cloud, descripcion: 'Impresora configurada en el sistema (Linux CUPS)' },
+  { value: 'WINDOWS', label: 'Windows', icon: Laptop, descripcion: 'Impresora instalada en Windows' },
 ]
 
 const getIconoComponent = (iconoNombre) => {
@@ -913,8 +914,8 @@ export default function BuffetImpresoras() {
                 </div>
               )}
 
-              {/* Campos para USB/CUPS */}
-              {(formData.tipoConexion === 'USB' || formData.tipoConexion === 'CUPS') && (
+              {/* Campos para USB/CUPS/WINDOWS */}
+              {(formData.tipoConexion === 'USB' || formData.tipoConexion === 'CUPS' || formData.tipoConexion === 'WINDOWS') && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -956,7 +957,8 @@ export default function BuffetImpresoras() {
                   {formData.puestoId && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {formData.tipoConexion === 'USB' ? 'Dispositivo USB *' : 'Impresora CUPS *'}
+                        {formData.tipoConexion === 'USB' ? 'Dispositivo USB *' :
+                         formData.tipoConexion === 'WINDOWS' ? 'Impresora Windows *' : 'Impresora CUPS *'}
                       </label>
                       {getImpresorasDelPuesto(formData.puestoId).length > 0 ? (
                         <select
@@ -967,7 +969,7 @@ export default function BuffetImpresoras() {
                         >
                           <option value="">Seleccionar impresora...</option>
                           {getImpresorasDelPuesto(formData.puestoId)
-                            .filter(imp => formData.tipoConexion === 'USB' ? imp.tipo === 'USB' : imp.tipo === 'CUPS')
+                            .filter(imp => imp.tipo === formData.tipoConexion)
                             .map((imp, idx) => (
                               <option key={idx} value={imp.destino}>
                                 {imp.nombre} ({imp.destino})
@@ -981,12 +983,15 @@ export default function BuffetImpresoras() {
                             value={formData.destino}
                             onChange={e => setFormData({ ...formData, destino: e.target.value })}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                            placeholder={formData.tipoConexion === 'USB' ? '/dev/usb/lp0' : 'EPSON_TM_T20'}
+                            placeholder={formData.tipoConexion === 'USB' ? '/dev/usb/lp0' :
+                                        formData.tipoConexion === 'WINDOWS' ? 'EPSON TM-T20' : 'EPSON_TM_T20'}
                             required
                           />
                           <p className="text-xs text-gray-500 mt-1">
                             {formData.tipoConexion === 'USB'
                               ? 'Ruta del dispositivo USB (ej: /dev/usb/lp0)'
+                              : formData.tipoConexion === 'WINDOWS'
+                              ? 'Nombre de la impresora en Windows (ver Panel de Control > Impresoras)'
                               : 'Nombre de la impresora en CUPS (usar: lpstat -p)'}
                           </p>
                         </div>

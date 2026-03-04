@@ -47,11 +47,16 @@ console.log('='.repeat(60))
 // DETECCIÓN DE IMPRESORAS
 // ============================================================================
 
+const isWindows = process.platform === 'win32'
+
 /**
- * Detecta impresoras USB disponibles en /dev/usb/lp*
+ * Detecta impresoras USB disponibles en /dev/usb/lp* (Linux)
  */
 function detectarImpresorasUSB() {
   const impresoras = []
+
+  // Solo funciona en Linux
+  if (isWindows) return impresoras
 
   try {
     // Buscar dispositivos USB de impresoras
@@ -73,10 +78,13 @@ function detectarImpresorasUSB() {
 }
 
 /**
- * Detecta impresoras configuradas en CUPS
+ * Detecta impresoras configuradas en CUPS (Linux/macOS)
  */
 function detectarImpresorasCUPS() {
   const impresoras = []
+
+  // Solo funciona en Linux/macOS
+  if (isWindows) return impresoras
 
   try {
     // Ejecutar lpstat -p para listar impresoras
@@ -106,15 +114,102 @@ function detectarImpresorasCUPS() {
 }
 
 /**
+ * Detecta impresoras en Windows usando wmic o PowerShell
+ */
+function detectarImpresorasWindows() {
+  const impresoras = []
+
+  if (!isWindows) return impresoras
+
+  // Primero intentar con PowerShell (más confiable en Windows 10/11)
+  try {
+    console.log('[Windows] Detectando impresoras con PowerShell...')
+    const output = execSync('powershell -ExecutionPolicy Bypass -Command "Get-Printer | Select-Object -Property Name,PortName | ConvertTo-Csv -NoTypeInformation"', {
+      encoding: 'utf-8',
+      windowsHide: true,
+      timeout: 10000
+    })
+
+    const lines = output.split('\n').filter(l => l.trim())
+    console.log('[Windows] Respuesta PowerShell:', lines.length, 'líneas')
+
+    for (let i = 1; i < lines.length; i++) {
+      // Formato CSV: "Nombre","Puerto"
+      const matches = lines[i].match(/"([^"]*)"/g)
+      if (matches && matches.length >= 1) {
+        const nombre = matches[0].replace(/"/g, '').trim()
+        const puerto = matches[1] ? matches[1].replace(/"/g, '').trim() : ''
+        if (nombre) {
+          console.log(`[Windows]   - ${nombre} (${puerto})`)
+          impresoras.push({
+            tipo: 'WINDOWS',
+            nombre: nombre,
+            destino: nombre,
+            puerto: puerto
+          })
+        }
+      }
+    }
+
+    if (impresoras.length > 0) {
+      return impresoras
+    }
+  } catch (psErr) {
+    console.log('[Windows] PowerShell no disponible o falló, intentando wmic...')
+  }
+
+  // Fallback: wmic (funciona en Windows 7/8)
+  try {
+    const output = execSync('wmic printer get Name,PortName,Status /format:csv', {
+      encoding: 'utf-8',
+      windowsHide: true,
+      timeout: 10000
+    })
+    const lines = output.split('\n').filter(l => l.trim())
+    console.log('[Windows] Respuesta wmic:', lines.length, 'líneas')
+
+    // La primera línea es el header: Node,Name,PortName,Status
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(',')
+      // wmic CSV: Node,Name,PortName,Status
+      if (parts.length >= 3) {
+        const nombre = parts[1]?.trim()
+        const puerto = parts[2]?.trim()
+        if (nombre && nombre !== 'Name' && !impresoras.find(p => p.nombre === nombre)) {
+          console.log(`[Windows]   - ${nombre} (${puerto})`)
+          impresoras.push({
+            tipo: 'WINDOWS',
+            nombre: nombre,
+            destino: nombre,
+            puerto: puerto
+          })
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Windows] Error con wmic:', err.message)
+  }
+
+  return impresoras
+}
+
+/**
  * Detecta todas las impresoras disponibles
  */
 function detectarTodasLasImpresoras() {
-  const usb = detectarImpresorasUSB()
-  const cups = detectarImpresorasCUPS()
+  let impresoras = []
 
-  console.log(`[Detectar] USB: ${usb.length}, CUPS: ${cups.length}`)
+  if (isWindows) {
+    impresoras = detectarImpresorasWindows()
+    console.log(`[Detectar] Windows: ${impresoras.length}`)
+  } else {
+    const usb = detectarImpresorasUSB()
+    const cups = detectarImpresorasCUPS()
+    console.log(`[Detectar] USB: ${usb.length}, CUPS: ${cups.length}`)
+    impresoras = [...usb, ...cups]
+  }
 
-  return [...usb, ...cups]
+  return impresoras
 }
 
 // ============================================================================
@@ -203,6 +298,151 @@ function imprimirCUPS(destino, datos, callback) {
 }
 
 /**
+ * Imprime en Windows enviando datos RAW directamente a la impresora
+ */
+function imprimirWindows(destino, datos, callback) {
+  const buffer = Buffer.from(datos, 'base64')
+
+  // Crear archivo temporal en la carpeta temp de Windows
+  const tmpDir = process.env.TEMP || process.env.TMP || 'C:\\Temp'
+  const tmpFile = `${tmpDir}\\rojoplus-print-${Date.now()}.prn`
+
+  fs.writeFile(tmpFile, buffer, (err) => {
+    if (err) {
+      console.error('[Windows] Error escribiendo archivo temporal:', err.message)
+      callback(err)
+      return
+    }
+
+    console.log(`[Windows] Archivo temporal: ${tmpFile} (${buffer.length} bytes)`)
+
+    // Crear script PowerShell temporal para imprimir RAW
+    const psScript = `${tmpDir}\\rojoplus-print-${Date.now()}.ps1`
+    const psContent = `
+$printerName = "${destino}"
+$filePath = "${tmpFile.replace(/\\/g, '\\\\')}"
+
+Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+
+public class RawPrinter
+{
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+    public class DOCINFOA
+    {
+        [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+        [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+        [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
+    }
+
+    [DllImport("winspool.Drv", EntryPoint = "OpenPrinterA", SetLastError = true, CharSet = CharSet.Ansi)]
+    public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
+
+    [DllImport("winspool.Drv", EntryPoint = "ClosePrinter", SetLastError = true)]
+    public static extern bool ClosePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.Drv", EntryPoint = "StartDocPrinterA", SetLastError = true, CharSet = CharSet.Ansi)]
+    public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
+
+    [DllImport("winspool.Drv", EntryPoint = "EndDocPrinter", SetLastError = true)]
+    public static extern bool EndDocPrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.Drv", EntryPoint = "StartPagePrinter", SetLastError = true)]
+    public static extern bool StartPagePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.Drv", EntryPoint = "EndPagePrinter", SetLastError = true)]
+    public static extern bool EndPagePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.Drv", EntryPoint = "WritePrinter", SetLastError = true)]
+    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
+
+    public static bool SendBytes(string printerName, byte[] bytes)
+    {
+        IntPtr hPrinter = IntPtr.Zero;
+        DOCINFOA di = new DOCINFOA();
+        di.pDocName = "RojoPlus Ticket";
+        di.pDataType = "RAW";
+
+        if (!OpenPrinter(printerName.Normalize(), out hPrinter, IntPtr.Zero))
+        {
+            Console.WriteLine("Error abriendo impresora: " + Marshal.GetLastWin32Error());
+            return false;
+        }
+
+        if (!StartDocPrinter(hPrinter, 1, di))
+        {
+            Console.WriteLine("Error StartDoc: " + Marshal.GetLastWin32Error());
+            ClosePrinter(hPrinter);
+            return false;
+        }
+
+        if (!StartPagePrinter(hPrinter))
+        {
+            Console.WriteLine("Error StartPage: " + Marshal.GetLastWin32Error());
+            EndDocPrinter(hPrinter);
+            ClosePrinter(hPrinter);
+            return false;
+        }
+
+        IntPtr pUnmanagedBytes = Marshal.AllocCoTaskMem(bytes.Length);
+        Marshal.Copy(bytes, 0, pUnmanagedBytes, bytes.Length);
+        int dwWritten;
+        bool success = WritePrinter(hPrinter, pUnmanagedBytes, bytes.Length, out dwWritten);
+        Marshal.FreeCoTaskMem(pUnmanagedBytes);
+
+        if (!success)
+            Console.WriteLine("Error WritePrinter: " + Marshal.GetLastWin32Error());
+
+        EndPagePrinter(hPrinter);
+        EndDocPrinter(hPrinter);
+        ClosePrinter(hPrinter);
+        return success;
+    }
+}
+'@
+
+$bytes = [System.IO.File]::ReadAllBytes($filePath)
+$result = [RawPrinter]::SendBytes($printerName, $bytes)
+if ($result) {
+    Write-Output "OK"
+    exit 0
+} else {
+    Write-Output "ERROR"
+    exit 1
+}
+`
+
+    fs.writeFile(psScript, psContent, (writeErr) => {
+      if (writeErr) {
+        console.error('[Windows] Error escribiendo script:', writeErr.message)
+        fs.unlink(tmpFile, () => {})
+        callback(writeErr)
+        return
+      }
+
+      exec(`powershell -ExecutionPolicy Bypass -File "${psScript}"`, {
+        windowsHide: true,
+        timeout: 30000
+      }, (psErr, stdout, stderr) => {
+        // Limpiar archivos temporales
+        fs.unlink(tmpFile, () => {})
+        fs.unlink(psScript, () => {})
+
+        if (psErr || stdout.trim() !== 'OK') {
+          console.error('[Windows] Error imprimiendo:', stderr || stdout || psErr?.message)
+          callback(psErr || new Error('Error al imprimir'))
+        } else {
+          console.log(`[Windows] Impreso en ${destino}`)
+          callback(null)
+        }
+      })
+    })
+  })
+}
+
+/**
  * Procesa un trabajo de impresión
  */
 function procesarTrabajo(trabajo) {
@@ -227,6 +467,9 @@ function procesarTrabajo(trabajo) {
       break
     case 'CUPS':
       imprimirCUPS(trabajo.destino, trabajo.datos, callback)
+      break
+    case 'WINDOWS':
+      imprimirWindows(trabajo.destino, trabajo.datos, callback)
       break
     default:
       console.error(`[Trabajo] Tipo de conexión desconocido: ${trabajo.tipoConexion}`)
