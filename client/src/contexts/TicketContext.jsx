@@ -1,11 +1,13 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import TicketPreview from '../components/buffet/TicketPreview'
+import api from '../services/api'
+import toast from 'react-hot-toast'
 
 const TicketContext = createContext()
 
 export function TicketProvider({ children }) {
   const [ticketActual, setTicketActual] = useState(null)
-  const [modoPreview, setModoPreview] = useState(true) // Por defecto en modo preview
+  const [modoPreview, setModoPreview] = useState(false) // Por defecto impresión directa
 
   /**
    * Genera un ticket para comanda/cuenta
@@ -181,10 +183,30 @@ export function TicketProvider({ children }) {
       setTicketActual(ticket)
       return { success: true, preview: true }
     } else {
-      // Modo real: enviar a impresora
-      // TODO: Implementar envío real a impresora ESC/POS
-      console.log('Enviando a impresora:', impresoraId, ticket)
-      return { success: true, preview: false }
+      // Modo impresión directa: enviar a impresora térmica
+      try {
+        const res = await api.post('/admin/buffet/imprimir-ticket', {
+          ticket,
+          impresoraId
+        })
+
+        if (res.data?.success) {
+          toast.success(`Ticket enviado a ${res.data.impresora || 'impresora'}`)
+          return { success: true, preview: false }
+        } else {
+          toast.error(res.data?.error || 'Error al imprimir')
+          // Si falla, mostrar preview como fallback
+          setTicketActual(ticket)
+          return { success: false, preview: true, error: res.data?.error }
+        }
+      } catch (error) {
+        console.error('Error enviando ticket a impresora:', error)
+        const errorMsg = error.response?.data?.error || 'Error de conexión con impresora'
+        toast.error(errorMsg)
+        // Si falla, mostrar preview como fallback
+        setTicketActual(ticket)
+        return { success: false, preview: true, error: errorMsg }
+      }
     }
   }, [modoPreview])
 

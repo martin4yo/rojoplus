@@ -6,6 +6,8 @@
 import express from 'express'
 import prisma from '../../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../../middleware/auth.js'
+import { generarTicketFiscal, generarTicketCuenta } from '../../services/thermalPrinter.js'
+import { enviarImpresion } from './impresoras.js'
 
 const router = express.Router()
 
@@ -238,6 +240,79 @@ router.get('/menu-publico', async (req, res) => {
   } catch (error) {
     console.error('Error al obtener menú público:', error)
     res.status(500).json({ success: false, error: 'Error al obtener menú' })
+  }
+})
+
+/**
+ * POST /imprimir-ticket
+ * Imprime un ticket directamente a la impresora térmica
+ * Body: { ticket: {...}, impresoraId?: number }
+ */
+router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async (req, res) => {
+  try {
+    const { ticket, impresoraId } = req.body
+
+    if (!ticket) {
+      return res.status(400).json({ success: false, error: 'Ticket requerido' })
+    }
+
+    // Buscar impresora de caja/tickets
+    let impresora = null
+
+    if (impresoraId) {
+      impresora = await prisma.impresoraTermica.findUnique({
+        where: { id: parseInt(impresoraId) }
+      })
+    } else {
+      // Buscar impresora del sector CAJA o la primera activa sin sector (ticket)
+      impresora = await prisma.impresoraTermica.findFirst({
+        where: {
+          activo: true,
+          OR: [
+            { sector: { codigo: 'CAJA' } },
+            { sector: { codigo: 'TICKET' } },
+            { sectorId: null } // Impresora sin sector = impresora de tickets
+          ]
+        },
+        include: { sector: true }
+      })
+    }
+
+    if (!impresora) {
+      return res.status(400).json({
+        success: false,
+        error: 'No hay impresora de tickets configurada'
+      })
+    }
+
+    // Generar comandos ESC/POS según tipo de ticket
+    let ticketData
+
+    if (ticket.tipo === 'FISCAL') {
+      ticketData = await generarTicketFiscal(ticket)
+    } else {
+      ticketData = await generarTicketCuenta(ticket)
+    }
+
+    // Convertir a base64 para enviar al print-agent
+    const ticketBase64 = Buffer.from(ticketData, 'binary').toString('base64')
+
+    // Enviar a impresora
+    const resultado = await enviarImpresion(impresora.id, ticketBase64, ticket.tipo || 'TICKET')
+
+    if (resultado.success) {
+      res.json({
+        success: true,
+        message: 'Ticket enviado a impresora',
+        impresora: impresora.nombre,
+        trabajoId: resultado.trabajoId
+      })
+    } else {
+      res.status(400).json({ success: false, error: resultado.error })
+    }
+  } catch (error) {
+    console.error('Error imprimiendo ticket:', error)
+    res.status(500).json({ success: false, error: 'Error al imprimir ticket' })
   }
 })
 
