@@ -37,6 +37,8 @@ function generarComandaESCPOS(comanda, items) {
   const ESC = 0x1B
   const GS = 0x1D
   const buffer = []
+  const LINEA = '='.repeat(48)
+  const LINEA_DASH = '-'.repeat(48)
 
   // Inicializar
   buffer.push(ESC, 0x40)
@@ -44,8 +46,10 @@ function generarComandaESCPOS(comanda, items) {
   // Título centrado
   buffer.push(ESC, 0x61, 0x01) // Centrar
   buffer.push(ESC, 0x45, 0x01) // Negrita
-  buffer.push(...Buffer.from('== COMANDA ==\n'))
+  buffer.push(...Buffer.from('*** COCINA ***\n'))
   buffer.push(ESC, 0x45, 0x00) // Fin negrita
+
+  buffer.push(...Buffer.from(`${LINEA}\n`))
 
   // Número de mesa - GRANDE Y DESTACADO
   buffer.push(GS, 0x21, 0x11) // Doble tamaño (alto y ancho)
@@ -55,35 +59,35 @@ function generarComandaESCPOS(comanda, items) {
   buffer.push(ESC, 0x45, 0x00) // Fin negrita
 
   // Nombre del cliente/socio - DESTACADO
-  const nombreCliente = comanda.socio?.apellidoNombre || comanda.nombreGrupo || null
+  const nombreCliente = comanda.socio?.apellidoNombre || comanda.observaciones || comanda.nombreGrupo || null
   if (nombreCliente) {
-    buffer.push(GS, 0x21, 0x01) // Doble ancho
     buffer.push(ESC, 0x45, 0x01) // Negrita
     buffer.push(...Buffer.from(`${nombreCliente}\n`))
-    buffer.push(GS, 0x21, 0x00)
     buffer.push(ESC, 0x45, 0x00)
   }
 
-  buffer.push(...Buffer.from(`Hora: ${new Date().toLocaleTimeString()}\n`))
-  buffer.push(...Buffer.from('==================\n'))
+  buffer.push(...Buffer.from(`Comanda #${comanda.numero || comanda.id}\n`))
+  buffer.push(...Buffer.from(`Hora: ${new Date().toLocaleTimeString('es-AR')}\n`))
+  buffer.push(...Buffer.from(`${LINEA_DASH}\n`))
 
   // Alinear a la izquierda
   buffer.push(ESC, 0x61, 0x00)
 
-  // Items
+  // Items - SIN negrita
   for (const item of items) {
     const nombre = item.productoBuffet?.nombre || 'Producto'
     const cantidad = item.cantidad || 1
-    buffer.push(ESC, 0x45, 0x01) // Negrita para items
-    buffer.push(...Buffer.from(`${cantidad}x ${nombre}\n`))
-    buffer.push(ESC, 0x45, 0x00)
+    buffer.push(...Buffer.from(`${cantidad}x ${nombre.toUpperCase()}\n`))
     if (item.observaciones) {
-      buffer.push(...Buffer.from(`   -> ${item.observaciones}\n`))
+      buffer.push(...Buffer.from(`   >> ${item.observaciones}\n`))
     }
   }
 
-  // Línea final y avance de papel antes de corte
-  buffer.push(...Buffer.from('\n==================\n\n\n\n\n\n'))
+  // Línea final
+  buffer.push(...Buffer.from(`${LINEA}\n`))
+
+  // Avance de papel (6 líneas) antes de corte para fácil manipulación
+  buffer.push(...Buffer.from('\n\n\n\n\n\n'))
   buffer.push(GS, 0x56, 0x00) // Corte
 
   return Buffer.from(buffer)
@@ -422,7 +426,7 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     if (itemsCreados.length > 0) {
       const comandaConMesa = await prisma.comanda.findUnique({
         where: { id: parseInt(id) },
-        include: { mesa: true }
+        include: { mesa: true, socio: true }
       })
       // Ejecutar impresión de forma asíncrona (no bloquea la respuesta)
       imprimirComandaPorDestinos(comandaConMesa, itemsCreados)

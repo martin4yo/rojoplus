@@ -106,10 +106,10 @@ function lineLeftRight(left, right, width = PAPER_WIDTH) {
 }
 
 /**
- * Genera QR usando comandos ESC/POS nativos (más compatible que bitmap)
- * Funciona en la mayoría de impresoras térmicas modernas (EPSON, similar)
+ * Genera QR usando comandos ESC/POS nativos
+ * Usa tamaño de módulo 8 para mejor visibilidad
  */
-function generateQRNative(data) {
+function generateQRNative(data, moduleSize = 8) {
   const dataBytes = Buffer.from(data, 'utf-8')
   const storeLen = dataBytes.length + 3 // +3 por cn + fn + m
   const storePL = storeLen & 0xFF
@@ -121,24 +121,19 @@ function generateQRNative(data) {
   // cn = 49 (0x31), funciones varían
 
   // 1. Seleccionar modelo QR (modelo 2)
-  // fn=65(A), n1=50(modelo 2), n2=0
   cmd += GS + '\x28\x6B\x04\x00\x31\x41\x32\x00'
 
-  // 2. Tamaño del módulo (6 = tamaño medio-grande, rango 1-16)
-  // fn=67(C), n=6
-  cmd += GS + '\x28\x6B\x03\x00\x31\x43\x06'
+  // 2. Tamaño del módulo (rango 1-16, 8 es un buen tamaño visible)
+  cmd += GS + '\x28\x6B\x03\x00\x31\x43' + String.fromCharCode(moduleSize)
 
   // 3. Nivel de corrección de error (M = 15%)
-  // fn=69(E), n=49(M)
   cmd += GS + '\x28\x6B\x03\x00\x31\x45\x31'
 
   // 4. Almacenar datos del QR
-  // fn=80(P), m=48(0)
   cmd += GS + '\x28\x6B' + String.fromCharCode(storePL) + String.fromCharCode(storePH) + '\x31\x50\x30'
   cmd += dataBytes.toString('binary')
 
   // 5. Imprimir el QR almacenado
-  // fn=81(Q), m=48(0)
   cmd += GS + '\x28\x6B\x03\x00\x31\x51\x30'
 
   return cmd
@@ -396,10 +391,10 @@ export async function generarTicketFiscal(datos) {
         ticket += 'Codigo QR ARCA' + commands.newLine
         ticket += commands.newLine
 
-        // Generar QR como imagen PNG
+        // Generar QR como imagen PNG (200px como AxiomaWeb)
         const qrBuffer = await QRCode.toBuffer(qrUrl, {
           type: 'png',
-          width: 250,
+          width: 200,
           margin: 1,
           errorCorrectionLevel: 'M'
         })

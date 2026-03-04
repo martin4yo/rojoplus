@@ -115,7 +115,7 @@ async function convertImageToBitmap(pngBuffer) {
 /**
  * Genera línea de separación
  */
-function separator(char = '-', width = 42) {
+function separator(char = '-', width = 48) {
   return char.repeat(width)
 }
 
@@ -137,7 +137,7 @@ function formatDate(date) {
 /**
  * Formatea línea de item con descripción y precio alineados
  */
-function formatItemLine(description, price, width = 42) {
+function formatItemLine(description, price, width = 48) {
   const priceStr = formatPrice(price)
   const maxDesc = width - priceStr.length - 1
   const desc = description.length > maxDesc ? description.substring(0, maxDesc) : description
@@ -148,7 +148,7 @@ function formatItemLine(description, price, width = 42) {
 /**
  * Formatea línea con label y valor alineados a la derecha
  */
-function formatLabelValue(label, value, width = 42) {
+function formatLabelValue(label, value, width = 48) {
   const spaces = width - label.length - value.length
   return label + ' '.repeat(Math.max(1, spaces)) + value
 }
@@ -202,15 +202,19 @@ export async function renderTicketFiscal(data) {
 
   // ========== DATOS CLIENTE ==========
   output += ESCPOS.ALIGN_LEFT
-  if (comprobante.nombreCliente && comprobante.nombreCliente !== 'Consumidor Final') {
-    output += `Cliente: ${comprobante.nombreCliente}\n`
-  }
+  output += ESCPOS.BOLD_ON
+  output += 'CLIENTE\n'
+  output += ESCPOS.BOLD_OFF
+
+  const nombreCliente = comprobante.nombreCliente || 'Consumidor Final'
+  output += `${nombreCliente}\n`
+
   if (comprobante.docCliente && comprobante.tipoDocCliente !== 99) {
     const tipoDoc = comprobante.tipoDocCliente === 80 ? 'CUIT' : comprobante.tipoDocCliente === 96 ? 'DNI' : 'Doc'
     output += `${tipoDoc}: ${comprobante.docCliente}\n`
   }
-  if (comprobante.condicionIvaCliente) {
-    output += `IVA: ${comprobante.condicionIvaCliente}\n`
+  if (comprobante.condicionIvaCliente && comprobante.condicionIvaCliente !== 'Consumidor Final') {
+    output += `Cond. IVA: ${comprobante.condicionIvaCliente}\n`
   }
 
   output += separator() + '\n'
@@ -272,10 +276,10 @@ export async function renderTicketFiscal(data) {
     try {
       console.log('[Ticket] Generando QR bitmap para:', qrUrl.substring(0, 50) + '...')
 
-      // Generar QR como imagen PNG
+      // Generar QR como imagen PNG (200px como AxiomaWeb)
       const qrBuffer = await QRCode.toBuffer(qrUrl, {
         type: 'png',
-        width: 250,
+        width: 200,
         margin: 1,
         errorCorrectionLevel: 'M'
       })
