@@ -47,8 +47,23 @@ function generarComandaESCPOS(comanda, items) {
   buffer.push(...Buffer.from('== COMANDA ==\n'))
   buffer.push(ESC, 0x45, 0x00) // Fin negrita
 
-  // Mesa
-  buffer.push(...Buffer.from(`Mesa: ${comanda.mesa?.numero || '?'}\n`))
+  // Número de mesa - GRANDE Y DESTACADO
+  buffer.push(GS, 0x21, 0x11) // Doble tamaño (alto y ancho)
+  buffer.push(ESC, 0x45, 0x01) // Negrita
+  buffer.push(...Buffer.from(`MESA ${comanda.mesa?.numero || '?'}\n`))
+  buffer.push(GS, 0x21, 0x00) // Tamaño normal
+  buffer.push(ESC, 0x45, 0x00) // Fin negrita
+
+  // Nombre del cliente/socio - DESTACADO
+  const nombreCliente = comanda.socio?.apellidoNombre || comanda.nombreGrupo || null
+  if (nombreCliente) {
+    buffer.push(GS, 0x21, 0x01) // Doble ancho
+    buffer.push(ESC, 0x45, 0x01) // Negrita
+    buffer.push(...Buffer.from(`${nombreCliente}\n`))
+    buffer.push(GS, 0x21, 0x00)
+    buffer.push(ESC, 0x45, 0x00)
+  }
+
   buffer.push(...Buffer.from(`Hora: ${new Date().toLocaleTimeString()}\n`))
   buffer.push(...Buffer.from('==================\n'))
 
@@ -59,7 +74,9 @@ function generarComandaESCPOS(comanda, items) {
   for (const item of items) {
     const nombre = item.productoBuffet?.nombre || 'Producto'
     const cantidad = item.cantidad || 1
+    buffer.push(ESC, 0x45, 0x01) // Negrita para items
     buffer.push(...Buffer.from(`${cantidad}x ${nombre}\n`))
+    buffer.push(ESC, 0x45, 0x00)
     if (item.observaciones) {
       buffer.push(...Buffer.from(`   -> ${item.observaciones}\n`))
     }

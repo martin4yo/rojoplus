@@ -718,6 +718,12 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   // Verificar si la comanda está esperando cobro (cuenta pedida)
   const esCuentaPedida = tipo === 'mesa' && comandaActiva?.estado === 'CUENTA_PEDIDA'
 
+  // Verificar si no se pueden agregar/editar items
+  // Para mesas: cuando la cuenta fue pedida
+  // Para takeaway: cuando está pagado, entregado o cancelado
+  const noPermiteAgregarItems = esCuentaPedida ||
+    (tipo === 'takeaway' && ['PAGADO', 'ENTREGADO', 'CANCELADO'].includes(entidad?.estado))
+
   const tiempoAbierta = comandaActiva?.horaApertura
     ? Math.floor((new Date() - new Date(comandaActiva.horaApertura)) / 60000)
     : 0
@@ -1353,8 +1359,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   <button
                     key={prod.id}
                     onClick={() => {
-                      if (esCuentaPedida) {
-                        toast.error('No se pueden agregar items, la cuenta ya fue pedida')
+                      if (noPermiteAgregarItems) {
+                        toast.error('No se pueden agregar items a este pedido')
                         return
                       }
                       agregarItem(prod)
@@ -1362,9 +1368,9 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                         toast.success(`+1 ${prod.nombre}`, { duration: 1000, position: 'bottom-center' })
                       }
                     }}
-                    disabled={esCuentaPedida}
+                    disabled={noPermiteAgregarItems}
                     className={`bg-white rounded-lg p-2 md:p-3 text-left transition-all border-2 border-transparent flex gap-2 md:gap-3 ${
-                      esCuentaPedida
+                      noPermiteAgregarItems
                         ? 'opacity-50 cursor-not-allowed'
                         : 'hover:shadow-lg hover:border-red-500 active:scale-95'
                     }`}
@@ -1411,8 +1417,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                       <tr
                         key={prod.id}
                         onClick={() => {
-                          if (esCuentaPedida) {
-                            toast.error('No se pueden agregar items, la cuenta ya fue pedida')
+                          if (noPermiteAgregarItems) {
+                            toast.error('No se pueden agregar items a este pedido')
                             return
                           }
                           agregarItem(prod)
@@ -1421,7 +1427,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                           }
                         }}
                         className={`transition-colors ${
-                          esCuentaPedida
+                          noPermiteAgregarItems
                             ? 'opacity-50 cursor-not-allowed bg-gray-50'
                             : 'hover:bg-gray-100 cursor-pointer'
                         }`}
@@ -1509,6 +1515,26 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   <Receipt size={18} className="text-orange-600" />
                   <span className="text-sm font-medium text-orange-800">
                     Cuenta solicitada - Esperando cobro
+                  </span>
+                </div>
+              )}
+
+              {/* Banner de pedido pagado para takeaway */}
+              {tipo === 'takeaway' && entidad?.estado === 'PAGADO' && (
+                <div className="bg-green-100 border-b border-green-200 px-4 py-2 flex items-center gap-2">
+                  <DollarSign size={18} className="text-green-600" />
+                  <span className="text-sm font-medium text-green-800">
+                    Pedido cobrado - Pendiente de entrega
+                  </span>
+                </div>
+              )}
+
+              {/* Banner de pedido entregado para takeaway */}
+              {tipo === 'takeaway' && entidad?.estado === 'ENTREGADO' && (
+                <div className="bg-blue-100 border-b border-blue-200 px-4 py-2 flex items-center gap-2">
+                  <Receipt size={18} className="text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">
+                    Pedido entregado
                   </span>
                 </div>
               )}
@@ -1664,8 +1690,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
                 {/* Botones */}
                 <div className="space-y-2">
-                  {/* Pedir - Solo si hay items nuevos y NO está cuenta pedida */}
-                  {itemsNuevos.length > 0 && !esCuentaPedida && (
+                  {/* Pedir - Solo si hay items nuevos y permite agregar items */}
+                  {itemsNuevos.length > 0 && !noPermiteAgregarItems && (
                     <button
                       onClick={enviarACocina}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600 active:bg-yellow-700 text-sm md:text-base"

@@ -16,8 +16,116 @@ import {
   generarNumeroMC,
   recalcularTotalesPedido
 } from './helpers.js'
+import { enviarImpresion } from './impresoras.js'
 
 const router = express.Router()
+
+// ============================================================================
+// FUNCIONES DE IMPRESIÓN PARA TAKEAWAY
+// ============================================================================
+
+/**
+ * Genera comandos ESC/POS para imprimir comanda de TakeAway
+ */
+function generarComandaTakeAwayESCPOS(pedido, items) {
+  const ESC = 0x1B
+  const GS = 0x1D
+  const buffer = []
+
+  // Inicializar
+  buffer.push(ESC, 0x40)
+
+  // Título centrado
+  buffer.push(ESC, 0x61, 0x01) // Centrar
+  buffer.push(ESC, 0x45, 0x01) // Negrita
+  buffer.push(...Buffer.from('== TAKE AWAY ==\n'))
+  buffer.push(ESC, 0x45, 0x00) // Fin negrita
+
+  // Número de pedido - GRANDE Y DESTACADO
+  buffer.push(GS, 0x21, 0x11) // Doble tamaño (alto y ancho)
+  buffer.push(ESC, 0x45, 0x01) // Negrita
+  buffer.push(...Buffer.from(`PEDIDO #${pedido.numero}\n`))
+  buffer.push(GS, 0x21, 0x00) // Tamaño normal
+  buffer.push(ESC, 0x45, 0x00) // Fin negrita
+
+  // Nombre del cliente - DESTACADO
+  const nombreCliente = pedido.socio?.apellidoNombre || pedido.nombreCliente || null
+  if (nombreCliente) {
+    buffer.push(GS, 0x21, 0x01) // Doble ancho
+    buffer.push(ESC, 0x45, 0x01) // Negrita
+    buffer.push(...Buffer.from(`${nombreCliente}\n`))
+    buffer.push(GS, 0x21, 0x00)
+    buffer.push(ESC, 0x45, 0x00)
+  }
+
+  // Hora
+  buffer.push(...Buffer.from(`Hora: ${new Date().toLocaleTimeString()}\n`))
+  buffer.push(...Buffer.from('==================\n'))
+
+  // Alinear a la izquierda
+  buffer.push(ESC, 0x61, 0x00)
+
+  // Items
+  for (const item of items) {
+    const nombre = item.productoBuffet?.nombre || 'Producto'
+    const cantidad = item.cantidad || 1
+    buffer.push(ESC, 0x45, 0x01) // Negrita
+    buffer.push(...Buffer.from(`${cantidad}x ${nombre}\n`))
+    buffer.push(ESC, 0x45, 0x00)
+    if (item.observaciones) {
+      buffer.push(...Buffer.from(`   -> ${item.observaciones}\n`))
+    }
+  }
+
+  // Línea final y avance
+  buffer.push(...Buffer.from('\n==================\n\n\n\n\n\n'))
+  buffer.push(GS, 0x56, 0x00) // Corte
+
+  return Buffer.from(buffer)
+}
+
+/**
+ * Imprime comanda de TakeAway en los destinos correspondientes
+ */
+async function imprimirComandaTakeAway(pedido, items) {
+  try {
+    console.log(`[Print TakeAway] Iniciando impresión. Items: ${items.length}`)
+
+    // Agrupar items por destino de impresión
+    const itemsPorDestino = new Map()
+
+    for (const item of items) {
+      const producto = item.productoBuffet
+      if (!producto?.categoriaMenuId) continue
+
+      const destino = await prisma.destinoImpresion.findFirst({
+        where: { categoriaMenuId: producto.categoriaMenuId },
+        include: { impresora: true }
+      })
+
+      if (!destino || !destino.impresora) continue
+
+      const impresoraId = destino.impresora.id
+      if (!itemsPorDestino.has(impresoraId)) {
+        itemsPorDestino.set(impresoraId, { impresora: destino.impresora, items: [] })
+      }
+      itemsPorDestino.get(impresoraId).items.push(item)
+    }
+
+    console.log(`[Print TakeAway] Impresoras a usar: ${itemsPorDestino.size}`)
+
+    // Imprimir en cada destino
+    for (const [impresoraId, data] of itemsPorDestino) {
+      console.log(`[Print TakeAway] Enviando a impresora ${data.impresora.nombre}`)
+      const ticketData = generarComandaTakeAwayESCPOS(pedido, data.items)
+      const base64Data = ticketData.toString('base64')
+      const resultado = await enviarImpresion(impresoraId, base64Data, 'COMANDA_TAKEAWAY')
+      console.log(`[Print TakeAway] Resultado: ${JSON.stringify(resultado)}`)
+    }
+  } catch (error) {
+    console.error('[Print TakeAway] Error:', error)
+  }
+}
 
 // ============================================================================
 // PEDIDOS TAKE AWAY - Listado y CRUD
@@ -188,7 +296,7 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
       return res.status(404).json({ success: false, error: 'Pedido no encontrado' })
     }
 
-    if (pedido.estado === 'ENTREGADO' || pedido.estado === 'CANCELADO') {
+    if (pedido.estado === 'PAGADO' || pedido.estado === 'ENTREGADO' || pedido.estado === 'CANCELADO') {
       return res.status(400).json({ success: false, error: 'No se pueden agregar items a este pedido' })
     }
 
@@ -236,6 +344,17 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
 
     await recalcularTotalesPedido(parseInt(id))
 
+    // Imprimir comanda en destinos correspondientes
+    if (itemsCreados.length > 0) {
+      const pedidoConSocio = await prisma.pedidoTakeAway.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          socio: { select: { apellidoNombre: true } }
+        }
+      })
+      imprimirComandaTakeAway(pedidoConSocio, itemsCreados)
+    }
+
     res.status(201).json({ success: true, data: itemsCreados })
   } catch (error) {
     console.error('Error al agregar items:', error)
@@ -251,6 +370,15 @@ router.put('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'
   try {
     const { id, itemId } = req.params
     const { cantidad } = req.body
+
+    // Verificar estado del pedido
+    const pedido = await prisma.pedidoTakeAway.findUnique({ where: { id: parseInt(id) } })
+    if (!pedido) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado' })
+    }
+    if (['PAGADO', 'ENTREGADO', 'CANCELADO'].includes(pedido.estado)) {
+      return res.status(400).json({ success: false, error: 'No se pueden modificar items de este pedido' })
+    }
 
     const item = await prisma.itemPedidoTakeAway.findUnique({
       where: { id: parseInt(itemId) },
@@ -292,6 +420,15 @@ router.put('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'
 router.delete('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
   try {
     const { id, itemId } = req.params
+
+    // Verificar estado del pedido
+    const pedido = await prisma.pedidoTakeAway.findUnique({ where: { id: parseInt(id) } })
+    if (!pedido) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado' })
+    }
+    if (['PAGADO', 'ENTREGADO', 'CANCELADO'].includes(pedido.estado)) {
+      return res.status(400).json({ success: false, error: 'No se pueden anular items de este pedido' })
+    }
 
     const item = await prisma.itemPedidoTakeAway.findUnique({
       where: { id: parseInt(itemId) }

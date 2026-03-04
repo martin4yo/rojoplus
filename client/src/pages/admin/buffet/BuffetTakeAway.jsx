@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Clock, Phone, Truck, ShoppingBag, X, Users } from 'lucide-react'
+import { Plus, Clock, Phone, Truck, ShoppingBag, X, Users, CheckCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -190,6 +190,18 @@ export default function BuffetTakeAway() {
     return 'text-red-600'
   }
 
+  async function marcarEntregado(pedido, e) {
+    e.stopPropagation() // Evitar abrir el detalle
+    try {
+      await api.post(`/admin/buffet/takeaway/${pedido.id}/entregar`)
+      toast.success(`Pedido #${pedido.numero} marcado como entregado`)
+      cargarPedidos()
+    } catch (err) {
+      console.error('Error marcando como entregado:', err)
+      toast.error(err.response?.data?.error || 'Error al marcar como entregado')
+    }
+  }
+
   if (loading) {
     return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>
   }
@@ -342,6 +354,19 @@ export default function BuffetTakeAway() {
                     <p className="text-xs text-gray-600 italic truncate" title={pedido.observaciones}>
                       {pedido.observaciones}
                     </p>
+                  </div>
+                )}
+
+                {/* Switch para marcar como entregado en la pestaña Pagados */}
+                {filtroEstado === 'PAGADOS' && pedido.estado === 'PAGADO' && (
+                  <div className="pt-3 border-t mt-2">
+                    <button
+                      onClick={(e) => marcarEntregado(pedido, e)}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg font-medium transition-colors"
+                    >
+                      <CheckCircle size={18} />
+                      Marcar como Entregado
+                    </button>
                   </div>
                 )}
               </div>

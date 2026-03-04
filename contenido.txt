@@ -1,40 +1,45 @@
-add_header Strict-Transport-Security "max-age=63072000" always;
-
-      # Logs
-      access_log /var/log/nginx/sportivo-access.log;
-      error_log /var/log/nginx/sportivo-error.log;
-
-      # Max upload size
-      client_max_body_size 10M;
-
-      # Socket.IO WebSocket
-      location /socket.io/ {
-          proxy_pass http://127.0.0.1:5300;
-          proxy_http_version 1.1;
-          proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection "upgrade";
-          proxy_set_header Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto $scheme;
-          proxy_cache_bypass $http_upgrade;
-          proxy_read_timeout 86400;
-          proxy_connect_timeout 60s;
-          proxy_send_timeout 86400;
-      }
-
-      # API Backend
-      location /api {
-          proxy_pass http://127.0.0.1:5300;
-          proxy_http_version 1.1;
-          proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection 'upgrade';
-          proxy_set_header Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto $scheme;
-          proxy_cache_bypass $http_upgrade;
-          proxy_read_timeout 120s;
-          proxy_connect_timeout 60s;
-          proxy_send_timeout 120s;
-      }
+module.exports = {
+  apps: [
+    {
+      name: 'rojoplus-server',
+      cwd: '/var/www/rojoplus/server',
+      script: 'src/index.js',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      // Cargar archivo .env (PM2 >= 5.2.0)
+      env_file: '/var/www/rojoplus/server/.env',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 5300,
+        PRINT_AGENT_TOKEN: 'rojoplus-print-agent'
+      },
+      error_file: '/var/log/rojoplus/backend-error.log',
+      out_file: '/var/log/rojoplus/backend-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true
+    },
+    {
+      name: 'rojoplus-client',
+      cwd: '/var/www/rojoplus/client',
+      script: 'node_modules/vite/bin/vite.js',
+      args: 'preview --port 8090 --host',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      // Cargar archivo .env (PM2 >= 5.2.0)
+      env_file: '/var/www/rojoplus/client/.env',
+      env: {
+        NODE_ENV: 'production',
+      },
+      error_file: '/var/log/rojoplus/frontend-error.log',
+      out_file: '/var/log/rojoplus/frontend-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true
+    }
+  ]
+};
