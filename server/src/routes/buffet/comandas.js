@@ -1126,7 +1126,9 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             razonSocial: config.razonSocial,
             domicilio: config.domicilioFiscal,
             cuit: config.cuit,
-            condicionIva: config.condicionIva
+            condicionIva: config.condicionIva,
+            iibb: config.iibb || 'EXENTO',
+            inicioActividades: config.inicioActividad ? new Date(config.inicioActividad).toLocaleDateString('es-AR') : null
           },
           comprobante: {
             tipo: tiposNombre[tipoAfip],

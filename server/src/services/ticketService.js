@@ -180,6 +180,7 @@ export async function renderTicketFiscal(data) {
   output += (empresa.domicilio || empresa.domicilioFiscal || '') + '\n'
   output += `CUIT: ${empresa.cuit || ''}\n`
   output += `${empresa.condicionIva || 'IVA Responsable Inscripto'}\n`
+  output += `IIBB: ${empresa.iibb || 'EXENTO'}\n`
   if (empresa.inicioActividades) {
     output += `Inicio Act.: ${empresa.inicioActividades}\n`
   }

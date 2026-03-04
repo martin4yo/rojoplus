@@ -247,6 +247,9 @@ export async function generarTicketFiscal(datos) {
 
   ticket += `${datos.empresa?.condicionIva || 'IVA Responsable Inscripto'}` + commands.newLine
   ticket += `Ingresos Brutos: ${datos.empresa?.iibb || 'EXENTO'}` + commands.newLine
+  if (datos.empresa?.inicioActividades) {
+    ticket += `Inicio Act.: ${datos.empresa.inicioActividades}` + commands.newLine
+  }
 
   if (datos.empresa?.domicilio) {
     ticket += datos.empresa.domicilio + commands.newLine

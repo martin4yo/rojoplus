@@ -384,7 +384,9 @@ router.post('/emitir', checkPermiso('FACTURACION_EMITIR'), asyncHandler(async (r
       razonSocial: config.razonSocial,
       domicilio: config.domicilioFiscal,
       cuit: config.cuit,
-      condicionIva: config.condicionIva
+      condicionIva: config.condicionIva,
+      iibb: config.iibb || 'EXENTO',
+      inicioActividades: config.inicioActividad ? new Date(config.inicioActividad).toLocaleDateString('es-AR') : null
     },
     comprobante: {
       tipo: tiposNombre[tipoComprobante],
@@ -550,7 +552,9 @@ router.get('/comprobantes/:id/ticket', asyncHandler(async (req, res) => {
       razonSocial: config.razonSocial,
       domicilio: config.domicilioFiscal,
       cuit: config.cuit,
-      condicionIva: config.condicionIva
+      condicionIva: config.condicionIva,
+      iibb: config.iibb || 'EXENTO',
+      inicioActividades: config.inicioActividad ? new Date(config.inicioActividad).toLocaleDateString('es-AR') : null
     },
     comprobante: {
       tipo: comprobante.tipo,
