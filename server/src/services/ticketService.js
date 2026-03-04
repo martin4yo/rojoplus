@@ -34,46 +34,69 @@ const ESCPOS = {
 }
 
 /**
- * Genera comandos ESC/POS para imprimir QR nativo
- * Usa el comando GS ( k que es soportado por la mayoría de impresoras térmicas
- * @param {string} data - Datos a codificar en el QR
- * @param {number} size - Tamaño del módulo (1-16), default 6
- * @returns {string} - Comandos ESC/POS para imprimir el QR
+ * Genera comandos ESC/POS para imprimir QR usando GS v 0 (raster image)
+ * Este método es más compatible con impresoras económicas
  */
-function generateNativeQR(data, size = 6) {
-  const dataBytes = Buffer.from(data, 'utf-8')
-  const dataLen = dataBytes.length + 3 // +3 for pL, pH, and store command
+async function generateQRRaster(data, moduleSize = 4) {
+  // Generar QR como imagen PNG
+  const qrSize = 200 // píxeles
+  const qrBuffer = await QRCode.toBuffer(data, {
+    type: 'png',
+    width: qrSize,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+    color: {
+      dark: '#000000',
+      light: '#FFFFFF'
+    }
+  })
 
-  // Construir secuencia de comandos
-  const commands = []
+  return new Promise((resolve, reject) => {
+    const png = new PNG()
+    png.parse(qrBuffer, (err, imgData) => {
+      if (err) return reject(err)
 
-  // 1. GS ( k pL pH cn fn - Function 165: Select model
-  //    cn=49 (QR Code), fn=65 (Select model), n1=50 (Model 2)
-  commands.push(Buffer.from([0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]))
+      const width = imgData.width
+      const height = imgData.height
 
-  // 2. GS ( k pL pH cn fn - Function 167: Set size
-  //    cn=49, fn=67, n=size (1-16)
-  commands.push(Buffer.from([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size]))
+      // Convertir a monocromo (1 bit por píxel)
+      // GS v 0 usa formato: cada byte = 8 píxeles horizontales
+      const bytesPerLine = Math.ceil(width / 8)
+      const imageData = Buffer.alloc(bytesPerLine * height)
 
-  // 3. GS ( k pL pH cn fn - Function 169: Set error correction
-  //    cn=49, fn=69, n=49 (L=48, M=49, Q=50, H=51)
-  commands.push(Buffer.from([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31]))
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (width * y + x) << 2
+          const r = imgData.data[idx]
+          const g = imgData.data[idx + 1]
+          const b = imgData.data[idx + 2]
+          const brightness = (r + g + b) / 3
 
-  // 4. GS ( k pL pH cn fn d1...dk - Function 180: Store data
-  //    cn=49, fn=80, data...
-  const pL = (dataLen) & 0xFF
-  const pH = (dataLen >> 8) & 0xFF
-  const storeCmd = Buffer.concat([
-    Buffer.from([0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30]),
-    dataBytes
-  ])
-  commands.push(storeCmd)
+          // Si es oscuro (negro), poner bit en 1
+          if (brightness < 128) {
+            const bytePos = Math.floor(x / 8)
+            const bitPos = 7 - (x % 8)
+            imageData[y * bytesPerLine + bytePos] |= (1 << bitPos)
+          }
+        }
+      }
 
-  // 5. GS ( k pL pH cn fn - Function 181: Print
-  //    cn=49, fn=81
-  commands.push(Buffer.from([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]))
+      // Construir comando GS v 0
+      // GS v 0 m xL xH yL yH d1...dk
+      // m = 0 (normal), 1 (double width), 2 (double height), 3 (double both)
+      const xL = bytesPerLine & 0xFF
+      const xH = (bytesPerLine >> 8) & 0xFF
+      const yL = height & 0xFF
+      const yH = (height >> 8) & 0xFF
 
-  return Buffer.concat(commands).toString('binary')
+      const command = Buffer.concat([
+        Buffer.from([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]),
+        imageData
+      ])
+
+      resolve(command.toString('binary'))
+    })
+  })
 }
 
 /**
@@ -318,19 +341,18 @@ export async function renderTicketFiscal(data) {
   const qrUrl = generateQRContent(comprobante)
   if (qrUrl) {
     try {
-      console.log('[Ticket] Generando QR nativo para:', qrUrl.substring(0, 80) + '...')
-      console.log('[Ticket] URL completa:', qrUrl)
+      console.log('[Ticket] Generando QR raster para:', qrUrl.substring(0, 80) + '...')
 
       output += '\n'
       output += ESCPOS.ALIGN_CENTER
 
-      // Usar comando nativo de QR (GS ( k) - mejor calidad y compatibilidad
-      const qrCommands = generateNativeQR(qrUrl, 5) // tamaño 5 (1-16)
+      // Usar GS v 0 (raster image) - más compatible con impresoras económicas
+      const qrCommands = await generateQRRaster(qrUrl)
       output += qrCommands
 
       output += '\n'
       output += 'Escanear QR para validar\n'
-      console.log('[Ticket] QR nativo generado')
+      console.log('[Ticket] QR raster generado')
     } catch (qrError) {
       console.error('[Ticket] Error generando QR:', qrError)
       output += '\n(Error al generar codigo QR)\n'
