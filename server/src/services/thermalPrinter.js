@@ -106,6 +106,37 @@ function lineLeftRight(left, right, width = PAPER_WIDTH) {
 }
 
 /**
+ * Genera QR usando comandos ESC/POS nativos (más compatible que bitmap)
+ * Funciona en la mayoría de impresoras térmicas modernas
+ */
+function generateQRNative(data) {
+  const dataBytes = Buffer.from(data, 'utf-8')
+  const dataLen = dataBytes.length + 3 // +3 por los bytes de función
+  const pL = dataLen & 0xFF
+  const pH = (dataLen >> 8) & 0xFF
+
+  let cmd = ''
+
+  // 1. Seleccionar modelo QR (modelo 2 = estándar)
+  cmd += GS + '(k' + '\x04\x00' + '1A' + '\x32\x00'
+
+  // 2. Tamaño del módulo (6 = tamaño medio-grande)
+  cmd += GS + '(k' + '\x03\x00' + '1C' + '\x06'
+
+  // 3. Nivel de corrección de error (49 = M, 15%)
+  cmd += GS + '(k' + '\x03\x00' + '1E' + '\x31'
+
+  // 4. Almacenar datos en el buffer del QR
+  cmd += GS + '(k' + String.fromCharCode(pL) + String.fromCharCode(pH) + '1P0'
+  cmd += dataBytes.toString('binary')
+
+  // 5. Imprimir el QR almacenado
+  cmd += GS + '(k' + '\x03\x00' + '1Q0'
+
+  return cmd
+}
+
+/**
  * Convierte imagen PNG a formato bitmap ESC/POS
  */
 async function convertImageToBitmap(pngBuffer) {
@@ -339,21 +370,11 @@ export async function generarTicketFiscal(datos) {
         console.log('[Ticket] Generando QR para URL:', qrUrl)
 
         ticket += commands.alignCenter
-        ticket += 'Codigo QR de validacion ARCA' + commands.newLine
-        ticket += '(Escanea para verificar)' + commands.newLine
+        ticket += 'Codigo QR ARCA' + commands.newLine
         ticket += commands.newLine
 
-        // Generar QR como imagen PNG
-        const qrBuffer = await QRCode.toBuffer(qrUrl, {
-          type: 'png',
-          width: 200,
-          margin: 1,
-          errorCorrectionLevel: 'M'
-        })
-
-        // Convertir a bitmap ESC/POS
-        const qrBitmap = await convertImageToBitmap(qrBuffer)
-        ticket += qrBitmap
+        // Usar comandos ESC/POS nativos para QR (más compatible)
+        ticket += generateQRNative(qrUrl)
 
         ticket += commands.newLine
         ticket += LINE + commands.newLine

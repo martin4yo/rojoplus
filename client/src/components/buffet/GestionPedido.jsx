@@ -72,6 +72,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   const [pagosParciales, setPagosParciales] = useState({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
   const [usarPagosMultiples, setUsarPagosMultiples] = useState(false)
   const [tabCobroActivo, setTabCobroActivo] = useState('cuenta') // 'cuenta' o 'finalizar'
+  const [cobrando, setCobrando] = useState(false) // Evitar doble click en cobrar
   const puedeCobrar = tienePermiso(PERMISOS.BUFFET_COBRAR)
   const puedeGestionarMesas = tienePermiso(PERMISOS.BUFFET_MESAS)
 
@@ -329,7 +330,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   // ==================== FUNCIONES DE COBRO ====================
 
   async function cobrar() {
-    if (!comandaActiva) return
+    if (!comandaActiva || cobrando) return
 
     const totalConPropina = Number(comandaActiva.subtotal || comandaActiva.total) -
       (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
@@ -344,6 +345,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       }
     }
 
+    setCobrando(true)
     try {
       let requestData
 
@@ -443,6 +445,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
     } catch (err) {
       console.error('Error al cobrar:', err)
       toast.error(err.response?.data?.error || 'Error al procesar el cobro')
+    } finally {
+      setCobrando(false)
     }
   }
 
@@ -2042,6 +2046,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 <button
                   onClick={cobrar}
                   disabled={
+                    cobrando ||
                     cajas.length === 0 ||
                     (mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO' &&
                       !usarPagosMultiples &&
@@ -2050,8 +2055,17 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   }
                   className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-green-600 text-white font-bold text-lg rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <CheckCircle size={24} />
-                  Confirmar Cobro
+                  {cobrando ? (
+                    <>
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={24} />
+                      Confirmar Cobro
+                    </>
+                  )}
                 </button>
               </div>
             </>
