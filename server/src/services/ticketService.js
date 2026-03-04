@@ -322,7 +322,8 @@ export async function renderTicketFiscal(data) {
   }
 
   output += ESCPOS.DOUBLE_SIZE
-  output += formatLabelValue('TOTAL:', formatPrice(comprobante.total)) + '\n'
+  // Con DOUBLE_SIZE el ancho efectivo es 24 caracteres (48/2)
+  output += formatLabelValue('TOTAL:', formatPrice(comprobante.total), 24) + '\n'
   output += ESCPOS.NORMAL_SIZE
   output += ESCPOS.BOLD_OFF
 

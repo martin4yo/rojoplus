@@ -576,19 +576,22 @@ export default function BuffetDashboard() {
           onClose={() => setPreviewTicket(null)}
           onPrint={() => setPreviewTicket(null)}
           onPrintAsImage={async (imageBase64, impresoraId) => {
+            console.log('[Dashboard] onPrintAsImage - impresoraId:', impresoraId)
             try {
               const res = await api.postFull('/admin/buffet/imprimir-imagen', {
                 imagen: imageBase64,
                 impresoraId
               })
+              console.log('[Dashboard] Respuesta del servidor:', res)
               if (res?.success) {
                 toast.success(`Ticket enviado a ${res.impresora || 'impresora'}`)
                 setPreviewTicket(null)
               } else {
+                console.log('[Dashboard] Error en respuesta:', res?.error)
                 toast.error(res?.error || 'Error al imprimir')
               }
             } catch (err) {
-              console.error('Error enviando imagen:', err)
+              console.error('[Dashboard] Error enviando imagen:', err)
               toast.error(err.message || 'Error al enviar a impresora')
             }
           }}
