@@ -65,8 +65,8 @@ function generarComandaESCPOS(comanda, items) {
     }
   }
 
-  // Línea final y corte
-  buffer.push(...Buffer.from('\n==================\n\n\n'))
+  // Línea final y avance de papel antes de corte
+  buffer.push(...Buffer.from('\n==================\n\n\n\n\n\n'))
   buffer.push(GS, 0x56, 0x00) // Corte
 
   return Buffer.from(buffer)
