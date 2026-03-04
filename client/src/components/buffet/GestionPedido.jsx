@@ -402,8 +402,9 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       const esFiscal = comprobanteRecibido && comprobanteRecibido.cae
       console.log('[DEBUG Cobro] Es fiscal:', esFiscal, 'CAE:', comprobanteRecibido?.cae)
 
+      // Solo imprimir si es factura fiscal (A, B o C con CAE)
+      // Si no es fiscal, se usa el cierre de mesa como comprobante
       if (esFiscal) {
-        // Generar ticket FISCAL con CAE y QR para el preview
         const ticketFiscalData = generarTicketFiscal({
           comprobante: comprobanteRecibido,
           items: comandaActiva.items?.map(item => ({
@@ -426,16 +427,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           vuelto: datosVuelto.vuelto || null
         })
         await imprimirTicket(ticketFiscalData)
-      } else {
-        // Ticket NO fiscal - generar ticket de comanda para el cliente
-        const ticketComandaData = generarTicketComanda({
-          ...comandaActiva,
-          items: comandaActiva.items,
-          subtotal: comandaActiva.subtotal,
-          total: totalConPropina,
-          medioPago: mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))
-        }, 'CUENTA')
-        await imprimirTicket(ticketComandaData)
       }
 
       // Reset estados
