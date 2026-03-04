@@ -22,8 +22,98 @@ import {
   generarNumeroMC,
   recalcularTotalesComanda
 } from './helpers.js'
+import { enviarImpresion } from './impresoras.js'
 
 const router = express.Router()
+
+// ============================================================================
+// FUNCIONES DE IMPRESIÓN
+// ============================================================================
+
+/**
+ * Genera comandos ESC/POS para imprimir comanda
+ */
+function generarComandaESCPOS(comanda, items) {
+  const ESC = 0x1B
+  const GS = 0x1D
+  const buffer = []
+
+  // Inicializar
+  buffer.push(ESC, 0x40)
+
+  // Título centrado
+  buffer.push(ESC, 0x61, 0x01) // Centrar
+  buffer.push(ESC, 0x45, 0x01) // Negrita
+  buffer.push(...Buffer.from('== COMANDA ==\n'))
+  buffer.push(ESC, 0x45, 0x00) // Fin negrita
+
+  // Mesa
+  buffer.push(...Buffer.from(`Mesa: ${comanda.mesa?.numero || '?'}\n`))
+  buffer.push(...Buffer.from(`Hora: ${new Date().toLocaleTimeString()}\n`))
+  buffer.push(...Buffer.from('==================\n'))
+
+  // Alinear a la izquierda
+  buffer.push(ESC, 0x61, 0x00)
+
+  // Items
+  for (const item of items) {
+    const nombre = item.productoBuffet?.nombre || 'Producto'
+    const cantidad = item.cantidad || 1
+    buffer.push(...Buffer.from(`${cantidad}x ${nombre}\n`))
+    if (item.observaciones) {
+      buffer.push(...Buffer.from(`   -> ${item.observaciones}\n`))
+    }
+  }
+
+  // Línea final y corte
+  buffer.push(...Buffer.from('\n==================\n\n\n'))
+  buffer.push(GS, 0x56, 0x00) // Corte
+
+  return Buffer.from(buffer)
+}
+
+/**
+ * Imprime comanda en los destinos correspondientes según categoría
+ */
+async function imprimirComandaPorDestinos(comanda, items) {
+  try {
+    console.log(`[Print] Iniciando impresión. Items: ${items.length}`)
+
+    // Agrupar items por destino de impresión
+    const itemsPorDestino = new Map()
+
+    for (const item of items) {
+      const producto = item.productoBuffet
+      if (!producto?.categoriaMenuId) continue
+
+      const destino = await prisma.destinoImpresion.findFirst({
+        where: { categoriaMenuId: producto.categoriaMenuId },
+        include: { impresora: true }
+      })
+
+      if (!destino || !destino.impresora) continue
+
+      const impresoraId = destino.impresora.id
+      if (!itemsPorDestino.has(impresoraId)) {
+        itemsPorDestino.set(impresoraId, { impresora: destino.impresora, items: [] })
+      }
+      itemsPorDestino.get(impresoraId).items.push(item)
+    }
+
+    console.log(`[Print] Impresoras a usar: ${itemsPorDestino.size}`)
+
+    // Imprimir en cada destino
+    for (const [impresoraId, data] of itemsPorDestino) {
+      console.log(`[Print] Enviando a impresora ${data.impresora.nombre}`)
+      const ticketData = generarComandaESCPOS(comanda, data.items)
+      const base64Data = ticketData.toString('base64')
+      const resultado = await enviarImpresion(impresoraId, base64Data, 'COMANDA')
+      console.log(`[Print] Resultado: ${JSON.stringify(resultado)}`)
+    }
+  } catch (error) {
+    console.error('[Print] Error:', error)
+  }
+}
 
 // ============================================================================
 // COMANDAS - Listado y CRUD
@@ -310,6 +400,16 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     }
 
     await recalcularTotalesComanda(parseInt(id))
+
+    // Imprimir comanda en los destinos correspondientes
+    if (itemsCreados.length > 0) {
+      const comandaConMesa = await prisma.comanda.findUnique({
+        where: { id: parseInt(id) },
+        include: { mesa: true }
+      })
+      // Ejecutar impresión de forma asíncrona (no bloquea la respuesta)
+      imprimirComandaPorDestinos(comandaConMesa, itemsCreados)
+    }
 
     res.status(201).json({ success: true, data: itemsCreados })
   } catch (error) {
