@@ -2,6 +2,119 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// Función para estimar precio según descripción del producto
+function estimarPrecio(descripcion, marca) {
+  const desc = descripcion.toLowerCase()
+
+  // Caramelos sueltos / masticables
+  if (desc.includes('caram') && (desc.includes('mast') || desc.includes('fruta'))) return 300
+  if (desc.includes('caram') || desc.includes('baston viena')) return 250
+
+  // Chupetines
+  if (desc.includes('chup') || desc.includes('mister pop') || desc.includes('mr. pop') || desc.includes('trompito')) return 400
+
+  // Chicles
+  if (desc.includes('chic') || desc.includes('topline') || desc.includes('top line') || desc.includes('beldent')) return 600
+  if (desc.includes('ch. tl') || desc.includes('ch.tl')) return 500
+
+  // Mentho Plus / pastillas
+  if (desc.includes('menthoplus') || desc.includes('mentho plus') || desc.includes('mp zero')) return 1200
+
+  // Gomitas / gelatinas pequeñas (por unidad)
+  if (desc.includes('mogul') && (desc.includes('x30g') || desc.includes('x35g'))) return 800
+  if (desc.includes('mogul') && desc.includes('x150')) return 1800
+  if (desc.includes('mogul') && desc.includes('x250')) return 2500
+  if (desc.includes('mogul') && (desc.includes('x500') || desc.includes('x1kg') || desc.includes('x1 kg'))) return 4500
+  if (desc.includes('mogul')) return 800
+  if (desc.includes('lotsa fizz') || desc.includes('lotza fizz')) return 500
+
+  // Turrones
+  if (desc.includes('turron') || desc.includes('tur.')) return 700
+
+  // Garrapiñada / maní
+  if (desc.includes('garrapiñada') || desc.includes('mani')) return 1200
+
+  // Bocaditos pequeños
+  if (desc.includes('bocadito') || desc.includes('bocad')) return 500
+  if (desc.includes('cabsha')) return 600
+
+  // Alfajores (no hay en la lista pero por si acaso)
+  if (desc.includes('alfajor')) return 1500
+
+  // Bombones
+  if (desc.includes('bombon') || desc.includes('bon o bon') || desc.includes('bob')) {
+    if (desc.includes('x7.8g') || desc.includes('x10g')) return 400
+    if (desc.includes('x15g')) return 600
+    if (desc.includes('x27g') || desc.includes('x30g')) return 900
+    return 700
+  }
+
+  // Rocklets
+  if (desc.includes('rocklets')) {
+    if (desc.includes('x10g')) return 500
+    if (desc.includes('x20g')) return 800
+    if (desc.includes('x40g')) return 1200
+    if (desc.includes('x120g')) return 2500
+    return 1000
+  }
+
+  // Obleas
+  if (desc.includes('oblea')) return 900
+
+  // Chocolates por tamaño
+  if (desc.includes('cofler') || desc.includes('tofi') || desc.includes('aguila')) {
+    if (desc.includes('block')) return 1500
+    if (desc.includes('aireado')) return 1200
+    if (desc.includes('x14g') || desc.includes('x15g')) return 600
+    if (desc.includes('x25g') || desc.includes('x27g')) return 1000
+    if (desc.includes('x38g')) return 1400
+    if (desc.includes('x55g')) return 1800
+    if (desc.includes('x100g')) return 3500
+    if (desc.includes('taza')) return 3500
+    if (desc.includes('chocolitos') || desc.includes('x150g')) return 4000
+    return 1500
+  }
+
+  // Chocolates genéricos
+  if (desc.includes('choc') && !desc.includes('chic')) {
+    if (desc.includes('x25g')) return 800
+    if (desc.includes('arcor')) return 800
+    return 1200
+  }
+
+  // Huevos de pascua
+  if (desc.includes('huevo') || desc.includes('hvo') || desc.includes('hvito') || desc.includes('hvto')) {
+    if (desc.includes('x7.8g') || desc.includes('x10g')) return 400
+    if (desc.includes('x55g') || desc.includes('x56g')) return 2000
+    if (desc.includes('x104g') || desc.includes('x110g') || desc.includes('x115g')) return 3500
+    if (desc.includes('x200g') || desc.includes('x210g')) return 6000
+    return 2500
+  }
+
+  // Conos
+  if (desc.includes('cono')) return 3000
+
+  // Cremino
+  if (desc.includes('cremino')) return 800
+
+  // Rodajas
+  if (desc.includes('rodajas')) return 400
+
+  // Rellenos frutales
+  if (desc.includes('rellenos')) return 350
+
+  // Por defecto según negocio/marca
+  if (marca) {
+    const m = marca.toLowerCase()
+    if (m.includes('aguila')) return 2000
+    if (m.includes('cofler')) return 1500
+    if (m.includes('arcor')) return 800
+  }
+
+  // Precio por defecto
+  return 1000
+}
+
 // Artículos extraídos del PDF MAESTRO ARTÍCULO CON EAN.pdf
 // Se importan TODOS los artículos con Estado = "Activo"
 // NOTA: El código original se prefija con "ARC" (ej: 1001009 -> ARC1001009)
@@ -123,25 +236,26 @@ async function importarArticulos() {
       console.log('ℹ️  Categoría de Producto "KIOSCO_ARCOR" ya existe\n')
     }
 
-    // 2. Verificar o crear categoría de menú para el buffet
+    // 2. Verificar o crear categoría de menú para el kiosco
     let categoriaMenu = await prisma.categoriaMenu.findFirst({
-      where: { nombre: 'Kiosco Arcor' }
+      where: { codigo: 'KIOS' }
     })
 
     if (!categoriaMenu) {
       categoriaMenu = await prisma.categoriaMenu.create({
         data: {
-          nombre: 'Kiosco Arcor',
-          descripcion: 'Productos de kiosco Arcor',
+          codigo: 'KIOS',
+          nombre: 'Kiosco',
+          descripcion: 'Golosinas y snacks',
           color: '#F59E0B',
           icono: 'shopping-bag',
           orden: 100,
           activo: true
         }
       })
-      console.log('✅ Categoría de Menú "Kiosco Arcor" creada\n')
+      console.log('✅ Categoría de Menú "Kiosco" creada\n')
     } else {
-      console.log('ℹ️  Categoría de Menú "Kiosco Arcor" ya existe\n')
+      console.log('ℹ️  Categoría de Menú "Kiosco" ya existe\n')
     }
 
     console.log('📦 Iniciando importación de productos...\n')
@@ -173,6 +287,9 @@ async function importarArticulos() {
             ? articulo.ean13U
             : null
 
+        // Estimar precio según descripción
+        const precioEstimado = estimarPrecio(articulo.descripcion, articulo.marca)
+
         // Crear el producto base
         const producto = await prisma.producto.create({
           data: {
@@ -180,7 +297,7 @@ async function importarArticulos() {
             nombre: articulo.descripcion,
             descripcion: `${articulo.marca} - ${articulo.negocio}`,
             categoriaId: categoriaProducto.id,
-            precioVenta: 0, // Precio a definir manualmente
+            precioVenta: precioEstimado,
             activo: true
           }
         })
@@ -208,7 +325,7 @@ async function importarArticulos() {
             categoriaMenuId: categoriaMenu.id,
             nombre: articulo.descripcion.substring(0, 100),
             descripcion: articulo.marca || '',
-            precio: 0, // Precio a definir manualmente
+            precio: precioEstimado,
             codigoBarras: codigoBarras,
             tiposVenta: ['KIOSCO'], // Solo visible en kiosco
             disponible: true,
@@ -218,7 +335,7 @@ async function importarArticulos() {
           }
         })
 
-        console.log(`✅ ${codigoConPrefijo} - ${articulo.descripcion.substring(0, 40)}... [EAN: ${codigoBarras || 'N/A'}]`)
+        console.log(`✅ ${codigoConPrefijo} - ${articulo.descripcion.substring(0, 40)}... $${precioEstimado} [EAN: ${codigoBarras || 'N/A'}]`)
         importados++
 
       } catch (error) {
@@ -238,9 +355,9 @@ async function importarArticulos() {
 
     if (importados > 0) {
       console.log('\n⚠️  IMPORTANTE:')
-      console.log('   • Los precios están en $0 por defecto')
-      console.log('   • Debes actualizar los precios desde el panel de administración')
-      console.log('   • Los productos solo son visibles en KIOSCO')
+      console.log('   • Los precios fueron estimados automáticamente según el tipo de producto')
+      console.log('   • Puedes ajustar los precios desde el panel de administración')
+      console.log('   • Los productos solo son visibles en KIOSCO (no en buffet ni menú público)')
       console.log('   • Se creó una variante "UN" para cada producto (control de stock)')
       console.log('   • El SKU de la variante es el código de barras EAN13 o el código + "-UN"')
       console.log('   • Todos los códigos tienen prefijo "ARC" (ej: ARC1001009)')

@@ -49,7 +49,7 @@ export default function PublicHeader() {
                   <button
                     onClick={() => setClubMenuOpen(!clubMenuOpen)}
                     onBlur={() => setTimeout(() => setClubMenuOpen(false), 150)}
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                       link.submenu.some(sub => isActive(sub.path))
                         ? 'bg-red-50 text-red-600'
                         : 'text-gray-700 hover:bg-gray-100'
@@ -77,7 +77,7 @@ export default function PublicHeader() {
                 <Link
                   key={link.path}
                   to={link.path}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                     isActive(link.path)
                       ? 'bg-red-50 text-red-600'
                       : 'text-gray-700 hover:bg-gray-100'
@@ -93,7 +93,7 @@ export default function PublicHeader() {
               <button
                 onClick={() => setSocioMenuOpen(!socioMenuOpen)}
                 onBlur={() => setTimeout(() => setSocioMenuOpen(false), 150)}
-                className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors whitespace-nowrap"
               >
                 Soy Socio
                 <ChevronDown className={`w-4 h-4 transition-transform ${socioMenuOpen ? 'rotate-180' : ''}`} />
@@ -120,7 +120,7 @@ export default function PublicHeader() {
             {/* CTA Button */}
             <Link
               to="/inscripcion-socio"
-              className="ml-4 px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm"
+              className="ml-4 px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm whitespace-nowrap"
             >
               Quiero ser Socio
             </Link>
