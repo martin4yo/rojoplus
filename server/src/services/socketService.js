@@ -33,6 +33,14 @@ export function initSocket(httpServer) {
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token
+      const isPrintAgent = socket.handshake.auth.isPrintAgent
+
+      // Permitir conexiones de print-agent sin token JWT
+      if (isPrintAgent) {
+        socket.isPrintAgent = true
+        return next()
+      }
+
       if (!token) {
         return next(new Error('Token requerido'))
       }
@@ -67,6 +75,12 @@ export function initSocket(httpServer) {
 
   // Conexión de cliente
   io.on('connection', (socket) => {
+    // Si es print-agent, no hacer nada aquí (lo maneja registrarEventosPrintAgent)
+    if (socket.isPrintAgent) {
+      console.log('[Socket] Print-agent conectado (esperando registro)')
+      return
+    }
+
     const admin = socket.admin
     console.log(`[Socket] Conectado: ${admin.nombre} (ID: ${admin.id})`)
 

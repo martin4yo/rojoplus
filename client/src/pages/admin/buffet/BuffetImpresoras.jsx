@@ -265,6 +265,17 @@ export default function BuffetImpresoras() {
     }
   }
 
+  async function toggleSaltarControl(destinoId, saltarControlActual) {
+    try {
+      await api.put(`/admin/buffet/destinos-impresion/${destinoId}`, {
+        saltarControlCocina: !saltarControlActual
+      })
+      cargarDatos()
+    } catch (err) {
+      console.error('Error actualizando destino:', err)
+    }
+  }
+
   const getDestinoImpresora = (categoriaId) => {
     return destinos.find(d => d.categoriaMenuId === categoriaId)
   }
@@ -524,6 +535,9 @@ export default function BuffetImpresoras() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Impresora Asignada
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Entrega Directa
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -559,6 +573,25 @@ export default function BuffetImpresoras() {
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td className="px-4 py-3">
+                        {destino ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={destino.saltarControlCocina || false}
+                              onChange={() => toggleSaltarControl(destino.id, destino.saltarControlCocina)}
+                              className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                            />
+                            <span className="text-xs text-gray-600">
+                              {destino.saltarControlCocina
+                                ? 'Listo automático'
+                                : 'Requiere control'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
                     </tr>
                   )

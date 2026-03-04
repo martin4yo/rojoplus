@@ -1287,6 +1287,28 @@ router.delete('/destinos-impresion/:id', authAdmin, checkPermiso('BUFFET_CONFIG'
   }
 });
 
+// Actualizar destino
+router.put('/destinos-impresion/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { saltarControlCocina } = req.body;
+
+    const destino = await prisma.destinoImpresion.update({
+      where: { id: parseInt(id) },
+      data: { saltarControlCocina },
+      include: {
+        categoriaMenu: true,
+        impresora: true
+      }
+    });
+
+    res.json({ success: true, data: destino });
+  } catch (error) {
+    console.error('Error al actualizar destino:', error);
+    res.status(500).json({ success: false, error: 'Error al actualizar destino' });
+  }
+});
+
 // ============================================================================
 // COMANDAS
 // ============================================================================
@@ -1478,6 +1500,8 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
 
       // Determinar estado inicial según destino de impresión
       let estadoInicial = 'PENDIENTE';
+      let listoAt = null;
+
       if (producto.categoriaMenuId) {
         const destino = await prisma.destinoImpresion.findFirst({
           where: { categoriaMenuId: producto.categoriaMenuId },
@@ -1485,11 +1509,19 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
         });
 
         if (destino && destino.impresora) {
-          const codigoSector = destino.impresora.sector?.codigo;
-          if (codigoSector === 'COCINA') {
-            estadoInicial = 'ENVIADO_COCINA';
-          } else if (codigoSector === 'BARRA') {
-            estadoInicial = 'ENVIADO_BARRA';
+          // NUEVO: Si el destino está configurado para saltar control de cocina,
+          // el item va directo a LISTO (entrega automática)
+          if (destino.saltarControlCocina) {
+            estadoInicial = 'LISTO';
+            listoAt = new Date();
+          } else {
+            // Flujo normal: requiere control de cocina/barra
+            const codigoSector = destino.impresora.sector?.codigo;
+            if (codigoSector === 'COCINA') {
+              estadoInicial = 'ENVIADO_COCINA';
+            } else if (codigoSector === 'BARRA') {
+              estadoInicial = 'ENVIADO_BARRA';
+            }
           }
         }
       }
@@ -1502,7 +1534,8 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
           precioUnitario: producto.precio,
           subtotal: Number(producto.precio) * (item.cantidad || 1),
           observaciones: item.observaciones,
-          estado: estadoInicial
+          estado: estadoInicial,
+          listoAt: listoAt
         },
         include: { productoBuffet: true }
       });

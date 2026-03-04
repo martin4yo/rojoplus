@@ -2488,12 +2488,13 @@ model ImpresoraTermica {
 }
 
 model DestinoImpresion {
-  id              Int              @id @default(autoincrement())
-  categoriaMenuId Int              @map("categoria_menu_id")
-  impresoraId     Int              @map("impresora_id")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  categoriaMenu   CategoriaMenu    @relation(fields: [categoriaMenuId], references: [id], onDelete: Cascade)
-  impresora       ImpresoraTermica @relation(fields: [impresoraId], references: [id], onDelete: Cascade)
+  id                   Int              @id @default(autoincrement())
+  categoriaMenuId      Int              @map("categoria_menu_id")
+  impresoraId          Int              @map("impresora_id")
+  saltarControlCocina  Boolean          @default(false) @map("saltar_control_cocina")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  categoriaMenu        CategoriaMenu    @relation(fields: [categoriaMenuId], references: [id], onDelete: Cascade)
+  impresora            ImpresoraTermica @relation(fields: [impresoraId], references: [id], onDelete: Cascade)
 
   @@unique([categoriaMenuId, impresoraId])
   @@map("destinos_impresion")

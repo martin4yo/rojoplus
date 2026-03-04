@@ -245,6 +245,9 @@ function conectar() {
   console.log(`[Socket] Conectando a ${CONFIG.serverUrl}...`)
 
   socket = io(CONFIG.serverUrl, {
+    auth: {
+      isPrintAgent: true
+    },
     reconnection: true,
     reconnectionDelay: CONFIG.reconnectInterval,
     reconnectionAttempts: Infinity,
