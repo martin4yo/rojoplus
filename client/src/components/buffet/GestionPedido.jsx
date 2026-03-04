@@ -1590,7 +1590,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 {/* Nuevos items a agregar */}
                 {itemsNuevos.length > 0 && (
                   <div className="p-3 md:p-4 border-b bg-yellow-50">
-                    <h3 className="font-bold text-yellow-800 mb-2 md:mb-3 text-sm md:text-base">Por enviar a cocina</h3>
+                    <h3 className="font-bold text-yellow-800 mb-2 md:mb-3 text-sm md:text-base">Pendiente</h3>
                     <div className="space-y-2">
                       {itemsNuevos.map((item, index) => (
                         <div key={index} className={`p-2 md:p-3 bg-white rounded-lg border ${item.observaciones ? 'border-yellow-500 border-2 shadow-md' : 'border-yellow-200'}`}>
@@ -1676,14 +1676,14 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
                 {/* Botones */}
                 <div className="space-y-2">
-                  {/* Enviar a cocina - Solo si hay items nuevos y NO está cuenta pedida */}
+                  {/* Pedir - Solo si hay items nuevos y NO está cuenta pedida */}
                   {itemsNuevos.length > 0 && !esCuentaPedida && (
                     <button
                       onClick={enviarACocina}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600 active:bg-yellow-700 text-sm md:text-base"
                     >
                       <Send size={18} />
-                      Enviar a Cocina ({formatCurrency(totalNuevos, { showSymbol: false })})
+                      Pedir ({formatCurrency(totalNuevos, { showSymbol: false })})
                     </button>
                   )}
 
