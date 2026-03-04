@@ -1,6 +1,7 @@
 /**
  * Servicio de impresión térmica ESC/POS
  * Genera tickets fiscales y no fiscales para impresoras térmicas de 80mm
+ * Basado en thermal-templates.js de AxiomaWeb
  */
 import QRCode from 'qrcode'
 import { PNG } from 'pngjs'
@@ -8,6 +9,11 @@ import { PNG } from 'pngjs'
 // Comandos ESC/POS
 const ESC = '\x1B'
 const GS = '\x1D'
+
+// Ancho de papel: 48 caracteres para 80mm
+const PAPER_WIDTH = 48
+const LINE = '='.repeat(PAPER_WIDTH)
+const LINE_DASH = '-'.repeat(PAPER_WIDTH)
 
 export const commands = {
   init: ESC + '@',
@@ -30,7 +36,7 @@ export const commands = {
 }
 
 /**
- * Genera el contenido del QR de ARCA
+ * Genera el contenido del QR de ARCA (ex-AFIP)
  * URL: https://www.afip.gob.ar/fe/qr/?p={base64_encoded_json}
  */
 export function generateAfipQRData(data) {
@@ -42,6 +48,7 @@ export function generateAfipQRData(data) {
   const day = String(date.getDate()).padStart(2, '0')
   const fecha = `${year}-${month}-${day}`
 
+  // Importe multiplicado por 100 y sin decimales
   const importe = Math.round((data.importe || 0) * 100)
 
   const customerDoc = (data.docReceptor || '').replace(/\D/g, '')
@@ -88,6 +95,14 @@ function fitText(text, width, align = 'left') {
     return text + padding
   }
   return text
+}
+
+/**
+ * Formatea una línea con texto a izquierda y derecha
+ */
+function lineLeftRight(left, right, width = PAPER_WIDTH) {
+  const leftLen = Math.max(1, width - right.length - 1)
+  return fitText(left, leftLen) + ' ' + right
 }
 
 /**
@@ -166,7 +181,7 @@ export async function generarTicketFiscal(datos) {
   // Inicializar
   ticket += commands.init
 
-  // ========== HEADER - DATOS DEL NEGOCIO ==========
+  // ========== HEADER - DATOS DEL CLUB ==========
   ticket += commands.alignCenter
   ticket += commands.bold.on
   ticket += commands.size.double
@@ -174,60 +189,70 @@ export async function generarTicketFiscal(datos) {
   ticket += commands.size.normal
   ticket += commands.bold.off
 
+  // Datos fiscales del emisor
   if (datos.empresa?.cuit) {
     ticket += `CUIT: ${datos.empresa.cuit}` + commands.newLine
   }
 
+  ticket += `${datos.empresa?.condicionIva || 'IVA Responsable Inscripto'}` + commands.newLine
   ticket += `Ingresos Brutos: ${datos.empresa?.iibb || 'EXENTO'}` + commands.newLine
 
   if (datos.empresa?.domicilio) {
     ticket += datos.empresa.domicilio + commands.newLine
   }
 
-  ticket += '----------------------------------------' + commands.newLine
+  ticket += 'www.sportivopilar.com.ar' + commands.newLine
+  ticket += LINE_DASH + commands.newLine
 
   // ========== TIPO DE COMPROBANTE ==========
   ticket += commands.alignCenter
   ticket += commands.bold.on
   ticket += commands.size.doubleHeight
-  ticket += (datos.comprobante?.tipo || 'FACTURA C') + commands.newLine
+
+  const tipoComprobante = datos.comprobante?.tipo || 'FACTURA C'
+  ticket += tipoComprobante + commands.newLine
   ticket += commands.size.normal
   ticket += commands.bold.off
 
   // Número de comprobante
   const pv = String(datos.comprobante?.puntoVenta || 1).padStart(4, '0')
   const num = String(datos.comprobante?.numero || 0).padStart(8, '0')
+  ticket += commands.bold.on
   ticket += `Nro: ${pv}-${num}` + commands.newLine
+  ticket += commands.bold.off
 
   const fecha = new Date(datos.comprobante?.fecha || new Date())
   ticket += `Fecha: ${fecha.toLocaleString('es-AR')}` + commands.newLine
 
-  ticket += commands.alignLeft
-  ticket += '----------------------------------------' + commands.newLine
+  ticket += LINE_DASH + commands.newLine
 
   // ========== DATOS DEL CLIENTE ==========
+  ticket += commands.alignLeft
   ticket += commands.bold.on
   ticket += 'DATOS DEL RECEPTOR' + commands.newLine
   ticket += commands.bold.off
 
-  ticket += `Cliente: ${datos.cliente?.nombre || 'Consumidor Final'}` + commands.newLine
+  const nombreCliente = datos.cliente?.nombre || 'Consumidor Final'
+  ticket += `Cliente: ${nombreCliente}` + commands.newLine
 
+  // Mostrar CUIT/DNI si no es consumidor final
   if (datos.cliente?.documento && datos.cliente?.tipoDoc !== 99) {
     const tipoDoc = datos.cliente.tipoDoc === 80 ? 'CUIT' : 'DNI'
     ticket += `${tipoDoc}: ${datos.cliente.documento}` + commands.newLine
   }
 
+  // Condición IVA del cliente
   if (datos.cliente?.condicionIva && datos.cliente.condicionIva !== 'Consumidor Final') {
-    ticket += `IVA: ${datos.cliente.condicionIva}` + commands.newLine
+    ticket += `Cond. IVA: ${datos.cliente.condicionIva}` + commands.newLine
   }
 
-  ticket += '----------------------------------------' + commands.newLine
+  ticket += LINE_DASH + commands.newLine
 
   // ========== ITEMS ==========
   ticket += commands.bold.on
-  ticket += 'PRODUCTOS' + commands.newLine
+  ticket += 'DETALLE' + commands.newLine
   ticket += commands.bold.off
-  ticket += '----------------------------------------' + commands.newLine
+  ticket += LINE_DASH + commands.newLine
 
   for (const item of (datos.items || [])) {
     const nombre = item.nombre || 'Producto'
@@ -235,26 +260,26 @@ export async function generarTicketFiscal(datos) {
     const precio = Number(item.precio || item.precioUnitario || 0)
     const subtotal = Number(item.subtotal || qty * precio)
 
+    // Nombre del producto
     ticket += nombre + commands.newLine
 
+    // Formato: cantidad x precio = subtotal (alineado a la derecha)
     const qtyStr = qty.toString()
     const priceStr = `$${precio.toFixed(2)}`
     const totalStr = `$${subtotal.toFixed(2)}`
 
-    const col1 = fitText(qtyStr, 7, 'right')
-    const col2 = fitText(priceStr, 15, 'right')
-    const col3 = fitText(totalStr, 15, 'right')
-
-    ticket += col1 + ' x ' + col2 + ' = ' + col3 + commands.newLine
+    // Columnas con anchos para ocupar todo el papel
+    const detalleLine = `  ${fitText(qtyStr, 4, 'right')} x ${fitText(priceStr, 12, 'right')} = ${fitText(totalStr, 14, 'right')}`
+    ticket += detalleLine + commands.newLine
   }
 
-  ticket += '----------------------------------------' + commands.newLine
+  ticket += LINE_DASH + commands.newLine
 
   // ========== TOTALES ==========
   ticket += commands.alignRight
 
   if (datos.discriminaIva && datos.subtotal) {
-    ticket += `Subtotal: $${Number(datos.subtotal).toFixed(2)}` + commands.newLine
+    ticket += `Subtotal Neto: $${Number(datos.subtotal).toFixed(2)}` + commands.newLine
     ticket += `IVA 21%: $${Number(datos.iva || 0).toFixed(2)}` + commands.newLine
   }
 
@@ -265,16 +290,16 @@ export async function generarTicketFiscal(datos) {
   ticket += commands.bold.off
 
   ticket += commands.alignLeft
-  ticket += '----------------------------------------' + commands.newLine
+  ticket += LINE_DASH + commands.newLine
 
   // ========== FORMA DE PAGO ==========
   if (datos.medioPago) {
     ticket += `Forma de pago: ${datos.medioPago}` + commands.newLine
-    if (datos.montoPagado && datos.montoPagado > datos.total) {
-      ticket += `Pago: $${Number(datos.montoPagado).toFixed(2)}` + commands.newLine
+    if (datos.montoPagado && Number(datos.montoPagado) > Number(datos.total)) {
+      ticket += `Pagado: $${Number(datos.montoPagado).toFixed(2)}` + commands.newLine
       ticket += `Vuelto: $${Number(datos.vuelto || 0).toFixed(2)}` + commands.newLine
     }
-    ticket += '----------------------------------------' + commands.newLine
+    ticket += LINE_DASH + commands.newLine
   }
 
   // ========== DATOS DE ARCA (CAE) ==========
@@ -290,11 +315,15 @@ export async function generarTicketFiscal(datos) {
       ticket += `Vto CAE: ${vto.toLocaleDateString('es-AR')}` + commands.newLine
     }
 
-    ticket += '----------------------------------------' + commands.newLine
+    ticket += LINE_DASH + commands.newLine
 
     // ========== QR CODE ==========
     if (datos.empresa?.cuit) {
       try {
+        // Determinar tipo de documento del cliente
+        let customerDocType = datos.cliente?.tipoDoc || 99
+        let customerDocNumber = datos.cliente?.documento || ''
+
         const qrUrl = generateAfipQRData({
           cuit: datos.empresa.cuit,
           tipoComprobante: datos.comprobante.tipoAfip || 11,
@@ -302,10 +331,12 @@ export async function generarTicketFiscal(datos) {
           numero: datos.comprobante.numero,
           importe: datos.total,
           fecha: datos.comprobante.fecha,
-          tipoDocReceptor: datos.cliente?.tipoDoc || 99,
-          docReceptor: datos.cliente?.documento || '',
+          tipoDocReceptor: customerDocType,
+          docReceptor: customerDocNumber,
           cae: datos.comprobante.cae
         })
+
+        console.log('[Ticket] Generando QR para URL:', qrUrl)
 
         ticket += commands.alignCenter
         ticket += 'Codigo QR de validacion ARCA' + commands.newLine
@@ -325,9 +356,11 @@ export async function generarTicketFiscal(datos) {
         ticket += qrBitmap
 
         ticket += commands.newLine
-        ticket += '----------------------------------------' + commands.newLine
+        ticket += LINE + commands.newLine
       } catch (error) {
-        console.error('Error generando QR:', error)
+        console.error('[Ticket] Error generando QR:', error)
+        ticket += '(Error al generar codigo QR)' + commands.newLine
+        ticket += LINE + commands.newLine
       }
     }
   }
@@ -337,8 +370,9 @@ export async function generarTicketFiscal(datos) {
   ticket += commands.bold.on
   ticket += 'Comprobante Autorizado' + commands.newLine
   ticket += commands.bold.off
-  ticket += 'Gracias por su visita' + commands.newLine
-  ticket += 'www.clubsportivopilar.com.ar' + commands.newLine
+  ticket += commands.newLine
+  ticket += 'Gracias por su visita!' + commands.newLine
+  ticket += 'www.sportivopilar.com.ar' + commands.newLine
   ticket += commands.feed(5)
   ticket += commands.cut
 
@@ -362,7 +396,8 @@ export async function generarTicketCuenta(datos) {
   ticket += commands.size.normal
   ticket += commands.bold.off
   ticket += 'Buffet - Restaurant' + commands.newLine
-  ticket += '========================================' + commands.newLine
+  ticket += 'www.sportivopilar.com.ar' + commands.newLine
+  ticket += LINE + commands.newLine
 
   // ========== TIPO DE TICKET ==========
   ticket += commands.bold.on
@@ -391,23 +426,31 @@ export async function generarTicketCuenta(datos) {
   ticket += fecha.toLocaleString('es-AR') + commands.newLine
 
   ticket += commands.alignLeft
-  ticket += '========================================' + commands.newLine
+  ticket += LINE + commands.newLine
 
   // ========== ITEMS ==========
+  ticket += commands.bold.on
+  ticket += 'DETALLE' + commands.newLine
+  ticket += commands.bold.off
+  ticket += LINE_DASH + commands.newLine
+
   for (const item of (datos.items || [])) {
     const nombre = item.nombre || 'Producto'
     const qty = item.cantidad || 1
     const precio = Number(item.precio || item.precioUnitario || 0)
     const subtotal = qty * precio
 
+    // Nombre del producto en negrita
     ticket += commands.bold.on
     ticket += `${qty}x ${nombre}` + commands.newLine
     ticket += commands.bold.off
 
     if (precio > 0) {
+      // Precio y subtotal alineados a la derecha
       const priceStr = `$${precio.toFixed(2)}`
       const totalStr = `$${subtotal.toFixed(2)}`
-      ticket += fitText(priceStr, 20, 'right') + fitText(totalStr, 20, 'right') + commands.newLine
+      const detalleLine = `  ${fitText(priceStr, 18, 'right')} x${qty} = ${fitText(totalStr, 14, 'right')}`
+      ticket += detalleLine + commands.newLine
     }
 
     if (item.observaciones) {
@@ -415,17 +458,18 @@ export async function generarTicketCuenta(datos) {
     }
   }
 
-  ticket += '========================================' + commands.newLine
+  ticket += LINE + commands.newLine
 
   // ========== TOTALES ==========
   ticket += commands.alignRight
 
-  if (datos.subtotal !== undefined) {
+  if (datos.subtotal !== undefined && datos.descuento > 0) {
     ticket += `Subtotal: $${Number(datos.subtotal).toFixed(2)}` + commands.newLine
   }
 
   if (datos.descuento && datos.descuento > 0) {
-    ticket += `Descuento (${datos.descuentoPorcentaje || 0}%): -$${Number(datos.descuento).toFixed(2)}` + commands.newLine
+    const pct = datos.descuentoPorcentaje ? `(${datos.descuentoPorcentaje}%)` : ''
+    ticket += `Descuento${pct}: -$${Number(datos.descuento).toFixed(2)}` + commands.newLine
   }
 
   ticket += commands.bold.on
@@ -435,19 +479,19 @@ export async function generarTicketCuenta(datos) {
   ticket += commands.bold.off
 
   ticket += commands.alignLeft
-  ticket += '========================================' + commands.newLine
+  ticket += LINE + commands.newLine
 
   // ========== MEDIO DE PAGO ==========
   if (datos.medioPago) {
     ticket += commands.alignCenter
     ticket += `Pago: ${datos.medioPago}` + commands.newLine
-    if (datos.montoPagado && datos.montoPagado > datos.total) {
-      ticket += `Pago: $${Number(datos.montoPagado).toFixed(2)}` + commands.newLine
+    if (datos.montoPagado && Number(datos.montoPagado) > Number(datos.total)) {
+      ticket += `Pagado: $${Number(datos.montoPagado).toFixed(2)}` + commands.newLine
       ticket += commands.bold.on
       ticket += `Vuelto: $${Number(datos.vuelto || 0).toFixed(2)}` + commands.newLine
       ticket += commands.bold.off
     }
-    ticket += '========================================' + commands.newLine
+    ticket += LINE + commands.newLine
   }
 
   // ========== AVISO NO FISCAL ==========
@@ -457,9 +501,9 @@ export async function generarTicketCuenta(datos) {
   ticket += commands.bold.off
 
   // ========== FOOTER ==========
-  ticket += '========================================' + commands.newLine
-  ticket += 'Gracias por su visita' + commands.newLine
-  ticket += 'www.clubsportivopilar.com.ar' + commands.newLine
+  ticket += LINE + commands.newLine
+  ticket += 'Gracias por su visita!' + commands.newLine
+  ticket += 'www.sportivopilar.com.ar' + commands.newLine
   ticket += commands.feed(5)
   ticket += commands.cut
 
