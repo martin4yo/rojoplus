@@ -107,31 +107,39 @@ function lineLeftRight(left, right, width = PAPER_WIDTH) {
 
 /**
  * Genera QR usando comandos ESC/POS nativos (más compatible que bitmap)
- * Funciona en la mayoría de impresoras térmicas modernas
+ * Funciona en la mayoría de impresoras térmicas modernas (EPSON, similar)
  */
 function generateQRNative(data) {
   const dataBytes = Buffer.from(data, 'utf-8')
-  const dataLen = dataBytes.length + 3 // +3 por los bytes de función
-  const pL = dataLen & 0xFF
-  const pH = (dataLen >> 8) & 0xFF
+  const storeLen = dataBytes.length + 3 // +3 por cn + fn + m
+  const storePL = storeLen & 0xFF
+  const storePH = (storeLen >> 8) & 0xFF
 
   let cmd = ''
 
-  // 1. Seleccionar modelo QR (modelo 2 = estándar)
-  cmd += GS + '(k' + '\x04\x00' + '1A' + '\x32\x00'
+  // GS ( k pL pH cn fn [parámetros]
+  // cn = 49 (0x31), funciones varían
 
-  // 2. Tamaño del módulo (6 = tamaño medio-grande)
-  cmd += GS + '(k' + '\x03\x00' + '1C' + '\x06'
+  // 1. Seleccionar modelo QR (modelo 2)
+  // fn=65(A), n1=50(modelo 2), n2=0
+  cmd += GS + '\x28\x6B\x04\x00\x31\x41\x32\x00'
 
-  // 3. Nivel de corrección de error (49 = M, 15%)
-  cmd += GS + '(k' + '\x03\x00' + '1E' + '\x31'
+  // 2. Tamaño del módulo (6 = tamaño medio-grande, rango 1-16)
+  // fn=67(C), n=6
+  cmd += GS + '\x28\x6B\x03\x00\x31\x43\x06'
 
-  // 4. Almacenar datos en el buffer del QR
-  cmd += GS + '(k' + String.fromCharCode(pL) + String.fromCharCode(pH) + '1P0'
+  // 3. Nivel de corrección de error (M = 15%)
+  // fn=69(E), n=49(M)
+  cmd += GS + '\x28\x6B\x03\x00\x31\x45\x31'
+
+  // 4. Almacenar datos del QR
+  // fn=80(P), m=48(0)
+  cmd += GS + '\x28\x6B' + String.fromCharCode(storePL) + String.fromCharCode(storePH) + '\x31\x50\x30'
   cmd += dataBytes.toString('binary')
 
   // 5. Imprimir el QR almacenado
-  cmd += GS + '(k' + '\x03\x00' + '1Q0'
+  // fn=81(Q), m=48(0)
+  cmd += GS + '\x28\x6B\x03\x00\x31\x51\x30'
 
   return cmd
 }
@@ -461,16 +469,15 @@ export async function generarTicketCuenta(datos) {
     const precio = Number(item.precio || item.precioUnitario || 0)
     const subtotal = qty * precio
 
-    // Nombre del producto en negrita
-    ticket += commands.bold.on
-    ticket += `${qty}x ${nombre}` + commands.newLine
-    ticket += commands.bold.off
+    // Nombre del producto (sin negrita)
+    ticket += nombre + commands.newLine
 
     if (precio > 0) {
-      // Precio y subtotal alineados a la derecha
+      // Formato: cantidad x precio = subtotal
+      const qtyStr = qty.toString()
       const priceStr = `$${precio.toFixed(2)}`
       const totalStr = `$${subtotal.toFixed(2)}`
-      const detalleLine = `  ${fitText(priceStr, 18, 'right')} x${qty} = ${fitText(totalStr, 14, 'right')}`
+      const detalleLine = `  ${fitText(qtyStr, 4, 'right')} x ${fitText(priceStr, 12, 'right')} = ${fitText(totalStr, 14, 'right')}`
       ticket += detalleLine + commands.newLine
     }
 

@@ -576,6 +576,12 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   async function crearNuevaComanda(e) {
     e.preventDefault()
 
+    // Validar que se ingrese socio o nombre
+    if (!nuevaComandaData.socioId && !nuevaComandaData.nombreGrupo?.trim()) {
+      toast.error('Debe ingresar un socio o un nombre para la comanda')
+      return
+    }
+
     try {
       await api.post('/admin/buffet/comandas', {
         mesaId: id,
@@ -920,10 +926,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               Capacidad: {entidad.capacidad} personas
             </p>
             <button
-              onClick={entidad.esComunal ? abrirModalNuevaComanda : abrirComandaDirecta}
-              className={`w-full px-6 py-4 text-white font-bold text-lg rounded-lg flex items-center justify-center gap-2 ${
-                entidad.esComunal ? 'bg-purple-600 hover:bg-purple-700' : 'bg-red-600 hover:bg-red-700'
-              }`}
+              onClick={abrirModalNuevaComanda}
+              className="w-full px-6 py-4 text-white font-bold text-lg rounded-lg flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700"
             >
               <Users size={24} />
               Abrir Comanda
@@ -998,14 +1002,23 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Grupo (opcional):</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre {!nuevaComandaData.socioId && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
                   value={nuevaComandaData.nombreGrupo}
                   onChange={e => setNuevaComandaData({ ...nuevaComandaData, nombreGrupo: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  placeholder="Ej: Familia García"
+                  className={`w-full border rounded-lg px-3 py-2 ${
+                    !nuevaComandaData.socioId && !nuevaComandaData.nombreGrupo?.trim()
+                      ? 'border-red-300 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
+                  placeholder="Ej: Familia García, Juan Pérez..."
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  * Debe ingresar un socio o un nombre
+                </p>
               </div>
 
               <div>
@@ -2135,14 +2148,23 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Grupo (opcional):</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre {!nuevaComandaData.socioId && <span className="text-red-500">*</span>}
+              </label>
               <input
                 type="text"
                 value={nuevaComandaData.nombreGrupo}
                 onChange={e => setNuevaComandaData({ ...nuevaComandaData, nombreGrupo: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                placeholder="Ej: Familia García"
+                className={`w-full border rounded-lg px-3 py-2 ${
+                  !nuevaComandaData.socioId && !nuevaComandaData.nombreGrupo?.trim()
+                    ? 'border-red-300 bg-red-50'
+                    : 'border-gray-300'
+                }`}
+                placeholder="Ej: Familia García, Juan Pérez..."
               />
+              <p className="text-xs text-gray-500 mt-1">
+                * Debe ingresar un socio o un nombre
+              </p>
             </div>
 
             <div>
