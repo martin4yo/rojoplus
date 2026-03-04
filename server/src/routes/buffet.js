@@ -1576,8 +1576,10 @@ router.put('/comandas/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (req,
 // Agregar items a comanda
 router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
   try {
+    console.log('========== ENDPOINT /comandas/:id/items EJECUTADO ==========');
     const { id } = req.params;
     const { items } = req.body; // [{ productoBuffetId, cantidad, observaciones }]
+    console.log(`Comanda ID: ${id}, Items recibidos: ${items?.length}`);
 
     const comanda = await prisma.comanda.findUnique({ where: { id: parseInt(id) } });
     if (!comanda) {
