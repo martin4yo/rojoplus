@@ -34,6 +34,49 @@ const ESCPOS = {
 }
 
 /**
+ * Genera comandos ESC/POS para imprimir QR nativo
+ * Usa el comando GS ( k que es soportado por la mayoría de impresoras térmicas
+ * @param {string} data - Datos a codificar en el QR
+ * @param {number} size - Tamaño del módulo (1-16), default 6
+ * @returns {string} - Comandos ESC/POS para imprimir el QR
+ */
+function generateNativeQR(data, size = 6) {
+  const dataBytes = Buffer.from(data, 'utf-8')
+  const dataLen = dataBytes.length + 3 // +3 for pL, pH, and store command
+
+  // Construir secuencia de comandos
+  const commands = []
+
+  // 1. GS ( k pL pH cn fn - Function 165: Select model
+  //    cn=49 (QR Code), fn=65 (Select model), n1=50 (Model 2)
+  commands.push(Buffer.from([0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]))
+
+  // 2. GS ( k pL pH cn fn - Function 167: Set size
+  //    cn=49, fn=67, n=size (1-16)
+  commands.push(Buffer.from([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size]))
+
+  // 3. GS ( k pL pH cn fn - Function 169: Set error correction
+  //    cn=49, fn=69, n=49 (L=48, M=49, Q=50, H=51)
+  commands.push(Buffer.from([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31]))
+
+  // 4. GS ( k pL pH cn fn d1...dk - Function 180: Store data
+  //    cn=49, fn=80, data...
+  const pL = (dataLen) & 0xFF
+  const pH = (dataLen >> 8) & 0xFF
+  const storeCmd = Buffer.concat([
+    Buffer.from([0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30]),
+    dataBytes
+  ])
+  commands.push(storeCmd)
+
+  // 5. GS ( k pL pH cn fn - Function 181: Print
+  //    cn=49, fn=81
+  commands.push(Buffer.from([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]))
+
+  return Buffer.concat(commands).toString('binary')
+}
+
+/**
  * Convierte imagen PNG a formato bitmap ESC/POS usando ESC * 33 (24-dot double density)
  * Este es el modo estándar para imprimir imágenes en impresoras térmicas
  */
@@ -275,29 +318,21 @@ export async function renderTicketFiscal(data) {
   const qrUrl = generateQRContent(comprobante)
   if (qrUrl) {
     try {
-      console.log('[Ticket] Generando QR bitmap para:', qrUrl.substring(0, 50) + '...')
-
-      // Generar QR como imagen PNG (200px como AxiomaWeb)
-      const qrBuffer = await QRCode.toBuffer(qrUrl, {
-        type: 'png',
-        width: 200,
-        margin: 1,
-        errorCorrectionLevel: 'M'
-      })
-
-      console.log('[Ticket] QR buffer generado, tamaño:', qrBuffer.length)
-
-      // Convertir a bitmap ESC/POS
-      const qrBitmap = await convertImageToBitmap(qrBuffer)
-      console.log('[Ticket] QR bitmap generado, tamaño:', qrBitmap.length)
+      console.log('[Ticket] Generando QR nativo para:', qrUrl.substring(0, 80) + '...')
+      console.log('[Ticket] URL completa:', qrUrl)
 
       output += '\n'
       output += ESCPOS.ALIGN_CENTER
-      output += qrBitmap
+
+      // Usar comando nativo de QR (GS ( k) - mejor calidad y compatibilidad
+      const qrCommands = generateNativeQR(qrUrl, 5) // tamaño 5 (1-16)
+      output += qrCommands
+
       output += '\n'
       output += 'Escanear QR para validar\n'
+      console.log('[Ticket] QR nativo generado')
     } catch (qrError) {
-      console.error('[Ticket] Error generando QR bitmap:', qrError)
+      console.error('[Ticket] Error generando QR:', qrError)
       output += '\n(Error al generar codigo QR)\n'
     }
   }
