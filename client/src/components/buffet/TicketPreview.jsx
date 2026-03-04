@@ -70,18 +70,27 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
       console.log('[TicketPreview] Importando html2canvas...')
       const html2canvas = (await import('html2canvas')).default
 
+      // Esperar un momento para que el QR se renderice completamente
+      await new Promise(resolve => setTimeout(resolve, 100))
+
       // Capturar el ticket como imagen
       console.log('[TicketPreview] Capturando imagen...')
       const canvas = await html2canvas(ticketRef.current, {
-        scale: 2, // Mayor resolución
+        scale: 3, // Mayor resolución para mejor calidad del QR
         backgroundColor: '#ffffff',
-        logging: false,
-        useCORS: true
+        logging: true, // Activar logs para debug
+        useCORS: true,
+        allowTaint: true,
+        imageTimeout: 0,
+        removeContainer: false
       })
 
       // Convertir a base64
       const imageBase64 = canvas.toDataURL('image/png')
       console.log('[TicketPreview] Imagen capturada, tamaño:', imageBase64.length)
+
+      // DEBUG: Abrir imagen en nueva pestaña para verificar qué se capturó
+      window.open(imageBase64, '_blank')
 
       // Llamar callback con la imagen y la impresora seleccionada
       console.log('[TicketPreview] Llamando onPrintAsImage...')
@@ -268,9 +277,10 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
             <div className="inline-block bg-white p-1">
               <QRCodeCanvas
                 value={ticket.qrUrl}
-                size={100}
+                size={120}
                 level="M"
                 includeMargin={true}
+                style={{ display: 'block' }}
               />
             </div>
             <div className="text-xs text-gray-600 mt-1">
