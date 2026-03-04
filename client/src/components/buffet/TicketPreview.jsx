@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Printer, Image } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
+import { QRCodeCanvas } from 'qrcode.react'
 import api from '../../services/api'
 
 /**
@@ -266,11 +266,11 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
         {ticket.qrUrl && (
           <div className="text-center my-3">
             <div className="inline-block bg-white p-1">
-              <QRCodeSVG
+              <QRCodeCanvas
                 value={ticket.qrUrl}
                 size={100}
-                level="L"
-                includeMargin={false}
+                level="M"
+                includeMargin={true}
               />
             </div>
             <div className="text-xs text-gray-600 mt-1">
