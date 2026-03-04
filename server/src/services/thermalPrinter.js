@@ -146,6 +146,7 @@ function generateQRNative(data) {
 
 /**
  * Convierte imagen PNG a formato bitmap ESC/POS usando ESC * (más compatible)
+ * Configura line spacing para que el QR salga cuadrado
  */
 async function convertImageToBitmap(pngBuffer) {
   return new Promise((resolve, reject) => {
@@ -173,18 +174,19 @@ async function convertImageToBitmap(pngBuffer) {
           }
         }
 
-        // Usar comando ESC * m nL nH [data] (más compatible que GS v 0)
-        // m = 33: 24 dots double density para mejor calidad
-        const mode = 33
         let output = ''
+
+        // ESC 3 n - Set line spacing to n/180 inch
+        // Para modo 33, usamos 24 para que no haya espacio entre bandas
+        output += ESC + '3' + String.fromCharCode(24)
 
         // Procesar en bandas de 24 pixels de alto
         for (let bandY = 0; bandY < height; bandY += 24) {
           const nL = width & 0xFF
           const nH = (width >> 8) & 0xFF
 
-          // ESC * m nL nH [data]
-          output += ESC + '*' + String.fromCharCode(mode)
+          // ESC * 33 nL nH [data] - 24 dots double density
+          output += ESC + '*' + String.fromCharCode(33)
           output += String.fromCharCode(nL) + String.fromCharCode(nH)
 
           // Para cada columna de pixels
@@ -208,6 +210,9 @@ async function convertImageToBitmap(pngBuffer) {
           // Nueva línea después de cada banda
           output += '\n'
         }
+
+        // ESC 2 - Reset line spacing to default
+        output += ESC + '2'
 
         console.log(`[QR Bitmap] Generado, tamaño: ${output.length} bytes`)
         resolve(output)
@@ -275,7 +280,7 @@ export async function generarTicketFiscal(datos) {
   // ========== DATOS DEL CLIENTE ==========
   ticket += commands.alignLeft
   ticket += commands.bold.on
-  ticket += 'DATOS DEL RECEPTOR' + commands.newLine
+  ticket += 'CLIENTE' + commands.newLine
   ticket += commands.bold.off
 
   const nombreCliente = datos.cliente?.nombre || 'Consumidor Final'
@@ -388,12 +393,12 @@ export async function generarTicketFiscal(datos) {
         ticket += 'Codigo QR ARCA' + commands.newLine
         ticket += commands.newLine
 
-        // Generar QR como imagen PNG (tamaño reducido para mejor compatibilidad)
+        // Generar QR como imagen PNG (tamaño grande para mejor legibilidad)
         const qrBuffer = await QRCode.toBuffer(qrUrl, {
           type: 'png',
-          width: 150,
+          width: 300,
           margin: 1,
-          errorCorrectionLevel: 'L'
+          errorCorrectionLevel: 'M'
         })
 
         console.log('[Ticket] QR buffer generado, tamaño:', qrBuffer.length)
