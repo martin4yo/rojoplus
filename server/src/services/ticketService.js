@@ -407,12 +407,18 @@ export function renderTicketNoFiscal(data) {
   output += `Nro: ${comanda.numero || comanda.id}\n`
   output += `Fecha: ${formatDate(comanda.fechaCobro || comanda.createdAt || new Date())}\n`
 
-  // Origen
-  if (comanda.origen) {
-    output += `Origen: ${comanda.origen.toUpperCase()}\n`
-  }
-  if (comanda.mesa) {
+  // Origen / Mesa / Pedido
+  if (comanda.origen === 'TAKEAWAY') {
+    output += `Pedido Take Away #${comanda.numero || comanda.id}\n`
+    if (comanda.nombreCliente) {
+      output += `Cliente: ${comanda.nombreCliente}\n`
+    }
+  } else if (comanda.origen === 'KIOSCO') {
+    output += `Venta Kiosco #${comanda.numero || comanda.id}\n`
+  } else if (comanda.mesa) {
     output += `Mesa: ${comanda.mesa.numero || comanda.mesa}\n`
+  } else if (comanda.origen) {
+    output += `Origen: ${comanda.origen.toUpperCase()}\n`
   }
 
   output += separator() + '\n'

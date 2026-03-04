@@ -861,8 +861,10 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         console.error('Error emitiendo factura takeaway:', facError)
       }
     } else {
+      // Generar ticket NO fiscal - mismo formato que buffet
       try {
         const { renderTicketNoFiscal, toBase64 } = await import('../../services/ticketService.js')
+
         const itemsTicket = pedido.items.map(item => ({
           nombre: item.productoBuffet?.nombre || 'Producto',
           cantidad: item.cantidad,
@@ -870,12 +872,33 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           subtotal: parseFloat(item.subtotal)
         }))
 
+        // Obtener nombre del cajero
+        let cajeroNombre = null
+        if (req.admin?.id) {
+          const cajero = await prisma.admin.findUnique({
+            where: { id: req.admin.id },
+            select: { nombre: true, apellido: true }
+          })
+          if (cajero) cajeroNombre = `${cajero.nombre} ${cajero.apellido || ''}`.trim()
+        }
+
+        // Obtener nombre del medio de pago
+        const medioPagoUsado = await prisma.medioPago.findUnique({
+          where: { id: medioPagoId || pagosParciales?.[0]?.medioPagoId }
+        })
+
         const ticketData = renderTicketNoFiscal({
           empresa: { razonSocial: 'CLUB SPORTIVO PILAR' },
-          comanda: { ...pedidoActualizado, origen: 'TAKEAWAY', metodoPago: 'VARIOS' },
+          comanda: {
+            ...pedidoActualizado,
+            origen: 'TAKEAWAY',
+            metodoPago: medioPagoUsado?.nombre || 'VARIOS',
+            cobradoPor: cajeroNombre
+          },
           items: itemsTicket
         })
         ticketBase64 = toBase64(ticketData)
+        console.log(`[TakeAway] Ticket no fiscal generado para pedido ${pedido.numero}`)
       } catch (ticketError) {
         console.error('Error generando ticket takeaway:', ticketError)
       }
