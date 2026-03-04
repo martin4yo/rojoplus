@@ -727,6 +727,89 @@ sudo netstat -tulpn | grep nginx | grep 443
 - Solo UNA aplicación con `default_server`
 - Deshabilitar IPv6 si el servidor no es accesible por IPv6
 
+### Frontend apunta a URL incorrecta (ej: sportivodemo en vez de sportivo)
+
+**Síntoma:** El navegador intenta conectarse a una URL incorrecta aunque el `.env` esté correcto.
+
+**Diagnóstico:**
+
+```bash
+# Ver en la consola del navegador (F12)
+# POST https://sportivodemo.axiomacloud.com/api/admin/login 401 (Unauthorized)
+
+# En el servidor, verificar que el build tenga la URL correcta
+cd /var/www/rojoplus/client
+grep -r "sportivodemo" dist/
+# Si aparece resultados = build tiene URL vieja
+```
+
+**Causa:** Vite usa múltiples archivos `.env` con **orden de prioridad**:
+
+1. `.env.production.local` (MAYOR prioridad - sobrescribe todo)
+2. `.env.production`
+3. `.env.local`
+4. `.env` (MENOR prioridad)
+
+Si `.env.production` o `.env.production.local` tienen la URL vieja, esos tienen prioridad sobre `.env`.
+
+**Solución:**
+
+```bash
+cd /var/www/rojoplus/client
+
+# 1. Listar TODOS los archivos .env
+ls -la | grep env
+
+# 2. Verificar contenido de cada uno
+cat .env
+cat .env.production 2>/dev/null
+cat .env.production.local 2>/dev/null
+cat .env.local 2>/dev/null
+
+# 3. Eliminar archivos con URL incorrecta o corregirlos
+# Opción A: Eliminar .env.production si tiene URL vieja
+rm .env.production
+
+# Opción B: Corregir .env.production
+nano .env.production
+# Cambiar a: VITE_API_URL=https://sportivo.axiomacloud.com/api
+
+# 4. Asegurar que .env tenga la URL correcta
+cat > .env << 'EOF'
+VITE_API_URL=https://sportivo.axiomacloud.com/api
+VITE_RECAPTCHA_SITE_KEY=6Ld-k08sAAAAAAJ28g-CUaty6gGZCq-wyP_iPEsx
+EOF
+
+# 5. Limpiar caché de Vite y rebuild
+rm -rf dist node_modules/.vite
+npm run build
+
+# 6. Verificar que NO aparezca la URL vieja
+grep -r "sportivodemo" dist/
+# Debe estar vacío (sin resultados)
+
+# 7. Verificar que SÍ aparezca la URL correcta
+grep -r "sportivo.axiomacloud.com" dist/assets/*.js | head -3
+# Debe mostrar resultados
+
+# 8. Reiniciar servicios
+cd ..
+pm2 restart all
+```
+
+**En el navegador:**
+
+Después de rebuild, el Service Worker puede seguir cacheando la versión vieja:
+
+```
+1. F12 → Application → Storage → Clear site data (marcar todo)
+2. Ctrl + Shift + Delete → Borrar caché de última hora
+3. Cerrar y reabrir el navegador
+4. Ctrl + Shift + R (recarga forzada)
+```
+
+**Prevención:** En producción, solo usar `.env` y evitar crear `.env.production` a menos que sea necesario.
+
 ---
 
 ## 12. Backup
