@@ -110,19 +110,31 @@ async function recalcularTotalesPedido(pedidoId) {
 // Imprimir comanda por destinos de impresión
 async function imprimirComandaPorDestinos(comanda, items) {
   try {
+    console.log(`[Print] Iniciando impresión de comanda. Items: ${items.length}`);
+
     // Agrupar items por destino de impresión
     const itemsPorDestino = new Map();
 
     for (const item of items) {
       const producto = item.productoBuffet;
-      if (!producto?.categoriaMenuId) continue;
+      console.log(`[Print] Item: ${producto?.nombre}, CategoriaId: ${producto?.categoriaMenuId}`);
+
+      if (!producto?.categoriaMenuId) {
+        console.log(`[Print] Item sin categoriaMenuId, saltando`);
+        continue;
+      }
 
       const destino = await prisma.destinoImpresion.findFirst({
         where: { categoriaMenuId: producto.categoriaMenuId },
         include: { impresora: true }
       });
 
-      if (!destino || !destino.impresora) continue;
+      if (!destino || !destino.impresora) {
+        console.log(`[Print] No hay destino configurado para categoría ${producto.categoriaMenuId}`);
+        continue;
+      }
+
+      console.log(`[Print] Destino encontrado: Impresora ${destino.impresora.nombre} (ID: ${destino.impresora.id})`);
 
       const impresoraId = destino.impresora.id;
       if (!itemsPorDestino.has(impresoraId)) {
@@ -131,17 +143,22 @@ async function imprimirComandaPorDestinos(comanda, items) {
       itemsPorDestino.get(impresoraId).items.push(item);
     }
 
+    console.log(`[Print] Impresoras a usar: ${itemsPorDestino.size}`);
+
     // Imprimir en cada destino
     for (const [impresoraId, data] of itemsPorDestino) {
+      console.log(`[Print] Generando comanda para impresora ${data.impresora.nombre}`);
+
       // Generar comandos ESC/POS
       const ticketData = generarComandaESCPOS(comanda, data.items);
       const base64Data = Buffer.from(ticketData).toString('base64');
 
       // Enviar a impresora
-      await enviarImpresion(impresoraId, base64Data, 'COMANDA');
+      const resultado = await enviarImpresion(impresoraId, base64Data, 'COMANDA');
+      console.log(`[Print] Resultado envío: ${JSON.stringify(resultado)}`);
     }
   } catch (error) {
-    console.error('Error imprimiendo comanda por destinos:', error);
+    console.error('[Print] Error imprimiendo comanda por destinos:', error);
     throw error;
   }
 }
@@ -1623,7 +1640,11 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
           estado: estadoInicial,
           listoAt: listoAt
         },
-        include: { productoBuffet: true }
+        include: {
+          productoBuffet: {
+            include: { categoriaMenu: true }
+          }
+        }
       });
 
       itemsCreados.push(itemCreado);
@@ -1632,14 +1653,23 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     await recalcularTotalesComanda(parseInt(id));
 
     // Imprimir comandas en los destinos correspondientes
+    console.log(`[DEBUG] Items creados: ${itemsCreados.length}`);
     if (itemsCreados.length > 0) {
+      console.log('[DEBUG] Iniciando impresión de comanda...');
       const comandaConMesa = await prisma.comanda.findUnique({
         where: { id: parseInt(id) },
         include: { mesa: true }
       });
-      await imprimirComandaPorDestinos(comandaConMesa, itemsCreados).catch(err =>
-        console.error('Error imprimiendo comanda:', err)
-      );
+      console.log(`[DEBUG] Comanda cargada: Mesa ${comandaConMesa?.mesa?.numero}`);
+
+      try {
+        await imprimirComandaPorDestinos(comandaConMesa, itemsCreados);
+        console.log('[DEBUG] Impresión completada exitosamente');
+      } catch (err) {
+        console.error('[DEBUG] Error imprimiendo comanda:', err);
+      }
+    } else {
+      console.log('[DEBUG] No hay items para imprimir');
     }
 
     res.status(201).json({ success: true, data: itemsCreados });
