@@ -941,8 +941,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           </div>
         </div>
 
-        {/* Modal Nueva Comanda - Para mesas comunales */}
-        {entidad.esComunal && modalNuevaComanda && (
+        {/* Modal Nueva Comanda */}
+        {modalNuevaComanda && (
           <Modal
             title="Nueva Comanda"
             isOpen={modalNuevaComanda}

@@ -235,7 +235,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           cae: resultadoCAE.cae
         })
 
-        const ticketData = renderTicketFiscal({
+        const ticketData = await renderTicketFiscal({
           empresa: { razonSocial: config.razonSocial, domicilio: config.domicilioFiscal, cuit: config.cuit, condicionIva: config.condicionIva },
           comprobante: { tipo: tiposNombre[tipoAfip], tipoAfip, puntoVenta, numero: numeroComprobante, fecha: new Date(), cae: resultadoCAE.cae, fechaVtoCae: resultadoCAE.caeExpiration, cuit: config.cuit, nombreCliente: datosCliente?.nombre || 'Consumidor Final', subtotal: subtotalNeto, iva: ivaTotal, total: totalFinal },
           comanda: { numero: `K-${movimientos[0]?.id || Date.now()}` },

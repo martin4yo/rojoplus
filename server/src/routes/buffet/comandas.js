@@ -1121,7 +1121,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cae: resultadoCAE.cae
         })
 
-        const ticketData = renderTicketFiscal({
+        const ticketData = await renderTicketFiscal({
           empresa: {
             razonSocial: config.razonSocial,
             domicilio: config.domicilioFiscal,

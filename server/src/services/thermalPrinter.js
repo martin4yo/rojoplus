@@ -381,8 +381,21 @@ export async function generarTicketFiscal(datos) {
         ticket += 'Codigo QR ARCA' + commands.newLine
         ticket += commands.newLine
 
-        // Usar comandos ESC/POS nativos para QR (más compatible)
-        ticket += generateQRNative(qrUrl)
+        // Generar QR como imagen PNG
+        const qrBuffer = await QRCode.toBuffer(qrUrl, {
+          type: 'png',
+          width: 200,
+          margin: 1,
+          errorCorrectionLevel: 'M'
+        })
+
+        console.log('[Ticket] QR buffer generado, tamaño:', qrBuffer.length)
+
+        // Convertir a bitmap ESC/POS
+        const qrBitmap = await convertImageToBitmap(qrBuffer)
+        console.log('[Ticket] QR bitmap generado, tamaño:', qrBitmap.length)
+
+        ticket += qrBitmap
 
         ticket += commands.newLine
         ticket += LINE + commands.newLine

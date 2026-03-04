@@ -8,6 +8,8 @@
  */
 
 import { generateQRContent } from './afipQRService.js'
+import QRCode from 'qrcode'
+import { PNG } from 'pngjs'
 
 // Comandos ESC/POS básicos
 const ESC = '\x1B'
@@ -28,14 +30,74 @@ const ESCPOS = {
   UNDERLINE_OFF: ESC + '-' + '\x00',
   CUT: GS + 'V' + '\x00',
   PARTIAL_CUT: GS + 'V' + '\x01',
-  FEED_LINES: (n) => ESC + 'd' + String.fromCharCode(n),
-  QR_SIZE: GS + '(k' + '\x03\x00\x31\x43' + '\x06', // Tamaño QR (6)
-  QR_ERROR: GS + '(k' + '\x03\x00\x31\x45\x30', // Error correction L
-  QR_STORE: (data) => {
-    const len = data.length + 3
-    return GS + '(k' + String.fromCharCode(len % 256) + String.fromCharCode(Math.floor(len / 256)) + '\x31\x50\x30' + data
-  },
-  QR_PRINT: GS + '(k' + '\x03\x00\x31\x51\x30'
+  FEED_LINES: (n) => ESC + 'd' + String.fromCharCode(n)
+}
+
+/**
+ * Convierte imagen PNG a formato bitmap ESC/POS
+ */
+async function convertImageToBitmap(pngBuffer) {
+  return new Promise((resolve, reject) => {
+    try {
+      const png = new PNG()
+
+      png.parse(pngBuffer, (err, data) => {
+        if (err) return reject(err)
+
+        const width = data.width
+        const height = data.height
+
+        const pixels = []
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (width * y + x) << 2
+            const r = data.data[idx]
+            const g = data.data[idx + 1]
+            const b = data.data[idx + 2]
+            const brightness = (r + g + b) / 3
+            pixels.push(brightness < 128 ? 1 : 0)
+          }
+        }
+
+        const widthBytes = Math.ceil(width / 8)
+        const imageBytes = []
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < widthBytes; x++) {
+            let byte = 0
+            for (let bit = 0; bit < 8; bit++) {
+              const pixelX = x * 8 + bit
+              if (pixelX < width) {
+                const pixelIndex = y * width + pixelX
+                if (pixels[pixelIndex] === 1) {
+                  byte |= (1 << (7 - bit))
+                }
+              }
+            }
+            imageBytes.push(byte)
+          }
+        }
+
+        const mode = 0
+        const xL = widthBytes & 0xFF
+        const xH = (widthBytes >> 8) & 0xFF
+        const yL = height & 0xFF
+        const yH = (height >> 8) & 0xFF
+
+        let command = GS + 'v' + String.fromCharCode(48) + String.fromCharCode(mode)
+        command += String.fromCharCode(xL) + String.fromCharCode(xH)
+        command += String.fromCharCode(yL) + String.fromCharCode(yH)
+
+        for (let i = 0; i < imageBytes.length; i++) {
+          command += String.fromCharCode(imageBytes[i])
+        }
+
+        resolve(command)
+      })
+    } catch (error) {
+      reject(error)
+    }
+  })
 }
 
 /**
@@ -88,7 +150,7 @@ function formatLabelValue(label, value, width = 42) {
  * @param {Object} data.comanda - Datos de la comanda
  * @param {Array} data.items - Items del ticket
  */
-export function renderTicketFiscal(data) {
+export async function renderTicketFiscal(data) {
   const { empresa, comprobante, comanda, items } = data
   let output = ''
 
@@ -191,14 +253,32 @@ export function renderTicketFiscal(data) {
   // ========== QR CODE ==========
   const qrUrl = generateQRContent(comprobante)
   if (qrUrl) {
-    output += '\n'
-    output += ESCPOS.ALIGN_CENTER
-    output += ESCPOS.QR_SIZE
-    output += ESCPOS.QR_ERROR
-    output += ESCPOS.QR_STORE(qrUrl)
-    output += ESCPOS.QR_PRINT
-    output += '\n'
-    output += 'Escanear QR para validar\n'
+    try {
+      console.log('[Ticket] Generando QR bitmap para:', qrUrl.substring(0, 50) + '...')
+
+      // Generar QR como imagen PNG
+      const qrBuffer = await QRCode.toBuffer(qrUrl, {
+        type: 'png',
+        width: 200,
+        margin: 1,
+        errorCorrectionLevel: 'M'
+      })
+
+      console.log('[Ticket] QR buffer generado, tamaño:', qrBuffer.length)
+
+      // Convertir a bitmap ESC/POS
+      const qrBitmap = await convertImageToBitmap(qrBuffer)
+      console.log('[Ticket] QR bitmap generado, tamaño:', qrBitmap.length)
+
+      output += '\n'
+      output += ESCPOS.ALIGN_CENTER
+      output += qrBitmap
+      output += '\n'
+      output += 'Escanear QR para validar\n'
+    } catch (qrError) {
+      console.error('[Ticket] Error generando QR bitmap:', qrError)
+      output += '\n(Error al generar codigo QR)\n'
+    }
   }
 
   // ========== PIE ==========
@@ -206,7 +286,7 @@ export function renderTicketFiscal(data) {
   output += separator() + '\n'
   output += ESCPOS.ALIGN_CENTER
   output += 'Gracias por su visita!\n'
-  output += 'www.clubsportivopi lar.com.ar\n'
+  output += 'www.sportivopilar.com.ar\n'
 
   // Corte de papel
   output += ESCPOS.FEED_LINES(4)

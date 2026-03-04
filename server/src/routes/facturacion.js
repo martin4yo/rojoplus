@@ -379,7 +379,7 @@ router.post('/emitir', checkPermiso('FACTURACION_EMITIR'), asyncHandler(async (r
   })
 
   // Generar ticket para impresión
-  const ticketData = renderTicketFiscal({
+  const ticketData = await renderTicketFiscal({
     empresa: {
       razonSocial: config.razonSocial,
       domicilio: config.domicilioFiscal,
@@ -545,7 +545,7 @@ router.get('/comprobantes/:id/ticket', asyncHandler(async (req, res) => {
     subtotal: parseFloat(item.subtotal)
   })) || []
 
-  const ticketData = renderTicketFiscal({
+  const ticketData = await renderTicketFiscal({
     empresa: {
       razonSocial: config.razonSocial,
       domicilio: config.domicilioFiscal,
