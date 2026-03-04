@@ -1249,7 +1249,7 @@ router.get('/cargos/:id/recargo', authAdmin, asyncHandler(async (req, res) => {
 // ============================================
 
 // GET /api/admin/configuracion/fiscal - Obtener configuración fiscal/AFIP
-router.get('/fiscal', authAdmin, asyncHandler(async (req, res) => {
+router.get('/configuracion/fiscal', authAdmin, asyncHandler(async (req, res) => {
   // TODO: Implementar modelo ConfiguracionFiscal en Prisma
   // Por ahora devolver null para que no falle el frontend
   res.json({ success: true, data: null })
