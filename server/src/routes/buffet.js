@@ -12,6 +12,7 @@ import {
   generarAsientoReciboCobro,
   CUENTAS
 } from '../services/asientosContables.js';
+import { enviarImpresion } from './buffet/impresoras.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -104,6 +105,91 @@ async function recalcularTotalesPedido(pedidoId) {
     where: { id: pedidoId },
     data: { subtotal, total: subtotal }
   });
+}
+
+// Imprimir comanda por destinos de impresión
+async function imprimirComandaPorDestinos(comanda, items) {
+  try {
+    // Agrupar items por destino de impresión
+    const itemsPorDestino = new Map();
+
+    for (const item of items) {
+      const producto = item.productoBuffet;
+      if (!producto?.categoriaMenuId) continue;
+
+      const destino = await prisma.destinoImpresion.findFirst({
+        where: { categoriaMenuId: producto.categoriaMenuId },
+        include: { impresora: true }
+      });
+
+      if (!destino || !destino.impresora) continue;
+
+      const impresoraId = destino.impresora.id;
+      if (!itemsPorDestino.has(impresoraId)) {
+        itemsPorDestino.set(impresoraId, { impresora: destino.impresora, items: [] });
+      }
+      itemsPorDestino.get(impresoraId).items.push(item);
+    }
+
+    // Imprimir en cada destino
+    for (const [impresoraId, data] of itemsPorDestino) {
+      // Generar comandos ESC/POS
+      const ticketData = generarComandaESCPOS(comanda, data.items);
+      const base64Data = Buffer.from(ticketData).toString('base64');
+
+      // Enviar a impresora
+      await enviarImpresion(impresoraId, base64Data, 'COMANDA');
+    }
+  } catch (error) {
+    console.error('Error imprimiendo comanda por destinos:', error);
+    throw error;
+  }
+}
+
+// Generar comanda en formato ESC/POS
+function generarComandaESCPOS(comanda, items) {
+  const ESC = 0x1B;
+  const GS = 0x1D;
+
+  const buffer = [];
+
+  // Inicializar
+  buffer.push(ESC, 0x40);
+
+  // Título centrado
+  buffer.push(ESC, 0x61, 0x01); // Centrar
+  buffer.push(ESC, 0x45, 0x01); // Negrita
+  buffer.push(...Buffer.from('== COMANDA ==\n'));
+  buffer.push(ESC, 0x45, 0x00); // Fin negrita
+
+  // Mesa
+  buffer.push(...Buffer.from(`Mesa: ${comanda.mesa?.numero || '?'}\n`));
+  buffer.push(...Buffer.from(`Hora: ${new Date().toLocaleTimeString()}\n`));
+  buffer.push(...Buffer.from('==================\n'));
+
+  // Alinear a la izquierda
+  buffer.push(ESC, 0x61, 0x00);
+
+  // Items
+  for (const item of items) {
+    buffer.push(ESC, 0x45, 0x01); // Negrita
+    buffer.push(...Buffer.from(`${item.cantidad}x ${item.productoBuffet?.nombre || 'Producto'}\n`));
+    buffer.push(ESC, 0x45, 0x00); // Fin negrita
+
+    if (item.observaciones) {
+      buffer.push(...Buffer.from(`   ${item.observaciones}\n`));
+    }
+    buffer.push(...Buffer.from('\n'));
+  }
+
+  // Separador
+  buffer.push(...Buffer.from('------------------\n'));
+
+  // Feed y cortar
+  buffer.push(ESC, 0x64, 0x03); // Feed 3 líneas
+  buffer.push(GS, 0x56, 0x41, 0x00); // Cortar papel
+
+  return Buffer.from(buffer);
 }
 
 // ============================================================================
@@ -1545,6 +1631,17 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
 
     await recalcularTotalesComanda(parseInt(id));
 
+    // Imprimir comandas en los destinos correspondientes
+    if (itemsCreados.length > 0) {
+      const comandaConMesa = await prisma.comanda.findUnique({
+        where: { id: parseInt(id) },
+        include: { mesa: true }
+      });
+      await imprimirComandaPorDestinos(comandaConMesa, itemsCreados).catch(err =>
+        console.error('Error imprimiendo comanda:', err)
+      );
+    }
+
     res.status(201).json({ success: true, data: itemsCreados });
   } catch (error) {
     console.error('Error al agregar items:', error);
@@ -1693,8 +1790,6 @@ router.post('/comandas/:id/enviar-cocina', authAdmin, checkPermiso('BUFFET_MESAS
       data: { estado: 'EN_PREPARACION' },
       include: { mesa: true }
     });
-
-    // TODO: Imprimir en impresoras correspondientes según destinos
 
     // Notificar a cocina/barra según destinos de impresión
     notificarNuevaComanda(comandaActualizada, comanda.items).catch(err =>
