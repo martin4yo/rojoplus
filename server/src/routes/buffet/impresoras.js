@@ -248,13 +248,35 @@ router.post('/impresoras/:id/test', authAdmin, checkPermiso('BUFFET_CONFIG'), as
       return res.status(404).json({ success: false, error: 'Impresora no encontrada' })
     }
 
-    // TODO: Implementar test real de conexión ESC/POS
-    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/
-    if (!ipRegex.test(impresora.ip)) {
-      return res.status(400).json({ success: false, error: 'IP inválida' })
+    if (!impresora.activo) {
+      return res.status(400).json({ success: false, error: 'Impresora inactiva' })
     }
 
-    res.json({ success: true, message: 'Conexión OK (simulada)' })
+    // Generar ticket de prueba simple (ESC/POS básico)
+    const testData = Buffer.from([
+      0x1B, 0x40,              // Inicializar impresora
+      0x1B, 0x61, 0x01,        // Centrar texto
+      ...Buffer.from('TEST DE IMPRESION\n'),
+      ...Buffer.from('RojoPlus Print Agent\n'),
+      ...Buffer.from('===================\n'),
+      0x1B, 0x61, 0x00,        // Alinear a la izquierda
+      ...Buffer.from(`Impresora: ${impresora.nombre}\n`),
+      ...Buffer.from(`Tipo: ${impresora.tipoConexion}\n`),
+      ...Buffer.from(`Fecha: ${new Date().toLocaleString()}\n`),
+      0x1B, 0x64, 0x03,        // Feed 3 líneas
+      0x1D, 0x56, 0x41, 0x00   // Cortar papel
+    ])
+
+    const testDataBase64 = testData.toString('base64')
+
+    // Enviar a la impresora
+    const resultado = await enviarImpresion(parseInt(id), testDataBase64, 'TEST')
+
+    if (resultado.success) {
+      res.json({ success: true, message: 'Test de impresión enviado. Verifica la impresora.' })
+    } else {
+      res.status(400).json({ success: false, error: resultado.error })
+    }
   } catch (error) {
     console.error('Error en test de impresora:', error)
     res.status(500).json({ success: false, error: 'Error en test de conexión' })
