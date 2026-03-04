@@ -505,7 +505,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           descuento: data.descuento?.monto || 0,
           porcentajeDescuento: data.descuento?.porcentaje || 0
         }, 'CUENTA')
-        imprimirTicket(ticketData)
+        await imprimirTicket(ticketData)
       }
 
       await cargarDatos()

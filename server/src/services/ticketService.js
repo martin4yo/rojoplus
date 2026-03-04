@@ -272,10 +272,10 @@ export async function renderTicketFiscal(data) {
     try {
       console.log('[Ticket] Generando QR bitmap para:', qrUrl.substring(0, 50) + '...')
 
-      // Generar QR como imagen PNG (tamaño grande para mejor legibilidad)
+      // Generar QR como imagen PNG
       const qrBuffer = await QRCode.toBuffer(qrUrl, {
         type: 'png',
-        width: 300,
+        width: 250,
         margin: 1,
         errorCorrectionLevel: 'M'
       })

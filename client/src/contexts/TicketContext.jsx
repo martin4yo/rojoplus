@@ -185,7 +185,8 @@ export function TicketProvider({ children }) {
     } else {
       // Modo impresión directa: enviar a impresora térmica
       try {
-        const data = await api.post('/admin/buffet/imprimir-ticket', {
+        // Usar postFull para obtener la respuesta completa con success, impresora, etc.
+        const data = await api.postFull('/admin/buffet/imprimir-ticket', {
           ticket,
           impresoraId
         })
@@ -199,7 +200,7 @@ export function TicketProvider({ children }) {
         }
       } catch (error) {
         console.error('Error enviando ticket a impresora:', error)
-        const errorMsg = error.response?.data?.error || 'Error de conexión con impresora'
+        const errorMsg = error.message || 'Error de conexión con impresora'
         toast.error(errorMsg)
         return { success: false, preview: false, error: errorMsg }
       }
