@@ -201,21 +201,19 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
 
         {/* ===== ITEMS ===== */}
         <div className="mb-2">
-          <div className="flex justify-between text-xs font-bold border-b border-gray-300 pb-1 mb-1">
-            <span>Descripción</span>
-            <span>Importe</span>
+          <div className="text-xs font-bold border-b border-gray-300 pb-1 mb-1">
+            DETALLE
           </div>
           {items && items.map((item, idx) => (
             <div key={idx} className="mb-1">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold">{item.cantidad}x {item.nombre}</span>
-                <span>{formatPrecio(item.subtotal)}</span>
+              <div className="text-xs font-semibold">{item.nombre}</div>
+              <div className="flex justify-end text-xs text-gray-600">
+                <span className="w-8 text-right">{item.cantidad}</span>
+                <span className="mx-1">x</span>
+                <span className="w-20 text-right">{formatPrecio(item.precio)}</span>
+                <span className="mx-1">=</span>
+                <span className="w-20 text-right font-semibold">{formatPrecio(item.subtotal)}</span>
               </div>
-              {item.cantidad > 1 && (
-                <div className="text-xs text-gray-500 pl-4">
-                  {formatPrecio(item.precio)} c/u
-                </div>
-              )}
             </div>
           ))}
         </div>

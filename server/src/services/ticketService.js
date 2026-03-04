@@ -290,21 +290,24 @@ export async function renderTicketFiscal(data) {
 
   // ========== ITEMS ==========
   output += ESCPOS.BOLD_ON
-  output += 'DESCRIPCION                         IMPORTE\n'
+  output += 'DETALLE\n'
   output += ESCPOS.BOLD_OFF
   output += separator('-') + '\n'
 
   items.forEach(item => {
     const cantidad = item.cantidad || 1
     const nombre = item.nombre || item.descripcion || 'Producto'
-    const subtotal = item.subtotal || (cantidad * (item.precioUnitario || item.precio || 0))
+    const precioUnit = item.precioUnitario || item.precio || 0
+    const subtotal = item.subtotal || (cantidad * precioUnit)
 
-    if (cantidad > 1) {
-      output += `${cantidad} x ${nombre}\n`
-      output += formatItemLine('', subtotal) + '\n'
-    } else {
-      output += formatItemLine(nombre, subtotal) + '\n'
-    }
+    // Línea 1: Nombre del producto
+    output += nombre + '\n'
+
+    // Línea 2: cantidad x precio = subtotal
+    const qtyStr = cantidad.toString().padStart(4)
+    const priceStr = `$${Number(precioUnit).toFixed(2)}`.padStart(12)
+    const totalStr = `$${Number(subtotal).toFixed(2)}`.padStart(14)
+    output += `  ${qtyStr} x ${priceStr} = ${totalStr}\n`
   })
 
   output += separator('=') + '\n'

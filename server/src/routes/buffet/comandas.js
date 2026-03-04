@@ -32,8 +32,11 @@ const router = express.Router()
 
 /**
  * Genera comandos ESC/POS para imprimir comanda
+ * @param {Object} comanda - Datos de la comanda
+ * @param {Array} items - Items a imprimir
+ * @param {string} sectorNombre - Nombre del sector destino (COCINA, BARRA, etc)
  */
-function generarComandaESCPOS(comanda, items) {
+function generarComandaESCPOS(comanda, items, sectorNombre = 'COCINA') {
   const ESC = 0x1B
   const GS = 0x1D
   const buffer = []
@@ -43,10 +46,10 @@ function generarComandaESCPOS(comanda, items) {
   // Inicializar
   buffer.push(ESC, 0x40)
 
-  // Título centrado
+  // Título centrado con nombre del sector
   buffer.push(ESC, 0x61, 0x01) // Centrar
   buffer.push(ESC, 0x45, 0x01) // Negrita
-  buffer.push(...Buffer.from('*** COCINA ***\n'))
+  buffer.push(...Buffer.from(`*** ${sectorNombre.toUpperCase()} ***\n`))
   buffer.push(ESC, 0x45, 0x00) // Fin negrita
 
   buffer.push(...Buffer.from(`${LINEA}\n`))
@@ -109,14 +112,22 @@ async function imprimirComandaPorDestinos(comanda, items) {
 
       const destino = await prisma.destinoImpresion.findFirst({
         where: { categoriaMenuId: producto.categoriaMenuId },
-        include: { impresora: true }
+        include: {
+          impresora: {
+            include: { sector: true }
+          }
+        }
       })
 
       if (!destino || !destino.impresora) continue
 
       const impresoraId = destino.impresora.id
       if (!itemsPorDestino.has(impresoraId)) {
-        itemsPorDestino.set(impresoraId, { impresora: destino.impresora, items: [] })
+        itemsPorDestino.set(impresoraId, {
+          impresora: destino.impresora,
+          sectorNombre: destino.impresora.sector?.nombre || destino.impresora.nombre || 'COCINA',
+          items: []
+        })
       }
       itemsPorDestino.get(impresoraId).items.push(item)
     }
@@ -125,8 +136,8 @@ async function imprimirComandaPorDestinos(comanda, items) {
 
     // Imprimir en cada destino
     for (const [impresoraId, data] of itemsPorDestino) {
-      console.log(`[Print] Enviando a impresora ${data.impresora.nombre}`)
-      const ticketData = generarComandaESCPOS(comanda, data.items)
+      console.log(`[Print] Enviando a impresora ${data.impresora.nombre} (sector: ${data.sectorNombre})`)
+      const ticketData = generarComandaESCPOS(comanda, data.items, data.sectorNombre)
       const base64Data = ticketData.toString('base64')
       const resultado = await enviarImpresion(impresoraId, base64Data, 'COMANDA')
       console.log(`[Print] Resultado: ${JSON.stringify(resultado)}`)
