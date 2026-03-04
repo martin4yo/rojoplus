@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { UtensilsCrossed, Phone, MapPin, Clock, ArrowLeft, Star, Coffee, Pizza, Sandwich, IceCream, Salad, Wine } from 'lucide-react'
+import { UtensilsCrossed, Phone, MapPin, Clock, ArrowLeft, Star, Coffee, Pizza, Sandwich, IceCream, Salad, Wine, ChevronDown, X } from 'lucide-react'
 
 // Imágenes de ejemplo por categoría (usando URLs de imágenes libres de derechos)
 const imagenesPorCategoria = {
@@ -44,6 +44,7 @@ export default function MenuBuffet() {
   const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [categoriaActiva, setCategoriaActiva] = useState(null)
+  const [menuMobileAbierto, setMenuMobileAbierto] = useState(false)
 
   useEffect(() => {
     cargarMenu()
@@ -112,8 +113,68 @@ export default function MenuBuffet() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 pt-4 pb-8">
-        {/* Categorías con wrap */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-8">
+        {/* Categorías - Mobile: dropdown, Desktop: flex-wrap */}
+
+        {/* Mobile: Botón dropdown */}
+        <div className="md:hidden mb-4 relative">
+          <button
+            onClick={() => setMenuMobileAbierto(!menuMobileAbierto)}
+            className="w-full bg-white rounded-xl shadow-sm p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              {categoriaSeleccionada && (
+                <>
+                  {(() => {
+                    const Icono = getIcono(categoriaSeleccionada.codigo)
+                    return <Icono size={20} className="text-gray-600" />
+                  })()}
+                  <span className="font-medium text-gray-800">{categoriaSeleccionada.nombre}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                    {categoriaSeleccionada.productos?.length || 0}
+                  </span>
+                </>
+              )}
+            </div>
+            <ChevronDown
+              size={20}
+              className={`text-gray-400 transition-transform ${menuMobileAbierto ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {/* Dropdown móvil */}
+          {menuMobileAbierto && (
+            <div className="absolute left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 z-50 max-h-80 overflow-y-auto">
+              {categorias.map(cat => {
+                const Icono = getIcono(cat.codigo)
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setCategoriaActiva(cat.id)
+                      setMenuMobileAbierto(false)
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${
+                      categoriaActiva === cat.id
+                        ? 'bg-red-50 text-red-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icono size={18} />
+                    <span className="flex-1 text-left font-medium">{cat.nombre}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      categoriaActiva === cat.id ? 'bg-red-100' : 'bg-gray-100'
+                    }`}>
+                      {cat.productos?.length || 0}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop: Categorías con wrap */}
+        <div className="hidden md:block bg-white rounded-2xl shadow-sm p-4 mb-8">
           <div className="flex flex-wrap gap-2 justify-center">
             {categorias.map(cat => {
               const Icono = getIcono(cat.codigo)
