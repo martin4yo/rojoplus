@@ -72,75 +72,46 @@ export default function MenuBuffet() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-red-900 to-red-800 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mx-auto mb-4"></div>
-          <p className="text-white/80">Cargando menú...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-600 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-500">Cargando menú...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-stone-100">
-      {/* Hero Header */}
-      <header className="relative bg-gradient-to-b from-red-900 via-red-800 to-red-700 text-white overflow-hidden">
-        {/* Patrón decorativo */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-        </div>
-
-        <div className="relative max-w-6xl mx-auto px-4 py-8 md:py-12">
-          <div className="flex items-center justify-between mb-6">
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
-            >
-              <ArrowLeft size={20} />
-              <span className="text-sm font-medium">Volver al sitio</span>
-            </Link>
-            <div className="hidden md:flex items-center gap-6 text-sm text-white/80">
-              <span className="flex items-center gap-2">
-                <Clock size={16} />
-                Lun-Dom 12:00 - 22:00
-              </span>
-              <span className="flex items-center gap-2">
-                <Phone size={16} />
-                (0230) 444-5678
-              </span>
-            </div>
-          </div>
-
-          <div className="text-center">
+    <div className="min-h-screen bg-gray-200">
+      {/* Header con onda gris oscuro compacto */}
+      <header className="relative bg-gradient-to-b from-gray-800 to-gray-700 text-white overflow-hidden">
+        <div className="relative max-w-6xl mx-auto px-4 pt-3 pb-16">
+          <div className="flex items-center justify-center gap-4">
             <img
               src="/images/club/pngwing.com.png"
               alt="Club Sportivo Pilar"
-              className="h-24 md:h-32 w-auto mx-auto mb-4 drop-shadow-2xl"
+              className="h-16 md:h-20 w-auto drop-shadow-lg"
             />
-            <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight">
-              Buffet del Club
-            </h1>
-            <p className="text-xl text-red-200 font-light">
-              Club Sportivo Pilar
-            </p>
-            <div className="mt-4 inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-sm">
-              <UtensilsCrossed size={16} />
-              <span>Cocina casera y parrilla</span>
+            <div className="text-left">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                Buffet del Club
+              </h1>
+              <p className="text-gray-300 text-sm md:text-base">
+                Club Sportivo Pilar
+              </p>
             </div>
           </div>
         </div>
 
         {/* Onda decorativa */}
         <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-            <path d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="#f5f5f4"/>
+          <svg viewBox="0 0 1440 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
+            <path d="M0 60L60 52.5C120 45 240 30 360 22.5C480 15 600 15 720 18.75C840 22.5 960 30 1080 33.75C1200 37.5 1320 37.5 1380 37.5L1440 37.5V60H1380C1320 60 1200 60 1080 60C960 60 840 60 720 60C600 60 480 60 360 60C240 60 120 60 60 60H0Z" fill="#e5e7eb"/>
           </svg>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 pt-4 pb-8">
         {/* Categorías con wrap */}
         <div className="bg-white rounded-2xl shadow-sm p-4 mb-8">
           <div className="flex flex-wrap gap-2 justify-center">
@@ -274,7 +245,7 @@ export default function MenuBuffet() {
                 </div>
               </div>
               <p className="text-stone-400 text-sm leading-relaxed">
-                Nuestro buffet ofrece comida casera, parrilla y las mejores minutas
+                Nuestro buffet ofrece comida casera y las mejores minutas
                 en un ambiente familiar. Abierto para socios y visitantes.
               </p>
             </div>
@@ -307,11 +278,11 @@ export default function MenuBuffet() {
               <ul className="text-stone-400 text-sm space-y-3">
                 <li className="flex items-center gap-2">
                   <Phone size={16} className="text-red-500" />
-                  (0230) 444-5678
+                  (0230) 442-0297
                 </li>
                 <li className="flex items-start gap-2">
                   <MapPin size={16} className="text-red-500 mt-0.5" />
-                  <span>Av. Sportivo 1234<br/>Pilar, Buenos Aires</span>
+                  <span>Av. Tomás Márquez 1125<br/>Pilar, Buenos Aires</span>
                 </li>
               </ul>
             </div>
