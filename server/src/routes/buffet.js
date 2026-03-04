@@ -410,6 +410,7 @@ router.get('/clientes/buscar', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_
 // Listar mesas
 router.get('/mesas', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) => {
   try {
+    console.log('========== [TEST LOG] GET /mesas EJECUTADO ==========');
     const { activo } = req.query;
 
     const where = {};
