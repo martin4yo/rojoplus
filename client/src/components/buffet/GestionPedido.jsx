@@ -402,7 +402,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       console.log('[DEBUG Cobro] Es fiscal:', esFiscal, 'CAE:', comprobanteRecibido?.cae)
       console.log('[DEBUG Cobro] Ticket pre-generado:', !!ticketPreGenerado)
 
-      // Solo imprimir si es factura fiscal (A, B o C con CAE)
+      // Imprimir ticket (fiscal o no fiscal)
       if (esFiscal && ticketPreGenerado) {
         // Usar el ticket pre-generado del backend (ya tiene QR incluido)
         try {
@@ -419,6 +419,22 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         } catch (printErr) {
           console.error('Error imprimiendo ticket fiscal:', printErr)
           toast.error('Error al enviar ticket a impresora')
+        }
+      } else if (!esFiscal && ticketPreGenerado) {
+        // Imprimir ticket NO fiscal (cierre de cuenta sin factura)
+        try {
+          const tipoTicket = tipo === 'takeaway' ? 'TAKEAWAY' : 'CUENTA'
+          const res = await api.postFull('/admin/buffet/imprimir-ticket-directo', {
+            ticketBase64: ticketPreGenerado,
+            tipoTicket
+          })
+          if (res?.success) {
+            toast.success(`Ticket enviado a ${res.impresora || 'impresora'}`)
+          } else {
+            console.warn('No se pudo imprimir ticket no fiscal:', res?.error)
+          }
+        } catch (printErr) {
+          console.error('Error imprimiendo ticket no fiscal:', printErr)
         }
       }
 
