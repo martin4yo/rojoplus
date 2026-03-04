@@ -538,6 +538,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   }
 
   async function buscarSocios(query) {
+    console.log('[buscarSocios] Query:', query)
     if (!query || query.length < 2) {
       setSociosBusqueda([])
       return
@@ -545,7 +546,9 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
     try {
       setBuscandoSocio(true)
+      console.log('[buscarSocios] Llamando API...')
       const res = await api.get(`/admin/socios?q=${encodeURIComponent(query)}&estadosValidos=ACTIVO,VIGENTE&limit=10`)
+      console.log('[buscarSocios] Respuesta:', res)
       setSociosBusqueda(res?.socios || [])
     } catch (err) {
       console.error('Error buscando socios:', err)

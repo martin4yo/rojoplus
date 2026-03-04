@@ -34,8 +34,8 @@ const ESCPOS = {
 }
 
 /**
- * Convierte imagen PNG a formato bitmap ESC/POS usando GS v 0 (raster bit image)
- * Este comando es más compatible y no tiene problemas de espaciado
+ * Convierte imagen PNG a formato bitmap ESC/POS usando ESC * 33 (24-dot double density)
+ * Este es el modo estándar para imprimir imágenes en impresoras térmicas
  */
 async function convertImageToBitmap(pngBuffer) {
   return new Promise((resolve, reject) => {
@@ -51,60 +51,61 @@ async function convertImageToBitmap(pngBuffer) {
         console.log(`[QR Bitmap] Procesando imagen ${width}x${height}`)
 
         // Convertir a blanco y negro (1 bit por píxel)
+        // pixels[y][x] = 1 si es negro, 0 si es blanco
         const pixels = []
         for (let y = 0; y < height; y++) {
+          pixels[y] = []
           for (let x = 0; x < width; x++) {
             const idx = (width * y + x) << 2
             const r = data.data[idx]
             const g = data.data[idx + 1]
             const b = data.data[idx + 2]
             const brightness = (r + g + b) / 3
-            // Si es oscuro, es un píxel negro (1), si es claro es blanco (0)
-            pixels.push(brightness < 128 ? 1 : 0)
+            pixels[y][x] = brightness < 128 ? 1 : 0
           }
         }
 
-        // Redimensionar ancho a múltiplo de 8
-        const widthBytes = Math.ceil(width / 8)
+        // Usar Buffer para construir el comando
+        const chunks = []
 
-        // Convertir píxeles a bytes (8 píxeles por byte)
-        const imageBytes = []
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < widthBytes; x++) {
-            let byte = 0
-            for (let bit = 0; bit < 8; bit++) {
-              const pixelX = x * 8 + bit
-              if (pixelX < width) {
-                const pixelIndex = y * width + pixelX
-                if (pixels[pixelIndex] === 1) {
+        // ESC 3 n - Set line spacing to n/180 inch (24 dots = sin espacio entre bandas)
+        chunks.push(Buffer.from([0x1B, 0x33, 24]))
+
+        // Procesar en bandas de 24 píxeles de alto
+        for (let bandY = 0; bandY < height; bandY += 24) {
+          // ESC * 33 nL nH - Select 24-dot double density bit image
+          const nL = width & 0xFF
+          const nH = (width >> 8) & 0xFF
+          chunks.push(Buffer.from([0x1B, 0x2A, 33, nL, nH]))
+
+          // Cada columna necesita 3 bytes (24 bits verticales)
+          const bandData = Buffer.alloc(width * 3)
+          for (let x = 0; x < width; x++) {
+            for (let byteNum = 0; byteNum < 3; byteNum++) {
+              let byte = 0
+              for (let bit = 0; bit < 8; bit++) {
+                const y = bandY + byteNum * 8 + bit
+                if (y < height && pixels[y][x] === 1) {
                   byte |= (1 << (7 - bit))
                 }
               }
+              bandData[x * 3 + byteNum] = byte
             }
-            imageBytes.push(byte)
           }
+          chunks.push(bandData)
+
+          // Nueva línea después de cada banda
+          chunks.push(Buffer.from([0x0A]))
         }
 
-        // Construir comando ESC/POS: GS v 0 mode xL xH yL yH [data]
-        // mode: 0 = normal, 1 = double width, 2 = double height, 3 = double both
-        const mode = 0
-        const xL = widthBytes & 0xFF
-        const xH = (widthBytes >> 8) & 0xFF
-        const yL = height & 0xFF
-        const yH = (height >> 8) & 0xFF
+        // ESC 2 - Reset line spacing to default
+        chunks.push(Buffer.from([0x1B, 0x32]))
 
-        // Construir comando GS v 0
-        let command = GS + 'v' + String.fromCharCode(48) + String.fromCharCode(mode)
-        command += String.fromCharCode(xL) + String.fromCharCode(xH)
-        command += String.fromCharCode(yL) + String.fromCharCode(yH)
+        const result = Buffer.concat(chunks)
+        console.log(`[QR Bitmap] Generado, tamaño: ${result.length} bytes`)
 
-        // Agregar bytes de imagen
-        for (let i = 0; i < imageBytes.length; i++) {
-          command += String.fromCharCode(imageBytes[i])
-        }
-
-        console.log(`[QR Bitmap] Generado, tamaño: ${command.length} bytes`)
-        resolve(command)
+        // Convertir Buffer a string binary
+        resolve(result.toString('binary'))
       })
     } catch (error) {
       reject(error)
