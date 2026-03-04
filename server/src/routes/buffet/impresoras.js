@@ -567,6 +567,78 @@ router.post('/puestos/heartbeat', async (req, res) => {
   }
 })
 
+/**
+ * POST /imprimir-ticket-directo
+ * Envía un ticket pre-generado (base64) directamente a la impresora
+ * Usado cuando el backend ya generó el ticket completo con QR
+ */
+router.post('/imprimir-ticket-directo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_KIOSCO'), async (req, res) => {
+  try {
+    const { ticketBase64, tipoTicket } = req.body
+
+    if (!ticketBase64) {
+      return res.status(400).json({ success: false, error: 'Ticket requerido' })
+    }
+
+    // Buscar impresora según configuración
+    let impresora = null
+    let configKey = 'BUFFET_IMPRESORA_TICKETS'
+    if (tipoTicket === 'KIOSCO') {
+      configKey = 'BUFFET_IMPRESORA_KIOSCO'
+    } else if (tipoTicket === 'TAKEAWAY') {
+      configKey = 'BUFFET_IMPRESORA_TAKEAWAY'
+    }
+
+    const config = await prisma.configuracion.findUnique({
+      where: { clave: configKey }
+    })
+
+    if (config?.valor) {
+      impresora = await prisma.impresoraTermica.findUnique({
+        where: { id: parseInt(config.valor) }
+      })
+    }
+
+    // Fallback: buscar impresora por sector
+    if (!impresora) {
+      impresora = await prisma.impresoraTermica.findFirst({
+        where: {
+          activo: true,
+          OR: [
+            { sector: { codigo: 'CAJA' } },
+            { sector: { codigo: 'TICKET' } },
+            { sectorId: null }
+          ]
+        }
+      })
+    }
+
+    if (!impresora) {
+      return res.status(400).json({
+        success: false,
+        error: 'No hay impresora de tickets configurada'
+      })
+    }
+
+    // Enviar directamente a la impresora
+    const resultado = await enviarImpresion(impresora.id, ticketBase64, tipoTicket || 'FISCAL')
+
+    if (resultado.success) {
+      res.json({
+        success: true,
+        message: 'Ticket enviado a impresora',
+        impresora: impresora.nombre,
+        trabajoId: resultado.trabajoId
+      })
+    } else {
+      res.status(400).json({ success: false, error: resultado.error })
+    }
+  } catch (error) {
+    console.error('Error imprimiendo ticket directo:', error)
+    res.status(500).json({ success: false, error: 'Error al imprimir ticket' })
+  }
+})
+
 // ============================================================================
 // FUNCIONES DE IMPRESIÓN
 // ============================================================================

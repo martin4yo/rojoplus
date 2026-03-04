@@ -395,37 +395,31 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       console.log('[DEBUG Cobro] Comprobante:', data?.comprobante)
       console.log('[DEBUG Cobro] CAE:', data?.comprobante?.cae)
 
-      // Determinar si se emitió factura fiscal
+      // Determinar si se emitió factura fiscal y si tenemos ticket pre-generado
       const comprobanteRecibido = data?.comprobante
-      const qrUrlRecibido = data?.qrUrl
+      const ticketPreGenerado = data?.ticket // Ticket ESC/POS en base64 con QR incluido
       const esFiscal = comprobanteRecibido && comprobanteRecibido.cae
       console.log('[DEBUG Cobro] Es fiscal:', esFiscal, 'CAE:', comprobanteRecibido?.cae)
+      console.log('[DEBUG Cobro] Ticket pre-generado:', !!ticketPreGenerado)
 
       // Solo imprimir si es factura fiscal (A, B o C con CAE)
-      // Si no es fiscal, se usa el cierre de mesa como comprobante
-      if (esFiscal) {
-        const ticketFiscalData = generarTicketFiscal({
-          comprobante: comprobanteRecibido,
-          items: comandaActiva.items?.map(item => ({
-            cantidad: item.cantidad,
-            nombre: item.productoBuffet?.nombre || item.nombre,
-            precio: Number(item.precioUnitario),
-            subtotal: Number(item.precioUnitario) * item.cantidad
-          })) || [],
-          qrUrl: qrUrlRecibido,
-          empresa: configFiscal ? {
-            razonSocial: configFiscal.razonSocial,
-            domicilio: configFiscal.domicilioFiscal,
-            cuit: configFiscal.cuit,
-            condicionIva: configFiscal.condicionIva,
-            iibb: configFiscal.iibb || 'EXENTO',
-            inicioActividades: configFiscal.inicioActividades
-          } : null,
-          medioPago: mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.nombre || 'Efectivo',
-          montoPagado: datosVuelto.montoPagado || null,
-          vuelto: datosVuelto.vuelto || null
-        })
-        await imprimirTicket(ticketFiscalData)
+      if (esFiscal && ticketPreGenerado) {
+        // Usar el ticket pre-generado del backend (ya tiene QR incluido)
+        try {
+          const tipoTicket = tipo === 'takeaway' ? 'TAKEAWAY' : 'FISCAL'
+          const res = await api.postFull('/admin/buffet/imprimir-ticket-directo', {
+            ticketBase64: ticketPreGenerado,
+            tipoTicket
+          })
+          if (res?.success) {
+            toast.success(`Ticket enviado a ${res.impresora || 'impresora'}`)
+          } else {
+            toast.error(res?.error || 'Error al imprimir ticket')
+          }
+        } catch (printErr) {
+          console.error('Error imprimiendo ticket fiscal:', printErr)
+          toast.error('Error al enviar ticket a impresora')
+        }
       }
 
       // Reset estados

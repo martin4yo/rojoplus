@@ -78,9 +78,16 @@ export function canGenerateQR(data) {
  * Retorna solo la URL que debe ser convertida a QR por el frontend/impresora
  */
 export function generateQRContent(comprobante) {
+  console.log('[QR] generateQRContent llamado con:', {
+    cae: comprobante?.cae,
+    cuit: comprobante?.cuit,
+    cuitEmisor: comprobante?.cuitEmisor
+  })
   if (!canGenerateQR(comprobante)) {
+    console.log('[QR] canGenerateQR retornó false - falta cae o cuit')
     return null
   }
+  console.log('[QR] Generando QR...')
 
   return generateQRData({
     cuit: comprobante.cuitEmisor || comprobante.cuit,

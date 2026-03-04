@@ -409,38 +409,30 @@ export default function BuffetKiosco() {
       const res = await api.post('/admin/buffet/kiosco/venta', datosVenta)
       const responseData = res.data?.data || res.data || res
 
-      // Determinar si se emitió factura fiscal
+      // Determinar si se emitió factura fiscal y si hay ticket pre-generado
       const comprobanteRecibido = responseData.comprobante
-      const qrUrlRecibido = responseData.qrUrl
+      const ticketPreGenerado = responseData.ticket // Ticket ESC/POS en base64 con QR incluido
       const esFiscal = comprobanteRecibido && comprobanteRecibido.cae
 
-      let ticketData
-      if (esFiscal) {
-        // Ticket FISCAL con CAE y QR
-        ticketData = generarTicketFiscal({
-          comprobante: comprobanteRecibido,
-          items: carrito.map(item => ({
-            cantidad: item.cantidad,
-            nombre: item.nombre,
-            precio: Number(item.precio),
-            subtotal: Number(item.precio) * item.cantidad
-          })),
-          qrUrl: qrUrlRecibido,
-          empresa: configFiscal ? {
-            razonSocial: configFiscal.razonSocial,
-            domicilio: configFiscal.domicilioFiscal,
-            cuit: configFiscal.cuit,
-            condicionIva: configFiscal.condicionIva,
-            iibb: configFiscal.iibb || 'EXENTO',
-            inicioActividades: configFiscal.inicioActividades
-          } : null,
-          medioPago: medioPagoSeleccionado?.nombre || 'Efectivo',
-          montoPagado: datosVuelto.montoPagado,
-          vuelto: datosVuelto.vuelto
-        })
+      if (esFiscal && ticketPreGenerado) {
+        // Usar el ticket pre-generado del backend (ya tiene QR incluido)
+        try {
+          const printRes = await api.postFull('/admin/buffet/imprimir-ticket-directo', {
+            ticketBase64: ticketPreGenerado,
+            tipoTicket: 'KIOSCO'
+          })
+          if (printRes?.success) {
+            toast.success(`Ticket enviado a ${printRes.impresora || 'impresora'}`)
+          } else {
+            toast.error(printRes?.error || 'Error al imprimir ticket')
+          }
+        } catch (printErr) {
+          console.error('Error imprimiendo ticket fiscal:', printErr)
+          toast.error('Error al enviar ticket a impresora')
+        }
       } else {
-        // Ticket NO fiscal
-        ticketData = generarTicketKiosco({
+        // Ticket NO fiscal - usar el flujo normal
+        const ticketData = generarTicketKiosco({
           numero: responseData.numero || `K${Date.now()}`,
           items: carrito.map(item => ({
             cantidad: item.cantidad,
@@ -453,8 +445,8 @@ export default function BuffetKiosco() {
           montoPagado: datosVuelto.montoPagado,
           vuelto: datosVuelto.vuelto
         })
+        await imprimirTicket(ticketData)
       }
-      await imprimirTicket(ticketData)
 
       // Guardar en historial de últimas ventas
       setUltimasVentas(prev => [{
