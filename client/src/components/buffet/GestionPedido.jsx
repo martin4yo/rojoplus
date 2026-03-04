@@ -384,17 +384,14 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         ? `/admin/buffet/comandas/${comandaActiva.id}/cobrar`
         : `/admin/buffet/takeaway/${id}/cobrar`
 
-      const res = await api.post(endpoint, requestData)
+      const data = await api.post(endpoint, requestData)
 
       toast.success(tipo === 'mesa' ? 'Comanda cobrada' : 'Pedido cobrado')
 
-      const data = res.data?.data || res.data
-
       // DEBUG: Ver qué devuelve el backend
-      console.log('[DEBUG Cobro] Respuesta completa:', res.data)
-      console.log('[DEBUG Cobro] Data extraída:', data)
+      console.log('[DEBUG Cobro] Data:', data)
       console.log('[DEBUG Cobro] Comprobante:', data?.comprobante)
-      console.log('[DEBUG Cobro] QR URL:', data?.qrUrl)
+      console.log('[DEBUG Cobro] CAE:', data?.comprobante?.cae)
 
       // Determinar si se emitió factura fiscal
       const comprobanteRecibido = data?.comprobante

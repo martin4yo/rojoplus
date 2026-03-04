@@ -385,9 +385,13 @@ router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async 
     // Generar comandos ESC/POS según tipo de ticket
     let ticketData
 
+    console.log('[Ticket] Tipo:', ticket.tipo, 'CAE:', ticket.comprobante?.cae)
+
     if (ticket.tipo === 'FISCAL') {
+      console.log('[Ticket] Generando ticket FISCAL con QR')
       ticketData = await generarTicketFiscal(ticket)
     } else {
+      console.log('[Ticket] Generando ticket NO fiscal')
       ticketData = await generarTicketCuenta(ticket)
     }
 

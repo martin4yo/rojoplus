@@ -195,17 +195,13 @@ export function TicketProvider({ children }) {
           return { success: true, preview: false }
         } else {
           toast.error(res.data?.error || 'Error al imprimir')
-          // Si falla, mostrar preview como fallback
-          setTicketActual(ticket)
-          return { success: false, preview: true, error: res.data?.error }
+          return { success: false, preview: false, error: res.data?.error }
         }
       } catch (error) {
         console.error('Error enviando ticket a impresora:', error)
         const errorMsg = error.response?.data?.error || 'Error de conexión con impresora'
         toast.error(errorMsg)
-        // Si falla, mostrar preview como fallback
-        setTicketActual(ticket)
-        return { success: false, preview: true, error: errorMsg }
+        return { success: false, preview: false, error: errorMsg }
       }
     }
   }, [modoPreview])
