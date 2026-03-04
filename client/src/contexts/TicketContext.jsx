@@ -185,17 +185,17 @@ export function TicketProvider({ children }) {
     } else {
       // Modo impresión directa: enviar a impresora térmica
       try {
-        const res = await api.post('/admin/buffet/imprimir-ticket', {
+        const data = await api.post('/admin/buffet/imprimir-ticket', {
           ticket,
           impresoraId
         })
 
-        if (res.data?.success) {
-          toast.success(`Ticket enviado a ${res.data.impresora || 'impresora'}`)
+        if (data?.success) {
+          toast.success(`Ticket enviado a ${data.impresora || 'impresora'}`)
           return { success: true, preview: false }
         } else {
-          toast.error(res.data?.error || 'Error al imprimir')
-          return { success: false, preview: false, error: res.data?.error }
+          toast.error(data?.error || 'Error al imprimir')
+          return { success: false, preview: false, error: data?.error }
         }
       } catch (error) {
         console.error('Error enviando ticket a impresora:', error)
