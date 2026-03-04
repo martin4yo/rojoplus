@@ -20,6 +20,7 @@ import net from 'net'
 import fs from 'fs'
 import { exec, execSync } from 'child_process'
 import os from 'os'
+import Jimp from 'jimp'
 
 // ============================================================================
 // CONFIGURACIÓN
@@ -555,6 +556,110 @@ function procesarTrabajo(trabajo) {
   }
 }
 
+/**
+ * Procesa un trabajo de impresión de IMAGEN
+ * Convierte la imagen a formato bitmap ESC/POS y la envía a la impresora
+ */
+async function procesarTrabajoImagen(trabajo) {
+  console.log(`[Imagen] Procesando: ${trabajo.id} (${trabajo.tipoConexion} -> ${trabajo.destino})`)
+
+  // Extraer datos base64 de la imagen (quitar prefijo data:image/png;base64,)
+  let imagenBase64 = trabajo.imagen
+  if (imagenBase64.includes(',')) {
+    imagenBase64 = imagenBase64.split(',')[1]
+  }
+
+  // Decodificar imagen
+  const imageBuffer = Buffer.from(imagenBase64, 'base64')
+
+  // Cargar imagen con Jimp
+  const image = await Jimp.read(imageBuffer)
+
+  // Redimensionar para impresora térmica de 80mm (~576 píxeles de ancho a 203 DPI)
+  const maxWidth = 576
+  if (image.getWidth() > maxWidth) {
+    image.resize(maxWidth, Jimp.AUTO)
+  }
+
+  // Convertir a escala de grises y luego a blanco/negro
+  image.grayscale()
+  image.contrast(0.2) // Aumentar contraste
+
+  const width = image.getWidth()
+  const height = image.getHeight()
+
+  console.log(`[Imagen] Procesando imagen ${width}x${height}`)
+
+  // Convertir a bitmap ESC/POS usando GS v 0
+  // Formato: GS v 0 m xL xH yL yH d1...dk
+  // m=0 (normal), cada byte = 8 píxeles horizontales
+  const bytesPerLine = Math.ceil(width / 8)
+  const imageData = Buffer.alloc(bytesPerLine * height)
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const pixel = Jimp.intToRGBA(image.getPixelColor(x, y))
+      const brightness = (pixel.r + pixel.g + pixel.b) / 3
+
+      // Si es oscuro (menos de 128), poner bit en 1 (negro)
+      if (brightness < 128) {
+        const bytePos = Math.floor(x / 8)
+        const bitPos = 7 - (x % 8)
+        imageData[y * bytesPerLine + bytePos] |= (1 << bitPos)
+      }
+    }
+  }
+
+  // Construir comando ESC/POS
+  const xL = bytesPerLine & 0xFF
+  const xH = (bytesPerLine >> 8) & 0xFF
+  const yL = height & 0xFF
+  const yH = (height >> 8) & 0xFF
+
+  // Comando completo: INIT + CENTER + GS v 0 + imagen + FEED + CUT
+  const escposCommand = Buffer.concat([
+    Buffer.from([0x1B, 0x40]),                    // ESC @ - Initialize printer
+    Buffer.from([0x1B, 0x61, 0x01]),              // ESC a 1 - Center alignment
+    Buffer.from([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]), // GS v 0 - Raster image
+    imageData,                                    // Image data
+    Buffer.from([0x1B, 0x64, 0x03]),              // ESC d 3 - Feed 3 lines
+    Buffer.from([0x1D, 0x56, 0x41, 0x00])         // GS V A - Partial cut
+  ])
+
+  const datosBase64 = escposCommand.toString('base64')
+
+  return new Promise((resolve, reject) => {
+    const callback = (err) => {
+      if (socket && socket.connected) {
+        socket.emit('print-agent:impreso', {
+          trabajoId: trabajo.id,
+          success: !err,
+          error: err?.message
+        })
+      }
+      if (err) reject(err)
+      else resolve()
+    }
+
+    switch (trabajo.tipoConexion) {
+      case 'IP':
+        imprimirIP(trabajo.destino, datosBase64, callback)
+        break
+      case 'USB':
+        imprimirUSB(trabajo.destino, datosBase64, callback)
+        break
+      case 'CUPS':
+        imprimirCUPS(trabajo.destino, datosBase64, callback)
+        break
+      case 'WINDOWS':
+        imprimirWindows(trabajo.destino, datosBase64, callback)
+        break
+      default:
+        callback(new Error('Tipo de conexión no soportado'))
+    }
+  })
+}
+
 // ============================================================================
 // CONEXIÓN SOCKET.IO
 // ============================================================================
@@ -604,6 +709,23 @@ function conectar() {
 
   socket.on('imprimir', (trabajo) => {
     procesarTrabajo(trabajo)
+  })
+
+  // Evento para imprimir imágenes (tickets renderizados como imagen)
+  socket.on('imprimir-imagen', async (trabajo) => {
+    console.log(`[Imagen] Recibido trabajo: ${trabajo.id}`)
+    try {
+      await procesarTrabajoImagen(trabajo)
+    } catch (err) {
+      console.error(`[Imagen] Error procesando trabajo ${trabajo.id}:`, err.message)
+      if (socket && socket.connected) {
+        socket.emit('print-agent:impreso', {
+          trabajoId: trabajo.id,
+          success: false,
+          error: err.message
+        })
+      }
+    }
   })
 
   socket.on('disconnect', (reason) => {

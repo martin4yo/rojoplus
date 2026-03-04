@@ -270,19 +270,21 @@ export async function renderTicketFiscal(data) {
   // ========== DATOS CLIENTE ==========
   output += ESCPOS.ALIGN_LEFT
   output += ESCPOS.BOLD_ON
-  output += 'CLIENTE\n'
+  output += 'DATOS DEL CLIENTE\n'
   output += ESCPOS.BOLD_OFF
 
   const nombreCliente = comprobante.nombreCliente || 'Consumidor Final'
-  output += `${nombreCliente}\n`
+  output += `Nombre: ${nombreCliente}\n`
+  output += `Direccion: ${comprobante.direccionCliente || ''}\n`
 
   if (comprobante.docCliente && comprobante.tipoDocCliente !== 99) {
     const tipoDoc = comprobante.tipoDocCliente === 80 ? 'CUIT' : comprobante.tipoDocCliente === 96 ? 'DNI' : 'Doc'
     output += `${tipoDoc}: ${comprobante.docCliente}\n`
   }
-  if (comprobante.condicionIvaCliente && comprobante.condicionIvaCliente !== 'Consumidor Final') {
-    output += `Cond. IVA: ${comprobante.condicionIvaCliente}\n`
-  }
+  output += `Cond. IVA: ${comprobante.condicionIvaCliente || 'Consumidor Final'}\n`
+
+  const metodoPago = comanda?.metodoPago || comprobante.metodoPago || 'EFECTIVO'
+  output += `Forma de Pago: ${metodoPago.toUpperCase()}\n`
 
   output += separator() + '\n'
 
@@ -323,13 +325,6 @@ export async function renderTicketFiscal(data) {
 
   output += separator() + '\n'
 
-  // ========== FORMA DE PAGO ==========
-  output += ESCPOS.ALIGN_LEFT
-  const metodoPago = comanda?.metodoPago || comprobante.metodoPago || 'EFECTIVO'
-  output += `Forma de pago: ${metodoPago.toUpperCase()}\n`
-
-  output += separator() + '\n'
-
   // ========== CAE ==========
   output += ESCPOS.ALIGN_CENTER
   output += ESCPOS.BOLD_ON
@@ -351,7 +346,7 @@ export async function renderTicketFiscal(data) {
       output += qrCommands
 
       output += '\n'
-      output += 'Escanear QR para validar\n'
+      output += 'Codigo QR ARCA\n'
       console.log('[Ticket] QR raster generado')
     } catch (qrError) {
       console.error('[Ticket] Error generando QR:', qrError)

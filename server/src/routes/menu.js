@@ -472,14 +472,15 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
       titulo: 'Buffet', icono: 'UtensilsCrossed', orden: 11,
       children: [
         { titulo: 'Dashboard', icono: 'LayoutDashboard', url: '/admin/buffet', orden: 1 },
-        { titulo: 'Mesas', icono: 'UtensilsCrossed', url: '/admin/buffet/mesas', orden: 2 },
-        { titulo: 'Pedidos', icono: 'ShoppingBag', url: '/admin/buffet/takeaway', orden: 3 },
-        { titulo: 'Kiosco', icono: 'Coffee', url: '/admin/buffet/kiosco', orden: 4 },
-        { titulo: 'Cocina (KDS)', icono: 'ChefHat', url: '/admin/buffet/cocina', orden: 5 },
-        { titulo: 'Productos', icono: 'Package', url: '/admin/buffet/productos', orden: 6 },
-        { titulo: 'Precios', icono: 'DollarSign', url: '/admin/buffet/precios', orden: 7 },
-        { titulo: 'Categorías', icono: 'Tag', url: '/admin/buffet/categorias', orden: 8 },
-        { titulo: 'Impresoras', icono: 'Printer', url: '/admin/buffet/impresoras', orden: 9 },
+        { titulo: 'Estado Mesas', icono: 'Users', url: '/admin/buffet/estado', orden: 2 },
+        { titulo: 'Mesas', icono: 'UtensilsCrossed', url: '/admin/buffet/mesas', orden: 3 },
+        { titulo: 'Pedidos', icono: 'ShoppingBag', url: '/admin/buffet/takeaway', orden: 4 },
+        { titulo: 'Kiosco', icono: 'Coffee', url: '/admin/buffet/kiosco', orden: 5 },
+        { titulo: 'Cocina (KDS)', icono: 'ChefHat', url: '/admin/buffet/cocina', orden: 6 },
+        { titulo: 'Productos', icono: 'Package', url: '/admin/buffet/productos', orden: 7 },
+        { titulo: 'Precios', icono: 'DollarSign', url: '/admin/buffet/precios', orden: 8 },
+        { titulo: 'Categorías', icono: 'Tag', url: '/admin/buffet/categorias', orden: 9 },
+        { titulo: 'Impresoras', icono: 'Printer', url: '/admin/buffet/impresoras', orden: 10 },
       ]
     },
     {

@@ -9,7 +9,7 @@ export default function BuffetComanda() {
     <GestionPedido
       tipo="mesa"
       id={parseInt(mesaId)}
-      onVolver={() => navigate('/admin/buffet')}
+      onVolver={() => navigate('/admin/buffet/estado')}
     />
   )
 }

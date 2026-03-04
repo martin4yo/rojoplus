@@ -1,14 +1,83 @@
-import { useState } from 'react'
-import { X, Printer } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { X, Printer, Image } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import api from '../../services/api'
 
 /**
  * Componente para previsualizar tickets de impresión
  * Soporta tickets fiscales (con CAE y QR) y no fiscales
  * Simula el formato de impresora térmica de 80mm
+ *
+ * @param {Object} ticket - Datos del ticket
+ * @param {Function} onClose - Callback al cerrar
+ * @param {Function} onPrint - Callback al imprimir (opcional)
+ * @param {Function} onPrintAsImage - Callback para imprimir como imagen (recibe base64, impresoraId)
  */
-export default function TicketPreview({ ticket, onClose, onPrint }) {
+export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage }) {
+  const ticketRef = useRef(null)
+  const [imprimiendo, setImprimiendo] = useState(false)
+  const [impresoras, setImpresoras] = useState([])
+  const [impresoraSeleccionada, setImpresoraSeleccionada] = useState(null)
+  const [cargandoImpresoras, setCargandoImpresoras] = useState(false)
+
+  // Cargar impresoras disponibles cuando se muestra el componente
+  useEffect(() => {
+    if (onPrintAsImage) {
+      cargarImpresoras()
+    }
+  }, [onPrintAsImage])
+
+  const cargarImpresoras = async () => {
+    setCargandoImpresoras(true)
+    try {
+      const data = await api.get('/admin/buffet/impresoras-tickets')
+      const lista = data || []
+      setImpresoras(lista)
+      // Seleccionar la primera por defecto
+      if (lista.length > 0) {
+        setImpresoraSeleccionada(lista[0].id)
+      }
+    } catch (err) {
+      console.error('Error cargando impresoras:', err)
+    } finally {
+      setCargandoImpresoras(false)
+    }
+  }
+
   if (!ticket) return null
+
+  // Imprimir como imagen usando html2canvas
+  const handlePrintAsImage = async () => {
+    if (!ticketRef.current || !onPrintAsImage) return
+    if (!impresoraSeleccionada) {
+      alert('Selecciona una impresora')
+      return
+    }
+
+    setImprimiendo(true)
+    try {
+      // Importar html2canvas dinámicamente
+      const html2canvas = (await import('html2canvas')).default
+
+      // Capturar el ticket como imagen
+      const canvas = await html2canvas(ticketRef.current, {
+        scale: 2, // Mayor resolución
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true
+      })
+
+      // Convertir a base64
+      const imageBase64 = canvas.toDataURL('image/png')
+
+      // Llamar callback con la imagen y la impresora seleccionada
+      await onPrintAsImage(imageBase64, impresoraSeleccionada)
+    } catch (error) {
+      console.error('Error capturando ticket como imagen:', error)
+    } finally {
+      setImprimiendo(false)
+    }
+  }
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=300,height=600')
@@ -352,6 +421,7 @@ export default function TicketPreview({ ticket, onClose, onPrint }) {
         {/* Ticket Preview */}
         <div className="flex-1 overflow-auto p-4 bg-gray-100">
           <div
+            ref={ticketRef}
             id="ticket-content"
             className="bg-white mx-auto shadow-lg"
             style={{
@@ -367,20 +437,61 @@ export default function TicketPreview({ ticket, onClose, onPrint }) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 p-4 border-t">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            Cerrar
-          </button>
-          <button
-            onClick={handlePrint}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Printer size={18} />
-            Imprimir
-          </button>
+        <div className="p-4 border-t space-y-3">
+          {/* Selector de impresora (solo si hay onPrintAsImage) */}
+          {onPrintAsImage && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600 whitespace-nowrap">Impresora:</label>
+              {cargandoImpresoras ? (
+                <div className="flex-1 text-sm text-gray-500">Cargando...</div>
+              ) : impresoras.length === 0 ? (
+                <div className="flex-1 text-sm text-red-500">No hay impresoras configuradas</div>
+              ) : (
+                <select
+                  value={impresoraSeleccionada || ''}
+                  onChange={e => setImpresoraSeleccionada(parseInt(e.target.value))}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                >
+                  {impresoras.map(imp => (
+                    <option key={imp.id} value={imp.id}>
+                      {imp.nombre} {imp.etiqueta ? `(${imp.etiqueta})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Botones */}
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cerrar
+            </button>
+            {onPrintAsImage && (
+              <button
+                onClick={handlePrintAsImage}
+                disabled={imprimiendo || !impresoraSeleccionada}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {imprimiendo ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <Image size={18} />
+                )}
+                {imprimiendo ? 'Enviando...' : 'Térmica'}
+              </button>
+            )}
+            <button
+              onClick={handlePrint}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Printer size={18} />
+              Navegador
+            </button>
+          </div>
         </div>
       </div>
     </div>

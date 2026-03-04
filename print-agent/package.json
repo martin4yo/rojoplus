@@ -9,6 +9,7 @@
     "dev": "node --watch index.js"
   },
   "dependencies": {
+    "jimp": "^0.22.12",
     "socket.io-client": "^4.7.2"
   },
   "author": "RojoPlus",

@@ -1,21 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { UtensilsCrossed, Users, Clock, ChefHat, ShoppingBag, Coffee, AlertCircle, RefreshCw, Settings, UserCheck, Trash2, Receipt, Printer, FileText, ChevronDown, ChevronUp } from 'lucide-react'
+import { UtensilsCrossed, Users, Clock, ChefHat, ShoppingBag, Coffee, AlertCircle, RefreshCw, Settings, UserCheck, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetContext'
-import { useTicket } from '../../../contexts/TicketContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import Modal from '../../../components/Modal'
 
-export default function BuffetDashboard() {
-  const { imprimirTicket, generarTicketFiscal, generarTicketComanda } = useTicket()
-
+export default function BuffetMesas() {
   // Permisos del usuario
   const puedeVerKpis = tienePermiso(PERMISOS.BUFFET_VER) || tienePermiso(PERMISOS.BUFFET_CONFIG)
   const puedeAsignar = tienePermiso(PERMISOS.BUFFET_CONFIG)
-  const puedeCobrar = tienePermiso(PERMISOS.BUFFET_COBRAR) || tienePermiso(PERMISOS.BUFFET_KIOSCO)
   const soloMesas = tienePermiso(PERMISOS.BUFFET_MESAS) && !puedeVerKpis // Camarero simple
 
   const [kpis, setKpis] = useState(null)
@@ -30,12 +26,6 @@ export default function BuffetDashboard() {
 
   // Filtro de estado de mesas (solo uno a la vez, o null para ver todas)
   const [estadoFiltro, setEstadoFiltro] = useState(null)
-
-  // Últimas ventas
-  const [ultimasVentas, setUltimasVentas] = useState([])
-  const [mostrarVentas, setMostrarVentas] = useState(false)
-  const [cargandoVentas, setCargandoVentas] = useState(false)
-  const [imprimiendo, setImprimiendo] = useState(null) // ID de la venta que se está imprimiendo
 
   const cargarDatos = useCallback(async () => {
     try {
@@ -102,87 +92,6 @@ export default function BuffetDashboard() {
     }
   }, [puedeAsignar])
 
-  // Cargar últimas ventas
-  const cargarUltimasVentas = async () => {
-    setCargandoVentas(true)
-    try {
-      const res = await api.get('/admin/buffet/ultimas-ventas?limit=15')
-      const data = res?.data || res || []
-      setUltimasVentas(data)
-    } catch (err) {
-      console.error('Error cargando últimas ventas:', err)
-      toast.error('Error al cargar últimas ventas')
-    } finally {
-      setCargandoVentas(false)
-    }
-  }
-
-  // Reimprimir ticket
-  const reimprimirTicket = async (venta, tipoTicket) => {
-    const ventaKey = `${venta.tipo}-${venta.id}-${tipoTicket}`
-    setImprimiendo(ventaKey)
-    try {
-      const tipo = venta.tipo === 'COMANDA' ? 'comanda' : 'takeaway'
-      const res = await api.post(`/admin/buffet/regenerar-ticket/${tipo}/${venta.id}`, { tipoTicket })
-      const data = res?.data || res
-
-      // Si es comprobante fiscal, generar ticket fiscal para el preview
-      if (tipoTicket === 'comprobante' && data?.comprobante?.cae) {
-        const ticketFiscal = generarTicketFiscal({
-          comprobante: data.comprobante,
-          items: data.items || [],
-          qrUrl: data.qrUrl,
-          empresa: data.empresa,
-          medioPago: data.medioPago || 'EFECTIVO'
-        })
-        await imprimirTicket(ticketFiscal)
-        toast.success('Factura lista para imprimir')
-      } else if (tipoTicket === 'cuenta' && data?.comanda) {
-        // Ticket de cuenta (pre-cuenta)
-        const ticketCuenta = generarTicketComanda({
-          numero: data.comanda.numero,
-          mesa: data.comanda.mesa,
-          items: data.items || [],
-          subtotal: data.comanda.subtotal || data.comanda.total,
-          total: data.comanda.total
-        }, 'CUENTA')
-        await imprimirTicket(ticketCuenta)
-        toast.success('Ticket de cuenta listo')
-      } else {
-        // Ticket no fiscal (comanda sin factura o takeaway)
-        const ticketNoFiscal = {
-          tipo: venta.tipo === 'COMANDA' ? 'CUENTA' : 'TAKEAWAY',
-          numero: data.comanda?.numero || data.pedido?.numero || venta.numero,
-          mesa: data.comanda?.mesa?.numero || venta.mesa,
-          cliente: data.comanda?.cliente || data.pedido?.nombreCliente || null,
-          fecha: new Date(venta.fecha),
-          items: data.items?.map(item => ({
-            cantidad: item.cantidad,
-            nombre: item.nombre,
-            precio: Number(item.precioUnitario || item.precio || 0)
-          })) || [],
-          subtotal: data.comanda?.subtotal || data.pedido?.subtotal || venta.total,
-          total: data.comanda?.total || data.pedido?.total || venta.total,
-          medioPago: data.medioPago || 'EFECTIVO'
-        }
-        await imprimirTicket(ticketNoFiscal)
-        toast.success('Ticket listo para imprimir')
-      }
-    } catch (err) {
-      console.error('Error reimprimiendo ticket:', err)
-      toast.error('Error al reimprimir ticket')
-    } finally {
-      setImprimiendo(null)
-    }
-  }
-
-  // Toggle mostrar ventas
-  const toggleMostrarVentas = () => {
-    if (!mostrarVentas && ultimasVentas.length === 0) {
-      cargarUltimasVentas()
-    }
-    setMostrarVentas(!mostrarVentas)
-  }
 
   const handleAsignacionChange = (mesaId, mozoId) => {
     setAsignaciones(prev => ({
@@ -385,8 +294,8 @@ export default function BuffetDashboard() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Buffet - Dashboard</h1>
-          <p className="text-gray-600">Vista general del estado del buffet</p>
+          <h1 className="text-2xl font-bold text-gray-900">Buffet</h1>
+          <p className="text-gray-600">Estado de mesas</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Toggle Mis Mesas / Todas - Solo para usuarios con permiso de ver todo */}
@@ -694,134 +603,6 @@ export default function BuffetDashboard() {
         )}
       </div>
 
-      {/* Últimas Ventas - Solo para usuarios con permiso de cobrar */}
-      {puedeCobrar && (
-        <div className="bg-white rounded-lg shadow">
-          {/* Header colapsable */}
-          <button
-            onClick={toggleMostrarVentas}
-            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Receipt className="text-green-600" size={20} />
-              <h2 className="text-lg font-semibold">Últimas Ventas del Día</h2>
-              {ultimasVentas.length > 0 && (
-                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
-                  {ultimasVentas.length}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {cargandoVentas && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-              )}
-              {mostrarVentas ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-            </div>
-          </button>
-
-          {/* Contenido colapsable */}
-          {mostrarVentas && (
-            <div className="border-t">
-              {/* Botón de actualizar */}
-              <div className="flex justify-end p-2 border-b bg-gray-50">
-                <button
-                  onClick={cargarUltimasVentas}
-                  disabled={cargandoVentas}
-                  className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50"
-                >
-                  <RefreshCw size={14} className={cargandoVentas ? 'animate-spin' : ''} />
-                  Actualizar
-                </button>
-              </div>
-
-              {/* Lista de ventas */}
-              {ultimasVentas.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">
-                  No hay ventas registradas hoy
-                </p>
-              ) : (
-                <div className="divide-y max-h-96 overflow-y-auto">
-                  {ultimasVentas.map(venta => (
-                    <div key={`${venta.tipo}-${venta.id}`} className="p-3 hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        {/* Info de la venta */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                              venta.tipo === 'COMANDA' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                            }`}>
-                              {venta.tipo === 'COMANDA' ? `Mesa ${venta.mesa}` : 'TakeAway'}
-                            </span>
-                            <span className="font-medium">{venta.numero}</span>
-                            <span className="text-green-600 font-semibold">
-                              ${venta.total?.toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-500 mt-0.5 flex flex-wrap gap-2">
-                            <span>
-                              {new Date(venta.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            {venta.itemsCount > 0 && <span>{venta.itemsCount} items</span>}
-                            {venta.socio && <span className="text-blue-600">{venta.socio}</span>}
-                            {venta.cliente && <span>{venta.cliente}</span>}
-                            {venta.cobradoPor && <span>por {venta.cobradoPor}</span>}
-                            {venta.comprobante && (
-                              <span className="text-green-600 flex items-center gap-0.5">
-                                <FileText size={10} />
-                                {venta.comprobante.tipo} {venta.comprobante.puntoVenta}-{venta.comprobante.numero}
-                              </span>
-                            )}
-                            {venta.esVentaInterna && !venta.comprobante && (
-                              <span className="text-amber-600">Venta Interna</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Botones de reimprimir */}
-                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                          {venta.tipo === 'COMANDA' && (
-                            <button
-                              onClick={() => reimprimirTicket(venta, 'cuenta')}
-                              disabled={imprimiendo === `${venta.tipo}-${venta.id}-cuenta`}
-                              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
-                              title="Reimprimir ticket de cuenta"
-                            >
-                              {imprimiendo === `${venta.tipo}-${venta.id}-cuenta` ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                              ) : (
-                                <Receipt size={16} />
-                              )}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => reimprimirTicket(venta, 'comprobante')}
-                            disabled={imprimiendo === `${venta.tipo}-${venta.id}-comprobante`}
-                            className={`p-1.5 rounded transition-colors disabled:opacity-50 ${
-                              venta.comprobante
-                                ? 'text-green-600 hover:text-green-700 hover:bg-green-50'
-                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                            }`}
-                            title={venta.comprobante ? `Reimprimir ${venta.comprobante.tipo} ${venta.comprobante.puntoVenta}-${venta.comprobante.numero}` : 'Reimprimir ticket'}
-                          >
-                            {imprimiendo === `${venta.tipo}-${venta.id}-comprobante` ? (
-                              <div className={`animate-spin rounded-full h-4 w-4 border-b-2 ${venta.comprobante ? 'border-green-600' : 'border-gray-600'}`}></div>
-                            ) : venta.comprobante ? (
-                              <FileText size={16} />
-                            ) : (
-                              <Receipt size={16} />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Modal Asignación de Mozos */}
       <Modal
         isOpen={modalAsignacion}
@@ -912,6 +693,7 @@ export default function BuffetDashboard() {
           </div>
         </div>
       </Modal>
+
     </div>
   )
 }

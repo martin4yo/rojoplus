@@ -283,6 +283,134 @@ router.post('/impresoras/:id/test', authAdmin, checkPermiso('BUFFET_CONFIG'), as
   }
 })
 
+/**
+ * GET /impresoras-tickets
+ * Obtiene las impresoras configuradas para tickets (mesas, kiosco, takeaway)
+ * Para uso en selector de impresora al imprimir
+ */
+router.get('/impresoras-tickets', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_KIOSCO'), async (req, res) => {
+  try {
+    // Obtener configuración de impresoras
+    const configs = await prisma.configuracion.findMany({
+      where: {
+        clave: {
+          in: ['BUFFET_IMPRESORA_TICKETS', 'BUFFET_IMPRESORA_KIOSCO', 'BUFFET_IMPRESORA_TAKEAWAY']
+        }
+      }
+    })
+
+    const configMap = {}
+    configs.forEach(c => {
+      configMap[c.clave] = c.valor ? parseInt(c.valor) : null
+    })
+
+    // Obtener IDs de impresoras configuradas
+    const impresoraIds = [
+      configMap['BUFFET_IMPRESORA_TICKETS'],
+      configMap['BUFFET_IMPRESORA_KIOSCO'],
+      configMap['BUFFET_IMPRESORA_TAKEAWAY']
+    ].filter(id => id !== null)
+
+    // Si no hay ninguna configurada, devolver todas las activas
+    let impresoras
+    if (impresoraIds.length === 0) {
+      impresoras = await prisma.impresoraTermica.findMany({
+        where: { activo: true },
+        orderBy: { nombre: 'asc' }
+      })
+    } else {
+      impresoras = await prisma.impresoraTermica.findMany({
+        where: {
+          id: { in: impresoraIds },
+          activo: true
+        },
+        orderBy: { nombre: 'asc' }
+      })
+    }
+
+    // Agregar etiqueta descriptiva a cada impresora
+    const impresorasConEtiqueta = impresoras.map(imp => {
+      const etiquetas = []
+      if (configMap['BUFFET_IMPRESORA_TICKETS'] === imp.id) etiquetas.push('Mesas')
+      if (configMap['BUFFET_IMPRESORA_KIOSCO'] === imp.id) etiquetas.push('Kiosco')
+      if (configMap['BUFFET_IMPRESORA_TAKEAWAY'] === imp.id) etiquetas.push('Pedidos')
+
+      return {
+        id: imp.id,
+        nombre: imp.nombre,
+        etiqueta: etiquetas.length > 0 ? etiquetas.join(', ') : null,
+        tipoConexion: imp.tipoConexion
+      }
+    })
+
+    res.json({ success: true, data: impresorasConEtiqueta })
+  } catch (error) {
+    console.error('Error obteniendo impresoras de tickets:', error)
+    res.status(500).json({ success: false, error: 'Error al obtener impresoras' })
+  }
+})
+
+/**
+ * POST /imprimir-imagen
+ * Imprimir una imagen PNG/JPEG como bitmap en impresora térmica
+ * Recibe imagen en base64 y la envía al print-agent para procesamiento
+ */
+router.post('/imprimir-imagen', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_KIOSCO'), async (req, res) => {
+  try {
+    const { imagen, impresoraId } = req.body
+
+    if (!imagen) {
+      return res.status(400).json({ success: false, error: 'Imagen requerida' })
+    }
+
+    // Obtener impresora por defecto o la especificada
+    let impresora
+    if (impresoraId) {
+      impresora = await prisma.impresoraTermica.findUnique({
+        where: { id: parseInt(impresoraId) }
+      })
+    } else {
+      // Buscar impresora por defecto (la primera activa)
+      impresora = await prisma.impresoraTermica.findFirst({
+        where: { activo: true },
+        orderBy: { id: 'asc' }
+      })
+    }
+
+    if (!impresora) {
+      return res.status(400).json({ success: false, error: 'No hay impresora configurada' })
+    }
+
+    const io = getIO()
+    const trabajo = {
+      id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      tipo: 'IMAGEN',
+      tipoConexion: impresora.tipoConexion,
+      destino: impresora.tipoConexion === 'IP'
+        ? `${impresora.ip}:${impresora.puerto}`
+        : impresora.destino,
+      imagen: imagen, // Imagen en base64 (data:image/png;base64,...)
+      timestamp: new Date().toISOString()
+    }
+
+    if (impresora.tipoConexion === 'IP') {
+      io.to('print-agents').emit('imprimir-imagen', trabajo)
+      console.log(`[Print] Imagen ${trabajo.id} enviada a print-agents (IP: ${impresora.ip})`)
+    } else {
+      if (!impresora.puestoId) {
+        return res.status(400).json({ success: false, error: 'Impresora sin puesto asignado' })
+      }
+      io.to(`puesto:${impresora.puestoId}`).emit('imprimir-imagen', trabajo)
+      console.log(`[Print] Imagen ${trabajo.id} enviada a puesto:${impresora.puestoId}`)
+    }
+
+    res.json({ success: true, trabajoId: trabajo.id, impresora: impresora.nombre })
+  } catch (error) {
+    console.error('Error enviando imagen a imprimir:', error)
+    res.status(500).json({ success: false, error: 'Error al enviar imagen' })
+  }
+})
+
 // ============================================================================
 // DESTINOS DE IMPRESIÓN
 // ============================================================================

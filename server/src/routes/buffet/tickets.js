@@ -212,6 +212,216 @@ router.post('/regenerar-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRA
 })
 
 /**
+ * GET /preview-ticket/:tipo/:id
+ * Preview de ticket sin imprimir
+ */
+router.get('/preview-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_KIOSCO'), async (req, res) => {
+  try {
+    const { tipo, id } = req.params
+    const { generateQRData } = await import('../../services/afipQRService.js')
+
+    let responseData = {}
+
+    if (tipo === 'comanda') {
+      const comanda = await prisma.comanda.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          mesa: true,
+          socio: { select: { nombre: true, apellido: true, nroSocio: true } },
+          items: {
+            where: { estado: { not: 'ANULADO' } },
+            include: { productoBuffet: { select: { nombre: true } } }
+          },
+          atendedor: { select: { nombre: true, apellido: true } }
+        }
+      })
+
+      if (!comanda) {
+        return res.status(404).json({ success: false, error: 'Comanda no encontrada' })
+      }
+
+      const itemsFormateados = comanda.items.map(item => ({
+        nombre: item.productoBuffet?.nombre || item.nombre || 'Producto',
+        descripcion: item.productoBuffet?.nombre || item.nombre || 'Producto',
+        cantidad: item.cantidad,
+        precio: parseFloat(item.precioUnitario),
+        precioUnitario: parseFloat(item.precioUnitario),
+        subtotal: parseFloat(item.subtotal)
+      }))
+
+      const comprobante = await prisma.comprobanteElectronico.findFirst({
+        where: { comandaId: parseInt(id) }
+      })
+
+      // Si hay comprobante fiscal, obtener datos de empresa y QR
+      if (comprobante) {
+        const { getConfiguracionFiscal } = await import('../../services/afipWSAAService.js')
+        const config = await getConfiguracionFiscal()
+
+        const qrUrl = generateQRData({
+          cuit: config.cuit,
+          tipoComprobante: comprobante.tipoAfip,
+          puntoVenta: comprobante.puntoVenta,
+          numeroComprobante: comprobante.numero,
+          importe: Number(comprobante.total),
+          fecha: new Date(comprobante.fecha),
+          tipoDocCliente: comprobante.tipoDocReceptor || 99,
+          docCliente: comprobante.cuitReceptor || '',
+          cae: comprobante.cae
+        })
+
+        responseData = {
+          comanda: {
+            id: comanda.id,
+            numero: comanda.numero,
+            mesa: comanda.mesa,
+            total: Number(comanda.total)
+          },
+          items: itemsFormateados,
+          comprobante: {
+            tipo: comprobante.tipo,
+            tipoAfip: comprobante.tipoAfip,
+            puntoVenta: comprobante.puntoVenta,
+            numero: comprobante.numero,
+            fecha: comprobante.fecha,
+            cae: comprobante.cae,
+            fechaVtoCae: comprobante.fechaVtoCae,
+            nombreReceptor: comprobante.nombreReceptor || 'Consumidor Final',
+            tipoDocReceptor: comprobante.tipoDocReceptor || 99,
+            docReceptor: comprobante.cuitReceptor,
+            condicionIvaReceptor: comprobante.condicionIvaReceptor || 5,
+            neto: Number(comprobante.neto),
+            iva: Number(comprobante.iva21 || 0),
+            total: Number(comprobante.total)
+          },
+          qrUrl,
+          empresa: {
+            razonSocial: config.razonSocial,
+            domicilio: config.domicilioFiscal,
+            cuit: config.cuit,
+            condicionIva: config.condicionIva,
+            iibb: 'EXENTO',
+            inicioActividades: config.inicioActividades
+          },
+          medioPago: comanda.metodoPago || 'VARIOS'
+        }
+      } else {
+        responseData = {
+          comanda: {
+            id: comanda.id,
+            numero: comanda.numero,
+            mesa: comanda.mesa,
+            total: Number(comanda.total)
+          },
+          items: itemsFormateados,
+          comprobante: null,
+          medioPago: comanda.metodoPago || 'VARIOS'
+        }
+      }
+    } else if (tipo === 'takeaway') {
+      const pedido = await prisma.pedidoTakeAway.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          items: {
+            include: { productoBuffet: { select: { nombre: true } } }
+          }
+        }
+      })
+
+      if (!pedido) {
+        return res.status(404).json({ success: false, error: 'Pedido no encontrado' })
+      }
+
+      const itemsFormateados = pedido.items.map(item => ({
+        nombre: item.productoBuffet?.nombre || 'Producto',
+        descripcion: item.productoBuffet?.nombre || 'Producto',
+        cantidad: item.cantidad,
+        precio: parseFloat(item.precioUnitario),
+        precioUnitario: parseFloat(item.precioUnitario),
+        subtotal: parseFloat(item.subtotal)
+      }))
+
+      const comprobante = await prisma.comprobanteElectronico.findFirst({
+        where: { pedidoTakeawayId: parseInt(id) }
+      })
+
+      // Si hay comprobante fiscal, obtener datos de empresa y QR
+      if (comprobante) {
+        const { getConfiguracionFiscal } = await import('../../services/afipWSAAService.js')
+        const config = await getConfiguracionFiscal()
+
+        const qrUrl = generateQRData({
+          cuit: config.cuit,
+          tipoComprobante: comprobante.tipoAfip,
+          puntoVenta: comprobante.puntoVenta,
+          numeroComprobante: comprobante.numero,
+          importe: Number(comprobante.total),
+          fecha: new Date(comprobante.fecha),
+          tipoDocCliente: comprobante.tipoDocReceptor || 99,
+          docCliente: comprobante.cuitReceptor || '',
+          cae: comprobante.cae
+        })
+
+        responseData = {
+          pedido: {
+            id: pedido.id,
+            numero: pedido.numero,
+            nombreCliente: pedido.nombreCliente,
+            total: Number(pedido.total)
+          },
+          items: itemsFormateados,
+          comprobante: {
+            tipo: comprobante.tipo,
+            tipoAfip: comprobante.tipoAfip,
+            puntoVenta: comprobante.puntoVenta,
+            numero: comprobante.numero,
+            fecha: comprobante.fecha,
+            cae: comprobante.cae,
+            fechaVtoCae: comprobante.fechaVtoCae,
+            nombreReceptor: comprobante.nombreReceptor || 'Consumidor Final',
+            tipoDocReceptor: comprobante.tipoDocReceptor || 99,
+            docReceptor: comprobante.cuitReceptor,
+            condicionIvaReceptor: comprobante.condicionIvaReceptor || 5,
+            neto: Number(comprobante.neto),
+            iva: Number(comprobante.iva21 || 0),
+            total: Number(comprobante.total)
+          },
+          qrUrl,
+          empresa: {
+            razonSocial: config.razonSocial,
+            domicilio: config.domicilioFiscal,
+            cuit: config.cuit,
+            condicionIva: config.condicionIva,
+            iibb: 'EXENTO',
+            inicioActividades: config.inicioActividades
+          },
+          medioPago: pedido.metodoPago || 'VARIOS'
+        }
+      } else {
+        responseData = {
+          pedido: {
+            id: pedido.id,
+            numero: pedido.numero,
+            nombreCliente: pedido.nombreCliente,
+            total: Number(pedido.total)
+          },
+          items: itemsFormateados,
+          comprobante: null,
+          medioPago: pedido.metodoPago || 'VARIOS'
+        }
+      }
+    } else {
+      return res.status(400).json({ success: false, error: 'Tipo de venta inválido' })
+    }
+
+    res.json({ success: true, ...responseData })
+  } catch (error) {
+    console.error('Error obteniendo preview de ticket:', error)
+    res.status(500).json({ success: false, error: 'Error al obtener preview' })
+  }
+})
+
+/**
  * GET /menu-publico
  * Menú público (sin autenticación)
  */

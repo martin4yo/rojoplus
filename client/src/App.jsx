@@ -176,7 +176,8 @@ import PasajeCategoria from './pages/admin/PasajeCategoria'
 import MiPerfil from './pages/admin/MiPerfil'
 
 // Buffet
-import BuffetDashboard from './pages/admin/buffet/BuffetDashboard'
+import BuffetDashboard from './pages/admin/buffet/BuffetDashboardNew'
+import BuffetEstadoMesas from './pages/admin/buffet/BuffetDashboard'
 import BuffetMesas from './pages/admin/buffet/BuffetMesas'
 import BuffetCategorias from './pages/admin/buffet/BuffetCategorias'
 import BuffetProductos from './pages/admin/buffet/BuffetProductos'
@@ -403,6 +404,7 @@ function App() {
 
         {/* Buffet */}
         <Route path="buffet" element={<BuffetDashboard />} />
+        <Route path="buffet/estado" element={<BuffetEstadoMesas />} />
         <Route path="buffet/mesas" element={<BuffetMesas />} />
         <Route path="buffet/categorias" element={<BuffetCategorias />} />
         <Route path="buffet/productos" element={<BuffetProductos />} />

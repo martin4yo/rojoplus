@@ -351,20 +351,17 @@ export async function generarTicketFiscal(datos) {
     ticket += LINE_DASH + commands.newLine
   }
 
-  // ========== DATOS DE ARCA (CAE) ==========
+  // ========== CAE ==========
   if (datos.comprobante?.cae) {
+    ticket += commands.alignCenter
     ticket += commands.bold.on
-    ticket += 'DATOS DE VALIDACION ARCA' + commands.newLine
-    ticket += commands.bold.off
-
     ticket += `CAE: ${datos.comprobante.cae}` + commands.newLine
 
     if (datos.comprobante.fechaVtoCae) {
       const vto = new Date(datos.comprobante.fechaVtoCae)
       ticket += `Vto CAE: ${vto.toLocaleDateString('es-AR')}` + commands.newLine
     }
-
-    ticket += LINE_DASH + commands.newLine
+    ticket += commands.bold.off
 
     // ========== QR CODE ==========
     if (datos.empresa?.cuit) {
@@ -388,8 +385,6 @@ export async function generarTicketFiscal(datos) {
         console.log('[Ticket] Generando QR para URL:', qrUrl)
 
         ticket += commands.alignCenter
-        ticket += 'Codigo QR ARCA' + commands.newLine
-        ticket += commands.newLine
 
         // Generar QR como imagen PNG (200px como AxiomaWeb)
         const qrBuffer = await QRCode.toBuffer(qrUrl, {
@@ -408,11 +403,10 @@ export async function generarTicketFiscal(datos) {
         ticket += qrBitmap
 
         ticket += commands.newLine
-        ticket += LINE + commands.newLine
+        ticket += 'Codigo QR ARCA' + commands.newLine
       } catch (error) {
         console.error('[Ticket] Error generando QR:', error)
         ticket += '(Error al generar codigo QR)' + commands.newLine
-        ticket += LINE + commands.newLine
       }
     }
   }
