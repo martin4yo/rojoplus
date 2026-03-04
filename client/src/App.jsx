@@ -251,6 +251,7 @@ function App() {
 
       {/* Menú Buffet Público */}
       <Route path="/buffet/menu" element={<MenuBuffet />} />
+      <Route path="/menu-buffet" element={<MenuBuffet />} />
 
       {/* Rutas admin */}
       <Route path="/admin/login" element={<AdminLogin />} />

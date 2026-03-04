@@ -14,6 +14,7 @@ export default function PublicHeader() {
     { path: '/', label: 'Inicio' },
     { path: '/actividades', label: 'Actividades' },
     { path: '/instalaciones', label: 'Instalaciones' },
+    { path: '/menu-buffet', label: 'Buffet' },
     { path: '/noticias', label: 'Noticias' },
     { path: '/comercios', label: 'Beneficios' },
     { path: '/nosotros', label: 'Nosotros', submenu: [

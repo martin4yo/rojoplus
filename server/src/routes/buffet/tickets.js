@@ -432,7 +432,11 @@ router.get('/menu-publico', async (req, res) => {
       orderBy: { orden: 'asc' },
       include: {
         productos: {
-          where: { activo: true, disponible: true },
+          where: {
+            activo: true,
+            disponible: true,
+            tiposVenta: { has: 'BUFFET' }
+          },
           orderBy: { orden: 'asc' },
           select: {
             id: true,
@@ -446,7 +450,10 @@ router.get('/menu-publico', async (req, res) => {
       }
     })
 
-    res.json({ success: true, data: categorias })
+    // Filtrar categorías que no tienen productos
+    const categoriasConProductos = categorias.filter(c => c.productos.length > 0)
+
+    res.json({ success: true, data: categoriasConProductos })
   } catch (error) {
     console.error('Error al obtener menú público:', error)
     res.status(500).json({ success: false, error: 'Error al obtener menú' })

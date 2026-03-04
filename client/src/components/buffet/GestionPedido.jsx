@@ -1336,11 +1336,11 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
             </div>
           </div>
 
-          {/* Categorías - Scroll horizontal */}
-          <div className="flex gap-2 p-3 md:p-4 bg-gray-50 border-b overflow-x-auto">
+          {/* Categorías - Wrap responsive */}
+          <div className="flex flex-wrap gap-2 p-3 md:p-4 bg-gray-50 border-b">
             <button
               onClick={() => setCategoriaActiva(null)}
-              className={`px-3 md:px-4 py-2 rounded-lg whitespace-nowrap text-sm md:text-base font-medium transition-colors ${
+              className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium transition-colors ${
                 categoriaActiva === null
                   ? 'bg-gray-800 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -1352,7 +1352,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               <button
                 key={cat.id}
                 onClick={() => setCategoriaActiva(cat.id)}
-                className={`px-3 md:px-4 py-2 rounded-lg whitespace-nowrap text-sm md:text-base font-medium transition-colors ${
+                className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium transition-colors ${
                   categoriaActiva === cat.id
                     ? 'text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
