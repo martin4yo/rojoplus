@@ -95,8 +95,12 @@ function detectarImpresorasCUPS() {
     const lines = output.split('\n')
 
     for (const line of lines) {
-      // Formato: "printer NOMBRE is idle."  o "printer NOMBRE disabled"
-      const match = line.match(/^printer\s+(\S+)\s+/)
+      // Formato inglés: "printer NOMBRE is idle."
+      // Formato español: "la impresora NOMBRE está inactiva."
+      let match = line.match(/^printer\s+(\S+)\s+/)
+      if (!match) {
+        match = line.match(/^la impresora\s+(\S+)\s+/)
+      }
       if (match) {
         const nombre = match[1]
         console.log(`[CUPS]   - ${nombre}`)
@@ -119,8 +123,9 @@ function detectarImpresorasCUPS() {
       const lines = output.split('\n')
 
       for (const line of lines) {
-        // Formato: "NOMBRE accepting requests since ..."
-        const match = line.match(/^(\S+)\s+accepting/)
+        // Formato inglés: "NOMBRE accepting requests since ..."
+        // Formato español: "NOMBRE aceptando peticiones desde ..."
+        const match = line.match(/^(\S+)\s+(?:accepting|aceptando)/)
         if (match) {
           const nombre = match[1]
           if (!impresoras.find(i => i.nombre === nombre)) {
