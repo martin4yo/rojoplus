@@ -34,7 +34,7 @@ const ESCPOS = {
 }
 
 /**
- * Convierte imagen PNG a formato bitmap ESC/POS
+ * Convierte imagen PNG a formato bitmap ESC/POS usando ESC * (más compatible)
  */
 async function convertImageToBitmap(pngBuffer) {
   return new Promise((resolve, reject) => {
@@ -47,6 +47,9 @@ async function convertImageToBitmap(pngBuffer) {
         const width = data.width
         const height = data.height
 
+        console.log(`[QR Bitmap] Procesando imagen ${width}x${height}`)
+
+        // Convertir a array de pixels (1 = negro, 0 = blanco)
         const pixels = []
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
@@ -59,40 +62,49 @@ async function convertImageToBitmap(pngBuffer) {
           }
         }
 
-        const widthBytes = Math.ceil(width / 8)
-        const imageBytes = []
+        // Usar comando ESC * m nL nH [data] (más compatible que GS v 0)
+        // m = 0: 8 dots single density
+        // m = 1: 8 dots double density
+        // m = 32: 24 dots single density
+        // m = 33: 24 dots double density
 
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < widthBytes; x++) {
-            let byte = 0
-            for (let bit = 0; bit < 8; bit++) {
-              const pixelX = x * 8 + bit
-              if (pixelX < width) {
-                const pixelIndex = y * width + pixelX
-                if (pixels[pixelIndex] === 1) {
-                  byte |= (1 << (7 - bit))
+        // Usamos modo 33 (24 dots double density) para mejor calidad
+        const mode = 33
+        let output = ''
+
+        // Procesar en bandas de 24 pixels de alto
+        for (let bandY = 0; bandY < height; bandY += 24) {
+          const nL = width & 0xFF
+          const nH = (width >> 8) & 0xFF
+
+          // ESC * m nL nH [data]
+          output += ESC + '*' + String.fromCharCode(mode)
+          output += String.fromCharCode(nL) + String.fromCharCode(nH)
+
+          // Para cada columna de pixels
+          for (let x = 0; x < width; x++) {
+            // 3 bytes por columna (24 bits = 24 dots verticales)
+            for (let byteNum = 0; byteNum < 3; byteNum++) {
+              let byte = 0
+              for (let bit = 0; bit < 8; bit++) {
+                const y = bandY + byteNum * 8 + bit
+                if (y < height) {
+                  const pixelIndex = y * width + x
+                  if (pixels[pixelIndex] === 1) {
+                    byte |= (1 << (7 - bit))
+                  }
                 }
               }
+              output += String.fromCharCode(byte)
             }
-            imageBytes.push(byte)
           }
+
+          // Nueva línea después de cada banda
+          output += '\n'
         }
 
-        const mode = 0
-        const xL = widthBytes & 0xFF
-        const xH = (widthBytes >> 8) & 0xFF
-        const yL = height & 0xFF
-        const yH = (height >> 8) & 0xFF
-
-        let command = GS + 'v' + String.fromCharCode(48) + String.fromCharCode(mode)
-        command += String.fromCharCode(xL) + String.fromCharCode(xH)
-        command += String.fromCharCode(yL) + String.fromCharCode(yH)
-
-        for (let i = 0; i < imageBytes.length; i++) {
-          command += String.fromCharCode(imageBytes[i])
-        }
-
-        resolve(command)
+        console.log(`[QR Bitmap] Generado, tamaño: ${output.length} bytes`)
+        resolve(output)
       })
     } catch (error) {
       reject(error)
@@ -256,12 +268,12 @@ export async function renderTicketFiscal(data) {
     try {
       console.log('[Ticket] Generando QR bitmap para:', qrUrl.substring(0, 50) + '...')
 
-      // Generar QR como imagen PNG
+      // Generar QR como imagen PNG (tamaño reducido para mejor compatibilidad)
       const qrBuffer = await QRCode.toBuffer(qrUrl, {
         type: 'png',
-        width: 200,
+        width: 150,
         margin: 1,
-        errorCorrectionLevel: 'M'
+        errorCorrectionLevel: 'L'
       })
 
       console.log('[Ticket] QR buffer generado, tamaño:', qrBuffer.length)
