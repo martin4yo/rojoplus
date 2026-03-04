@@ -403,7 +403,7 @@ export async function generarTicketFiscal(datos) {
         ticket += qrBitmap
 
         ticket += commands.newLine
-        ticket += 'Codigo QR ARCA' + commands.newLine
+        ticket += 'Comprobante Autorizado' + commands.newLine
       } catch (error) {
         console.error('[Ticket] Error generando QR:', error)
         ticket += '(Error al generar codigo QR)' + commands.newLine

@@ -30,8 +30,10 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
   const cargarImpresoras = async () => {
     setCargandoImpresoras(true)
     try {
-      const data = await api.get('/admin/buffet/impresoras-tickets')
-      const lista = data || []
+      const res = await api.get('/admin/buffet/impresoras-tickets')
+      // La respuesta puede ser { success, data } o directamente el array
+      const lista = res?.data || res || []
+      console.log('[TicketPreview] Impresoras cargadas:', lista)
       setImpresoras(lista)
       // Seleccionar la primera por defecto
       if (lista.length > 0) {
@@ -48,7 +50,15 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
 
   // Imprimir como imagen usando html2canvas
   const handlePrintAsImage = async () => {
-    if (!ticketRef.current || !onPrintAsImage) return
+    console.log('[TicketPreview] handlePrintAsImage llamado')
+    console.log('[TicketPreview] ticketRef.current:', !!ticketRef.current)
+    console.log('[TicketPreview] onPrintAsImage:', !!onPrintAsImage)
+    console.log('[TicketPreview] impresoraSeleccionada:', impresoraSeleccionada)
+
+    if (!ticketRef.current || !onPrintAsImage) {
+      console.log('[TicketPreview] Return temprano - falta ticketRef o onPrintAsImage')
+      return
+    }
     if (!impresoraSeleccionada) {
       alert('Selecciona una impresora')
       return
@@ -57,9 +67,11 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
     setImprimiendo(true)
     try {
       // Importar html2canvas dinámicamente
+      console.log('[TicketPreview] Importando html2canvas...')
       const html2canvas = (await import('html2canvas')).default
 
       // Capturar el ticket como imagen
+      console.log('[TicketPreview] Capturando imagen...')
       const canvas = await html2canvas(ticketRef.current, {
         scale: 2, // Mayor resolución
         backgroundColor: '#ffffff',
@@ -69,9 +81,12 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
 
       // Convertir a base64
       const imageBase64 = canvas.toDataURL('image/png')
+      console.log('[TicketPreview] Imagen capturada, tamaño:', imageBase64.length)
 
       // Llamar callback con la imagen y la impresora seleccionada
+      console.log('[TicketPreview] Llamando onPrintAsImage...')
       await onPrintAsImage(imageBase64, impresoraSeleccionada)
+      console.log('[TicketPreview] onPrintAsImage completado')
     } catch (error) {
       console.error('Error capturando ticket como imagen:', error)
     } finally {
@@ -242,7 +257,7 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
         {/* ===== CAE ===== */}
         <div className="border-t-2 border-dashed border-gray-600 my-2"></div>
         <div className="text-center">
-          <div className="font-bold text-xs">DATOS DE VALIDACIÓN ARCA</div>
+          <div className="font-bold text-xs">Comprobante Autorizado</div>
           <div className="text-sm font-bold mt-1">CAE: {comprobante?.cae || '-'}</div>
           <div className="text-xs">
             Vto CAE: {comprobante?.fechaVtoCae ? formatFecha(comprobante.fechaVtoCae) : '-'}
@@ -261,7 +276,7 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
               />
             </div>
             <div className="text-xs text-gray-600 mt-1">
-              Escanear para verificar en ARCA
+              Escanear para verificar
             </div>
           </div>
         )}

@@ -346,7 +346,7 @@ export async function renderTicketFiscal(data) {
       output += qrCommands
 
       output += '\n'
-      output += 'Codigo QR ARCA\n'
+      output += 'Comprobante Autorizado\n'
       console.log('[Ticket] QR raster generado')
     } catch (qrError) {
       console.error('[Ticket] Error generando QR:', qrError)
