@@ -26,20 +26,25 @@ const router = express.Router()
 
 /**
  * Genera comandos ESC/POS para imprimir comanda de TakeAway
+ * Usa el mismo formato que las comandas del Buffet
  */
-function generarComandaTakeAwayESCPOS(pedido, items) {
+function generarComandaTakeAwayESCPOS(pedido, items, sectorNombre = 'TAKE AWAY') {
   const ESC = 0x1B
   const GS = 0x1D
   const buffer = []
+  const LINEA = '='.repeat(48)
+  const LINEA_DASH = '-'.repeat(48)
 
   // Inicializar
   buffer.push(ESC, 0x40)
 
-  // Título centrado
+  // Título centrado con nombre del sector
   buffer.push(ESC, 0x61, 0x01) // Centrar
   buffer.push(ESC, 0x45, 0x01) // Negrita
-  buffer.push(...Buffer.from('== TAKE AWAY ==\n'))
+  buffer.push(...Buffer.from(`*** ${sectorNombre.toUpperCase()} ***\n`))
   buffer.push(ESC, 0x45, 0x00) // Fin negrita
+
+  buffer.push(...Buffer.from(`${LINEA}\n`))
 
   // Número de pedido - GRANDE Y DESTACADO
   buffer.push(GS, 0x21, 0x11) // Doble tamaño (alto y ancho)
@@ -51,34 +56,32 @@ function generarComandaTakeAwayESCPOS(pedido, items) {
   // Nombre del cliente - DESTACADO
   const nombreCliente = pedido.socio?.apellidoNombre || pedido.nombreCliente || null
   if (nombreCliente) {
-    buffer.push(GS, 0x21, 0x01) // Doble ancho
     buffer.push(ESC, 0x45, 0x01) // Negrita
     buffer.push(...Buffer.from(`${nombreCliente}\n`))
-    buffer.push(GS, 0x21, 0x00)
     buffer.push(ESC, 0x45, 0x00)
   }
 
-  // Hora
-  buffer.push(...Buffer.from(`Hora: ${new Date().toLocaleTimeString()}\n`))
-  buffer.push(...Buffer.from('==================\n'))
+  buffer.push(...Buffer.from(`Hora: ${new Date().toLocaleTimeString('es-AR')}\n`))
+  buffer.push(...Buffer.from(`${LINEA_DASH}\n`))
 
   // Alinear a la izquierda
   buffer.push(ESC, 0x61, 0x00)
 
-  // Items
+  // Items - SIN negrita (igual que buffet)
   for (const item of items) {
     const nombre = item.productoBuffet?.nombre || 'Producto'
     const cantidad = item.cantidad || 1
-    buffer.push(ESC, 0x45, 0x01) // Negrita
-    buffer.push(...Buffer.from(`${cantidad}x ${nombre}\n`))
-    buffer.push(ESC, 0x45, 0x00)
+    buffer.push(...Buffer.from(`${cantidad}x ${nombre.toUpperCase()}\n`))
     if (item.observaciones) {
-      buffer.push(...Buffer.from(`   -> ${item.observaciones}\n`))
+      buffer.push(...Buffer.from(`   >> ${item.observaciones}\n`))
     }
   }
 
-  // Línea final y avance
-  buffer.push(...Buffer.from('\n==================\n\n\n\n\n\n'))
+  // Línea final
+  buffer.push(...Buffer.from(`${LINEA}\n`))
+
+  // Avance de papel (6 líneas) antes de corte para fácil manipulación
+  buffer.push(...Buffer.from('\n\n\n\n\n\n'))
   buffer.push(GS, 0x56, 0x00) // Corte
 
   return Buffer.from(buffer)
@@ -100,14 +103,22 @@ async function imprimirComandaTakeAway(pedido, items) {
 
       const destino = await prisma.destinoImpresion.findFirst({
         where: { categoriaMenuId: producto.categoriaMenuId },
-        include: { impresora: true }
+        include: {
+          impresora: {
+            include: { sector: true }
+          }
+        }
       })
 
       if (!destino || !destino.impresora) continue
 
       const impresoraId = destino.impresora.id
       if (!itemsPorDestino.has(impresoraId)) {
-        itemsPorDestino.set(impresoraId, { impresora: destino.impresora, items: [] })
+        itemsPorDestino.set(impresoraId, {
+          impresora: destino.impresora,
+          sectorNombre: destino.impresora.sector?.nombre || destino.impresora.nombre || 'TAKE AWAY',
+          items: []
+        })
       }
       itemsPorDestino.get(impresoraId).items.push(item)
     }
@@ -116,8 +127,8 @@ async function imprimirComandaTakeAway(pedido, items) {
 
     // Imprimir en cada destino
     for (const [impresoraId, data] of itemsPorDestino) {
-      console.log(`[Print TakeAway] Enviando a impresora ${data.impresora.nombre}`)
-      const ticketData = generarComandaTakeAwayESCPOS(pedido, data.items)
+      console.log(`[Print TakeAway] Enviando a impresora ${data.impresora.nombre} (sector: ${data.sectorNombre})`)
+      const ticketData = generarComandaTakeAwayESCPOS(pedido, data.items, data.sectorNombre)
       const base64Data = ticketData.toString('base64')
       const resultado = await enviarImpresion(impresoraId, base64Data, 'COMANDA_TAKEAWAY')
       console.log(`[Print TakeAway] Resultado: ${JSON.stringify(resultado)}`)

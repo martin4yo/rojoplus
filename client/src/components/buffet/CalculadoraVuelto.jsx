@@ -59,7 +59,7 @@ export default function CalculadoraVuelto({
       </div>
 
       {/* Paga con */}
-      <div className="flex items-center gap-3 bg-white border-2 border-gray-300 rounded-lg px-4 py-2 focus-within:border-blue-500">
+      <div className="flex items-center gap-3 bg-white border-2 border-gray-300 rounded-lg px-4 py-2 focus-within:border-blue-500 overflow-hidden">
         <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Paga con:</span>
         <input
           type="text"
@@ -67,7 +67,7 @@ export default function CalculadoraVuelto({
           value={montoPagado}
           onChange={handleInputChange}
           placeholder="0.00"
-          className="flex-1 text-xl font-bold text-right outline-none bg-transparent"
+          className="flex-1 min-w-0 text-xl font-bold text-right outline-none bg-transparent"
           autoFocus
         />
       </div>
