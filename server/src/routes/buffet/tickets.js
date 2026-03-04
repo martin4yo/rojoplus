@@ -244,19 +244,96 @@ router.get('/menu-publico', async (req, res) => {
 })
 
 /**
+ * GET /config-impresoras
+ * Obtiene la configuración de impresoras para tickets
+ */
+router.get('/config-impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const configs = await prisma.configuracion.findMany({
+      where: {
+        clave: {
+          in: ['BUFFET_IMPRESORA_TICKETS', 'BUFFET_IMPRESORA_KIOSCO', 'BUFFET_IMPRESORA_TAKEAWAY']
+        }
+      }
+    })
+
+    const impresoras = await prisma.impresoraTermica.findMany({
+      where: { activo: true },
+      include: { sector: true },
+      orderBy: { nombre: 'asc' }
+    })
+
+    const configMap = {}
+    configs.forEach(c => {
+      configMap[c.clave] = c.valor ? parseInt(c.valor) : null
+    })
+
+    res.json({
+      success: true,
+      data: {
+        impresoras,
+        config: {
+          tickets: configMap['BUFFET_IMPRESORA_TICKETS'] || null,
+          kiosco: configMap['BUFFET_IMPRESORA_KIOSCO'] || null,
+          takeaway: configMap['BUFFET_IMPRESORA_TAKEAWAY'] || null
+        }
+      }
+    })
+  } catch (error) {
+    console.error('Error obteniendo config impresoras:', error)
+    res.status(500).json({ success: false, error: 'Error al obtener configuración' })
+  }
+})
+
+/**
+ * PUT /config-impresoras
+ * Guarda la configuración de impresoras para tickets
+ */
+router.put('/config-impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const { tickets, kiosco, takeaway } = req.body
+
+    const configs = [
+      { clave: 'BUFFET_IMPRESORA_TICKETS', valor: tickets?.toString() || '', desc: 'Impresora para tickets de cobro' },
+      { clave: 'BUFFET_IMPRESORA_KIOSCO', valor: kiosco?.toString() || '', desc: 'Impresora para tickets de kiosco' },
+      { clave: 'BUFFET_IMPRESORA_TAKEAWAY', valor: takeaway?.toString() || '', desc: 'Impresora para tickets de take away' }
+    ]
+
+    for (const cfg of configs) {
+      await prisma.configuracion.upsert({
+        where: { clave: cfg.clave },
+        update: { valor: cfg.valor },
+        create: {
+          clave: cfg.clave,
+          valor: cfg.valor,
+          descripcion: cfg.desc,
+          modulo: 'BUFFET',
+          tipo: 'NUMBER'
+        }
+      })
+    }
+
+    res.json({ success: true, message: 'Configuración guardada' })
+  } catch (error) {
+    console.error('Error guardando config impresoras:', error)
+    res.status(500).json({ success: false, error: 'Error al guardar configuración' })
+  }
+})
+
+/**
  * POST /imprimir-ticket
  * Imprime un ticket directamente a la impresora térmica
- * Body: { ticket: {...}, impresoraId?: number }
+ * Body: { ticket: {...}, impresoraId?: number, tipoTicket?: string }
  */
 router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async (req, res) => {
   try {
-    const { ticket, impresoraId } = req.body
+    const { ticket, impresoraId, tipoTicket } = req.body
 
     if (!ticket) {
       return res.status(400).json({ success: false, error: 'Ticket requerido' })
     }
 
-    // Buscar impresora de caja/tickets
+    // Buscar impresora según configuración
     let impresora = null
 
     if (impresoraId) {
@@ -264,24 +341,44 @@ router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async 
         where: { id: parseInt(impresoraId) }
       })
     } else {
-      // Buscar impresora del sector CAJA o la primera activa sin sector (ticket)
-      impresora = await prisma.impresoraTermica.findFirst({
-        where: {
-          activo: true,
-          OR: [
-            { sector: { codigo: 'CAJA' } },
-            { sector: { codigo: 'TICKET' } },
-            { sectorId: null } // Impresora sin sector = impresora de tickets
-          ]
-        },
-        include: { sector: true }
+      // Buscar en configuración según tipo de ticket
+      let configKey = 'BUFFET_IMPRESORA_TICKETS'
+      if (tipoTicket === 'KIOSCO') {
+        configKey = 'BUFFET_IMPRESORA_KIOSCO'
+      } else if (tipoTicket === 'TAKEAWAY') {
+        configKey = 'BUFFET_IMPRESORA_TAKEAWAY'
+      }
+
+      const config = await prisma.configuracion.findUnique({
+        where: { clave: configKey }
       })
+
+      if (config?.valor) {
+        impresora = await prisma.impresoraTermica.findUnique({
+          where: { id: parseInt(config.valor) }
+        })
+      }
+
+      // Fallback: buscar impresora por sector o sin sector
+      if (!impresora) {
+        impresora = await prisma.impresoraTermica.findFirst({
+          where: {
+            activo: true,
+            OR: [
+              { sector: { codigo: 'CAJA' } },
+              { sector: { codigo: 'TICKET' } },
+              { sectorId: null }
+            ]
+          },
+          include: { sector: true }
+        })
+      }
     }
 
     if (!impresora) {
       return res.status(400).json({
         success: false,
-        error: 'No hay impresora de tickets configurada'
+        error: 'No hay impresora de tickets configurada. Ve a Configuración > Impresoras de Tickets'
       })
     }
 

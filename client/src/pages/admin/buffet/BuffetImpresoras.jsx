@@ -64,8 +64,17 @@ export default function BuffetImpresoras() {
 
   const [testResult, setTestResult] = useState({})
 
+  // Config de impresoras para tickets
+  const [configTickets, setConfigTickets] = useState({
+    tickets: null,
+    kiosco: null,
+    takeaway: null
+  })
+  const [guardandoConfig, setGuardandoConfig] = useState(false)
+
   useEffect(() => {
     cargarDatos()
+    cargarConfigTickets()
   }, [])
 
   async function cargarDatos() {
@@ -96,6 +105,29 @@ export default function BuffetImpresoras() {
       toast.success('Puestos actualizados')
     } catch (err) {
       console.error('Error refrescando puestos:', err)
+    }
+  }
+
+  async function cargarConfigTickets() {
+    try {
+      const res = await api.get('/admin/buffet/config-impresoras')
+      const data = res.data?.data || res.data || {}
+      setConfigTickets(data.config || { tickets: null, kiosco: null, takeaway: null })
+    } catch (err) {
+      console.error('Error cargando config tickets:', err)
+    }
+  }
+
+  async function guardarConfigTickets() {
+    setGuardandoConfig(true)
+    try {
+      await api.put('/admin/buffet/config-impresoras', configTickets)
+      toast.success('Configuración de impresoras guardada')
+    } catch (err) {
+      console.error('Error guardando config:', err)
+      toast.error('Error al guardar configuración')
+    } finally {
+      setGuardandoConfig(false)
     }
   }
 
@@ -598,6 +630,94 @@ export default function BuffetImpresoras() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ============== IMPRESORAS PARA TICKETS ============== */}
+      {impresoras.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-bold mb-4">Impresoras para Tickets</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Selecciona qué impresora usar para cada tipo de ticket de cobro
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Tickets de Mesas */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🍽️ Tickets de Mesas
+              </label>
+              <select
+                value={configTickets.tickets || ''}
+                onChange={e => setConfigTickets({ ...configTickets, tickets: e.target.value ? parseInt(e.target.value) : null })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="">Sin asignar</option>
+                {impresoras.map(imp => (
+                  <option key={imp.id} value={imp.id}>
+                    {imp.nombre} {imp.sector ? `(${imp.sector.nombre})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Para cobros de comandas en mesas
+              </p>
+            </div>
+
+            {/* Tickets de Kiosco */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🏪 Tickets de Kiosco
+              </label>
+              <select
+                value={configTickets.kiosco || ''}
+                onChange={e => setConfigTickets({ ...configTickets, kiosco: e.target.value ? parseInt(e.target.value) : null })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="">Sin asignar</option>
+                {impresoras.map(imp => (
+                  <option key={imp.id} value={imp.id}>
+                    {imp.nombre} {imp.sector ? `(${imp.sector.nombre})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Para ventas rápidas de kiosco
+              </p>
+            </div>
+
+            {/* Tickets de Take Away */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🥡 Tickets de Take Away
+              </label>
+              <select
+                value={configTickets.takeaway || ''}
+                onChange={e => setConfigTickets({ ...configTickets, takeaway: e.target.value ? parseInt(e.target.value) : null })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="">Sin asignar</option>
+                {impresoras.map(imp => (
+                  <option key={imp.id} value={imp.id}>
+                    {imp.nombre} {imp.sector ? `(${imp.sector.nombre})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Para pedidos para llevar
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t flex justify-end">
+            <button
+              onClick={guardarConfigTickets}
+              disabled={guardandoConfig}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {guardandoConfig ? 'Guardando...' : 'Guardar Configuración'}
+            </button>
           </div>
         </div>
       )}
