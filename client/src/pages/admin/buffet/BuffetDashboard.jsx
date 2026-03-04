@@ -28,6 +28,9 @@ export default function BuffetDashboard() {
   const [modalAsignacion, setModalAsignacion] = useState(false)
   const [asignaciones, setAsignaciones] = useState({}) // { mesaId: mozoId }
 
+  // Filtro de estado de mesas (solo uno a la vez, o null para ver todas)
+  const [estadoFiltro, setEstadoFiltro] = useState(null)
+
   // Últimas ventas
   const [ultimasVentas, setUltimasVentas] = useState([])
   const [mostrarVentas, setMostrarVentas] = useState(false)
@@ -218,6 +221,48 @@ export default function BuffetDashboard() {
       toast.error('Error al limpiar asignaciones')
     }
   }
+
+  // Toggle filtro de estado (solo uno a la vez)
+  const toggleFiltroEstado = (estado) => {
+    // Si se clickea el mismo estado, se deselecciona (muestra todas)
+    setEstadoFiltro(prev => prev === estado ? null : estado)
+  }
+
+  // Clasificar mesa según estado para filtrado
+  const clasificarMesa = (mesa) => {
+    if (mesa.estado === 'LIBRE') return 'libre'
+    if (mesa.estado === 'LIMPIEZA') return 'limpieza'
+
+    const comandasActivas = mesa.comandas?.filter(c =>
+      ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'].includes(c.estado)
+    ) || []
+
+    if (comandasActivas.length === 0) return 'sinItems'
+
+    const todosLosItems = comandasActivas.flatMap(c => c.items || [])
+    const hayComandaEsperandoCobro = comandasActivas.some(c => c.estado === 'CUENTA_PEDIDA')
+
+    if (todosLosItems.length === 0) return 'sinItems'
+
+    const hayItemsListos = todosLosItems.some(item => item.estado === 'LISTO')
+    const hayItemsEnProceso = todosLosItems.some(item =>
+      ['PENDIENTE', 'ENVIADO_COCINA', 'ENVIADO_BARRA', 'EN_PREPARACION'].includes(item.estado)
+    )
+    const todosEntregadosOAnulados = todosLosItems.every(item =>
+      ['ENTREGADO', 'ANULADO'].includes(item.estado)
+    )
+
+    if (hayItemsListos) return 'paraEntregar'
+    if (hayItemsEnProceso || hayComandaEsperandoCobro) return 'enProceso'
+    if (todosEntregadosOAnulados) return 'lista'
+
+    return 'sinItems'
+  }
+
+  // Filtrar mesas según estado seleccionado (o todas si no hay filtro)
+  const mesasFiltradas = estadoFiltro === null
+    ? mesas
+    : mesas.filter(mesa => clasificarMesa(mesa) === estadoFiltro)
 
   const getColorEstadoMesa = (mesa) => {
     // Mesa disponible - verde
@@ -451,7 +496,8 @@ export default function BuffetDashboard() {
         </div>
       )}
 
-      {/* Accesos Rápidos - Filtrados según permisos */}
+      {/* Accesos Rápidos - OCULTOS por pedido del usuario */}
+      {/*
       <div className={`grid grid-cols-2 ${soloMesas ? 'md:grid-cols-2' : 'md:grid-cols-4'} gap-4`}>
         {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
           <Link
@@ -493,53 +539,95 @@ export default function BuffetDashboard() {
           </Link>
         )}
       </div>
+      */}
 
       {/* Mapa de Mesas */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
+        {/* Título y Filtros de Estado en la misma línea */}
+        <div className="flex flex-wrap items-center gap-4 mb-4">
           <h2 className="text-lg font-semibold">
             {verMisMesas ? 'Mis Mesas Asignadas' : 'Estado de Mesas'}
           </h2>
-          {verMisMesas && mesas.length === 0 && (
-            <span className="text-sm text-gray-500">No tenés mesas asignadas</span>
-          )}
-        </div>
 
-        {/* Leyenda */}
-        <div className="flex flex-wrap gap-3 mb-4 text-xs">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span>Libre</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <span>Sin items</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-            <span>En proceso / Cobro</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <span>Para entregar</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-cyan-500 rounded-full"></div>
-            <span>Lista</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-            <span>Limpieza</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center text-white text-[9px]">C</div>
-            <span>Comunal</span>
+          {/* Botones de filtro por estado */}
+          <div className="flex flex-wrap gap-2 text-sm">
+            <button
+              onClick={() => toggleFiltroEstado('libre')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+                estadoFiltro === 'libre'
+                  ? 'bg-green-500 text-white border-green-600 shadow-md'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-green-400'
+              }`}
+            >
+              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'libre' ? 'bg-white' : 'bg-green-500'}`}></div>
+              <span className="font-medium">Libre</span>
+            </button>
+
+            <button
+              onClick={() => toggleFiltroEstado('sinItems')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+                estadoFiltro === 'sinItems'
+                  ? 'bg-yellow-500 text-white border-yellow-600 shadow-md'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-yellow-400'
+              }`}
+            >
+              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'sinItems' ? 'bg-white' : 'bg-yellow-500'}`}></div>
+              <span className="font-medium">Sin items</span>
+            </button>
+
+            <button
+              onClick={() => toggleFiltroEstado('enProceso')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+                estadoFiltro === 'enProceso'
+                  ? 'bg-orange-500 text-white border-orange-600 shadow-md'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400'
+              }`}
+            >
+              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'enProceso' ? 'bg-white' : 'bg-orange-500'}`}></div>
+              <span className="font-medium">En proceso</span>
+            </button>
+
+            <button
+              onClick={() => toggleFiltroEstado('paraEntregar')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-48 ${
+                estadoFiltro === 'paraEntregar'
+                  ? 'bg-red-500 text-white border-red-600 shadow-md'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-red-400'
+              }`}
+            >
+              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'paraEntregar' ? 'bg-white' : 'bg-red-500'}`}></div>
+              <span className="font-medium">Para entregar</span>
+            </button>
+
+            <button
+              onClick={() => toggleFiltroEstado('lista')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+                estadoFiltro === 'lista'
+                  ? 'bg-cyan-500 text-white border-cyan-600 shadow-md'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-cyan-400'
+              }`}
+            >
+              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'lista' ? 'bg-white' : 'bg-cyan-500'}`}></div>
+              <span className="font-medium">Lista</span>
+            </button>
+
+            <button
+              onClick={() => toggleFiltroEstado('limpieza')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+                estadoFiltro === 'limpieza'
+                  ? 'bg-gray-400 text-white border-gray-500 shadow-md'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'limpieza' ? 'bg-white' : 'bg-gray-400'}`}></div>
+              <span className="font-medium">Limpieza</span>
+            </button>
           </div>
         </div>
 
         {/* Grid de Mesas */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-          {mesas.map(mesa => {
+          {mesasFiltradas.map(mesa => {
             const comandasActivas = mesa.comandas?.filter(c =>
               ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'].includes(c.estado)
             ) || []
@@ -577,6 +665,12 @@ export default function BuffetDashboard() {
             )
           })}
         </div>
+
+        {mesasFiltradas.length === 0 && mesas.length > 0 && estadoFiltro !== null && (
+          <p className="text-center text-gray-500 py-8">
+            No hay mesas en estado "{estadoFiltro === 'libre' ? 'Libre' : estadoFiltro === 'sinItems' ? 'Sin items' : estadoFiltro === 'enProceso' ? 'En proceso' : estadoFiltro === 'paraEntregar' ? 'Para entregar' : estadoFiltro === 'lista' ? 'Lista' : 'Limpieza'}".
+          </p>
+        )}
 
         {mesas.length === 0 && !verMisMesas && (
           <p className="text-center text-gray-500 py-8">
