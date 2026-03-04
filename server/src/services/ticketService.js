@@ -34,8 +34,8 @@ const ESCPOS = {
 }
 
 /**
- * Convierte imagen PNG a formato bitmap ESC/POS usando ESC * (más compatible)
- * Configura line spacing para que el QR salga cuadrado
+ * Convierte imagen PNG a formato bitmap ESC/POS usando GS v 0 (raster bit image)
+ * Este comando es más compatible y no tiene problemas de espaciado
  */
 async function convertImageToBitmap(pngBuffer) {
   return new Promise((resolve, reject) => {
@@ -50,7 +50,7 @@ async function convertImageToBitmap(pngBuffer) {
 
         console.log(`[QR Bitmap] Procesando imagen ${width}x${height}`)
 
-        // Convertir a array de pixels (1 = negro, 0 = blanco)
+        // Convertir a blanco y negro (1 bit por píxel)
         const pixels = []
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
@@ -59,52 +59,52 @@ async function convertImageToBitmap(pngBuffer) {
             const g = data.data[idx + 1]
             const b = data.data[idx + 2]
             const brightness = (r + g + b) / 3
+            // Si es oscuro, es un píxel negro (1), si es claro es blanco (0)
             pixels.push(brightness < 128 ? 1 : 0)
           }
         }
 
-        let output = ''
+        // Redimensionar ancho a múltiplo de 8
+        const widthBytes = Math.ceil(width / 8)
 
-        // ESC 3 n - Set line spacing to n/180 inch
-        // Para modo 33, usamos 24 para que no haya espacio entre bandas
-        output += ESC + '3' + String.fromCharCode(24)
-
-        // Procesar en bandas de 24 pixels de alto
-        for (let bandY = 0; bandY < height; bandY += 24) {
-          const nL = width & 0xFF
-          const nH = (width >> 8) & 0xFF
-
-          // ESC * 33 nL nH [data] - 24 dots double density
-          output += ESC + '*' + String.fromCharCode(33)
-          output += String.fromCharCode(nL) + String.fromCharCode(nH)
-
-          // Para cada columna de pixels
-          for (let x = 0; x < width; x++) {
-            // 3 bytes por columna (24 bits = 24 dots verticales)
-            for (let byteNum = 0; byteNum < 3; byteNum++) {
-              let byte = 0
-              for (let bit = 0; bit < 8; bit++) {
-                const y = bandY + byteNum * 8 + bit
-                if (y < height) {
-                  const pixelIndex = y * width + x
-                  if (pixels[pixelIndex] === 1) {
-                    byte |= (1 << (7 - bit))
-                  }
+        // Convertir píxeles a bytes (8 píxeles por byte)
+        const imageBytes = []
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < widthBytes; x++) {
+            let byte = 0
+            for (let bit = 0; bit < 8; bit++) {
+              const pixelX = x * 8 + bit
+              if (pixelX < width) {
+                const pixelIndex = y * width + pixelX
+                if (pixels[pixelIndex] === 1) {
+                  byte |= (1 << (7 - bit))
                 }
               }
-              output += String.fromCharCode(byte)
             }
+            imageBytes.push(byte)
           }
-
-          // Nueva línea después de cada banda
-          output += '\n'
         }
 
-        // ESC 2 - Reset line spacing to default
-        output += ESC + '2'
+        // Construir comando ESC/POS: GS v 0 mode xL xH yL yH [data]
+        // mode: 0 = normal, 1 = double width, 2 = double height, 3 = double both
+        const mode = 0
+        const xL = widthBytes & 0xFF
+        const xH = (widthBytes >> 8) & 0xFF
+        const yL = height & 0xFF
+        const yH = (height >> 8) & 0xFF
 
-        console.log(`[QR Bitmap] Generado, tamaño: ${output.length} bytes`)
-        resolve(output)
+        // Construir comando GS v 0
+        let command = GS + 'v' + String.fromCharCode(48) + String.fromCharCode(mode)
+        command += String.fromCharCode(xL) + String.fromCharCode(xH)
+        command += String.fromCharCode(yL) + String.fromCharCode(yH)
+
+        // Agregar bytes de imagen
+        for (let i = 0; i < imageBytes.length; i++) {
+          command += String.fromCharCode(imageBytes[i])
+        }
+
+        console.log(`[QR Bitmap] Generado, tamaño: ${command.length} bytes`)
+        resolve(command)
       })
     } catch (error) {
       reject(error)
@@ -437,10 +437,12 @@ export function renderTicketComanda(data) {
   output += ESCPOS.DOUBLE_SIZE
   output += `*** ${destino || 'COCINA'} ***\n`
   output += ESCPOS.NORMAL_SIZE
+  output += ESCPOS.BOLD_OFF
 
-  output += separator('=') + '\n'
+  output += separator('=', 48) + '\n'
 
   // ========== DATOS COMANDA ==========
+  output += ESCPOS.BOLD_ON
   output += ESCPOS.DOUBLE_HEIGHT
   if (comanda.mesa) {
     output += `MESA ${comanda.mesa.numero || comanda.mesa}\n`
@@ -452,6 +454,18 @@ export function renderTicketComanda(data) {
     output += 'KIOSCO\n'
   }
   output += ESCPOS.NORMAL_SIZE
+  output += ESCPOS.BOLD_OFF
+
+  // Nombre del cliente/socio
+  const nombreCliente = comanda.socio?.apellidoNombre
+    || comanda.nombreCliente
+    || comanda.observaciones
+    || comanda.nombreGrupo
+  if (nombreCliente) {
+    output += ESCPOS.BOLD_ON
+    output += `${nombreCliente}\n`
+    output += ESCPOS.BOLD_OFF
+  }
 
   output += `Comanda #${comanda.numero || comanda.id}\n`
   output += `${formatDate(comanda.createdAt || new Date())}\n`
@@ -460,11 +474,10 @@ export function renderTicketComanda(data) {
     output += `Mozo: ${comanda.mozo || comanda.creadoPor}\n`
   }
 
-  output += separator() + '\n'
+  output += separator('-', 48) + '\n'
 
   // ========== ITEMS ==========
   output += ESCPOS.ALIGN_LEFT
-  output += ESCPOS.DOUBLE_HEIGHT
 
   items.forEach(item => {
     const cantidad = item.cantidad || 1
@@ -473,27 +486,24 @@ export function renderTicketComanda(data) {
     output += `${cantidad}x ${nombre.toUpperCase()}\n`
 
     if (item.notas || item.observaciones) {
-      output += ESCPOS.NORMAL_SIZE
       output += `   >> ${item.notas || item.observaciones}\n`
-      output += ESCPOS.DOUBLE_HEIGHT
     }
   })
 
-  output += ESCPOS.NORMAL_SIZE
-  output += separator('=') + '\n'
+  output += separator('=', 48) + '\n'
 
   // ========== NOTAS GENERALES ==========
-  if (comanda.notas || comanda.observaciones) {
+  if (comanda.notas && comanda.notas !== nombreCliente) {
     output += ESCPOS.ALIGN_CENTER
     output += ESCPOS.BOLD_ON
     output += 'NOTAS:\n'
     output += ESCPOS.BOLD_OFF
-    output += comanda.notas || comanda.observaciones
+    output += comanda.notas
     output += '\n'
   }
 
-  // Corte de papel
-  output += ESCPOS.FEED_LINES(3)
+  // Corte de papel - más espacio para manipular
+  output += ESCPOS.FEED_LINES(6)
   output += ESCPOS.PARTIAL_CUT
 
   return output

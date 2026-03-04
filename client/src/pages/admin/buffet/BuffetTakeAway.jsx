@@ -76,8 +76,8 @@ export default function BuffetTakeAway() {
 
     try {
       setBuscandoSocio(true)
-      const res = await api.get(`/admin/socios?busqueda=${encodeURIComponent(query)}&activo=true&limit=10`)
-      setSociosBusqueda(res.data || res || [])
+      const res = await api.get(`/admin/socios?q=${encodeURIComponent(query)}&estadosValidos=ACTIVO,VIGENTE&limit=10`)
+      setSociosBusqueda(res?.socios || [])
     } catch (err) {
       console.error('Error buscando socios:', err)
     } finally {
