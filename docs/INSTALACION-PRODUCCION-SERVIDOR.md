@@ -42,6 +42,136 @@
 
 ---
 
+## 0. Configurar Seguridad SSH (PRIMERO)
+
+**⚠️ IMPORTANTE:** Realizar estos pasos ANTES de continuar con la instalación para evitar accesos no autorizados.
+
+### Crear usuario administrador
+
+```bash
+# Conectado como root (primera vez)
+# Crear usuario axiomacloud
+adduser axiomacloud
+
+# Agregar a grupo sudo
+usermod -aG sudo axiomacloud
+
+# Verificar
+groups axiomacloud
+# Debe mostrar: axiomacloud : axiomacloud sudo
+```
+
+### Configurar autenticación por clave SSH (Recomendado)
+
+**En tu máquina local:**
+
+```bash
+# Generar par de claves SSH (si no tienes)
+ssh-keygen -t ed25519 -C "tu_email@example.com"
+
+# Copiar clave pública al servidor
+ssh-copy-id axiomacloud@sportivo.axiomacloud.com
+
+# O manualmente:
+cat ~/.ssh/id_ed25519.pub
+# Copiar el contenido
+```
+
+**En el servidor (como axiomacloud):**
+
+```bash
+# Cambiar a usuario axiomacloud
+su - axiomacloud
+
+# Crear directorio SSH
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+
+# Pegar clave pública
+nano ~/.ssh/authorized_keys
+# Pegar la clave copiada, guardar y salir
+
+# Ajustar permisos
+chmod 600 ~/.ssh/authorized_keys
+```
+
+### Deshabilitar login de root por SSH
+
+```bash
+# Volver a root o usar sudo
+exit
+# O continuar con sudo
+
+# Editar configuración SSH
+sudo nano /etc/ssh/sshd_config
+```
+
+**Modificar las siguientes líneas:**
+
+```bash
+# Buscar y cambiar estas directivas:
+PermitRootLogin no                    # Era "yes", cambiar a "no"
+PasswordAuthentication yes            # Mantener "yes" inicialmente
+PubkeyAuthentication yes              # Debe estar en "yes"
+
+# Opcional (más seguro - solo claves SSH):
+# PasswordAuthentication no           # Descomentar después de probar con clave
+```
+
+**Guardar y cerrar (Ctrl+O, Enter, Ctrl+X)**
+
+### Reiniciar servicio SSH
+
+```bash
+# Probar configuración
+sudo sshd -t
+
+# Si no hay errores, reiniciar
+sudo systemctl restart sshd
+```
+
+### Verificar acceso
+
+**⚠️ NO CERRAR la sesión actual de SSH. Abrir una NUEVA terminal y probar:**
+
+```bash
+# En otra terminal
+ssh axiomacloud@sportivo.axiomacloud.com
+
+# Probar sudo
+sudo whoami
+# Debe retornar: root
+```
+
+**Si funciona correctamente:**
+- ✅ Puedes cerrar la sesión de root
+- ✅ Continuar con el resto de la instalación como `axiomacloud`
+
+**Si NO funciona:**
+- ⚠️ NO cerrar la sesión de root original
+- ⚠️ Revisar configuración en /etc/ssh/sshd_config
+- ⚠️ Verificar permisos de ~/.ssh y ~/.ssh/authorized_keys
+
+### Seguridad adicional (Opcional)
+
+```bash
+# Cambiar puerto SSH (evita bots)
+sudo nano /etc/ssh/sshd_config
+# Buscar: #Port 22
+# Cambiar a: Port 2222
+
+# Configurar firewall
+sudo ufw allow 2222/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+
+# Reiniciar SSH
+sudo systemctl restart sshd
+```
+
+---
+
 ## 1. Crear Usuario del Sistema
 
 ```bash
@@ -361,7 +491,44 @@ curl https://sportivo.axiomacloud.com/api/rubros
 
 ---
 
-## 10. Comandos de Mantenimiento
+## 10. Crear Usuario Super Administrador
+
+```bash
+# Como sportivouser
+sudo su - sportivouser
+cd /var/www/rojoplus/server
+
+# Ejecutar script de creación de super admin
+node createSuperAdmin.js
+```
+
+**Credenciales creadas:**
+- **Email:** `admin@sportivopilar.com.ar`
+- **Contraseña:** `Sportivo2026!`
+
+**⚠️ IMPORTANTE:** Cambia esta contraseña después del primer login en:
+`https://sportivo.axiomacloud.com/admin` → Perfil → Cambiar Contraseña
+
+### Crear admin con contraseña personalizada
+
+Si necesitas una contraseña diferente, edita el archivo antes de ejecutar:
+
+```bash
+nano /var/www/rojoplus/server/createSuperAdmin.js
+
+# Buscar la línea:
+const password = 'Sportivo2026!';
+
+# Cambiar por tu contraseña deseada
+const password = 'TuContraseñaSegura';
+
+# Guardar (Ctrl+O, Enter, Ctrl+X) y ejecutar
+node createSuperAdmin.js
+```
+
+---
+
+## 11. Comandos de Mantenimiento
 
 ### Actualizar aplicación
 
@@ -477,6 +644,89 @@ sudo nginx -t
 sudo journalctl -u nginx -f
 ```
 
+### SSL sirve certificado incorrecto (servidores con múltiples aplicaciones)
+
+**Síntoma:** Al acceder a `https://sportivo.axiomacloud.com`, el navegador muestra error de certificado o sirve el certificado de otro sitio (ej: mediflow).
+
+**Diagnóstico:**
+
+```bash
+# Verificar qué certificado está sirviendo
+echo | openssl s_client -connect sportivo.axiomacloud.com:443 -servername sportivo.axiomacloud.com 2>/dev/null | openssl x509 -noout -subject
+
+# Debe mostrar: subject=CN = sportivo.axiomacloud.com
+# Si muestra otro dominio, hay un problema de configuración
+```
+
+**Causas comunes:**
+
+1. **Múltiples sitios con `default_server` en puerto 443**
+2. **Orden de carga de archivos de configuración** (conf.d carga antes que sites-enabled)
+3. **IPv6 habilitado en servidor NO accesible por IPv6**
+
+**Solución:**
+
+```bash
+# 1. Buscar conflictos de default_server
+grep -r "default_server" /etc/nginx/
+# Debe haber SOLO UNO en puerto 443
+
+# 2. Verificar orden de carga
+sudo nginx -T 2>/dev/null | grep "# configuration file /etc/nginx" | grep -E "(conf.d|sites-enabled)"
+# Los archivos en conf.d/ cargan ANTES que sites-enabled/
+
+# 3. Verificar accesibilidad IPv6
+curl -6 -I http://sportivo.axiomacloud.com
+# Si falla, el servidor NO es accesible por IPv6
+
+# 4. Si el servidor NO soporta IPv6, deshabilitar en TODOS los sitios
+grep -r "listen \[::\]:443" /etc/nginx/sites-enabled/
+
+# Comentar líneas IPv6 en cada sitio:
+sudo sed -i 's/listen \[::\]:443/# listen [::]:443/g' /etc/nginx/sites-enabled/*
+
+# 5. Mover sportivo a conf.d para que cargue primero
+sudo cp /etc/nginx/sites-available/sportivo /etc/nginx/conf.d/00-sportivo.conf
+sudo rm /etc/nginx/sites-enabled/sportivo
+
+# 6. Asegurar que solo sportivo tenga default_server
+sudo nano /etc/nginx/conf.d/00-sportivo.conf
+# Buscar: listen 443 ssl http2;
+# Cambiar a: listen 443 ssl http2 default_server;
+
+# 7. Quitar default_server de otros sitios
+grep -r "default_server" /etc/nginx/conf.d/
+# Editar archivos y quitar default_server excepto de 00-sportivo.conf
+
+# 8. Verificar y reiniciar
+sudo nginx -t
+sudo systemctl restart nginx
+
+# 9. Probar
+curl -I https://sportivo.axiomacloud.com
+echo | openssl s_client -connect sportivo.axiomacloud.com:443 -servername sportivo.axiomacloud.com 2>/dev/null | openssl x509 -noout -subject
+```
+
+**Verificación final:**
+
+```bash
+# Por IPv4 debe funcionar
+curl -4 -I https://sportivo.axiomacloud.com
+
+# Certificado correcto
+echo | openssl s_client -connect sportivo.axiomacloud.com:443 -servername sportivo.axiomacloud.com 2>/dev/null | openssl x509 -noout -subject
+# Debe mostrar: subject=CN = sportivo.axiomacloud.com
+
+# Solo debe escuchar en IPv4:443 (no IPv6)
+sudo netstat -tulpn | grep nginx | grep 443
+# Debe mostrar: tcp  0.0.0.0:443  (sin tcp6 :::443)
+```
+
+**Nota:** En servidores con múltiples aplicaciones, se recomienda:
+- Usar prefijos numéricos en nombres de archivos: `00-principal.conf`, `01-app1.conf`
+- Solo UNA aplicación con `default_server`
+- Deshabilitar IPv6 si el servidor no es accesible por IPv6
+
 ---
 
 ## 12. Backup
@@ -527,6 +777,14 @@ tar -czvf rojoplus_backup_$(date +%Y%m%d).tar.gz /var/www/rojoplus
 
 ## Checklist de Deployment
 
+### Seguridad
+- [ ] Usuario axiomacloud creado con permisos sudo
+- [ ] Autenticación SSH por clave configurada
+- [ ] Login de root por SSH deshabilitado
+- [ ] Acceso con axiomacloud verificado
+- [ ] Firewall UFW configurado (opcional)
+
+### Sistema
 - [ ] Usuario sportivouser creado
 - [ ] Base de datos rojoplus_db creada
 - [ ] Usuario rojoplususer con permisos
@@ -540,5 +798,7 @@ tar -czvf rojoplus_backup_$(date +%Y%m%d).tar.gz /var/www/rojoplus
 - [ ] PM2 guardado para auto-inicio
 - [ ] Nginx configurado
 - [ ] Certificado SSL obtenido
+- [ ] SSL sirviendo certificado correcto (no de otro sitio)
 - [ ] Health check funcionando
-- [ ] Admin creado en base de datos
+- [ ] Super Admin creado (admin@sportivopilar.com.ar)
+- [ ] Contraseña del admin cambiada desde el panel
