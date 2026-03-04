@@ -86,9 +86,12 @@ function detectarImpresorasCUPS() {
   // Solo funciona en Linux/macOS
   if (isWindows) return impresoras
 
+  console.log('[CUPS] Detectando impresoras...')
+
+  // Método 1: lpstat -p
   try {
-    // Ejecutar lpstat -p para listar impresoras
     const output = execSync('lpstat -p 2>/dev/null', { encoding: 'utf-8' })
+    console.log('[CUPS] lpstat -p output:', output)
     const lines = output.split('\n')
 
     for (const line of lines) {
@@ -96,6 +99,7 @@ function detectarImpresorasCUPS() {
       const match = line.match(/^printer\s+(\S+)\s+/)
       if (match) {
         const nombre = match[1]
+        console.log(`[CUPS]   - ${nombre}`)
         impresoras.push({
           tipo: 'CUPS',
           nombre: nombre,
@@ -104,12 +108,81 @@ function detectarImpresorasCUPS() {
       }
     }
   } catch (err) {
-    // lpstat no disponible o sin impresoras
-    if (err.message && !err.message.includes('not found')) {
-      console.error('[CUPS] Error detectando impresoras:', err.message)
+    console.log('[CUPS] lpstat -p falló:', err.message)
+  }
+
+  // Método 2: lpstat -a (lista impresoras que aceptan trabajos)
+  if (impresoras.length === 0) {
+    try {
+      const output = execSync('lpstat -a 2>/dev/null', { encoding: 'utf-8' })
+      console.log('[CUPS] lpstat -a output:', output)
+      const lines = output.split('\n')
+
+      for (const line of lines) {
+        // Formato: "NOMBRE accepting requests since ..."
+        const match = line.match(/^(\S+)\s+accepting/)
+        if (match) {
+          const nombre = match[1]
+          if (!impresoras.find(i => i.nombre === nombre)) {
+            console.log(`[CUPS]   - ${nombre}`)
+            impresoras.push({
+              tipo: 'CUPS',
+              nombre: nombre,
+              destino: nombre
+            })
+          }
+        }
+      }
+    } catch (err) {
+      console.log('[CUPS] lpstat -a falló:', err.message)
     }
   }
 
+  // Método 3: lpstat -e (lista todas las impresoras disponibles)
+  if (impresoras.length === 0) {
+    try {
+      const output = execSync('lpstat -e 2>/dev/null', { encoding: 'utf-8' })
+      console.log('[CUPS] lpstat -e output:', output)
+      const lines = output.split('\n').filter(l => l.trim())
+
+      for (const line of lines) {
+        const nombre = line.trim()
+        if (nombre && !impresoras.find(i => i.nombre === nombre)) {
+          console.log(`[CUPS]   - ${nombre}`)
+          impresoras.push({
+            tipo: 'CUPS',
+            nombre: nombre,
+            destino: nombre
+          })
+        }
+      }
+    } catch (err) {
+      console.log('[CUPS] lpstat -e falló:', err.message)
+    }
+  }
+
+  // Método 4: Leer directamente de /etc/cups/printers.conf
+  if (impresoras.length === 0) {
+    try {
+      if (fs.existsSync('/etc/cups/printers.conf')) {
+        const content = fs.readFileSync('/etc/cups/printers.conf', 'utf-8')
+        const matches = content.matchAll(/<Printer\s+([^>]+)>/g)
+        for (const match of matches) {
+          const nombre = match[1]
+          console.log(`[CUPS]   - ${nombre} (desde printers.conf)`)
+          impresoras.push({
+            tipo: 'CUPS',
+            nombre: nombre,
+            destino: nombre
+          })
+        }
+      }
+    } catch (err) {
+      console.log('[CUPS] No se pudo leer printers.conf:', err.message)
+    }
+  }
+
+  console.log(`[CUPS] Total impresoras detectadas: ${impresoras.length}`)
   return impresoras
 }
 
