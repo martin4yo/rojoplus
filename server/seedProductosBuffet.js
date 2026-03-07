@@ -4,10 +4,10 @@ import XLSX from 'xlsx';
 
 const client = new Client({
   host: 'localhost',
-  port: 5434,
+  port: 5432,
   database: 'rojoplus_db',
   user: 'postgres',
-  password: 'Q27G4B98'
+  password: 'postgres'
 });
 
 // Mapeo de categorías del Excel a códigos de categorías en BD

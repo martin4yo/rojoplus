@@ -3,10 +3,10 @@ const { Client } = pkg;
 
 const client = new Client({
   host: 'localhost',
-  port: 5434,
+  port: 5432,
   database: 'rojoplus_db',
   user: 'postgres',
-  password: 'Q27G4B98'
+  password: 'postgres'
 });
 
 async function seedMesas() {

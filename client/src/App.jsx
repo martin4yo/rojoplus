@@ -187,6 +187,7 @@ import BuffetComanda from './pages/admin/buffet/BuffetComanda'
 import BuffetCocina from './pages/admin/buffet/BuffetCocina'
 import BuffetKiosco from './pages/admin/buffet/BuffetKiosco'
 import BuffetTakeAway from './pages/admin/buffet/BuffetTakeAway'
+import BuffetBarra from './pages/admin/buffet/BuffetBarra'
 import BuffetImpresoras from './pages/admin/buffet/BuffetImpresoras'
 import MenuBuffet from './pages/public/MenuBuffet'
 
@@ -417,6 +418,7 @@ function App() {
         <Route path="buffet/cocina" element={<BuffetCocina />} />
         <Route path="buffet/kiosco" element={<BuffetKiosco />} />
         <Route path="buffet/takeaway" element={<BuffetTakeAway />} />
+        <Route path="buffet/barra" element={<BuffetBarra />} />
         <Route path="buffet/impresoras" element={<BuffetImpresoras />} />
 
         {/* Control de Accesos */}

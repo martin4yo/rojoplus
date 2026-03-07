@@ -32,24 +32,30 @@ export async function cargarPermisos() {
       return false
     }
 
-    const res = await fetch('/api/admin/mis-permisos', {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+
+    const res = await fetch(`${API_URL}/admin/mis-permisos`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
     })
 
     if (!res.ok) {
+      console.error('Error cargando permisos:', res.status, res.statusText)
       limpiarPermisos()
       return false
     }
 
     const data = await res.json()
+    console.log('[Permisos] Datos recibidos:', data)
+
     if (data.success && data.data) {
       permisosUsuario = data.data.permisos || []
       cajasPermitidas = data.data.cajasPermitidas || []
       esSuperAdmin = data.data.esSuperAdmin || false
       usuarioActual = data.data.usuario
       rolActual = data.data.rol
+      console.log('[Permisos] Cargados:', { permisos: permisosUsuario.length, esSuperAdmin })
       return true
     }
 
