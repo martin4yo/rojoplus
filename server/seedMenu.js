@@ -90,11 +90,12 @@ const menuData = [
       { titulo: 'Mesas', icono: 'UtensilsCrossed', url: '/admin/buffet/mesas', orden: 3 },
       { titulo: 'Pedidos', icono: 'ShoppingBag', url: '/admin/buffet/takeaway', orden: 4 },
       { titulo: 'Kiosco', icono: 'Coffee', url: '/admin/buffet/kiosco', orden: 5 },
-      { titulo: 'Cocina (KDS)', icono: 'ChefHat', url: '/admin/buffet/cocina', orden: 6 },
-      { titulo: 'Productos', icono: 'Package', url: '/admin/buffet/productos', orden: 7 },
-      { titulo: 'Precios', icono: 'DollarSign', url: '/admin/buffet/precios', orden: 8 },
-      { titulo: 'Categorías', icono: 'Tag', url: '/admin/buffet/categorias', orden: 9 },
-      { titulo: 'Impresoras', icono: 'Printer', url: '/admin/buffet/impresoras', orden: 10 },
+      { titulo: 'Venta Barra', icono: 'Zap', url: '/admin/buffet/barra', orden: 6 },
+      { titulo: 'Cocina (KDS)', icono: 'ChefHat', url: '/admin/buffet/cocina', orden: 7 },
+      { titulo: 'Productos', icono: 'Package', url: '/admin/buffet/productos', orden: 8 },
+      { titulo: 'Precios', icono: 'DollarSign', url: '/admin/buffet/precios', orden: 9 },
+      { titulo: 'Categorías', icono: 'Tag', url: '/admin/buffet/categorias', orden: 10 },
+      { titulo: 'Impresoras', icono: 'Printer', url: '/admin/buffet/impresoras', orden: 11 },
     ]
   },
   {

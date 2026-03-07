@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { ShoppingBag, User, X, Zap } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { User, X, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import GestionPedido from '../../../components/buffet/GestionPedido'
@@ -9,10 +9,14 @@ export default function BuffetBarra() {
   const [pedidoActivo, setPedidoActivo] = useState(null)
   const [mostrarSelectorCliente, setMostrarSelectorCliente] = useState(false)
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+  const creandoPedido = useRef(false)
 
   // Al montar, crear un pedido temporal automáticamente
   useEffect(() => {
-    crearPedidoBarra()
+    if (!creandoPedido.current) {
+      creandoPedido.current = true
+      crearPedidoBarra()
+    }
   }, [])
 
   async function crearPedidoBarra(cliente = null) {
@@ -76,8 +80,17 @@ export default function BuffetBarra() {
     // Limpiar y crear nuevo pedido
     setPedidoActivo(null)
     setClienteSeleccionado(null)
-    crearPedidoBarra()
+    creandoPedido.current = false
+    setTimeout(() => {
+      creandoPedido.current = true
+      crearPedidoBarra()
+    }, 100)
   }
+
+  // Callback estable para evitar loops infinitos en GestionPedido
+  const handleActualizarPedido = useCallback((pedidoActualizado) => {
+    setPedidoActivo(pedidoActualizado)
+  }, [])
 
   if (!pedidoActivo) {
     return (
@@ -143,9 +156,7 @@ export default function BuffetBarra() {
         tipo="takeaway"
         id={pedidoActivo.id}
         onVolver={handlePedidoCerrado}
-        onActualizar={(pedidoActualizado) => {
-          setPedidoActivo(pedidoActualizado)
-        }}
+        onActualizar={handleActualizarPedido}
       />
 
       {/* Modal selector de cliente */}

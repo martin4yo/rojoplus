@@ -241,18 +241,21 @@ router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
   try {
     const { nombreCliente, telefono, socioId, horaEstimada, observaciones, items, tipo, centroCostoId } = req.body
 
+    // Validar campo requerido
+    const nombreClienteFinal = nombreCliente || 'Sin nombre'
+
     const numero = await generarNumeroPedido()
 
     const pedido = await prisma.pedidoTakeAway.create({
       data: {
         numero,
-        nombreCliente,
-        telefono,
-        socioId,
+        nombreCliente: nombreClienteFinal,
+        telefono: telefono || null,
+        socioId: socioId ? parseInt(socioId) : null,
         tipo: tipo || 'RETIRO',
         centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
         horaEstimada: horaEstimada ? new Date(horaEstimada) : null,
-        observaciones,
+        observaciones: observaciones || null,
         atendidoPor: req.admin.id
       }
     })
@@ -284,8 +287,8 @@ router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
 
     res.status(201).json({ success: true, data: pedidoCompleto })
   } catch (error) {
-    console.error('Error al crear pedido:', error)
-    res.status(500).json({ success: false, error: 'Error al crear pedido' })
+    console.error('Error al crear pedido:', error.message, error.stack)
+    res.status(500).json({ success: false, error: error.message || 'Error al crear pedido' })
   }
 })
 
