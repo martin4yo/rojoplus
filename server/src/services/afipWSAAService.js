@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import soap from 'soap'
 import { parseStringPromise } from 'xml2js'
 import { createRequire } from 'module'
@@ -6,8 +6,6 @@ import { AppError } from '../middleware/errorHandler.js'
 
 const require = createRequire(import.meta.url)
 const forge = require('node-forge')
-
-const prisma = new PrismaClient()
 
 // Cache del Ticket de Acceso en memoria
 let taCache = {

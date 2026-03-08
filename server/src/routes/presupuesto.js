@@ -1,9 +1,8 @@
 import express from 'express'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // Helper para manejar errores async
 const asyncHandler = (fn) => (req, res, next) =>

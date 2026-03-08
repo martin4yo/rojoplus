@@ -4,6 +4,7 @@ import { Plus, Clock, Phone, Truck, ShoppingBag, X, Users, CheckCircle } from 'l
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import PageHeader from '../../../components/PageHeader'
 import SelectCentroCosto from '../../../components/SelectCentroCosto'
 import { formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
@@ -226,60 +227,53 @@ export default function BuffetTakeAway() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
-          <p className="text-gray-600">{pedidosFiltrados.length} pedidos</p>
+      <PageHeader icon={ShoppingBag} title="Pedidos TakeAway" subtitle={`${pedidosFiltrados.length} pedidos`}>
+        {/* Filtros */}
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setFiltroEstado('EN_CURSO')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              filtroEstado === 'EN_CURSO' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            En Curso
+          </button>
+          <button
+            onClick={() => setFiltroEstado('PAGADOS')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              filtroEstado === 'PAGADOS' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Pagados
+          </button>
+          <button
+            onClick={() => setFiltroEstado('ENTREGADOS_HOY')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              filtroEstado === 'ENTREGADOS_HOY' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Entregados Hoy
+          </button>
+          <button
+            onClick={() => setFiltroEstado('TODOS')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              filtroEstado === 'TODOS' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Todos
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Filtros */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setFiltroEstado('EN_CURSO')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                filtroEstado === 'EN_CURSO' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              En Curso
-            </button>
-            <button
-              onClick={() => setFiltroEstado('PAGADOS')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                filtroEstado === 'PAGADOS' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Pagados
-            </button>
-            <button
-              onClick={() => setFiltroEstado('ENTREGADOS_HOY')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                filtroEstado === 'ENTREGADOS_HOY' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Entregados Hoy
-            </button>
-            <button
-              onClick={() => setFiltroEstado('TODOS')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                filtroEstado === 'TODOS' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Todos
-            </button>
-          </div>
 
-          {tienePermiso(PERMISOS.BUFFET_MESAS) && (
-            <button
-              onClick={() => setModalNuevoPedido(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-            >
-              <Plus size={18} />
-              Nuevo Pedido
-            </button>
-          )}
-        </div>
-      </div>
+        {tienePermiso(PERMISOS.BUFFET_MESAS) && (
+          <button
+            onClick={() => setModalNuevoPedido(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+          >
+            <Plus size={18} />
+            Nuevo Pedido
+          </button>
+        )}
+      </PageHeader>
 
       {/* Grid de Pedidos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

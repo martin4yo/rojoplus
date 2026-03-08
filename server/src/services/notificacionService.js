@@ -1,9 +1,7 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import nodemailer from 'nodemailer'
 import Handlebars from 'handlebars'
 import { enviarNotificacionPush } from './webPush.js'
-
-const prisma = new PrismaClient()
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,

@@ -1,10 +1,9 @@
 import { Router } from 'express'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { generarAsientoPagoSueldo } from '../services/asientosContables.js'
 
 const router = Router()
-const prisma = new PrismaClient()
 
 // Middleware de autenticación para todas las rutas
 const authenticateAdmin = authAdmin

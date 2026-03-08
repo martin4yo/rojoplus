@@ -4,6 +4,7 @@ import { UtensilsCrossed, Users, Clock, ChefHat, ShoppingBag, Coffee, AlertCircl
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import PageHeader from '../../../components/PageHeader'
 import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import Modal from '../../../components/Modal'
@@ -291,57 +292,49 @@ export default function BuffetMesas() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Buffet</h1>
-          <p className="text-gray-600">Estado de mesas</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Toggle Mis Mesas / Todas - Solo para usuarios con permiso de ver todo */}
-          {!soloMesas && (
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setVerMisMesas(false)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  !verMisMesas ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Todas
-              </button>
-              <button
-                onClick={() => setVerMisMesas(true)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  verMisMesas ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Mis Mesas
-              </button>
-            </div>
-          )}
-
-          {/* Notificaciones en tiempo real */}
-          <NotificacionBuffet />
-
-          {puedeAsignar && (
+      <PageHeader icon={UtensilsCrossed} title="Buffet" subtitle="Estado de mesas">
+        {/* Toggle Mis Mesas / Todas - Solo para usuarios con permiso de ver todo */}
+        {!soloMesas && (
+          <div className="flex bg-gray-100 rounded-lg p-1">
             <button
-              onClick={() => setModalAsignacion(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm"
+              onClick={() => setVerMisMesas(false)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                !verMisMesas ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
-              <Settings size={16} />
-              <span className="hidden md:inline">Asignar Mozos</span>
+              Todas
             </button>
-          )}
+            <button
+              onClick={() => setVerMisMesas(true)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                verMisMesas ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Mis Mesas
+            </button>
+          </div>
+        )}
 
+        <NotificacionBuffet />
+
+        {puedeAsignar && (
           <button
-            onClick={cargarDatos}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm"
+            onClick={() => setModalAsignacion(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm"
           >
-            <RefreshCw size={16} />
-            <span className="hidden md:inline">Actualizar</span>
+            <Settings size={16} />
+            <span className="hidden md:inline">Asignar Mozos</span>
           </button>
-        </div>
-      </div>
+        )}
+
+        <button
+          onClick={cargarDatos}
+          className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm"
+        >
+          <RefreshCw size={16} />
+          <span className="hidden md:inline">Actualizar</span>
+        </button>
+      </PageHeader>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
@@ -459,77 +452,71 @@ export default function BuffetMesas() {
           </h2>
 
           {/* Botones de filtro por estado */}
-          <div className="flex flex-wrap gap-2 text-sm">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-sm">
             <button
               onClick={() => toggleFiltroEstado('libre')}
-              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium truncate ${
                 estadoFiltro === 'libre'
-                  ? 'bg-green-500 text-white border-green-600 shadow-md'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-green-400'
+                  ? 'bg-green-600 text-white border-green-700 shadow-md ring-2 ring-green-300'
+                  : 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
               }`}
             >
-              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'libre' ? 'bg-white' : 'bg-green-500'}`}></div>
-              <span className="font-medium">Libre</span>
+              Libre
             </button>
 
             <button
               onClick={() => toggleFiltroEstado('sinItems')}
-              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium truncate ${
                 estadoFiltro === 'sinItems'
-                  ? 'bg-yellow-500 text-white border-yellow-600 shadow-md'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-yellow-400'
+                  ? 'bg-yellow-500 text-white border-yellow-600 shadow-md ring-2 ring-yellow-300'
+                  : 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200'
               }`}
             >
-              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'sinItems' ? 'bg-white' : 'bg-yellow-500'}`}></div>
-              <span className="font-medium">Sin items</span>
+              Sin items
             </button>
 
             <button
               onClick={() => toggleFiltroEstado('enProceso')}
-              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium truncate ${
                 estadoFiltro === 'enProceso'
-                  ? 'bg-orange-500 text-white border-orange-600 shadow-md'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400'
+                  ? 'bg-orange-500 text-white border-orange-600 shadow-md ring-2 ring-orange-300'
+                  : 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200'
               }`}
             >
-              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'enProceso' ? 'bg-white' : 'bg-orange-500'}`}></div>
-              <span className="font-medium">En proceso</span>
+              En proceso
             </button>
 
             <button
               onClick={() => toggleFiltroEstado('paraEntregar')}
-              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-48 ${
+              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium truncate ${
                 estadoFiltro === 'paraEntregar'
-                  ? 'bg-red-500 text-white border-red-600 shadow-md'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-red-400'
+                  ? 'bg-red-500 text-white border-red-600 shadow-md ring-2 ring-red-300'
+                  : 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200'
               }`}
             >
-              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'paraEntregar' ? 'bg-white' : 'bg-red-500'}`}></div>
-              <span className="font-medium">Para entregar</span>
+              Para entregar
             </button>
 
             <button
               onClick={() => toggleFiltroEstado('lista')}
-              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium truncate ${
                 estadoFiltro === 'lista'
-                  ? 'bg-cyan-500 text-white border-cyan-600 shadow-md'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-cyan-400'
+                  ? 'bg-cyan-500 text-white border-cyan-600 shadow-md ring-2 ring-cyan-300'
+                  : 'bg-cyan-100 text-cyan-800 border-cyan-200 hover:bg-cyan-200'
               }`}
             >
-              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'lista' ? 'bg-white' : 'bg-cyan-500'}`}></div>
-              <span className="font-medium">Lista</span>
+              Lista
             </button>
 
             <button
               onClick={() => toggleFiltroEstado('limpieza')}
-              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all w-40 ${
+              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium truncate ${
                 estadoFiltro === 'limpieza'
-                  ? 'bg-gray-400 text-white border-gray-500 shadow-md'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                  ? 'bg-gray-500 text-white border-gray-600 shadow-md ring-2 ring-gray-300'
+                  : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
               }`}
             >
-              <div className={`w-3 h-3 rounded-full ${estadoFiltro === 'limpieza' ? 'bg-white' : 'bg-gray-400'}`}></div>
-              <span className="font-medium">Limpieza</span>
+              Limpieza
             </button>
           </div>
         </div>

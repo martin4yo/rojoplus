@@ -1,5 +1,5 @@
 import express from 'express'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import multer from 'multer'
 import path from 'path'
@@ -10,7 +10,6 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // Configurar directorio de uploads para noticias
 const uploadDir = path.join(__dirname, '../../uploads/noticias')

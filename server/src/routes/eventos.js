@@ -1,5 +1,5 @@
 import express from 'express'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { v4 as uuidv4 } from 'uuid'
@@ -16,7 +16,6 @@ const __dirname = path.dirname(__filename)
 // import mercadopago from 'mercadopago' // TODO: FASE 2.5 - Implementar SDK v2
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // ============================================================================
 // GESTIÓN ADMIN - CRUD EVENTOS

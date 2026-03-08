@@ -1,5 +1,5 @@
 import express from 'express'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import multer from 'multer'
 import csv from 'csv-parser'
@@ -12,7 +12,6 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // Configurar multer para recibir archivos
 const storage = multer.memoryStorage()

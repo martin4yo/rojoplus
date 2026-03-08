@@ -1,10 +1,10 @@
 import { Router } from 'express'
-import { PrismaClient, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { enviarReciboPago } from '../services/email.js'
 
 const router = Router()
-const prisma = new PrismaClient()
 
 // Helper para manejar errores async
 const asyncHandler = (fn) => (req, res, next) => {

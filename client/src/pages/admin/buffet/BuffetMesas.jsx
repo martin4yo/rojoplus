@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Settings } from 'lucide-react'
+import { Plus, Edit, Trash2, Settings, UtensilsCrossed } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import PageHeader from '../../../components/PageHeader'
 
 export default function BuffetMesas() {
   const [mesas, setMesas] = useState([])
@@ -101,11 +102,7 @@ export default function BuffetMesas() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Mesas</h1>
-          <p className="text-gray-600">Configuración de mesas del buffet</p>
-        </div>
+      <PageHeader icon={UtensilsCrossed} title="Gestión de Mesas" subtitle="Configuración de mesas del buffet">
         {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
           <button
             onClick={() => abrirModal()}
@@ -115,7 +112,7 @@ export default function BuffetMesas() {
             Nueva Mesa
           </button>
         )}
-      </div>
+      </PageHeader>
 
       {/* Tabla de Mesas */}
       <div className="bg-white rounded-lg shadow overflow-hidden">

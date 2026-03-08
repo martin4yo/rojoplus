@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { getTicketAcceso, getConfiguracionFiscal, invalidateTicket } from '../services/afipWSAAService.js'
@@ -14,7 +14,6 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const router = Router()
-const prisma = new PrismaClient()
 
 // Todas las rutas requieren autenticación de admin
 router.use(authAdmin)

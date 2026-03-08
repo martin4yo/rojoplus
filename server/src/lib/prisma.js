@@ -3,25 +3,29 @@ import { PrismaClient } from '@prisma/client'
 /**
  * Instancia centralizada de PrismaClient
  *
- * En desarrollo, usa una instancia global para evitar crear múltiples
- * conexiones durante hot reload.
- *
- * Uso:
+ * IMPORTANTE: Todos los archivos deben importar desde aquí:
  * import prisma from '../lib/prisma.js'
  *
- * const users = await prisma.user.findMany()
+ * NO crear nuevas instancias con `new PrismaClient()`
  */
 
-// Singleton para desarrollo (evita múltiples instancias con hot reload)
+// Singleton global (evita múltiples instancias)
 const globalForPrisma = globalThis
 
 const prisma = globalForPrisma.prisma || new PrismaClient({
   log: process.env.NODE_ENV === 'development'
     ? ['query', 'error', 'warn']
-    : ['error']
+    : ['error'],
+  // Configuración de connection pool
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+    }
+  }
 })
 
-if (process.env.NODE_ENV !== 'production') {
+// Guardar en global para evitar múltiples instancias en hot reload y producción
+if (!globalForPrisma.prisma) {
   globalForPrisma.prisma = prisma
 }
 

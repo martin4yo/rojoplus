@@ -15,6 +15,7 @@ import PropinaSelector from './PropinaSelector'
 import SplitCuenta from './SplitCuenta'
 import PagoMultiple from './PagoMultiple'
 import ClienteSelector from './ClienteSelector'
+import MenuProductos from './MenuProductos'
 
 /**
  * Componente universal para gestión de pedidos
@@ -39,7 +40,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   const [cajas, setCajas] = useState([])
   const [mediosPago, setMediosPago] = useState([])
   const [loading, setLoading] = useState(true)
-  const [categoriaActiva, setCategoriaActiva] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [itemsNuevos, setItemsNuevos] = useState([])
   const [vistaProductos, setVistaProductos] = useState(() => {
@@ -728,14 +728,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
     return colores[estado] || 'bg-white border border-gray-200'
   }
 
-  const productosFiltrados = productos.filter(p => {
-    const matchCategoria = categoriaActiva === null || p.categoriaMenuId === categoriaActiva
-    const matchBusqueda = !busqueda ||
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.codigoBarras?.includes(busqueda)
-    return matchCategoria && matchBusqueda
-  })
-
   const totalNuevos = itemsNuevos.reduce((sum, item) => sum + (Number(item.precio) * item.cantidad), 0)
 
   // Verificar si la comanda está esperando cobro (cuenta pedida)
@@ -1155,31 +1147,61 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           )}
         </div>
 
-        {/* Tabs para móvil */}
+        {/* Header móvil simplificado */}
+        <div className="md:hidden bg-white border-b px-3 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onVolver}
+                className="p-2 hover:bg-gray-100 rounded-lg active:bg-gray-200"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <h1 className="font-bold text-base">
+                  {cfg.textos.entidad} {cfg.textos.numero}
+                </h1>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Clock size={12} />
+                  <span>{tiempoAbierta} min</span>
+                  {comandaActiva?.socio && (
+                    <span className="flex items-center gap-1 text-gray-700 font-medium">
+                      <img src="/images/logo.png" alt="" className="w-3 h-3" />
+                      {comandaActiva.socio.apellidoNombre?.split(',')[0] || comandaActiva.socio.apellido}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <StatusBadge status={comandaActiva?.estado} type={tipo === 'mesa' ? 'comanda' : 'pedidoTakeAway'} size="sm" />
+          </div>
+        </div>
+
+        {/* Tabs para móvil - Más grandes para touch */}
         <div className="md:hidden flex border-b bg-white">
           <button
             onClick={() => setTabActivo('productos')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 font-medium transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-2 py-3.5 font-semibold text-sm transition-colors ${
               tabActivo === 'productos'
                 ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
-                : 'text-gray-600'
+                : 'text-gray-500'
             }`}
           >
-            <UtensilsCrossed size={18} />
+            <UtensilsCrossed size={20} />
             Menú
           </button>
           <button
             onClick={() => setTabActivo('carrito')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 font-medium transition-colors relative ${
+            className={`flex-1 flex items-center justify-center gap-2 py-3.5 font-semibold text-sm transition-colors relative ${
               tabActivo === 'carrito'
                 ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
-                : 'text-gray-600'
+                : 'text-gray-500'
             }`}
           >
-            <ShoppingCart size={18} />
+            <ShoppingCart size={20} />
             {tipo === 'mesa' ? 'Pedido' : 'Cuenta'}
             {cantidadItemsCarrito > 0 && (
-              <span className="absolute top-2 right-1/4 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="absolute top-2 right-[18%] bg-red-600 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1">
                 {cantidadItemsCarrito}
               </span>
             )}
@@ -1310,188 +1332,66 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
             )}
           </div>
 
-          {/* Barra de búsqueda y toggle vista */}
-          <div className="p-3 md:p-4 bg-white border-b">
-            <div className="flex gap-3 items-center">
+          {/* Barra de búsqueda y toggle vista - Compacta en móvil */}
+          <div className="px-2 py-2 md:p-4 bg-white border-b">
+            <div className="flex gap-2 items-center">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
                   value={busqueda}
                   onChange={e => setBusqueda(e.target.value)}
-                  placeholder="Buscar producto..."
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  placeholder="Buscar..."
+                  className="w-full pl-8 pr-8 py-2 md:py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-gray-50 focus:bg-white transition-colors"
                 />
                 {busqueda && (
                   <button
                     onClick={() => setBusqueda('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 active:scale-90"
                   >
                     <X size={16} />
                   </button>
                 )}
               </div>
 
-              {/* Toggle Vista */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              {/* Toggle Vista - Más compacto en móvil */}
+              <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
                 <button
                   onClick={() => setVistaProductos('shop')}
-                  className={`p-2 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`p-1.5 md:p-2 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
                   title="Vista Tarjetas"
                 >
-                  <LayoutGrid className="w-5 h-5" />
+                  <LayoutGrid className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
                 <button
                   onClick={() => setVistaProductos('lista')}
-                  className={`p-2 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`p-1.5 md:p-2 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
                   title="Vista Lista"
                 >
-                  <List className="w-5 h-5" />
+                  <List className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Categorías - Wrap responsive */}
-          <div className="flex flex-wrap gap-2 p-3 md:p-4 bg-gray-50 border-b">
-            <button
-              onClick={() => setCategoriaActiva(null)}
-              className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium transition-colors ${
-                categoriaActiva === null
-                  ? 'bg-gray-800 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              Todos
-            </button>
-            {categorias.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setCategoriaActiva(cat.id)}
-                className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium transition-colors ${
-                  categoriaActiva === cat.id
-                    ? 'text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
-                }`}
-                style={categoriaActiva === cat.id ? { backgroundColor: cat.color || '#DC2626' } : {}}
-              >
-                {cat.nombre}
-              </button>
-            ))}
-          </div>
-
-          {/* Grid/Lista de Productos */}
-          <div className="flex-1 overflow-y-auto p-3 md:p-4 bg-gray-100">
-            {vistaProductos === 'shop' ? (
-              /* Vista Shop - Tarjetas */
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-3">
-                {productosFiltrados.map(prod => (
-                  <button
-                    key={prod.id}
-                    onClick={() => {
-                      if (noPermiteAgregarItems) {
-                        toast.error('No se pueden agregar items a este pedido')
-                        return
-                      }
-                      agregarItem(prod)
-                      if (window.innerWidth < 768) {
-                        toast.success(`+1 ${prod.nombre}`, { duration: 1000, position: 'bottom-center' })
-                      }
-                    }}
-                    disabled={noPermiteAgregarItems}
-                    className={`bg-white rounded-lg p-2 md:p-3 text-left transition-all border-2 border-transparent flex gap-2 md:gap-3 ${
-                      noPermiteAgregarItems
-                        ? 'opacity-50 cursor-not-allowed'
-                        : 'hover:shadow-lg hover:border-red-500 active:scale-95'
-                    }`}
-                  >
-                    {prod.imagen ? (
-                      <img
-                        src={prod.imagen}
-                        alt={prod.nombre}
-                        className="w-12 h-12 md:w-14 md:h-14 object-cover rounded-lg flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 md:w-14 md:h-14 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
-                        <Coffee size={20} className="text-gray-400" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-xs md:text-sm line-clamp-2 leading-tight">{prod.nombre}</h3>
-                      <p className="text-sm md:text-base font-bold text-green-600 mt-1">
-                        {formatCurrency(prod.precio, { showSymbol: false })}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              /* Vista Lista - Tabla */
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                        Foto
-                      </th>
-                      <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Producto
-                      </th>
-                      <th className="px-4 md:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Precio
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {productosFiltrados.map(prod => (
-                      <tr
-                        key={prod.id}
-                        onClick={() => {
-                          if (noPermiteAgregarItems) {
-                            toast.error('No se pueden agregar items a este pedido')
-                            return
-                          }
-                          agregarItem(prod)
-                          if (window.innerWidth < 768) {
-                            toast.success(`+1 ${prod.nombre}`, { duration: 1000, position: 'bottom-center' })
-                          }
-                        }}
-                        className={`transition-colors ${
-                          noPermiteAgregarItems
-                            ? 'opacity-50 cursor-not-allowed bg-gray-50'
-                            : 'hover:bg-gray-100 cursor-pointer'
-                        }`}
-                      >
-                        <td className="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                          <div className="w-10 h-10 md:w-12 md:h-12 rounded bg-gray-100 overflow-hidden">
-                            {prod.imagen ? (
-                              <img
-                                src={prod.imagen}
-                                alt={prod.nombre}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Coffee className="w-5 h-5 md:w-6 md:h-6 text-gray-300" />
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                          <p className="font-medium text-sm md:text-base text-gray-800">{prod.nombre}</p>
-                        </td>
-                        <td className="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap text-right">
-                          <span className="text-base md:text-lg font-bold text-green-600">
-                            {formatCurrency(prod.precio, { showSymbol: false })}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          {/* Menú de Categorías y Productos */}
+          <MenuProductos
+            categorias={categorias}
+            productos={productos}
+            busqueda={busqueda}
+            disabled={noPermiteAgregarItems}
+            onProductoClick={(prod) => {
+              if (noPermiteAgregarItems) {
+                toast.error('No se pueden agregar items a este pedido')
+                return
+              }
+              agregarItem(prod)
+              if (window.innerWidth < 768) {
+                toast.success(`+1 ${prod.nombre}`, { duration: 800, position: 'bottom-center' })
+              }
+            }}
+            className="pb-20 md:pb-0"
+          />
         </div>
 
         {/* Panel Derecho - Resumen con Tabs (oculto en móvil cuando está en tab productos) */}
@@ -2329,6 +2229,22 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
             onClose={() => setModalSplit(false)}
           />
         </Modal>
+      )}
+
+      {/* Botón flotante carrito - Mobile (solo visible en tab productos) */}
+      {tabActivo === 'productos' && cantidadItemsCarrito > 0 && (
+        <button
+          onClick={() => setTabActivo('carrito')}
+          className="md:hidden fixed bottom-4 right-4 z-40 flex items-center gap-2 pl-4 pr-3 py-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 active:scale-95 transition-all"
+        >
+          <span className="font-bold text-base">{formatCurrency(Number(comandaActiva?.total || 0) + totalNuevos, { showSymbol: false })}</span>
+          <div className="relative">
+            <ShoppingCart size={22} />
+            <span className="absolute -top-2 -right-2 bg-white text-green-600 text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 shadow">
+              {cantidadItemsCarrito}
+            </span>
+          </div>
+        </button>
       )}
 
       {/* Dialog de prompt para devoluciones */}

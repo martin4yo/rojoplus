@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, GripVertical } from 'lucide-react'
+import { Plus, Edit, Trash2, GripVertical, Tag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import PageHeader from '../../../components/PageHeader'
 
 export default function BuffetCategorias() {
   const [categorias, setCategorias] = useState([])
@@ -100,11 +101,7 @@ export default function BuffetCategorias() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Categorías del Menú</h1>
-          <p className="text-gray-600">Organiza los productos por categoría</p>
-        </div>
+      <PageHeader icon={Tag} title="Categorías del Menú" subtitle="Organiza los productos por categoría">
         {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
           <button
             onClick={() => abrirModal()}
@@ -114,7 +111,7 @@ export default function BuffetCategorias() {
             Nueva Categoría
           </button>
         )}
-      </div>
+      </PageHeader>
 
       {/* Grid de Categorías */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

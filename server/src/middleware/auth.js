@@ -1,9 +1,8 @@
 import jwt from 'jsonwebtoken'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import { AppError } from './errorHandler.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'rojoplus-secret'
-const prisma = new PrismaClient()
 
 // Cache de permisos por rol (se invalida cada 5 minutos)
 let permisosCache = {}

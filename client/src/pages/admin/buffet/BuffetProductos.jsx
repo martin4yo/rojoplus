@@ -4,6 +4,7 @@ import { Plus, Edit, Trash2, Image, Search, Check, X, Package, Upload } from 'lu
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import PageHeader from '../../../components/PageHeader'
 
 export default function BuffetProductos() {
   const navigate = useNavigate()
@@ -243,11 +244,7 @@ export default function BuffetProductos() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Productos del Menú</h1>
-          <p className="text-gray-600">Gestiona los productos disponibles en el buffet</p>
-        </div>
+      <PageHeader icon={Package} title="Productos del Menú" subtitle="Gestiona los productos disponibles en el buffet">
         {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
           <>
             <button
@@ -266,7 +263,7 @@ export default function BuffetProductos() {
             </button>
           </>
         )}
-      </div>
+      </PageHeader>
 
       {/* Filtros */}
       <div className="flex gap-4 bg-white p-4 rounded-lg shadow">

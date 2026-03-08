@@ -5,7 +5,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { PrismaClient } from '@prisma/client'
+import prisma from './lib/prisma.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -61,7 +61,6 @@ import { errorHandler } from './middleware/errorHandler.js'
 
 const app = express()
 const httpServer = createServer(app)
-const prisma = new PrismaClient()
 const PORT = process.env.PORT || 3001
 
 // Middlewares globales

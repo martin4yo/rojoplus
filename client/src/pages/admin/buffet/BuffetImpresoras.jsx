@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, Printer, Wifi, WifiOff, TestTube2, ChefHat, Coffee,
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import PageHeader from '../../../components/PageHeader'
 
 // Iconos disponibles para sectores
 const ICONOS_DISPONIBLES = [
@@ -321,11 +322,7 @@ export default function BuffetImpresoras() {
     <div className="space-y-8">
       {/* ============== SECTORES ============== */}
       <div>
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Sectores de Preparación</h1>
-            <p className="text-gray-600">Áreas de preparación del buffet (Cocina, Barra, Parrilla, etc.)</p>
-          </div>
+        <PageHeader icon={Printer} title="Sectores de Preparación" subtitle="Áreas de preparación del buffet (Cocina, Barra, Parrilla, etc.)">
           {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
             <button
               onClick={() => abrirModalSector()}
@@ -335,7 +332,7 @@ export default function BuffetImpresoras() {
               Nuevo Sector
             </button>
           )}
-        </div>
+        </PageHeader>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {sectores.map(sector => {

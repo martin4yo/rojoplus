@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom'
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, Receipt,
   Clock, ChefHat, Coffee, Truck, Calendar, RefreshCw, ArrowRight,
-  CreditCard, Banknote, QrCode, Eye, FileText, Printer
+  CreditCard, Banknote, QrCode, Eye, FileText, Printer, BarChart3
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import TicketPreview from '../../../components/buffet/TicketPreview'
+import PageHeader from '../../../components/PageHeader'
 
 // Rangos de fecha predefinidos
 const RANGOS_FECHA = [
@@ -230,38 +231,30 @@ export default function BuffetDashboard() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard Buffet</h1>
-          <p className="text-gray-500 text-sm">Estadísticas y métricas de ventas</p>
-        </div>
-
+    <div className="space-y-6">
+      <PageHeader icon={BarChart3} title="Dashboard Buffet" subtitle="Estadísticas y métricas de ventas">
         {/* Filtros de fecha */}
-        <div className="flex flex-wrap items-center gap-2">
-          {RANGOS_FECHA.map(rango => (
-            <button
-              key={rango.id}
-              onClick={() => setRangoSeleccionado(rango.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                rangoSeleccionado === rango.id
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {rango.label}
-            </button>
-          ))}
+        {RANGOS_FECHA.map(rango => (
           <button
-            onClick={() => { cargarDatos(); cargarVentas() }}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-            title="Actualizar"
+            key={rango.id}
+            onClick={() => setRangoSeleccionado(rango.id)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              rangoSeleccionado === rango.id
+                ? 'bg-orange-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
           >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            {rango.label}
           </button>
-        </div>
-      </div>
+        ))}
+        <button
+          onClick={() => { cargarDatos(); cargarVentas() }}
+          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+          title="Actualizar"
+        >
+          <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </PageHeader>
 
       {/* Fechas personalizadas */}
       {rangoSeleccionado === 'personalizado' && (

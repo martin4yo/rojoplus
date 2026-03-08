@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Coffee, Plus, Minus, DollarSign, ShoppingCart, Search, X, Barcode, FileText, LayoutGrid, List, Receipt } from 'lucide-react'
+import { Plus, Minus, DollarSign, ShoppingCart, Search, X, Barcode, FileText, LayoutGrid, List, Receipt, Coffee } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { useTicket } from '../../../contexts/TicketContext'
@@ -9,6 +9,7 @@ import SearchInput from '../../../components/SearchInput'
 import CalculadoraVuelto from '../../../components/buffet/CalculadoraVuelto'
 import SelectorMedioPago from '../../../components/buffet/SelectorMedioPago'
 import ClienteSelector from '../../../components/buffet/ClienteSelector'
+import MenuProductos from '../../../components/buffet/MenuProductos'
 
 export default function BuffetKiosco() {
   const { generarTicketKiosco, generarTicketFiscal, imprimirTicket } = useTicket()
@@ -16,7 +17,6 @@ export default function BuffetKiosco() {
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [carrito, setCarrito] = useState([])
-  const [categoriaActiva, setCategoriaActiva] = useState(null)
   const [cajas, setCajas] = useState([])
   const [mediosPago, setMediosPago] = useState([])
   const [cajaId, setCajaId] = useState('')
@@ -497,10 +497,6 @@ export default function BuffetKiosco() {
     }
   }
 
-  const productosFiltrados = categoriaActiva
-    ? productos.filter(p => p.categoriaMenuId === categoriaActiva)
-    : productos
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -662,161 +658,17 @@ export default function BuffetKiosco() {
           </div>
         </div>
 
-        {/* Categorías - Ocultas en Kiosco */}
-
-        {/* Grid/Lista de Productos */}
-        <div className="flex-1 overflow-y-auto p-2 md:p-4 bg-gray-100 pb-20 md:pb-4">
-          {vistaProductos === 'shop' ? (
-            /* Vista Shop - Tarjetas */
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
-              {productosFiltrados.map(prod => {
-                const sinStock = prod.stock !== undefined && prod.stock === 0
-                const stockBajo = prod.stock !== undefined && prod.stock > 0 && prod.stock <= 5
-
-                return (
-                  <button
-                    key={prod.id}
-                    onClick={() => agregarAlCarrito(prod)}
-                    disabled={sinStock}
-                    className={`bg-white rounded-lg p-2 md:p-4 text-left hover:shadow-lg transition-all border-2 border-transparent hover:border-red-500 active:scale-95 md:hover:scale-[1.02] flex flex-col md:flex-row gap-2 md:gap-4 ${
-                      sinStock ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    {/* Imagen - más pequeña en mobile */}
-                    {prod.imagen ? (
-                      <img
-                        src={prod.imagen}
-                        alt={prod.nombre}
-                        className="w-full h-20 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-full h-20 md:w-20 md:h-20 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center">
-                        <Coffee size={24} className="text-gray-400 md:w-8 md:h-8" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-xs md:text-base line-clamp-2 leading-snug">{prod.nombre}</h3>
-                      {prod.codigoBarras && (
-                        <p className="text-[10px] md:text-xs text-gray-400 truncate mt-0.5 md:mt-1 hidden md:block">{prod.codigoBarras}</p>
-                      )}
-                      <p className="text-sm md:text-lg font-bold text-green-600 mt-1 md:mt-1.5">
-                        ${Number(prod.precio).toLocaleString()}
-                      </p>
-
-                      {/* Badge de stock */}
-                      {prod.stock !== undefined && (
-                        <div className="mt-1 md:mt-1.5">
-                          {sinStock ? (
-                            <span className="inline-block text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
-                              Sin stock
-                            </span>
-                        ) : stockBajo ? (
-                          <span className="inline-block text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">
-                            Quedan {prod.stock}
-                          </span>
-                        ) : null}
-                      </div>
-                    )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            /* Vista Lista - Tabla */
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                      Foto
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Producto
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                      Código
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                      Stock
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Precio
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {productosFiltrados.map(prod => {
-                    const sinStock = prod.stock !== undefined && prod.stock === 0
-                    const stockBajo = prod.stock !== undefined && prod.stock > 0 && prod.stock <= 5
-
-                    return (
-                      <tr
-                        key={prod.id}
-                        onClick={() => !sinStock && agregarAlCarrito(prod)}
-                        className={`transition-colors ${
-                          sinStock
-                            ? 'opacity-50 cursor-not-allowed'
-                            : 'hover:bg-gray-100 cursor-pointer'
-                        }`}
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden">
-                            {prod.imagen ? (
-                              <img
-                                src={prod.imagen}
-                                alt={prod.nombre}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Coffee className="w-6 h-6 text-gray-300" />
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <p className="font-medium text-gray-800">{prod.nombre}</p>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono hidden sm:table-cell">
-                          {prod.codigoBarras || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center hidden md:table-cell">
-                          {prod.stock !== undefined ? (
-                            sinStock ? (
-                              <span className="inline-block text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
-                                Sin stock
-                              </span>
-                            ) : stockBajo ? (
-                              <span className="inline-block text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">
-                                {prod.stock}
-                              </span>
-                            ) : (
-                              <span className="text-gray-800 font-semibold">{prod.stock}</span>
-                            )
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <span className="text-lg font-bold text-green-600">
-                            ${Number(prod.precio).toLocaleString()}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {productosFiltrados.length === 0 && (
-            <div className="flex items-center justify-center h-48 text-gray-500">
-              No hay productos {categoriaActiva ? 'en esta categoría' : 'disponibles'}
-            </div>
-          )}
-        </div>
+        {/* Menú de Categorías y Productos */}
+        <MenuProductos
+          categorias={categorias}
+          productos={productos}
+          busqueda={busqueda}
+          mostrarStock={true}
+          gridCategorias="grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
+          gridProductos="grid-cols-1 sm:grid-cols-3"
+          onProductoClick={(prod) => agregarAlCarrito(prod)}
+          className="pb-20 md:pb-0"
+        />
       </div>
 
       {/* Botón flotante carrito - Mobile */}

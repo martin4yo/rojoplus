@@ -1,9 +1,7 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import soap from 'soap'
 import { AppError } from '../middleware/errorHandler.js'
 import { getTicketAcceso, getConfiguracionFiscal } from './afipWSAAService.js'
-
-const prisma = new PrismaClient()
 
 /**
  * Obtiene el último número de comprobante autorizado en AFIP

@@ -1,5 +1,5 @@
 import cron from 'node-cron'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../lib/prisma.js'
 import {
   procesarNotificacionesPendientes,
   verificarCuotasProximasVencer,
@@ -7,8 +7,6 @@ import {
   verificarMorosidad,
   verificarPartidosProximos,
 } from '../services/notificacionService.js'
-
-const prisma = new PrismaClient()
 
 /**
  * Sistema de Notificaciones Automáticas
