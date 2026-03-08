@@ -72,6 +72,34 @@ function generarComandaTakeAwayESCPOS(pedido, items, sectorNombre = 'TAKE AWAY')
     const nombre = item.productoBuffet?.nombre || 'Producto'
     const cantidad = item.cantidad || 1
     buffer.push(...Buffer.from(`${cantidad}x ${nombre.toUpperCase()}\n`))
+
+    // Mostrar opciones seleccionadas
+    if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
+      for (const opSel of item.opcionesSeleccionadas) {
+        // Usar nombre del producto referenciado si existe, sino el nombre de la opción
+        const opcionNombre = opSel.opcion?.productoRef?.nombre || opSel.opcion?.nombre || 'Opción'
+        const cantOp = opSel.cantidad > 1 ? `${opSel.cantidad}x ` : ''
+        buffer.push(...Buffer.from(`   + ${cantOp}${opcionNombre.toUpperCase()}\n`))
+      }
+    }
+
+    // Mostrar opciones removidas (ingredientes que vienen por defecto y se quitaron)
+    if (item.opcionesRemovidas) {
+      try {
+        const removidas = typeof item.opcionesRemovidas === 'string'
+          ? JSON.parse(item.opcionesRemovidas)
+          : item.opcionesRemovidas
+        if (Array.isArray(removidas)) {
+          for (const removida of removidas) {
+            const nombreRemovido = removida.nombre || 'Ingrediente'
+            buffer.push(...Buffer.from(`   - SIN ${nombreRemovido.toUpperCase()}\n`))
+          }
+        }
+      } catch (e) {
+        console.error('Error parseando opcionesRemovidas:', e)
+      }
+    }
+
     if (item.observaciones) {
       buffer.push(...Buffer.from(`   >> ${item.observaciones}\n`))
     }
@@ -190,7 +218,10 @@ router.get('/takeaway/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, r
       include: {
         items: {
           include: {
-            productoBuffet: { include: { categoriaMenu: true } }
+            productoBuffet: { include: { categoriaMenu: true } },
+            opcionesSeleccionadas: {
+              include: { opcion: true }
+            }
           }
         },
         socio: {
@@ -340,17 +371,52 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
         }
       }
 
+      // Calcular precio adicional de opciones seleccionadas
+      let precioAdicionalOpciones = 0
+      if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
+        for (const opSel of item.opcionesSeleccionadas) {
+          const opcion = await prisma.opcionProducto.findUnique({ where: { id: opSel.opcionId } })
+          if (opcion) {
+            precioAdicionalOpciones += Number(opcion.precioAdicional) * (opSel.cantidad || 1)
+          }
+        }
+      }
+
+      const precioUnitarioTotal = Number(producto.precio) + precioAdicionalOpciones
+      const cantidad = item.cantidad || 1
+
       const itemCreado = await prisma.itemPedidoTakeAway.create({
         data: {
           pedidoId: parseInt(id),
           productoBuffetId: item.productoBuffetId,
-          cantidad: item.cantidad || 1,
-          precioUnitario: producto.precio,
-          subtotal: Number(producto.precio) * (item.cantidad || 1),
+          cantidad,
+          precioUnitario: precioUnitarioTotal,
+          subtotal: precioUnitarioTotal * cantidad,
           observaciones: item.observaciones,
-          estado: estadoInicial
+          estado: estadoInicial,
+          // Guardar opciones removidas (ingredientes que vienen por defecto y se quitaron)
+          opcionesRemovidas: item.opcionesRemovidas && item.opcionesRemovidas.length > 0
+            ? item.opcionesRemovidas
+            : undefined,
+          // Crear opciones seleccionadas si existen
+          opcionesSeleccionadas: item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0 ? {
+            create: item.opcionesSeleccionadas.map(opSel => ({
+              opcionId: opSel.opcionId,
+              cantidad: opSel.cantidad || 1,
+              precioAdicional: opSel.precioAdicional || 0
+            }))
+          } : undefined
         },
-        include: { productoBuffet: true }
+        include: {
+          productoBuffet: true,
+          opcionesSeleccionadas: {
+            include: {
+              opcion: {
+                include: { productoRef: true }
+              }
+            }
+          }
+        }
       })
 
       itemsCreados.push(itemCreado)

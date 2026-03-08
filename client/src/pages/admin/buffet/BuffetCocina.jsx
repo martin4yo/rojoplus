@@ -297,6 +297,28 @@ export default function BuffetCocina() {
             <p className="text-gray-400 text-xs mb-2">{item.categoria}</p>
           )}
 
+          {/* Opciones seleccionadas */}
+          {item.opciones && item.opciones.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {item.opciones.map((op, i) => (
+                <span key={i} className="text-sm bg-blue-600 text-white px-2 py-0.5 rounded">
+                  + {op}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Opciones removidas */}
+          {item.opcionesRemovidas && item.opcionesRemovidas.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {item.opcionesRemovidas.map((op, i) => (
+                <span key={i} className="text-sm bg-red-600 text-white px-2 py-0.5 rounded font-bold">
+                  SIN {op}
+                </span>
+              ))}
+            </div>
+          )}
+
           {item.observaciones && (
             <div className="bg-yellow-500 text-yellow-950 text-sm p-2 rounded mt-2 font-bold flex items-start gap-1">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />

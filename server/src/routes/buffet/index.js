@@ -23,6 +23,7 @@ import express from 'express'
 import configRoutes from './config.js'
 import mesasRoutes from './mesas.js'
 import productosRoutes from './productos.js'
+import opcionesRoutes from './opciones.js'
 import impresorasRoutes from './impresoras.js'
 import comandasRoutes from './comandas.js'
 import takeawayRoutes from './takeaway.js'
@@ -38,6 +39,7 @@ const router = express.Router()
 router.use('/', configRoutes)
 router.use('/', mesasRoutes)
 router.use('/', productosRoutes)
+router.use('/', opcionesRoutes)
 router.use('/', impresorasRoutes)
 router.use('/', comandasRoutes)
 router.use('/', takeawayRoutes)

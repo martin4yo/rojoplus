@@ -16,6 +16,7 @@ import SplitCuenta from './SplitCuenta'
 import PagoMultiple from './PagoMultiple'
 import ClienteSelector from './ClienteSelector'
 import MenuProductos from './MenuProductos'
+import ModalOpcionesProducto from './ModalOpcionesProducto'
 
 /**
  * Componente universal para gestión de pedidos
@@ -88,6 +89,10 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   const [validandoCuit, setValidandoCuit] = useState(false)
   // Cliente seleccionado para MovimientoContable
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+
+  // Modal de opciones de producto
+  const [modalOpciones, setModalOpciones] = useState(false)
+  const [productoConOpciones, setProductoConOpciones] = useState(null)
 
   // Configuración según tipo
   const config = {
@@ -247,8 +252,32 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
   // ==================== FUNCIONES DE ITEMS ====================
 
-  function agregarItem(producto) {
-    const existente = itemsNuevos.findIndex(item => item.productoBuffetId === producto.id)
+  /**
+   * Maneja el click en un producto
+   * - Si tiene opciones: abre modal para seleccionar
+   * - Si no tiene opciones: agrega directo al carrito
+   */
+  function handleProductoClick(producto) {
+    const tieneOpciones = producto.gruposOpciones && producto.gruposOpciones.length > 0
+
+    if (tieneOpciones) {
+      // Mostrar modal para seleccionar opciones
+      setProductoConOpciones(producto)
+      setModalOpciones(true)
+    } else {
+      // Agregar directo sin opciones
+      agregarItemSimple(producto)
+    }
+  }
+
+  /**
+   * Agrega un producto simple (sin opciones) al carrito
+   */
+  function agregarItemSimple(producto) {
+    const existente = itemsNuevos.findIndex(item =>
+      item.productoBuffetId === producto.id &&
+      !item.opcionesSeleccionadas?.length // Solo agrupar si no tiene opciones
+    )
     if (existente >= 0) {
       const nuevos = [...itemsNuevos]
       nuevos[existente].cantidad++
@@ -259,9 +288,55 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         nombre: producto.nombre,
         precio: producto.precio,
         cantidad: 1,
-        observaciones: ''
+        observaciones: '',
+        opcionesSeleccionadas: []
       }])
     }
+  }
+
+  /**
+   * Agrega un producto con opciones seleccionadas al carrito
+   * Cada combinación de opciones se trata como un item separado
+   */
+  function agregarItemConOpciones({ producto, opcionesSeleccionadas, opcionesRemovidas, cantidad, observaciones }) {
+    // Calcular precio total incluyendo opciones
+    const precioBase = Number(producto.precio)
+    const precioOpciones = opcionesSeleccionadas.reduce((sum, op) => sum + Number(op.precioAdicional || 0), 0)
+    const precioTotal = precioBase + precioOpciones
+
+    // Crear descripción de opciones para mostrar
+    const nombresOpciones = opcionesSeleccionadas.map(op => {
+      const grupo = producto.gruposOpciones.find(g => g.opciones.some(o => o.id === op.opcionId))
+      const opcion = grupo?.opciones.find(o => o.id === op.opcionId)
+      return opcion?.nombre || ''
+    }).filter(Boolean)
+
+    // Crear descripción de opciones removidas
+    const nombresRemovidas = (opcionesRemovidas || []).map(op => `SIN ${op.nombre}`)
+
+    setItemsNuevos([...itemsNuevos, {
+      productoBuffetId: producto.id,
+      nombre: producto.nombre,
+      precio: precioTotal,
+      cantidad,
+      observaciones: observaciones || '',
+      opcionesSeleccionadas,
+      opcionesRemovidas: opcionesRemovidas || [],
+      nombresOpciones, // Para mostrar en el carrito
+      nombresRemovidas // Opciones quitadas
+    }])
+
+    setModalOpciones(false)
+    setProductoConOpciones(null)
+
+    if (window.innerWidth < 768) {
+      toast.success(`+${cantidad} ${producto.nombre}`, { duration: 800, position: 'bottom-center' })
+    }
+  }
+
+  // Mantener compatibilidad con código existente
+  function agregarItem(producto) {
+    handleProductoClick(producto)
   }
 
   function modificarCantidadNuevo(index, delta) {
@@ -1541,6 +1616,26 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                           <div className="flex justify-between items-center gap-2">
                             <div className="flex-1 min-w-0">
                               <span className="font-medium text-sm md:text-base block truncate">{item.nombre}</span>
+                              {/* Mostrar opciones seleccionadas */}
+                              {item.nombresOpciones && item.nombresOpciones.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {item.nombresOpciones.map((opNombre, i) => (
+                                    <span key={i} className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                      + {opNombre}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {/* Mostrar opciones removidas */}
+                              {item.nombresRemovidas && item.nombresRemovidas.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {item.nombresRemovidas.map((nombre, i) => (
+                                    <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
+                                      {nombre}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               <p className="text-xs md:text-sm text-gray-500">{formatCurrency(item.precio, { showSymbol: false })}</p>
                             </div>
                             <div className="flex items-center gap-1 md:gap-2">
@@ -2249,6 +2344,18 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
       {/* Dialog de prompt para devoluciones */}
       <PromptDialog />
+
+      {/* Modal de opciones de producto */}
+      {modalOpciones && productoConOpciones && (
+        <ModalOpcionesProducto
+          producto={productoConOpciones}
+          onConfirmar={agregarItemConOpciones}
+          onCerrar={() => {
+            setModalOpciones(false)
+            setProductoConOpciones(null)
+          }}
+        />
+      )}
     </>
   )
 }

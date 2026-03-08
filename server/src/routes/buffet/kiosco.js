@@ -50,15 +50,49 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       if (!producto) continue
 
       const cantidad = item.cantidad || 1
-      const subtotal = Number(producto.precio) * cantidad
+
+      // Calcular precio adicional de opciones
+      let precioAdicionalOpciones = 0
+      const opcionesInfo = []
+
+      if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
+        for (const opSel of item.opcionesSeleccionadas) {
+          const opcion = await prisma.opcionProducto.findUnique({
+            where: { id: opSel.opcionId },
+            include: { productoRef: true }
+          })
+          if (opcion) {
+            precioAdicionalOpciones += Number(opcion.precioAdicional) * (opSel.cantidad || 1)
+            const nombreOp = opcion.productoRef?.nombre || opcion.nombre
+            opcionesInfo.push(`+ ${opSel.cantidad > 1 ? `${opSel.cantidad}x ` : ''}${nombreOp}`)
+          }
+        }
+      }
+
+      // Agregar opciones removidas
+      if (item.opcionesRemovidas && item.opcionesRemovidas.length > 0) {
+        for (const removida of item.opcionesRemovidas) {
+          opcionesInfo.push(`- SIN ${removida.nombre}`)
+        }
+      }
+
+      const precioUnitarioTotal = Number(producto.precio) + precioAdicionalOpciones
+      const subtotal = precioUnitarioTotal * cantidad
       totalItems += subtotal
-      detalleItems.push(`${cantidad}x ${producto.nombre}`)
+
+      // Construir nombre con opciones para detalle
+      let nombreConOpciones = `${cantidad}x ${producto.nombre}`
+      if (opcionesInfo.length > 0) {
+        nombreConOpciones += ` (${opcionesInfo.join(', ')})`
+      }
+      detalleItems.push(nombreConOpciones)
 
       productosVenta.push({
         nombre: producto.nombre,
         cantidad,
-        precioUnitario: Number(producto.precio),
-        subtotal
+        precioUnitario: precioUnitarioTotal,
+        subtotal,
+        opcionesInfo // Para el ticket
       })
     }
 

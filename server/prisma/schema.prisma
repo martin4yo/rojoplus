@@ -2330,6 +2330,8 @@ model ProductoBuffet {
   itemsTakeAway   ItemPedidoTakeAway[]
   categoriaMenu   CategoriaMenu        @relation(fields: [categoriaMenuId], references: [id])
   producto        Producto             @relation(fields: [productoId], references: [id])
+  gruposOpciones  GrupoOpcionProducto[]
+  esOpcionDe      OpcionProducto[]     @relation("ProductoComoOpcion") // Este producto puede ser opción de otros (ej: empanada individual es opción de docena)
 
   @@index([categoriaMenuId])
   @@index([disponible])
@@ -2337,6 +2339,53 @@ model ProductoBuffet {
   @@index([tiposVenta])
   @@index([codigoBarras])
   @@map("productos_buffet")
+}
+
+// Sistema de Opciones/Modificadores de Productos
+// Permite configurar combos con opciones (ej: Milanesa + Guarnición, Desayuno + Infusión)
+// y productos armables (ej: Ensalada personalizada)
+
+model GrupoOpcionProducto {
+  id                Int               @id @default(autoincrement())
+  productoBuffetId  Int               @map("producto_buffet_id")
+  nombre            String            // Ej: "Guarnición", "Infusión", "Ingredientes"
+  descripcion       String?
+  tipo              String            @default("UNICA") // UNICA = seleccionar 1, MULTIPLE = seleccionar varios
+  obligatorio       Boolean           @default(true)
+  minSelecciones    Int               @default(1) @map("min_selecciones") // Mínimo de opciones a seleccionar
+  maxSelecciones    Int               @default(1) @map("max_selecciones") // Máximo de opciones a seleccionar
+  orden             Int               @default(0)
+  activo            Boolean           @default(true)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  productoBuffet    ProductoBuffet    @relation(fields: [productoBuffetId], references: [id], onDelete: Cascade)
+  opciones          OpcionProducto[]
+
+  @@index([productoBuffetId])
+  @@map("grupos_opcion_producto")
+}
+
+model OpcionProducto {
+  id                      Int                   @id @default(autoincrement())
+  grupoId                 Int                   @map("grupo_id")
+  nombre                  String                // Ej: "Papas Fritas", "Café" - Puede ser null si usa productoRef
+  descripcion             String?
+  precioAdicional         Decimal               @default(0) @map("precio_adicional") @db.Decimal(12, 2) // Precio extra/descuento
+  productoRefId           Int?                  @map("producto_ref_id") // Referencia opcional a ProductoBuffet (ej: empanada individual)
+  seleccionadoPorDefecto  Boolean               @default(false) @map("seleccionado_por_defecto") // true = viene incluido (hamburguesa), false = debe agregarse (ensalada)
+  disponible              Boolean               @default(true)
+  orden                   Int                   @default(0)
+  activo                  Boolean               @default(true)
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @updatedAt @map("updated_at")
+  grupo                   GrupoOpcionProducto   @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  productoRef             ProductoBuffet?       @relation("ProductoComoOpcion", fields: [productoRefId], references: [id])
+  opcionesComanda         OpcionItemComanda[]
+  opcionesTakeAway        OpcionItemTakeAway[]
+
+  @@index([grupoId])
+  @@index([productoRefId])
+  @@map("opciones_producto")
 }
 
 model Comanda {
@@ -2376,25 +2425,42 @@ model Comanda {
 }
 
 model ItemComanda {
-  id               Int            @id @default(autoincrement())
-  comandaId        Int            @map("comanda_id")
-  productoBuffetId Int            @map("producto_buffet_id")
-  cantidad         Int            @default(1)
-  precioUnitario   Decimal        @db.Decimal(12, 2)
-  subtotal         Decimal        @db.Decimal(12, 2)
-  estado           String         @default("PENDIENTE")
+  id               Int                 @id @default(autoincrement())
+  comandaId        Int                 @map("comanda_id")
+  productoBuffetId Int                 @map("producto_buffet_id")
+  cantidad         Int                 @default(1)
+  precioUnitario   Decimal             @db.Decimal(12, 2)
+  subtotal         Decimal             @db.Decimal(12, 2)
+  estado           String              @default("PENDIENTE")
   observaciones    String?
-  enviadoCocinaAt  DateTime?      @map("enviado_cocina_at")
-  listoAt          DateTime?      @map("listo_at")
-  entregadoAt      DateTime?      @map("entregado_at")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-  comanda          Comanda        @relation(fields: [comandaId], references: [id], onDelete: Cascade)
-  productoBuffet   ProductoBuffet @relation(fields: [productoBuffetId], references: [id])
+  opcionesRemovidas Json?              @map("opciones_removidas") // Ingredientes quitados [{opcionId, nombre}]
+  enviadoCocinaAt  DateTime?           @map("enviado_cocina_at")
+  listoAt          DateTime?           @map("listo_at")
+  entregadoAt      DateTime?           @map("entregado_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  comanda          Comanda             @relation(fields: [comandaId], references: [id], onDelete: Cascade)
+  productoBuffet   ProductoBuffet      @relation(fields: [productoBuffetId], references: [id])
+  opcionesSeleccionadas OpcionItemComanda[]
 
   @@index([comandaId])
   @@index([estado])
   @@map("items_comanda")
+}
+
+model OpcionItemComanda {
+  id              Int            @id @default(autoincrement())
+  itemComandaId   Int            @map("item_comanda_id")
+  opcionId        Int            @map("opcion_id")
+  cantidad        Int            @default(1)
+  precioAdicional Decimal        @default(0) @db.Decimal(12, 2) @map("precio_adicional")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  itemComanda     ItemComanda    @relation(fields: [itemComandaId], references: [id], onDelete: Cascade)
+  opcion          OpcionProducto @relation(fields: [opcionId], references: [id])
+
+  @@index([itemComandaId])
+  @@index([opcionId])
+  @@map("opciones_item_comanda")
 }
 
 model PedidoTakeAway {
@@ -2436,22 +2502,39 @@ model PedidoTakeAway {
 }
 
 model ItemPedidoTakeAway {
-  id               Int            @id @default(autoincrement())
-  pedidoId         Int            @map("pedido_id")
-  productoBuffetId Int            @map("producto_buffet_id")
-  cantidad         Int            @default(1)
-  precioUnitario   Decimal        @db.Decimal(12, 2)
-  subtotal         Decimal        @db.Decimal(12, 2)
-  estado           String         @default("PENDIENTE")
+  id               Int                  @id @default(autoincrement())
+  pedidoId         Int                  @map("pedido_id")
+  productoBuffetId Int                  @map("producto_buffet_id")
+  cantidad         Int                  @default(1)
+  precioUnitario   Decimal              @db.Decimal(12, 2)
+  subtotal         Decimal              @db.Decimal(12, 2)
+  estado           String               @default("PENDIENTE")
   observaciones    String?
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-  pedido           PedidoTakeAway @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  productoBuffet   ProductoBuffet @relation(fields: [productoBuffetId], references: [id])
+  opcionesRemovidas Json?               @map("opciones_removidas") // Ingredientes quitados [{opcionId, nombre}]
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  pedido           PedidoTakeAway       @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  productoBuffet   ProductoBuffet       @relation(fields: [productoBuffetId], references: [id])
+  opcionesSeleccionadas OpcionItemTakeAway[]
 
   @@index([pedidoId])
   @@index([estado])
   @@map("items_pedido_takeaway")
+}
+
+model OpcionItemTakeAway {
+  id              Int                @id @default(autoincrement())
+  itemTakeAwayId  Int                @map("item_takeaway_id")
+  opcionId        Int                @map("opcion_id")
+  cantidad        Int                @default(1)
+  precioAdicional Decimal            @default(0) @db.Decimal(12, 2) @map("precio_adicional")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  itemTakeAway    ItemPedidoTakeAway @relation(fields: [itemTakeAwayId], references: [id], onDelete: Cascade)
+  opcion          OpcionProducto     @relation(fields: [opcionId], references: [id])
+
+  @@index([itemTakeAwayId])
+  @@index([opcionId])
+  @@map("opciones_item_takeaway")
 }
 
 model SectorBuffet {

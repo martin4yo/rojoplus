@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, Coffee, LayoutGrid, ImageIcon } from 'lucide-react'
+import { ArrowLeft, Coffee, LayoutGrid, ImageIcon, Settings2 } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
 
 /**
@@ -132,18 +132,26 @@ export default function MenuProductos({
             {productosFiltrados.map(prod => {
               const sinStock = mostrarStock && prod.stock !== undefined && prod.stock === 0
               const stockBajo = mostrarStock && prod.stock !== undefined && prod.stock > 0 && prod.stock <= 5
+              const tieneOpciones = prod.gruposOpciones && prod.gruposOpciones.length > 0
 
               return (
                 <button
                   key={prod.id}
                   onClick={() => !sinStock && !disabled && onProductoClick?.(prod)}
                   disabled={sinStock || disabled}
-                  className={`bg-white rounded-xl p-2.5 md:p-3 text-left transition-all border-2 shadow-sm ${
+                  className={`bg-white rounded-xl p-2.5 md:p-3 text-left transition-all border-2 shadow-sm relative ${
                     sinStock || disabled
                       ? 'opacity-50 cursor-not-allowed border-transparent'
                       : 'border-transparent hover:shadow-lg hover:border-red-500 active:scale-[0.97] active:bg-red-50'
                   }`}
                 >
+                  {/* Badge de opciones */}
+                  {tieneOpciones && (
+                    <div className="absolute top-1.5 right-1.5 bg-blue-500 text-white rounded-full p-1" title="Personalizable">
+                      <Settings2 size={12} />
+                    </div>
+                  )}
+
                   <div className="flex gap-2.5 md:gap-3">
                     {prod.imagen ? (
                       <img
@@ -161,9 +169,14 @@ export default function MenuProductos({
                       {prod.codigoBarras && (
                         <p className="text-xs text-gray-400 truncate mt-0.5 hidden md:block">{prod.codigoBarras}</p>
                       )}
-                      <p className="text-base md:text-lg font-bold text-green-600 mt-0.5">
-                        {formatCurrency(prod.precio, { showSymbol: false })}
-                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-base md:text-lg font-bold text-green-600">
+                          {formatCurrency(prod.precio, { showSymbol: false })}
+                        </p>
+                        {tieneOpciones && (
+                          <span className="text-xs text-blue-600 font-medium hidden sm:inline">+ opciones</span>
+                        )}
+                      </div>
 
                       {/* Badge de stock */}
                       {mostrarStock && prod.stock !== undefined && (

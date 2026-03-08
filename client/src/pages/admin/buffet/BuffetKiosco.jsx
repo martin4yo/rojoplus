@@ -10,6 +10,7 @@ import CalculadoraVuelto from '../../../components/buffet/CalculadoraVuelto'
 import SelectorMedioPago from '../../../components/buffet/SelectorMedioPago'
 import ClienteSelector from '../../../components/buffet/ClienteSelector'
 import MenuProductos from '../../../components/buffet/MenuProductos'
+import ModalOpcionesProducto from '../../../components/buffet/ModalOpcionesProducto'
 
 export default function BuffetKiosco() {
   const { generarTicketKiosco, generarTicketFiscal, imprimirTicket } = useTicket()
@@ -50,6 +51,10 @@ export default function BuffetKiosco() {
     nombre: '',
     condicionIva: 5
   })
+
+  // Modal de opciones de producto
+  const [modalOpciones, setModalOpciones] = useState(false)
+  const [productoConOpciones, setProductoConOpciones] = useState(null)
 
   useEffect(() => {
     cargarDatos()
@@ -292,26 +297,76 @@ export default function BuffetKiosco() {
     cargarDatos(true)
   }
 
-  function agregarAlCarrito(producto) {
-    // Reproducir sonido al agregar
-    playSound('scan')
+  /**
+   * Maneja el click en un producto
+   * - Si tiene opciones: abre modal para seleccionar
+   * - Si no tiene opciones: agrega directo al carrito
+   */
+  function handleProductoClick(producto) {
+    const tieneOpciones = producto.gruposOpciones && producto.gruposOpciones.length > 0
 
+    if (tieneOpciones) {
+      setProductoConOpciones(producto)
+      setModalOpciones(true)
+    } else {
+      agregarAlCarritoSimple(producto)
+    }
+  }
+
+  function agregarAlCarritoSimple(producto) {
+    playSound('scan')
     const cantidad = parseInt(cantidadAgregar) || 1
 
     setCarrito(prev => {
-      const existe = prev.find(item => item.id === producto.id)
+      const existe = prev.find(item => item.id === producto.id && !item.opcionesSeleccionadas?.length)
       if (existe) {
         return prev.map(item =>
-          item.id === producto.id
+          item.id === producto.id && !item.opcionesSeleccionadas?.length
             ? { ...item, cantidad: item.cantidad + cantidad }
             : item
         )
       }
-      return [...prev, { ...producto, cantidad }]
+      return [...prev, { ...producto, cantidad, opcionesSeleccionadas: [] }]
     })
 
-    // Resetear cantidad a 1 después de agregar
     setCantidadAgregar(1)
+  }
+
+  function agregarAlCarritoConOpciones({ producto, opcionesSeleccionadas, opcionesRemovidas, cantidad, observaciones }) {
+    playSound('scan')
+
+    const precioBase = Number(producto.precio)
+    const precioOpciones = opcionesSeleccionadas.reduce((sum, op) => sum + Number(op.precioAdicional || 0), 0)
+    const precioTotal = precioBase + precioOpciones
+
+    const nombresOpciones = opcionesSeleccionadas.map(op => {
+      const grupo = producto.gruposOpciones.find(g => g.opciones.some(o => o.id === op.opcionId))
+      const opcion = grupo?.opciones.find(o => o.id === op.opcionId)
+      return opcion?.nombre || ''
+    }).filter(Boolean)
+
+    // Crear descripción de opciones removidas
+    const nombresRemovidas = (opcionesRemovidas || []).map(op => `SIN ${op.nombre}`)
+
+    setCarrito(prev => [...prev, {
+      ...producto,
+      precio: precioTotal,
+      cantidad,
+      observaciones,
+      opcionesSeleccionadas,
+      opcionesRemovidas: opcionesRemovidas || [],
+      nombresOpciones,
+      nombresRemovidas
+    }])
+
+    setModalOpciones(false)
+    setProductoConOpciones(null)
+    setCantidadAgregar(1)
+  }
+
+  // Mantener compatibilidad
+  function agregarAlCarrito(producto) {
+    handleProductoClick(producto)
   }
 
   function modificarCantidad(productoId, delta) {
@@ -373,7 +428,10 @@ export default function BuffetKiosco() {
     try {
       const items = carrito.map(item => ({
         productoBuffetId: item.id,
-        cantidad: item.cantidad
+        cantidad: item.cantidad,
+        observaciones: item.observaciones || '',
+        opcionesSeleccionadas: item.opcionesSeleccionadas || [],
+        opcionesRemovidas: item.opcionesRemovidas || []
       }))
 
       // Preparar datos de facturación
@@ -729,6 +787,26 @@ export default function BuffetKiosco() {
                     <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-sm truncate">{item.nombre}</h4>
+                        {/* Opciones seleccionadas */}
+                        {item.nombresOpciones && item.nombresOpciones.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {item.nombresOpciones.map((opNombre, i) => (
+                              <span key={i} className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                + {opNombre}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Opciones removidas */}
+                        {item.nombresRemovidas && item.nombresRemovidas.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {item.nombresRemovidas.map((nombre, i) => (
+                              <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
+                                {nombre}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <p className="text-green-600 font-bold text-sm">
                           ${Number(item.precio).toLocaleString()}
                         </p>
@@ -874,6 +952,26 @@ export default function BuffetKiosco() {
                     <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                       <div className="flex-1">
                         <h4 className="font-medium text-sm">{item.nombre}</h4>
+                        {/* Opciones seleccionadas */}
+                        {item.nombresOpciones && item.nombresOpciones.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {item.nombresOpciones.map((opNombre, i) => (
+                              <span key={i} className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                + {opNombre}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Opciones removidas */}
+                        {item.nombresRemovidas && item.nombresRemovidas.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {item.nombresRemovidas.map((nombre, i) => (
+                              <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
+                                {nombre}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <p className="text-green-600 font-bold">
                           ${Number(item.precio).toLocaleString()}
                         </p>
@@ -1180,6 +1278,18 @@ export default function BuffetKiosco() {
 
       {/* Dialog de confirmación */}
       <ConfirmDialog />
+
+      {/* Modal de opciones de producto */}
+      {modalOpciones && productoConOpciones && (
+        <ModalOpcionesProducto
+          producto={productoConOpciones}
+          onConfirmar={agregarAlCarritoConOpciones}
+          onCerrar={() => {
+            setModalOpciones(false)
+            setProductoConOpciones(null)
+          }}
+        />
+      )}
     </div>
   )
 }

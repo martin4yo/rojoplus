@@ -81,6 +81,30 @@ function generarComandaESCPOS(comanda, items, sectorNombre = 'COCINA') {
     const nombre = item.productoBuffet?.nombre || 'Producto'
     const cantidad = item.cantidad || 1
     buffer.push(...Buffer.from(`${cantidad}x ${nombre.toUpperCase()}\n`))
+
+    // Mostrar opciones seleccionadas (agregadas)
+    if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
+      for (const opSel of item.opcionesSeleccionadas) {
+        const opcionNombre = opSel.opcion?.productoRef?.nombre || opSel.opcion?.nombre || 'Opción'
+        const cantOp = opSel.cantidad > 1 ? `${opSel.cantidad}x ` : ''
+        buffer.push(...Buffer.from(`   + ${cantOp}${opcionNombre.toUpperCase()}\n`))
+      }
+    }
+
+    // Mostrar opciones removidas (ingredientes quitados)
+    if (item.opcionesRemovidas) {
+      try {
+        const removidas = typeof item.opcionesRemovidas === 'string'
+          ? JSON.parse(item.opcionesRemovidas)
+          : item.opcionesRemovidas
+        if (Array.isArray(removidas)) {
+          for (const opRem of removidas) {
+            buffer.push(...Buffer.from(`   - SIN ${(opRem.nombre || '').toUpperCase()}\n`))
+          }
+        }
+      } catch (e) {}
+    }
+
     if (item.observaciones) {
       buffer.push(...Buffer.from(`   >> ${item.observaciones}\n`))
     }
@@ -202,7 +226,12 @@ router.get('/comandas/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, r
         mesa: true,
         socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
         items: {
-          include: { productoBuffet: { include: { categoriaMenu: true } } },
+          include: {
+            productoBuffet: { include: { categoriaMenu: true } },
+            opcionesSeleccionadas: {
+              include: { opcion: true }
+            }
+          },
           orderBy: { createdAt: 'asc' }
         },
         atendedor: { select: { id: true, nombre: true } },
@@ -415,17 +444,46 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
         }
       }
 
+      // Calcular precio adicional de opciones seleccionadas
+      let precioAdicionalOpciones = 0
+      if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
+        for (const opSel of item.opcionesSeleccionadas) {
+          const opcion = await prisma.opcionProducto.findUnique({ where: { id: opSel.opcionId } })
+          if (opcion) {
+            precioAdicionalOpciones += Number(opcion.precioAdicional) * (opSel.cantidad || 1)
+          }
+        }
+      }
+
+      const precioUnitarioTotal = Number(producto.precio) + precioAdicionalOpciones
+      const cantidad = item.cantidad || 1
+
       const itemCreado = await prisma.itemComanda.create({
         data: {
           comandaId: parseInt(id),
           productoBuffetId: item.productoBuffetId,
-          cantidad: item.cantidad || 1,
-          precioUnitario: producto.precio,
-          subtotal: Number(producto.precio) * (item.cantidad || 1),
+          cantidad,
+          precioUnitario: precioUnitarioTotal,
+          subtotal: precioUnitarioTotal * cantidad,
           observaciones: item.observaciones,
-          estado: estadoInicial
+          estado: estadoInicial,
+          // Guardar opciones removidas (ingredientes quitados) como JSON
+          opcionesRemovidas: item.opcionesRemovidas && item.opcionesRemovidas.length > 0
+            ? item.opcionesRemovidas
+            : undefined,
+          // Crear opciones seleccionadas si existen
+          opcionesSeleccionadas: item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0 ? {
+            create: item.opcionesSeleccionadas.map(opSel => ({
+              opcionId: opSel.opcionId,
+              cantidad: opSel.cantidad || 1,
+              precioAdicional: opSel.precioAdicional || 0
+            }))
+          } : undefined
         },
-        include: { productoBuffet: true }
+        include: {
+          productoBuffet: true,
+          opcionesSeleccionadas: { include: { opcion: { include: { productoRef: true } } } }
+        }
       })
 
       itemsCreados.push(itemCreado)

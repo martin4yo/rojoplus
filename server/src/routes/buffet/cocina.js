@@ -94,7 +94,12 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
       },
       include: {
         productoBuffet: { include: { categoriaMenu: true } },
-        comanda: { include: { mesa: true } }
+        comanda: { include: { mesa: true } },
+        opcionesSeleccionadas: {
+          include: {
+            opcion: { include: { productoRef: true } }
+          }
+        }
       },
       orderBy: { enviadoCocinaAt: 'asc' }
     })
@@ -106,7 +111,12 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
       },
       include: {
         productoBuffet: { include: { categoriaMenu: true } },
-        pedido: true
+        pedido: true,
+        opcionesSeleccionadas: {
+          include: {
+            opcion: { include: { productoRef: true } }
+          }
+        }
       },
       orderBy: { createdAt: 'asc' }
     })
@@ -121,6 +131,8 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
         categoria: item.productoBuffet.categoriaMenu?.nombre,
         cantidad: item.cantidad,
         observaciones: item.observaciones,
+        opciones: item.opcionesSeleccionadas?.map(op => op.opcion?.productoRef?.nombre || op.opcion?.nombre).filter(Boolean) || [],
+        opcionesRemovidas: item.opcionesRemovidas ? (typeof item.opcionesRemovidas === 'string' ? JSON.parse(item.opcionesRemovidas) : item.opcionesRemovidas).map(op => op.nombre) : [],
         estado: item.estado,
         horaEnvio: item.enviadoCocinaAt,
         listoAt: item.listoAt,
@@ -135,6 +147,8 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
         categoria: item.productoBuffet.categoriaMenu?.nombre,
         cantidad: item.cantidad,
         observaciones: item.observaciones,
+        opciones: item.opcionesSeleccionadas?.map(op => op.opcion?.productoRef?.nombre || op.opcion?.nombre).filter(Boolean) || [],
+        opcionesRemovidas: item.opcionesRemovidas ? (typeof item.opcionesRemovidas === 'string' ? JSON.parse(item.opcionesRemovidas) : item.opcionesRemovidas).map(op => op.nombre) : [],
         estado: item.estado,
         horaEnvio: item.createdAt,
         tiempoEspera: Math.floor((new Date() - new Date(item.createdAt)) / 60000)
