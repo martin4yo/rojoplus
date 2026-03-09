@@ -46,14 +46,25 @@ export default function BuffetProductoOpciones() {
 
   async function cargarDatos() {
     try {
-      const [prodRes, gruposRes] = await Promise.all([
-        api.get(`/admin/buffet/productos/${productoId}`),
-        api.get(`/admin/buffet/productos/${productoId}/grupos-opciones`)
-      ])
-      // Extraer datos correctamente de la respuesta envuelta
-      const prodData = prodRes.data?.data || prodRes.data || prodRes
-      const gruposData = gruposRes.data?.data || gruposRes.data || []
-      setProducto(prodData)
+      // Cargar todos los productos y filtrar el que necesitamos
+      const res = await api.get('/admin/buffet/productos')
+      const productos = res.data?.data || res.data || res || []
+
+      console.log('Productos cargados:', productos.length, 'Buscando ID:', productoId)
+
+      // Comparar como string para evitar problemas de tipos
+      const prod = productos.find(p => String(p.id) === String(productoId))
+
+      if (!prod) {
+        console.log('Producto no encontrado. IDs disponibles:', productos.slice(0, 5).map(p => p.id))
+        toast.error('Producto no encontrado')
+        setLoading(false)
+        return
+      }
+
+      console.log('Producto encontrado:', prod.nombre, 'Grupos:', prod.gruposOpciones?.length || 0)
+      setProducto(prod)
+      const gruposData = prod.gruposOpciones || []
       setGrupos(gruposData)
 
       // Expandir todos los grupos por defecto

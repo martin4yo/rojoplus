@@ -133,7 +133,7 @@ router.get('/productos', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO', 
 
     const productos = await prisma.productoBuffet.findMany({
       where,
-      orderBy: [{ categoriaMenuId: 'asc' }, { orden: 'asc' }],
+      orderBy: [{ nombre: 'asc' }],
       include: {
         categoriaMenu: true,
         producto: { select: { id: true, codigo: true, nombre: true } },
@@ -154,41 +154,6 @@ router.get('/productos', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO', 
   } catch (error) {
     console.error('Error al listar productos:', error)
     res.status(500).json({ success: false, error: 'Error al listar productos' })
-  }
-})
-
-/**
- * GET /productos/:id
- * Obtener un producto por ID con sus opciones
- */
-router.get('/productos/:id', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_CONFIG'), async (req, res) => {
-  try {
-    const { id } = req.params
-
-    const producto = await prisma.productoBuffet.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        categoriaMenu: true,
-        producto: { select: { id: true, codigo: true, nombre: true } },
-        gruposOpciones: {
-          orderBy: { orden: 'asc' },
-          include: {
-            opciones: {
-              orderBy: { orden: 'asc' }
-            }
-          }
-        }
-      }
-    })
-
-    if (!producto) {
-      return res.status(404).json({ success: false, error: 'Producto no encontrado' })
-    }
-
-    res.json({ success: true, data: producto })
-  } catch (error) {
-    console.error('Error al obtener producto:', error)
-    res.status(500).json({ success: false, error: 'Error al obtener producto' })
   }
 })
 
@@ -429,6 +394,43 @@ router.put('/productos/:id/disponibilidad', authAdmin, checkPermiso('BUFFET_MESA
   } catch (error) {
     console.error('Error al cambiar disponibilidad:', error)
     res.status(500).json({ success: false, error: 'Error al cambiar disponibilidad' })
+  }
+})
+
+/**
+ * GET /productos/:id/detalle
+ * Obtener un producto por ID con sus opciones (para página de edición de opciones)
+ */
+router.get('/productos/:id/detalle', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const producto = await prisma.productoBuffet.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        categoriaMenu: true,
+        producto: { select: { id: true, codigo: true, nombre: true } },
+        gruposOpciones: {
+          where: { activo: true },
+          orderBy: { orden: 'asc' },
+          include: {
+            opciones: {
+              where: { activo: true },
+              orderBy: { orden: 'asc' }
+            }
+          }
+        }
+      }
+    })
+
+    if (!producto) {
+      return res.status(404).json({ success: false, error: 'Producto no encontrado' })
+    }
+
+    res.json({ success: true, data: producto })
+  } catch (error) {
+    console.error('Error al obtener producto:', error)
+    res.status(500).json({ success: false, error: 'Error al obtener producto' })
   }
 })
 
