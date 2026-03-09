@@ -22,6 +22,7 @@ export default function CajaForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [cuentasContables, setCuentasContables] = useState([])
+  const [centrosCosto, setCentrosCosto] = useState([])
   const [mediosPago, setMediosPago] = useState([])
 
   const [form, setForm] = useState({
@@ -31,6 +32,7 @@ export default function CajaForm() {
     descripcion: '',
     saldoInicial: '',
     cuentaContableId: '',
+    centroCostoId: '',
     requiereConciliacion: false,
     activo: true,
     mediosPagoPermitidos: ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'],
@@ -51,11 +53,13 @@ export default function CajaForm() {
 
   async function cargarDatosIniciales() {
     try {
-      const [cuentasRes, mediosRes] = await Promise.all([
+      const [cuentasRes, centrosRes, mediosRes] = await Promise.all([
         api.getFull('/admin/cuentas-contables?tipo=ACTIVO&esImputable=true&flat=true'),
+        api.getFull('/admin/centros-costo?activo=true'),
         api.getFull('/admin/medios-pago?activo=true')
       ])
       setCuentasContables(cuentasRes.data || [])
+      setCentrosCosto(centrosRes.data || centrosRes || [])
       setMediosPago(mediosRes.data || mediosRes || [])
 
       // Si es nueva caja, inicializar con todos los medios de pago activos
@@ -81,6 +85,7 @@ export default function CajaForm() {
         descripcion: caja.descripcion || '',
         saldoInicial: '',
         cuentaContableId: caja.cuentaContableId ? String(caja.cuentaContableId) : '',
+        centroCostoId: caja.centroCostoId ? String(caja.centroCostoId) : '',
         requiereConciliacion: caja.requiereConciliacion || false,
         activo: caja.activo,
         mediosPagoPermitidos: caja.mediosPagoPermitidos || [],
@@ -132,6 +137,7 @@ export default function CajaForm() {
         tipo: form.tipo,
         descripcion: form.descripcion || null,
         cuentaContableId: form.cuentaContableId ? parseInt(form.cuentaContableId) : null,
+        centroCostoId: form.centroCostoId ? parseInt(form.centroCostoId) : null,
         requiereConciliacion: form.requiereConciliacion,
         activo: form.activo,
         mediosPagoPermitidos: form.mediosPagoPermitidos,
@@ -261,6 +267,27 @@ export default function CajaForm() {
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 Vincula esta caja a una cuenta del plan de cuentas para asientos automaticos
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Centro de Costo
+              </label>
+              <select
+                name="centroCostoId"
+                value={form.centroCostoId}
+                onChange={handleChange}
+                className="input-field w-full"
+              >
+                <option value="">-- Sin centro de costo --</option>
+                {centrosCosto.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.codigo} - {c.nombre}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Las ventas de esta caja se asignarán a este centro de costo
               </p>
             </div>
             {!isEditing && (

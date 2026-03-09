@@ -5,9 +5,11 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function EntrenadoresLista() {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [entrenadores, setEntrenadores] = useState([])
@@ -30,7 +32,8 @@ export default function EntrenadoresLista() {
   }
 
   async function eliminarEntrenador(entrenador) {
-    if (!confirm(`¿Eliminar a ${entrenador.nombre} ${entrenador.apellido || ''}?`)) return
+    const confirmed = await confirm('Eliminar entrenador', `¿Eliminar a ${entrenador.nombre} ${entrenador.apellido || ''}?`)
+    if (!confirmed) return
     try {
       await api.delete(`/admin/entrenadores/${entrenador.id}`)
       cargarEntrenadores()
@@ -201,6 +204,9 @@ export default function EntrenadoresLista() {
           </div>
         )}
       </div>
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
     </div>
   )
 }

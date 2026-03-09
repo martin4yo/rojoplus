@@ -5,11 +5,13 @@ import {
   Plus, Eye, Edit, Users, CreditCard, Search, Filter, ChevronDown, DollarSign
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import toast from 'react-hot-toast'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import StatusBadge from '../../components/StatusBadge'
 import Pagination from '../../components/Pagination'
 import Table from '../../components/Table'
+import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { usePagination } from '../../hooks/usePagination'
@@ -39,6 +41,7 @@ function AvatarSocio({ foto, nombre }) {
 
 export default function AdminSocios() {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [socios, setSocios] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -105,17 +108,21 @@ export default function AdminSocios() {
   }
 
   async function regenerarToken(socio) {
-    if (!confirm(`¿Regenerar el token de ${socio.apellidoNombre}? El QR actual dejara de funcionar.`)) {
-      return
-    }
+    const confirmed = await confirm(
+      'Regenerar token',
+      `El QR actual de ${socio.apellidoNombre} dejara de funcionar. ¿Desea continuar?`,
+      { variant: 'warning', confirmText: 'Regenerar' }
+    )
+    if (!confirmed) return
 
     setRegenerando(true)
     try {
       const data = await api.post(`/admin/socios/${socio.id}/regenerar-token`)
       setSocios(socios.map(s => s.id === socio.id ? { ...s, tokenPortal: data.tokenPortal } : s))
       setQrModal({ ...socio, tokenPortal: data.tokenPortal })
+      toast.success('Token regenerado correctamente')
     } catch (err) {
-      setError('Error al regenerar token')
+      toast.error('Error al regenerar token')
     } finally {
       setRegenerando(false)
     }
@@ -557,6 +564,7 @@ export default function AdminSocios() {
           </div>
         </div>
       )}
+      <ConfirmDialog />
     </div>
   )
 }

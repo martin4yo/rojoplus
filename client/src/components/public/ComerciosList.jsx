@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapPin, Phone, Navigation, Store, Percent } from 'lucide-react'
+import toast from 'react-hot-toast'
 import api from '../../services/api'
 
 // Fix para el icono de Leaflet
@@ -118,7 +119,7 @@ export default function ComerciosList({ showHeader = true, showInfo = true, clas
 
   function obtenerUbicacion() {
     if (!navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalizacion')
+      toast.error('Tu navegador no soporta geolocalizacion')
       return
     }
 
@@ -133,7 +134,7 @@ export default function ComerciosList({ showHeader = true, showInfo = true, clas
       },
       (error) => {
         console.error('Error obteniendo ubicacion:', error)
-        alert('No pudimos obtener tu ubicacion. Verifica los permisos del navegador.')
+        toast.error('No pudimos obtener tu ubicacion. Verifica los permisos del navegador.')
         setObteniendoUbicacion(false)
       },
       { enableHighAccuracy: true, timeout: 10000 }

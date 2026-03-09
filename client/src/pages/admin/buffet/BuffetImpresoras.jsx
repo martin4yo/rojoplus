@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 // Iconos disponibles para sectores
 const ICONOS_DISPONIBLES = [
@@ -33,6 +34,7 @@ const getTipoConexionIcon = (tipo) => {
 }
 
 export default function BuffetImpresoras() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [sectores, setSectores] = useState([])
   const [impresoras, setImpresoras] = useState([])
   const [categorias, setCategorias] = useState([])
@@ -176,7 +178,12 @@ export default function BuffetImpresoras() {
   }
 
   async function eliminarSector(id) {
-    if (!confirm('¿Eliminar este sector?')) return
+    const confirmed = await confirm(
+      '¿Eliminar sector?',
+      'Se eliminará este sector del sistema.',
+      { variant: 'danger', confirmText: 'Eliminar' }
+    )
+    if (!confirmed) return
     try {
       await api.delete(`/admin/buffet/sectores/${id}`)
       toast.success('Sector eliminado')
@@ -249,7 +256,12 @@ export default function BuffetImpresoras() {
   }
 
   async function eliminar(id) {
-    if (!confirm('¿Eliminar esta impresora?')) return
+    const confirmed = await confirm(
+      '¿Eliminar impresora?',
+      'Se eliminará esta impresora del sistema.',
+      { variant: 'danger', confirmText: 'Eliminar' }
+    )
+    if (!confirmed) return
     try {
       await api.delete(`/admin/buffet/impresoras/${id}`)
       toast.success('Impresora eliminada')
@@ -1017,6 +1029,8 @@ export default function BuffetImpresoras() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog />
     </div>
   )
 }

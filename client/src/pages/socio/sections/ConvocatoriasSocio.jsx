@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../../services/api'
+import toast from 'react-hot-toast'
+import { useConfirm } from '../../../hooks/useConfirm'
 import {
   CalendarDaysIcon,
   ClockIcon,
@@ -11,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 export default function ConvocatoriasSocio({ socio, tokenPortal }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [convocatorias, setConvocatorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('todas') // 'todas', 'pendiente', 'confirmada', 'rechazada'
@@ -35,7 +38,24 @@ export default function ConvocatoriasSocio({ socio, tokenPortal }) {
   }
 
   const responderConvocatoria = async (partidoId, confirmado) => {
-    const motivoRechazo = confirmado ? null : prompt('¿Por qué no podés asistir? (opcional)')
+    let motivoRechazo = null
+
+    if (!confirmado) {
+      const confirmedRechazo = await confirm(
+        'No puedo asistir',
+        '¿Confirmas que no podrás asistir a este partido?',
+        { variant: 'warning', confirmText: 'Confirmar' }
+      )
+      if (!confirmedRechazo) return
+      motivoRechazo = prompt('¿Por qué no podés asistir? (opcional)')
+    } else {
+      const confirmedAsistencia = await confirm(
+        'Confirmar asistencia',
+        '¿Confirmas tu asistencia a este partido?',
+        { variant: 'primary', confirmText: 'Confirmar' }
+      )
+      if (!confirmedAsistencia) return
+    }
 
     try {
       setProcesando(partidoId)
@@ -43,10 +63,10 @@ export default function ConvocatoriasSocio({ socio, tokenPortal }) {
         confirmado,
         motivoRechazo
       })
-      alert(confirmado ? '¡Asistencia confirmada!' : 'Se registró que no podés asistir')
+      toast.success(confirmado ? '¡Asistencia confirmada!' : 'Se registró que no podés asistir')
       cargarConvocatorias()
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.message || err.message))
+      toast.error('Error: ' + (err.response?.data?.message || err.message))
     } finally {
       setProcesando(null)
     }
@@ -334,6 +354,8 @@ export default function ConvocatoriasSocio({ socio, tokenPortal }) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog />
     </div>
   )
 }

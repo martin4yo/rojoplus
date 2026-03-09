@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import toast from 'react-hot-toast'
 import {
   UserIcon,
   EnvelopeIcon,
@@ -70,10 +71,11 @@ export default function MiPerfilSocio({ socio, tokenPortal, onUpdate }) {
       setGuardando(true)
       await api.put(`/socio/${tokenPortal}/perfil`, datosEditados)
       setModoEdicion(false)
+      toast.success('Cambios guardados correctamente')
       onUpdate?.()
     } catch (err) {
       console.error('Error actualizando datos:', err)
-      alert('Error al guardar los cambios. Por favor, intenta nuevamente.')
+      toast.error('Error al guardar los cambios. Por favor, intenta nuevamente.')
     } finally {
       setGuardando(false)
     }

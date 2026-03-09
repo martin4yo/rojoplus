@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Paperclip, Upload, Trash2, Download, File, FileText, Image, X } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from './Button'
 import { Alert } from './Alert'
 import api from '../services/api'
+import { useConfirm } from '../hooks/useConfirm'
 
 // Iconos según tipo de archivo
 function getFileIcon(mimeType) {
@@ -26,6 +28,7 @@ function formatSize(bytes) {
  * @param {boolean} soloLectura - Si es true, no permite subir ni eliminar
  */
 export default function AdjuntosComprobante({ tipo, comprobanteId, soloLectura = false }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [adjuntos, setAdjuntos] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -76,11 +79,13 @@ export default function AdjuntosComprobante({ tipo, comprobanteId, soloLectura =
   }
 
   async function eliminarAdjunto(adjuntoId) {
-    if (!confirm('¿Eliminar este adjunto?')) return
+    const confirmed = await confirm('¿Eliminar este adjunto?')
+    if (!confirmed) return
 
     try {
       await api.delete(`/admin/adjuntos/${adjuntoId}`)
       setAdjuntos(prev => prev.filter(a => a.id !== adjuntoId))
+      toast.success('Adjunto eliminado')
     } catch (err) {
       setError(err.message || 'Error al eliminar adjunto')
     }
@@ -146,6 +151,7 @@ export default function AdjuntosComprobante({ tipo, comprobanteId, soloLectura =
 
   return (
     <div className="space-y-3">
+      <ConfirmDialog />
       {/* Header */}
       <div className="flex items-center gap-2">
         <Paperclip className="w-4 h-4 text-gray-500" />

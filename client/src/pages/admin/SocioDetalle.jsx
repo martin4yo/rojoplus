@@ -6,9 +6,11 @@ import {
   Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import toast from 'react-hot-toast'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import Modal from '../../components/Modal'
+import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { formatDate } from '../../utils/formatters'
@@ -17,6 +19,7 @@ import StatusBadge from '../../components/StatusBadge'
 export default function SocioDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [socio, setSocio] = useState(null)
@@ -113,13 +116,15 @@ export default function SocioDetalle() {
   }
 
   async function regenerarToken() {
-    if (!confirm(`¿Regenerar el token? El QR actual dejara de funcionar.`)) return
+    const confirmed = await confirm('Regenerar token', 'El QR actual dejara de funcionar. ¿Desea continuar?', { variant: 'warning', confirmText: 'Regenerar' })
+    if (!confirmed) return
     setRegenerando(true)
     try {
       const data = await api.post(`/admin/socios/${id}/regenerar-token`)
       setSocio({ ...socio, tokenPortal: data.tokenPortal })
+      toast.success('Token regenerado correctamente')
     } catch (err) {
-      setError('Error al regenerar token')
+      toast.error('Error al regenerar token')
     } finally {
       setRegenerando(false)
     }
@@ -171,15 +176,17 @@ export default function SocioDetalle() {
 
   // Desvincular de familia
   async function desvincularFamilia() {
-    if (!confirm('¿Desvincular a este socio de su familia?')) return
+    const confirmed = await confirm('Desvincular de familia', '¿Desvincular a este socio de su familia?', { variant: 'danger', confirmText: 'Desvincular' })
+    if (!confirmed) return
     setAsignandoFamilia(true)
     try {
       await api.put(`/admin/socios/${id}/familia`, {
         titularFamiliaId: null
       })
       await cargarSocio()
+      toast.success('Socio desvinculado de la familia')
     } catch (err) {
-      setError('Error al desvincular')
+      toast.error('Error al desvincular')
     } finally {
       setAsignandoFamilia(false)
     }
@@ -225,13 +232,15 @@ export default function SocioDetalle() {
 
   // Quitar miembro de mi familia (cuando soy titular)
   async function quitarMiembro(miembroId) {
-    if (!confirm('¿Quitar a este miembro de la familia?')) return
+    const confirmed = await confirm('Quitar miembro', '¿Quitar a este miembro de la familia?', { variant: 'danger', confirmText: 'Quitar' })
+    if (!confirmed) return
     setAsignandoFamilia(true)
     try {
       await api.delete(`/admin/socios/${id}/familia/miembro/${miembroId}`)
       await cargarSocio()
+      toast.success('Miembro quitado de la familia')
     } catch (err) {
-      setError('Error al quitar miembro')
+      toast.error('Error al quitar miembro')
     } finally {
       setAsignandoFamilia(false)
     }
@@ -240,15 +249,19 @@ export default function SocioDetalle() {
   // Desarmar familia (cuando soy titular)
   async function desarmarFamilia() {
     const cantidadMiembros = socio.miembrosFamilia?.length || 0
-    if (!confirm(`¿Desarmar esta familia?\n\nEsto desvinculará a los ${cantidadMiembros} miembro(s) y todos pasarán a ser "Socio Unico".\n\nEsta acción no se puede deshacer.`)) {
-      return
-    }
+    const confirmed = await confirm(
+      'Desarmar familia',
+      `Esto desvinculara a los ${cantidadMiembros} miembro(s) y todos pasaran a ser "Socio Unico". Esta accion no se puede deshacer.`,
+      { variant: 'danger', confirmText: 'Desarmar' }
+    )
+    if (!confirmed) return
     setAsignandoFamilia(true)
     try {
       await api.post(`/admin/socios/${id}/familia/desarmar`)
       await cargarSocio()
+      toast.success('Familia desarmada correctamente')
     } catch (err) {
-      setError('Error al desarmar familia')
+      toast.error('Error al desarmar familia')
     } finally {
       setAsignandoFamilia(false)
     }
@@ -1205,6 +1218,7 @@ export default function SocioDetalle() {
           </Button>
         </div>
       </Modal>
+      <ConfirmDialog />
     </div>
   )
 }

@@ -8,6 +8,7 @@ import {
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const TIPOS_PARTIDO = [
   { value: 'LIGA', label: 'Liga' },
@@ -24,6 +25,7 @@ const ESTADOS_PARTIDO = [
 ]
 
 export default function Partidos() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [partidos, setPartidos] = useState([])
   const [actividades, setActividades] = useState([])
   const [categorias, setCategorias] = useState([])
@@ -152,7 +154,8 @@ export default function Partidos() {
   }
 
   const handleDelete = async (partido) => {
-    if (!confirm(`¿Eliminar partido vs ${partido.rival}?`)) return
+    const confirmed = await confirm('Eliminar partido', `¿Eliminar partido vs ${partido.rival}?`)
+    if (!confirmed) return
     try {
       await api.delete(`/admin/partidos/${partido.id}`)
       toast.success('Partido eliminado')
@@ -163,7 +166,7 @@ export default function Partidos() {
   }
 
   const handleCancelar = async (partido) => {
-    const motivo = prompt('Motivo de cancelación:')
+    const motivo = window.prompt('Motivo de cancelación:')
     if (motivo === null) return
     try {
       await api.post(`/admin/partidos/${partido.id}/cancelar`, { motivo })
@@ -175,7 +178,7 @@ export default function Partidos() {
   }
 
   const handleSuspender = async (partido) => {
-    const motivo = prompt('Motivo de suspensión:')
+    const motivo = window.prompt('Motivo de suspensión:')
     if (motivo === null) return
     try {
       await api.post(`/admin/partidos/${partido.id}/suspender`, { motivo })
@@ -642,6 +645,9 @@ export default function Partidos() {
           </div>
         </div>
       )}
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
     </div>
   )
 }

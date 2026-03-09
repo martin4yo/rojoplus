@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { FileText, Save, RefreshCw, Eye, Download, Loader, Code } from 'lucide-react'
+import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 const TIPO_LABELS = {
   RECIBO: {
@@ -19,6 +21,7 @@ const TIPO_LABELS = {
 }
 
 export default function PdfTemplates() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [templates, setTemplates] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTemplate, setSelectedTemplate] = useState(null)
@@ -66,10 +69,10 @@ export default function PdfTemplates() {
       const updated = await api.put(`/admin/templates/pdf/${selectedTemplate.id}`, editedTemplate)
       setTemplates(templates.map(t => t.id === updated.id ? updated : t))
       setSelectedTemplate(updated)
-      alert('Template guardado correctamente')
+      toast.success('Template guardado correctamente')
     } catch (error) {
       console.error('Error saving template:', error)
-      alert('Error al guardar template')
+      toast.error('Error al guardar template')
     } finally {
       setSaving(false)
     }
@@ -101,7 +104,7 @@ export default function PdfTemplates() {
       a.remove()
     } catch (error) {
       console.error('Error downloading test PDF:', error)
-      alert('Error al descargar PDF de prueba')
+      toast.error('Error al descargar PDF de prueba')
     } finally {
       setDownloadingTest(false)
     }
@@ -155,6 +158,7 @@ export default function PdfTemplates() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
+      <ConfirmDialog />
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
         <div className="flex items-center space-x-3">

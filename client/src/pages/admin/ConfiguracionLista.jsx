@@ -5,6 +5,7 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const COLORES = {
   green: 'bg-green-100 text-green-800',
@@ -41,6 +42,7 @@ const ICONOS = {
 export default function ConfiguracionLista() {
   const { tabla } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -67,7 +69,8 @@ export default function ConfiguracionLista() {
   }
 
   async function eliminar(id) {
-    if (!confirm('¿Eliminar este registro?')) return
+    const confirmed = await confirm('Eliminar registro', '¿Eliminar este registro?')
+    if (!confirmed) return
 
     setError(null)
     try {
@@ -241,6 +244,9 @@ export default function ConfiguracionLista() {
           </tbody>
         </table>
       </div>
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
     </div>
   )
 }

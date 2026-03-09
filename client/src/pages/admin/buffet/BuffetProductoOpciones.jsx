@@ -4,10 +4,12 @@ import { ArrowLeft, Plus, Edit, Trash2, Settings, ChevronDown, ChevronUp, GripVe
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import PageHeader from '../../../components/PageHeader'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function BuffetProductoOpciones() {
   const { productoId } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [producto, setProducto] = useState(null)
   const [grupos, setGrupos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -121,7 +123,12 @@ export default function BuffetProductoOpciones() {
   }
 
   async function eliminarGrupo(grupo) {
-    if (!confirm(`¿Eliminar el grupo "${grupo.nombre}" y todas sus opciones?`)) return
+    const confirmed = await confirm(
+      '¿Eliminar grupo?',
+      `Se eliminará "${grupo.nombre}" y todas sus opciones. Esta acción no se puede deshacer.`,
+      { variant: 'danger', confirmText: 'Eliminar' }
+    )
+    if (!confirmed) return
     try {
       await api.delete(`/admin/buffet/grupos-opciones/${grupo.id}`)
       toast.success('Grupo eliminado')
@@ -176,7 +183,12 @@ export default function BuffetProductoOpciones() {
   }
 
   async function eliminarOpcion(opcion) {
-    if (!confirm(`¿Eliminar la opción "${opcion.nombre}"?`)) return
+    const confirmed = await confirm(
+      '¿Eliminar opción?',
+      `Se eliminará "${opcion.nombre}". Esta acción no se puede deshacer.`,
+      { variant: 'danger', confirmText: 'Eliminar' }
+    )
+    if (!confirmed) return
     try {
       await api.delete(`/admin/buffet/opciones/${opcion.id}`)
       toast.success('Opción eliminada')
@@ -539,6 +551,8 @@ export default function BuffetProductoOpciones() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog />
     </div>
   )
 }

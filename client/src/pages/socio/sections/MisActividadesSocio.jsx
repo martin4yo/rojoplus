@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../../services/api'
+import toast from 'react-hot-toast'
+import { useConfirm } from '../../../hooks/useConfirm'
 import {
   TrophyIcon,
   CalendarIcon,
@@ -12,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 export default function MisActividadesSocio({ socio, tokenPortal }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [inscripciones, setInscripciones] = useState([])
   const [disponibles, setDisponibles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -39,26 +42,28 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
   }
 
   const inscribirseEnActividad = async (categoriaId) => {
-    if (!confirm('¿Confirmar inscripción?')) return
+    const confirmed = await confirm('Confirmar inscripción', '¿Deseas inscribirte en esta actividad?', { variant: 'primary', confirmText: 'Inscribirme' })
+    if (!confirmed) return
 
     try {
       await api.post(`/socio/${tokenPortal}/inscripciones`, { categoriaActividadId: categoriaId })
-      alert('¡Inscripción exitosa!')
+      toast.success('¡Inscripción exitosa!')
       cargarActividades()
     } catch (err) {
-      alert('Error: ' + err.message)
+      toast.error('Error: ' + err.message)
     }
   }
 
   const darDeBaja = async (inscripcionId) => {
-    if (!confirm('¿Estás seguro de darte de baja?')) return
+    const confirmed = await confirm('Darse de baja', '¿Estás seguro de darte de baja de esta actividad?', { variant: 'danger', confirmText: 'Darme de baja' })
+    if (!confirmed) return
 
     try {
       await api.post(`/socio/${tokenPortal}/inscripciones/${inscripcionId}/baja`)
-      alert('Baja realizada')
+      toast.success('Baja realizada')
       cargarActividades()
     } catch (err) {
-      alert('Error: ' + err.message)
+      toast.error('Error: ' + err.message)
     }
   }
 
@@ -277,6 +282,8 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
           )}
         </div>
       )}
+
+      <ConfirmDialog />
     </div>
   )
 }

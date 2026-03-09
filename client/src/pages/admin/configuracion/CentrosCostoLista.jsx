@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import api from '../../../services/api'
+import toast from 'react-hot-toast'
 import { PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import CentroCostoForm from './CentroCostoForm'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function CentrosCostoLista() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [centros, setCentros] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

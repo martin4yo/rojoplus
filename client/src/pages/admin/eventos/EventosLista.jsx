@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Eye, Edit2, Trash2, Calendar, MapPin, Users, Ticket, X } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../../../components/Button'
 import { Modal } from '../../../components/Modal'
 import api from '../../../services/api'
@@ -8,9 +9,10 @@ import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { formatDate } from '../../../utils/formatters'
 import EventoDetalle from './EventoDetalle'
 import EventoForm from './EventoForm'
-import toast from 'react-hot-toast'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function EventosLista() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [eventos, setEventos] = useState([])
@@ -82,7 +84,8 @@ export default function EventosLista() {
   }
 
   async function cancelarEvento(id) {
-    if (!confirm('¿Cancelar este evento? Se anularán todas las entradas vendidas.')) return
+    const confirmed = await confirm('¿Cancelar este evento?', 'Se anularán todas las entradas vendidas.')
+    if (!confirmed) return
     try {
       await api.delete(`/eventos/${id}`)
       toast.success('Evento cancelado exitosamente')
@@ -121,6 +124,7 @@ export default function EventosLista() {
 
   return (
     <div>
+      <ConfirmDialog />
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">

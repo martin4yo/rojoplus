@@ -5,9 +5,11 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function BuffetProductos() {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [categoriasStock, setCategoriasStock] = useState([])
@@ -200,7 +202,12 @@ export default function BuffetProductos() {
   }
 
   async function eliminar(id) {
-    if (!confirm('¿Eliminar este producto del menú?')) return
+    const confirmed = await confirm(
+      '¿Eliminar producto?',
+      'Se eliminará este producto del menú. Esta acción no se puede deshacer.',
+      { variant: 'danger', confirmText: 'Eliminar' }
+    )
+    if (!confirmed) return
     try {
       await api.delete(`/admin/buffet/productos/${id}`)
       toast.success('Producto eliminado del menú')
@@ -738,6 +745,8 @@ export default function BuffetProductos() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog />
     </div>
   )
 }

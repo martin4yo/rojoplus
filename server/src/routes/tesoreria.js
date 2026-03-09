@@ -40,6 +40,7 @@ router.get('/cajas', asyncHandler(async (req, res) => {
 
   const cajas = await prisma.caja.findMany({
     where,
+    include: { centroCosto: true },
     orderBy: { nombre: 'asc' }
   })
 
@@ -123,7 +124,7 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
 // POST /api/admin/cajas - Crear caja
 router.post('/cajas', asyncHandler(async (req, res) => {
   const {
-    codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId,
+    codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId, centroCostoId,
     requiereConciliacion, mediosPagoPermitidos,
     puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja
   } = req.body
@@ -157,6 +158,9 @@ router.post('/cajas', asyncHandler(async (req, res) => {
       paraCaja: paraCaja !== undefined ? paraCaja : true,
       ...(cuentaContableId && {
         cuentaContable: { connect: { id: parseInt(cuentaContableId) } }
+      }),
+      ...(centroCostoId && {
+        centroCosto: { connect: { id: parseInt(centroCostoId) } }
       })
     }
   })
@@ -171,7 +175,7 @@ router.post('/cajas', asyncHandler(async (req, res) => {
 router.put('/cajas/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const {
-    codigo, nombre, tipo, descripcion, activo, cuentaContableId,
+    codigo, nombre, tipo, descripcion, activo, cuentaContableId, centroCostoId,
     requiereConciliacion, mediosPagoPermitidos,
     puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja
   } = req.body
@@ -211,6 +215,15 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
       updateData.cuentaContable = { connect: { id: parseInt(cuentaContableId) } }
     } else {
       updateData.cuentaContable = { disconnect: true }
+    }
+  }
+
+  // Manejar la relación con centro de costo
+  if (centroCostoId !== undefined) {
+    if (centroCostoId) {
+      updateData.centroCosto = { connect: { id: parseInt(centroCostoId) } }
+    } else {
+      updateData.centroCosto = { disconnect: true }
     }
   }
 

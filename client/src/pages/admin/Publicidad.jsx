@@ -19,8 +19,10 @@ import {
 import { BANNER_SIZES } from '../../components/public/BannerPublicitario'
 import Modal from '../../components/Modal'
 import ImageUpload from '../../components/ImageUpload'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function Publicidad() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [tab, setTab] = useState('banners') // 'banners' | 'sponsors' | 'estadisticas'
   const [banners, setBanners] = useState([])
   const [sponsors, setSponsors] = useState([])
@@ -72,7 +74,8 @@ export default function Publicidad() {
   }
 
   const handleDeleteBanner = async (id) => {
-    if (!confirm('¿Eliminar este banner?')) return
+    const confirmed = await confirm('Eliminar banner', '¿Eliminar este banner?')
+    if (!confirmed) return
     try {
       await api.delete(`/admin/banners/${id}`)
       toast.success('Banner eliminado')
@@ -100,7 +103,8 @@ export default function Publicidad() {
   }
 
   const handleDeleteSponsor = async (id) => {
-    if (!confirm('¿Eliminar este sponsor?')) return
+    const confirmed = await confirm('Eliminar sponsor', '¿Eliminar este sponsor?')
+    if (!confirmed) return
     try {
       await api.delete(`/admin/sponsors/${id}`)
       toast.success('Sponsor eliminado')
@@ -493,6 +497,9 @@ export default function Publicidad() {
           onSave={handleSaveSponsor}
         />
       </Modal>
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
     </div>
   )
 }

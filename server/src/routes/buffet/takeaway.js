@@ -743,10 +743,6 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       })
     }
 
-    const centroCosto = await prisma.centroCosto.findFirst({
-      where: { codigo: 'BUFFET' }
-    })
-
     const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0
     const movimientos = []
 
@@ -780,7 +776,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cajaId: parseInt(pago.cajaId || cajaId),
             tipo: 'INGRESO',
             cuentaContableId: cuentaContable?.id || 1,
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             monto: parseFloat(pago.monto),
             concepto: `Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
@@ -811,7 +807,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cajaId,
           tipo: 'INGRESO',
           cuentaContableId: cuentaContable?.id || 1,
-          centroCostoId: centroCosto?.id,
+          centroCostoId: caja.centroCostoId,
           monto: totalFinal,
           concepto: `Take Away - Pedido ${pedido.numero}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
@@ -1019,7 +1015,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             estado: 'PAGADO',
             cajaId: cajaUsadaId,
             medioPago: medioPagoUsado?.nombre || 'VARIOS',
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             registradoPor: req.admin.id,
             observaciones: `Venta TakeAway - Pedido ${pedido.numero}`
           },
@@ -1041,7 +1037,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             iva21: ivaTotal,
             iva105: 0,
             montoTotal: totalFinal,
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             socio: movimientoContableVenta.socio,
             entidad: movimientoContableVenta.entidad
           },
@@ -1065,7 +1061,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             estado: 'CONFIRMADO',
             cajaId: cajaUsadaId,
             medioPago: medioPagoUsado?.nombre || 'VARIOS',
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             registradoPor: req.admin.id,
             observaciones: `Cobro Venta TakeAway - Pedido ${pedido.numero}`
           }
@@ -1077,7 +1073,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             numero: numeroMCCobro,
             fecha: new Date(),
             montoTotal: totalFinal,
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             socio: movimientoContableVenta.socio,
             entidad: movimientoContableVenta.entidad
           },

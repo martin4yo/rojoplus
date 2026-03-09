@@ -5,7 +5,6 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
-import SelectCentroCosto from '../../../components/SelectCentroCosto'
 import { formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
 import Modal from '../../../components/Modal'
@@ -33,7 +32,6 @@ export default function BuffetTakeAway() {
     tipo: 'RETIRO',
     horaEstimada: '',
     observaciones: '',
-    centroCostoId: '',
     socioId: null,
     socioNombre: '',
     buscarSocio: ''
@@ -114,7 +112,6 @@ export default function BuffetTakeAway() {
         telefono: nuevoPedidoData.telefono || null,
         tipo: nuevoPedidoData.tipo,
         socioId: nuevoPedidoData.socioId,
-        centroCostoId: nuevoPedidoData.centroCostoId ? parseInt(nuevoPedidoData.centroCostoId) : null,
         horaEstimada: nuevoPedidoData.horaEstimada ? new Date(nuevoPedidoData.horaEstimada).toISOString() : null,
         observaciones: nuevoPedidoData.observaciones || null,
         items: []
@@ -128,7 +125,6 @@ export default function BuffetTakeAway() {
         tipo: 'RETIRO',
         horaEstimada: '',
         observaciones: '',
-        centroCostoId: '',
         socioId: null,
         socioNombre: '',
         buscarSocio: ''
@@ -514,18 +510,6 @@ export default function BuffetTakeAway() {
               value={nuevoPedidoData.horaEstimada}
               onChange={e => setNuevoPedidoData({ ...nuevoPedidoData, horaEstimada: e.target.value })}
               className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            />
-          </div>
-
-          {/* Centro de Costo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Centro de Costo
-            </label>
-            <SelectCentroCosto
-              value={nuevoPedidoData.centroCostoId}
-              onChange={value => setNuevoPedidoData({ ...nuevoPedidoData, centroCostoId: value })}
-              className="w-full"
             />
           </div>
 

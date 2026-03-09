@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import { AlertTriangle, CheckCircle, XCircle, Clock, MapPin, Trash2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
+import toast from 'react-hot-toast'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function IntentosDenegados() {
   const [intentos, setIntentos] = useState([])
   const [loading, setLoading] = useState(false)
   const [mostrarResueltos, setMostrarResueltos] = useState(false)
   const [modalHabilitacion, setModalHabilitacion] = useState(null)
+  const { confirm, ConfirmDialog } = useConfirm()
 
   useEffect(() => {
     cargarIntentos()
@@ -57,24 +60,27 @@ export default function IntentosDenegados() {
       const data = await response.json()
 
       if (data.success) {
-        alert('✅ Habilitación creada correctamente')
+        toast.success('Habilitación creada correctamente')
         setModalHabilitacion(null)
         cargarIntentos()
       } else {
-        alert(`❌ Error: ${data.error}`)
+        toast.error(`Error: ${data.error}`)
       }
     } catch (error) {
       console.error('Error habilitando:', error)
-      alert('❌ Error al crear habilitación')
+      toast.error('Error al crear habilitación')
     } finally {
       setLoading(false)
     }
   }
 
   const handleDescartar = async (dni) => {
-    if (!confirm(`¿Está seguro de descartar los intentos del DNI ${dni}?\n\nEsta acción no se puede deshacer.`)) {
-      return
-    }
+    const confirmed = await confirm(
+      '¿Descartar intentos?',
+      `¿Está seguro de descartar los intentos del DNI ${dni}? Esta acción no se puede deshacer.`,
+      { variant: 'danger', confirmText: 'Descartar' }
+    )
+    if (!confirmed) return
 
     try {
       const response = await fetch(`/api/accesos/intentos-denegados/${dni}`, {
@@ -87,14 +93,14 @@ export default function IntentosDenegados() {
       const data = await response.json()
 
       if (data.success) {
-        alert('✅ Intentos descartados')
+        toast.success('Intentos descartados')
         cargarIntentos()
       } else {
-        alert(`❌ Error: ${data.error}`)
+        toast.error(`Error: ${data.error}`)
       }
     } catch (error) {
       console.error('Error descartando:', error)
-      alert('❌ Error al descartar intentos')
+      toast.error('Error al descartar intentos')
     }
   }
 
@@ -284,6 +290,8 @@ export default function IntentosDenegados() {
           loading={loading}
         />
       )}
+
+      <ConfirmDialog />
     </div>
   )
 }

@@ -13,10 +13,12 @@ import StatusBadge from '../../components/StatusBadge'
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters'
 import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function Cuotas() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
 
   const [cuotas, setCuotas] = useState([])
   const [periodos, setPeriodos] = useState([])
@@ -191,7 +193,8 @@ export default function Cuotas() {
   }
 
   async function anularCargo(cargoId) {
-    if (!confirm('¿Anular este cargo? Esta accion no se puede deshacer.')) return
+    const confirmed = await confirm('Anular cargo', '¿Anular este cargo? Esta accion no se puede deshacer.')
+    if (!confirmed) return
 
     try {
       await api.delete(`/admin/cargos/${cargoId}`)
@@ -1418,6 +1421,9 @@ export default function Cuotas() {
           </>
         )}
       </Modal>
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
 
       {/* Modal crear cargo */}
       <Modal

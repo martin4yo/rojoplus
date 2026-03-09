@@ -5,7 +5,6 @@ import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { useTicket } from '../../contexts/TicketContext'
 import { usePrompt } from '../../hooks/usePrompt.jsx'
-import SelectCentroCosto from '../SelectCentroCosto'
 import StatusBadge from '../StatusBadge'
 import { formatCurrency } from '../../utils/formatters'
 import Modal from '../Modal'
@@ -53,7 +52,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
   // Modal nueva comanda (solo mesas comunales)
   const [modalNuevaComanda, setModalNuevaComanda] = useState(false)
-  const [nuevaComandaData, setNuevaComandaData] = useState({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '', centroCostoId: '' })
+  const [nuevaComandaData, setNuevaComandaData] = useState({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '' })
   const [sociosBusqueda, setSociosBusqueda] = useState([])
   const [buscandoSocio, setBuscandoSocio] = useState(false)
 
@@ -617,7 +616,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   // ==================== FUNCIONES PARA MESAS COMUNALES ====================
 
   async function abrirModalNuevaComanda() {
-    setNuevaComandaData({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '', centroCostoId: '' })
+    setNuevaComandaData({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '' })
     setSociosBusqueda([])
     setModalNuevaComanda(true)
   }
@@ -674,8 +673,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       await api.post('/admin/buffet/comandas', {
         mesaId: id,
         socioId: nuevaComandaData.socioId,
-        observaciones: nuevaComandaData.nombreGrupo,
-        centroCostoId: nuevaComandaData.centroCostoId ? parseInt(nuevaComandaData.centroCostoId) : null
+        observaciones: nuevaComandaData.nombreGrupo
       })
 
       toast.success('Nueva comanda creada')
@@ -1114,15 +1112,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo:</label>
-                <SelectCentroCosto
-                  value={nuevaComandaData.centroCostoId}
-                  onChange={value => setNuevaComandaData({ ...nuevaComandaData, centroCostoId: value })}
-                />
-              </div>
-
-              <button
+                <button
                 type="submit"
                 className="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 font-medium"
               >
@@ -1509,7 +1499,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         </div>
 
         {/* Panel Derecho - Resumen con Tabs (oculto en móvil cuando está en tab productos) */}
-        <div className={`md:w-[480px] bg-white md:border-l flex flex-col ${tabActivo === 'productos' ? 'hidden md:flex' : 'flex flex-1'}`}>
+        <div className={`md:w-[480px] bg-white md:border-l flex flex-col overflow-hidden ${tabActivo === 'productos' ? 'hidden md:flex' : 'flex flex-1'}`}>
           {/* Tabs Navigation */}
           <div className="flex border-b flex-shrink-0">
             <button
@@ -2212,14 +2202,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               <p className="text-xs text-gray-500 mt-1">
                 * Debe ingresar un socio o un nombre
               </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo:</label>
-              <SelectCentroCosto
-                value={nuevaComandaData.centroCostoId}
-                onChange={value => setNuevaComandaData({ ...nuevaComandaData, centroCostoId: value })}
-              />
             </div>
 
             <button

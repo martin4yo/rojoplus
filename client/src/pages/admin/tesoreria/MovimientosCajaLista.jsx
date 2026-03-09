@@ -9,11 +9,14 @@ import { formatCurrency, formatDate } from '../../../utils/formatters'
 import { usePagination } from '../../../hooks/usePagination'
 import Pagination from '../../../components/Pagination'
 import { useApiData } from '../../../hooks/useApiData'
+import { useConfirm } from '../../../hooks/useConfirm'
+import toast from 'react-hot-toast'
 
 export default function MovimientosCajaLista() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const cajaIdParam = searchParams.get('cajaId')
+  const { confirm, ConfirmDialog } = useConfirm()
 
   const [filtros, setFiltros] = useState({
     cajaId: cajaIdParam || '',
@@ -72,13 +75,14 @@ export default function MovimientosCajaLista() {
   }
 
   async function handleAnular(id) {
-    if (!confirm('¿Anular este movimiento? Se revertira el saldo de la caja.')) return
+    const confirmed = await confirm('Anular Movimiento', '¿Anular este movimiento? Se revertira el saldo de la caja.', { variant: 'danger', confirmText: 'Anular' })
+    if (!confirmed) return
 
     try {
       await api.post(`/admin/movimientos-caja/${id}/anular`)
       cargarMovimientos()
     } catch (err) {
-      alert(err.message || 'Error al anular')
+      toast.error(err.message || 'Error al anular')
     }
   }
 
@@ -289,6 +293,7 @@ export default function MovimientosCajaLista() {
           </>
         )}
       </div>
+      <ConfirmDialog />
     </div>
   )
 }

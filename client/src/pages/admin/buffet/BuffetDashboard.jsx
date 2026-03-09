@@ -8,8 +8,10 @@ import PageHeader from '../../../components/PageHeader'
 import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import Modal from '../../../components/Modal'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function BuffetMesas() {
+  const { confirm, ConfirmDialog } = useConfirm()
   // Permisos del usuario
   const puedeVerKpis = tienePermiso(PERMISOS.BUFFET_VER) || tienePermiso(PERMISOS.BUFFET_CONFIG)
   const puedeAsignar = tienePermiso(PERMISOS.BUFFET_CONFIG)
@@ -119,7 +121,12 @@ export default function BuffetMesas() {
   }
 
   const limpiarAsignaciones = async () => {
-    if (!confirm('¿Desasignar todas las mesas? (Limpiar turno)')) return
+    const confirmed = await confirm(
+      '¿Limpiar turno?',
+      'Se desasignarán todas las mesas de los mozos.',
+      { variant: 'warning', confirmText: 'Limpiar' }
+    )
+    if (!confirmed) return
 
     try {
       await api.post('/admin/buffet/mesas/desasignar-todas')
@@ -681,6 +688,7 @@ export default function BuffetMesas() {
         </div>
       </Modal>
 
+      <ConfirmDialog />
     </div>
   )
 }

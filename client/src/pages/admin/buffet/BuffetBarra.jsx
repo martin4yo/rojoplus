@@ -30,7 +30,6 @@ export default function BuffetBarra() {
         tipoVenta: 'BARRA', // Identificador especial
         horaEstimada: ahora.toISOString(),
         observaciones: cliente ? `Cliente: ${cliente.razonSocial}` : 'Venta rápida en barra',
-        centroCostoId: null,
         socioId: cliente?.socioId || null,
         clienteId: cliente?.id || null
       })

@@ -8,9 +8,12 @@ import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
+import { useConfirm } from '../../../hooks/useConfirm'
+import toast from 'react-hot-toast'
 
 export default function ConciliacionBancaria() {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [tab, setTab] = useState('extractos')
   const [loading, setLoading] = useState(true)
   const [resumen, setResumen] = useState(null)
@@ -158,13 +161,14 @@ export default function ConciliacionBancaria() {
   }
 
   async function handleEliminarExtracto(id) {
-    if (!confirm('Eliminar este extracto?')) return
+    const confirmed = await confirm('Eliminar Extracto', '¿Eliminar este extracto?', { variant: 'danger', confirmText: 'Eliminar' })
+    if (!confirmed) return
     try {
       await api.delete(`/admin/conciliacion/extractos/${id}`)
       setSuccess('Extracto eliminado')
       cargarExtractos()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
@@ -223,13 +227,14 @@ export default function ConciliacionBancaria() {
   }
 
   async function handleEliminarFormato(id) {
-    if (!confirm('Eliminar este formato?')) return
+    const confirmed = await confirm('Eliminar Formato', '¿Eliminar este formato?', { variant: 'danger', confirmText: 'Eliminar' })
+    if (!confirmed) return
     try {
       await api.delete(`/admin/conciliacion/formatos/${id}`)
       setSuccess('Formato eliminado')
       cargarFormatos()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
@@ -751,6 +756,7 @@ export default function ConciliacionBancaria() {
           </div>
         </div>
       )}
+      <ConfirmDialog />
     </div>
   )
 }

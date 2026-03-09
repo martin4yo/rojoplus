@@ -5,9 +5,11 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function ActividadesLista() {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -35,7 +37,8 @@ export default function ActividadesLista() {
   }
 
   async function eliminarActividad(id) {
-    if (!confirm('¿Eliminar esta actividad?')) return
+    const confirmed = await confirm('Eliminar actividad', '¿Eliminar esta actividad?')
+    if (!confirmed) return
     setError(null)
     try {
       await api.delete(`/admin/actividades/${id}`)
@@ -47,7 +50,8 @@ export default function ActividadesLista() {
   }
 
   async function eliminarCategoria(id) {
-    if (!confirm('¿Eliminar esta categoría?')) return
+    const confirmed = await confirm('Eliminar categoría', '¿Eliminar esta categoría?')
+    if (!confirmed) return
     setError(null)
     try {
       await api.delete(`/admin/categorias-actividad/${id}`)
@@ -245,6 +249,9 @@ export default function ActividadesLista() {
           </div>
         )}
       </div>
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
     </div>
   )
 }

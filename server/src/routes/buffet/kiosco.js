@@ -109,10 +109,6 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       })
     }
 
-    const centroCosto = await prisma.centroCosto.findFirst({
-      where: { codigo: 'BUFFET' }
-    })
-
     const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0
     const movimientos = []
 
@@ -146,7 +142,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             cajaId: parseInt(pago.cajaId || cajaId),
             tipo: 'INGRESO',
             cuentaContableId: cuentaContable?.id || 1,
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             monto: parseFloat(pago.monto),
             concepto: `Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
@@ -176,7 +172,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           cajaId,
           tipo: 'INGRESO',
           cuentaContableId: cuentaContable?.id || 1,
-          centroCostoId: centroCosto?.id,
+          centroCostoId: caja.centroCostoId,
           monto: totalFinal,
           concepto: `Kiosco - ${detalleItems.join(', ')}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
@@ -342,7 +338,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             estado: 'PAGADO',
             cajaId: cajaUsadaId,
             medioPago: medioPagoUsado?.nombre || 'VARIOS',
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             registradoPor: req.admin.id,
             observaciones: `Venta Kiosco - ${detalleItems.join(', ')}`
           },
@@ -364,7 +360,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             iva21: ivaTotal,
             iva105: 0,
             montoTotal: totalFinal,
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             socio: movimientoContableVenta.socio,
             entidad: movimientoContableVenta.entidad
           },
@@ -388,7 +384,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             estado: 'CONFIRMADO',
             cajaId: cajaUsadaId,
             medioPago: medioPagoUsado?.nombre || 'VARIOS',
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             registradoPor: req.admin.id,
             observaciones: `Cobro Venta Kiosco`
           }
@@ -400,7 +396,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             numero: numeroMCCobro,
             fecha: new Date(),
             montoTotal: totalFinal,
-            centroCostoId: centroCosto?.id,
+            centroCostoId: caja.centroCostoId,
             socio: movimientoContableVenta.socio,
             entidad: movimientoContableVenta.entidad
           },

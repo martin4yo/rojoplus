@@ -12,6 +12,7 @@ import {
   Mail, UserCheck, FileCheck
 } from 'lucide-react'
 import api from '../../../services/api'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 // Mapeo de nombres de iconos a componentes
 const ICONOS = {
@@ -133,6 +134,7 @@ function MenuPreview({ items, selectedRolId, roles, IconComponent }) {
 }
 
 export default function MenuAdmin() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [menuItems, setMenuItems] = useState([])
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Camera, QrCode, CheckCircle, XCircle, Smartphone, Wifi, WifiOff } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { Scanner } from '@yudiel/react-qr-scanner'
+import toast from 'react-hot-toast'
 
 export default function ControlPWA() {
   const [scanning, setScanning] = useState(false)
@@ -45,7 +46,7 @@ export default function ControlPWA() {
   const handleError = (error) => {
     console.error('Error en escáner QR:', error)
     if (error?.name === 'NotAllowedError') {
-      alert('Permiso de cámara denegado. Por favor, habilite el acceso a la cámara.')
+      toast.error('Permiso de cámara denegado. Por favor, habilite el acceso a la cámara.')
       detenerCamara()
     }
   }

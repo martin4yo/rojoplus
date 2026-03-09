@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Printer, Image } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
+import toast from 'react-hot-toast'
 import api from '../../services/api'
 
 /**
@@ -60,7 +61,7 @@ export default function TicketPreview({ ticket, onClose, onPrint, onPrintAsImage
       return
     }
     if (!impresoraSeleccionada) {
-      alert('Selecciona una impresora')
+      toast.error('Selecciona una impresora')
       return
     }
 

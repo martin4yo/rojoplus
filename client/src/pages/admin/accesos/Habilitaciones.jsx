@@ -4,6 +4,8 @@ import { Button } from '../../../components/Button'
 import { usePagination } from '../../../hooks/usePagination'
 import Pagination from '../../../components/Pagination'
 import Modal from '../../../components/Modal'
+import toast from 'react-hot-toast'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function Habilitaciones() {
   const [habilitaciones, setHabilitaciones] = useState([])
@@ -12,6 +14,7 @@ export default function Habilitaciones() {
   const [filtroEstado, setFiltroEstado] = useState('activas') // activas, vencidas, todas
   const [modalFormulario, setModalFormulario] = useState(false)
   const [habilitacionEditar, setHabilitacionEditar] = useState(null)
+  const { confirm, ConfirmDialog } = useConfirm()
 
   const { page, limit, pagination, setPagination, goToPage } = usePagination(1, 20)
 
@@ -71,7 +74,12 @@ export default function Habilitaciones() {
   }
 
   const handleDesactivar = async (id) => {
-    if (!confirm('¿Está seguro de desactivar esta habilitación?')) return
+    const confirmed = await confirm(
+      '¿Desactivar habilitación?',
+      '¿Está seguro de desactivar esta habilitación?',
+      { variant: 'danger', confirmText: 'Desactivar' }
+    )
+    if (!confirmed) return
 
     try {
       const response = await fetch(`/api/accesos/habilitaciones/${id}`, {
@@ -85,12 +93,12 @@ export default function Habilitaciones() {
 
       const data = await response.json()
       if (data.success) {
-        alert('✅ Habilitación desactivada')
+        toast.success('Habilitación desactivada')
         cargarHabilitaciones()
       }
     } catch (error) {
       console.error('Error desactivando:', error)
-      alert('❌ Error al desactivar')
+      toast.error('Error al desactivar')
     }
   }
 
@@ -320,6 +328,8 @@ export default function Habilitaciones() {
           }}
         />
       )}
+
+      <ConfirmDialog />
     </div>
   )
 }
@@ -365,14 +375,14 @@ function FormularioHabilitacion({ habilitacion, onClose, onSuccess }) {
       const data = await response.json()
 
       if (data.success) {
-        alert(`✅ Habilitación ${esEdicion ? 'actualizada' : 'creada'} correctamente`)
+        toast.success(`Habilitación ${esEdicion ? 'actualizada' : 'creada'} correctamente`)
         onSuccess()
       } else {
-        alert(`❌ Error: ${data.error}`)
+        toast.error(`Error: ${data.error}`)
       }
     } catch (error) {
       console.error('Error guardando:', error)
-      alert('❌ Error al guardar')
+      toast.error('Error al guardar')
     } finally {
       setLoading(false)
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Mail, Save, RefreshCw, Eye, Send, ChevronDown, ChevronUp, Loader, FileText } from 'lucide-react'
+import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
@@ -81,10 +82,10 @@ export default function EmailTemplates() {
       const updated = await api.put(`/admin/templates/email/${selectedTemplate.id}`, editedTemplate)
       setTemplates(templates.map(t => t.id === updated.id ? updated : t))
       setSelectedTemplate(updated)
-      alert('Template guardado correctamente')
+      toast.success('Template guardado correctamente')
     } catch (error) {
       console.error('Error saving template:', error)
-      alert('Error al guardar template')
+      toast.error('Error al guardar template')
     } finally {
       setSaving(false)
     }
@@ -96,11 +97,11 @@ export default function EmailTemplates() {
     setSendingTest(true)
     try {
       await api.post(`/admin/templates/email/${selectedTemplate.id}/test`, { email: testEmail })
-      alert(`Email de prueba enviado a ${testEmail}`)
+      toast.success(`Email de prueba enviado a ${testEmail}`)
       setTestEmail('')
     } catch (error) {
       console.error('Error sending test:', error)
-      alert('Error al enviar email de prueba')
+      toast.error('Error al enviar email de prueba')
     } finally {
       setSendingTest(false)
     }

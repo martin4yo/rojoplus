@@ -4,8 +4,10 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function BuffetMesas() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [mesas, setMesas] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -67,7 +69,12 @@ export default function BuffetMesas() {
   }
 
   async function eliminar(id) {
-    if (!confirm('¿Eliminar esta mesa?')) return
+    const confirmed = await confirm(
+      '¿Eliminar mesa?',
+      'Se eliminará esta mesa del sistema.',
+      { variant: 'danger', confirmText: 'Eliminar' }
+    )
+    if (!confirmed) return
     try {
       await api.delete(`/admin/buffet/mesas/${id}`)
       cargarMesas()
@@ -287,6 +294,8 @@ export default function BuffetMesas() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog />
     </div>
   )
 }

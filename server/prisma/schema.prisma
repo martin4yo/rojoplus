@@ -741,6 +741,7 @@ model Caja {
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
   cuentaContableId     Int?                 @map("cuenta_contable_id")
+  centroCostoId        Int?                 @map("centro_costo_id")
   requiereConciliacion Boolean              @default(false) @map("requiere_conciliacion")
   paraBuffet           Boolean              @default(true) @map("para_buffet")
   paraCaja             Boolean              @default(true) @map("para_caja")
@@ -749,6 +750,7 @@ model Caja {
   mediosPagoPermitidos String[]             @default(["EFECTIVO", "TRANSFERENCIA", "CHEQUE", "TARJETA"]) @map("medios_pago_permitidos")
   puntoVentaAfip       Int?                 @map("punto_venta_afip")
   cuentaContable       CuentaContable?      @relation(fields: [cuentaContableId], references: [id])
+  centroCosto          CentroCosto?         @relation(fields: [centroCostoId], references: [id])
   cierres              CierreCaja[]
   cuentaBancaria       CuentaBancaria?
   echeqsDestino        ECheq[]              @relation("ECheqCajaDestino")
@@ -1943,6 +1945,7 @@ model CentroCosto {
   pedidos              Pedido[]
   pedidosTakeAway      PedidoTakeAway[]
   ventas               Venta[]
+  cajas                Caja[]
 
   @@map("centros_costo")
 }

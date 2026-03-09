@@ -6,13 +6,16 @@ import {
   Search, Filter, Building, Send, RotateCcw, BarChart3,
   UserPlus, Check, X
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../../components/Button'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import StatusBadge from '../../components/StatusBadge'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function DebitoAutomatico() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const [activeTab, setActiveTab] = useState('adhesiones')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -193,7 +196,7 @@ export default function DebitoAutomatico() {
       a.click()
       URL.revokeObjectURL(url)
 
-      alert(data.mensaje)
+      toast.success(data.mensaje)
       cargarSociosDisponibles()
       cargarArchivos()
     } catch (err) {
@@ -277,7 +280,7 @@ export default function DebitoAutomatico() {
     setLoading(true)
     try {
       const data = await api.post(`/admin/debito/archivos/${id}/reintentar-rechazados`)
-      alert(data.mensaje)
+      toast.success(data.mensaje)
       cargarArchivos()
     } catch (err) {
       setError(err.message)
@@ -315,7 +318,8 @@ export default function DebitoAutomatico() {
   }
 
   async function aprobarAdhesion(socioId) {
-    if (!confirm('¿Aprobar esta solicitud de adhesión al débito automático?')) return
+    const confirmed = await confirm('Aprobar adhesión', '¿Aprobar esta solicitud de adhesión al débito automático?')
+    if (!confirmed) return
     try {
       await api.put(`/admin/debito/adhesiones/${socioId}/aprobar`)
       cargarAdhesiones()
@@ -326,7 +330,8 @@ export default function DebitoAutomatico() {
   }
 
   async function rechazarAdhesion(socioId) {
-    const motivo = prompt('Motivo del rechazo (opcional):')
+    const motivo = window.prompt('Motivo del rechazo (opcional):')
+    if (motivo === null) return
     try {
       await api.put(`/admin/debito/adhesiones/${socioId}/rechazar`, { motivo })
       cargarAdhesiones()
@@ -336,7 +341,8 @@ export default function DebitoAutomatico() {
   }
 
   async function desactivarDebito(socioId) {
-    if (!confirm('¿Desactivar el débito automático para este socio?')) return
+    const confirmed = await confirm('Desactivar débito', '¿Desactivar el débito automático para este socio?')
+    if (!confirmed) return
     try {
       await api.put(`/admin/debito/adhesiones/${socioId}/desactivar`)
       cargarAdhesiones()
@@ -1183,6 +1189,9 @@ export default function DebitoAutomatico() {
           </div>
         </div>
       )}
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
 
       {/* Modal Nuevo Procesador */}
       {showNuevoProcesador && (

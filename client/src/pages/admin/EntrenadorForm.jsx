@@ -8,10 +8,12 @@ import ImageUpload from '../../components/ImageUpload'
 import { formatCurrency, formatDateForInput } from '../../utils/formatters'
 import { useApiData } from '../../hooks/useApiData'
 import api from '../../services/api'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function EntrenadorForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const isEditing = Boolean(id)
 
   const [loading, setLoading] = useState(false)
@@ -189,7 +191,8 @@ export default function EntrenadorForm() {
   }
 
   async function quitarCategoria(categoriaId) {
-    if (!confirm('¿Quitar esta categoría del entrenador?')) return
+    const confirmed = await confirm('Quitar categoría', '¿Quitar esta categoría del entrenador?')
+    if (!confirmed) return
 
     try {
       await api.delete(`/admin/entrenadores/${id}/categorias/${categoriaId}`)
@@ -823,6 +826,9 @@ export default function EntrenadorForm() {
           </div>
         )}
       </div>
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
     </div>
   )
 }

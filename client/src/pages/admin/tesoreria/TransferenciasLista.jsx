@@ -8,9 +8,12 @@ import { formatDate, formatCurrency } from '../../../utils/formatters'
 import { usePagination } from '../../../hooks/usePagination'
 import Pagination from '../../../components/Pagination'
 import Table from '../../../components/Table'
+import { useConfirm } from '../../../hooks/useConfirm'
+import toast from 'react-hot-toast'
 
 export default function TransferenciasLista() {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [transferencias, setTransferencias] = useState([])
   const [loading, setLoading] = useState(true)
   const { page, pagination, setPagination, goToPage } = usePagination(1, 30)
@@ -49,13 +52,14 @@ export default function TransferenciasLista() {
   }
 
   async function handleAnular(id) {
-    if (!confirm('¿Anular esta transferencia? Se revertiran los saldos de ambas cajas.')) return
+    const confirmed = await confirm('Anular Transferencia', '¿Anular esta transferencia? Se revertiran los saldos de ambas cajas.', { variant: 'danger', confirmText: 'Anular' })
+    if (!confirmed) return
 
     try {
       await api.post(`/admin/transferencias/${id}/anular`)
       cargarTransferencias()
     } catch (err) {
-      alert(err.message || 'Error al anular')
+      toast.error(err.message || 'Error al anular')
     }
   }
 
@@ -237,6 +241,7 @@ export default function TransferenciasLista() {
           </>
         )}
       </div>
+      <ConfirmDialog />
     </div>
   )
 }

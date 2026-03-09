@@ -4,10 +4,12 @@ import { ArrowLeft, Users, User, ChevronDown, ChevronRight, Search, X, UserCheck
 import { Alert } from '../../components/Alert'
 import { Button } from '../../components/Button'
 import api from '../../services/api'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function ReporteActividadDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -113,7 +115,8 @@ export default function ReporteActividadDetalle() {
 
   // Quitar entrenador de categoría
   async function quitarEntrenador(entrenadorId, categoriaId) {
-    if (!confirm('¿Quitar este entrenador de la categoría?')) return
+    const confirmed = await confirm('Quitar entrenador', '¿Quitar este entrenador de la categoría?')
+    if (!confirmed) return
 
     try {
       await api.delete(`/admin/entrenadores/${entrenadorId}/categorias/${categoriaId}`)
@@ -404,6 +407,9 @@ export default function ReporteActividadDetalle() {
           </div>
         )}
       </div>
+
+      {/* ConfirmDialog */}
+      <ConfirmDialog />
     </div>
   )
 }

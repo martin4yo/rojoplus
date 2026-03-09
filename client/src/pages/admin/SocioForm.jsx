@@ -4,13 +4,16 @@ import {
   ArrowLeft, Save, User, Phone, MapPin, Heart, CreditCard, AlertCircle, Users, X
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
 
 export default function SocioForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const isEditing = Boolean(id)
 
   const [loading, setLoading] = useState(isEditing)
@@ -299,13 +302,15 @@ export default function SocioForm() {
   }
 
   async function quitarMiembro(miembroId) {
-    if (!confirm('¿Quitar a este miembro de la familia?')) return
+    const confirmed = await confirm('Quitar miembro', '¿Quitar a este miembro de la familia?', { variant: 'danger', confirmText: 'Quitar' })
+    if (!confirmed) return
     setAsignandoFamilia(true)
     try {
       await api.delete(`/admin/socios/${id}/familia/miembro/${miembroId}`)
       await cargarSocio()
+      toast.success('Miembro quitado de la familia')
     } catch (err) {
-      setError('Error al quitar miembro')
+      toast.error('Error al quitar miembro')
     } finally {
       setAsignandoFamilia(false)
     }
@@ -331,13 +336,15 @@ export default function SocioForm() {
   }
 
   async function desvincularFamilia() {
-    if (!confirm('¿Desvincular a este socio de su familia?')) return
+    const confirmed = await confirm('Desvincular de familia', '¿Desvincular a este socio de su familia?', { variant: 'danger', confirmText: 'Desvincular' })
+    if (!confirmed) return
     setAsignandoFamilia(true)
     try {
       await api.put(`/admin/socios/${id}/familia`, { titularFamiliaId: null })
       await cargarSocio()
+      toast.success('Socio desvinculado de la familia')
     } catch (err) {
-      setError('Error al desvincular')
+      toast.error('Error al desvincular')
     } finally {
       setAsignandoFamilia(false)
     }
@@ -345,15 +352,19 @@ export default function SocioForm() {
 
   async function desarmarFamilia() {
     const cantidadMiembros = socioData?.miembrosFamilia?.length || 0
-    if (!confirm(`¿Desarmar esta familia?\n\nEsto desvinculará a los ${cantidadMiembros} miembro(s) y todos pasarán a ser "Socio Unico".\n\nEsta acción no se puede deshacer.`)) {
-      return
-    }
+    const confirmed = await confirm(
+      'Desarmar familia',
+      `Esto desvinculara a los ${cantidadMiembros} miembro(s) y todos pasaran a ser "Socio Unico". Esta accion no se puede deshacer.`,
+      { variant: 'danger', confirmText: 'Desarmar' }
+    )
+    if (!confirmed) return
     setAsignandoFamilia(true)
     try {
       await api.post(`/admin/socios/${id}/familia/desarmar`)
       await cargarSocio()
+      toast.success('Familia desarmada correctamente')
     } catch (err) {
-      setError('Error al desarmar familia')
+      toast.error('Error al desarmar familia')
     } finally {
       setAsignandoFamilia(false)
     }
@@ -1413,6 +1424,7 @@ export default function SocioForm() {
           </div>
         </div>
       )}
+      <ConfirmDialog />
     </div>
   )
 }

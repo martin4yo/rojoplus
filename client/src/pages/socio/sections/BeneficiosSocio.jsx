@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../../services/api'
+import toast from 'react-hot-toast'
 import {
   MapPinIcon,
   PhoneIcon,
@@ -73,7 +74,7 @@ export default function BeneficiosSocio({ socio, tokenPortal }) {
 
   const obtenerUbicacion = () => {
     if (!navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización')
+      toast.error('Tu navegador no soporta geolocalización')
       return
     }
 
@@ -88,7 +89,7 @@ export default function BeneficiosSocio({ socio, tokenPortal }) {
       },
       (error) => {
         console.error('Error obteniendo ubicación:', error)
-        alert('No pudimos obtener tu ubicación. Verifica los permisos del navegador.')
+        toast.error('No pudimos obtener tu ubicación. Verifica los permisos del navegador.')
         setObteniendoUbicacion(false)
       },
       { enableHighAccuracy: true, timeout: 10000 }

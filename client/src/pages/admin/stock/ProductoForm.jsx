@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Save, Package, Plus, Trash2, Star, Image } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { MultiImageUpload } from '../../../components/ImageUpload'
 import api from '../../../services/api'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 const TALLES_DEFAULT = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'UNICO']
 
 export default function ProductoForm() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const { id } = useParams()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -177,7 +180,8 @@ export default function ProductoForm() {
 
   async function eliminarVariante(variante) {
     if (isEditing) {
-      if (!confirm('Eliminar esta variante?')) return
+      const confirmed = await confirm('Eliminar esta variante?', 'Esta accion no se puede deshacer.')
+      if (!confirmed) return
       try {
         await api.delete(`/admin/producto-variantes/${variante.id}`)
         setVariantes(variantes.filter(v => v.id !== variante.id))
@@ -290,6 +294,7 @@ export default function ProductoForm() {
 
   return (
     <div>
+      <ConfirmDialog />
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button

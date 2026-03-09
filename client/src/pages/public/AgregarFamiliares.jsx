@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function AgregarFamiliares() {
+  const { confirm, ConfirmDialog } = useConfirm()
   const { solicitudId } = useParams()
   const navigate = useNavigate()
 
@@ -134,9 +136,8 @@ export default function AgregarFamiliares() {
   }
 
   const handleEliminar = async (familiarId) => {
-    if (!confirm('¿Estás seguro de eliminar este familiar?')) {
-      return
-    }
+    const confirmed = await confirm('¿Eliminar este familiar?', '¿Estás seguro de eliminar este familiar?')
+    if (!confirmed) return
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/public/solicitud-socio/${solicitudId}/familiar/${familiarId}`, {
@@ -161,6 +162,7 @@ export default function AgregarFamiliares() {
 
   return (
     <div className="min-h-screen bg-gray-300 py-12 px-4">
+      <ConfirmDialog />
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Header */}

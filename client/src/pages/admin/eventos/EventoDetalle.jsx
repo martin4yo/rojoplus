@@ -4,13 +4,15 @@ import {
   ArrowLeft, Edit2, Calendar, MapPin, Users, Ticket,
   TrendingUp, Plus, Trash2, Save, X, Download, Eye, Mail
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { formatDate, formatCurrency } from '../../../utils/formatters'
-import toast from 'react-hot-toast'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 export default function EventoDetalle({ eventoId, eventoData, onClose, isModal = false }) {
+  const { confirm, ConfirmDialog } = useConfirm()
   const { id: paramId } = useParams()
   const navigate = useNavigate()
 
@@ -251,7 +253,8 @@ export default function EventoDetalle({ eventoId, eventoData, onClose, isModal =
   }
 
   async function eliminarCategoria(categoriaId) {
-    if (!confirm('¿Eliminar esta categoría? No se puede deshacer.')) return
+    const confirmed = await confirm('¿Eliminar esta categoría?', 'Esta accion no se puede deshacer.')
+    if (!confirmed) return
     try {
       await api.delete(`/eventos/categorias/${categoriaId}`)
       toast.success('Categoría eliminada')
@@ -309,6 +312,7 @@ export default function EventoDetalle({ eventoId, eventoData, onClose, isModal =
 
   return (
     <div>
+      <ConfirmDialog />
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">

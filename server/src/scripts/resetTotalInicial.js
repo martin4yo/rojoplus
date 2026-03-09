@@ -156,7 +156,7 @@ async function main() {
         nombre,
         descripcion: opciones.descripcion || null,
         precio,
-        tiposVenta: opciones.tiposVenta || ['BUFFET', 'KIOSCO'],
+        tiposVenta: opciones.tiposVenta || ['BUFFET', 'TAKEAWAY'],
         disponible: true,
         activo: true
       }
@@ -324,7 +324,7 @@ async function main() {
   ]
 
   for (const mila of milanesas) {
-    const prod = await crearProducto(mila.nombre, mila.precio, categorias.minutas.id, { tiposVenta: ['BUFFET'] })
+    const prod = await crearProducto(mila.nombre, mila.precio, categorias.minutas.id, { tiposVenta: ['BUFFET', 'TAKEAWAY'] })
     const grupo = await crearGrupo(prod.id, 'Guarnición')
     for (let i = 0; i < guarniciones.length; i++) {
       await crearOpcion(grupo.id, guarniciones[i].nombre, { precioAdicional: guarniciones[i].adicional, orden: i + 1 })
@@ -354,7 +354,7 @@ async function main() {
 
   // Precio base = pizza entera, opción "Media" resta la diferencia
   for (const pizza of pizzas) {
-    const prod = await crearProducto(pizza.nombre, pizza.precioEntera, categorias.pizzas.id, { tiposVenta: ['BUFFET'] })
+    const prod = await crearProducto(pizza.nombre, pizza.precioEntera, categorias.pizzas.id, { tiposVenta: ['BUFFET', 'TAKEAWAY'] })
     const grupo = await crearGrupo(prod.id, 'Tamaño')
     await crearOpcion(grupo.id, 'Entera', { orden: 1 })
     await crearOpcion(grupo.id, 'Media', { precioAdicional: -(pizza.precioEntera - pizza.precioMedia), orden: 2 })

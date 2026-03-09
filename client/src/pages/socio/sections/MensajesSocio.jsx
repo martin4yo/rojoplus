@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../../../services/api'
+import toast from 'react-hot-toast'
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
@@ -69,7 +70,7 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
       setNuevoMensaje('')
       await cargarMensajes(conversacionActiva)
     } catch (err) {
-      alert('Error al enviar: ' + err.message)
+      toast.error('Error al enviar: ' + err.message)
     } finally {
       setEnviando(false)
     }
