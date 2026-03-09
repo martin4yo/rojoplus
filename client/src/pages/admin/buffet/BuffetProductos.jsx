@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit, Trash2, Image, Search, Check, X, Package, Upload } from 'lucide-react'
+import { Plus, Edit, Trash2, Image, Search, Check, X, Package, Upload, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -413,14 +413,23 @@ export default function BuffetProductos() {
                 {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
                   <div className="flex gap-1">
                     <button
+                      onClick={() => navigate(`/admin/buffet/productos/${prod.id}/opciones`)}
+                      className="p-2 text-purple-600 hover:bg-purple-50 rounded"
+                      title="Configurar opciones"
+                    >
+                      <Settings size={16} />
+                    </button>
+                    <button
                       onClick={() => abrirModal(prod)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                      title="Editar producto"
                     >
                       <Edit size={16} />
                     </button>
                     <button
                       onClick={() => eliminar(prod.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      title="Eliminar producto"
                     >
                       <Trash2 size={16} />
                     </button>

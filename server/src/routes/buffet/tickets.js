@@ -430,7 +430,13 @@ router.get('/menu-publico', async (req, res) => {
     const categorias = await prisma.categoriaMenu.findMany({
       where: { activo: true },
       orderBy: { orden: 'asc' },
-      include: {
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        descripcion: true,
+        color: true,
+        icono: true,
         productos: {
           where: {
             activo: true,

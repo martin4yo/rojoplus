@@ -181,6 +181,7 @@ import BuffetEstadoMesas from './pages/admin/buffet/BuffetDashboard'
 import BuffetMesas from './pages/admin/buffet/BuffetMesas'
 import BuffetCategorias from './pages/admin/buffet/BuffetCategorias'
 import BuffetProductos from './pages/admin/buffet/BuffetProductos'
+import BuffetProductoOpciones from './pages/admin/buffet/BuffetProductoOpciones'
 import BuffetPrecios from './pages/admin/buffet/BuffetPrecios'
 import ImportarProductos from './pages/admin/buffet/ImportarProductos'
 import BuffetComanda from './pages/admin/buffet/BuffetComanda'
@@ -411,6 +412,7 @@ function App() {
         <Route path="buffet/categorias" element={<BuffetCategorias />} />
         <Route path="buffet/productos" element={<BuffetProductos />} />
         <Route path="buffet/productos/importar" element={<ImportarProductos />} />
+        <Route path="buffet/productos/:productoId/opciones" element={<BuffetProductoOpciones />} />
         <Route path="buffet/precios" element={<BuffetPrecios />} />
         <Route path="buffet/comanda/:mesaId" element={<BuffetComanda />} />
         <Route path="buffet/kds" element={<BuffetCocina />} />

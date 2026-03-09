@@ -836,6 +836,68 @@ router.post('/comandas/:id/reabrir', authAdmin, checkPermiso('BUFFET_MESAS'), as
   }
 })
 
+/**
+ * POST /comandas/:id/cancelar
+ * Cancelar comanda y liberar mesa (solo si no tiene items)
+ */
+router.post('/comandas/:id/cancelar', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const comanda = await prisma.comanda.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        mesa: true,
+        items: { where: { estado: { not: 'ANULADO' } } }
+      }
+    })
+
+    if (!comanda) {
+      return res.status(404).json({ success: false, error: 'Comanda no encontrada' })
+    }
+
+    if (!['ABIERTA', 'EN_PREPARACION'].includes(comanda.estado)) {
+      return res.status(400).json({ success: false, error: 'Solo se pueden cancelar comandas abiertas o en preparación' })
+    }
+
+    // Verificar que no tenga items (o todos estén anulados)
+    if (comanda.items.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se puede cancelar una comanda con items. Anule los items primero o cobre la cuenta.'
+      })
+    }
+
+    // Cerrar la comanda
+    const comandaCancelada = await prisma.comanda.update({
+      where: { id: parseInt(id) },
+      data: {
+        estado: 'CERRADA',
+        horaCierre: new Date(),
+        cerradoPor: req.admin.id,
+        observaciones: comanda.observaciones
+          ? `${comanda.observaciones} | Cancelada sin consumo`
+          : 'Cancelada sin consumo'
+      }
+    })
+
+    // Liberar la mesa
+    await prisma.mesa.update({
+      where: { id: comanda.mesaId },
+      data: { estado: 'LIBRE' }
+    })
+
+    res.json({
+      success: true,
+      message: 'Comanda cancelada y mesa liberada',
+      data: comandaCancelada
+    })
+  } catch (error) {
+    console.error('Error al cancelar comanda:', error)
+    res.status(500).json({ success: false, error: 'Error al cancelar comanda' })
+  }
+})
+
 // ============================================================================
 // DESCUENTOS Y COBRO
 // ============================================================================

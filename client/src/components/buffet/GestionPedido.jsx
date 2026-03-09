@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Plus, Minus, Send, DollarSign, Clock, User, ShoppingCart, UtensilsCrossed, Coffee, Search, X, Users, Percent, CheckCircle, AlertCircle, Trash2, Edit3, FileText, Package, Check, LayoutGrid, List, Receipt, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, Send, DollarSign, Clock, User, ShoppingCart, UtensilsCrossed, Coffee, Search, X, Users, Percent, CheckCircle, AlertCircle, Trash2, Edit3, FileText, Package, Check, LayoutGrid, List, Receipt, RotateCcw, DoorOpen } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
@@ -724,6 +724,19 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
     }
   }
 
+  async function cancelarYLiberarMesa() {
+    if (!comandaActiva) return
+
+    try {
+      await api.post(`/admin/buffet/comandas/${comandaActiva.id}/cancelar`)
+      toast.success('Mesa liberada')
+      if (onVolver) onVolver()
+    } catch (err) {
+      console.error('Error cancelando comanda:', err)
+      toast.error(err.response?.data?.error || 'Error al liberar mesa')
+    }
+  }
+
   function abrirEditarComanda(comanda) {
     setComandaAEditar(comanda)
     setEditarComandaData({
@@ -1158,6 +1171,17 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 )}
               </h1>
             </div>
+            {/* Botón Liberar Mesa - Solo si no hay items */}
+            {tipo === 'mesa' && comandaActiva && (!comandaActiva.items || comandaActiva.items.length === 0) && itemsNuevos.length === 0 && (
+              <button
+                onClick={cancelarYLiberarMesa}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200"
+                title="Liberar mesa"
+              >
+                <DoorOpen size={16} />
+                <span className="hidden sm:inline">Liberar</span>
+              </button>
+            )}
           </div>
 
           {/* Selector de comandas - Solo mesas comunales */}
@@ -1335,6 +1359,17 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   </span>
                 )}
                 <StatusBadge status={comandaActiva.estado} type={tipo === 'mesa' ? 'comanda' : 'pedidoTakeAway'} size="sm" />
+                {/* Botón Liberar Mesa - Solo si no hay items */}
+                {tipo === 'mesa' && (!comandaActiva.items || comandaActiva.items.length === 0) && itemsNuevos.length === 0 && (
+                  <button
+                    onClick={cancelarYLiberarMesa}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200 transition-colors"
+                    title="Liberar mesa sin cobrar"
+                  >
+                    <DoorOpen size={16} />
+                    Liberar Mesa
+                  </button>
+                )}
               </div>
             </div>
 

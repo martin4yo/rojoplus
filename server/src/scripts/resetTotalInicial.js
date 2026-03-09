@@ -84,47 +84,47 @@ async function main() {
   console.log('\n  ✅ Módulo buffet + kiosco reseteado completamente\n')
 
   // ============================================
-  // CATEGORÍAS DEL MENÚ
+  // CATEGORÍAS DEL MENÚ (con colores distintos)
   // ============================================
   const categorias = {
     cafeteria: await prisma.categoriaMenu.create({
-      data: { codigo: 'CAFE', nombre: 'Cafetería', orden: 1, activo: true }
+      data: { codigo: 'CAFE', nombre: 'Cafetería', color: '#8B4513', orden: 1, activo: true }
     }),
     desayunos: await prisma.categoriaMenu.create({
-      data: { codigo: 'DESAY', nombre: 'Desayunos y Meriendas', orden: 2, activo: true }
+      data: { codigo: 'DESAY', nombre: 'Desayunos y Meriendas', color: '#F59E0B', orden: 2, activo: true }
     }),
     comidas: await prisma.categoriaMenu.create({
-      data: { codigo: 'COMIDAS', nombre: 'Comidas al Plato', orden: 3, activo: true }
+      data: { codigo: 'COMIDAS', nombre: 'Comidas al Plato', color: '#EF4444', orden: 3, activo: true }
     }),
     minutas: await prisma.categoriaMenu.create({
-      data: { codigo: 'MINUTAS', nombre: 'Minutas', orden: 4, activo: true }
+      data: { codigo: 'MINUTAS', nombre: 'Minutas', color: '#F97316', orden: 4, activo: true }
     }),
     sandwiches: await prisma.categoriaMenu.create({
-      data: { codigo: 'SANDW', nombre: 'Sándwiches', orden: 5, activo: true }
+      data: { codigo: 'SANDW', nombre: 'Sándwiches', color: '#84CC16', orden: 5, activo: true }
     }),
     hamburguesas: await prisma.categoriaMenu.create({
-      data: { codigo: 'HAMB', nombre: 'Hamburguesas', orden: 6, activo: true }
+      data: { codigo: 'HAMB', nombre: 'Hamburguesas', color: '#DC2626', orden: 6, activo: true }
     }),
     empanadas: await prisma.categoriaMenu.create({
-      data: { codigo: 'EMP', nombre: 'Empanadas', orden: 7, activo: true }
+      data: { codigo: 'EMP', nombre: 'Empanadas', color: '#CA8A04', orden: 7, activo: true }
     }),
     pizzas: await prisma.categoriaMenu.create({
-      data: { codigo: 'PIZZA', nombre: 'Pizzas', orden: 8, activo: true }
+      data: { codigo: 'PIZZA', nombre: 'Pizzas', color: '#EA580C', orden: 8, activo: true }
     }),
     ensaladas: await prisma.categoriaMenu.create({
-      data: { codigo: 'ENSALADAS', nombre: 'Ensaladas', orden: 9, activo: true }
+      data: { codigo: 'ENSALADAS', nombre: 'Ensaladas', color: '#22C55E', orden: 9, activo: true }
     }),
     bebidas: await prisma.categoriaMenu.create({
-      data: { codigo: 'BEBIDAS', nombre: 'Bebidas', orden: 10, activo: true }
+      data: { codigo: 'BEBIDAS', nombre: 'Bebidas', color: '#3B82F6', orden: 10, activo: true }
     }),
     cervezas: await prisma.categoriaMenu.create({
-      data: { codigo: 'CERVEZA', nombre: 'Cervezas', orden: 11, activo: true }
+      data: { codigo: 'CERVEZA', nombre: 'Cervezas', color: '#EAB308', orden: 11, activo: true }
     }),
     postres: await prisma.categoriaMenu.create({
-      data: { codigo: 'POSTRES', nombre: 'Postres', orden: 12, activo: true }
+      data: { codigo: 'POSTRES', nombre: 'Postres', color: '#EC4899', orden: 12, activo: true }
     }),
     huertas: await prisma.categoriaMenu.create({
-      data: { codigo: 'HUERTAS', nombre: 'Huertas del Pilar', orden: 13, activo: true }
+      data: { codigo: 'HUERTAS', nombre: 'Huertas del Pilar', color: '#10B981', orden: 13, activo: true }
     })
   }
   console.log('✅ Categorías creadas')
@@ -352,11 +352,12 @@ async function main() {
     { nombre: 'Pizza Especial', precioMedia: 6500, precioEntera: 13000 }
   ]
 
+  // Precio base = pizza entera, opción "Media" resta la diferencia
   for (const pizza of pizzas) {
-    const prod = await crearProducto(pizza.nombre, pizza.precioMedia, categorias.pizzas.id, { tiposVenta: ['BUFFET'] })
+    const prod = await crearProducto(pizza.nombre, pizza.precioEntera, categorias.pizzas.id, { tiposVenta: ['BUFFET'] })
     const grupo = await crearGrupo(prod.id, 'Tamaño')
-    await crearOpcion(grupo.id, 'Media', { orden: 1 })
-    await crearOpcion(grupo.id, 'Entera', { precioAdicional: pizza.precioEntera - pizza.precioMedia, orden: 2 })
+    await crearOpcion(grupo.id, 'Entera', { orden: 1 })
+    await crearOpcion(grupo.id, 'Media', { precioAdicional: -(pizza.precioEntera - pizza.precioMedia), orden: 2 })
   }
   console.log('  ✓ Pizzas creadas')
 
@@ -418,20 +419,20 @@ async function main() {
   // ============================================
   console.log('\n🥤 Creando Bebidas...')
 
-  // Gaseosas con tamaño
-  const gaseosas = ['Coca Cola', 'Sprite', 'Fanta']
+  // Gaseosas - productos separados por tamaño
+  const gaseosas = [
+    { nombre: 'Coca Cola', precioChica: 2000, precioGrande: 4500 },
+    { nombre: 'Sprite', precioChica: 2000, precioGrande: 4500 },
+    { nombre: 'Fanta', precioChica: 2000, precioGrande: 4500 }
+  ]
   for (const gaseosa of gaseosas) {
-    const prod = await crearProducto(gaseosa, 2000, categorias.bebidas.id)
-    const grupo = await crearGrupo(prod.id, 'Tamaño')
-    await crearOpcion(grupo.id, 'Chica (500ml)', { orden: 1 })
-    await crearOpcion(grupo.id, 'Grande (1.5L)', { precioAdicional: 2500, orden: 2 })
+    await crearProducto(`${gaseosa.nombre} Chica`, gaseosa.precioChica, categorias.bebidas.id)
+    await crearProducto(`${gaseosa.nombre} Grande`, gaseosa.precioGrande, categorias.bebidas.id)
   }
 
-  // Aguas con tamaño
-  const aguaVilla = await crearProducto('Agua Villamanaos', 1000, categorias.bebidas.id)
-  const grupoAgua = await crearGrupo(aguaVilla.id, 'Tamaño')
-  await crearOpcion(grupoAgua.id, 'Chica', { orden: 1 })
-  await crearOpcion(grupoAgua.id, 'Grande', { precioAdicional: 500, orden: 2 })
+  // Aguas - productos separados por tamaño
+  await crearProducto('Agua Villamanaos Chica', 1000, categorias.bebidas.id)
+  await crearProducto('Agua Villamanaos Grande', 1500, categorias.bebidas.id)
 
   // Bebidas sin opciones
   await crearProducto('Cepita Grande', 3000, categorias.bebidas.id)
