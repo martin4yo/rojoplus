@@ -1171,8 +1171,10 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 )}
               </h1>
             </div>
-            {/* Botón Liberar Mesa - Solo si no hay items */}
-            {tipo === 'mesa' && comandaActiva && (!comandaActiva.items || comandaActiva.items.length === 0) && itemsNuevos.length === 0 && (
+            {/* Botón Liberar Mesa - Solo si no hay items activos */}
+            {tipo === 'mesa' && comandaActiva && itemsNuevos.length === 0 && (
+              !comandaActiva.items || comandaActiva.items.filter(i => i.estado !== 'ANULADO').length === 0
+            ) && (
               <button
                 onClick={cancelarYLiberarMesa}
                 className="flex items-center gap-1 px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200"
@@ -1359,8 +1361,10 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   </span>
                 )}
                 <StatusBadge status={comandaActiva.estado} type={tipo === 'mesa' ? 'comanda' : 'pedidoTakeAway'} size="sm" />
-                {/* Botón Liberar Mesa - Solo si no hay items */}
-                {tipo === 'mesa' && (!comandaActiva.items || comandaActiva.items.length === 0) && itemsNuevos.length === 0 && (
+                {/* Botón Liberar Mesa - Solo si no hay items activos */}
+                {tipo === 'mesa' && itemsNuevos.length === 0 && (
+                  !comandaActiva.items || comandaActiva.items.filter(i => i.estado !== 'ANULADO').length === 0
+                ) && (
                   <button
                     onClick={cancelarYLiberarMesa}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200 transition-colors"
