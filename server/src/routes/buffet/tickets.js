@@ -509,7 +509,7 @@ router.get('/menu-publico/pdf', async (req, res) => {
     // Crear documento PDF
     const doc = new PDFDocument({
       size: 'A4',
-      margin: 50,
+      margin: 40,
       bufferPages: true
     })
 
@@ -520,121 +520,134 @@ router.get('/menu-publico/pdf', async (req, res) => {
     // Pipe el PDF directamente a la respuesta
     doc.pipe(res)
 
-    // === ENCABEZADO ===
-    doc.fontSize(24)
-       .fillColor('#1F2937')
-       .font('Helvetica-Bold')
-       .text('Buffet del Club', { align: 'center' })
+    const pageWidth = doc.page.width
+    const margin = 40
+    const contentWidth = pageWidth - (margin * 2)
 
-    doc.fontSize(14)
-       .fillColor('#DC2626')
+    // === ENCABEZADO CON FONDO ===
+    doc.rect(0, 0, pageWidth, 140)
+       .fill('#DC2626')
+
+    doc.fontSize(32)
+       .fillColor('#FFFFFF')
        .font('Helvetica-Bold')
-       .text('Club Sportivo Pilar', { align: 'center' })
-       .moveDown(0.5)
+       .text('MENÚ', margin, 30, { align: 'center', width: contentWidth })
+
+    doc.fontSize(18)
+       .fillColor('#FFFFFF')
+       .font('Helvetica-Bold')
+       .text('Buffet del Club', margin, 70, { align: 'center', width: contentWidth })
+
+    doc.fontSize(12)
+       .fillColor('#FEE2E2')
+       .font('Helvetica')
+       .text('Club Sportivo Pilar - El Rojo de la Avenida', margin, 95, { align: 'center', width: contentWidth })
 
     doc.fontSize(10)
-       .fillColor('#6B7280')
-       .font('Helvetica')
-       .text('El Rojo de la Avenida - Desde 1912', { align: 'center' })
-       .moveDown(0.3)
+       .fillColor('#FEE2E2')
+       .text('Av. Tomás Márquez 1125, Pilar | Tel: (0230) 442-0297', margin, 115, { align: 'center', width: contentWidth })
 
-    doc.fontSize(9)
-       .text('Av. Tomás Márquez 1125, Pilar, Buenos Aires', { align: 'center' })
-       .text('Tel: (0230) 442-0297', { align: 'center' })
-       .moveDown(2)
-
-    // Línea decorativa
-    doc.moveTo(50, doc.y)
-       .lineTo(545, doc.y)
-       .strokeColor('#DC2626')
-       .lineWidth(2)
-       .stroke()
-       .moveDown(1.5)
+    // Resetear posición después del header
+    doc.y = 160
 
     // === CATEGORÍAS Y PRODUCTOS ===
     categoriasConProductos.forEach((categoria, catIndex) => {
-      // Verificar espacio para nueva categoría
+      // Verificar espacio para nueva categoría (título + al menos 1 producto)
       if (doc.y > 650) {
         doc.addPage()
+        doc.y = 60
       }
 
-      // Título de categoría
-      doc.fontSize(16)
-         .fillColor(categoria.color || '#DC2626')
+      // Fondo de categoría
+      const categoryHeaderY = doc.y
+      doc.rect(margin, categoryHeaderY, contentWidth, 35)
+         .fill(categoria.color || '#374151')
+
+      // Título de categoría (sobre el fondo)
+      doc.fontSize(14)
+         .fillColor('#FFFFFF')
          .font('Helvetica-Bold')
-         .text(categoria.nombre.toUpperCase(), { underline: true })
-         .moveDown(0.3)
+         .text(categoria.nombre.toUpperCase(), margin + 15, categoryHeaderY + 10, {
+           width: contentWidth - 30,
+           align: 'left'
+         })
 
+      // Descripción de categoría (si existe)
       if (categoria.descripcion) {
-        doc.fontSize(9)
-           .fillColor('#6B7280')
-           .font('Helvetica-Oblique')
-           .text(categoria.descripcion)
-           .moveDown(0.5)
-      } else {
-        doc.moveDown(0.5)
+        doc.fontSize(8)
+           .fillColor('#FFFFFF')
+           .font('Helvetica')
+           .text(categoria.descripcion, margin + 15, categoryHeaderY + 25, {
+             width: contentWidth - 30,
+             align: 'left'
+           })
       }
+
+      doc.y = categoryHeaderY + 45
 
       // Productos de la categoría
       categoria.productos.forEach((producto, prodIndex) => {
-        // Verificar espacio para nuevo producto
-        if (doc.y > 700) {
+        // Verificar espacio para nuevo producto (mínimo 50px)
+        if (doc.y > 720) {
           doc.addPage()
+          doc.y = 60
         }
 
-        const startY = doc.y
+        const productY = doc.y
+        const productHeight = producto.descripcion ? 45 : 35
+
+        // Fondo alternado para productos
+        if (prodIndex % 2 === 0) {
+          doc.rect(margin, productY, contentWidth, productHeight)
+             .fill('#F9FAFB')
+        }
+
+        // Estrella si es destacado
+        let textStartX = margin + 15
+        if (producto.destacado) {
+          doc.fontSize(12)
+             .fillColor('#F59E0B')
+             .font('Helvetica-Bold')
+             .text('★', margin + 10, productY + 8, { width: 15 })
+          textStartX = margin + 25
+        }
 
         // Nombre del producto
         doc.fontSize(11)
-           .fillColor('#1F2937')
+           .fillColor('#111827')
            .font('Helvetica-Bold')
-           .text(producto.nombre, 70, startY, { width: 350, continued: false })
+           .text(producto.nombre, textStartX, productY + 8, {
+             width: contentWidth - 140,
+             continued: false
+           })
 
-        // Precio a la derecha
+        // Precio alineado a la derecha
+        const precioTexto = `$${parseFloat(producto.precio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+        const precioWidth = doc.widthOfString(precioTexto)
         doc.fontSize(12)
            .fillColor('#DC2626')
            .font('Helvetica-Bold')
-           .text(`$${parseFloat(producto.precio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 450, startY, { width: 95, align: 'right' })
+           .text(precioTexto, pageWidth - margin - precioWidth - 10, productY + 8, {
+             width: precioWidth + 10,
+             align: 'right'
+           })
 
-        // Descripción (si existe)
+        // Descripción del producto
         if (producto.descripcion) {
           doc.fontSize(9)
              .fillColor('#6B7280')
              .font('Helvetica')
-             .text(producto.descripcion, 70, doc.y + 2, { width: 475 })
+             .text(producto.descripcion, textStartX, productY + 25, {
+               width: contentWidth - 140,
+               continued: false
+             })
         }
 
-        // Indicador de destacado
-        if (producto.destacado) {
-          doc.fontSize(8)
-             .fillColor('#F59E0B')
-             .font('Helvetica-Bold')
-             .text('★ RECOMENDADO', 70, doc.y + 1)
-        }
-
-        doc.moveDown(0.8)
-
-        // Línea separadora sutil
-        if (prodIndex < categoria.productos.length - 1) {
-          doc.moveTo(70, doc.y)
-             .lineTo(545, doc.y)
-             .strokeColor('#E5E7EB')
-             .lineWidth(0.5)
-             .stroke()
-          doc.moveDown(0.5)
-        }
+        doc.y = productY + productHeight + 5
       })
 
       // Espaciado entre categorías
-      if (catIndex < categoriasConProductos.length - 1) {
-        doc.moveDown(1.5)
-        doc.moveTo(50, doc.y)
-           .lineTo(545, doc.y)
-           .strokeColor('#DC2626')
-           .lineWidth(1)
-           .stroke()
-        doc.moveDown(1.5)
-      }
+      doc.moveDown(1)
     })
 
     // === FOOTER EN TODAS LAS PÁGINAS ===
@@ -642,16 +655,31 @@ router.get('/menu-publico/pdf', async (req, res) => {
     for (let i = 0; i < pageCount; i++) {
       doc.switchToPage(i)
 
-      // Footer
+      // Línea superior del footer
+      const footerY = doc.page.height - 35
+      doc.moveTo(margin, footerY)
+         .lineTo(pageWidth - margin, footerY)
+         .strokeColor('#E5E7EB')
+         .lineWidth(1)
+         .stroke()
+
+      // Texto del footer
       doc.fontSize(8)
          .fillColor('#9CA3AF')
          .font('Helvetica')
          .text(
-           `Página ${i + 1} de ${pageCount} | Generado el ${new Date().toLocaleDateString('es-AR')} | Club Sportivo Pilar`,
-           50,
-           doc.page.height - 50,
-           { align: 'center', width: doc.page.width - 100 }
+           `Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+           margin,
+           footerY + 8,
+           { align: 'left', width: contentWidth / 2 }
          )
+
+      doc.text(
+        `Página ${i + 1} de ${pageCount}`,
+        pageWidth - margin - contentWidth / 2,
+        footerY + 8,
+        { align: 'right', width: contentWidth / 2 }
+      )
     }
 
     // Finalizar el PDF
