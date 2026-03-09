@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -26,6 +26,7 @@ export default function TablasAuxiliares() {
   const [usuarios, setUsuarios] = useState([])
   const [roles, setRoles] = useState([])
   const [mediosPago, setMediosPago] = useState([])
+  const [centrosCosto, setCentrosCosto] = useState([])
 
   // Modo Demo
   const [modoDemo, setModoDemo] = useState({ activo: false, email: '' })
@@ -64,7 +65,7 @@ export default function TablasAuxiliares() {
   async function cargarDatos() {
     setLoading(true)
     try {
-      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, descuentos, rubrosData, cuentas, usrs, rols, medios] = await Promise.all([
+      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, descuentos, rubrosData, cuentas, usrs, rols, medios, centros] = await Promise.all([
         api.get('/admin/tipos-socio'),
         api.get('/admin/categorias-socio'),
         api.get('/admin/estados-socio'),
@@ -78,6 +79,7 @@ export default function TablasAuxiliares() {
         api.get('/admin/usuarios').catch(() => ({ data: [] })),
         api.get('/admin/roles').catch(() => ({ data: [] })),
         api.getFull('/admin/medios-pago').catch(() => ({ data: [] })),
+        api.getFull('/admin/centros-costo').catch(() => ({ data: [] })),
       ])
       setTiposSocio(tipos || [])
       setCategoriasSocio(categorias || [])
@@ -92,6 +94,7 @@ export default function TablasAuxiliares() {
       setUsuarios(usrs?.data || usrs || [])
       setRoles(rols?.data || rols || [])
       setMediosPago(medios?.data || medios || [])
+      setCentrosCosto(centros?.data || centros || [])
     } catch (err) {
       setError('Error al cargar datos')
     } finally {
@@ -1070,6 +1073,38 @@ export default function TablasAuxiliares() {
                     <p className="text-2xl font-bold text-gray-900 mt-1">{mediosPago.length}</p>
                     <p className="text-xs text-gray-500">
                       {mediosPago.filter(m => m.activo).length} activos
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+                  Ver listado →
+                </div>
+              </div>
+
+              {/* Centros de Costo */}
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+                onClick={() => navigate('/admin/configuracion/centros-costo')}
+              >
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="p-3 rounded-xl bg-cyan-100">
+                      <Calculator className="w-6 h-6 text-cyan-600" />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/centros-costo') }}
+                      className="flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nuevo
+                    </Button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-base font-semibold text-gray-800">Centros de Costo</h3>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{centrosCosto.length}</p>
+                    <p className="text-xs text-gray-500">
+                      {centrosCosto.filter(c => c.activo).length} activos
                     </p>
                   </div>
                 </div>

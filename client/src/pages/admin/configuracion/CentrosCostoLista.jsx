@@ -27,7 +27,7 @@ export default function CentrosCostoLista() {
       if (filtroActivo !== 'todos') params.activo = filtroActivo === 'activos'
 
       const response = await api.get('/admin/centros-costo', { params })
-      setCentros(response.data)
+      setCentros(response?.data || response || [])
       setError(null)
     } catch (err) {
       setError(err.message)

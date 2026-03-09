@@ -4,6 +4,7 @@
  * - Menú público
  */
 import express from 'express'
+import PDFDocument from 'pdfkit'
 import prisma from '../../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 import { generarTicketFiscal, generarTicketCuenta } from '../../services/thermalPrinter.js'
@@ -463,6 +464,204 @@ router.get('/menu-publico', async (req, res) => {
   } catch (error) {
     console.error('Error al obtener menú público:', error)
     res.status(500).json({ success: false, error: 'Error al obtener menú' })
+  }
+})
+
+/**
+ * GET /menu-publico/pdf
+ * Genera PDF del menú para descarga (sin autenticación)
+ */
+router.get('/menu-publico/pdf', async (req, res) => {
+  try {
+    const categorias = await prisma.categoriaMenu.findMany({
+      where: { activo: true },
+      orderBy: { orden: 'asc' },
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        descripcion: true,
+        color: true,
+        productos: {
+          where: {
+            activo: true,
+            disponible: true,
+            tiposVenta: { has: 'BUFFET' }
+          },
+          orderBy: { orden: 'asc' },
+          select: {
+            nombre: true,
+            descripcion: true,
+            precio: true,
+            destacado: true
+          }
+        }
+      }
+    })
+
+    // Filtrar categorías sin productos
+    const categoriasConProductos = categorias.filter(c => c.productos.length > 0)
+
+    if (categoriasConProductos.length === 0) {
+      return res.status(404).json({ success: false, error: 'No hay productos en el menú' })
+    }
+
+    // Crear documento PDF
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 50,
+      bufferPages: true
+    })
+
+    // Configurar headers para descarga
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="menu-buffet-${new Date().toISOString().split('T')[0]}.pdf"`)
+
+    // Pipe el PDF directamente a la respuesta
+    doc.pipe(res)
+
+    // === ENCABEZADO ===
+    doc.fontSize(24)
+       .fillColor('#1F2937')
+       .font('Helvetica-Bold')
+       .text('Buffet del Club', { align: 'center' })
+
+    doc.fontSize(14)
+       .fillColor('#DC2626')
+       .font('Helvetica-Bold')
+       .text('Club Sportivo Pilar', { align: 'center' })
+       .moveDown(0.5)
+
+    doc.fontSize(10)
+       .fillColor('#6B7280')
+       .font('Helvetica')
+       .text('El Rojo de la Avenida - Desde 1912', { align: 'center' })
+       .moveDown(0.3)
+
+    doc.fontSize(9)
+       .text('Av. Tomás Márquez 1125, Pilar, Buenos Aires', { align: 'center' })
+       .text('Tel: (0230) 442-0297', { align: 'center' })
+       .moveDown(2)
+
+    // Línea decorativa
+    doc.moveTo(50, doc.y)
+       .lineTo(545, doc.y)
+       .strokeColor('#DC2626')
+       .lineWidth(2)
+       .stroke()
+       .moveDown(1.5)
+
+    // === CATEGORÍAS Y PRODUCTOS ===
+    categoriasConProductos.forEach((categoria, catIndex) => {
+      // Verificar espacio para nueva categoría
+      if (doc.y > 650) {
+        doc.addPage()
+      }
+
+      // Título de categoría
+      doc.fontSize(16)
+         .fillColor(categoria.color || '#DC2626')
+         .font('Helvetica-Bold')
+         .text(categoria.nombre.toUpperCase(), { underline: true })
+         .moveDown(0.3)
+
+      if (categoria.descripcion) {
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica-Oblique')
+           .text(categoria.descripcion)
+           .moveDown(0.5)
+      } else {
+        doc.moveDown(0.5)
+      }
+
+      // Productos de la categoría
+      categoria.productos.forEach((producto, prodIndex) => {
+        // Verificar espacio para nuevo producto
+        if (doc.y > 700) {
+          doc.addPage()
+        }
+
+        const startY = doc.y
+
+        // Nombre del producto
+        doc.fontSize(11)
+           .fillColor('#1F2937')
+           .font('Helvetica-Bold')
+           .text(producto.nombre, 70, startY, { width: 350, continued: false })
+
+        // Precio a la derecha
+        doc.fontSize(12)
+           .fillColor('#DC2626')
+           .font('Helvetica-Bold')
+           .text(`$${parseFloat(producto.precio).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 450, startY, { width: 95, align: 'right' })
+
+        // Descripción (si existe)
+        if (producto.descripcion) {
+          doc.fontSize(9)
+             .fillColor('#6B7280')
+             .font('Helvetica')
+             .text(producto.descripcion, 70, doc.y + 2, { width: 475 })
+        }
+
+        // Indicador de destacado
+        if (producto.destacado) {
+          doc.fontSize(8)
+             .fillColor('#F59E0B')
+             .font('Helvetica-Bold')
+             .text('★ RECOMENDADO', 70, doc.y + 1)
+        }
+
+        doc.moveDown(0.8)
+
+        // Línea separadora sutil
+        if (prodIndex < categoria.productos.length - 1) {
+          doc.moveTo(70, doc.y)
+             .lineTo(545, doc.y)
+             .strokeColor('#E5E7EB')
+             .lineWidth(0.5)
+             .stroke()
+          doc.moveDown(0.5)
+        }
+      })
+
+      // Espaciado entre categorías
+      if (catIndex < categoriasConProductos.length - 1) {
+        doc.moveDown(1.5)
+        doc.moveTo(50, doc.y)
+           .lineTo(545, doc.y)
+           .strokeColor('#DC2626')
+           .lineWidth(1)
+           .stroke()
+        doc.moveDown(1.5)
+      }
+    })
+
+    // === FOOTER EN TODAS LAS PÁGINAS ===
+    const pageCount = doc.bufferedPageRange().count
+    for (let i = 0; i < pageCount; i++) {
+      doc.switchToPage(i)
+
+      // Footer
+      doc.fontSize(8)
+         .fillColor('#9CA3AF')
+         .font('Helvetica')
+         .text(
+           `Página ${i + 1} de ${pageCount} | Generado el ${new Date().toLocaleDateString('es-AR')} | Club Sportivo Pilar`,
+           50,
+           doc.page.height - 50,
+           { align: 'center', width: doc.page.width - 100 }
+         )
+    }
+
+    // Finalizar el PDF
+    doc.end()
+
+  } catch (error) {
+    console.error('Error al generar PDF del menú:', error)
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: 'Error al generar PDF del menú' })
+    }
   }
 })
 

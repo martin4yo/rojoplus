@@ -69,7 +69,8 @@ self.addEventListener('fetch', (event) => {
         // Si falla el fetch, intentar obtener del cache
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
-            console.log('[Service Worker] Sirviendo desde cache:', event.request.url)
+            // Solo logear en producción o para debugging específico
+            // console.log('[Service Worker] Sirviendo desde cache:', event.request.url)
             return cachedResponse
           }
           // Si tampoco está en cache, mostrar página offline

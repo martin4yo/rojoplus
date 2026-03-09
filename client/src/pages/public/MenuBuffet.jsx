@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { UtensilsCrossed, Phone, MapPin, Clock, ArrowLeft, Star, Coffee, Pizza, Sandwich, IceCream, Salad, Wine, ChevronDown, X } from 'lucide-react'
+import { UtensilsCrossed, Phone, MapPin, Clock, ArrowLeft, Star, Coffee, Pizza, Sandwich, IceCream, Salad, Wine, ChevronDown, X, Download } from 'lucide-react'
 
 // Imágenes de ejemplo por categoría (usando URLs de imágenes libres de derechos)
 const imagenesPorCategoria = {
@@ -71,6 +71,16 @@ export default function MenuBuffet() {
   const getIcono = (codigo) => iconosPorCategoria[codigo] || UtensilsCrossed
   const getImagen = (codigo) => imagenesPorCategoria[codigo] || null
 
+  const descargarPDF = () => {
+    const url = '/api/buffet/menu-publico/pdf'
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `menu-buffet-${new Date().toISOString().split('T')[0]}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-200 flex items-center justify-center">
@@ -87,20 +97,33 @@ export default function MenuBuffet() {
       {/* Header con onda gris oscuro compacto */}
       <header className="relative bg-gradient-to-b from-gray-800 to-gray-700 text-white overflow-hidden">
         <div className="relative max-w-6xl mx-auto px-4 pt-3 pb-16">
-          <div className="flex items-center justify-center gap-4">
-            <img
-              src="/images/club/pngwing.com.png"
-              alt="Club Sportivo Pilar"
-              className="h-16 md:h-20 w-auto drop-shadow-lg"
-            />
-            <div className="text-left">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                Buffet del Club
-              </h1>
-              <p className="text-gray-300 text-sm md:text-base">
-                Club Sportivo Pilar
-              </p>
+          <div className="flex items-center justify-between">
+            {/* Logo y título */}
+            <div className="flex items-center gap-4">
+              <img
+                src="/images/club/pngwing.com.png"
+                alt="Club Sportivo Pilar"
+                className="h-16 md:h-20 w-auto drop-shadow-lg"
+              />
+              <div className="text-left">
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                  Buffet del Club
+                </h1>
+                <p className="text-gray-300 text-sm md:text-base">
+                  Club Sportivo Pilar
+                </p>
+              </div>
             </div>
+
+            {/* Botón descargar PDF */}
+            <button
+              onClick={descargarPDF}
+              className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-lg transition-all duration-200 hover:scale-105 font-medium"
+              title="Descargar menú en PDF"
+            >
+              <Download size={20} />
+              <span className="hidden sm:inline">Descargar PDF</span>
+            </button>
           </div>
         </div>
 
