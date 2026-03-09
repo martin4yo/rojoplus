@@ -50,12 +50,15 @@ export default function BuffetProductoOpciones() {
         api.get(`/admin/buffet/productos/${productoId}`),
         api.get(`/admin/buffet/productos/${productoId}/grupos-opciones`)
       ])
-      setProducto(prodRes.data || prodRes)
-      setGrupos(gruposRes.data?.data || gruposRes.data || [])
+      // Extraer datos correctamente de la respuesta envuelta
+      const prodData = prodRes.data?.data || prodRes.data || prodRes
+      const gruposData = gruposRes.data?.data || gruposRes.data || []
+      setProducto(prodData)
+      setGrupos(gruposData)
 
       // Expandir todos los grupos por defecto
       const exp = {}
-      ;(gruposRes.data?.data || gruposRes.data || []).forEach(g => {
+      gruposData.forEach(g => {
         exp[g.id] = true
       })
       setExpandidos(exp)

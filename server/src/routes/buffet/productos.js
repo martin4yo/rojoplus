@@ -158,6 +158,41 @@ router.get('/productos', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO', 
 })
 
 /**
+ * GET /productos/:id
+ * Obtener un producto por ID con sus opciones
+ */
+router.get('/productos/:id', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const producto = await prisma.productoBuffet.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        categoriaMenu: true,
+        producto: { select: { id: true, codigo: true, nombre: true } },
+        gruposOpciones: {
+          orderBy: { orden: 'asc' },
+          include: {
+            opciones: {
+              orderBy: { orden: 'asc' }
+            }
+          }
+        }
+      }
+    })
+
+    if (!producto) {
+      return res.status(404).json({ success: false, error: 'Producto no encontrado' })
+    }
+
+    res.json({ success: true, data: producto })
+  } catch (error) {
+    console.error('Error al obtener producto:', error)
+    res.status(500).json({ success: false, error: 'Error al obtener producto' })
+  }
+})
+
+/**
  * GET /productos/barcode/:codigo
  * Buscar producto por código de barras
  */
