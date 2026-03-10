@@ -169,10 +169,10 @@ router.get('/productos', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO', 
               select: {
                 id: true,
                 nombre: true,
-                precio: true,
+                precioAdicional: true,
                 orden: true,
                 activo: true,
-                productoOpcionId: true
+                productoRefId: true
               }
             }
           }
