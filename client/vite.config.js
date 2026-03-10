@@ -92,8 +92,11 @@ export default defineConfig({
         ]
       },
       devOptions: {
-        enabled: false, // Deshabilitado en desarrollo para evitar problemas de cache
-        type: 'module'
+        enabled: false // Deshabilitado en desarrollo para evitar problemas de cache
+      },
+      workbox: {
+        clientsClaim: true,
+        skipWaiting: true
       }
     })
   ],

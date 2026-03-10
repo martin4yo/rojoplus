@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { User, X, Zap } from 'lucide-react'
+import { User, X, Zap, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import GestionPedido from '../../../components/buffet/GestionPedido'
@@ -103,60 +103,67 @@ export default function BuffetBarra() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header con info rápida */}
-      <div className="bg-gradient-to-r from-orange-600 to-red-600 rounded-lg p-4 text-white shadow-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-white/20 p-3 rounded-full">
-              <Zap className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">Venta Rápida en Barra</h1>
-              <p className="text-orange-100 text-sm">
-                Pedido #{pedidoActivo.numero} • Retiro inmediato
-              </p>
-            </div>
+    <div className="flex flex-col h-[calc(100vh-100px)]">
+      {/* Header personalizado con gradiente naranja */}
+      <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handlePedidoCerrado}
+            className="p-2 hover:bg-white/20 rounded transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-lg font-bold flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Venta Rápida en Barra
+            </h1>
+            <p className="text-sm text-orange-100">Pedido #{pedidoActivo.numero}</p>
           </div>
+        </div>
 
-          {/* Cliente */}
-          <div className="flex items-center space-x-2">
-            {clienteSeleccionado ? (
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center space-x-2">
-                <User className="h-5 w-5" />
-                <div className="text-left">
-                  <div className="font-medium">{clienteSeleccionado.razonSocial}</div>
-                  <div className="text-xs text-orange-100">
-                    {clienteSeleccionado.tipoDocumento} {clienteSeleccionado.documento}
-                  </div>
+        {/* Cliente */}
+        <div>
+          {clienteSeleccionado ? (
+            <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
+              <User className="h-4 w-4" />
+              <div>
+                <div className="text-sm font-medium">{clienteSeleccionado.razonSocial}</div>
+                <div className="text-xs text-orange-100">
+                  {clienteSeleccionado.tipoDocumento} {clienteSeleccionado.documento}
                 </div>
-                <button
-                  onClick={limpiarCliente}
-                  className="ml-2 p-1 hover:bg-white/20 rounded"
-                >
-                  <X className="h-4 w-4" />
-                </button>
               </div>
-            ) : (
               <button
-                onClick={() => setMostrarSelectorCliente(true)}
-                className="bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors rounded-lg px-4 py-2 flex items-center space-x-2"
+                onClick={limpiarCliente}
+                className="ml-2 p-1 hover:bg-white/30 rounded transition-colors"
+                title="Quitar cliente"
               >
-                <User className="h-5 w-5" />
-                <span className="font-medium">Agregar Cliente</span>
+                <X className="h-4 w-4" />
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setMostrarSelectorCliente(true)}
+              className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+              <User className="h-4 w-4" />
+              Agregar Cliente
+            </button>
+          )}
         </div>
       </div>
 
       {/* Gestión del pedido */}
-      <GestionPedido
-        tipo="takeaway"
-        id={pedidoActivo.id}
-        onVolver={handlePedidoCerrado}
-        onActualizar={handleActualizarPedido}
-      />
+      <div className="flex-1 min-h-0">
+        <GestionPedido
+          tipo="takeaway"
+          id={pedidoActivo.id}
+          onVolver={handlePedidoCerrado}
+          onActualizar={handleActualizarPedido}
+          useFlexHeight={true}
+          hideHeader={true}
+        />
+      </div>
 
       {/* Modal selector de cliente */}
       {mostrarSelectorCliente && (

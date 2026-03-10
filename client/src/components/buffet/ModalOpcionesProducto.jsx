@@ -265,10 +265,9 @@ export default function ModalOpcionesProducto({ producto, onConfirmar, onCerrar 
                   <div>
                     <h3 className="font-semibold text-gray-800">{grupo.nombre}</h3>
                     {grupo.descripcion && (
-                      <p className="text-xs text-gray-500">{grupo.descripcion}</p>
-                    )}
-                    {tieneDefaults && (
-                      <p className="text-xs text-blue-600">Desmarcá lo que no querés</p>
+                      <p className={`text-xs ${tieneDefaults ? 'text-blue-600 font-bold' : 'text-gray-500'}`}>
+                        {grupo.descripcion}
+                      </p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">

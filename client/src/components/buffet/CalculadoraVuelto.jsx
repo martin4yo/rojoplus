@@ -20,7 +20,8 @@ export default function CalculadoraVuelto({
       vuelto: vuelto > 0 ? vuelto : 0,
       esSuficiente
     })
-  }, [montoNumerico, vuelto, esSuficiente, onVueltoCalculado])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [montoNumerico, vuelto, esSuficiente])
 
   // Auto-llenar con el total al montar o cuando cambia el total
   useEffect(() => {
@@ -49,51 +50,59 @@ export default function CalculadoraVuelto({
   }
 
   return (
-    <div className="space-y-2">
-      {/* A Pagar */}
-      <div className="flex items-center justify-between bg-gray-100 rounded-lg px-4 py-3">
-        <span className="text-sm font-medium text-gray-600">A Pagar:</span>
-        <span className="text-xl font-bold text-gray-900">
+    <div className="grid grid-cols-3 gap-2">
+      {/* Total a Pagar */}
+      <div className="flex flex-col justify-center bg-gray-100 rounded-lg px-3 py-2.5">
+        <span className="text-xs font-medium text-gray-600 mb-1">Total a Pagar:</span>
+        <span className="text-lg font-bold text-gray-900 truncate">
           ${total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </div>
 
       {/* Paga con */}
-      <div className="flex items-center gap-3 bg-white border-2 border-gray-300 rounded-lg px-4 py-2 focus-within:border-blue-500 overflow-hidden">
-        <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Paga con:</span>
+      <div className="flex flex-col justify-center bg-white border-2 border-gray-300 rounded-lg px-3 py-2.5 focus-within:border-blue-500">
+        <label className="text-xs font-medium text-gray-600 mb-1">Paga con:</label>
         <input
           type="text"
           inputMode="decimal"
           value={montoPagado}
           onChange={handleInputChange}
           placeholder="0.00"
-          className="flex-1 min-w-0 text-xl font-bold text-right outline-none bg-transparent"
+          className="text-lg font-bold text-left outline-none bg-transparent"
           autoFocus
         />
       </div>
 
       {/* Vuelto */}
-      {montoPagado && (
-        <div className={`flex items-center justify-between rounded-lg px-4 py-3 ${
-          esSuficiente
+      <div className={`flex flex-col justify-center rounded-lg px-3 py-2.5 ${
+        montoPagado
+          ? esSuficiente
             ? 'bg-green-100 border-2 border-green-500'
             : 'bg-red-100 border-2 border-red-400'
-        }`}>
-          <div className="flex items-center gap-2">
-            {esSuficiente ? (
-              <Check size={18} className="text-green-600" />
-            ) : (
-              <AlertCircle size={18} className="text-red-600" />
-            )}
-            <span className={`text-sm font-medium ${esSuficiente ? 'text-green-700' : 'text-red-700'}`}>
-              {esSuficiente ? 'Vuelto:' : 'Faltan:'}
-            </span>
-          </div>
-          <span className={`text-xl font-bold ${esSuficiente ? 'text-green-700' : 'text-red-700'}`}>
-            ${Math.abs(vuelto).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          : 'bg-gray-50 border-2 border-gray-200'
+      }`}>
+        <div className="flex items-center gap-1.5 mb-1">
+          {montoPagado && (esSuficiente ? (
+            <Check size={14} className="text-green-600" />
+          ) : (
+            <AlertCircle size={14} className="text-red-600" />
+          ))}
+          <span className={`text-xs font-medium ${
+            montoPagado
+              ? esSuficiente ? 'text-green-700' : 'text-red-700'
+              : 'text-gray-500'
+          }`}>
+            {montoPagado ? (esSuficiente ? 'Vuelto:' : 'Faltan:') : 'Vuelto:'}
           </span>
         </div>
-      )}
+        <span className={`text-lg font-bold truncate ${
+          montoPagado
+            ? esSuficiente ? 'text-green-700' : 'text-red-700'
+            : 'text-gray-400'
+        }`}>
+          ${montoPagado ? Math.abs(vuelto).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+        </span>
+      </div>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 // Service Worker para PWA de Control de Accesos
-const CACHE_NAME = 'rojoplus-accesos-v1'
+const CACHE_NAME = 'rojoplus-accesos-v2'
 const urlsToCache = [
   '/admin/accesos/control-pwa',
   '/manifest.json',
@@ -9,15 +9,15 @@ const urlsToCache = [
 
 // Instalación del service worker
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Instalando...')
+  // console.log('[Service Worker] Instalando...')
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[Service Worker] Cacheando recursos')
+        // console.log('[Service Worker] Cacheando recursos')
         return cache.addAll(urlsToCache)
       })
       .catch((error) => {
-        console.error('[Service Worker] Error cacheando:', error)
+        // console.error('[Service Worker] Error cacheando:', error)
       })
   )
   self.skipWaiting()
@@ -25,13 +25,13 @@ self.addEventListener('install', (event) => {
 
 // Activación del service worker
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activando...')
+  // console.log('[Service Worker] Activando...')
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[Service Worker] Eliminando cache antiguo:', cacheName)
+            // console.log('[Service Worker] Eliminando cache antiguo:', cacheName)
             return caches.delete(cacheName)
           }
         })

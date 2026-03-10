@@ -14,14 +14,25 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 // Registro del Service Worker para PWA
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+  window.addEventListener('load', async () => {
+    // En desarrollo, desregistrar service workers para evitar problemas de cache
+    if (import.meta.env.DEV) {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      for (let registration of registrations) {
+        await registration.unregister()
+      }
+      return
+    }
+
+    // En producción, registrar y actualizar service worker
     navigator.serviceWorker
       .register('/service-worker.js')
       .then((registration) => {
-        console.log('✅ Service Worker registrado:', registration.scope)
+        // Forzar actualización del service worker si hay una nueva versión
+        registration.update()
       })
       .catch((error) => {
-        console.error('❌ Error registrando Service Worker:', error)
+        // Error registrando service worker
       })
   })
 }

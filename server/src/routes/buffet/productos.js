@@ -136,7 +136,17 @@ router.get('/productos', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO', 
       orderBy: [{ nombre: 'asc' }],
       include: {
         categoriaMenu: true,
-        producto: { select: { id: true, codigo: true, nombre: true } },
+        producto: {
+          select: {
+            id: true,
+            codigo: true,
+            nombre: true,
+            variantes: {
+              where: { activo: true },
+              select: { id: true, talle: true, color: true, stockActual: true }
+            }
+          }
+        },
         gruposOpciones: {
           where: { activo: true },
           orderBy: { orden: 'asc' },

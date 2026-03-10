@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ArrowLeft, Plus, Minus, Send, DollarSign, Clock, User, ShoppingCart, UtensilsCrossed, Coffee, Search, X, Users, Percent, CheckCircle, AlertCircle, Trash2, Edit3, FileText, Package, Check, LayoutGrid, List, Receipt, RotateCcw, DoorOpen } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
@@ -10,7 +10,6 @@ import { formatCurrency } from '../../utils/formatters'
 import Modal from '../Modal'
 import CalculadoraVuelto from './CalculadoraVuelto'
 import SelectorMedioPago from './SelectorMedioPago'
-import PropinaSelector from './PropinaSelector'
 import SplitCuenta from './SplitCuenta'
 import PagoMultiple from './PagoMultiple'
 import ClienteSelector from './ClienteSelector'
@@ -26,8 +25,10 @@ import ModalOpcionesProducto from './ModalOpcionesProducto'
  * @param {number} props.id - ID de la mesa o pedido
  * @param {Function} props.onVolver - Callback para volver al dashboard
  * @param {Function} props.onActualizar - Callback opcional cuando hay cambios
+ * @param {boolean} props.useFlexHeight - Si true, usa h-full para contenedores flex, si false usa h-[calc(100vh-100px)]
+ * @param {boolean} props.hideHeader - Si true, oculta el header desktop (para páginas que tienen su propio header)
  */
-export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualizar }) {
+export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualizar, useFlexHeight = false, hideHeader = false }) {
   const { generarTicketComanda, generarTicketFiscal, imprimirTicket } = useTicket()
   const { prompt, PromptDialog } = usePrompt()
 
@@ -67,7 +68,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
   // Estados para cobro
   const [datosVuelto, setDatosVuelto] = useState({ montoPagado: 0, vuelto: 0, esSuficiente: false })
-  const [propinaData, setPropinaData] = useState({ porcentaje: 0, monto: 0, esCustom: false })
   const [modalSplit, setModalSplit] = useState(false)
   const [pagosParciales, setPagosParciales] = useState({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
   const [usarPagosMultiples, setUsarPagosMultiples] = useState(false)
@@ -249,6 +249,43 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
     }
   }, [tipo, entidad, tabCobroActivo])
 
+  // ==================== FILTROS Y CÁLCULOS ====================
+
+  // Filtrar medios de pago según la caja seleccionada
+  const mediosPagoDisponibles = useMemo(() => {
+    if (!cobroData.cajaId || cajas.length === 0 || mediosPago.length === 0) {
+      return mediosPago
+    }
+
+    const cajaSeleccionada = cajas.find(c => c.id === parseInt(cobroData.cajaId))
+
+    if (!cajaSeleccionada || !cajaSeleccionada.mediosPagoPermitidos || cajaSeleccionada.mediosPagoPermitidos.length === 0) {
+      return mediosPago
+    }
+
+    // Filtrar medios de pago según los códigos permitidos en la caja
+    return mediosPago.filter(mp =>
+      cajaSeleccionada.mediosPagoPermitidos.includes(mp.codigo)
+    )
+  }, [cobroData.cajaId, cajas, mediosPago])
+
+  // Cuando cambia la caja, verificar que el medio de pago seleccionado esté permitido
+  useEffect(() => {
+    if (cobroData.cajaId && cobroData.medioPagoId && mediosPagoDisponibles.length > 0) {
+      const medioPagoSeleccionado = mediosPagoDisponibles.find(m => m.id === parseInt(cobroData.medioPagoId))
+
+      // Si el medio de pago seleccionado no está en los disponibles, cambiar al primero disponible
+      if (!medioPagoSeleccionado) {
+        const efectivo = mediosPagoDisponibles.find(m => m.codigo === 'EFECTIVO')
+        setCobroData(prev => ({
+          ...prev,
+          medioPagoId: efectivo?.id || mediosPagoDisponibles[0]?.id || ''
+        }))
+        setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+      }
+    }
+  }, [cobroData.cajaId, mediosPagoDisponibles])
+
   // ==================== FUNCIONES DE ITEMS ====================
 
   /**
@@ -406,12 +443,11 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   async function cobrar() {
     if (!comandaActiva || cobrando) return
 
-    const totalConPropina = Number(comandaActiva.subtotal || comandaActiva.total) -
-      (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
-      propinaData.monto
+    const totalFinal = Number(comandaActiva.subtotal || comandaActiva.total) -
+      (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)
 
     // Validación de vuelto si es efectivo
-    const medioPago = mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))
+    const medioPago = mediosPagoDisponibles.find(m => m.id === parseInt(cobroData.medioPagoId))
     if (medioPago?.codigo === 'EFECTIVO' && !usarPagosMultiples) {
       if (!datosVuelto.esSuficiente) {
         toast.error('El monto pagado es insuficiente')
@@ -430,15 +466,15 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         }
         requestData = {
           pagos: pagosParciales.pagos,
-          propina: propinaData.monto,
+          propina: 0,
           aplicarDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable
         }
       } else {
         requestData = {
           cajaId: parseInt(cobroData.cajaId),
           medioPagoId: parseInt(cobroData.medioPagoId),
-          montoPagado: medioPago?.codigo === 'EFECTIVO' ? datosVuelto.montoPagado : totalConPropina,
-          propina: propinaData.monto,
+          montoPagado: medioPago?.codigo === 'EFECTIVO' ? datosVuelto.montoPagado : totalFinal,
+          propina: 0,
           aplicarDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable
         }
       }
@@ -513,7 +549,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       }
 
       // Reset estados
-      setPropinaData({ porcentaje: 0, monto: 0, esCustom: false })
       setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
       setUsarPagosMultiples(false)
       setPagosParciales({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
@@ -1136,7 +1171,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
   return (
     <>
-      <div className="flex flex-col md:flex-row h-[calc(100vh-100px)]">
+      <div className={`flex flex-col md:flex-row ${useFlexHeight ? 'h-full' : 'h-[calc(100vh-100px)]'}`}>
         {/* Header - Móvil */}
         <div className="bg-white border-b p-3 md:hidden">
           <div className="flex items-center justify-between">
@@ -1302,15 +1337,16 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         {/* Panel Izquierdo - Productos (oculto en móvil cuando está en tab carrito) */}
         <div className={`flex-1 flex flex-col overflow-hidden ${tabActivo === 'carrito' ? 'hidden md:flex' : 'flex'}`}>
           {/* Header - Solo Desktop */}
-          <div className="hidden md:block bg-white border-b p-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={onVolver}
-                  className="p-2 hover:bg-gray-100 rounded"
-                >
-                  <ArrowLeft size={20} />
-                </button>
+          {!hideHeader && (
+            <div className="hidden md:block bg-white border-b p-4">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={onVolver}
+                    className="p-2 hover:bg-gray-100 rounded"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
                 <div>
                   <h1 className="text-xl font-bold">
                     {cfg.textos.entidad} {cfg.textos.numero}
@@ -1435,6 +1471,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               </div>
             )}
           </div>
+          )}
 
           {/* Barra de búsqueda y toggle vista - Compacta en móvil */}
           <div className="px-2 py-2 md:p-4 bg-white border-b">
@@ -1499,7 +1536,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         </div>
 
         {/* Panel Derecho - Resumen con Tabs (oculto en móvil cuando está en tab productos) */}
-        <div className={`md:w-[480px] bg-white md:border-l flex flex-col overflow-hidden ${tabActivo === 'productos' ? 'hidden md:flex' : 'flex flex-1'}`}>
+        <div className={`md:w-[480px] bg-white md:border-l flex flex-col h-full overflow-hidden ${tabActivo === 'productos' ? 'hidden md:flex' : 'flex flex-1'}`}>
           {/* Tabs Navigation */}
           <div className="flex border-b flex-shrink-0">
             <button
@@ -1542,10 +1579,10 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
           {/* Tab Content: Cuenta */}
           {tabCobroActivo === 'cuenta' && (
-            <>
+            <div className="flex flex-col flex-1 min-h-0">
               {/* Banner de cuenta pedida */}
               {esCuentaPedida && (
-                <div className="bg-orange-100 border-b border-orange-200 px-4 py-2 flex items-center gap-2">
+                <div className="bg-orange-100 border-b border-orange-200 px-4 py-2 flex items-center gap-2 flex-shrink-0">
                   <Receipt size={18} className="text-orange-600" />
                   <span className="text-sm font-medium text-orange-800">
                     Cuenta solicitada - Esperando cobro
@@ -1555,7 +1592,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
               {/* Banner de pedido pagado para takeaway */}
               {tipo === 'takeaway' && entidad?.estado === 'PAGADO' && (
-                <div className="bg-green-100 border-b border-green-200 px-4 py-2 flex items-center gap-2">
+                <div className="bg-green-100 border-b border-green-200 px-4 py-2 flex items-center gap-2 flex-shrink-0">
                   <DollarSign size={18} className="text-green-600" />
                   <span className="text-sm font-medium text-green-800">
                     Pedido cobrado - Pendiente de entrega
@@ -1565,7 +1602,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
               {/* Banner de pedido entregado para takeaway */}
               {tipo === 'takeaway' && entidad?.estado === 'ENTREGADO' && (
-                <div className="bg-blue-100 border-b border-blue-200 px-4 py-2 flex items-center gap-2">
+                <div className="bg-blue-100 border-b border-blue-200 px-4 py-2 flex items-center gap-2 flex-shrink-0">
                   <Receipt size={18} className="text-blue-600" />
                   <span className="text-sm font-medium text-blue-800">
                     Pedido entregado
@@ -1574,7 +1611,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               )}
 
               {/* Items de la comanda */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {/* Items existentes */}
                 {comandaActiva.items?.length > 0 && (
                   <div className="p-3 md:p-4 border-b">
@@ -1719,7 +1756,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               </div>
 
               {/* Footer - Totales y acciones */}
-              <div className="border-t p-3 md:p-4 space-y-3 md:space-y-4 bg-white">
+              <div className="border-t p-3 md:p-4 space-y-3 md:space-y-4 bg-white flex-shrink-0">
                 {/* Resumen */}
                 <div className="space-y-1 md:space-y-2 text-sm">
                   {Number(comandaActiva.total) > 0 && (
@@ -1817,12 +1854,12 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   )}
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* Tab Content: Finalizar */}
           {tabCobroActivo === 'finalizar' && (
-            <>
+            <div className="flex flex-col flex-1 min-h-0">
               <div className="p-3 py-2 border-b bg-green-50 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium text-gray-700">
@@ -1837,26 +1874,14 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                {/* Propina */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Propina:</label>
-                  <PropinaSelector
-                    subtotal={Number(comandaActiva.subtotal || comandaActiva.total) -
-                              (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)}
-                    onPropinaChange={(data) => setPropinaData(data)}
-                    compact={true}
-                  />
-                </div>
-
+              <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
                 {/* Total destacado */}
                 <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-3 border-2 border-green-200">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-gray-700">Total a Cobrar:</span>
                     <span className="text-2xl font-bold text-green-600 tabular-nums">
                       ${((Number(comandaActiva.subtotal || comandaActiva.total) -
-                          (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
-                          propinaData.monto)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0))).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   {tipo === 'mesa' && comandaActiva.socio && descuentoInfo?.aplicable && cobroData.aplicarDescuento && (
@@ -1926,21 +1951,23 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   <div className="space-y-3">
                     {/* Selector Medio de Pago */}
                     <SelectorMedioPago
-                      mediosPago={mediosPago}
+                      mediosPago={mediosPagoDisponibles}
                       selectedId={cobroData.medioPagoId}
                       onChange={(id) => {
-                        setCobroData({ ...cobroData, medioPagoId: id })
-                        setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+                        // Solo resetear vuelto si cambia el medio de pago
+                        if (id !== cobroData.medioPagoId) {
+                          setCobroData({ ...cobroData, medioPagoId: id })
+                          setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+                        }
                       }}
                       compact={true}
                     />
 
                     {/* Calculadora de vuelto (solo efectivo) */}
-                    {mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO' && (
+                    {mediosPagoDisponibles.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO' && (
                       <CalculadoraVuelto
                         total={Number(comandaActiva.subtotal || comandaActiva.total) -
-                          (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
-                          propinaData.monto}
+                          (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)}
                         onVueltoCalculado={(datos) => setDatosVuelto(datos)}
                         medioPagoSeleccionado={mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))}
                       />
@@ -1952,9 +1979,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                 {usarPagosMultiples && (
                   <PagoMultiple
                     total={Number(comandaActiva.subtotal || comandaActiva.total) -
-                      (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0) +
-                      propinaData.monto}
-                    mediosPago={mediosPago}
+                      (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)}
+                    mediosPago={mediosPagoDisponibles}
                     onPagosChange={(datos) => setPagosParciales(datos)}
                   />
                 )}
@@ -2092,7 +2118,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               </div>
 
               {/* Footer - Botón cobrar */}
-              <div className="border-t p-3 bg-white">
+              <div className="border-t p-3 bg-white flex-shrink-0">
                 <button
                   onClick={cobrar}
                   disabled={
@@ -2118,7 +2144,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   )}
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

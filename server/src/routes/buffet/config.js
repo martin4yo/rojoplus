@@ -48,7 +48,7 @@ router.get('/config/cajas/:puntoVenta', authAdmin, checkPermiso('BUFFET_VER', 'B
     const cajas = await prisma.caja.findMany({
       where,
       orderBy: { nombre: 'asc' },
-      select: { id: true, codigo: true, nombre: true, tipo: true, puntoVentaAfip: true }
+      select: { id: true, codigo: true, nombre: true, tipo: true, puntoVentaAfip: true, mediosPagoPermitidos: true }
     })
 
     res.json({ success: true, data: cajas })

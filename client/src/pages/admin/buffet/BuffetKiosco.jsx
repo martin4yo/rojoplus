@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Plus, Minus, DollarSign, ShoppingCart, Search, X, Barcode, FileText, LayoutGrid, List, Receipt, Coffee } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
@@ -56,6 +56,24 @@ export default function BuffetKiosco() {
   const [modalOpciones, setModalOpciones] = useState(false)
   const [productoConOpciones, setProductoConOpciones] = useState(null)
 
+  // Filtrar medios de pago según la caja seleccionada
+  const mediosPagoDisponibles = useMemo(() => {
+    if (!cajaId || cajas.length === 0 || mediosPago.length === 0) {
+      return mediosPago
+    }
+
+    const cajaSeleccionada = cajas.find(c => c.id === parseInt(cajaId))
+
+    if (!cajaSeleccionada || !cajaSeleccionada.mediosPagoPermitidos || cajaSeleccionada.mediosPagoPermitidos.length === 0) {
+      return mediosPago
+    }
+
+    // Filtrar medios de pago según los códigos permitidos en la caja
+    return mediosPago.filter(mp =>
+      cajaSeleccionada.mediosPagoPermitidos.includes(mp.codigo)
+    )
+  }, [cajaId, cajas, mediosPago])
+
   useEffect(() => {
     cargarDatos()
   }, [])
@@ -71,7 +89,7 @@ export default function BuffetKiosco() {
       if (e.key === 'Enter' && e.target.tagName === 'INPUT' && tabActivo === 'finalizar') {
         e.preventDefault()
         if (carrito.length > 0 && cajaId && medioPagoId && !procesando) {
-          const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(medioPagoId))
+          const medioPagoSeleccionado = mediosPagoDisponibles.find(m => m.id === parseInt(medioPagoId))
           if (medioPagoSeleccionado?.codigo !== 'EFECTIVO' || datosVuelto.esSuficiente) {
             cobrar()
           }
@@ -120,7 +138,7 @@ export default function BuffetKiosco() {
             toast.info('Presiona F2 nuevamente para cobrar')
           } else {
             // Si ya está en finalizar, cobrar directamente
-            const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(medioPagoId))
+            const medioPagoSeleccionado = mediosPagoDisponibles.find(m => m.id === parseInt(medioPagoId))
             if (medioPagoSeleccionado?.codigo === 'EFECTIVO' && !datosVuelto.esSuficiente) {
               toast.error('El monto pagado es insuficiente')
             } else {
@@ -142,7 +160,7 @@ export default function BuffetKiosco() {
           break
         case 'F5': // Efectivo
           e.preventDefault()
-          const efectivo = mediosPago.find(m => m.codigo === 'EFECTIVO')
+          const efectivo = mediosPagoDisponibles.find(m => m.codigo === 'EFECTIVO')
           if (efectivo) {
             setMedioPagoId(efectivo.id)
             toast.success('Medio de pago: Efectivo')
@@ -150,7 +168,7 @@ export default function BuffetKiosco() {
           break
         case 'F6': // Tarjeta
           e.preventDefault()
-          const tarjeta = mediosPago.find(m => m.codigo === 'TARJETA' || m.codigo === 'TARJETA_DEBITO' || m.codigo === 'TARJETA_CREDITO')
+          const tarjeta = mediosPagoDisponibles.find(m => m.codigo === 'TARJETA' || m.codigo === 'TARJETA_DEBITO' || m.codigo === 'TARJETA_CREDITO')
           if (tarjeta) {
             setMedioPagoId(tarjeta.id)
             toast.success('Medio de pago: Tarjeta')
@@ -415,7 +433,7 @@ export default function BuffetKiosco() {
     }
 
     // Validar pago suficiente solo si es efectivo
-    const medioPagoSeleccionado = mediosPago.find(m => m.id === parseInt(medioPagoId))
+    const medioPagoSeleccionado = mediosPagoDisponibles.find(m => m.id === parseInt(medioPagoId))
     if (medioPagoSeleccionado?.codigo === 'EFECTIVO' && !datosVuelto.esSuficiente) {
       toast.error('El monto pagado es insuficiente')
       return
@@ -846,7 +864,7 @@ export default function BuffetKiosco() {
 
                 {/* Selector medio de pago compacto */}
                 <SelectorMedioPago
-                  mediosPago={mediosPago}
+                  mediosPago={mediosPagoDisponibles}
                   selectedId={medioPagoId}
                   onChange={setMedioPagoId}
                   compact={true}
@@ -1104,7 +1122,7 @@ export default function BuffetKiosco() {
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Medio de Pago:</label>
                   <SelectorMedioPago
-                    mediosPago={mediosPago}
+                    mediosPago={mediosPagoDisponibles}
                     selectedId={medioPagoId}
                     onChange={setMedioPagoId}
                     compact={true}
@@ -1115,7 +1133,7 @@ export default function BuffetKiosco() {
                 <CalculadoraVuelto
                   total={total}
                   onVueltoCalculado={setDatosVuelto}
-                  medioPagoSeleccionado={mediosPago.find(m => m.id === medioPagoId)}
+                  medioPagoSeleccionado={mediosPagoDisponibles.find(m => m.id === medioPagoId)}
                 />
 
                 {/* Tipo de Comprobante */}

@@ -69,7 +69,7 @@ export default function SelectorMedioPago({
               key={medio.id}
               type="button"
               onClick={() => onChange(medio.id)}
-              className={`${compact ? 'p-2' : 'p-4'} border-2 rounded-lg font-bold flex items-center ${compact ? 'gap-2' : 'gap-3'} transition-all active:scale-95 ${colorClasses}`}
+              className={`${compact ? 'py-3 px-2' : 'p-4'} border-2 rounded-lg font-bold flex items-center ${compact ? 'gap-2' : 'gap-3'} transition-all active:scale-95 ${colorClasses}`}
             >
               <div className="flex-shrink-0">
                 {getIcono(medio.codigo, iconSize)}
