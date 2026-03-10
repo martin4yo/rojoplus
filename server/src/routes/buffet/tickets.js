@@ -506,6 +506,21 @@ router.get('/menu-publico/pdf', async (req, res) => {
       return res.status(404).json({ success: false, error: 'No hay productos en el menú' })
     }
 
+    // Obtener configuración del club
+    const clubConfig = await prisma.configuracion.findMany({
+      where: {
+        clave: { in: ['CLUB_NOMBRE', 'CLUB_DIRECCION', 'CLUB_TELEFONO', 'CLUB_LOGO_URL'] }
+      }
+    })
+
+    const configMap = {}
+    clubConfig.forEach(c => { configMap[c.clave] = c.valor })
+
+    const clubNombre = configMap.CLUB_NOMBRE || 'Club Sportivo Pilar'
+    const clubDireccion = configMap.CLUB_DIRECCION || 'Av. Tomás Márquez 1125, Pilar'
+    const clubTelefono = configMap.CLUB_TELEFONO || '(0230) 442-0297'
+    const clubLogoUrl = configMap.CLUB_LOGO_URL
+
     // Crear documento PDF
     const doc = new PDFDocument({
       size: 'A4',
@@ -523,39 +538,64 @@ router.get('/menu-publico/pdf', async (req, res) => {
     const pageWidth = doc.page.width
     const margin = 40
     const contentWidth = pageWidth - (margin * 2)
+    const headerHeight = 90
 
-    // === ENCABEZADO CON FONDO ===
-    doc.rect(0, 0, pageWidth, 140)
-       .fill('#DC2626')
+    // === FUNCIÓN PARA RENDERIZAR ENCABEZADO ===
+    const renderHeader = (pageNum) => {
+      const currentY = doc.y
 
-    doc.fontSize(32)
-       .fillColor('#FFFFFF')
-       .font('Helvetica-Bold')
-       .text('MENÚ', margin, 30, { align: 'center', width: contentWidth })
+      // Fondo del encabezado
+      doc.rect(0, 0, pageWidth, headerHeight)
+         .fill('#DC2626')
 
-    doc.fontSize(18)
-       .fillColor('#FFFFFF')
-       .font('Helvetica-Bold')
-       .text('Buffet del Club', margin, 70, { align: 'center', width: contentWidth })
+      // Intentar cargar logo del club
+      let logoLoaded = false
+      if (clubLogoUrl) {
+        try {
+          const logoPath = clubLogoUrl.startsWith('http')
+            ? clubLogoUrl
+            : `./public${clubLogoUrl}`
+          doc.image(logoPath, margin, 15, { width: 50, height: 50 })
+          logoLoaded = true
+        } catch (err) {
+          console.log('No se pudo cargar el logo del club')
+        }
+      }
 
-    doc.fontSize(12)
-       .fillColor('#FEE2E2')
-       .font('Helvetica')
-       .text('Club Sportivo Pilar - El Rojo de la Avenida', margin, 95, { align: 'center', width: contentWidth })
+      const textStartX = logoLoaded ? margin + 60 : margin
 
-    doc.fontSize(10)
-       .fillColor('#FEE2E2')
-       .text('Av. Tomás Márquez 1125, Pilar | Tel: (0230) 442-0297', margin, 115, { align: 'center', width: contentWidth })
+      // Título
+      doc.fontSize(22)
+         .fillColor('#FFFFFF')
+         .font('Helvetica-Bold')
+         .text('MENÚ - Buffet del Club', textStartX, 20, { align: 'left' })
+
+      doc.fontSize(9)
+         .fillColor('#FEE2E2')
+         .font('Helvetica')
+         .text(clubNombre, textStartX, 45, { align: 'left' })
+
+      doc.fontSize(8)
+         .fillColor('#FEE2E2')
+         .text(`${clubDireccion} | ${clubTelefono}`, textStartX, 60, { align: 'left' })
+
+      // Restaurar posición
+      doc.y = currentY
+    }
+
+    // Renderizar header en primera página
+    renderHeader(0)
 
     // Resetear posición después del header
-    doc.y = 160
+    doc.y = headerHeight + 20
 
     // === CATEGORÍAS Y PRODUCTOS ===
     categoriasConProductos.forEach((categoria, catIndex) => {
       // Verificar espacio para nueva categoría (título + al menos 1 producto)
       if (doc.y > 650) {
         doc.addPage()
-        doc.y = 60
+        renderHeader()
+        doc.y = headerHeight + 20
       }
 
       // Fondo de categoría
@@ -590,7 +630,8 @@ router.get('/menu-publico/pdf', async (req, res) => {
         // Verificar espacio para nuevo producto (mínimo 50px)
         if (doc.y > 720) {
           doc.addPage()
-          doc.y = 60
+          renderHeader()
+          doc.y = headerHeight + 20
         }
 
         const productY = doc.y
@@ -650,10 +691,17 @@ router.get('/menu-publico/pdf', async (req, res) => {
       doc.moveDown(1)
     })
 
-    // === FOOTER EN TODAS LAS PÁGINAS ===
-    const pageCount = doc.bufferedPageRange().count
+    // === HEADER Y FOOTER EN TODAS LAS PÁGINAS ===
+    const range = doc.bufferedPageRange()
+    const pageCount = range.count
+
     for (let i = 0; i < pageCount; i++) {
       doc.switchToPage(i)
+
+      // Renderizar header en cada página (por si PDFKit creó páginas automáticamente)
+      if (i > 0) {
+        renderHeader()
+      }
 
       // Línea superior del footer
       const footerY = doc.page.height - 35
@@ -681,6 +729,10 @@ router.get('/menu-publico/pdf', async (req, res) => {
         { align: 'right', width: contentWidth / 2 }
       )
     }
+
+    // IMPORTANTE: Volver a la última página antes de finalizar
+    // Esto evita que se generen páginas en blanco adicionales
+    doc.switchToPage(pageCount - 1)
 
     // Finalizar el PDF
     doc.end()
