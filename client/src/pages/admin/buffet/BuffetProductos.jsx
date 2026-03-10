@@ -245,14 +245,36 @@ export default function BuffetProductos() {
     !productos.some(pb => pb.productoId === p.id)
   )
 
+  // Función auxiliar para contar opciones totales de un producto
+  const contarOpciones = (producto) => {
+    if (!producto.gruposOpciones || producto.gruposOpciones.length === 0) return 0
+    return producto.gruposOpciones.reduce((total, grupo) => {
+      return total + (grupo.opciones?.length || 0)
+    }, 0)
+  }
+
   const productosFiltrados = productos.filter(p => {
     const matchCategoria = !filtroCategoria || p.categoriaMenuId === parseInt(filtroCategoria)
     // Si hay filtros de tipo, el producto debe tener al menos uno de los tipos seleccionados
     const matchTipoVenta = filtroTiposVenta.length === 0 ||
       filtroTiposVenta.some(tipo => p.tiposVenta?.includes(tipo))
-    const matchBusqueda = !busqueda ||
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
+
+    // Búsqueda en nombre, descripción y nombres de ingredientes
+    const matchBusqueda = !busqueda || (() => {
+      const searchLower = busqueda.toLowerCase()
+      const nombreMatch = p.nombre.toLowerCase().includes(searchLower)
+      const descripcionMatch = p.descripcion?.toLowerCase().includes(searchLower)
+
+      // Buscar en nombres de ingredientes/opciones
+      const ingredientesMatch = p.gruposOpciones?.some(grupo =>
+        grupo.opciones?.some(opcion =>
+          opcion.nombre.toLowerCase().includes(searchLower)
+        )
+      )
+
+      return nombreMatch || descripcionMatch || ingredientesMatch
+    })()
+
     return matchCategoria && matchTipoVenta && matchBusqueda
   })
 
@@ -348,18 +370,24 @@ export default function BuffetProductos() {
       sortable: false,
       className: 'text-center w-32',
       cellClassName: 'text-center',
-      render: (prod) => (
-        tienePermiso(PERMISOS.BUFFET_CONFIG) && (
+      render: (prod) => {
+        const totalOpciones = contarOpciones(prod)
+        return tienePermiso(PERMISOS.BUFFET_CONFIG) && (
           <div className="flex items-center justify-center gap-1">
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 navigate(`/admin/buffet/productos/${prod.id}/opciones`)
               }}
-              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded"
+              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded relative"
               title="Configurar opciones"
             >
               <Settings className="w-4 h-4" />
+              {totalOpciones > 0 && (
+                <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {totalOpciones}
+                </span>
+              )}
             </button>
             <button
               onClick={(e) => {
@@ -383,7 +411,7 @@ export default function BuffetProductos() {
             </button>
           </div>
         )
-      )
+      }
     }
   ]
 
@@ -593,10 +621,15 @@ export default function BuffetProductos() {
                   <div className="flex gap-1">
                     <button
                       onClick={() => navigate(`/admin/buffet/productos/${prod.id}/opciones`)}
-                      className="p-2 text-purple-600 hover:bg-purple-50 rounded"
+                      className="p-2 text-purple-600 hover:bg-purple-50 rounded relative"
                       title="Configurar opciones"
                     >
                       <Settings size={16} />
+                      {contarOpciones(prod) > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                          {contarOpciones(prod)}
+                        </span>
+                      )}
                     </button>
                     <button
                       onClick={() => abrirModal(prod)}

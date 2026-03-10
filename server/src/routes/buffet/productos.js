@@ -127,7 +127,19 @@ router.get('/productos', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO', 
       where.OR = [
         { nombre: { contains: busqueda, mode: 'insensitive' } },
         { descripcion: { contains: busqueda, mode: 'insensitive' } },
-        { codigoBarras: { equals: busqueda } }
+        { codigoBarras: { equals: busqueda } },
+        // Buscar en nombres de ingredientes/opciones
+        {
+          gruposOpciones: {
+            some: {
+              opciones: {
+                some: {
+                  nombre: { contains: busqueda, mode: 'insensitive' }
+                }
+              }
+            }
+          }
+        }
       ]
     }
 
@@ -153,7 +165,15 @@ router.get('/productos', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO', 
           include: {
             opciones: {
               where: { activo: true },
-              orderBy: { orden: 'asc' }
+              orderBy: { orden: 'asc' },
+              select: {
+                id: true,
+                nombre: true,
+                precio: true,
+                orden: true,
+                activo: true,
+                productoOpcionId: true
+              }
             }
           }
         }
