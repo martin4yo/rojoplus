@@ -125,8 +125,12 @@ export default function BuffetImpresoras() {
   async function guardarConfigTickets() {
     setGuardandoConfig(true)
     try {
-      await api.put('/admin/buffet/config-impresoras', configTickets)
+      console.log('Guardando config:', configTickets) // Debug
+      const res = await api.put('/admin/buffet/config-impresoras', configTickets)
+      console.log('Respuesta del servidor:', res.data) // Debug
       toast.success('Configuración de impresoras guardada')
+      // Recargar la configuración para asegurar que se actualizó
+      await cargarConfigTickets()
     } catch (err) {
       console.error('Error guardando config:', err)
       toast.error('Error al guardar configuración')

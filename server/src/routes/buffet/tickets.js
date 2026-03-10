@@ -791,23 +791,31 @@ router.put('/config-impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async
     const { tickets, kiosco, takeaway } = req.body
 
     const configs = [
-      { clave: 'BUFFET_IMPRESORA_TICKETS', valor: tickets?.toString() || '', desc: 'Impresora para tickets de cobro' },
-      { clave: 'BUFFET_IMPRESORA_KIOSCO', valor: kiosco?.toString() || '', desc: 'Impresora para tickets de kiosco' },
-      { clave: 'BUFFET_IMPRESORA_TAKEAWAY', valor: takeaway?.toString() || '', desc: 'Impresora para tickets de take away' }
+      { clave: 'BUFFET_IMPRESORA_TICKETS', valor: tickets ? tickets.toString() : null, desc: 'Impresora para tickets de cobro' },
+      { clave: 'BUFFET_IMPRESORA_KIOSCO', valor: kiosco ? kiosco.toString() : null, desc: 'Impresora para tickets de kiosco' },
+      { clave: 'BUFFET_IMPRESORA_TAKEAWAY', valor: takeaway ? takeaway.toString() : null, desc: 'Impresora para tickets de take away' }
     ]
 
     for (const cfg of configs) {
-      await prisma.configuracion.upsert({
-        where: { clave: cfg.clave },
-        update: { valor: cfg.valor },
-        create: {
-          clave: cfg.clave,
-          valor: cfg.valor,
-          descripcion: cfg.desc,
-          modulo: 'BUFFET',
-          tipo: 'NUMBER'
-        }
-      })
+      if (cfg.valor === null) {
+        // Si el valor es null, eliminar la configuración
+        await prisma.configuracion.deleteMany({
+          where: { clave: cfg.clave }
+        })
+      } else {
+        // Si tiene valor, hacer upsert
+        await prisma.configuracion.upsert({
+          where: { clave: cfg.clave },
+          update: { valor: cfg.valor },
+          create: {
+            clave: cfg.clave,
+            valor: cfg.valor,
+            descripcion: cfg.desc,
+            modulo: 'BUFFET',
+            tipo: 'NUMBER'
+          }
+        })
+      }
     }
 
     res.json({ success: true, message: 'Configuración guardada' })
