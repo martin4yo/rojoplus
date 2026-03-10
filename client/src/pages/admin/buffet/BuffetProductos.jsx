@@ -20,6 +20,7 @@ export default function BuffetProductos() {
   const [editando, setEditando] = useState(null)
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroTiposVenta, setFiltroTiposVenta] = useState([]) // Array para multiselect
+  const [filtroDisponibilidad, setFiltroDisponibilidad] = useState('todos') // 'todos', 'disponibles', 'no_disponibles'
   const [busqueda, setBusqueda] = useState('')
   const [modoCreacion, setModoCreacion] = useState('nuevo') // 'nuevo' o 'existente'
   const [productosStock, setProductosStock] = useState([])
@@ -255,9 +256,16 @@ export default function BuffetProductos() {
 
   const productosFiltrados = productos.filter(p => {
     const matchCategoria = !filtroCategoria || p.categoriaMenuId === parseInt(filtroCategoria)
+
     // Si hay filtros de tipo, el producto debe tener al menos uno de los tipos seleccionados
     const matchTipoVenta = filtroTiposVenta.length === 0 ||
       filtroTiposVenta.some(tipo => p.tiposVenta?.includes(tipo))
+
+    // Filtro de disponibilidad
+    const matchDisponibilidad =
+      filtroDisponibilidad === 'todos' ||
+      (filtroDisponibilidad === 'disponibles' && p.disponible) ||
+      (filtroDisponibilidad === 'no_disponibles' && !p.disponible)
 
     // Búsqueda en nombre, descripción y nombres de ingredientes
     const matchBusqueda = !busqueda || (() => {
@@ -275,7 +283,7 @@ export default function BuffetProductos() {
       return nombreMatch || descripcionMatch || ingredientesMatch
     })()
 
-    return matchCategoria && matchTipoVenta && matchBusqueda
+    return matchCategoria && matchTipoVenta && matchDisponibilidad && matchBusqueda
   })
 
   // Definir columnas para la vista de tabla
@@ -353,11 +361,26 @@ export default function BuffetProductos() {
       label: 'Estado',
       sortable: false,
       render: (prod) => (
-        <div className="flex flex-col gap-1">
-          <span className={`px-2 py-0.5 rounded text-xs font-medium inline-flex items-center gap-1 ${prod.disponible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {prod.disponible ? <Check size={12} /> : <X size={12} />}
-            {prod.disponible ? 'Disponible' : 'No disponible'}
-          </span>
+        <div className="flex flex-col gap-2">
+          {tienePermiso(PERMISOS.BUFFET_CONFIG) ? (
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={prod.disponible}
+                onChange={() => toggleDisponible(prod)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+              <span className="ml-2 text-sm font-medium text-gray-700">
+                {prod.disponible ? 'Disponible' : 'No disponible'}
+              </span>
+            </label>
+          ) : (
+            <span className={`px-2 py-0.5 rounded text-xs font-medium inline-flex items-center gap-1 ${prod.disponible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {prod.disponible ? <Check size={12} /> : <X size={12} />}
+              {prod.disponible ? 'Disponible' : 'No disponible'}
+            </span>
+          )}
           {prod.destacado && (
             <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">Destacado</span>
           )}
@@ -443,8 +466,8 @@ export default function BuffetProductos() {
       </PageHeader>
 
       {/* Filtros */}
-      <div className="flex gap-4 bg-white p-4 rounded-lg shadow">
-        <div className="flex-1">
+      <div className="flex flex-wrap gap-4 bg-white p-4 rounded-lg shadow">
+        <div className="flex-1 min-w-[200px]">
           <div className="relative">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -466,6 +489,17 @@ export default function BuffetProductos() {
             {categorias.map(cat => (
               <option key={cat.id} value={cat.id}>{cat.nombre}</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <select
+            value={filtroDisponibilidad}
+            onChange={e => setFiltroDisponibilidad(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2"
+          >
+            <option value="todos">Todos</option>
+            <option value="disponibles">Disponibles</option>
+            <option value="no_disponibles">No disponibles</option>
           </select>
         </div>
         <div className="flex items-center gap-4">
@@ -582,43 +616,51 @@ export default function BuffetProductos() {
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">{prod.descripcion}</p>
               )}
 
-              <div className="flex justify-between items-center pt-3 border-t">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => toggleDisponible(prod)}
-                    className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${
-                      prod.disponible
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {prod.disponible ? <Check size={12} /> : <X size={12} />}
-                    {prod.disponible ? 'Disponible' : 'No disponible'}
-                  </button>
+              <div className="pt-3 border-t space-y-2">
+                {/* Switch de disponibilidad */}
+                {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={prod.disponible}
+                      onChange={() => toggleDisponible(prod)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                    <span className="ml-2 text-xs font-medium text-gray-700">
+                      {prod.disponible ? 'Disponible' : 'No disponible'}
+                    </span>
+                  </label>
+                )}
+
+                {/* Badges */}
+                <div className="flex flex-wrap gap-1">
                   {prod.destacado && (
-                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
+                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
                       Destacado
                     </span>
                   )}
                   {prod.tiposVenta?.includes('BUFFET') && (
-                    <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">
                       Buffet
                     </span>
                   )}
                   {prod.tiposVenta?.includes('KIOSCO') && (
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
                       Kiosco
                     </span>
                   )}
                   {prod.tiposVenta?.includes('TAKEAWAY') && (
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                    <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium">
                       Pedidos
                     </span>
                   )}
                 </div>
+              </div>
 
-                {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
-                  <div className="flex gap-1">
+              {/* Botones de acciones */}
+              {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
+                <div className="pt-2 border-t flex justify-end gap-1">
                     <button
                       onClick={() => navigate(`/admin/buffet/productos/${prod.id}/opciones`)}
                       className="p-2 text-purple-600 hover:bg-purple-50 rounded relative"
@@ -645,9 +687,8 @@ export default function BuffetProductos() {
                     >
                       <Trash2 size={16} />
                     </button>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         ))}
