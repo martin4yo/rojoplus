@@ -537,6 +537,43 @@ router.delete('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MES
 })
 
 /**
+ * DELETE /takeaway/:id
+ * Eliminar/Anular pedido completo (solo si no está pagado o entregado)
+ */
+router.delete('/takeaway/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Verificar que el pedido existe
+    const pedido = await prisma.pedidoTakeAway.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        items: true
+      }
+    })
+
+    if (!pedido) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado' })
+    }
+
+    // No permitir eliminar pedidos pagados o entregados
+    if (['PAGADO', 'ENTREGADO'].includes(pedido.estado)) {
+      return res.status(400).json({ success: false, error: 'No se puede eliminar un pedido pagado o entregado' })
+    }
+
+    // Eliminar el pedido (los items se eliminan en cascada)
+    await prisma.pedidoTakeAway.delete({
+      where: { id: parseInt(id) }
+    })
+
+    res.json({ success: true, message: 'Pedido eliminado correctamente' })
+  } catch (error) {
+    console.error('Error al eliminar pedido:', error)
+    res.status(500).json({ success: false, error: 'Error al eliminar pedido' })
+  }
+})
+
+/**
  * POST /takeaway/:id/items/:itemId/entregar
  * Marcar item como entregado
  */

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Clock, Phone, Truck, ShoppingBag, X, Users, CheckCircle } from 'lucide-react'
+import { Plus, Clock, Phone, Truck, ShoppingBag, X, Users, CheckCircle, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -199,6 +199,28 @@ export default function BuffetTakeAway() {
     }
   }
 
+  async function eliminarPedido(pedido, e) {
+    e.stopPropagation() // Evitar abrir el detalle
+
+    if (!confirm(`¿Eliminar el pedido #${pedido.numero}?`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/admin/buffet/takeaway/${pedido.id}`)
+      toast.success(`Pedido #${pedido.numero} eliminado`)
+      cargarPedidos()
+    } catch (err) {
+      console.error('Error eliminando pedido:', err)
+      toast.error(err.response?.data?.error || 'Error al eliminar pedido')
+    }
+  }
+
+  function puedeEliminar(pedido) {
+    // Solo se puede eliminar si NO está pagado o entregado
+    return !['PAGADO', 'ENTREGADO'].includes(pedido.estado)
+  }
+
   if (loading) {
     return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>
   }
@@ -307,6 +329,16 @@ export default function BuffetTakeAway() {
                       <Phone size={12} />
                       <span>{pedido.telefono}</span>
                     </div>
+                  )}
+                  {/* Icono de eliminar - solo si se puede eliminar */}
+                  {puedeEliminar(pedido) && tienePermiso(PERMISOS.BUFFET_MESAS) && (
+                    <button
+                      onClick={(e) => eliminarPedido(pedido, e)}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                      title="Eliminar pedido"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   )}
                 </div>
               </div>
