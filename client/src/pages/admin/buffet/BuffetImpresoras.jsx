@@ -295,19 +295,32 @@ export default function BuffetImpresoras() {
 
   async function asignarDestino(categoriaMenuId, impresoraId) {
     try {
+      // Primero verificar si ya existe un destino para esta categoría
+      const destinoExistente = destinos.find(d => d.categoriaMenuId === categoriaMenuId)
+
+      // Si existe y es diferente, eliminarlo primero
+      if (destinoExistente && destinoExistente.impresoraId !== impresoraId) {
+        await api.delete(`/admin/buffet/destinos-impresion/${destinoExistente.id}`)
+      }
+
+      // Luego crear el nuevo destino
       await api.post('/admin/buffet/destinos-impresion', { categoriaMenuId, impresoraId })
+      toast.success('Destino asignado correctamente')
       cargarDatos()
     } catch (err) {
       console.error('Error asignando destino:', err)
+      toast.error('Error al asignar destino')
     }
   }
 
   async function eliminarDestino(destinoId) {
     try {
       await api.delete(`/admin/buffet/destinos-impresion/${destinoId}`)
+      toast.success('Destino eliminado')
       cargarDatos()
     } catch (err) {
       console.error('Error eliminando destino:', err)
+      toast.error('Error al eliminar destino')
     }
   }
 
@@ -316,9 +329,11 @@ export default function BuffetImpresoras() {
       await api.put(`/admin/buffet/destinos-impresion/${destinoId}`, {
         saltarControlCocina: !saltarControlActual
       })
+      toast.success('Configuración actualizada')
       cargarDatos()
     } catch (err) {
       console.error('Error actualizando destino:', err)
+      toast.error('Error al actualizar configuración')
     }
   }
 

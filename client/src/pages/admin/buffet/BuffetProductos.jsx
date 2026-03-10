@@ -235,9 +235,11 @@ export default function BuffetProductos() {
       await api.put(`/admin/buffet/productos/${producto.id}/disponibilidad`, {
         disponible: !producto.disponible
       })
+      toast.success(producto.disponible ? 'Producto marcado como no disponible' : 'Producto marcado como disponible')
       cargarDatos()
     } catch (err) {
       console.error('Error actualizando disponibilidad:', err)
+      toast.error('Error al actualizar disponibilidad')
     }
   }
 
