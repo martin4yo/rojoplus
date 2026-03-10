@@ -29,7 +29,7 @@ export default function PublicHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 md:h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3 flex-shrink-0 relative z-10">
             <img
               src="/images/club/pngwing.com.png"
               alt="Club Sportivo Pilar"
@@ -42,14 +42,14 @@ export default function PublicHeader() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1 ml-4">
             {navLinks.map(link => (
               link.submenu ? (
                 <div key={link.path} className="relative">
                   <button
                     onClick={() => setClubMenuOpen(!clubMenuOpen)}
                     onBlur={() => setTimeout(() => setClubMenuOpen(false), 150)}
-                    className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                       link.submenu.some(sub => isActive(sub.path))
                         ? 'bg-red-50 text-red-600'
                         : 'text-gray-700 hover:bg-gray-100'
@@ -60,7 +60,7 @@ export default function PublicHeader() {
                   </button>
 
                   {clubMenuOpen && (
-                    <div className="absolute left-0 mt-2 w-48 bg-gray-200 rounded-lg shadow-lg border border-gray-300 py-2">
+                    <div className="absolute left-0 mt-2 w-48 bg-gray-200 rounded-lg shadow-lg border border-gray-300 py-2 z-50">
                       {link.submenu.map(sub => (
                         <Link
                           key={sub.path}
@@ -77,7 +77,7 @@ export default function PublicHeader() {
                 <Link
                   key={link.path}
                   to={link.path}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                     isActive(link.path)
                       ? 'bg-red-50 text-red-600'
                       : 'text-gray-700 hover:bg-gray-100'
@@ -93,14 +93,14 @@ export default function PublicHeader() {
               <button
                 onClick={() => setSocioMenuOpen(!socioMenuOpen)}
                 onBlur={() => setTimeout(() => setSocioMenuOpen(false), 150)}
-                className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors whitespace-nowrap"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors whitespace-nowrap"
               >
                 Soy Socio
                 <ChevronDown className={`w-4 h-4 transition-transform ${socioMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {socioMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-gray-200 rounded-lg shadow-lg border border-gray-300 py-2">
+                <div className="absolute right-0 mt-2 w-56 bg-gray-200 rounded-lg shadow-lg border border-gray-300 py-2 z-50">
                   <Link
                     to="/mi-qr"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
@@ -120,7 +120,7 @@ export default function PublicHeader() {
             {/* CTA Button */}
             <Link
               to="/inscripcion-socio"
-              className="ml-4 px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm whitespace-nowrap"
+              className="ml-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm whitespace-nowrap"
             >
               Quiero ser Socio
             </Link>

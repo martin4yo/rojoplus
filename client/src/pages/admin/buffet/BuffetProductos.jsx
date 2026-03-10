@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit, Trash2, Image, Search, Check, X, Package, Upload, Settings } from 'lucide-react'
+import { Plus, Edit, Trash2, Image, Search, Check, X, Package, Upload, Settings, LayoutGrid, List } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
 import { useConfirm } from '../../../hooks/useConfirm'
+import Table from '../../../components/Table'
+import { formatCurrency } from '../../../utils/formatters'
 
 export default function BuffetProductos() {
   const navigate = useNavigate()
@@ -21,6 +23,11 @@ export default function BuffetProductos() {
   const [busqueda, setBusqueda] = useState('')
   const [modoCreacion, setModoCreacion] = useState('nuevo') // 'nuevo' o 'existente'
   const [productosStock, setProductosStock] = useState([])
+
+  // Vista: 'shop' o 'lista'
+  const [vista, setVista] = useState(() => {
+    return localStorage.getItem('buffetProductosVista') || 'shop'
+  })
 
   const [formData, setFormData] = useState({
     // Campos para producto nuevo (stock)
@@ -45,6 +52,10 @@ export default function BuffetProductos() {
   useEffect(() => {
     cargarDatos()
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem('buffetProductosVista', vista)
+  }, [vista])
 
   async function cargarDatos() {
     try {
@@ -245,6 +256,137 @@ export default function BuffetProductos() {
     return matchCategoria && matchTipoVenta && matchBusqueda
   })
 
+  // Definir columnas para la vista de tabla
+  const columns = [
+    {
+      key: 'imagen',
+      label: 'Foto',
+      sortable: false,
+      className: 'w-16',
+      render: (prod) => (
+        <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden">
+          {prod.imagen ? (
+            <img src={prod.imagen} alt={prod.nombre} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Image className="w-6 h-6 text-gray-300" />
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'nombre',
+      label: 'Producto',
+      sortable: true,
+      render: (prod) => (
+        <div>
+          <p className="font-medium text-gray-800">{prod.nombre}</p>
+          <p className="text-sm text-gray-500">{prod.categoriaMenu?.nombre}</p>
+        </div>
+      )
+    },
+    {
+      key: 'descripcion',
+      label: 'Descripción',
+      sortable: false,
+      className: 'hidden lg:table-cell',
+      cellClassName: 'hidden lg:table-cell',
+      render: (prod) => (
+        <p className="text-sm text-gray-600 truncate max-w-xs">{prod.descripcion || '-'}</p>
+      )
+    },
+    {
+      key: 'precio',
+      label: 'Precio',
+      sortable: true,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (prod) => (
+        <span className="text-lg font-bold text-green-600">{formatCurrency(prod.precio)}</span>
+      )
+    },
+    {
+      key: 'tiposVenta',
+      label: 'Disponible en',
+      sortable: false,
+      className: 'hidden md:table-cell',
+      cellClassName: 'hidden md:table-cell',
+      render: (prod) => (
+        <div className="flex flex-wrap gap-1">
+          {prod.tiposVenta?.includes('BUFFET') && (
+            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">Buffet</span>
+          )}
+          {prod.tiposVenta?.includes('KIOSCO') && (
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">Kiosco</span>
+          )}
+          {prod.tiposVenta?.includes('TAKEAWAY') && (
+            <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium">Pedidos</span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      sortable: false,
+      render: (prod) => (
+        <div className="flex flex-col gap-1">
+          <span className={`px-2 py-0.5 rounded text-xs font-medium inline-flex items-center gap-1 ${prod.disponible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {prod.disponible ? <Check size={12} /> : <X size={12} />}
+            {prod.disponible ? 'Disponible' : 'No disponible'}
+          </span>
+          {prod.destacado && (
+            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">Destacado</span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      className: 'text-center w-32',
+      cellClassName: 'text-center',
+      render: (prod) => (
+        tienePermiso(PERMISOS.BUFFET_CONFIG) && (
+          <div className="flex items-center justify-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(`/admin/buffet/productos/${prod.id}/opciones`)
+              }}
+              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded"
+              title="Configurar opciones"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                abrirModal(prod)
+              }}
+              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+              title="Editar producto"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                eliminar(prod.id)
+              }}
+              className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+              title="Eliminar producto"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )
+      )
+    }
+  ]
+
   if (loading) {
     return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>
   }
@@ -346,11 +488,41 @@ export default function BuffetProductos() {
             <span className="text-sm font-medium text-green-700">Pedidos</span>
           </label>
         </div>
+
+        {/* Toggle Vista */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setVista('shop')}
+            className={`p-2 rounded-md transition ${vista === 'shop' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            title="Vista Shop"
+          >
+            <LayoutGrid className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setVista('lista')}
+            className={`p-2 rounded-md transition ${vista === 'lista' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            title="Vista Lista"
+          >
+            <List className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
-      {/* Grid de Productos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {productosFiltrados.map(prod => (
+      {/* Contenido según vista */}
+      {vista === 'lista' ? (
+        /* Vista Lista/Tabla */
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <Table
+            columns={columns}
+            data={productosFiltrados}
+            sortable
+            emptyMessage="No hay productos que coincidan con los filtros seleccionados"
+          />
+        </div>
+      ) : (
+        /* Vista Shop/Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {productosFiltrados.map(prod => (
           <div
             key={prod.id}
             className={`bg-white rounded-lg shadow overflow-hidden ${!prod.activo ? 'opacity-60' : ''}`}
@@ -446,7 +618,8 @@ export default function BuffetProductos() {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {productosFiltrados.length === 0 && (
         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
