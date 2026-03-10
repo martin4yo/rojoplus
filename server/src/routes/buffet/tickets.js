@@ -691,17 +691,15 @@ router.get('/menu-publico/pdf', async (req, res) => {
       doc.moveDown(1)
     })
 
-    // === HEADER Y FOOTER EN TODAS LAS PÁGINAS ===
+    // === FOOTER EN TODAS LAS PÁGINAS ===
     const range = doc.bufferedPageRange()
     const pageCount = range.count
 
     for (let i = 0; i < pageCount; i++) {
       doc.switchToPage(i)
 
-      // Renderizar header en cada página (por si PDFKit creó páginas automáticamente)
-      if (i > 0) {
-        renderHeader()
-      }
+      // Guardar posición actual para no crear páginas nuevas
+      const savedY = doc.y
 
       // Línea superior del footer
       const footerY = doc.page.height - 35
@@ -711,28 +709,30 @@ router.get('/menu-publico/pdf', async (req, res) => {
          .lineWidth(1)
          .stroke()
 
-      // Texto del footer
+      // Texto del footer - IMPORTANTE: usar coordenadas absolutas
       doc.fontSize(8)
          .fillColor('#9CA3AF')
          .font('Helvetica')
-         .text(
-           `Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
-           margin,
-           footerY + 8,
-           { align: 'left', width: contentWidth / 2 }
-         )
 
+      // Fecha generación (izquierda)
+      doc.text(
+        `Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+        margin,
+        footerY + 8,
+        { align: 'left', width: contentWidth / 2, lineBreak: false }
+      )
+
+      // Número de página (derecha) - con posición Y explícita
       doc.text(
         `Página ${i + 1} de ${pageCount}`,
         pageWidth - margin - contentWidth / 2,
         footerY + 8,
-        { align: 'right', width: contentWidth / 2 }
+        { align: 'right', width: contentWidth / 2, lineBreak: false }
       )
-    }
 
-    // IMPORTANTE: Volver a la última página antes de finalizar
-    // Esto evita que se generen páginas en blanco adicionales
-    doc.switchToPage(pageCount - 1)
+      // Restaurar posición para no afectar el contenido
+      doc.y = savedY
+    }
 
     // Finalizar el PDF
     doc.end()
