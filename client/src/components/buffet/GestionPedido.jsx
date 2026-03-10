@@ -1172,43 +1172,47 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   return (
     <>
       <div className={`flex flex-col md:flex-row ${useFlexHeight ? 'h-full' : 'h-[calc(100vh-100px)]'}`}>
-        {/* Header - Móvil */}
-        <div className="bg-white border-b p-3 md:hidden">
+        {/* Header - Móvil Unificado */}
+        <div className="md:hidden bg-white border-b px-3 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <button
                 onClick={onVolver}
-                className="p-2 hover:bg-gray-100 rounded"
+                className="p-2 hover:bg-gray-100 rounded-lg active:bg-gray-200"
               >
                 <ArrowLeft size={20} />
               </button>
-              <h1 className="text-lg font-bold flex items-center gap-2">
-                {cfg.textos.entidad} {cfg.textos.numero}
-                {tipo === 'mesa' && entidad.esComunal && (
-                  <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded-full">
-                    Comunal
-                  </span>
-                )}
-                {tipo === 'takeaway' && (
-                  <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">
-                    Pedidos
-                  </span>
-                )}
-              </h1>
+              <div>
+                <h1 className="font-bold text-base">
+                  {cfg.textos.entidad} {cfg.textos.numero}
+                </h1>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Clock size={12} />
+                  <span>{tiempoAbierta} min</span>
+                  {comandaActiva?.socio && (
+                    <span className="flex items-center gap-1 text-gray-700 font-medium">
+                      <img src="/images/logo.png" alt="" className="w-3 h-3" />
+                      {comandaActiva.socio.apellidoNombre?.split(',')[0] || comandaActiva.socio.apellido}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            {/* Botón Liberar Mesa - Solo si no hay items activos */}
-            {tipo === 'mesa' && comandaActiva && itemsNuevos.length === 0 && (
-              !comandaActiva.items || comandaActiva.items.filter(i => i.estado !== 'ANULADO').length === 0
-            ) && (
-              <button
-                onClick={cancelarYLiberarMesa}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200"
-                title="Liberar mesa"
-              >
-                <DoorOpen size={16} />
-                <span className="hidden sm:inline">Liberar</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Botón Liberar Mesa - Solo si no hay items activos */}
+              {tipo === 'mesa' && comandaActiva && itemsNuevos.length === 0 && (
+                !comandaActiva.items || comandaActiva.items.filter(i => i.estado !== 'ANULADO').length === 0
+              ) && (
+                <button
+                  onClick={cancelarYLiberarMesa}
+                  className="flex items-center gap-1 p-1.5 text-sm text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200"
+                  title="Liberar mesa"
+                >
+                  <DoorOpen size={16} />
+                </button>
+              )}
+              <StatusBadge status={comandaActiva?.estado} type={tipo === 'mesa' ? 'comanda' : 'pedidoTakeAway'} size="sm" />
+            </div>
           </div>
 
           {/* Selector de comandas - Solo mesas comunales */}
@@ -1271,36 +1275,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               </button>
             </div>
           )}
-        </div>
-
-        {/* Header móvil simplificado */}
-        <div className="md:hidden bg-white border-b px-3 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onVolver}
-                className="p-2 hover:bg-gray-100 rounded-lg active:bg-gray-200"
-              >
-                <ArrowLeft size={20} />
-              </button>
-              <div>
-                <h1 className="font-bold text-base">
-                  {cfg.textos.entidad} {cfg.textos.numero}
-                </h1>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <Clock size={12} />
-                  <span>{tiempoAbierta} min</span>
-                  {comandaActiva?.socio && (
-                    <span className="flex items-center gap-1 text-gray-700 font-medium">
-                      <img src="/images/logo.png" alt="" className="w-3 h-3" />
-                      {comandaActiva.socio.apellidoNombre?.split(',')[0] || comandaActiva.socio.apellido}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <StatusBadge status={comandaActiva?.estado} type={tipo === 'mesa' ? 'comanda' : 'pedidoTakeAway'} size="sm" />
-          </div>
         </div>
 
         {/* Tabs para móvil - Más grandes para touch */}

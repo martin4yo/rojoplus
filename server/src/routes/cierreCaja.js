@@ -9,6 +9,7 @@
 import express from 'express'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { authAdmin } from '../middleware/auth.js'
+import { generarPDFCierreCaja } from '../services/pdfGenerator.js'
 
 const router = express.Router()
 
@@ -81,14 +82,16 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
     })
 
     if (!cierreHoy) {
-      // Calcular movimientos del día
+      // Calcular movimientos del día (solo confirmados, no anulados)
       const movimientosHoy = await req.prisma.movimientoCaja.findMany({
         where: {
           cajaId: caja.id,
           fecha: {
             gte: hoy,
             lt: mañana
-          }
+          },
+          anulado: false,
+          estado: 'CONFIRMADO'
         }
       })
 
@@ -100,12 +103,26 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
         .filter(m => m.tipo === 'EGRESO')
         .reduce((sum, m) => sum + Number(m.monto), 0)
 
+      // Buscar el último cierre de esta caja para saber el saldo inicial del día
+      const ultimoCierre = await req.prisma.cierreCaja.findFirst({
+        where: {
+          cajaId: caja.id
+        },
+        orderBy: {
+          fecha: 'desc'
+        }
+      })
+
+      // Saldo esperado = saldo del último cierre + ingresos de hoy - egresos de hoy
+      const saldoInicial = ultimoCierre ? Number(ultimoCierre.saldoReal) : 0
+      const saldoEsperado = saldoInicial + totalIngresos - totalEgresos
+
       cajasPendientes.push({
         ...caja,
         cantidadMovimientos: movimientosHoy.length,
         totalIngresos,
         totalEgresos,
-        saldoEsperado: Number(caja.saldoActual)
+        saldoEsperado
       })
     }
   }
@@ -190,14 +207,16 @@ router.post('/', asyncHandler(async (req, res) => {
     throw new AppError('Ya existe un cierre para esta caja en la fecha especificada', 400)
   }
 
-  // Calcular movimientos del día
+  // Calcular movimientos del día (solo confirmados, no anulados)
   const movimientosDelDia = await req.prisma.movimientoCaja.findMany({
     where: {
       cajaId: parseInt(cajaId),
       fecha: {
         gte: fechaCierre,
         lt: mañana
-      }
+      },
+      anulado: false,
+      estado: 'CONFIRMADO'
     },
     orderBy: { fecha: 'asc' }
   })
@@ -210,7 +229,23 @@ router.post('/', asyncHandler(async (req, res) => {
     .filter(m => m.tipo === 'EGRESO')
     .reduce((sum, m) => sum + Number(m.monto), 0)
 
-  const saldoSistema = Number(caja.saldoActual)
+  // Buscar el último cierre de esta caja para saber el saldo inicial del día
+  const ultimoCierre = await req.prisma.cierreCaja.findFirst({
+    where: {
+      cajaId: parseInt(cajaId),
+      fecha: {
+        lt: fechaCierre  // Cierres anteriores a hoy
+      }
+    },
+    orderBy: {
+      fecha: 'desc'
+    }
+  })
+
+  // Saldo sistema = saldo del último cierre + ingresos de hoy - egresos de hoy
+  const saldoInicial = ultimoCierre ? Number(ultimoCierre.saldoReal) : 0
+  const saldoSistema = saldoInicial + totalIngresos - totalEgresos
+
   const saldoRealDecimal = parseFloat(saldoReal)
   const diferencia = saldoRealDecimal - saldoSistema
 
@@ -391,7 +426,9 @@ router.get('/:id', asyncHandler(async (req, res) => {
       fecha: {
         gte: fechaCierre,
         lt: mañana
-      }
+      },
+      anulado: false,
+      estado: 'CONFIRMADO'
     },
     include: {
       registrador: {
@@ -404,20 +441,417 @@ router.get('/:id', asyncHandler(async (req, res) => {
       pago: {
         select: {
           id: true,
-          socio: { select: { nroSocio: true, apellidoNombre: true } }
+          socio: { select: { nroSocio: true, apellidoNombre: true } },
+          medioPago: { select: { id: true, nombre: true, codigo: true } }
+        }
+      },
+      cuentaContable: {
+        select: {
+          id: true,
+          nombre: true,
+          codigo: true
         }
       }
     },
     orderBy: { fecha: 'asc' }
   })
 
+  // Calcular desglose por medio de pago
+  const desgloseMedioPago = {}
+
+  movimientos.forEach(mov => {
+    // Obtener el medio de pago - priorizar el del pago si existe
+    let medioPagoNombre = 'Efectivo' // Por defecto efectivo ya que es caja de efectivo
+
+    if (mov.pago?.medioPago?.nombre) {
+      medioPagoNombre = mov.pago.medioPago.nombre
+    }
+
+    if (!desgloseMedioPago[medioPagoNombre]) {
+      desgloseMedioPago[medioPagoNombre] = {
+        nombre: medioPagoNombre,
+        ingresos: 0,
+        egresos: 0,
+        total: 0
+      }
+    }
+
+    if (mov.tipo === 'INGRESO') {
+      desgloseMedioPago[medioPagoNombre].ingresos += Number(mov.monto)
+    } else if (mov.tipo === 'EGRESO') {
+      desgloseMedioPago[medioPagoNombre].egresos += Number(mov.monto)
+    }
+
+    desgloseMedioPago[medioPagoNombre].total =
+      desgloseMedioPago[medioPagoNombre].ingresos - desgloseMedioPago[medioPagoNombre].egresos
+  })
+
+  // Calcular desglose por concepto/cuenta contable
+  const desgloseConcepto = {}
+
+  movimientos.forEach(mov => {
+    const concepto = mov.concepto || 'Sin concepto'
+    const cuentaNombre = mov.cuentaContable?.nombre || 'Sin cuenta'
+    const key = `${concepto} - ${cuentaNombre}`
+
+    if (!desgloseConcepto[key]) {
+      desgloseConcepto[key] = {
+        concepto,
+        cuenta: cuentaNombre,
+        ingresos: 0,
+        egresos: 0,
+        cantidad: 0
+      }
+    }
+
+    desgloseConcepto[key].cantidad++
+
+    if (mov.tipo === 'INGRESO') {
+      desgloseConcepto[key].ingresos += Number(mov.monto)
+    } else if (mov.tipo === 'EGRESO') {
+      desgloseConcepto[key].egresos += Number(mov.monto)
+    }
+  })
+
   res.json({
     success: true,
     data: {
       ...cierre,
-      movimientos
+      movimientos,
+      desgloseMedioPago: Object.values(desgloseMedioPago),
+      desgloseConcepto: Object.values(desgloseConcepto)
     }
   })
+}))
+
+/**
+ * GET /api/admin/cierres-caja/informe-previo/:cajaId
+ * Generar informe previo (antes del cierre) con movimientos del día
+ */
+router.get('/informe-previo/:cajaId', asyncHandler(async (req, res) => {
+  const { cajaId } = req.params
+  const { fecha } = req.query
+
+  // Validar caja
+  const caja = await req.prisma.caja.findUnique({
+    where: { id: parseInt(cajaId) }
+  })
+
+  if (!caja) {
+    throw new AppError('Caja no encontrada', 404)
+  }
+
+  // Fecha a consultar (por defecto hoy)
+  const fechaConsulta = fecha ? new Date(fecha) : new Date()
+  fechaConsulta.setHours(0, 0, 0, 0)
+
+  const mañana = new Date(fechaConsulta)
+  mañana.setDate(mañana.getDate() + 1)
+
+  // Obtener movimientos del día
+  const movimientos = await req.prisma.movimientoCaja.findMany({
+    where: {
+      cajaId: parseInt(cajaId),
+      fecha: {
+        gte: fechaConsulta,
+        lt: mañana
+      },
+      anulado: false,
+      estado: 'CONFIRMADO'
+    },
+    include: {
+      pago: {
+        select: {
+          id: true,
+          medioPago: { select: { nombre: true, codigo: true } }
+        }
+      },
+      cuentaContable: {
+        select: {
+          nombre: true
+        }
+      }
+    },
+    orderBy: { fecha: 'asc' }
+  })
+
+  // Calcular totales
+  const totalIngresos = movimientos
+    .filter(m => m.tipo === 'INGRESO')
+    .reduce((sum, m) => sum + Number(m.monto), 0)
+
+  const totalEgresos = movimientos
+    .filter(m => m.tipo === 'EGRESO')
+    .reduce((sum, m) => sum + Number(m.monto), 0)
+
+  // Buscar el último cierre de esta caja para saber el saldo inicial
+  const ultimoCierre = await req.prisma.cierreCaja.findFirst({
+    where: {
+      cajaId: parseInt(cajaId),
+      fecha: {
+        lt: fechaConsulta
+      }
+    },
+    orderBy: {
+      fecha: 'desc'
+    }
+  })
+
+  const saldoInicial = ultimoCierre ? Number(ultimoCierre.saldoReal) : 0
+  const saldoEsperado = saldoInicial + totalIngresos - totalEgresos
+
+  // Calcular desglose por medio de pago
+  const desgloseMedioPago = {}
+
+  movimientos.forEach(mov => {
+    // Obtener el medio de pago - priorizar el del pago si existe
+    let medioPagoNombre = 'Efectivo' // Por defecto efectivo ya que es caja de efectivo
+
+    if (mov.pago?.medioPago?.nombre) {
+      medioPagoNombre = mov.pago.medioPago.nombre
+    }
+
+    if (!desgloseMedioPago[medioPagoNombre]) {
+      desgloseMedioPago[medioPagoNombre] = {
+        nombre: medioPagoNombre,
+        ingresos: 0,
+        egresos: 0,
+        total: 0
+      }
+    }
+
+    if (mov.tipo === 'INGRESO') {
+      desgloseMedioPago[medioPagoNombre].ingresos += Number(mov.monto)
+    } else if (mov.tipo === 'EGRESO') {
+      desgloseMedioPago[medioPagoNombre].egresos += Number(mov.monto)
+    }
+
+    desgloseMedioPago[medioPagoNombre].total =
+      desgloseMedioPago[medioPagoNombre].ingresos - desgloseMedioPago[medioPagoNombre].egresos
+  })
+
+  // Calcular desglose por concepto
+  const desgloseConcepto = {}
+
+  movimientos.forEach(mov => {
+    const concepto = mov.concepto || 'Sin concepto'
+    const cuentaNombre = mov.cuentaContable?.nombre || 'Sin cuenta'
+    const key = `${concepto} - ${cuentaNombre}`
+
+    if (!desgloseConcepto[key]) {
+      desgloseConcepto[key] = {
+        concepto,
+        cuenta: cuentaNombre,
+        ingresos: 0,
+        egresos: 0,
+        cantidad: 0
+      }
+    }
+
+    desgloseConcepto[key].cantidad++
+
+    if (mov.tipo === 'INGRESO') {
+      desgloseConcepto[key].ingresos += Number(mov.monto)
+    } else if (mov.tipo === 'EGRESO') {
+      desgloseConcepto[key].egresos += Number(mov.monto)
+    }
+  })
+
+  // Obtener configuración del club
+  const clubConfig = await req.prisma.configuracion.findMany({
+    where: {
+      clave: {
+        in: ['CLUB_NOMBRE', 'CLUB_LOGO_URL']
+      }
+    }
+  })
+
+  const clubNombre = clubConfig.find(c => c.clave === 'CLUB_NOMBRE')?.valor || 'Club Sportivo Pilar'
+  const clubLogoUrl = clubConfig.find(c => c.clave === 'CLUB_LOGO_URL')?.valor || null
+
+  // Preparar datos para el PDF
+  const pdfData = {
+    cajaNombre: caja.nombre,
+    fecha: fechaConsulta.toLocaleDateString('es-AR'),
+    esInformePrevio: true,
+    saldoInicial,
+    totalIngresos,
+    totalEgresos,
+    saldoEsperado,
+    cantidadMovimientos: movimientos.length,
+    desgloseMedioPago: Object.values(desgloseMedioPago),
+    desgloseConcepto: Object.values(desgloseConcepto),
+    clubNombre,
+    clubLogoUrl
+  }
+
+  // Generar PDF
+  const pdfBuffer = await generarPDFCierreCaja(pdfData)
+
+  // Configurar headers para descarga
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename=informe-previo-${caja.nombre}-${fechaConsulta.toISOString().split('T')[0]}.pdf`)
+  res.send(pdfBuffer)
+}))
+
+/**
+ * GET /api/admin/cierres-caja/:id/pdf
+ * Generar PDF del cierre de caja
+ */
+router.get('/:id/pdf', asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const cierre = await req.prisma.cierreCaja.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      caja: true,
+      adminCerrado: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true
+        }
+      },
+      adminFirmado: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true
+        }
+      }
+    }
+  })
+
+  if (!cierre) {
+    throw new AppError('Cierre no encontrado', 404)
+  }
+
+  // Obtener movimientos del día
+  const fechaCierre = new Date(cierre.fecha)
+  fechaCierre.setHours(0, 0, 0, 0)
+
+  const mañana = new Date(fechaCierre)
+  mañana.setDate(mañana.getDate() + 1)
+
+  const movimientos = await req.prisma.movimientoCaja.findMany({
+    where: {
+      cajaId: cierre.cajaId,
+      fecha: {
+        gte: fechaCierre,
+        lt: mañana
+      },
+      anulado: false,
+      estado: 'CONFIRMADO'
+    },
+    include: {
+      pago: {
+        select: {
+          medioPago: { select: { nombre: true } }
+        }
+      },
+      cuentaContable: {
+        select: {
+          nombre: true
+        }
+      }
+    },
+    orderBy: { fecha: 'asc' }
+  })
+
+  // Calcular desglose por medio de pago
+  const desgloseMedioPago = {}
+
+  movimientos.forEach(mov => {
+    // Obtener el medio de pago - priorizar el del pago si existe
+    let medioPagoNombre = 'Efectivo' // Por defecto efectivo ya que es caja de efectivo
+
+    if (mov.pago?.medioPago?.nombre) {
+      medioPagoNombre = mov.pago.medioPago.nombre
+    }
+
+    if (!desgloseMedioPago[medioPagoNombre]) {
+      desgloseMedioPago[medioPagoNombre] = {
+        nombre: medioPagoNombre,
+        ingresos: 0,
+        egresos: 0,
+        total: 0
+      }
+    }
+
+    if (mov.tipo === 'INGRESO') {
+      desgloseMedioPago[medioPagoNombre].ingresos += Number(mov.monto)
+    } else if (mov.tipo === 'EGRESO') {
+      desgloseMedioPago[medioPagoNombre].egresos += Number(mov.monto)
+    }
+
+    desgloseMedioPago[medioPagoNombre].total =
+      desgloseMedioPago[medioPagoNombre].ingresos - desgloseMedioPago[medioPagoNombre].egresos
+  })
+
+  // Calcular desglose por concepto
+  const desgloseConcepto = {}
+
+  movimientos.forEach(mov => {
+    const concepto = mov.concepto || 'Sin concepto'
+    const cuentaNombre = mov.cuentaContable?.nombre || 'Sin cuenta'
+    const key = `${concepto} - ${cuentaNombre}`
+
+    if (!desgloseConcepto[key]) {
+      desgloseConcepto[key] = {
+        concepto,
+        cuenta: cuentaNombre,
+        ingresos: 0,
+        egresos: 0,
+        cantidad: 0
+      }
+    }
+
+    desgloseConcepto[key].cantidad++
+
+    if (mov.tipo === 'INGRESO') {
+      desgloseConcepto[key].ingresos += Number(mov.monto)
+    } else if (mov.tipo === 'EGRESO') {
+      desgloseConcepto[key].egresos += Number(mov.monto)
+    }
+  })
+
+  // Obtener configuración del club
+  const clubConfig = await req.prisma.configuracion.findMany({
+    where: {
+      clave: {
+        in: ['CLUB_NOMBRE', 'CLUB_LOGO_URL']
+      }
+    }
+  })
+
+  const clubNombre = clubConfig.find(c => c.clave === 'CLUB_NOMBRE')?.valor || 'Club Sportivo Pilar'
+  const clubLogoUrl = clubConfig.find(c => c.clave === 'CLUB_LOGO_URL')?.valor || null
+
+  // Preparar datos para el PDF
+  const pdfData = {
+    cajaNombre: cierre.caja.nombre,
+    fecha: new Date(cierre.fecha).toLocaleDateString('es-AR'),
+    cerradoPor: `${cierre.adminCerrado.nombre} ${cierre.adminCerrado.apellido}`,
+    firmadoPor: cierre.adminFirmado ? `${cierre.adminFirmado.nombre} ${cierre.adminFirmado.apellido}` : null,
+    totalIngresos: Number(cierre.totalIngresos),
+    totalEgresos: Number(cierre.totalEgresos),
+    saldoSistema: Number(cierre.saldoSistema),
+    saldoReal: Number(cierre.saldoReal),
+    diferencia: Number(cierre.diferencia),
+    observaciones: cierre.observaciones,
+    desgloseMedioPago: Object.values(desgloseMedioPago),
+    desgloseConcepto: Object.values(desgloseConcepto),
+    clubNombre,
+    clubLogoUrl
+  }
+
+  // Generar PDF
+  const pdfBuffer = await generarPDFCierreCaja(pdfData)
+
+  // Configurar headers para descarga
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename=cierre-caja-${cierre.caja.nombre}-${new Date(cierre.fecha).toISOString().split('T')[0]}.pdf`)
+  res.send(pdfBuffer)
 }))
 
 /**

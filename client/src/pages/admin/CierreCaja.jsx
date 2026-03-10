@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lock, CheckCircle, AlertTriangle, X, Eye, FileText, Calendar, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
+import { Lock, CheckCircle, AlertTriangle, X, Eye, FileText, Calendar, DollarSign, TrendingUp, TrendingDown, Download } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -110,6 +110,64 @@ export default function CierreCaja() {
     }
   }
 
+  async function descargarPDF(cierreId) {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/cierres-caja/${cierreId}/pdf`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al generar PDF')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cierre-caja-${cierreId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      setSuccess('PDF generado exitosamente')
+    } catch (err) {
+      setError('Error al generar PDF del cierre')
+    }
+  }
+
+  async function descargarInformePrevio(caja) {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/cierres-caja/informe-previo/${caja.id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al generar informe')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `informe-previo-${caja.nombre}-${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      setSuccess('Informe generado exitosamente')
+    } catch (err) {
+      setError('Error al generar informe previo')
+    }
+  }
+
   if (loading && cajasPendientes.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -209,16 +267,27 @@ export default function CierreCaja() {
                   </div>
                 </div>
 
-                {tienePermiso(PERMISOS.CAJA_CIERRE) && (
+                <div className="flex gap-2">
                   <Button
-                    onClick={() => abrirModalCerrar(caja)}
-                    className="w-full"
+                    onClick={() => descargarInformePrevio(caja)}
+                    variant="outline"
+                    className="flex-1 flex items-center justify-center"
                     size="sm"
                   >
-                    <Lock className="w-4 h-4 mr-2" />
-                    Cerrar Caja
+                    <FileText className="w-5 h-5 mr-2" />
+                    Ver Informe
                   </Button>
-                )}
+                  {tienePermiso(PERMISOS.CAJA_CIERRE) && (
+                    <Button
+                      onClick={() => abrirModalCerrar(caja)}
+                      className="flex-1 flex items-center justify-center"
+                      size="sm"
+                    >
+                      <Lock className="w-5 h-5 mr-2" />
+                      Cerrar
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -468,15 +537,24 @@ export default function CierreCaja() {
               <h2 className="text-xl font-bold text-gray-800">
                 Detalle de Cierre - {cierreSeleccionado.caja.nombre}
               </h2>
-              <button
-                onClick={() => {
-                  setModalDetalle(false)
-                  setCierreSeleccionado(null)
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => descargarPDF(cierreSeleccionado.id)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Descargar PDF"
+                >
+                  <Download className="w-5 h-5 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => {
+                    setModalDetalle(false)
+                    setCierreSeleccionado(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6">
@@ -564,6 +642,74 @@ export default function CierreCaja() {
                 </div>
               )}
 
+              {/* Desglose por Medio de Pago */}
+              {cierreSeleccionado.desgloseMedioPago && cierreSeleccionado.desgloseMedioPago.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">Desglose por Medio de Pago</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-medium text-gray-700">Medio de Pago</th>
+                          <th className="px-4 py-2 text-right font-medium text-gray-700">Ingresos</th>
+                          <th className="px-4 py-2 text-right font-medium text-gray-700">Egresos</th>
+                          <th className="px-4 py-2 text-right font-medium text-gray-700">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {cierreSeleccionado.desgloseMedioPago.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-900">{item.nombre}</td>
+                            <td className="px-4 py-2 text-right text-green-600 font-medium">
+                              ${item.ingresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-4 py-2 text-right text-red-600 font-medium">
+                              ${item.egresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-4 py-2 text-right text-gray-900 font-semibold">
+                              ${item.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Desglose por Concepto */}
+              {cierreSeleccionado.desgloseConcepto && cierreSeleccionado.desgloseConcepto.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">Desglose por Concepto</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-medium text-gray-700">Concepto</th>
+                          <th className="px-4 py-2 text-center font-medium text-gray-700">Cantidad</th>
+                          <th className="px-4 py-2 text-right font-medium text-gray-700">Ingresos</th>
+                          <th className="px-4 py-2 text-right font-medium text-gray-700">Egresos</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {cierreSeleccionado.desgloseConcepto.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-900">{item.concepto}</td>
+                            <td className="px-4 py-2 text-center text-gray-700">{item.cantidad}</td>
+                            <td className="px-4 py-2 text-right text-green-600 font-medium">
+                              ${item.ingresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-4 py-2 text-right text-red-600 font-medium">
+                              ${item.egresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Firma */}
               <div className="mb-6">
                 {cierreSeleccionado.firmadoPor ? (
@@ -605,17 +751,26 @@ export default function CierreCaja() {
                 )}
               </div>
 
-              {/* Botón Cerrar */}
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setModalDetalle(false)
-                  setCierreSeleccionado(null)
-                }}
-                className="w-full"
-              >
-                Cerrar
-              </Button>
+              {/* Botones de acción */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => descargarPDF(cierreSeleccionado.id)}
+                  className="flex-1"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Descargar PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setModalDetalle(false)
+                    setCierreSeleccionado(null)
+                  }}
+                  className="flex-1"
+                >
+                  Cerrar
+                </Button>
+              </div>
             </div>
           </div>
         </div>

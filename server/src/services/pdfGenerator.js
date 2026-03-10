@@ -305,6 +305,573 @@ async function generarPDFComprobantePago(data, template) {
 }
 
 /**
+ * Genera PDF de Cierre de Caja con desglose por medio de pago y concepto
+ */
+export async function generarPDFCierreCaja(cierreData) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 40
+      })
+
+      const buffers = []
+      doc.on('data', buffers.push.bind(buffers))
+      doc.on('end', () => resolve(Buffer.concat(buffers)))
+      doc.on('error', reject)
+
+      const esInformePrevio = cierreData.esInformePrevio || false
+      const pageWidth = doc.page.width - 80 // Ancho útil (descontando márgenes)
+
+      // ==================== ENCABEZADO CON DISEÑO MEJORADO ====================
+
+      // Fondo del encabezado
+      doc.rect(40, 40, pageWidth, 100)
+         .fill('#F3F4F6')
+
+      // Logo del club (si existe)
+      let logoLoaded = false
+      if (cierreData.clubLogoUrl) {
+        try {
+          const logoPath = cierreData.clubLogoUrl.startsWith('http')
+            ? cierreData.clubLogoUrl
+            : `./public${cierreData.clubLogoUrl}`
+
+          doc.image(logoPath, 55, 55, { width: 70, height: 70 })
+          logoLoaded = true
+        } catch (err) {
+          console.log('No se pudo cargar el logo del club:', err.message)
+        }
+      }
+
+      // Nombre del club y título
+      const textStartX = logoLoaded ? 145 : 55
+
+      doc.fontSize(16)
+         .fillColor('#1F2937')
+         .font('Helvetica-Bold')
+         .text(cierreData.clubNombre || 'Club Sportivo Pilar', textStartX, 55, { align: 'left' })
+
+      const tituloInforme = esInformePrevio ? 'INFORME PREVIO AL CIERRE' : 'INFORME DE CIERRE DE CAJA'
+
+      doc.fontSize(20)
+         .fillColor('#DC2626')
+         .font('Helvetica-Bold')
+         .text(tituloInforme, textStartX, 80, { align: 'left' })
+
+      if (esInformePrevio) {
+        doc.fontSize(9)
+           .fillColor('#F59E0B')
+           .font('Helvetica-Bold')
+           .text('* Documento no oficial - Solo para referencia', textStartX, 105, { align: 'left' })
+      }
+
+      doc.fillColor('#000') // Reset color
+
+      // ==================== INFO DE LA CAJA ====================
+
+      doc.y = 160
+
+      // Caja con información de la caja y fecha
+      doc.roundedRect(40, doc.y, pageWidth, 65, 5)
+         .lineWidth(1)
+         .strokeColor('#E5E7EB')
+         .stroke()
+
+      doc.roundedRect(40, doc.y, pageWidth, 25, 5)
+         .fill('#DC2626')
+
+      doc.fontSize(14)
+         .fillColor('#FFFFFF')
+         .font('Helvetica-Bold')
+         .text(cierreData.cajaNombre || 'Caja', 50, doc.y - 23 + 7, { align: 'left' })
+
+      doc.y = 160 + 35
+
+      // Información en dos columnas
+      doc.fontSize(9)
+         .fillColor('#6B7280')
+         .font('Helvetica')
+         .text('FECHA:', 50, doc.y)
+
+      doc.fontSize(11)
+         .fillColor('#1F2937')
+         .font('Helvetica-Bold')
+         .text(cierreData.fecha, 130, doc.y)
+
+      if (!esInformePrevio && cierreData.cerradoPor) {
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica')
+           .text('CERRADO POR:', 300, doc.y)
+
+        doc.fontSize(11)
+           .fillColor('#1F2937')
+           .font('Helvetica-Bold')
+           .text(cierreData.cerradoPor, 380, doc.y, { width: 160 })
+      }
+
+      doc.y += 20
+
+      if (!esInformePrevio && cierreData.firmadoPor) {
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica')
+           .text('FIRMADO POR:', 300, doc.y)
+
+        doc.fontSize(11)
+           .fillColor('#16A34A')
+           .font('Helvetica-Bold')
+           .text(cierreData.firmadoPor, 380, doc.y, { width: 160 })
+      }
+
+      doc.moveDown(3)
+
+      // ==================== RESUMEN FINANCIERO CON TARJETAS ====================
+
+      doc.fontSize(14)
+         .fillColor('#1F2937')
+         .font('Helvetica-Bold')
+         .text('RESUMEN FINANCIERO', 40)
+         .moveDown(0.8)
+
+      const startY = doc.y
+      const cardWidth = (pageWidth - 10) / 2
+      const cardHeight = esInformePrevio ? 210 : 190
+
+      // Tarjeta izquierda - Movimientos del día
+      doc.roundedRect(40, startY, cardWidth, cardHeight, 5)
+         .lineWidth(1)
+         .strokeColor('#E5E7EB')
+         .stroke()
+
+      // Header de la tarjeta
+      doc.roundedRect(40, startY, cardWidth, 30, 5)
+         .fill('#3B82F6')
+
+      doc.fontSize(11)
+         .fillColor('#FFFFFF')
+         .font('Helvetica-Bold')
+         .text('MOVIMIENTOS DEL DIA', 50, startY + 10)
+
+      let cardY = startY + 45
+
+      // Saldo Inicial (solo en informe previo)
+      if (esInformePrevio && cierreData.saldoInicial !== undefined) {
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica')
+           .text('Saldo Inicial', 50, cardY)
+
+        doc.fontSize(13)
+           .fillColor('#1F2937')
+           .font('Helvetica-Bold')
+           .text(`$${cierreData.saldoInicial.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 50, cardY + 12)
+
+        cardY += 40
+      }
+
+      // Ingresos
+      doc.fontSize(9)
+         .fillColor('#6B7280')
+         .font('Helvetica')
+         .text('^ Total Ingresos', 50, cardY)
+
+      doc.fontSize(13)
+         .fillColor('#16A34A')
+         .font('Helvetica-Bold')
+         .text(`$${cierreData.totalIngresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 50, cardY + 12)
+
+      cardY += 40
+
+      // Egresos
+      doc.fontSize(9)
+         .fillColor('#6B7280')
+         .font('Helvetica')
+         .text('v Total Egresos', 50, cardY)
+
+      doc.fontSize(13)
+         .fillColor('#DC2626')
+         .font('Helvetica-Bold')
+         .text(`$${cierreData.totalEgresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 50, cardY + 12)
+
+      if (esInformePrevio && cierreData.cantidadMovimientos !== undefined) {
+        cardY += 40
+
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica')
+           .text('# Operaciones', 50, cardY)
+
+        doc.fontSize(13)
+           .fillColor('#1F2937')
+           .font('Helvetica-Bold')
+           .text(`${cierreData.cantidadMovimientos}`, 50, cardY + 12)
+      }
+
+      // Tarjeta derecha - Resultado
+      const rightCardX = 40 + cardWidth + 10
+
+      doc.roundedRect(rightCardX, startY, cardWidth, cardHeight, 5)
+         .lineWidth(1)
+         .strokeColor('#E5E7EB')
+         .stroke()
+
+      if (esInformePrevio) {
+        // Header para informe previo
+        doc.roundedRect(rightCardX, startY, cardWidth, 30, 5)
+           .fill('#F59E0B')
+
+        doc.fontSize(11)
+           .fillColor('#FFFFFF')
+           .font('Helvetica-Bold')
+           .text('SALDO ESPERADO', rightCardX + 10, startY + 10)
+
+        const resultY = startY + 60
+
+        doc.fontSize(10)
+           .fillColor('#6B7280')
+           .font('Helvetica')
+           .text('Efectivo que debe haber', rightCardX + 10, resultY)
+
+        doc.fontSize(24)
+           .fillColor('#F59E0B')
+           .font('Helvetica-Bold')
+           .text(`$${cierreData.saldoEsperado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, rightCardX + 10, resultY + 20)
+
+        doc.fontSize(8)
+           .fillColor('#9CA3AF')
+           .font('Helvetica')
+           .text('Este monto debe coincidir con el', rightCardX + 10, resultY + 60)
+           .text('efectivo contado fisicamente', rightCardX + 10, resultY + 70)
+
+      } else {
+        // Header para cierre final
+        const diferencia = cierreData.diferencia
+        const headerColor = diferencia === 0 ? '#16A34A' : diferencia > 0 ? '#3B82F6' : '#DC2626'
+        const headerText = diferencia === 0 ? 'CAJA BALANCEADA' : diferencia > 0 ? 'SOBRANTE' : 'FALTANTE'
+
+        doc.roundedRect(rightCardX, startY, cardWidth, 30, 5)
+           .fill(headerColor)
+
+        doc.fontSize(11)
+           .fillColor('#FFFFFF')
+           .font('Helvetica-Bold')
+           .text(headerText, rightCardX + 10, startY + 10)
+
+        let resultY = startY + 45
+
+        // Saldo Sistema
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica')
+           .text('Saldo Sistema', rightCardX + 10, resultY)
+
+        doc.fontSize(12)
+           .fillColor('#1F2937')
+           .font('Helvetica-Bold')
+           .text(`$${cierreData.saldoSistema.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, rightCardX + 10, resultY + 12)
+
+        resultY += 40
+
+        // Saldo Real
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica')
+           .text('Saldo Real (Contado)', rightCardX + 10, resultY)
+
+        doc.fontSize(12)
+           .fillColor('#1F2937')
+           .font('Helvetica-Bold')
+           .text(`$${cierreData.saldoReal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, rightCardX + 10, resultY + 12)
+
+        resultY += 40
+
+        // Diferencia (destacada)
+        doc.roundedRect(rightCardX + 10, resultY - 5, cardWidth - 20, 45, 3)
+           .fillOpacity(0.1)
+           .fill(headerColor)
+           .fillOpacity(1)
+
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica')
+           .text('Diferencia', rightCardX + 20, resultY)
+
+        doc.fontSize(18)
+           .fillColor(headerColor)
+           .font('Helvetica-Bold')
+           .text(`${diferencia >= 0 ? '+' : ''}$${diferencia.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, rightCardX + 20, resultY + 14)
+      }
+
+      doc.y = startY + cardHeight + 20
+
+      // ==================== DESGLOSE POR MEDIO DE PAGO ====================
+
+      doc.fontSize(14)
+         .fillColor('#1F2937')
+         .font('Helvetica-Bold')
+         .text('DESGLOSE POR MEDIO DE PAGO', 40)
+         .moveDown(0.8)
+
+      if (cierreData.desgloseMedioPago && cierreData.desgloseMedioPago.length > 0) {
+        const tableY = doc.y
+
+        // Fondo y borde de la tabla
+        const rowHeight = 28
+        const tableHeight = (cierreData.desgloseMedioPago.length + 1) * rowHeight
+
+        doc.roundedRect(40, tableY, pageWidth, tableHeight, 5)
+           .lineWidth(1)
+           .strokeColor('#E5E7EB')
+           .stroke()
+
+        // Header de la tabla
+        doc.rect(40, tableY, pageWidth, rowHeight)
+           .fill('#F9FAFB')
+
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica-Bold')
+           .text('MEDIO DE PAGO', 50, tableY + 10, { width: 180 })
+           .text('INGRESOS', 240, tableY + 10, { width: 100, align: 'right' })
+           .text('EGRESOS', 350, tableY + 10, { width: 100, align: 'right' })
+           .text('TOTAL', 460, tableY + 10, { width: 80, align: 'right' })
+
+        let currentRowY = tableY + rowHeight
+
+        cierreData.desgloseMedioPago.forEach((item, index) => {
+          // Fondo alternado
+          if (index % 2 === 0) {
+            doc.rect(40, currentRowY, pageWidth, rowHeight)
+               .fillOpacity(0.03)
+               .fill('#000000')
+               .fillOpacity(1)
+          }
+
+          // Línea separadora
+          doc.moveTo(40, currentRowY)
+             .lineTo(40 + pageWidth, currentRowY)
+             .strokeColor('#F3F4F6')
+             .stroke()
+
+          // Contenido de la fila
+          doc.fontSize(10)
+             .fillColor('#1F2937')
+             .font('Helvetica')
+             .text(item.nombre, 50, currentRowY + 9, { width: 180 })
+
+          doc.font('Helvetica-Bold')
+             .fillColor('#16A34A')
+             .text(`$${item.ingresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 240, currentRowY + 9, { width: 100, align: 'right' })
+
+          doc.fillColor('#DC2626')
+             .text(`$${item.egresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 350, currentRowY + 9, { width: 100, align: 'right' })
+
+          const totalColor = item.total >= 0 ? '#1F2937' : '#DC2626'
+          doc.fillColor(totalColor)
+             .text(`$${item.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 460, currentRowY + 9, { width: 80, align: 'right' })
+
+          currentRowY += rowHeight
+        })
+
+        doc.y = currentRowY + 10
+      } else {
+        doc.fontSize(9)
+           .font('Helvetica')
+           .fillColor('#9CA3AF')
+           .text('No hay movimientos registrados', { align: 'center' })
+        doc.moveDown(1)
+      }
+
+      doc.moveDown(1)
+
+      // ==================== DESGLOSE POR CONCEPTO ====================
+
+      doc.fontSize(14)
+         .fillColor('#1F2937')
+         .font('Helvetica-Bold')
+         .text('DESGLOSE POR CONCEPTO', 40)
+         .moveDown(0.8)
+
+      if (cierreData.desgloseConcepto && cierreData.desgloseConcepto.length > 0) {
+        const tableY = doc.y
+        const rowHeight = 32
+
+        // Verificar si necesitamos nueva página
+        if (tableY > 650) {
+          doc.addPage()
+          doc.y = 80
+        }
+
+        const tableHeight = (cierreData.desgloseConcepto.length + 1) * rowHeight
+
+        // Fondo y borde de la tabla
+        doc.roundedRect(40, doc.y, pageWidth, tableHeight, 5)
+           .lineWidth(1)
+           .strokeColor('#E5E7EB')
+           .stroke()
+
+        const headerY = doc.y
+
+        // Header de la tabla
+        doc.rect(40, headerY, pageWidth, rowHeight)
+           .fill('#F9FAFB')
+
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .font('Helvetica-Bold')
+           .text('CONCEPTO', 50, headerY + 11, { width: 200 })
+           .text('CANT.', 260, headerY + 11, { width: 50, align: 'center' })
+           .text('INGRESOS', 320, headerY + 11, { width: 100, align: 'right' })
+           .text('EGRESOS', 430, headerY + 11, { width: 100, align: 'right' })
+
+        let currentRowY = headerY + rowHeight
+
+        cierreData.desgloseConcepto.forEach((item, index) => {
+          // Verificar nueva página
+          if (currentRowY > 750) {
+            doc.addPage()
+            currentRowY = 80
+          }
+
+          // Fondo alternado
+          if (index % 2 === 0) {
+            doc.rect(40, currentRowY, pageWidth, rowHeight)
+               .fillOpacity(0.03)
+               .fill('#000000')
+               .fillOpacity(1)
+          }
+
+          // Línea separadora
+          doc.moveTo(40, currentRowY)
+             .lineTo(40 + pageWidth, currentRowY)
+             .strokeColor('#F3F4F6')
+             .stroke()
+
+          // Contenido de la fila
+          doc.fontSize(9)
+             .fillColor('#1F2937')
+             .font('Helvetica')
+             .text(item.concepto, 50, currentRowY + 11, { width: 200 })
+
+          doc.font('Helvetica-Bold')
+             .fillColor('#6B7280')
+             .text(item.cantidad.toString(), 260, currentRowY + 11, { width: 50, align: 'center' })
+
+          doc.fillColor('#16A34A')
+             .text(`$${item.ingresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 320, currentRowY + 11, { width: 100, align: 'right' })
+
+          doc.fillColor('#DC2626')
+             .text(`$${item.egresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 430, currentRowY + 11, { width: 100, align: 'right' })
+
+          currentRowY += rowHeight
+        })
+
+        doc.y = currentRowY + 10
+      } else {
+        doc.fontSize(9)
+           .font('Helvetica')
+           .fillColor('#9CA3AF')
+           .text('No hay movimientos registrados', { align: 'center' })
+        doc.moveDown(1)
+      }
+
+      // ==================== OBSERVACIONES ====================
+
+      if (cierreData.observaciones) {
+        doc.moveDown(1.5)
+
+        doc.roundedRect(40, doc.y, pageWidth, 'auto', 5)
+           .lineWidth(1)
+           .strokeColor('#E5E7EB')
+
+        const obsY = doc.y
+
+        doc.rect(40, obsY, pageWidth, 25)
+           .fill('#FEF3C7')
+
+        doc.fontSize(10)
+           .fillColor('#92400E')
+           .font('Helvetica-Bold')
+           .text('OBSERVACIONES', 50, obsY + 7)
+
+        doc.y = obsY + 35
+
+        doc.fontSize(9)
+           .fillColor('#374151')
+           .font('Helvetica')
+           .text(cierreData.observaciones, 50, doc.y, { width: pageWidth - 20, align: 'left' })
+
+        const textHeight = doc.heightOfString(cierreData.observaciones, { width: pageWidth - 20 })
+
+        doc.roundedRect(40, obsY, pageWidth, 35 + textHeight + 15, 5)
+           .lineWidth(1)
+           .strokeColor('#E5E7EB')
+           .stroke()
+
+        doc.y = obsY + 35 + textHeight + 20
+      }
+
+      // ==================== FOOTER MEJORADO ====================
+
+      const footerStartY = doc.page.height - 80
+
+      // Ir al footer
+      if (doc.y > footerStartY - 20) {
+        doc.addPage()
+        doc.y = footerStartY
+      } else {
+        doc.y = footerStartY
+      }
+
+      // Línea separadora superior
+      doc.moveTo(40, doc.y)
+         .lineTo(40 + pageWidth, doc.y)
+         .strokeColor('#E5E7EB')
+         .lineWidth(1)
+         .stroke()
+
+      doc.moveDown(0.8)
+
+      // Información del footer en dos columnas
+      const footerTextY = doc.y
+
+      doc.fontSize(7)
+         .fillColor('#9CA3AF')
+         .font('Helvetica')
+         .text('Fecha de generacion:', 50, footerTextY)
+
+      doc.fontSize(8)
+         .fillColor('#6B7280')
+         .font('Helvetica-Bold')
+         .text(new Date().toLocaleString('es-AR', {
+           day: '2-digit',
+           month: '2-digit',
+           year: 'numeric',
+           hour: '2-digit',
+           minute: '2-digit'
+         }), 50, footerTextY + 10)
+
+      doc.fontSize(7)
+         .fillColor('#9CA3AF')
+         .font('Helvetica')
+         .text('Sistema:', 350, footerTextY, { align: 'right', width: 185 })
+
+      doc.fontSize(8)
+         .fillColor('#DC2626')
+         .font('Helvetica-Bold')
+         .text('RojoPlus - Gestion de Club', 350, footerTextY + 10, { align: 'right', width: 185 })
+
+      doc.end()
+
+    } catch (error) {
+      reject(error)
+    }
+  })
+}
+
+/**
  * Genera un PDF de prueba con datos de ejemplo
  * @param {Object} prisma - Cliente de Prisma
  * @param {string} tipo - Tipo de PDF
