@@ -5,10 +5,15 @@
  */
 import express from 'express'
 import PDFDocument from 'pdfkit'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import prisma from '../../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 import { generarTicketFiscal, generarTicketCuenta } from '../../services/thermalPrinter.js'
 import { enviarImpresion } from './impresoras.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const router = express.Router()
 
@@ -521,11 +526,18 @@ router.get('/menu-publico/pdf', async (req, res) => {
     const clubTelefono = configMap.CLUB_TELEFONO || '(0230) 442-0297'
     const clubLogoUrl = configMap.CLUB_LOGO_URL
 
-    // Crear documento PDF
+    // Crear documento PDF (SIN bufferPages)
     const doc = new PDFDocument({
       size: 'A4',
-      margin: 40,
-      bufferPages: true
+      margin: 40
+    })
+
+    // Manejar errores del documento
+    doc.on('error', (err) => {
+      console.error('Error en el documento PDF:', err)
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: 'Error al generar PDF del menú' })
+      }
     })
 
     // Configurar headers para descarga
@@ -535,31 +547,28 @@ router.get('/menu-publico/pdf', async (req, res) => {
     // Pipe el PDF directamente a la respuesta
     doc.pipe(res)
 
+    // Ahora sí podemos acceder a las propiedades de la página
     const pageWidth = doc.page.width
     const margin = 40
     const contentWidth = pageWidth - (margin * 2)
     const headerHeight = 90
 
     // === FUNCIÓN PARA RENDERIZAR ENCABEZADO ===
-    const renderHeader = (pageNum) => {
-      const currentY = doc.y
-
+    const renderHeader = () => {
       // Fondo del encabezado
       doc.rect(0, 0, pageWidth, headerHeight)
          .fill('#DC2626')
 
-      // Intentar cargar logo del club
+      // Cargar logo del club
       let logoLoaded = false
-      if (clubLogoUrl) {
-        try {
-          const logoPath = clubLogoUrl.startsWith('http')
-            ? clubLogoUrl
-            : `./public${clubLogoUrl}`
-          doc.image(logoPath, margin, 15, { width: 50, height: 50 })
-          logoLoaded = true
-        } catch (err) {
-          console.log('No se pudo cargar el logo del club')
-        }
+      try {
+        // Usar logo de la página pública
+        // Desde server/src/routes/buffet/ subimos a la raíz del proyecto y vamos a client/public/images/
+        const logoPath = path.resolve(__dirname, '../../../../client/public/images/logo.png')
+        doc.image(logoPath, margin, 15, { width: 50, height: 50 })
+        logoLoaded = true
+      } catch (err) {
+        console.log('No se pudo cargar el logo del club:', err.message)
       }
 
       const textStartX = logoLoaded ? margin + 60 : margin
@@ -568,34 +577,55 @@ router.get('/menu-publico/pdf', async (req, res) => {
       doc.fontSize(22)
          .fillColor('#FFFFFF')
          .font('Helvetica-Bold')
-         .text('MENÚ - Buffet del Club', textStartX, 20, { align: 'left' })
+         .text('MENÚ - Buffet del Club', textStartX, 20, { lineBreak: false })
 
       doc.fontSize(9)
          .fillColor('#FEE2E2')
          .font('Helvetica')
-         .text(clubNombre, textStartX, 45, { align: 'left' })
+         .text(clubNombre, textStartX, 45, { lineBreak: false })
 
       doc.fontSize(8)
          .fillColor('#FEE2E2')
-         .text(`${clubDireccion} | ${clubTelefono}`, textStartX, 60, { align: 'left' })
+         .text(`${clubDireccion} | ${clubTelefono}`, textStartX, 60, { lineBreak: false })
 
-      // Restaurar posición
-      doc.y = currentY
+      // Posicionar después del header
+      doc.y = headerHeight + 20
+    }
+
+    // === FUNCIÓN PARA RENDERIZAR FOOTER (solo línea y fecha, sin número de página)===
+    const renderFooter = () => {
+      const currentY = doc.y
+      const footerY = doc.page.height - 35
+
+      doc.moveTo(margin, footerY)
+         .lineTo(pageWidth - margin, footerY)
+         .strokeColor('#E5E7EB')
+         .lineWidth(1)
+         .stroke()
+
+      doc.fontSize(8)
+         .fillColor('#9CA3AF')
+         .font('Helvetica')
+         .text(
+           `Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+           margin,
+           footerY + 8,
+           { lineBreak: false }
+         )
+
+      doc.y = currentY // Restaurar posición Y
     }
 
     // Renderizar header en primera página
-    renderHeader(0)
-
-    // Resetear posición después del header
-    doc.y = headerHeight + 20
+    renderHeader()
 
     // === CATEGORÍAS Y PRODUCTOS ===
     categoriasConProductos.forEach((categoria, catIndex) => {
       // Verificar espacio para nueva categoría (título + al menos 1 producto)
       if (doc.y > 650) {
-        doc.addPage()
-        renderHeader()
-        doc.y = headerHeight + 20
+        renderFooter() // Footer de la página actual
+        doc.addPage()  // Nueva página
+        renderHeader() // Header de la nueva página
       }
 
       // Fondo de categoría
@@ -629,9 +659,9 @@ router.get('/menu-publico/pdf', async (req, res) => {
       categoria.productos.forEach((producto, prodIndex) => {
         // Verificar espacio para nuevo producto (mínimo 50px)
         if (doc.y > 720) {
-          doc.addPage()
-          renderHeader()
-          doc.y = headerHeight + 20
+          renderFooter() // Footer de la página actual
+          doc.addPage()  // Nueva página
+          renderHeader() // Header de la nueva página
         }
 
         const productY = doc.y
@@ -691,56 +721,21 @@ router.get('/menu-publico/pdf', async (req, res) => {
       doc.moveDown(1)
     })
 
-    // === FOOTER EN TODAS LAS PÁGINAS ===
-    const range = doc.bufferedPageRange()
-    const pageCount = range.count
-
-    for (let i = 0; i < pageCount; i++) {
-      doc.switchToPage(i)
-
-      // Guardar posición actual para no crear páginas nuevas
-      const savedY = doc.y
-
-      // Línea superior del footer
-      const footerY = doc.page.height - 35
-      doc.moveTo(margin, footerY)
-         .lineTo(pageWidth - margin, footerY)
-         .strokeColor('#E5E7EB')
-         .lineWidth(1)
-         .stroke()
-
-      // Texto del footer - IMPORTANTE: usar coordenadas absolutas
-      doc.fontSize(8)
-         .fillColor('#9CA3AF')
-         .font('Helvetica')
-
-      // Fecha generación (izquierda)
-      doc.text(
-        `Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
-        margin,
-        footerY + 8,
-        { align: 'left', width: contentWidth / 2, lineBreak: false }
-      )
-
-      // Número de página (derecha) - con posición Y explícita
-      doc.text(
-        `Página ${i + 1} de ${pageCount}`,
-        pageWidth - margin - contentWidth / 2,
-        footerY + 8,
-        { align: 'right', width: contentWidth / 2, lineBreak: false }
-      )
-
-      // Restaurar posición para no afectar el contenido
-      doc.y = savedY
-    }
+    // === FOOTER DE LA ÚLTIMA PÁGINA ===
+    renderFooter()
 
     // Finalizar el PDF
     doc.end()
 
   } catch (error) {
     console.error('Error al generar PDF del menú:', error)
+
+    // Si el PDF ya está en pipe, no podemos enviar JSON
     if (!res.headersSent) {
       res.status(500).json({ success: false, error: 'Error al generar PDF del menú' })
+    } else {
+      // Si ya empezamos a enviar el PDF, solo logueamos el error
+      console.error('Error después de iniciar el stream del PDF')
     }
   }
 })
