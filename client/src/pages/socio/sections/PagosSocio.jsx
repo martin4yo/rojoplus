@@ -19,6 +19,7 @@ import {
 import { useModal } from '../../../components/Modal'
 import { formatDate, formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
+import ChatWidget from '../../../components/chat/ChatWidget'
 
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [cuotas, setCuotas] = useState([])
@@ -828,6 +829,9 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
       )}
 
       {ModalComponent}
+
+      {/* ROJO IA - Chat Widget */}
+      <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
     </div>
   )
 }

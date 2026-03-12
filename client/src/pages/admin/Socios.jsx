@@ -15,6 +15,7 @@ import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { usePagination } from '../../hooks/usePagination'
+import ChatWidget from '../../components/chat/ChatWidget'
 
 // Componente Avatar con fallback si la imagen no carga
 function AvatarSocio({ foto, nombre }) {
@@ -586,6 +587,9 @@ export default function AdminSocios() {
         </div>
       )}
       <ConfirmDialog />
+
+      {/* ROJO IA - Chat Widget para Admins */}
+      <ChatWidget role="admin" position="bottom-right" />
     </div>
   )
 }

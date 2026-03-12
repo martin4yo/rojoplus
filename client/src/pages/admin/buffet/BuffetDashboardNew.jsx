@@ -10,6 +10,7 @@ import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import TicketPreview from '../../../components/buffet/TicketPreview'
 import PageHeader from '../../../components/PageHeader'
+import ChatWidget from '../../../components/chat/ChatWidget'
 
 // Rangos de fecha predefinidos
 const RANGOS_FECHA = [
@@ -590,6 +591,9 @@ export default function BuffetDashboard() {
           }}
         />
       )}
+
+      {/* ROJO IA - Chat Widget para Camareros */}
+      <ChatWidget role="camarero" position="bottom-right" />
     </div>
   )
 }
