@@ -33,9 +33,11 @@ import React from 'react'
 // Configuraciones de colores por tipo
 const STATUS_CONFIGS = {
   socio: {
-    activo: { color: 'green', label: 'ACTIVO', keywords: ['activ', 'vigent'] },
-    inactivo: { color: 'red', label: 'INACTIVO', keywords: ['baja', 'inactiv', 'suspend'] },
-    pendiente: { color: 'yellow', label: 'PENDIENTE', keywords: ['pendiente', 'revision'] },
+    vigente: { color: 'green', keywords: ['vigent'] },
+    activo: { color: 'green', keywords: ['activ'] },
+    baja: { color: 'red', keywords: ['baja'] },
+    suspendido: { color: 'red', keywords: ['suspend'] },
+    pendiente: { color: 'yellow', keywords: ['pendiente', 'revision'] },
     default: { color: 'gray' }
   },
 

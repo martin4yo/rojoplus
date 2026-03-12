@@ -7,6 +7,7 @@
 import express from 'express'
 import prisma from '../../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../../middleware/auth.js'
+import { generarAsientoAutomatico } from '../asientos.js'
 import {
   generarAsientoFacturaVenta,
   generarAsientoReciboCobro
@@ -770,12 +771,22 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     const propinaMonto = propina && propina > 0 ? parseFloat(propina) : 0
     const totalFinal = Number(pedido.total) + propinaMonto
 
-    let cuentaContable = await prisma.cuentaContable.findFirst({
+    // Agrupar items por cuenta contable del producto para asientos
+    const itemsPorCuenta = {}
+    for (const item of pedido.items) {
+      const cuentaId = item.productoBuffet?.cuentaContableId
+      if (!itemsPorCuenta[cuentaId]) {
+        itemsPorCuenta[cuentaId] = 0
+      }
+      itemsPorCuenta[cuentaId] += Number(item.total)
+    }
+
+    // Cuenta contable fallback si no tiene configurada
+    let cuentaContableFallback = await prisma.cuentaContable.findFirst({
       where: { codigo: { contains: 'BUFFET' }, esImputable: true }
     })
-
-    if (!cuentaContable) {
-      cuentaContable = await prisma.cuentaContable.findFirst({
+    if (!cuentaContableFallback) {
+      cuentaContableFallback = await prisma.cuentaContable.findFirst({
         where: { codigo: '4.1.1.01', esImputable: true }
       })
     }
@@ -822,6 +833,43 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           }
         })
 
+        // Generar asiento contable automático
+        const lineasAsiento = [
+          {
+            cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+            debe: parseFloat(pago.monto),
+            haber: 0,
+            descripcion: `Ingreso por venta take away - ${medioPago.nombre}`
+          }
+        ]
+
+        // Distribuir el monto del pago proporcionalmente entre las cuentas contables
+        const totalPedido = Number(pedido.total)
+        for (const [cuentaId, montoItems] of Object.entries(itemsPorCuenta)) {
+          const cuentaContableId = cuentaId !== 'null' && cuentaId ? parseInt(cuentaId) : cuentaContableFallback?.id
+          if (!cuentaContableId) continue
+
+          // Proporción del monto de este pago que corresponde a esta cuenta
+          const proporcion = montoItems / totalPedido
+          const montoCuenta = parseFloat(pago.monto) * proporcion
+
+          lineasAsiento.push({
+            cuentaContableId,
+            debe: 0,
+            haber: montoCuenta,
+            descripcion: `Venta take away - Pedido ${pedido.numero}`
+          })
+        }
+
+        await generarAsientoAutomatico(prisma, {
+          fecha: new Date(),
+          concepto: `Venta Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}`,
+          tipoOrigen: 'VENTA_TAKEAWAY',
+          origenId: movimiento.id,
+          registradoPor: req.admin.id,
+          lineas: lineasAsiento
+        })
+
         movimientos.push(movimiento)
       }
     } else {
@@ -851,6 +899,43 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           pedidoTakeAwayId: parseInt(id),
           registradoPor: req.admin.id
         }
+      })
+
+      // Generar asiento contable automático
+      const lineasAsiento = [
+        {
+          cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+          debe: totalFinal,
+          haber: 0,
+          descripcion: `Ingreso por venta take away - ${medioPago.nombre}`
+        }
+      ]
+
+      // Distribuir el total entre las cuentas contables de los productos
+      const totalPedido = Number(pedido.total)
+      for (const [cuentaId, montoItems] of Object.entries(itemsPorCuenta)) {
+        const cuentaContableId = cuentaId !== 'null' && cuentaId ? parseInt(cuentaId) : cuentaContableFallback?.id
+        if (!cuentaContableId) continue
+
+        // Proporción del total que corresponde a esta cuenta (incluye propina proporcionalmente)
+        const proporcion = montoItems / totalPedido
+        const montoCuenta = totalFinal * proporcion
+
+        lineasAsiento.push({
+          cuentaContableId,
+          debe: 0,
+          haber: montoCuenta,
+          descripcion: `Venta take away - Pedido ${pedido.numero}`
+        })
+      }
+
+      await generarAsientoAutomatico(prisma, {
+        fecha: new Date(),
+        concepto: `Venta Take Away - Pedido ${pedido.numero}`,
+        tipoOrigen: 'VENTA_TAKEAWAY',
+        origenId: movimiento.id,
+        registradoPor: req.admin.id,
+        lineas: lineasAsiento
       })
 
       movimientos.push(movimiento)

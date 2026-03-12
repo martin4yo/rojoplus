@@ -509,20 +509,23 @@ model Cargo {
 }
 
 model MedioPago {
-  id                 Int     @id @default(autoincrement())
-  codigo             String  @unique
+  id                 Int             @id @default(autoincrement())
+  codigo             String          @unique
   nombre             String
-  tipo               String  @default("EFECTIVO")
-  requiereDatosBanco Boolean @default(false) @map("requiere_datos_banco")
-  comisionPct        Decimal @default(0) @map("comision_pct") @db.Decimal(5, 2)
-  activo             Boolean @default(true)
-  orden              Int     @default(0)
-  paraBuffet         Boolean @default(true) @map("para_buffet")
-  paraCaja           Boolean @default(true) @map("para_caja")
-  paraKiosco         Boolean @default(true) @map("para_kiosco")
-  paraTakeaway       Boolean @default(true) @map("para_takeaway")
+  tipo               String          @default("EFECTIVO")
+  requiereDatosBanco Boolean         @default(false) @map("requiere_datos_banco")
+  comisionPct        Decimal         @default(0) @map("comision_pct") @db.Decimal(5, 2)
+  activo             Boolean         @default(true)
+  orden              Int             @default(0)
+  paraBuffet         Boolean         @default(true) @map("para_buffet")
+  paraCaja           Boolean         @default(true) @map("para_caja")
+  paraKiosco         Boolean         @default(true) @map("para_kiosco")
+  paraTakeaway       Boolean         @default(true) @map("para_takeaway")
+  cuentaContableId   Int?            @map("cuenta_contable_id")
   pagos              Pago[]
+  cuentaContable     CuentaContable? @relation(fields: [cuentaContableId], references: [id])
 
+  @@index([cuentaContableId])
   @@map("medios_pago")
 }
 
@@ -825,6 +828,8 @@ model CuentaContable {
   hijos              CuentaContable[]    @relation("CuentaHijos")
   lineasPresupuesto  LineaPresupuesto[]
   movimientos        MovimientoCaja[]
+  mediosPago         MedioPago[]
+  productosBuffet    ProductoBuffet[]
 
   @@map("cuentas_contables")
 }
@@ -1906,18 +1911,21 @@ model LineaPresupuesto {
   presupuestoId      Int                @map("presupuesto_id")
   cuentaContableId   Int?               @map("cuenta_contable_id")
   conceptoId         Int?               @map("concepto_id")
+  centroCostoId      Int?               @map("centro_costo_id")
   mes                Int
   montoPresupuestado Decimal            @map("monto_presupuestado") @db.Decimal(12, 2)
   observaciones      String?
   createdAt          DateTime           @default(now()) @map("created_at")
   concepto           ConceptoTesoreria? @relation(fields: [conceptoId], references: [id])
   cuentaContable     CuentaContable?    @relation(fields: [cuentaContableId], references: [id])
+  centroCosto        CentroCosto?       @relation(fields: [centroCostoId], references: [id])
   presupuesto        Presupuesto        @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
 
-  @@unique([presupuestoId, cuentaContableId, conceptoId, mes])
+  @@unique([presupuestoId, cuentaContableId, conceptoId, centroCostoId, mes])
   @@index([presupuestoId])
   @@index([cuentaContableId])
   @@index([conceptoId])
+  @@index([centroCostoId])
   @@map("lineas_presupuesto")
 }
 
@@ -1946,6 +1954,7 @@ model CentroCosto {
   pedidosTakeAway      PedidoTakeAway[]
   ventas               Venta[]
   cajas                Caja[]
+  lineasPresupuesto    LineaPresupuesto[]
 
   @@map("centros_costo")
 }
@@ -2314,33 +2323,36 @@ model CategoriaMenu {
 }
 
 model ProductoBuffet {
-  id              Int                  @id @default(autoincrement())
-  productoId      Int                  @unique @map("producto_id")
-  categoriaMenuId Int                  @map("categoria_menu_id")
-  nombre          String
-  descripcion     String?
-  precio          Decimal              @db.Decimal(12, 2)
-  imagen          String?
-  disponible      Boolean              @default(true)
-  destacado       Boolean              @default(false)
-  orden           Int                  @default(0)
-  activo          Boolean              @default(true)
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
-  codigoBarras    String?              @map("codigo_barras")
-  tiposVenta      String[]             @default(["BUFFET", "KIOSCO"]) @map("tipos_venta")
-  itemsComanda    ItemComanda[]
-  itemsTakeAway   ItemPedidoTakeAway[]
-  categoriaMenu   CategoriaMenu        @relation(fields: [categoriaMenuId], references: [id])
-  producto        Producto             @relation(fields: [productoId], references: [id])
-  gruposOpciones  GrupoOpcionProducto[]
-  esOpcionDe      OpcionProducto[]     @relation("ProductoComoOpcion") // Este producto puede ser opción de otros (ej: empanada individual es opción de docena)
+  id               Int                  @id @default(autoincrement())
+  productoId       Int                  @unique @map("producto_id")
+  categoriaMenuId  Int                  @map("categoria_menu_id")
+  nombre           String
+  descripcion      String?
+  precio           Decimal              @db.Decimal(12, 2)
+  imagen           String?
+  disponible       Boolean              @default(true)
+  destacado        Boolean              @default(false)
+  orden            Int                  @default(0)
+  activo           Boolean              @default(true)
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  codigoBarras     String?              @map("codigo_barras")
+  tiposVenta       String[]             @default(["BUFFET", "KIOSCO"]) @map("tipos_venta")
+  cuentaContableId Int?                 @map("cuenta_contable_id")
+  itemsComanda     ItemComanda[]
+  itemsTakeAway    ItemPedidoTakeAway[]
+  categoriaMenu    CategoriaMenu        @relation(fields: [categoriaMenuId], references: [id])
+  producto         Producto             @relation(fields: [productoId], references: [id])
+  cuentaContable   CuentaContable?      @relation(fields: [cuentaContableId], references: [id])
+  gruposOpciones   GrupoOpcionProducto[]
+  esOpcionDe       OpcionProducto[]     @relation("ProductoComoOpcion") // Este producto puede ser opción de otros (ej: empanada individual es opción de docena)
 
   @@index([categoriaMenuId])
   @@index([disponible])
   @@index([activo])
   @@index([tiposVenta])
   @@index([codigoBarras])
+  @@index([cuentaContableId])
   @@map("productos_buffet")
 }
 

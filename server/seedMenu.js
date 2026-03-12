@@ -137,6 +137,16 @@ const menuData = [
       { titulo: 'Facturacion AFIP', icono: 'FileText', url: '/admin/configuracion/fiscal', orden: 9 },
     ]
   },
+  {
+    titulo: 'Centros de Costo', icono: 'Building2', orden: 17,
+    children: [
+      { titulo: 'Dashboard Ejecutivo', icono: 'LayoutDashboard', url: '/admin/reportes/centros-costo/dashboard', orden: 1 },
+      { titulo: 'Evolución Temporal', icono: 'TrendingUp', url: '/admin/reportes/centros-costo/evolucion', orden: 2 },
+      { titulo: 'Rentabilidad Actividades', icono: 'Target', url: '/admin/reportes/centros-costo/rentabilidad', orden: 3 },
+      { titulo: 'Presupuesto vs Real', icono: 'PieChart', url: '/admin/reportes/centros-costo/presupuesto', orden: 4 },
+      { titulo: 'Estado de Resultados', icono: 'FileText', url: '/admin/reportes/centros-costo', orden: 5 },
+    ]
+  },
 ]
 
 async function seedMenu() {

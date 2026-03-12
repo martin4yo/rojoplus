@@ -6,6 +6,7 @@
 import express from 'express'
 import prisma from '../../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../../middleware/auth.js'
+import { generarAsientoAutomatico } from '../asientos.js'
 import {
   generarAsientoFacturaVenta,
   generarAsientoReciboCobro
@@ -150,6 +151,29 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           }
         })
 
+        // Generar asiento contable automático
+        await generarAsientoAutomatico(prisma, {
+          fecha: new Date(),
+          concepto: `Venta Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}`,
+          tipoOrigen: 'VENTA_KIOSCO',
+          origenId: movimiento.id,
+          registradoPor: req.admin.id,
+          lineas: [
+            {
+              cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+              debe: parseFloat(pago.monto),
+              haber: 0,
+              descripcion: `Ingreso por venta kiosco`
+            },
+            {
+              cuentaContableId: cuentaContable?.id || 1, // HABER: Ventas Kiosco (aumenta ingreso)
+              debe: 0,
+              haber: parseFloat(pago.monto),
+              descripcion: `Venta kiosco - ${detalleItems.join(', ')}`
+            }
+          ]
+        })
+
         movimientos.push(movimiento)
       }
     } else {
@@ -178,6 +202,29 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           descripcion: observaciones,
           registradoPor: req.admin.id
         }
+      })
+
+      // Generar asiento contable automático
+      await generarAsientoAutomatico(prisma, {
+        fecha: new Date(),
+        concepto: `Venta Kiosco - ${detalleItems.join(', ')}`,
+        tipoOrigen: 'VENTA_KIOSCO',
+        origenId: movimiento.id,
+        registradoPor: req.admin.id,
+        lineas: [
+          {
+            cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+            debe: totalFinal,
+            haber: 0,
+            descripcion: `Ingreso por venta kiosco`
+          },
+          {
+            cuentaContableId: cuentaContable?.id || 1, // HABER: Ventas Kiosco (aumenta ingreso)
+            debe: 0,
+            haber: totalFinal,
+            descripcion: `Venta kiosco - ${detalleItems.join(', ')}`
+          }
+        ]
       })
 
       movimientos.push(movimiento)
