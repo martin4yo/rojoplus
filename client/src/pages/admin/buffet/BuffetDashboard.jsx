@@ -9,6 +9,7 @@ import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetConte
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import Modal from '../../../components/Modal'
 import { useConfirm } from '../../../hooks/useConfirm'
+import ChatWidget from '../../../components/chat/ChatWidget'
 
 export default function BuffetMesas() {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -689,6 +690,9 @@ export default function BuffetMesas() {
       </Modal>
 
       <ConfirmDialog />
+
+      {/* ROJO IA - Chat Widget para Camareros */}
+      <ChatWidget role="camarero" position="bottom-right" />
     </div>
   )
 }

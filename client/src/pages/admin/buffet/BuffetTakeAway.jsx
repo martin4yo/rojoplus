@@ -10,6 +10,7 @@ import { formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
 import Modal from '../../../components/Modal'
 import GestionPedido from '../../../components/buffet/GestionPedido'
+import ChatWidget from '../../../components/chat/ChatWidget'
 
 export default function BuffetTakeAway() {
   const navigate = useNavigate()
@@ -575,9 +576,6 @@ export default function BuffetTakeAway() {
           </button>
         </form>
       </Modal>
-
-      {/* Dialog de confirmación */}
-      <ConfirmDialog />
     </div>
   )
 }

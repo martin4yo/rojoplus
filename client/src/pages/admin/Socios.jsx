@@ -15,6 +15,7 @@ import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { usePagination } from '../../hooks/usePagination'
+import ChatWidget from '../../components/chat/ChatWidget'
 
 // Componente Avatar con fallback si la imagen no carga
 function AvatarSocio({ foto, nombre }) {
@@ -46,6 +47,7 @@ export default function AdminSocios() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [busqueda, setBusqueda] = useState('')
+  const [terminoBusqueda, setTerminoBusqueda] = useState('') // Término activo de búsqueda
   const [estado, setEstado] = useState('VIGENTE')
   const [categoria, setCategoria] = useState('')
   const [tipoSocio, setTipoSocio] = useState('')
@@ -60,26 +62,36 @@ export default function AdminSocios() {
   const [regenerando, setRegenerando] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  // Debounce para búsqueda automática
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTerminoBusqueda(busqueda)
+    }, 500) // Esperar 500ms después de que el usuario deje de escribir
+
+    return () => clearTimeout(timer)
+  }, [busqueda])
+
   useEffect(() => {
     cargarSocios()
-  }, [page, estado, categoria, tipoSocio, zona, esMenor])
+  }, [page, estado, categoria, tipoSocio, zona, esMenor, terminoBusqueda])
 
-  async function cargarSocios(query = busqueda) {
+  async function cargarSocios() {
     setLoading(true)
     try {
       const params = new URLSearchParams({ page: page.toString() })
-      if (query) params.append('q', query)
+      if (terminoBusqueda) params.append('q', terminoBusqueda)
       if (estado) params.append('estado', estado)
       if (categoria) params.append('categoria', categoria)
       if (tipoSocio) params.append('tipoSocio', tipoSocio)
       if (zona) params.append('zona', zona)
       if (esMenor) params.append('esMenor', esMenor)
-      const data = await api.get(`/admin/socios?${params}`)
-      setSocios(data.socios || [])
-      setPagination(data.pagination)
-      if (data.filtros) setFiltros(data.filtros)
+      const response = await api.getFull(`/admin/socios?${params}`)
+      setSocios(response.data.socios || [])
+      setPagination(response.data.pagination)
+      if (response.data.filtros) setFiltros(response.data.filtros)
     } catch (err) {
       setError('Error al cargar socios')
+      console.error('Error cargando socios:', err)
     } finally {
       setLoading(false)
     }
@@ -87,12 +99,13 @@ export default function AdminSocios() {
 
   function handleBuscar(e) {
     e.preventDefault()
+    setTerminoBusqueda(busqueda) // Activar la búsqueda
     goToPage(1)
-    cargarSocios(busqueda)
   }
 
   function limpiarFiltros() {
     setBusqueda('')
+    setTerminoBusqueda('') // Limpiar búsqueda activa
     setEstado('')
     setCategoria('')
     setTipoSocio('')
@@ -101,7 +114,7 @@ export default function AdminSocios() {
     goToPage(1)
   }
 
-  const hayFiltrosActivos = estado || categoria || tipoSocio || zona || esMenor || busqueda
+  const hayFiltrosActivos = estado || categoria || tipoSocio || zona || esMenor || terminoBusqueda
 
   function getQrUrl(tokenPortal) {
     return `https://sportivo.axiomacloud.com/s/${tokenPortal}`
@@ -321,9 +334,18 @@ export default function AdminSocios() {
               type="text"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por nombre, nro. socio, DNI, email o celular"
-              className="input-field pl-10 w-full"
+              placeholder="Buscar por nombre, nro. socio, DNI, email o celular (búsqueda automática)"
+              className="input-field pl-10 pr-10 w-full"
             />
+            {busqueda && (
+              <button
+                type="button"
+                onClick={() => setBusqueda('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
           <Button type="submit">Buscar</Button>
           <button
@@ -565,6 +587,9 @@ export default function AdminSocios() {
         </div>
       )}
       <ConfirmDialog />
+
+      {/* ROJO IA - Chat Widget para Admins */}
+      <ChatWidget role="admin" position="bottom-right" />
     </div>
   )
 }

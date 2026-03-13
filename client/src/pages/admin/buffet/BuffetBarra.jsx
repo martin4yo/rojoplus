@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import GestionPedido from '../../../components/buffet/GestionPedido'
 import ClienteSelector from '../../../components/buffet/ClienteSelector'
+import ChatWidget from '../../../components/chat/ChatWidget'
 
 export default function BuffetBarra() {
   const [pedidoActivo, setPedidoActivo] = useState(null)
@@ -200,6 +201,9 @@ export default function BuffetBarra() {
           </div>
         </div>
       )}
+
+      {/* ROJO IA - Chat Widget para Camareros */}
+      <ChatWidget role="camarero" position="bottom-right" />
     </div>
   )
 }

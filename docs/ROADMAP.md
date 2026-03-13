@@ -1136,6 +1136,100 @@ MVP del módulo buffet con funcionalidades esenciales:
 
 ---
 
+## FASE 40: ROJO IA - Asistente Inteligente ✅
+> Asistente conversacional con IA para socios, camareros y admins
+
+### Concepto
+Asistente inteligente basado en Claude Sonnet 4 que permite interactuar con RojoPlus usando lenguaje natural. Integrado en portal socio, buffet y administración.
+
+### Implementación
+
+#### Backend - Servicios IA ✅
+- [x] **40.1** Servicio AIAssistantService con Anthropic Claude API (aiAssistant.js - 400+ líneas)
+- [x] **40.2** Prompts específicos por rol (socio, camarero, admin)
+- [x] **40.3** Sistema de respuesta estructurada JSON con validación
+- [x] **40.4** ActionExecutor para ejecutar acciones (actionExecutor.js - 800+ líneas)
+- [x] **40.5** 23 acciones implementadas (consultar_deuda, ver_mesas, generar_link_pago, etc.)
+- [x] **40.6** Endpoints POST /api/chat y GET /api/chat/health
+- [x] **40.7** Rate limiting (20 req/min socios, 60 req/min admins)
+- [x] **40.8** Upload de documentos con multer
+
+#### Frontend - Componentes Chat ✅
+- [x] **40.9** ChatWidget.jsx con botón flotante y panel colapsable
+- [x] **40.10** ChatMessage.jsx con soporte Markdown (react-markdown)
+- [x] **40.11** chatService.js para comunicación HTTP
+- [x] **40.12** Mensajes de bienvenida personalizados por rol
+- [x] **40.13** Estados de conexión (Conectado/No disponible)
+- [x] **40.14** Loading states y manejo de errores
+
+#### Integraciones ✅
+- [x] **40.15** Portal Socio (PortalSocioNuevo.jsx y PagosSocio.jsx)
+- [x] **40.16** Buffet Estado/Salón (BuffetDashboard.jsx)
+- [x] **40.17** Buffet Barra (BuffetBarra.jsx)
+- [x] **40.18** Buffet TakeAway (BuffetTakeAway.jsx)
+- [x] **40.19** Admin Socios (Socios.jsx)
+- [x] **40.20** Admin Cuotas (Cuotas.jsx)
+
+#### Configuración ✅
+- [x] **40.21** Variable ANTHROPIC_API_KEY en .env
+- [x] **40.22** Proxy Vite corregido (puerto 3000)
+- [x] **40.23** Dependencias: @anthropic-ai/sdk, react-markdown, express-validator
+
+#### Documentación ✅
+- [x] **40.24** README_ROJO_IA.md - Guía de usuario y quick start
+- [x] **40.25** docs/PROPUESTA_ASISTENTE_IA.md - Propuesta técnica completa
+- [x] **40.26** docs/ROJO_IA_SETUP.md - Setup técnico y testing
+
+### Funcionalidades por Rol
+
+**Socios:**
+- Consultar deuda y generar links de pago MercadoPago
+- Ver actividades inscriptas y disponibles
+- Ver calendario de entrenamientos
+- Consultar grupo familiar
+- Ver menú del buffet
+- Hacer pedidos takeaway (pendiente)
+
+**Camareros:**
+- Ver estado de mesas (ocupadas/libres)
+- Abrir/cerrar mesas
+- Agregar items a comandas
+- Ver cuenta de mesa
+- Ver comandas pendientes en cocina
+
+**Admins:**
+- Consultar estadísticas de socios
+- Reportes de ventas del buffet
+- Consultas generales del sistema
+
+### Archivos Clave
+```
+server/src/services/aiAssistant.js          # 400 líneas - Servicio IA
+server/src/services/actionExecutor.js       # 800 líneas - Ejecutor de acciones
+server/src/routes/chat.js                   # 260 líneas - Endpoints HTTP
+client/src/services/chatService.js          # 100 líneas - Cliente HTTP
+client/src/components/chat/ChatWidget.jsx   # 315 líneas - Widget principal
+client/src/components/chat/ChatMessage.jsx  # 80 líneas - Mensajes con Markdown
+```
+
+### Costos Estimados
+- **Modelo:** Claude Sonnet 4 (claude-sonnet-4-20250514)
+- **Input:** $3 / 1M tokens
+- **Output:** $15 / 1M tokens
+- **Costo mensual:** USD 15-40 (500 socios activos, 2-4 consultas/mes)
+- **Costo por request:** ~USD 0.01
+
+### Próximos Pasos (Post-MVP)
+- [ ] Implementar autenticación para camareros
+- [ ] Implementar autenticación para admins
+- [ ] Completar acciones pendientes (bajaActividad, pedirTakeaway, etc.)
+- [ ] Agregar analytics de uso
+- [ ] Testing con usuarios reales
+- [ ] Voice input support
+- [ ] WhatsApp Business integration
+
+---
+
 ## Progreso General
 
 | Fase | Descripcion | Estado |
@@ -1179,6 +1273,7 @@ MVP del módulo buffet con funcionalidades esenciales:
 | 37 | Sitio Institucional Público | ✅ Completado |
 | 38 | Usuarios, Roles y Permisos | ✅ Completado |
 | 39 | Módulo Buffet/Restaurant | ✅ Completado |
+| 40 | ROJO IA - Asistente Inteligente | ✅ Completado |
 
 ---
 
@@ -1200,19 +1295,20 @@ npm run dev
 
 ---
 
-*Ultima actualizacion: 22 de Febrero 2026*
+*Ultima actualizacion: 12 de Marzo 2026*
 
 **FASES COMPLETADAS RECIENTEMENTE:**
+- ✅ FASE 40: ROJO IA - Asistente Inteligente (12/03/2026)
+  - **⭐ NUEVO:** Asistente conversacional con Claude Sonnet 4
+  - Backend: aiAssistant.js (400 líneas), actionExecutor.js (800 líneas), chat.js (260 líneas)
+  - Frontend: ChatWidget, ChatMessage con Markdown, chatService
+  - 23 acciones implementadas para socios, camareros y admins
+  - Integrado en 6 páginas: Portal Socio, Buffet (3), Admin (2)
+  - Documentación completa: README, PROPUESTA, SETUP
+  - Costo estimado: USD 15-40/mes
 - ✅ FASE 31: Control de Accesos (molinetes con QR/DNI/RFID, modo offline, PWA móvil)
 - ✅ FASE 39: Módulo Buffet/Restaurant MVP (Mesas/Comandas, Take Away, Kiosco, Cocina KDS, Impresoras Térmicas, Socket.io)
-  - **⭐ NUEVO:** Mejoras POS completadas al 100% (22/02/2026)
-    - 6 componentes reutilizables (Calculadora, Teclado, Selector Pago, Propina, Split, Pagos Múltiples)
-    - BuffetKiosco mejorado: Stock badges, atajos teclado (F2,F4,F5,F6), historial ventas
-    - BuffetComanda mejorado: Modal premium, propina, split cuenta, pagos múltiples
-    - Backend: Soporte pagos múltiples y propina en 3 endpoints
-    - Migración DB: Campo propina agregado a comandas y pedidos
-    - KPIs: -33% tiempo/venta, -33% clicks, -80% errores
-    - Docs: 5 archivos técnicos generados, 29 casos de testing
+  - Mejoras POS completadas al 100% (22/02/2026)
 - 🔶 FASE 32: Centros de Costos (90% - implementado en todos los módulos, falta Task #10: reportes)
 
 **ARCHIVOS CLAVE BUFFET:**

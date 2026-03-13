@@ -186,15 +186,22 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
     req.prisma.socio.groupBy({ by: ['zona'], _count: true }),
   ])
 
+  const currentPage = parseInt(page)
+  const itemsPerPage = parseInt(limit)
+  const from = total > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0
+  const to = Math.min(currentPage * itemsPerPage, total)
+
   res.json({
     success: true,
     data: {
       socios,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: currentPage,
+        limit: itemsPerPage,
         total,
-        pages: Math.ceil(total / parseInt(limit)),
+        totalPages: Math.ceil(total / itemsPerPage),
+        from,
+        to,
       },
       filtros: {
         estados: estados.map(e => e.estado).filter(Boolean).sort(),
@@ -1023,7 +1030,7 @@ router.post('/socios/upload', authAdmin, upload.single('file'), asyncHandler(asy
       // Club
       fechaAlta: excelDateToJS(row['Fecha Alta']),
       fechaBaja: excelDateToJS(row['Fecha Baja']),
-      estado: cleanString(row['Estado']) || 'ACTIVO',
+      estado: cleanString(row['Estado']) || 'VIGENTE',
       categoria: cleanString(row['Categoria'] || row['Categoría']),
       tipoSocio: cleanString(row['TipoSocio'] || row['Tipo Socio'] || row['Tipo de Socio']),
       zona: cleanString(row['Zona']),

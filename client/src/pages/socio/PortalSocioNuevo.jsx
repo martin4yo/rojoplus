@@ -29,6 +29,7 @@ import {
 import { useModal } from '../../components/Modal'
 import PushNotificationBanner from '../../components/PushNotificationBanner'
 import InstallAppButton from '../../components/InstallAppButton'
+import ChatWidget from '../../components/chat/ChatWidget'
 
 // Componentes de secciones
 import DashboardSocio from './sections/DashboardSocio'
@@ -396,6 +397,9 @@ export default function PortalSocioNuevo() {
 
       {/* Botón instalar app */}
       <InstallAppButton />
+
+      {/* ROJO IA - Chat Widget */}
+      <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
     </div>
   )
 }

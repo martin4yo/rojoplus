@@ -14,6 +14,7 @@ import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatte
 import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
 import { useConfirm } from '../../hooks/useConfirm'
+import ChatWidget from '../../components/chat/ChatWidget'
 
 export default function Cuotas() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1530,6 +1531,9 @@ export default function Cuotas() {
           </>
         )}
       </Modal>
+
+      {/* ROJO IA - Chat Widget para Admins */}
+      <ChatWidget role="admin" position="bottom-right" />
     </div>
   )
 }

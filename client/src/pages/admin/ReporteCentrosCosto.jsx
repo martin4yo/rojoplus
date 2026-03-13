@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
-import { ChartBarIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline'
+import { ChartBarIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 
 export default function ReporteCentrosCosto() {
   const [data, setData] = useState(null)
@@ -52,6 +52,49 @@ export default function ReporteCentrosCosto() {
     return `${porcentaje.toFixed(1)}%`
   }
 
+  const exportarExcel = async () => {
+    try {
+      const params = new URLSearchParams({
+        fechaDesde,
+        fechaHasta,
+      })
+      const token = localStorage.getItem('adminToken')
+      const response = await fetch(`/api/admin/centros-costo-export-comparativo?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `centros-costo-${Date.now()}.xlsx`
+      a.click()
+    } catch (err) {
+      console.error('Error al exportar:', err)
+    }
+  }
+
+  const exportarPDF = async () => {
+    try {
+      const params = new URLSearchParams({
+        fechaDesde,
+        fechaHasta,
+        formato: 'pdf',
+      })
+      const token = localStorage.getItem('adminToken')
+      const response = await fetch(`/api/admin/centros-costo-export-comparativo?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `centros-costo-${Date.now()}.pdf`
+      a.click()
+    } catch (err) {
+      console.error('Error al exportar:', err)
+    }
+  }
+
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -63,11 +106,31 @@ export default function ReporteCentrosCosto() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Estado de Resultados por Centro de Costo</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Análisis multidimensional de ingresos y egresos
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Estado de Resultados por Centro de Costo</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Análisis multidimensional de ingresos y egresos
+          </p>
+        </div>
+        {data && (
+          <div className="flex gap-2">
+            <button
+              onClick={exportarExcel}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" />
+              Excel
+            </button>
+            <button
+              onClick={exportarPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" />
+              PDF
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
