@@ -198,7 +198,22 @@ router.get('/takeaway', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) 
       }
     })
 
-    res.json({ success: true, data: pedidos })
+    // Filtrar pedidos vacíos de barra que no están pagados/entregados
+    const pedidosFiltrados = pedidos.filter(p => {
+      const esVentaBarra = p.nombreCliente?.includes('Venta Barra') ||
+                          p.observaciones?.toLowerCase().includes('venta rápida en barra')
+      const tieneItems = p.items && p.items.length > 0
+      const estaCerrado = ['PAGADO', 'ENTREGADO', 'CANCELADO'].includes(p.estado)
+
+      // Excluir pedidos de barra vacíos que no están cerrados
+      if (esVentaBarra && !tieneItems && !estaCerrado) {
+        return false
+      }
+
+      return true
+    })
+
+    res.json({ success: true, data: pedidosFiltrados })
   } catch (error) {
     console.error('Error al listar pedidos:', error)
     res.status(500).json({ success: false, error: 'Error al listar pedidos' })
@@ -856,13 +871,18 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       movimientos.push(movimiento)
     }
 
+    // Detectar si es venta de barra (venta instantánea)
+    const esVentaBarra = pedido.nombreCliente?.includes('Venta Barra') ||
+                        pedido.observaciones?.toLowerCase().includes('venta rápida en barra')
+
     const pedidoActualizado = await prisma.pedidoTakeAway.update({
       where: { id: parseInt(id) },
       data: {
-        estado: 'PAGADO',
+        estado: esVentaBarra ? 'ENTREGADO' : 'PAGADO',
         propina: propinaMonto,
         total: totalFinal,
         horaPagado: new Date(),
+        horaEntregado: esVentaBarra ? new Date() : null,
         esVentaInterna: esVentaInterna || false
       }
     })

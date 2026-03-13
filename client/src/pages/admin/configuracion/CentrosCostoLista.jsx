@@ -48,13 +48,22 @@ export default function CentrosCostoLista() {
   }
 
   const handleEliminar = async (centro) => {
-    if (!confirm(`¿Desactivar centro de costo "${centro.nombre}"?`)) return
+    const confirmado = await confirm({
+      title: 'Desactivar Centro de Costo',
+      message: `¿Estás seguro de que deseas desactivar el centro de costo "${centro.nombre}"?`,
+      confirmText: 'Desactivar',
+      cancelText: 'Cancelar',
+      isDangerous: true
+    })
+
+    if (!confirmado) return
 
     try {
       await api.delete(`/admin/centros-costo/${centro.id}`)
+      toast.success('Centro de costo desactivado')
       await cargarCentros()
     } catch (err) {
-      alert('Error al eliminar: ' + err.message)
+      toast.error('Error al eliminar: ' + err.message)
     }
   }
 
@@ -271,6 +280,9 @@ export default function CentrosCostoLista() {
           onSaved={handleGuardado}
         />
       )}
+
+      {/* Dialog de confirmación */}
+      <ConfirmDialog />
     </div>
   )
 }
