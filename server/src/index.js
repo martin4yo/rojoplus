@@ -52,6 +52,7 @@ import facturacionRoutes from './routes/facturacion.js'
 import menuRoutes from './routes/menu.js'
 import chatRoutes from './routes/chat.js'
 import superAdminRoutes from './routes/super-admin/index.js'
+import brandingRoutes from './routes/admin/branding.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -162,6 +163,7 @@ app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
 app.use('/api/importacion', importacionRoutes)
 app.use('/api/admin/facturacion', facturacionRoutes)
 app.use('/api/admin/menu', menuRoutes)
+app.use('/api/admin/branding', brandingRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/super-admin', superAdminRoutes)
 

@@ -85,6 +85,7 @@ import AdminEntrenadorForm from './pages/admin/EntrenadorForm'
 import AdminPeriodos from './pages/admin/Periodos'
 import AdminCuotas from './pages/admin/Cuotas'
 import PlaceholderPage from './pages/admin/PlaceholderPage'
+import Branding from './pages/admin/Branding'
 
 // Usuarios y Roles
 import UsuariosLista from './pages/admin/usuarios/UsuariosLista'
@@ -312,6 +313,7 @@ function App() {
         <Route path="configuracion/menu" element={<MenuAdmin />} />
         <Route path="configuracion/templates/email" element={<EmailTemplates />} />
         <Route path="configuracion/templates/pdf" element={<PdfTemplates />} />
+        <Route path="configuracion/branding" element={<Branding />} />
         <Route path="configuracion/:tabla" element={<AdminConfiguracionLista />} />
         <Route path="configuracion/:tabla/nuevo" element={<AdminConfiguracionForm />} />
         <Route path="configuracion/:tabla/:id" element={<AdminConfiguracionForm />} />
