@@ -15,6 +15,9 @@ import centrosCostoRoutes from './centros-costo.js'
 import conciliacionRoutes from './conciliacion.js'
 import solicitudesRoutes from './solicitudes.js'
 import inscripcionesRoutes from './inscripciones.js'
+import cobranzasRoutes from './cobranzas.js'
+import recuperoRoutes from './recupero.js'
+import comunicacionesRoutes from './comunicaciones.js'
 
 const router = Router()
 
@@ -33,5 +36,8 @@ router.use(centrosCostoRoutes)
 router.use(conciliacionRoutes)
 router.use(solicitudesRoutes)
 router.use(inscripcionesRoutes)
+router.use('/cobranzas', cobranzasRoutes)
+router.use('/recupero', recuperoRoutes)
+router.use('/comunicaciones', comunicacionesRoutes)
 
 export default router

@@ -220,6 +220,10 @@ model Socio {
   solicitudesAprobadas         SolicitudSocio[]
   ventas                       Venta[]
   entradas                     Entrada[]
+  gestionesCobranza            GestionCobranza[]      @relation("GestionesCobranza")
+  encuestasBaja                EncuestaBaja[]         @relation("EncuestasBaja")
+  accionesRecupero             AccionRecupero[]       @relation("AccionesRecupero")
+  enviosCampana                EnvioCampana[]         @relation("EnviosCampana")
 
   @@index([documento])
   @@index([apellidoNombre])
@@ -1131,6 +1135,11 @@ model Admin {
   ingresosValidados       IngresoEntrada[]     @relation("IngresoValidador")
   transferenciasRegistradas TransferenciaCaja[]
   comprobantesEmitidos    ComprobanteElectronico[]
+  gestionesCobranzaResponsable GestionCobranza[] @relation("CobranzasResponsable")
+  accionesCobranzaRealizadas AccionCobranza[]  @relation("AccionesCobranza")
+  accionesRecuperoRealizadas AccionRecupero[]  @relation("AccionesRecupero")
+  campanasRecuperoCreadas CampanaRecupero[]    @relation("CampanasRecupero")
+  campanasComunicacionCreadas CampanaComunicacion[] @relation("CampanasComunicacion")
 
   @@map("admins")
 }
@@ -1997,6 +2006,7 @@ model EmailTemplate {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  campanasComunicacion CampanaComunicacion[]
 
   @@map("email_templates")
 }
@@ -3065,4 +3075,413 @@ model ComprobanteElectronico {
   @@index([pedidoTakeawayId])
   @@index([estado])
   @@map("comprobantes_electronicos")
+}
+
+// ==============================
+// GESTIÓN DE COBRANZAS
+// ==============================
+
+model GestionCobranza {
+  id                    Int                   @id @default(autoincrement())
+
+  // Socio relacionado
+  socioId               Int                   @map("socio_id")
+  socio                 Socio                 @relation("GestionesCobranza", fields: [socioId], references: [id])
+
+  // Estado de la gestión
+  estado                EstadoGestion         @default(PENDIENTE)
+  prioridad             PrioridadGestion      @default(MEDIA)
+
+  // Deuda
+  montoDeuda            Decimal               @map("monto_deuda") @db.Decimal(12, 2)
+  cuotasAdeudadas       Int                   @map("cuotas_adeudadas")
+  diasAtraso            Int                   @map("dias_atraso")
+
+  // Última acción
+  ultimaAccion          TipoAccionCobranza?   @map("ultima_accion")
+  fechaUltimaAccion     DateTime?             @map("fecha_ultima_accion")
+
+  // Próxima acción programada
+  proximaAccion         TipoAccionCobranza?   @map("proxima_accion")
+  fechaProximaAccion    DateTime?             @map("fecha_proxima_accion")
+  recordatorioEnviado   Boolean               @default(false) @map("recordatorio_enviado")
+
+  // Responsable
+  responsableId         Int?                  @map("responsable_id")
+  responsable           Admin?                @relation("CobranzasResponsable", fields: [responsableId], references: [id])
+
+  // Acciones realizadas
+  acciones              AccionCobranza[]
+
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  @@index([socioId])
+  @@index([estado])
+  @@index([prioridad])
+  @@index([responsableId])
+  @@index([fechaProximaAccion])
+  @@map("gestiones_cobranza")
+}
+
+enum EstadoGestion {
+  PENDIENTE         // Sin contactar
+  EN_GESTION        // Contactado, en proceso
+  PROMESA_PAGO      // Prometió pagar
+  PLAN_PAGO         // Con plan de pago activo
+  NO_CONTACTADO     // No atiende/responde
+  RESUELTO          // Deuda saldada
+  DERIVADO          // Derivado a otra gestión
+}
+
+enum PrioridadGestion {
+  BAJA      // < 30 días de atraso
+  MEDIA     // 30-60 días
+  ALTA      // 60-90 días
+  CRITICA   // > 90 días
+}
+
+enum TipoAccionCobranza {
+  LLAMADA_TELEFONICA
+  EMAIL
+  WHATSAPP
+  MENSAJE_PORTAL
+  VISITA_CLUB
+  CARTA_DOCUMENTO
+  PROMESA_PAGO
+  PAGO_PARCIAL
+  PAGO_TOTAL
+  OTRO
+}
+
+model AccionCobranza {
+  id                Int                   @id @default(autoincrement())
+
+  // Gestión relacionada
+  gestionId         Int                   @map("gestion_id")
+  gestion           GestionCobranza       @relation(fields: [gestionId], references: [id], onDelete: Cascade)
+
+  // Tipo de acción
+  tipo              TipoAccionCobranza
+  fecha             DateTime              @default(now())
+
+  // Resultado
+  resultado         ResultadoAccion
+  contactado        Boolean               @default(false)
+
+  // Detalles
+  observaciones     String?               @db.Text
+  monto             Decimal?              @db.Decimal(12, 2) // Si fue un pago
+  promesaPago       DateTime?             @map("promesa_pago") // Si prometió pagar
+
+  // Próxima acción sugerida
+  proximaAccion     TipoAccionCobranza?   @map("proxima_accion")
+  fechaProxima      DateTime?             @map("fecha_proxima")
+
+  // Responsable de la acción
+  responsableId     Int                   @map("responsable_id")
+  responsable       Admin                 @relation("AccionesCobranza", fields: [responsableId], references: [id])
+
+  createdAt         DateTime              @default(now()) @map("created_at")
+
+  @@index([gestionId])
+  @@index([fecha])
+  @@index([responsableId])
+  @@map("acciones_cobranza")
+}
+
+enum ResultadoAccion {
+  EXITOSO           // Contactado y positivo
+  PROMESA_PAGO      // Prometió pagar
+  SIN_RESPUESTA     // No atiende
+  NEGATIVO          // Se niega a pagar
+  PENDIENTE         // Pidió más tiempo
+  INFORMATIVO       // Solo se informó
+  PAGO_REALIZADO    // Realizó el pago
+}
+
+// ==============================
+// RECUPERO DE SOCIOS
+// ==============================
+
+model EncuestaBaja {
+  id                Int         @id @default(autoincrement())
+
+  socioId           Int         @map("socio_id")
+  socio             Socio       @relation("EncuestasBaja", fields: [socioId], references: [id])
+
+  // Motivo principal
+  motivoPrincipal   MotivoBaja  @map("motivo_principal")
+  motivoDetalle     String?     @map("motivo_detalle") @db.Text
+
+  // Satisfacción
+  satisfaccion      Int         // 1-5 estrellas
+  recomendaria      Boolean?
+
+  // Otro club
+  seVaOtroClub      Boolean     @default(false) @map("se_va_otro_club")
+  nombreOtroClub    String?     @map("nombre_otro_club")
+
+  // Posibilidad de retorno
+  volveria          Boolean?
+  condicionesVolver String?     @map("condiciones_volver") @db.Text
+
+  // Comentarios
+  comentarios       String?     @db.Text
+
+  // Contacto futuro
+  aceptaContacto    Boolean     @default(true) @map("acepta_contacto")
+
+  // Metadata
+  fechaEncuesta     DateTime    @default(now()) @map("fecha_encuesta")
+
+  @@index([socioId])
+  @@index([motivoPrincipal])
+  @@index([fechaEncuesta])
+  @@map("encuestas_baja")
+}
+
+enum MotivoBaja {
+  ECONOMICO
+  MUDANZA
+  FALTA_USO
+  INSATISFACCION_SERVICIOS
+  OTRO_CLUB
+  SALUD
+  TEMPORARIA
+  OTRO
+}
+
+model AccionRecupero {
+  id              Int                   @id @default(autoincrement())
+
+  socioId         Int                   @map("socio_id")
+  socio           Socio                 @relation("AccionesRecupero", fields: [socioId], references: [id])
+
+  // Campaña relacionada (si aplica)
+  campanaId       Int?                  @map("campana_id")
+  campana         CampanaRecupero?      @relation(fields: [campanaId], references: [id])
+
+  // Acción
+  tipo            TipoAccionRecupero
+  fecha           DateTime              @default(now())
+
+  // Resultado
+  resultado       ResultadoRecupero
+  nivelInteres    NivelInteres?         @map("nivel_interes")
+
+  // Detalles
+  observaciones   String?               @db.Text
+  objeciones      String?               @db.Text
+  ofertaRealizada String?               @map("oferta_realizada") @db.Text
+
+  // Seguimiento
+  proximaAccion   TipoAccionRecupero?   @map("proxima_accion")
+  fechaProxima    DateTime?             @map("fecha_proxima")
+  recordatorio    Boolean               @default(false)
+
+  // Responsable
+  responsableId   Int                   @map("responsable_id")
+  responsable     Admin                 @relation("AccionesRecupero", fields: [responsableId], references: [id])
+
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  @@index([socioId])
+  @@index([fecha])
+  @@index([campanaId])
+  @@index([responsableId])
+  @@map("acciones_recupero")
+}
+
+enum TipoAccionRecupero {
+  LLAMADA_TELEFONICA
+  EMAIL
+  WHATSAPP
+  MENSAJE_PORTAL
+  VISITA_CLUB
+  EVENTO_ESPECIAL
+  OTRO
+}
+
+enum ResultadoRecupero {
+  RECUPERADO        // Volvió al club
+  INTERESADO        // Mostró interés
+  SIN_RESPUESTA     // No contactado
+  NO_INTERESADO     // No quiere volver
+  PENDIENTE_DECISION // Evaluando
+}
+
+enum NivelInteres {
+  ALTO
+  MEDIO
+  BAJO
+  NULO
+}
+
+model CampanaRecupero {
+  id                Int               @id @default(autoincrement())
+
+  nombre            String
+  descripcion       String?           @db.Text
+
+  // Segmentación
+  motivosBaja       String?           @map("motivos_baja") // JSON array de MotivoBaja
+  tiempoBajaMin     Int?              @map("tiempo_baja_min") // Días mínimos de baja
+  tiempoBajaMax     Int?              @map("tiempo_baja_max") // Días máximos de baja
+
+  // Oferta/Incentivo
+  oferta            String            @db.Text
+  descuento         Decimal?          @db.Decimal(5, 2)
+  mesesDescuento    Int?              @map("meses_descuento")
+  sinCuotaIngreso   Boolean           @default(false) @map("sin_cuota_ingreso")
+
+  // Vigencia
+  fechaInicio       DateTime          @map("fecha_inicio")
+  fechaFin          DateTime          @map("fecha_fin")
+  activa            Boolean           @default(true)
+
+  // Resultados
+  sociosObjetivo    Int               @default(0) @map("socios_objetivo")
+  contactados       Int               @default(0)
+  interesados       Int               @default(0)
+  recuperados       Int               @default(0)
+
+  // Acciones
+  acciones          AccionRecupero[]
+
+  // Auditoría
+  creadoPor         Int               @map("creado_por")
+  admin             Admin             @relation("CampanasRecupero", fields: [creadoPor], references: [id])
+
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@index([activa])
+  @@index([fechaInicio])
+  @@index([fechaFin])
+  @@map("campanas_recupero")
+}
+
+// ==============================
+// COMUNICACIONES (Campañas)
+// ==============================
+
+model CampanaComunicacion {
+  id                  Int                   @id @default(autoincrement())
+
+  // Datos básicos
+  nombre              String
+  descripcion         String?               @db.Text
+  tipo                TipoCampana
+
+  // Canal - Guardamos como JSON array de strings
+  canales             String                @default("[]") // JSON array: ["EMAIL", "PUSH", ...]
+
+  // Template
+  emailTemplateId     String?               @map("email_template_id")
+  emailTemplate       EmailTemplate?        @relation(fields: [emailTemplateId], references: [id])
+  whatsappTemplate    String?               @map("whatsapp_template") @db.Text
+  smsTemplate         String?               @map("sms_template") @db.Text
+  pushTemplate        String?               @map("push_template") @db.Text
+
+  // Segmentación (JSON con filtros)
+  segmentacion        Json                  // { estado: ["ACTIVO"], categoria: [...], etc }
+
+  // Destinatarios (pre-calculados)
+  destinatarios       Json?                 // Array de {socioId, email, nombre, ...}
+  totalDestinatarios  Int                   @default(0) @map("total_destinatarios")
+
+  // Programación
+  estado              EstadoCampana         @default(BORRADOR)
+  fechaProgramada     DateTime?             @map("fecha_programada")
+  fechaEnvio          DateTime?             @map("fecha_envio")
+
+  // Resultados
+  enviados            Int                   @default(0)
+  abiertos            Int                   @default(0)
+  clicks              Int                   @default(0)
+  rebotados           Int                   @default(0)
+  errores             Int                   @default(0)
+
+  // Tracking individual
+  envios              EnvioCampana[]
+
+  // Auditoría
+  creadoPor           Int                   @map("creado_por")
+  admin               Admin                 @relation("CampanasComunicacion", fields: [creadoPor], references: [id])
+
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  @@index([tipo])
+  @@index([estado])
+  @@index([fechaProgramada])
+  @@map("campanas_comunicacion")
+}
+
+enum TipoCampana {
+  INFORMATIVA      // Novedades generales del club
+  COBRANZA         // Recordatorios de pago
+  RECUPERO         // Reactivación de ex-socios
+  EVENTO           // Invitación a eventos
+  MARKETING        // Promociones
+  DEPORTIVA        // Convocatorias, entrenamientos
+}
+
+enum EstadoCampana {
+  BORRADOR
+  PROGRAMADA
+  EN_CURSO
+  COMPLETADA
+  CANCELADA
+  PAUSADA
+}
+
+model EnvioCampana {
+  id              Int                   @id @default(autoincrement())
+
+  campanaId       Int                   @map("campana_id")
+  campana         CampanaComunicacion   @relation(fields: [campanaId], references: [id], onDelete: Cascade)
+
+  socioId         Int                   @map("socio_id")
+  socio           Socio                 @relation("EnviosCampana", fields: [socioId], references: [id])
+
+  canal           String                // EMAIL, WHATSAPP, SMS, PUSH
+  destinatario    String                // email, teléfono, etc
+
+  // Estado
+  estado          EstadoEnvio           @default(PENDIENTE)
+  fechaEnvio      DateTime?             @map("fecha_envio")
+  fechaApertura   DateTime?             @map("fecha_apertura")
+  fechaClick      DateTime?             @map("fecha_click")
+
+  // Tracking
+  abierto         Boolean               @default(false)
+  clickeo         Boolean               @default(false)
+  rebotado        Boolean               @default(false)
+
+  error           String?               @db.Text
+  intentos        Int                   @default(0)
+
+  // IDs externos (para tracking)
+  messageId       String?               @map("message_id") // ID del proveedor (SMTP, WhatsApp, etc)
+
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  @@index([campanaId])
+  @@index([socioId])
+  @@index([estado])
+  @@index([messageId])
+  @@map("envios_campana")
+}
+
+enum EstadoEnvio {
+  PENDIENTE
+  ENVIADO
+  ENTREGADO
+  ABIERTO
+  CLICKEADO
+  REBOTADO
+  ERROR
 }

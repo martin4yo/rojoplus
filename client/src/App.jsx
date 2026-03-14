@@ -73,6 +73,10 @@ import AdminReporteCuotas from './pages/admin/ReporteCuotas'
 import AdminReporteSocios from './pages/admin/ReporteSocios'
 import AdminReporteComercios from './pages/admin/ReporteComercios'
 import AdminReporteCentrosCosto from './pages/admin/ReporteCentrosCosto'
+import DashboardEjecutivoCentros from './pages/admin/centros-costo/DashboardEjecutivo'
+import EvolucionTemporalCentros from './pages/admin/centros-costo/EvolucionTemporal'
+import RentabilidadActividades from './pages/admin/centros-costo/RentabilidadActividades'
+import PresupuestoVsReal from './pages/admin/centros-costo/PresupuestoVsReal'
 import AdminReporteMorosidad from './pages/admin/ReporteMorosidadAvanzado'
 import AdminEntrenadoresLista from './pages/admin/EntrenadoresLista'
 import AdminEntrenadorForm from './pages/admin/EntrenadorForm'
@@ -204,6 +208,16 @@ import EventoForm from './pages/admin/eventos/EventoForm'
 import EventoDetalle from './pages/admin/eventos/EventoDetalle'
 import VentaEntradas from './pages/admin/eventos/VentaEntradas'
 
+// Gestión de Cobranzas
+import GestionCobranzas from './pages/admin/GestionCobranzas'
+import DetalleGestion from './pages/admin/DetalleGestion'
+
+// Gestión de Recupero
+import GestionRecupero from './pages/admin/GestionRecupero'
+
+// Gestión de Comunicaciones
+import GestionComunicaciones from './pages/admin/GestionComunicaciones'
+
 // Layout admin
 import AdminLayout from './components/AdminLayout'
 
@@ -281,6 +295,10 @@ function App() {
         <Route path="reportes/socios" element={<AdminReporteSocios />} />
         <Route path="reportes/comercios" element={<AdminReporteComercios />} />
         <Route path="reportes/centros-costo" element={<AdminReporteCentrosCosto />} />
+        <Route path="reportes/centros-costo/dashboard" element={<DashboardEjecutivoCentros />} />
+        <Route path="reportes/centros-costo/evolucion" element={<EvolucionTemporalCentros />} />
+        <Route path="reportes/centros-costo/rentabilidad" element={<RentabilidadActividades />} />
+        <Route path="reportes/centros-costo/presupuesto" element={<PresupuestoVsReal />} />
         <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
         <Route path="configuracion" element={<AdminTablasAuxiliares />} />
         <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
@@ -435,6 +453,16 @@ function App() {
         <Route path="eventos/nuevo" element={<EventoForm />} />
         <Route path="eventos/:id" element={<EventoDetalle />} />
         <Route path="eventos/:id/editar" element={<EventoForm />} />
+
+        {/* Gestión de Cobranzas */}
+        <Route path="cobranzas" element={<GestionCobranzas />} />
+        <Route path="cobranzas/:id" element={<DetalleGestion />} />
+
+        {/* Gestión de Recupero */}
+        <Route path="recupero" element={<GestionRecupero />} />
+
+        {/* Gestión de Comunicaciones */}
+        <Route path="comunicaciones" element={<GestionComunicaciones />} />
       </Route>
         </Routes>
         </NotificacionBuffetProvider>

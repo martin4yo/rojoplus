@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clubix - Sistema Inteligente con IA que hace crecer tu club</title>
+    <meta name="description" content="Más que un gestor: plataforma con IA predictiva que analiza, genera informes y sugiere acciones estratégicas para hacer crecer tu club deportivo">
+    <link rel="icon" type="image/png" href="LogoClubix.png">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <div class="logo">
+                    <img src="LogoClubix.png" alt="Clubix Logo" class="logo-img">
+                </div>
+                <div class="nav-links">
+                    <a href="#caracteristicas">Características</a>
+                    <a href="#modulos">Módulos</a>
+                    <a href="#beneficios">Beneficios</a>
+                    <a href="#precios">Precios</a>
+                    <a href="#contacto" class="btn-primary">Solicitar Demo</a>
+                </div>
+                <button class="mobile-menu-btn" id="mobileMenuBtn">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section con Parallax -->
+    <section class="hero">
+        <div class="parallax-bg"></div>
+        <div class="container hero-content">
+            <div class="hero-text" data-aos="fade-up">
+                <h1>El sistema inteligente que hace crecer tu club</h1>
+                <p class="hero-subtitle">Más que un gestor: una plataforma con IA predictiva que analiza, sugiere y te ayuda a tomar decisiones estratégicas para potenciar tu institución</p>
+                <div class="hero-buttons">
+                    <a href="#contacto" class="btn-primary btn-lg">Solicitar Demo Gratuita</a>
+                    <a href="#video" class="btn-secondary btn-lg">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M6.3 2.84A1 1 0 004 3.5v13a1 1 0 001.6.8l10-6.5a1 1 0 000-1.6l-10-6.5a1 1 0 00-.3-.16z"/>
+                        </svg>
+                        Ver Video
+                    </a>
+                </div>
+                <div class="stats-bar">
+                    <div class="stat stat-icon">
+                        <svg class="stat-icon-svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                        <span class="stat-label">IA Integrada</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">35+</span>
+                        <span class="stat-label">Módulos</span>
+                    </div>
+                    <div class="stat stat-icon">
+                        <svg class="stat-icon-svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            <circle cx="9" cy="10" r="1" fill="currentColor"/>
+                            <circle cx="12" cy="10" r="1" fill="currentColor"/>
+                            <circle cx="15" cy="10" r="1" fill="currentColor"/>
+                        </svg>
+                        <span class="stat-label">Asistente Xavi</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-image" data-aos="fade-left">
+                <div class="dashboard-preview">
+                    <div class="browser-bar">
+                        <div class="browser-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80" alt="Dashboard Preview">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="caracteristicas">
+        <div class="container">
+            <div class="section-header" data-aos="fade-up">
+                <h2>Inteligencia Artificial al servicio de tu club</h2>
+                <p>Análisis predictivo, informes automáticos y sugerencias estratégicas para hacer crecer tu institución</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                        </svg>
+                    </div>
+                    <h3>Gestión de Socios</h3>
+                    <p>Control completo de altas, bajas, grupos familiares, inscripciones y cuenta corriente individual</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                            <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+                        </svg>
+                    </div>
+                    <h3>Administración Financiera</h3>
+                    <p>Tesorería, contabilidad, facturación electrónica, conciliación bancaria y débito automático</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <h3>Módulo Deportivo</h3>
+                    <p>Gestión de actividades, equipos, entrenadores, partidos, categorías y plantel completo</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="400">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <h3>Buffet Integrado</h3>
+                    <p>POS completo con gestión de mesas, comandas, cocina/barra, kiosco, takeaway e impresión térmica</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="500">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                            <line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                    </div>
+                    <h3>Control de Accesos</h3>
+                    <p>Sistema QR para ingreso, habilitaciones, control de invitados y monitoreo en tiempo real</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="600">
+                    <div class="feature-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                        </svg>
+                    </div>
+                    <h3>Portal del Socio PWA</h3>
+                    <p>App web progresiva con cuenta corriente, pagos online, QR de acceso y gestión de familia</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Parallax Image -->
+    <div class="parallax-image" style="background-image: url('https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=1920&q=80')">
+        <div class="parallax-overlay">
+            <h2 data-aos="fade-up">Tecnología que impulsa resultados</h2>
+            <p data-aos="fade-up" data-aos-delay="100">Más de 35 módulos trabajando en perfecta sincronía</p>
+        </div>
+    </div>
+
+    <!-- Módulos Section -->
+    <section class="modules" id="modulos">
+        <div class="container">
+            <div class="section-header" data-aos="fade-up">
+                <h2>Módulos Principales</h2>
+                <p>Sistema modular completo y escalable</p>
+            </div>
+            <div class="modules-grid">
+                <!-- Gestión de Cobranzas -->
+                <div class="module-card" data-aos="zoom-in">
+                    <div class="module-header">
+                        <div class="module-icon">💰</div>
+                        <h3>Gestión de Cobranzas</h3>
+                        <span class="badge new">Nuevo</span>
+                    </div>
+                    <p>Sistema inteligente de seguimiento de deudas con clasificación automática por prioridad</p>
+                    <ul class="module-features">
+                        <li>Clasificación automática por días de atraso</li>
+                        <li>Registro de acciones (llamadas, emails, visitas)</li>
+                        <li>Estados dinámicos según gestión</li>
+                        <li>Integración con planes de pago</li>
+                        <li>Recordatorios programados</li>
+                    </ul>
+                </div>
+
+                <!-- Recupero de Socios -->
+                <div class="module-card" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="module-header">
+                        <div class="module-icon">🎯</div>
+                        <h3>Recupero de Socios</h3>
+                        <span class="badge new">Nuevo</span>
+                    </div>
+                    <p>Campañas para recuperar socios dados de baja con ofertas personalizadas</p>
+                    <ul class="module-features">
+                        <li>Encuestas de baja con análisis</li>
+                        <li>Campañas con ofertas especiales</li>
+                        <li>Segmentación por motivos y tiempo</li>
+                        <li>Métricas de conversión</li>
+                        <li>Seguimiento de acciones</li>
+                    </ul>
+                </div>
+
+                <!-- Comunicaciones -->
+                <div class="module-card" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="module-header">
+                        <div class="module-icon">📧</div>
+                        <h3>Comunicaciones Masivas</h3>
+                        <span class="badge new">Nuevo</span>
+                    </div>
+                    <p>Campañas multi-canal con segmentación inteligente de destinatarios</p>
+                    <ul class="module-features">
+                        <li>Email, WhatsApp y SMS</li>
+                        <li>Templates reutilizables</li>
+                        <li>Segmentación flexible</li>
+                        <li>Programación de envíos</li>
+                        <li>Tracking de métricas</li>
+                    </ul>
+                </div>
+
+                <!-- Finanzas -->
+                <div class="module-card" data-aos="zoom-in">
+                    <div class="module-header">
+                        <div class="module-icon">💳</div>
+                        <h3>Sistema Financiero</h3>
+                    </div>
+                    <p>Control total de ingresos, egresos y movimientos contables</p>
+                    <ul class="module-features">
+                        <li>Tesorería multi-caja</li>
+                        <li>Contabilidad completa</li>
+                        <li>Facturación electrónica AFIP</li>
+                        <li>Conciliación bancaria</li>
+                        <li>Presupuestos y ejecución</li>
+                    </ul>
+                </div>
+
+                <!-- Deportivo -->
+                <div class="module-card" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="module-header">
+                        <div class="module-icon">⚽</div>
+                        <h3>Módulo Deportivo</h3>
+                    </div>
+                    <p>Gestión integral de actividades deportivas y competitivas</p>
+                    <ul class="module-features">
+                        <li>Actividades y categorías</li>
+                        <li>Equipos y plantel</li>
+                        <li>Partidos y torneos</li>
+                        <li>Entrenadores y estadísticas</li>
+                        <li>Reportes de rendimiento</li>
+                    </ul>
+                </div>
+
+                <!-- Portal Socio -->
+                <div class="module-card" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="module-header">
+                        <div class="module-icon">📱</div>
+                        <h3>Portal del Socio PWA</h3>
+                    </div>
+                    <p>App web progresiva con experiencia nativa móvil</p>
+                    <ul class="module-features">
+                        <li>Cuenta corriente online</li>
+                        <li>Pagos con tarjeta/transferencia</li>
+                        <li>QR de acceso al club</li>
+                        <li>Gestión de familia</li>
+                        <li>Solicitudes online</li>
+                    </ul>
+                </div>
+
+                <!-- Buffet -->
+                <div class="module-card" data-aos="zoom-in">
+                    <div class="module-header">
+                        <div class="module-icon">🍽️</div>
+                        <h3>Buffet & Punto de Venta</h3>
+                    </div>
+                    <p>Sistema completo para buffet, kiosco y takeaway</p>
+                    <ul class="module-features">
+                        <li>Gestión de mesas y comandas</li>
+                        <li>Kiosco con productos rápidos</li>
+                        <li>TakeAway y delivery</li>
+                        <li>Impresión térmica de tickets</li>
+                        <li>Control de stock en tiempo real</li>
+                    </ul>
+                </div>
+
+                <!-- Control de Accesos -->
+                <div class="module-card" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="module-header">
+                        <div class="module-icon">🚪</div>
+                        <h3>Control de Accesos</h3>
+                    </div>
+                    <p>Registro de ingresos con verificación de estado</p>
+                    <ul class="module-features">
+                        <li>Escaneo QR de socios</li>
+                        <li>Verificación automática de cuotas</li>
+                        <li>Registro de visitas</li>
+                        <li>Múltiples puntos de acceso</li>
+                        <li>Alertas de deudores</li>
+                    </ul>
+                </div>
+
+                <!-- Socios -->
+                <div class="module-card" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="module-header">
+                        <div class="module-icon">👥</div>
+                        <h3>Gestión de Socios</h3>
+                    </div>
+                    <p>Administración completa del padrón de socios</p>
+                    <ul class="module-features">
+                        <li>Grupos familiares</li>
+                        <li>Cuenta corriente individual</li>
+                        <li>Historial completo</li>
+                        <li>Documentación digital</li>
+                        <li>Estados y categorías</li>
+                    </ul>
+                </div>
+
+                <!-- Cuotas -->
+                <div class="module-card" data-aos="zoom-in">
+                    <div class="module-header">
+                        <div class="module-icon">💵</div>
+                        <h3>Cuotas & Cobranzas</h3>
+                    </div>
+                    <p>Sistema de cuotas automáticas y recargos</p>
+                    <ul class="module-features">
+                        <li>Generación automática mensual</li>
+                        <li>Recargos por mora</li>
+                        <li>Débito automático bancario</li>
+                        <li>Medios de pago múltiples</li>
+                        <li>Comprobantes digitales</li>
+                    </ul>
+                </div>
+
+                <!-- Actividades -->
+                <div class="module-card" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="module-header">
+                        <div class="module-icon">🏊</div>
+                        <h3>Actividades & Inscripciones</h3>
+                    </div>
+                    <p>Gestión de actividades deportivas y recreativas</p>
+                    <ul class="module-features">
+                        <li>Catálogo de actividades</li>
+                        <li>Inscripciones online</li>
+                        <li>Control de cupos</li>
+                        <li>Horarios y profesores</li>
+                        <li>Pagos adicionales</li>
+                    </ul>
+                </div>
+
+                <!-- Sitio Institucional -->
+                <div class="module-card" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="module-header">
+                        <div class="module-icon">🌐</div>
+                        <h3>Sitio Institucional</h3>
+                    </div>
+                    <p>Sitio web público del club totalmente personalizable</p>
+                    <ul class="module-features">
+                        <li>Editor visual de contenidos</li>
+                        <li>Noticias y novedades</li>
+                        <li>Galería de fotos</li>
+                        <li>Formularios de contacto</li>
+                        <li>Responsive design</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Xavi IA Section -->
+    <section class="rojo-ia">
+        <div class="container">
+            <div class="rojo-ia-content">
+                <div class="rojo-ia-image" data-aos="fade-right">
+                    <div class="ai-visual">
+                        <div class="ai-circle"></div>
+                        <div class="ai-circle"></div>
+                        <div class="ai-circle"></div>
+                        <svg width="200" height="200" viewBox="0 0 200 200">
+                            <circle cx="100" cy="100" r="80" fill="none" stroke="url(#ai-gradient)" stroke-width="2"/>
+                            <circle cx="100" cy="100" r="60" fill="none" stroke="url(#ai-gradient)" stroke-width="2" opacity="0.6"/>
+                            <circle cx="100" cy="100" r="40" fill="none" stroke="url(#ai-gradient)" stroke-width="2" opacity="0.3"/>
+                            <defs>
+                                <linearGradient id="ai-gradient">
+                                    <stop offset="0%" stop-color="#3B9FF3"/>
+                                    <stop offset="100%" stop-color="#00D4D4"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                </div>
+                <div class="rojo-ia-text" data-aos="fade-left">
+                    <div class="badge-ai">Powered by Claude Sonnet 4</div>
+                    <h2>Xavi - IA Predictiva Integrada</h2>
+                    <p class="subtitle">El cerebro inteligente de tu club</p>
+                    <p>Más que un asistente: Xavi analiza tus datos en tiempo real, genera informes estratégicos y sugiere acciones concretas para mejorar la gestión y hacer crecer tu institución.</p>
+                    <ul class="ai-features">
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                            </svg>
+                            Análisis predictivo de tendencias y comportamiento de socios
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                            </svg>
+                            Informes automáticos personalizados en lenguaje natural
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                            </svg>
+                            Sugerencias estratégicas para retención y crecimiento
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                            </svg>
+                            Detección temprana de problemas financieros y operativos
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                            </svg>
+                            Recomendaciones basadas en mejores prácticas de la industria
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benefits Section -->
+    <section class="benefits" id="beneficios">
+        <div class="container">
+            <div class="section-header" data-aos="fade-up">
+                <h2>¿Por qué Clubix hace crecer tu club?</h2>
+                <p>No es solo gestión, es estrategia inteligente</p>
+            </div>
+            <div class="benefits-grid">
+                <div class="benefit-item" data-aos="fade-up" data-aos-delay="100">
+                    <div class="benefit-number">01</div>
+                    <h3>IA Predictiva Incorporada</h3>
+                    <p>Xavi analiza patrones, predice tendencias y sugiere acciones para mejorar retención de socios y optimizar ingresos</p>
+                </div>
+                <div class="benefit-item" data-aos="fade-up" data-aos-delay="200">
+                    <div class="benefit-number">02</div>
+                    <h3>Decisiones Basadas en Datos</h3>
+                    <p>Informes automáticos en tiempo real que transforman información en estrategias concretas de crecimiento</p>
+                </div>
+                <div class="benefit-item" data-aos="fade-up" data-aos-delay="300">
+                    <div class="benefit-number">03</div>
+                    <h3>Mejora Continua Automática</h3>
+                    <p>El sistema aprende de tu club y sugiere optimizaciones específicas para tu realidad institucional</p>
+                </div>
+                <div class="benefit-item" data-aos="fade-up" data-aos-delay="400">
+                    <div class="benefit-number">04</div>
+                    <h3>Todo en Uno + Inteligente</h3>
+                    <p>Gestión completa con capacidad analítica que ningún sistema tradicional puede ofrecer</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing" id="precios">
+        <div class="container">
+            <div class="section-header" data-aos="fade-up">
+                <h2>Planes a tu medida</h2>
+                <p>Soluciones escalables según el tamaño de tu club</p>
+            </div>
+            <div class="pricing-grid">
+                <div class="pricing-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="pricing-header">
+                        <h3>Básico</h3>
+                        <div class="price">
+                            <span class="currency">$</span>
+                            <span class="amount">Consultar</span>
+                        </div>
+                        <p class="price-desc">Hasta 500 socios</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>✓ Gestión de Socios</li>
+                        <li>✓ Portal del Socio</li>
+                        <li>✓ Cuotas y Pagos</li>
+                        <li>✓ Reportes Básicos</li>
+                        <li>✓ Soporte Email</li>
+                    </ul>
+                    <a href="#contacto" class="btn-outline">Consultar</a>
+                </div>
+
+                <div class="pricing-card featured" data-aos="fade-up" data-aos-delay="200">
+                    <div class="badge-popular">Más Popular</div>
+                    <div class="pricing-header">
+                        <h3>Profesional</h3>
+                        <div class="price">
+                            <span class="currency">$</span>
+                            <span class="amount">Consultar</span>
+                        </div>
+                        <p class="price-desc">Hasta 2000 socios</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>✓ Todo del plan Básico</li>
+                        <li>✓ Módulo Financiero Completo</li>
+                        <li>✓ Módulo Deportivo</li>
+                        <li>✓ Buffet/POS</li>
+                        <li>✓ Control de Accesos</li>
+                        <li>✓ Xavi IA</li>
+                        <li>✓ Soporte Prioritario</li>
+                    </ul>
+                    <a href="#contacto" class="btn-primary">Solicitar Demo</a>
+                </div>
+
+                <div class="pricing-card" data-aos="fade-up" data-aos-delay="300">
+                    <div class="pricing-header">
+                        <h3>Enterprise</h3>
+                        <div class="price">
+                            <span class="currency">$</span>
+                            <span class="amount">Consultar</span>
+                        </div>
+                        <p class="price-desc">Ilimitado</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>✓ Todo del plan Profesional</li>
+                        <li>✓ Módulos Personalizados</li>
+                        <li>✓ Integraciones a Medida</li>
+                        <li>✓ Capacitación In-Situ</li>
+                        <li>✓ Soporte 24/7</li>
+                        <li>✓ Gestor de Cuenta Dedicado</li>
+                    </ul>
+                    <a href="#contacto" class="btn-outline">Contactar</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <div class="cta-content" data-aos="zoom-in">
+                <h2>¿Listo para hacer crecer tu club con IA?</h2>
+                <p>Solicita una demo gratuita y descubre cómo Xavi puede transformar tu gestión con análisis predictivo e informes inteligentes</p>
+                <a href="#contacto" class="btn-primary btn-lg">Solicitar Demo Gratuita</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="contact" id="contacto">
+        <div class="container">
+            <div class="contact-grid">
+                <div class="contact-info" data-aos="fade-right">
+                    <h2>Contáctanos</h2>
+                    <p>Completa el formulario y te contactaremos a la brevedad para coordinar una demo personalizada</p>
+                    <div class="contact-details">
+                        <div class="contact-item">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            <span>info@clubix.com</span>
+                        </div>
+                        <div class="contact-item">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                            </svg>
+                            <span>+54 9 11 XXXX-XXXX</span>
+                        </div>
+                    </div>
+                </div>
+                <form class="contact-form" data-aos="fade-left">
+                    <div class="form-group">
+                        <input type="text" placeholder="Nombre completo" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="email" placeholder="Email" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="tel" placeholder="Teléfono" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" placeholder="Nombre del club">
+                    </div>
+                    <div class="form-group">
+                        <select>
+                            <option>Cantidad de socios</option>
+                            <option>Hasta 500</option>
+                            <option>500 - 1000</option>
+                            <option>1000 - 2000</option>
+                            <option>Más de 2000</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <textarea placeholder="Mensaje (opcional)" rows="4"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary btn-block">Enviar Solicitud</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <img src="LogoClubix.png" alt="Clubix Logo" class="footer-logo-img">
+                    </div>
+                    <p>Inteligencia para gestionar tu club</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>Producto</h4>
+                        <a href="#caracteristicas">Características</a>
+                        <a href="#modulos">Módulos</a>
+                        <a href="#precios">Precios</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Soporte</h4>
+                        <a href="#contacto">Contacto</a>
+                        <a href="#">Documentación</a>
+                        <a href="#">FAQ</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Clubix. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
