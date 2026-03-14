@@ -153,7 +153,7 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [socios, total, estados, categorias, tiposSocio, zonas] = await Promise.all([
-    req.req.db.socio.findMany({
+    req.db.socio.findMany({
       where,
       orderBy: { nroSocio: 'asc' },
       skip: (page - 1) * parseInt(limit),
@@ -179,11 +179,11 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
         createdAt: true,
       },
     }),
-    req.req.db.socio.count({ where }),
-    req.req.db.socio.groupBy({ by: ['estado'], _count: true }),
-    req.req.db.socio.groupBy({ by: ['categoria'], _count: true }),
-    req.req.db.socio.groupBy({ by: ['tipoSocio'], _count: true }),
-    req.req.db.socio.groupBy({ by: ['zona'], _count: true }),
+    req.db.socio.count({ where }),
+    req.db.socio.groupBy({ by: ['estado'], _count: true }),
+    req.db.socio.groupBy({ by: ['categoria'], _count: true }),
+    req.db.socio.groupBy({ by: ['tipoSocio'], _count: true }),
+    req.db.socio.groupBy({ by: ['zona'], _count: true }),
   ])
 
   const currentPage = parseInt(page)
@@ -217,7 +217,7 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
 router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const socio = await req.req.db.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(id) },
     include: {
       responsable: {
@@ -254,7 +254,7 @@ router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener cuotas pendientes
-  const cuotasPendientes = await req.req.db.cargo.findMany({
+  const cuotasPendientes = await req.db.cargo.findMany({
     where: {
       socioId: socio.id,
       estado: 'PENDIENTE',
@@ -267,12 +267,12 @@ router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Resumen de pagos
   const [pagosTotales, ultimoPago] = await Promise.all([
-    req.req.db.pago.aggregate({
+    req.db.pago.aggregate({
       where: { socioId: socio.id, estado: 'CONFIRMADO' },
       _count: true,
       _sum: { montoTotal: true },
     }),
-    req.req.db.pago.findFirst({
+    req.db.pago.findFirst({
       where: { socioId: socio.id, estado: 'CONFIRMADO' },
       orderBy: { fecha: 'desc' },
       select: { fecha: true, montoTotal: true },
@@ -314,7 +314,7 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar que no exista
-  const existente = await req.req.db.socio.findUnique({
+  const existente = await req.db.socio.findUnique({
     where: { nroSocio: data.nroSocio },
   })
 
@@ -409,7 +409,7 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
     creadoPor: req.admin.id,
   }
 
-  const socio = await req.req.db.socio.create({
+  const socio = await req.db.socio.create({
     data: socioData,
     select: {
       id: true,
@@ -434,7 +434,7 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   const data = req.body
 
   // Verificar que existe
-  const existente = await req.req.db.socio.findUnique({
+  const existente = await req.db.socio.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -444,7 +444,7 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Si cambia nroSocio, verificar que no exista otro
   if (data.nroSocio && data.nroSocio !== existente.nroSocio) {
-    const duplicado = await req.req.db.socio.findUnique({
+    const duplicado = await req.db.socio.findUnique({
       where: { nroSocio: data.nroSocio },
     })
     if (duplicado) {
@@ -518,7 +518,7 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   // Auditoría
   updateData.actualizadoPor = req.admin.id
 
-  const socio = await req.req.db.socio.update({
+  const socio = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: updateData,
     select: {
@@ -543,7 +543,7 @@ router.post('/socios/:id/desactivar', authAdmin, asyncHandler(async (req, res) =
   const { id } = req.params
   const { motivoBaja } = req.body
 
-  const socio = await req.req.db.socio.update({
+  const socio = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'INACTIVO',
@@ -567,7 +567,7 @@ router.post('/socios/:id/desactivar', authAdmin, asyncHandler(async (req, res) =
 router.post('/socios/:id/activar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const socio = await req.req.db.socio.update({
+  const socio = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'ACTIVO',
@@ -591,7 +591,7 @@ router.post('/socios/:id/activar', authAdmin, asyncHandler(async (req, res) => {
 router.post('/socios/:id/regenerar-token', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const socio = await req.req.db.socio.update({
+  const socio = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: { tokenPortal: uuidv4() },
     select: { id: true, nroSocio: true, tokenPortal: true },
@@ -613,7 +613,7 @@ router.put('/socios/:id/familia', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { titularFamiliaId, parentescoTitular } = req.body
 
-  const socio = await req.req.db.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(id) },
     include: { miembrosFamilia: { select: { id: true } } }
   })
@@ -624,7 +624,7 @@ router.put('/socios/:id/familia', authAdmin, asyncHandler(async (req, res) => {
 
   // Si se asigna un titular, verificar que exista
   if (titularFamiliaId) {
-    const titular = await req.req.db.socio.findUnique({
+    const titular = await req.db.socio.findUnique({
       where: { id: parseInt(titularFamiliaId) },
     })
 
@@ -643,7 +643,7 @@ router.put('/socios/:id/familia', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  const updated = await req.req.db.socio.update({
+  const updated = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: {
       titularFamiliaId: titularFamiliaId ? parseInt(titularFamiliaId) : null,
@@ -674,7 +674,7 @@ router.put('/socios/:id/familia', authAdmin, asyncHandler(async (req, res) => {
 router.post('/socios/:id/familia/desarmar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const titular = await req.req.db.socio.findUnique({
+  const titular = await req.db.socio.findUnique({
     where: { id: parseInt(id) },
     include: {
       miembrosFamilia: { select: { id: true, apellidoNombre: true } }
@@ -692,7 +692,7 @@ router.post('/socios/:id/familia/desarmar', authAdmin, asyncHandler(async (req, 
   // Actualizar todos los miembros a Socio Unico
   const miembrosIds = titular.miembrosFamilia.map(m => m.id)
 
-  await req.req.db.socio.updateMany({
+  await req.db.socio.updateMany({
     where: { id: { in: miembrosIds } },
     data: {
       titularFamiliaId: null,
@@ -702,7 +702,7 @@ router.post('/socios/:id/familia/desarmar', authAdmin, asyncHandler(async (req, 
   })
 
   // Cambiar el titular a Socio Unico
-  await req.req.db.socio.update({
+  await req.db.socio.update({
     where: { id: parseInt(id) },
     data: {
       tipoSocio: 'Socio Unico',
@@ -727,7 +727,7 @@ router.get('/socios/titulares/buscar', authAdmin, asyncHandler(async (req, res) 
     return res.json({ success: true, data: [] })
   }
 
-  const titulares = await req.req.db.socio.findMany({
+  const titulares = await req.db.socio.findMany({
     where: {
       tipoSocio: { contains: 'Titular', mode: 'insensitive' },
       OR: [
@@ -767,7 +767,7 @@ router.get('/socios/miembros/buscar', authAdmin, asyncHandler(async (req, res) =
     return res.json({ success: true, data: [] })
   }
 
-  const socios = await req.req.db.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where: {
       // No incluir al titular
       id: { not: parseInt(titularId) },
@@ -798,7 +798,7 @@ router.delete('/socios/:id/familia/miembro/:miembroId', authAdmin, asyncHandler(
   const { id, miembroId } = req.params
 
   // Verificar que el miembro pertenece a este titular
-  const miembro = await req.req.db.socio.findUnique({
+  const miembro = await req.db.socio.findUnique({
     where: { id: parseInt(miembroId) },
   })
 
@@ -810,7 +810,7 @@ router.delete('/socios/:id/familia/miembro/:miembroId', authAdmin, asyncHandler(
     throw new AppError('Este miembro no pertenece a esta familia', 400, 'INVALID_OPERATION')
   }
 
-  await req.req.db.socio.update({
+  await req.db.socio.update({
     where: { id: parseInt(miembroId) },
     data: {
       titularFamiliaId: null,
@@ -832,7 +832,7 @@ router.post('/socios/:id/familia/miembro', authAdmin, asyncHandler(async (req, r
   const { socioId, parentesco } = req.body
 
   // Verificar que el titular existe
-  const titular = await req.req.db.socio.findUnique({
+  const titular = await req.db.socio.findUnique({
     where: { id: parseInt(id) },
     include: { miembrosFamilia: { select: { id: true } } }
   })
@@ -842,7 +842,7 @@ router.post('/socios/:id/familia/miembro', authAdmin, asyncHandler(async (req, r
   }
 
   // Verificar que el socio a agregar existe
-  const socio = await req.req.db.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(socioId) },
     include: { miembrosFamilia: { select: { id: true } } }
   })
@@ -860,7 +860,7 @@ router.post('/socios/:id/familia/miembro', authAdmin, asyncHandler(async (req, r
     throw new AppError('Este socio es titular de otra familia', 400, 'IS_TITULAR')
   }
 
-  const updated = await req.req.db.socio.update({
+  const updated = await req.db.socio.update({
     where: { id: parseInt(socioId) },
     data: {
       titularFamiliaId: parseInt(id),
@@ -884,7 +884,7 @@ router.post('/socios/:id/familia/miembro', authAdmin, asyncHandler(async (req, r
 router.get('/socios/:id/datos-debito', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const socio = await req.req.db.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(id) },
     select: {
       id: true,
@@ -938,7 +938,7 @@ router.put('/socios/:id/datos-debito', authAdmin, asyncHandler(async (req, res) 
     actualizadoPor: req.admin.id,
   }
 
-  const socio = await req.req.db.socio.update({
+  const socio = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: updateData,
     select: { id: true, nroSocio: true, enviaDebito: true },
@@ -1073,7 +1073,7 @@ router.post('/socios/upload', authAdmin, upload.single('file'), asyncHandler(asy
     }
 
     // Verificar si existe
-    const existente = await req.req.db.socio.findUnique({
+    const existente = await req.db.socio.findUnique({
       where: { nroSocio },
     })
 
@@ -1218,7 +1218,7 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   // Crear nuevos
   if (cached.crear.length > 0) {
     const datosParaCrear = cached.crear.map(limpiarCamposTemporales)
-    await req.req.db.socio.createMany({
+    await req.db.socio.createMany({
       data: datosParaCrear,
       skipDuplicates: true,
     })
@@ -1227,7 +1227,7 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   // Actualizar existentes con TODOS los campos
   for (const socio of cached.actualizar) {
     const datosLimpios = limpiarCamposTemporales(socio)
-    await req.req.db.socio.update({
+    await req.db.socio.update({
       where: { id: socio.id },
       data: {
         // Nombre completo y separado
@@ -1308,7 +1308,7 @@ router.get('/socios/:socioId/cuenta-corriente', authAdmin, asyncHandler(async (r
   const { socioId } = req.params
   const { desde, hasta, incluirFamilia } = req.query
 
-  const socio = await req.req.db.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(socioId) },
     select: {
       id: true,
@@ -1340,7 +1340,7 @@ router.get('/socios/:socioId/cuenta-corriente', authAdmin, asyncHandler(async (r
   if (hasta) whereFecha.lte = new Date(hasta)
 
   // Obtener todos los cargos
-  const cargos = await req.req.db.cargo.findMany({
+  const cargos = await req.db.cargo.findMany({
     where: {
       socioId: { in: socioIds },
       estado: { not: 'ANULADO' },
@@ -1361,7 +1361,7 @@ router.get('/socios/:socioId/cuenta-corriente', authAdmin, asyncHandler(async (r
   })
 
   // Obtener todos los pagos
-  const pagos = await req.req.db.pago.findMany({
+  const pagos = await req.db.pago.findMany({
     where: {
       socioId: { in: socioIds },
       estado: 'CONFIRMADO',

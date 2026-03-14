@@ -238,12 +238,12 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
 
   // Obtener movimientos de caja por tipo
   const [ingresosCaja, egresosCaja] = await Promise.all([
-    req.req.db.movimientoCaja.aggregate({
+    req.db.movimientoCaja.aggregate({
       where: { ...whereMovCaja, tipo: 'INGRESO' },
       _sum: { monto: true },
       _count: true,
     }),
-    req.req.db.movimientoCaja.aggregate({
+    req.db.movimientoCaja.aggregate({
       where: { ...whereMovCaja, tipo: 'EGRESO' },
       _sum: { monto: true },
       _count: true,
@@ -369,11 +369,11 @@ router.get('/centros-costo-reporte-comparativo', authAdmin, asyncHandler(async (
     centros.map(async centro => {
       // Movimientos de caja
       const [ingresosCaja, egresosCaja] = await Promise.all([
-        req.req.db.movimientoCaja.aggregate({
+        req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'INGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
         }),
-        req.req.db.movimientoCaja.aggregate({
+        req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'EGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
         }),
@@ -478,7 +478,7 @@ router.get('/centros-costo-evolucion-temporal', authAdmin, asyncHandler(async (r
 
   // Obtener todos los movimientos
   const [movimientosCaja, movimientosContables] = await Promise.all([
-    req.req.db.movimientoCaja.findMany({
+    req.db.movimientoCaja.findMany({
       where: whereMovCaja,
       select: {
         fecha: true,
@@ -671,7 +671,7 @@ router.get('/centros-costo-presupuesto-vs-real', authAdmin, asyncHandler(async (
   }
 
   // Obtener presupuesto principal del año
-  const presupuesto = await req.req.db.presupuesto.findFirst({
+  const presupuesto = await req.db.presupuesto.findFirst({
     where: {
       anio: parseInt(anio),
       esPrincipal: true,
@@ -719,7 +719,7 @@ router.get('/centros-costo-presupuesto-vs-real', authAdmin, asyncHandler(async (
   const fechaHasta = new Date(`${anio}-12-31`)
 
   const [movimientosCaja, movimientosContables] = await Promise.all([
-    req.req.db.movimientoCaja.findMany({
+    req.db.movimientoCaja.findMany({
       where: {
         fecha: { gte: fechaDesde, lte: fechaHasta },
         anulado: false,
@@ -954,11 +954,11 @@ router.get('/centros-costo-export-comparativo', authAdmin, asyncHandler(async (r
   const dataCentros = await Promise.all(
     centros.map(async centro => {
       const [ingresosCaja, egresosCaja] = await Promise.all([
-        req.req.db.movimientoCaja.aggregate({
+        req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'INGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
         }),
-        req.req.db.movimientoCaja.aggregate({
+        req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'EGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
         }),
@@ -1044,7 +1044,7 @@ router.get('/centros-costo-export-evolucion', authAdmin, asyncHandler(async (req
   }
 
   const [movimientosCaja, movimientosContables] = await Promise.all([
-    req.req.db.movimientoCaja.findMany({
+    req.db.movimientoCaja.findMany({
       where: whereMovCaja,
       select: {
         fecha: true,
@@ -1197,7 +1197,7 @@ router.get('/centros-costo-export-presupuesto', authAdmin, asyncHandler(async (r
     throw new AppError('El año es requerido', 400, 'VALIDATION_ERROR')
   }
 
-  const presupuesto = await req.req.db.presupuesto.findFirst({
+  const presupuesto = await req.db.presupuesto.findFirst({
     where: { anio: parseInt(anio), esPrincipal: true, estado: 'APROBADO' },
     include: {
       lineas: {

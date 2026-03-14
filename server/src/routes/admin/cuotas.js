@@ -73,22 +73,22 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
   const periodosConStats = await Promise.all(periodos.map(async (periodo) => {
     const ahora = new Date()
     const [statsTotal, statsPagadas, statsPendientes, statsVencidas] = await Promise.all([
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: { periodoId: periodo.id },
         _sum: { montoTotal: true },
         _count: { _all: true },
       }),
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: { periodoId: periodo.id, estado: 'PAGADO' },
         _sum: { montoTotal: true },
         _count: { _all: true },
       }),
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: { periodoId: periodo.id, estado: 'PENDIENTE' },
         _sum: { montoTotal: true },
         _count: { _all: true },
       }),
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: {
           periodoId: periodo.id,
           estado: 'PENDIENTE',
@@ -126,7 +126,7 @@ router.get('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
   }
 
-  const stats = await req.req.db.cargo.groupBy({
+  const stats = await req.db.cargo.groupBy({
     by: ['estado'],
     where: { periodoId: periodo.id },
     _count: true,
@@ -227,7 +227,7 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar si hay cuotas pagadas
-  const cuotasPagadas = await req.req.db.cargo.count({
+  const cuotasPagadas = await req.db.cargo.count({
     where: {
       periodoId: periodo.id,
       estado: 'PAGADO',
@@ -239,7 +239,7 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Eliminar cuotas pendientes del periodo
-  await req.req.db.cargo.deleteMany({
+  await req.db.cargo.deleteMany({
     where: { periodoId: periodo.id },
   })
 
@@ -264,7 +264,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   }
 
   // Obtener socios que YA tienen cuota social en este periodo (pueden ser de planes de pago)
-  const sociosConCuotaSocial = await req.req.db.cargo.findMany({
+  const sociosConCuotaSocial = await req.db.cargo.findMany({
     where: {
       periodoId: periodo.id,
       categoria: 'CUOTA_SOCIAL'
@@ -274,7 +274,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   const sociosConCuotaSocialIds = new Set(sociosConCuotaSocial.map(c => c.socioId))
 
   // Obtener cargos de actividad que YA existen en este periodo (socio + categoriaActividad)
-  const cargosActividad = await req.req.db.cargo.findMany({
+  const cargosActividad = await req.db.cargo.findMany({
     where: {
       periodoId: periodo.id,
       categoria: 'CUOTA_ACTIVIDAD'
@@ -284,7 +284,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   const actividadesConCargo = new Set(cargosActividad.map(c => `${c.socioId}-${c.categoriaActividadId}`))
 
   // Obtener socios activos con sus relaciones
-  const socios = await req.req.db.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where: {
       OR: [
         { estado: { contains: 'Activ', mode: 'insensitive' } },
@@ -411,11 +411,11 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
 
   // Crear todos los cargos en batch
   if (cargosACrear.length > 0) {
-    await req.req.db.cargo.createMany({ data: cargosACrear })
+    await req.db.cargo.createMany({ data: cargosACrear })
   }
 
   // Actualizar estado del periodo (solo si se generaron nuevas cuotas o es la primera vez)
-  const totalCuotasPeriodo = await req.req.db.cargo.count({
+  const totalCuotasPeriodo = await req.db.cargo.count({
     where: { periodoId: periodo.id }
   })
 
@@ -479,7 +479,7 @@ router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
   if (estado) where.estado = estado
 
   const [cuotas, total] = await Promise.all([
-    req.req.db.cargo.findMany({
+    req.db.cargo.findMany({
       where,
       skip,
       take: limit,
@@ -496,7 +496,7 @@ router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
         },
       },
     }),
-    req.req.db.cargo.count({ where }),
+    req.db.cargo.count({ where }),
   ])
 
   res.json({
@@ -521,7 +521,7 @@ router.get('/cuotas/socio/:socioId', authAdmin, asyncHandler(async (req, res) =>
   const where = { socioId: parseInt(socioId) }
   if (estado) where.estado = estado
 
-  const cuotas = await req.req.db.cargo.findMany({
+  const cuotas = await req.db.cargo.findMany({
     where,
     orderBy: [{ fechaVencimiento: 'desc' }],
     include: {
@@ -563,7 +563,7 @@ router.get('/cuotas/familia/:titularId', authAdmin, asyncHandler(async (req, res
   if (estado) where.estado = estado
   if (periodoId) where.periodoId = parseInt(periodoId)
 
-  const cuotas = await req.req.db.cargo.findMany({
+  const cuotas = await req.db.cargo.findMany({
     where,
     orderBy: [{ fechaVencimiento: 'desc' }, { socioId: 'asc' }],
     include: {
@@ -620,7 +620,7 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
   const { periodoId, estado } = req.query
 
   // Obtener el socio con info de familia
-  const socio = await req.req.db.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(socioId) },
     include: {
       miembrosFamilia: { select: { id: true, nroSocio: true, apellidoNombre: true } },
@@ -654,7 +654,7 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
     where.socioId = socio.id
   }
 
-  const cuotasRaw = await req.req.db.cargo.findMany({
+  const cuotasRaw = await req.db.cargo.findMany({
     where,
     orderBy: [{ periodo: { anio: 'desc' } }, { periodo: { mes: 'desc' } }, { socioId: 'asc' }],
     include: {
@@ -702,7 +702,7 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
   // Obtener titular si es familia
   let titular = null
   if (esFamilia && titularId !== socio.id) {
-    titular = await req.req.db.socio.findUnique({
+    titular = await req.db.socio.findUnique({
       where: { id: titularId },
       select: { id: true, nroSocio: true, apellidoNombre: true },
     })
@@ -751,7 +751,7 @@ router.get('/pagos', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [pagos, total] = await Promise.all([
-    req.req.db.pago.findMany({
+    req.db.pago.findMany({
       where,
       skip,
       take: limit,
@@ -768,7 +768,7 @@ router.get('/pagos', authAdmin, asyncHandler(async (req, res) => {
         },
       },
     }),
-    req.req.db.pago.count({ where }),
+    req.db.pago.count({ where }),
   ])
 
   res.json({
@@ -787,7 +787,7 @@ router.get('/pagos', authAdmin, asyncHandler(async (req, res) => {
 router.get('/pagos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const pago = await req.req.db.pago.findUnique({
+  const pago = await req.db.pago.findUnique({
     where: { id: parseInt(id) },
     include: {
       socio: {
@@ -831,7 +831,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener cuotas a pagar (fuera de transacción para validar)
-  const cuotasRaw = await req.req.db.cargo.findMany({
+  const cuotasRaw = await req.db.cargo.findMany({
     where: {
       id: { in: cuotaIds.map(id => parseInt(id)) },
       estado: 'PENDIENTE',
@@ -866,7 +866,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   const montoRecibidoNum = parseFloat(montoRecibido) || montoTotal
 
   // Obtener caja seleccionada
-  const caja = await req.req.db.caja.findUnique({
+  const caja = await req.db.caja.findUnique({
     where: { id: parseInt(cajaId) },
     include: { cuentaContable: true },
   })
@@ -1160,7 +1160,7 @@ router.delete('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
   // Verificar si hay pagos usando este medio
-  const pagosConMedio = await req.req.db.pago.count({
+  const pagosConMedio = await req.db.pago.count({
     where: { medioPagoId: parseInt(id) },
   })
 

@@ -17,7 +17,7 @@ router.get('/cargos-personal', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const cargos = await req.req.db.cargoPersonal.findMany({
+  const cargos = await req.db.cargoPersonal.findMany({
     where,
     orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
     include: {
@@ -30,7 +30,7 @@ router.get('/cargos-personal', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/cargos-personal/:id - Detalle de cargo
 router.get('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
-  const cargo = await req.req.db.cargoPersonal.findUnique({
+  const cargo = await req.db.cargoPersonal.findUnique({
     where: { id: parseInt(req.params.id) },
     include: {
       entidades: {
@@ -53,12 +53,12 @@ router.post('/cargos-personal', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Codigo y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.req.db.cargoPersonal.findUnique({ where: { codigo } })
+  const existente = await req.db.cargoPersonal.findUnique({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un cargo con ese codigo', 400, 'DUPLICATE')
   }
 
-  const cargo = await req.req.db.cargoPersonal.create({
+  const cargo = await req.db.cargoPersonal.create({
     data: {
       codigo: codigo.toUpperCase(),
       nombre,
@@ -75,16 +75,16 @@ router.put('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, descripcion, orden, activo } = req.body
 
-  const existente = await req.req.db.cargoPersonal.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.cargoPersonal.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Cargo no encontrado', 404, 'NOT_FOUND')
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const otro = await req.req.db.cargoPersonal.findUnique({ where: { codigo } })
+    const otro = await req.db.cargoPersonal.findUnique({ where: { codigo } })
     if (otro) throw new AppError('Ya existe un cargo con ese codigo', 400, 'DUPLICATE')
   }
 
-  const cargo = await req.req.db.cargoPersonal.update({
+  const cargo = await req.db.cargoPersonal.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo ? codigo.toUpperCase() : existente.codigo,
@@ -102,7 +102,7 @@ router.put('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cargo = await req.req.db.cargoPersonal.findUnique({
+  const cargo = await req.db.cargoPersonal.findUnique({
     where: { id: parseInt(id) },
     include: { _count: { select: { entidades: true } } }
   })
@@ -113,7 +113,7 @@ router.delete('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) =
     throw new AppError(`No se puede eliminar, tiene ${cargo._count.entidades} empleado(s) asignado(s)`, 400, 'HAS_RELATIONS')
   }
 
-  await req.req.db.cargoPersonal.delete({ where: { id: parseInt(id) } })
+  await req.db.cargoPersonal.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Cargo eliminado' } })
 }))
 
@@ -124,7 +124,7 @@ router.get('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const entrenadores = await req.req.db.entrenador.findMany({
+  const entrenadores = await req.db.entrenador.findMany({
     where,
     include: {
       entidad: true,
@@ -151,7 +151,7 @@ router.get('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/entrenadores/:id - Detalle de entrenador
 router.get('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
-  const entrenador = await req.req.db.entrenador.findUnique({
+  const entrenador = await req.db.entrenador.findUnique({
     where: { id: parseInt(req.params.id) },
     include: {
       entidad: {
@@ -277,7 +277,7 @@ router.put('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
     mostrarEnWeb, fotoStaff, biografiaStaff, emailPublico, telefonoPublico, ordenStaff
   } = req.body
 
-  const existente = await req.req.db.entrenador.findUnique({
+  const existente = await req.db.entrenador.findUnique({
     where: { id: parseInt(id) },
     include: { entidad: true }
   })
@@ -392,11 +392,11 @@ router.delete('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
   // Primero eliminar las asignaciones de categorías
-  await req.req.db.entrenadorCategoria.deleteMany({
+  await req.db.entrenadorCategoria.deleteMany({
     where: { entrenadorId: parseInt(id) }
   })
 
-  await req.req.db.entrenador.delete({ where: { id: parseInt(id) } })
+  await req.db.entrenador.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Entrenador eliminado' } })
 }))
 
@@ -455,14 +455,14 @@ router.post('/entrenadores/:id/categorias', authAdmin, asyncHandler(async (req, 
     throw new AppError('La categoría es requerida', 400, 'VALIDATION_ERROR')
   }
 
-  const entrenador = await req.req.db.entrenador.findUnique({ where: { id: parseInt(id) } })
+  const entrenador = await req.db.entrenador.findUnique({ where: { id: parseInt(id) } })
   if (!entrenador) throw new AppError('Entrenador no encontrado', 404, 'NOT_FOUND')
 
   const categoria = await req.prisma.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
   if (!categoria) throw new AppError('Categoría no encontrada', 404, 'NOT_FOUND')
 
   // Verificar si ya existe la asignación
-  const existente = await req.req.db.entrenadorCategoria.findUnique({
+  const existente = await req.db.entrenadorCategoria.findUnique({
     where: {
       entrenadorId_categoriaActividadId: {
         entrenadorId: parseInt(id),
@@ -474,7 +474,7 @@ router.post('/entrenadores/:id/categorias', authAdmin, asyncHandler(async (req, 
   if (existente) {
     // Si existe pero está inactiva, reactivarla
     if (!existente.activo) {
-      const asignacion = await req.req.db.entrenadorCategoria.update({
+      const asignacion = await req.db.entrenadorCategoria.update({
         where: { id: existente.id },
         data: { activo: true, rol: rol || 'ENTRENADOR', fechaDesde: new Date() },
         include: {
@@ -488,7 +488,7 @@ router.post('/entrenadores/:id/categorias', authAdmin, asyncHandler(async (req, 
     throw new AppError('El entrenador ya está asignado a esta categoría', 400, 'DUPLICATE')
   }
 
-  const asignacion = await req.req.db.entrenadorCategoria.create({
+  const asignacion = await req.db.entrenadorCategoria.create({
     data: {
       entrenadorId: parseInt(id),
       categoriaActividadId: parseInt(categoriaActividadId),
@@ -508,7 +508,7 @@ router.post('/entrenadores/:id/categorias', authAdmin, asyncHandler(async (req, 
 router.delete('/entrenadores/:id/categorias/:catId', authAdmin, asyncHandler(async (req, res) => {
   const { id, catId } = req.params
 
-  const asignacion = await req.req.db.entrenadorCategoria.findFirst({
+  const asignacion = await req.db.entrenadorCategoria.findFirst({
     where: {
       entrenadorId: parseInt(id),
       categoriaActividadId: parseInt(catId),
@@ -518,7 +518,7 @@ router.delete('/entrenadores/:id/categorias/:catId', authAdmin, asyncHandler(asy
 
   if (!asignacion) throw new AppError('Asignación no encontrada', 404, 'NOT_FOUND')
 
-  await req.req.db.entrenadorCategoria.update({
+  await req.db.entrenadorCategoria.update({
     where: { id: asignacion.id },
     data: { activo: false, fechaHasta: new Date() }
   })

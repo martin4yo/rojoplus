@@ -41,7 +41,7 @@ router.get('/:token/socios/buscar', asyncHandler(authComercio), asyncHandler(asy
     throw new AppError('Parámetro de búsqueda requerido', 400, 'VALIDATION_ERROR')
   }
 
-  const socio = await req.req.db.socio.findFirst({
+  const socio = await req.db.socio.findFirst({
     where: {
       OR: [
         { nroSocio: q },
@@ -84,7 +84,7 @@ router.get('/:token/socios/buscar-qr', asyncHandler(authComercio), asyncHandler(
     throw new AppError('Token de socio requerido', 400, 'VALIDATION_ERROR')
   }
 
-  const socio = await req.req.db.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { tokenPortal: tokenSocio },
     select: {
       id: true,
@@ -181,7 +181,7 @@ router.post('/:token/ventas', asyncHandler(authComercio), asyncHandler(async (re
   }
 
   // Verificar que el socio existe y está activo
-  const socio = await req.req.db.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: socioId },
   })
 

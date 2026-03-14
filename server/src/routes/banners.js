@@ -116,7 +116,7 @@ router.get('/public/banners', asyncHandler(async (req, res) => {
     where.tipo = tipo
   }
 
-  const banners = await req.req.db.banner.findMany({
+  const banners = await req.db.banner.findMany({
     where,
     include: {
       sponsor: {
@@ -141,7 +141,7 @@ router.get('/public/banners', asyncHandler(async (req, res) => {
 router.post('/public/banners/:id/impresion', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  await req.req.db.banner.update({
+  await req.db.banner.update({
     where: { id: parseInt(id) },
     data: { impresiones: { increment: 1 } }
   })
@@ -156,7 +156,7 @@ router.post('/public/banners/:id/impresion', asyncHandler(async (req, res) => {
 router.post('/public/banners/:id/clic', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const banner = await req.req.db.banner.update({
+  const banner = await req.db.banner.update({
     where: { id: parseInt(id) },
     data: { clics: { increment: 1 } },
     select: { linkDestino: true }
@@ -170,7 +170,7 @@ router.post('/public/banners/:id/clic', asyncHandler(async (req, res) => {
  * Obtener sponsors activos para mostrar en el sitio
  */
 router.get('/public/sponsors', asyncHandler(async (req, res) => {
-  const sponsors = await req.req.db.sponsor.findMany({
+  const sponsors = await req.db.sponsor.findMany({
     where: { activo: true },
     select: {
       id: true,
@@ -209,7 +209,7 @@ router.get('/admin/sponsors', authAdmin, asyncHandler(async (req, res) => {
     ]
   }
 
-  const sponsors = await req.req.db.sponsor.findMany({
+  const sponsors = await req.db.sponsor.findMany({
     where,
     include: {
       _count: {
@@ -229,7 +229,7 @@ router.get('/admin/sponsors', authAdmin, asyncHandler(async (req, res) => {
 router.get('/admin/sponsors/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const sponsor = await req.req.db.sponsor.findUnique({
+  const sponsor = await req.db.sponsor.findUnique({
     where: { id: parseInt(id) },
     include: {
       banners: {
@@ -267,7 +267,7 @@ router.post('/admin/sponsors', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('El nombre es obligatorio', 400)
   }
 
-  const sponsor = await req.req.db.sponsor.create({
+  const sponsor = await req.db.sponsor.create({
     data: {
       nombre,
       razonSocial,
@@ -305,7 +305,7 @@ router.put('/admin/sponsors/:id', authAdmin, asyncHandler(async (req, res) => {
     activo
   } = req.body
 
-  const sponsor = await req.req.db.sponsor.update({
+  const sponsor = await req.db.sponsor.update({
     where: { id: parseInt(id) },
     data: {
       nombre,
@@ -333,7 +333,7 @@ router.delete('/admin/sponsors/:id', authAdmin, asyncHandler(async (req, res) =>
   const { id } = req.params
 
   // Verificar si tiene banners
-  const bannersCount = await req.req.db.banner.count({
+  const bannersCount = await req.db.banner.count({
     where: { sponsorId: parseInt(id) }
   })
 
@@ -341,7 +341,7 @@ router.delete('/admin/sponsors/:id', authAdmin, asyncHandler(async (req, res) =>
     throw new AppError(`No se puede eliminar: tiene ${bannersCount} banners asociados`, 400)
   }
 
-  await req.req.db.sponsor.delete({
+  await req.db.sponsor.delete({
     where: { id: parseInt(id) }
   })
 
@@ -409,7 +409,7 @@ router.get('/admin/banners', authAdmin, asyncHandler(async (req, res) => {
     where.sponsorId = parseInt(sponsorId)
   }
 
-  const banners = await req.req.db.banner.findMany({
+  const banners = await req.db.banner.findMany({
     where,
     include: {
       sponsor: {
@@ -434,12 +434,12 @@ router.get('/admin/banners/estadisticas', authAdmin, asyncHandler(async (req, re
   const now = new Date()
 
   // Total de banners activos
-  const totalActivos = await req.req.db.banner.count({
+  const totalActivos = await req.db.banner.count({
     where: { activo: true }
   })
 
   // Banners por vencer (próximos 7 días)
-  const porVencer = await req.req.db.banner.count({
+  const porVencer = await req.db.banner.count({
     where: {
       activo: true,
       fechaFin: {
@@ -450,7 +450,7 @@ router.get('/admin/banners/estadisticas', authAdmin, asyncHandler(async (req, re
   })
 
   // Métricas agregadas
-  const metricas = await req.req.db.banner.aggregate({
+  const metricas = await req.db.banner.aggregate({
     _sum: {
       impresiones: true,
       clics: true
@@ -459,7 +459,7 @@ router.get('/admin/banners/estadisticas', authAdmin, asyncHandler(async (req, re
   })
 
   // Top 5 banners por clics
-  const topBanners = await req.req.db.banner.findMany({
+  const topBanners = await req.db.banner.findMany({
     where: { activo: true },
     orderBy: { clics: 'desc' },
     take: 5,
@@ -476,7 +476,7 @@ router.get('/admin/banners/estadisticas', authAdmin, asyncHandler(async (req, re
 
   // Ingresos del mes actual
   const mesActual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const ingresosMes = await req.req.db.banner.aggregate({
+  const ingresosMes = await req.db.banner.aggregate({
     _sum: {
       montoMensual: true
     },
@@ -509,7 +509,7 @@ router.get('/admin/banners/estadisticas', authAdmin, asyncHandler(async (req, re
 router.get('/admin/banners/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const banner = await req.req.db.banner.findUnique({
+  const banner = await req.db.banner.findUnique({
     where: { id: parseInt(id) },
     include: {
       sponsor: true
@@ -552,7 +552,7 @@ router.post('/admin/banners', authAdmin, asyncHandler(async (req, res) => {
   // Helper para convertir strings vacíos a null
   const emptyToNull = (val) => (val === '' || val === undefined) ? null : val
 
-  const banner = await req.req.db.banner.create({
+  const banner = await req.db.banner.create({
     data: {
       titulo,
       sponsorId: sponsorId ? parseInt(sponsorId) : null,
@@ -606,7 +606,7 @@ router.put('/admin/banners/:id', authAdmin, asyncHandler(async (req, res) => {
   // Helper para convertir strings vacíos a null
   const emptyToNull = (val) => (val === '' || val === undefined) ? null : val
 
-  const banner = await req.req.db.banner.update({
+  const banner = await req.db.banner.update({
     where: { id: parseInt(id) },
     data: {
       titulo,
@@ -642,7 +642,7 @@ router.put('/admin/banners/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/admin/banners/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  await req.req.db.banner.delete({
+  await req.db.banner.delete({
     where: { id: parseInt(id) }
   })
 

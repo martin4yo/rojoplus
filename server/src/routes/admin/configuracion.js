@@ -121,7 +121,7 @@ router.delete('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
   // Verificar si hay socios usando este tipo
-  const sociosConTipo = await req.req.db.socio.count({
+  const sociosConTipo = await req.db.socio.count({
     where: { tipoSocioRelId: parseInt(id) },
   })
 
@@ -224,7 +224,7 @@ router.put('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => 
 router.delete('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const sociosConCategoria = await req.req.db.socio.count({
+  const sociosConCategoria = await req.db.socio.count({
     where: { categoriaSocioId: parseInt(id) },
   })
 
@@ -318,7 +318,7 @@ router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const sociosConEstado = await req.req.db.socio.count({
+  const sociosConEstado = await req.db.socio.count({
     where: { estadoSocioId: parseInt(id) },
   })
 
@@ -597,7 +597,7 @@ router.delete('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, re
   // Verificar si hay tipos de socio o actividades usando este concepto
   const [tiposSocio, actividades, categorias] = await Promise.all([
     req.prisma.tipoSocio.count({ where: { conceptoId: parseInt(id) } }),
-    req.req.db.actividad.count({ where: { conceptoId: parseInt(id) } }),
+    req.db.actividad.count({ where: { conceptoId: parseInt(id) } }),
     req.prisma.categoriaActividad.count({ where: { conceptoId: parseInt(id) } }),
   ])
 
@@ -632,22 +632,22 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
   const periodosConStats = await Promise.all(periodos.map(async (periodo) => {
     const ahora = new Date()
     const [statsTotal, statsPagadas, statsPendientes, statsVencidas] = await Promise.all([
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: { periodoId: periodo.id },
         _sum: { montoTotal: true },
         _count: { _all: true },
       }),
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: { periodoId: periodo.id, estado: 'PAGADO' },
         _sum: { montoTotal: true },
         _count: { _all: true },
       }),
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: { periodoId: periodo.id, estado: 'PENDIENTE' },
         _sum: { montoTotal: true },
         _count: { _all: true },
       }),
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: {
           periodoId: periodo.id,
           estado: 'PENDIENTE',
@@ -685,7 +685,7 @@ router.get('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
   }
 
-  const stats = await req.req.db.cargo.groupBy({
+  const stats = await req.db.cargo.groupBy({
     by: ['estado'],
     where: { periodoId: periodo.id },
     _count: true,
@@ -786,7 +786,7 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar si hay cuotas pagadas
-  const cuotasPagadas = await req.req.db.cargo.count({
+  const cuotasPagadas = await req.db.cargo.count({
     where: {
       periodoId: periodo.id,
       estado: 'PAGADO',
@@ -798,7 +798,7 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Eliminar cuotas pendientes del periodo
-  await req.req.db.cargo.deleteMany({
+  await req.db.cargo.deleteMany({
     where: { periodoId: periodo.id },
   })
 
@@ -823,7 +823,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   }
 
   // Obtener socios que YA tienen cuota social en este periodo (pueden ser de planes de pago)
-  const sociosConCuotaSocial = await req.req.db.cargo.findMany({
+  const sociosConCuotaSocial = await req.db.cargo.findMany({
     where: {
       periodoId: periodo.id,
       categoria: 'CUOTA_SOCIAL'
@@ -833,7 +833,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   const sociosConCuotaSocialIds = new Set(sociosConCuotaSocial.map(c => c.socioId))
 
   // Obtener cargos de actividad que YA existen en este periodo (socio + categoriaActividad)
-  const cargosActividad = await req.req.db.cargo.findMany({
+  const cargosActividad = await req.db.cargo.findMany({
     where: {
       periodoId: periodo.id,
       categoria: 'CUOTA_ACTIVIDAD'
@@ -843,7 +843,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   const actividadesConCargo = new Set(cargosActividad.map(c => `${c.socioId}-${c.categoriaActividadId}`))
 
   // Obtener socios activos con sus relaciones
-  const socios = await req.req.db.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where: {
       OR: [
         { estado: { contains: 'Activ', mode: 'insensitive' } },
@@ -970,11 +970,11 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
 
   // Crear todos los cargos en batch
   if (cargosACrear.length > 0) {
-    await req.req.db.cargo.createMany({ data: cargosACrear })
+    await req.db.cargo.createMany({ data: cargosACrear })
   }
 
   // Actualizar estado del periodo (solo si se generaron nuevas cuotas o es la primera vez)
-  const totalCuotasPeriodo = await req.req.db.cargo.count({
+  const totalCuotasPeriodo = await req.db.cargo.count({
     where: { periodoId: periodo.id }
   })
 
@@ -1232,7 +1232,7 @@ async function calcularRecargoCargo(prisma, cargo) {
 router.get('/cargos/:id/recargo', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cargo = await req.req.db.cargo.findUnique({
+  const cargo = await req.db.cargo.findUnique({
     where: { id: parseInt(id) },
   })
 

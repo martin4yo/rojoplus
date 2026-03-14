@@ -629,7 +629,7 @@ router.get('/candidatos', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [candidatos, total] = await Promise.all([
-    req.req.db.socio.findMany({
+    req.db.socio.findMany({
       where,
       skip,
       take: parseInt(limit),
@@ -653,7 +653,7 @@ router.get('/candidatos', authAdmin, asyncHandler(async (req, res) => {
       },
       orderBy: { fechaBaja: 'desc' }
     }),
-    req.req.db.socio.count({ where })
+    req.db.socio.count({ where })
   ])
 
   res.json({

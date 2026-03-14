@@ -82,9 +82,13 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 // Servir archivos públicos (plantillas, etc)
 app.use('/public', express.static(path.join(__dirname, '../public')))
 
-// Pasar prisma a las rutas
+// Pasar prisma a las rutas (fallback para req.db si no está configurado)
 app.use((req, res, next) => {
   req.prisma = prisma
+  // Fallback: si req.db no está configurado, usar prisma global
+  if (!req.db) {
+    req.db = prisma
+  }
   next()
 })
 

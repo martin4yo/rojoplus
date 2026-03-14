@@ -61,7 +61,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
   }
 
   // Validar que no exista un socio activo con el mismo documento
-  const socioExistente = await req.req.db.socio.findFirst({
+  const socioExistente = await req.db.socio.findFirst({
     where: {
       documento,
       estado: 'ACTIVO'
@@ -107,7 +107,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
 
   // Enviar email de confirmación al solicitante
   try {
-    const clubNombre = (await req.req.db.configuracion.findUnique({
+    const clubNombre = (await req.db.configuracion.findUnique({
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
 
@@ -133,7 +133,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
       select: { email: true }
     })
 
-    const clubNombre = (await req.req.db.configuracion.findUnique({
+    const clubNombre = (await req.db.configuracion.findUnique({
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
 
@@ -346,7 +346,7 @@ router.post('/solicitud-socio/:id/verificar', asyncHandler(async (req, res) => {
  * Obtener lista de actividades activas para mostrar en el sitio web
  */
 router.get('/actividades', asyncHandler(async (req, res) => {
-  const actividades = await req.req.db.actividad.findMany({
+  const actividades = await req.db.actividad.findMany({
     where: {
       activo: true
     },
@@ -387,7 +387,7 @@ router.get('/actividades', asyncHandler(async (req, res) => {
 router.get('/actividades/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const actividad = await req.req.db.actividad.findUnique({
+  const actividad = await req.db.actividad.findUnique({
     where: { id: parseInt(id) },
     include: {
       categorias: {
@@ -449,7 +449,7 @@ router.get('/calendario', asyncHandler(async (req, res) => {
   const fechaFin = new Date(year, month, 0, 23, 59, 59)
 
   // Obtener partidos del mes
-  const partidos = await req.req.db.partido.findMany({
+  const partidos = await req.db.partido.findMany({
     where: {
       fecha: {
         gte: fechaInicio,
@@ -756,7 +756,7 @@ router.get('/cronograma', asyncHandler(async (req, res) => {
       wherePartidos.categoriaActividadId = { in: categorias }
     }
 
-    let partidos = await req.req.db.partido.findMany({
+    let partidos = await req.db.partido.findMany({
       where: wherePartidos,
       include: {
         categoriaActividad: {
@@ -843,7 +843,7 @@ router.get('/actividades/:id/staff', asyncHandler(async (req, res) => {
     }
   }
 
-  const asignaciones = await req.req.db.entrenadorCategoria.findMany({
+  const asignaciones = await req.db.entrenadorCategoria.findMany({
     where: whereCategoria,
     include: {
       entrenador: {
@@ -909,7 +909,7 @@ router.get('/actividades/:id/noticias', asyncHandler(async (req, res) => {
     where.categoriaId = parseInt(categoriaId)
   }
 
-  const noticias = await req.req.db.noticiaDeportiva.findMany({
+  const noticias = await req.db.noticiaDeportiva.findMany({
     where,
     include: {
       categoria: {
@@ -927,7 +927,7 @@ router.get('/actividades/:id/noticias', asyncHandler(async (req, res) => {
     skip: parseInt(offset)
   })
 
-  const total = await req.req.db.noticiaDeportiva.count({ where })
+  const total = await req.db.noticiaDeportiva.count({ where })
 
   res.json({
     success: true,
@@ -956,7 +956,7 @@ router.get('/partidos/proximos', asyncHandler(async (req, res) => {
   }
 
   if (actividadId) {
-    const actividad = await req.req.db.actividad.findUnique({
+    const actividad = await req.db.actividad.findUnique({
       where: { id: parseInt(actividadId) },
       include: {
         categorias: {
@@ -976,7 +976,7 @@ router.get('/partidos/proximos', asyncHandler(async (req, res) => {
     where.categoriaActividadId = parseInt(categoriaId)
   }
 
-  const partidos = await req.req.db.partido.findMany({
+  const partidos = await req.db.partido.findMany({
     where,
     include: {
       categoriaActividad: {

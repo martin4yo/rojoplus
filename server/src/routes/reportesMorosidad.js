@@ -59,7 +59,7 @@ router.get('/resumen-kpis', authAdmin, asyncHandler(async (req, res) => {
   const hoy = new Date()
 
   // Cuotas vencidas pendientes
-  const cuotasVencidas = await req.req.db.cargo.findMany({
+  const cuotasVencidas = await req.db.cargo.findMany({
     where: {
       estado: 'PENDIENTE',
       fechaVencimiento: { lt: hoy },
@@ -98,7 +98,7 @@ router.get('/resumen-kpis', authAdmin, asyncHandler(async (req, res) => {
   const promedioAtraso = cuotasVencidas.length > 0 ? Math.round(sumaDias / cuotasVencidas.length) : 0
 
   // Total de socios activos para calcular % de morosidad
-  const totalSociosActivos = await req.req.db.socio.count({
+  const totalSociosActivos = await req.db.socio.count({
     where: {
       OR: [
         { estado: { contains: 'Activ', mode: 'insensitive' } },
@@ -149,7 +149,7 @@ router.get('/antiguedad', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener cuotas vencidas
-  const cuotasVencidas = await req.req.db.cargo.findMany({
+  const cuotasVencidas = await req.db.cargo.findMany({
     where,
     select: {
       id: true,
@@ -228,7 +228,7 @@ router.get('/proyeccion', authAdmin, asyncHandler(async (req, res) => {
   const hoy = new Date()
 
   // Obtener configuración de recargos
-  const config = await req.req.db.configuracionRecargo.findFirst({
+  const config = await req.db.configuracionRecargo.findFirst({
     where: { activo: true },
   })
 
@@ -243,7 +243,7 @@ router.get('/proyeccion', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Cuotas pendientes (incluye no vencidas que podrían vencer)
-  const cuotasPendientes = await req.req.db.cargo.findMany({
+  const cuotasPendientes = await req.db.cargo.findMany({
     where: {
       estado: 'PENDIENTE',
       fechaVencimiento: { not: null },
@@ -348,7 +348,7 @@ router.get('/detalle', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener cuotas
-  const cuotas = await req.req.db.cargo.findMany({
+  const cuotas = await req.db.cargo.findMany({
     where,
     include: {
       socio: {
@@ -490,7 +490,7 @@ router.get('/exportar', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener cuotas con socio
-  const cuotas = await req.req.db.cargo.findMany({
+  const cuotas = await req.db.cargo.findMany({
     where,
     include: {
       socio: {

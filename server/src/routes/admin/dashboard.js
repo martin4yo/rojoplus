@@ -18,7 +18,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   const inicio6Meses = new Date(anioActual, mesActual - 6, 1)
 
   // Socios activos
-  const sociosActivos = await req.req.db.socio.count({
+  const sociosActivos = await req.db.socio.count({
     where: {
       OR: [
         { estado: { contains: 'Activ', mode: 'insensitive' } },
@@ -28,7 +28,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Socios con inscripciones activas en actividades
-  const sociosConActividad = await req.req.db.inscripcion.findMany({
+  const sociosConActividad = await req.db.inscripcion.findMany({
     where: {
       estado: 'ACTIVA',
     },
@@ -49,12 +49,12 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   let cobranzaPeriodo = { cobrado: 0, pendiente: 0, cantCobrado: 0, cantPendiente: 0 }
   if (periodoActual) {
     const [cobrado, pendiente] = await Promise.all([
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: { periodoId: periodoActual.id, estado: 'PAGADO' },
         _sum: { montoTotal: true },
         _count: true,
       }),
-      req.req.db.cargo.aggregate({
+      req.db.cargo.aggregate({
         where: { periodoId: periodoActual.id, estado: 'PENDIENTE' },
         _sum: { montoTotal: true },
         _count: true,
@@ -70,14 +70,14 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
 
   // Movimientos de caja del mes actual
   const [ingresosMes, egresosMes] = await Promise.all([
-    req.req.db.movimientoCaja.aggregate({
+    req.db.movimientoCaja.aggregate({
       where: {
         tipo: 'INGRESO',
         fecha: { gte: inicioMes },
       },
       _sum: { monto: true },
     }),
-    req.req.db.movimientoCaja.aggregate({
+    req.db.movimientoCaja.aggregate({
       where: {
         tipo: 'EGRESO',
         fecha: { gte: inicioMes },
@@ -87,7 +87,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   ])
 
   // Saldos de cajas activas
-  const cajas = await req.req.db.caja.findMany({
+  const cajas = await req.db.caja.findMany({
     where: { activo: true },
     select: { id: true, nombre: true, tipo: true, saldoActual: true },
     orderBy: { nombre: 'asc' },
@@ -146,7 +146,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   // Tarjetas pendientes de conciliación
   let tarjetasPendientes = []
   try {
-    tarjetasPendientes = await req.req.db.movimientoCaja.findMany({
+    tarjetasPendientes = await req.db.movimientoCaja.findMany({
       where: {
         conciliado: false,
         anulado: false,
@@ -267,7 +267,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   // ============ DATOS HISTÓRICOS PARA GRÁFICOS ============
 
   // Movimientos de caja de los últimos 6 meses
-  const movimientosHistoricos = await req.req.db.movimientoCaja.findMany({
+  const movimientosHistoricos = await req.db.movimientoCaja.findMany({
     where: { fecha: { gte: inicio6Meses } },
     select: { fecha: true, tipo: true, monto: true, concepto: true },
     orderBy: { fecha: 'asc' },

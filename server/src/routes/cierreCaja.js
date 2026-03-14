@@ -41,7 +41,7 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
   const esSuperAdmin = admin?.rol?.esSuperAdmin || false
 
   if (!esSuperAdmin && admin?.rolId) {
-    const cajasRol = await req.req.db.cajaRol.findMany({
+    const cajasRol = await req.db.cajaRol.findMany({
       where: { rolId: admin.rolId },
       select: { cajaId: true }
     })
@@ -62,7 +62,7 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
     whereClause.id = { in: cajasPermitidasIds }
   }
 
-  const cajasEfectivo = await req.req.db.caja.findMany({
+  const cajasEfectivo = await req.db.caja.findMany({
     where: whereClause,
     orderBy: { nombre: 'asc' }
   })
@@ -83,7 +83,7 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
 
     if (!cierreHoy) {
       // Calcular movimientos del día (solo confirmados, no anulados)
-      const movimientosHoy = await req.req.db.movimientoCaja.findMany({
+      const movimientosHoy = await req.db.movimientoCaja.findMany({
         where: {
           cajaId: caja.id,
           fecha: {
@@ -151,7 +151,7 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 
   // Verificar que la caja existe y está activa
-  const caja = await req.req.db.caja.findUnique({
+  const caja = await req.db.caja.findUnique({
     where: { id: parseInt(cajaId) }
   })
 
@@ -172,7 +172,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const esSuperAdmin = admin?.rol?.esSuperAdmin || false
 
   if (!esSuperAdmin && admin?.rolId) {
-    const cajasRol = await req.req.db.cajaRol.findMany({
+    const cajasRol = await req.db.cajaRol.findMany({
       where: { rolId: admin.rolId },
       select: { cajaId: true }
     })
@@ -208,7 +208,7 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 
   // Calcular movimientos del día (solo confirmados, no anulados)
-  const movimientosDelDia = await req.req.db.movimientoCaja.findMany({
+  const movimientosDelDia = await req.db.movimientoCaja.findMany({
     where: {
       cajaId: parseInt(cajaId),
       fecha: {
@@ -309,7 +309,7 @@ router.get('/', asyncHandler(async (req, res) => {
   // Obtener cajas permitidas para el rol del usuario
   let cajasPermitidasIds = null
   if (!esSuperAdmin && admin?.rolId) {
-    const cajasRol = await req.req.db.cajaRol.findMany({
+    const cajasRol = await req.db.cajaRol.findMany({
       where: { rolId: admin.rolId },
       select: { cajaId: true }
     })
@@ -420,7 +420,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const mañana = new Date(fechaCierre)
   mañana.setDate(mañana.getDate() + 1)
 
-  const movimientos = await req.req.db.movimientoCaja.findMany({
+  const movimientos = await req.db.movimientoCaja.findMany({
     where: {
       cajaId: cierre.cajaId,
       fecha: {
@@ -533,7 +533,7 @@ router.get('/informe-previo/:cajaId', asyncHandler(async (req, res) => {
   const { fecha } = req.query
 
   // Validar caja
-  const caja = await req.req.db.caja.findUnique({
+  const caja = await req.db.caja.findUnique({
     where: { id: parseInt(cajaId) }
   })
 
@@ -549,7 +549,7 @@ router.get('/informe-previo/:cajaId', asyncHandler(async (req, res) => {
   mañana.setDate(mañana.getDate() + 1)
 
   // Obtener movimientos del día
-  const movimientos = await req.req.db.movimientoCaja.findMany({
+  const movimientos = await req.db.movimientoCaja.findMany({
     where: {
       cajaId: parseInt(cajaId),
       fecha: {
@@ -658,7 +658,7 @@ router.get('/informe-previo/:cajaId', asyncHandler(async (req, res) => {
   })
 
   // Obtener configuración del club
-  const clubConfig = await req.req.db.configuracion.findMany({
+  const clubConfig = await req.db.configuracion.findMany({
     where: {
       clave: {
         in: ['CLUB_NOMBRE', 'CLUB_LOGO_URL']
@@ -733,7 +733,7 @@ router.get('/:id/pdf', asyncHandler(async (req, res) => {
   const mañana = new Date(fechaCierre)
   mañana.setDate(mañana.getDate() + 1)
 
-  const movimientos = await req.req.db.movimientoCaja.findMany({
+  const movimientos = await req.db.movimientoCaja.findMany({
     where: {
       cajaId: cierre.cajaId,
       fecha: {
@@ -816,7 +816,7 @@ router.get('/:id/pdf', asyncHandler(async (req, res) => {
   })
 
   // Obtener configuración del club
-  const clubConfig = await req.req.db.configuracion.findMany({
+  const clubConfig = await req.db.configuracion.findMany({
     where: {
       clave: {
         in: ['CLUB_NOMBRE', 'CLUB_LOGO_URL']
