@@ -1,0 +1,294 @@
+import { useState, useEffect } from 'react'
+import { Eye, Edit, Trash2, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import api from '../../services/api'
+
+export default function TenantsList() {
+  const navigate = useNavigate()
+  const [tenants, setTenants] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all') // all, pending, active, suspended
+  const [searchTerm, setSearchTerm] = useState('')
+
+  useEffect(() => {
+    cargarTenants()
+  }, [filter])
+
+  async function cargarTenants() {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+
+      if (filter !== 'all') {
+        const estadoMap = {
+          pending: 'PENDING_APPROVAL',
+          active: 'ACTIVE',
+          suspended: 'SUSPENDED'
+        }
+        params.append('estado', estadoMap[filter])
+      }
+
+      const data = await api.get(`/super-admin/tenants?${params.toString()}`)
+      setTenants(data || [])
+    } catch (error) {
+      toast.error('Error cargando tenants: ' + error.message)
+      setTenants([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function aprobar(id) {
+    try {
+      await api.post(`/super-admin/tenants/${id}/approve`)
+      toast.success('Tenant aprobado')
+      cargarTenants()
+    } catch (error) {
+      toast.error('Error aprobando tenant: ' + error.message)
+    }
+  }
+
+  async function rechazar(id) {
+    const razon = prompt('¿Motivo del rechazo?')
+    if (!razon) return
+
+    try {
+      await api.post(`/super-admin/tenants/${id}/reject`, { razon })
+      toast.success('Tenant rechazado')
+      cargarTenants()
+    } catch (error) {
+      toast.error('Error rechazando tenant: ' + error.message)
+    }
+  }
+
+  async function suspender(id) {
+    const razon = prompt('¿Motivo de la suspensión?')
+    if (!razon) return
+
+    try {
+      await api.post(`/super-admin/tenants/${id}/suspend`, { razon })
+      toast.success('Tenant suspendido')
+      cargarTenants()
+    } catch (error) {
+      toast.error('Error suspendiendo tenant: ' + error.message)
+    }
+  }
+
+  async function eliminar(id, subdomain) {
+    if (subdomain === 'sportivo-pilar') {
+      toast.error('No se puede eliminar el tenant por defecto')
+      return
+    }
+
+    if (!confirm('¿Eliminar este tenant? Esta acción no se puede deshacer.')) return
+
+    try {
+      await api.delete(`/super-admin/tenants/${id}`)
+      toast.success('Tenant eliminado')
+      cargarTenants()
+    } catch (error) {
+      toast.error('Error eliminando tenant: ' + error.message)
+    }
+  }
+
+  const filtered = tenants.filter(t =>
+    t.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.subdomain.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (t.email && t.email.toLowerCase().includes(searchTerm.toLowerCase()))
+  )
+
+  const getEstadoBadge = (estado) => {
+    const badges = {
+      PENDING_APPROVAL: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendiente' },
+      ACTIVE: { bg: 'bg-green-100', text: 'text-green-800', label: 'Activo' },
+      SUSPENDED: { bg: 'bg-red-100', text: 'text-red-800', label: 'Suspendido' },
+      CANCELLED: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Cancelado' }
+    }
+    const badge = badges[estado] || badges.PENDING_APPROVAL
+    return (
+      <span className={`px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
+        {badge.label}
+      </span>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Gestión de Tenants</h1>
+          <p className="text-gray-600">Administra todos los clubs del sistema</p>
+        </div>
+        <button
+          onClick={() => navigate('/super-admin/tenants/nuevo')}
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Nuevo Tenant
+        </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-white rounded-lg shadow p-4 space-y-4">
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { value: 'all', label: 'Todos' },
+            { value: 'pending', label: 'Pendientes' },
+            { value: 'active', label: 'Activos' },
+            { value: 'suspended', label: 'Suspendidos' }
+          ].map(f => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                filter === f.value
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <input
+          type="text"
+          placeholder="Buscar por nombre, subdomain o email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+        />
+      </div>
+
+      {/* Tabla */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nombre</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Subdomain</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Plan</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Creado</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filtered.map(tenant => (
+                <tr key={tenant.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-gray-900">{tenant.nombre}</div>
+                    <div className="text-sm text-gray-500">{tenant.descripcion?.substring(0, 50)}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <code className="text-sm bg-gray-100 px-2 py-1 rounded">{tenant.subdomain}</code>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{tenant.email || '-'}</td>
+                  <td className="px-6 py-4 text-sm font-medium">{tenant.plan}</td>
+                  <td className="px-6 py-4">{getEstadoBadge(tenant.estado)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {new Date(tenant.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => navigate(`/super-admin/tenants/${tenant.id}`)}
+                        className="p-2 hover:bg-blue-50 rounded text-blue-600"
+                        title="Ver"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+
+                      {tenant.estado === 'PENDING_APPROVAL' && (
+                        <>
+                          <button
+                            onClick={() => aprobar(tenant.id)}
+                            className="p-2 hover:bg-green-50 rounded text-green-600"
+                            title="Aprobar"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => rechazar(tenant.id)}
+                            className="p-2 hover:bg-red-50 rounded text-red-600"
+                            title="Rechazar"
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+
+                      {tenant.estado === 'ACTIVE' && (
+                        <button
+                          onClick={() => suspender(tenant.id)}
+                          className="p-2 hover:bg-yellow-50 rounded text-yellow-600"
+                          title="Suspender"
+                        >
+                          <AlertCircle className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {tenant.subdomain !== 'sportivo-pilar' && (
+                        <button
+                          onClick={() => eliminar(tenant.id, tenant.subdomain)}
+                          className="p-2 hover:bg-red-50 rounded text-red-600"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {filtered.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No hay tenants que coincidan con los criterios de búsqueda
+          </div>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-sm text-gray-600">Total Tenants</p>
+          <p className="text-3xl font-bold text-primary">{tenants.length}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-sm text-gray-600">Activos</p>
+          <p className="text-3xl font-bold text-green-600">
+            {tenants.filter(t => t.estado === 'ACTIVE').length}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-sm text-gray-600">Pendientes</p>
+          <p className="text-3xl font-bold text-yellow-600">
+            {tenants.filter(t => t.estado === 'PENDING_APPROVAL').length}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-sm text-gray-600">Suspendidos</p>
+          <p className="text-3xl font-bold text-red-600">
+            {tenants.filter(t => t.estado === 'SUSPENDED').length}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

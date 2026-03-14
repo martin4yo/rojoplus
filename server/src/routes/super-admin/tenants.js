@@ -167,6 +167,176 @@ router.delete('/:id', async (req, res) => {
 })
 
 /**
+ * POST /api/super-admin/tenants
+ * Crear un nuevo tenant
+ */
+router.post('/', async (req, res) => {
+  try {
+    const { nombre, subdomain, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, plan, maxSocios, maxAdmins, timezone, moneda } = req.body
+
+    // Validaciones
+    if (!nombre || !subdomain) {
+      return res.status(400).json({ error: 'nombre y subdomain son requeridos' })
+    }
+
+    // Verificar que el subdomain sea único
+    const existing = await prisma.tenant.findUnique({ where: { subdomain } })
+    if (existing) {
+      return res.status(409).json({ error: 'El subdomain ya existe' })
+    }
+
+    const tenant = await prisma.tenant.create({
+      data: {
+        nombre,
+        subdomain,
+        slug: subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        email,
+        telefono,
+        direccion,
+        ciudad,
+        provincia,
+        codigoPostal,
+        descripcion,
+        slogan,
+        plan: plan || 'TRIAL',
+        maxSocios,
+        maxAdmins,
+        timezone: timezone || 'America/Argentina/Buenos_Aires',
+        moneda: moneda || 'ARS',
+        estado: 'PENDING_APPROVAL',
+        activo: false
+      }
+    })
+
+    res.status(201).json(tenant)
+  } catch (error) {
+    console.error('Error creating tenant:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * PUT /api/super-admin/tenants/:id
+ * Actualizar un tenant
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { nombre, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, plan, maxSocios, maxAdmins, timezone, moneda } = req.body
+
+    const tenant = await prisma.tenant.update({
+      where: { id: parseInt(id) },
+      data: {
+        nombre,
+        email,
+        telefono,
+        direccion,
+        ciudad,
+        provincia,
+        codigoPostal,
+        descripcion,
+        slogan,
+        plan,
+        maxSocios,
+        maxAdmins,
+        timezone,
+        moneda
+      }
+    })
+
+    res.json(tenant)
+  } catch (error) {
+    console.error('Error updating tenant:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * POST /api/super-admin/tenants/register
+ * Registro público de nuevo tenant
+ */
+router.post('/register', async (req, res) => {
+  try {
+    const { nombre, subdomain, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, razonSocial, cuit, adminData } = req.body
+
+    // Validaciones
+    if (!nombre || !subdomain || !email || !adminData) {
+      return res.status(400).json({ error: 'Campos requeridos faltando' })
+    }
+
+    // Verificar que el subdomain sea único
+    const existing = await prisma.tenant.findUnique({ where: { subdomain } })
+    if (existing) {
+      return res.status(409).json({ error: 'El subdomain ya existe' })
+    }
+
+    // Crear o buscar admin
+    let admin = await prisma.admin.findUnique({
+      where: { email: adminData.email }
+    })
+
+    if (!admin) {
+      // Crear nuevo admin (TODO: agregar hash de contraseña)
+      admin = await prisma.admin.create({
+        data: {
+          nombre: adminData.nombre,
+          email: adminData.email,
+          nombreUsuario: adminData.nombreUsuario || adminData.email.split('@')[0],
+          password: adminData.password, // TODO: hashear con bcrypt
+          activo: true
+        }
+      })
+    }
+
+    // Crear tenant en estado PENDING_APPROVAL
+    const tenant = await prisma.tenant.create({
+      data: {
+        nombre,
+        subdomain,
+        slug: subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        email,
+        telefono,
+        direccion,
+        ciudad,
+        provincia,
+        codigoPostal,
+        descripcion,
+        slogan,
+        razonSocial,
+        cuit,
+        plan: 'TRIAL',
+        maxSocios: 100,
+        maxAdmins: 5,
+        timezone: 'America/Argentina/Buenos_Aires',
+        moneda: 'ARS',
+        estado: 'PENDING_APPROVAL',
+        activo: false,
+        tenantUsuarios: {
+          create: {
+            adminId: admin.id,
+            rol: 'ADMIN'
+          }
+        }
+      },
+      include: {
+        tenantUsuarios: true
+      }
+    })
+
+    // TODO: Enviar email de confirmación
+
+    res.status(201).json({
+      success: true,
+      message: 'Registro enviado. Pendiente de aprobación.',
+      tenant
+    })
+  } catch (error) {
+    console.error('Error registering tenant:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
  * GET /api/super-admin/stats
  * Estadísticas globales del sistema
  */

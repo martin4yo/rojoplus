@@ -24,9 +24,10 @@ import CronogramaPublic from './pages/public/Cronograma'
 import GaleriaPublic from './pages/public/Galeria'
 import NotFoundPublic from './pages/public/NotFound'
 
-// Registro comercios
+// Registro comercios y clubs
 import Registro from './pages/registro/Registro'
 import RegistroExito from './pages/registro/RegistroExito'
+import RegistroClub from './pages/registro/RegistroClub'
 
 // Página del comerciante
 import Comercio from './pages/comercio/Comercio'
@@ -224,6 +225,13 @@ import GestionComunicaciones from './pages/admin/GestionComunicaciones'
 // Layout admin
 import AdminLayout from './components/AdminLayout'
 
+// Super-Admin
+import SuperAdminLayout from './components/SuperAdminLayout'
+import SuperAdminDashboard from './pages/super-admin/Dashboard'
+import TenantsList from './pages/super-admin/TenantsList'
+import TenantForm from './pages/super-admin/TenantForm'
+import TenantDetail from './pages/super-admin/TenantDetail'
+
 function App() {
   return (
     <ErrorBoundary>
@@ -254,6 +262,7 @@ function App() {
         </Route>
       <Route path="/registro" element={<Registro />} />
       <Route path="/registro/exito" element={<RegistroExito />} />
+      <Route path="/registro-club" element={<RegistroClub />} />
       <Route path="/inscripcion-socio" element={<InscripcionSocio />} />
       <Route path="/inscripcion-socio/:solicitudId/familiares" element={<AgregarFamiliares />} />
 
@@ -469,6 +478,15 @@ function App() {
 
         {/* Gestión de Comunicaciones */}
         <Route path="comunicaciones" element={<GestionComunicaciones />} />
+      </Route>
+
+      {/* Super-Admin */}
+      <Route path="/super-admin" element={<SuperAdminLayout />}>
+        <Route index element={<SuperAdminDashboard />} />
+        <Route path="tenants" element={<TenantsList />} />
+        <Route path="tenants/nuevo" element={<TenantForm />} />
+        <Route path="tenants/:id" element={<TenantDetail />} />
+        <Route path="tenants/:id/editar" element={<TenantForm />} />
       </Route>
             </Routes>
             </NotificacionBuffetProvider>
