@@ -53,6 +53,7 @@ import menuRoutes from './routes/menu.js'
 import chatRoutes from './routes/chat.js'
 import superAdminRoutes from './routes/super-admin/index.js'
 import brandingRoutes from './routes/admin/branding.js'
+import authRoutes from './routes/admin/auth.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -93,11 +94,22 @@ app.use((req, res, next) => {
 })
 
 // ===== MULTI-TENANT SETUP =====
-// Rutas que requieren tenant context
-app.use('/api/admin/*', extractTenant, (req, res, next) => {
-  req.db = createTenantPrisma(req.tenantId)
-  next()
+// Middleware para rutas admin - salta extractTenant para login
+app.use('/api/admin', (req, res, next) => {
+  // Skip extractTenant for login endpoint
+  if (req.path === '/login') {
+    return next()
+  }
+  // Apply tenant extraction for all other admin routes
+  extractTenant(req, res, (err) => {
+    if (err) return next(err)
+    req.db = createTenantPrisma(req.tenantId)
+    next()
+  })
 })
+
+// Rutas específicas admin (sin tenant requirement)
+app.use('/api/admin/login', authRoutes)
 app.use('/api/socio/*', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()
@@ -124,6 +136,9 @@ app.get('/api/tenant/current', extractTenant, (req, res) => {
 })
 
 // ===== FIN MULTI-TENANT SETUP =====
+
+// Auth routes (bypass tenant middleware - login before tenant context)
+app.use('/api/auth', authRoutes)
 
 // Rutas
 app.use('/api/rubros', rubrosRoutes)
