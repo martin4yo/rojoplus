@@ -94,10 +94,12 @@ app.use((req, res, next) => {
 })
 
 // ===== MULTI-TENANT SETUP =====
-// Middleware para rutas admin - salta extractTenant para login
-app.use('/api/admin', (req, res, next) => {
+// Rutas que requieren tenant context
+// BUT: login endpoint bypasses extractTenant
+app.use('/api/admin/*', (req, res, next) => {
   // Skip extractTenant for login endpoint
-  if (req.path === '/login') {
+  // Check originalUrl to get the full path including /api/admin
+  if (req.originalUrl.includes('/api/admin/login')) {
     return next()
   }
   // Apply tenant extraction for all other admin routes
@@ -108,7 +110,7 @@ app.use('/api/admin', (req, res, next) => {
   })
 })
 
-// Rutas específicas admin (sin tenant requirement)
+// Login endpoint - mounted WITHIN the /api/admin middleware chain but bypassed above
 app.use('/api/admin/login', authRoutes)
 app.use('/api/socio/*', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
