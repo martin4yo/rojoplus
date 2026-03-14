@@ -37,7 +37,7 @@ router.post('/validar', async (req, res) => {
     // 1. Buscar según el tipo de lectura
     if (tipoLectura === 'QR') {
       // Primero buscar por tokenPortal (Socios)
-      persona = await prisma.socio.findUnique({
+      persona = await req.db.socio.findUnique({
         where: { tokenPortal: valorLeido },
         select: {
           id: true,
@@ -69,7 +69,7 @@ router.post('/validar', async (req, res) => {
       }
     } else if (tipoLectura === 'DNI') {
       // Buscar por documento en Socios
-      persona = await prisma.socio.findFirst({
+      persona = await req.db.socio.findFirst({
         where: { documento: valorLeido },
         select: {
           id: true,
@@ -101,7 +101,7 @@ router.post('/validar', async (req, res) => {
       }
     } else if (tipoLectura === 'RFID') {
       // Buscar por rfidUid
-      persona = await prisma.socio.findUnique({
+      persona = await req.db.socio.findUnique({
         where: { rfidUid: valorLeido },
         select: {
           id: true,
@@ -355,7 +355,7 @@ router.get('/cache-socios', async (req, res) => {
     }
 
     // Obtener socios VIGENTES
-    const socios = await prisma.socio.findMany({
+    const socios = await req.db.socio.findMany({
       where: {
         estado: 'VIGENTE'
       },

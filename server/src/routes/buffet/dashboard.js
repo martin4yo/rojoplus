@@ -21,15 +21,15 @@ router.get('/dashboard', authAdmin, checkPermiso('BUFFET_VER'), async (req, res)
     manana.setDate(manana.getDate() + 1)
 
     // Mesas
-    const mesasTotal = await prisma.mesa.count({ where: { activo: true } })
-    const mesasOcupadas = await prisma.mesa.count({ where: { activo: true, estado: 'OCUPADA' } })
+    const mesasTotal = await req.db.mesa.count({ where: { activo: true } })
+    const mesasOcupadas = await req.db.mesa.count({ where: { activo: true, estado: 'OCUPADA' } })
 
     // Comandas del día
-    const comandasActivas = await prisma.comanda.count({
+    const comandasActivas = await req.db.comanda.count({
       where: { estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] } }
     })
 
-    const comandasCerradas = await prisma.comanda.count({
+    const comandasCerradas = await req.db.comanda.count({
       where: {
         estado: 'CERRADA',
         horaCierre: { gte: hoy, lt: manana }
@@ -49,7 +49,7 @@ router.get('/dashboard', authAdmin, checkPermiso('BUFFET_VER'), async (req, res)
     })
 
     // Ventas del día
-    const ventasBuffet = await prisma.movimientoCaja.aggregate({
+    const ventasBuffet = await req.db.movimientoCaja.aggregate({
       where: {
         OR: [
           { comandaId: { not: null } },
@@ -63,7 +63,7 @@ router.get('/dashboard', authAdmin, checkPermiso('BUFFET_VER'), async (req, res)
     })
 
     // Items pendientes cocina
-    const itemsPendientesCocina = await prisma.itemComanda.count({
+    const itemsPendientesCocina = await req.db.itemComanda.count({
       where: { estado: { in: ['ENVIADO_COCINA', 'EN_PREPARACION'] } }
     })
 
@@ -108,7 +108,7 @@ router.get('/ultimas-ventas', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
     hoy.setHours(0, 0, 0, 0)
 
     // Comandas cerradas hoy
-    const comandas = await prisma.comanda.findMany({
+    const comandas = await req.db.comanda.findMany({
       where: {
         estado: 'CERRADA',
         horaCierre: { gte: hoy }
@@ -226,7 +226,7 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     const fechaHastaAnterior = new Date(fechaDesde)
 
     // Comandas cerradas en el período
-    const comandas = await prisma.comanda.findMany({
+    const comandas = await req.db.comanda.findMany({
       where: {
         estado: 'CERRADA',
         horaCierre: { gte: fechaDesde, lte: fechaHasta }
@@ -240,7 +240,7 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     })
 
     // Comandas período anterior
-    const comandasAnterior = await prisma.comanda.aggregate({
+    const comandasAnterior = await req.db.comanda.aggregate({
       where: {
         estado: 'CERRADA',
         horaCierre: { gte: fechaDesdeAnterior, lt: fechaHastaAnterior }
@@ -263,7 +263,7 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     })
 
     // Ventas de Kiosco (movimientos de caja)
-    const ventasKiosco = await prisma.movimientoCaja.aggregate({
+    const ventasKiosco = await req.db.movimientoCaja.aggregate({
       where: {
         concepto: { startsWith: 'Kiosco' },
         fecha: { gte: fechaDesde, lte: fechaHasta },
@@ -409,7 +409,7 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
     const fechaHasta = new Date(hasta)
 
     // Comandas cerradas en el período
-    const comandas = await prisma.comanda.findMany({
+    const comandas = await req.db.comanda.findMany({
       where: {
         estado: 'CERRADA',
         horaCierre: { gte: fechaDesde, lte: fechaHasta }

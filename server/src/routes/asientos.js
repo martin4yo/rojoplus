@@ -11,7 +11,7 @@ const router = Router()
 // Generar número de asiento único
 async function generarNumeroAsiento(prisma) {
   const anio = new Date().getFullYear()
-  const ultimo = await prisma.asiento.findFirst({
+  const ultimo = await req.db.asiento.findFirst({
     where: { numero: { startsWith: `AST-${anio}` } },
     orderBy: { numero: 'desc' }
   })
@@ -61,7 +61,7 @@ router.get('/resumen/balance', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener todas las cuentas con sus movimientos
-  const cuentas = await req.prisma.cuentaContable.findMany({
+  const cuentas = await req.req.db.cuentaContable.findMany({
     where: { activo: true },
     include: {
       asientoLineas: {
@@ -137,7 +137,7 @@ router.get('/libro-mayor/:cuentaId', authAdmin, asyncHandler(async (req, res) =>
   const { cuentaId } = req.params
   const { fechaDesde, fechaHasta, page = 1, limit = 100 } = req.query
 
-  const cuenta = await req.prisma.cuentaContable.findUnique({
+  const cuenta = await req.req.db.cuentaContable.findUnique({
     where: { id: parseInt(cuentaId) }
   })
 
@@ -162,7 +162,7 @@ router.get('/libro-mayor/:cuentaId', authAdmin, asyncHandler(async (req, res) =>
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [lineas, total] = await Promise.all([
-    req.prisma.asientoLinea.findMany({
+    req.req.db.asientoLinea.findMany({
       where: {
         cuentaContableId: parseInt(cuentaId),
         asiento: whereAsiento
@@ -178,7 +178,7 @@ router.get('/libro-mayor/:cuentaId', authAdmin, asyncHandler(async (req, res) =>
       skip,
       take: parseInt(limit)
     }),
-    req.prisma.asientoLinea.count({
+    req.req.db.asientoLinea.count({
       where: {
         cuentaContableId: parseInt(cuentaId),
         asiento: whereAsiento
@@ -213,7 +213,7 @@ router.get('/libro-mayor/:cuentaId', authAdmin, asyncHandler(async (req, res) =>
   })
 
   // Totales
-  const totales = await req.prisma.asientoLinea.aggregate({
+  const totales = await req.req.db.asientoLinea.aggregate({
     where: {
       cuentaContableId: parseInt(cuentaId),
       asiento: whereAsiento
@@ -298,7 +298,7 @@ router.get('/', authAdmin, asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [asientos, total] = await Promise.all([
-    req.prisma.asiento.findMany({
+    req.req.db.asiento.findMany({
       where,
       include: {
         lineas: {
@@ -317,7 +317,7 @@ router.get('/', authAdmin, asyncHandler(async (req, res) => {
       skip,
       take: parseInt(limit)
     }),
-    req.prisma.asiento.count({ where })
+    req.req.db.asiento.count({ where })
   ])
 
   // Calcular totales para cada asiento
@@ -349,7 +349,7 @@ router.get('/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('ID de asiento inválido', 400, 'INVALID_ID')
   }
 
-  const asiento = await req.prisma.asiento.findUnique({
+  const asiento = await req.req.db.asiento.findUnique({
     where: { id: asientoId },
     include: {
       lineas: {
@@ -404,7 +404,7 @@ router.post('/', authAdmin, asyncHandler(async (req, res) => {
 
   // Validar que todas las cuentas existen y son imputables
   const cuentaIds = [...new Set(lineas.map(l => l.cuentaContableId))]
-  const cuentas = await req.prisma.cuentaContable.findMany({
+  const cuentas = await req.req.db.cuentaContable.findMany({
     where: {
       id: { in: cuentaIds },
       activo: true,
@@ -423,7 +423,7 @@ router.post('/', authAdmin, asyncHandler(async (req, res) => {
   // Crear asiento
   const numero = await generarNumeroAsiento(req.prisma)
 
-  const asiento = await req.prisma.asiento.create({
+  const asiento = await req.req.db.asiento.create({
     data: {
       numero,
       fecha: fecha ? new Date(fecha) : new Date(),
@@ -463,7 +463,7 @@ router.put('/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { fecha, concepto, lineas } = req.body
 
-  const asiento = await req.prisma.asiento.findUnique({
+  const asiento = await req.req.db.asiento.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -529,7 +529,7 @@ router.post('/:id/anular', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { motivo } = req.body
 
-  const asiento = await req.prisma.asiento.findUnique({
+  const asiento = await req.req.db.asiento.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -541,7 +541,7 @@ router.post('/:id/anular', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('El asiento ya está anulado', 400, 'YA_ANULADO')
   }
 
-  const asientoAnulado = await req.prisma.asiento.update({
+  const asientoAnulado = await req.req.db.asiento.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'ANULADO',
@@ -561,7 +561,7 @@ router.post('/:id/anular', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const asiento = await req.prisma.asiento.findUnique({
+  const asiento = await req.req.db.asiento.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -573,7 +573,7 @@ router.delete('/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Solo se pueden eliminar asientos en borrador', 400, 'ESTADO_INVALIDO')
   }
 
-  await req.prisma.asiento.delete({
+  await req.req.db.asiento.delete({
     where: { id: parseInt(id) }
   })
 
@@ -601,7 +601,7 @@ export async function generarAsientoAutomatico(prisma, {
 
   const numero = await generarNumeroAsiento(prisma)
 
-  const asiento = await prisma.asiento.create({
+  const asiento = await req.db.asiento.create({
     data: {
       numero,
       fecha: fecha || new Date(),

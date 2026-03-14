@@ -197,7 +197,7 @@ async function calcularDestinatarios(prisma, segmentacion) {
   }
 
   // Buscar socios
-  const socios = await prisma.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where,
     select: {
       id: true,

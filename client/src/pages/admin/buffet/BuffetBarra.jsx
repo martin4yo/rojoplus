@@ -20,6 +20,21 @@ export default function BuffetBarra() {
     }
   }, [])
 
+  // Limpiar pedido BARRA al desmontar o refrescar la página
+  useEffect(() => {
+    return () => {
+      // Cleanup: eliminar pedido BARRA si existe y está vacío
+      if (pedidoActivo?.id && pedidoActivo.tipoVenta === 'BARRA') {
+        const items = pedidoActivo.items || []
+        if (items.length === 0 || pedidoActivo.estado === 'PENDIENTE') {
+          api.delete(`/admin/buffet/takeaway/${pedidoActivo.id}`).catch(() => {
+            console.log('Pedido BARRA ya fue eliminado o no existe')
+          })
+        }
+      }
+    }
+  }, [pedidoActivo])
+
   async function crearPedidoBarra(cliente = null) {
     try {
       const ahora = new Date()
@@ -202,7 +217,7 @@ export default function BuffetBarra() {
         </div>
       )}
 
-      {/* ROJO IA - Chat Widget para Camareros */}
+      {/* Xavi - Chat Widget para Camareros */}
       <ChatWidget role="camarero" position="bottom-right" />
     </div>
   )

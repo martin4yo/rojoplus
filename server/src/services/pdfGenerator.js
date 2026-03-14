@@ -861,7 +861,7 @@ export async function generarPDFCierreCaja(cierreData) {
       doc.fontSize(8)
          .fillColor('#DC2626')
          .font('Helvetica-Bold')
-         .text('RojoPlus - Gestion de Club', 350, footerTextY + 10, { align: 'right', width: 185 })
+         .text('Clubix - Gestion de Club', 350, footerTextY + 10, { align: 'right', width: 185 })
 
       doc.end()
 

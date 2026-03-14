@@ -314,7 +314,7 @@ router.get('/estadisticas/aceptacion', checkPermiso('REGLAMENTO_VER'), asyncHand
   })
 
   // Total de socios activos
-  const totalSociosActivos = await prisma.socio.count({
+  const totalSociosActivos = await req.db.socio.count({
     where: { estado: 'ACTIVO' }
   })
 
@@ -391,7 +391,7 @@ router.get('/socios-sin-aceptar', checkPermiso('REGLAMENTO_VER'), asyncHandler(a
   }
 
   // Obtener socios activos que NO tienen aceptación de algún artículo
-  const sociosActivos = await prisma.socio.findMany({
+  const sociosActivos = await req.db.socio.findMany({
     where: { estado: 'ACTIVO' },
     select: {
       id: true,

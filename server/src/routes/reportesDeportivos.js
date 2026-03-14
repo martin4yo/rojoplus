@@ -129,7 +129,7 @@ router.get('/asistencia/socio/:socioId', asyncHandler(async (req, res) => {
     if (fechaHasta) whereAsistencia.entrenamiento.fecha.lte = new Date(fechaHasta)
   }
 
-  const asistencias = await prisma.asistencia.findMany({
+  const asistencias = await req.db.asistencia.findMany({
     where: whereAsistencia,
     include: {
       entrenamiento: {
@@ -143,7 +143,7 @@ router.get('/asistencia/socio/:socioId', asyncHandler(async (req, res) => {
     orderBy: { entrenamiento: { fecha: 'desc' } }
   })
 
-  const socio = await prisma.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(socioId) },
     select: { id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true }
   })
@@ -201,7 +201,7 @@ router.get('/partidos', asyncHandler(async (req, res) => {
     }
   }
 
-  const partidos = await prisma.partido.findMany({
+  const partidos = await req.db.partido.findMany({
     where: wherePartido,
     include: {
       categoriaActividad: {
@@ -337,7 +337,7 @@ router.get('/goleadores', asyncHandler(async (req, res) => {
 
   // Obtener datos de los socios
   const socioIds = estadisticas.map(e => e.socioId)
-  const socios = await prisma.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where: { id: { in: socioIds } },
     select: { id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true }
   })
@@ -405,7 +405,7 @@ router.get('/asistidores', asyncHandler(async (req, res) => {
   })
 
   const socioIds = estadisticas.map(e => e.socioId)
-  const socios = await prisma.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where: { id: { in: socioIds } },
     select: { id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true }
   })
@@ -428,7 +428,7 @@ router.get('/jugador/:socioId', asyncHandler(async (req, res) => {
   const { socioId } = req.params
   const { temporada } = req.query
 
-  const socio = await prisma.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(socioId) },
     select: {
       id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true,
@@ -492,7 +492,7 @@ router.get('/jugador/:socioId', asyncHandler(async (req, res) => {
     }
   }
 
-  const asistencias = await prisma.asistencia.findMany({
+  const asistencias = await req.db.asistencia.findMany({
     where: whereAsistencia
   })
 
@@ -508,7 +508,7 @@ router.get('/jugador/:socioId', asyncHandler(async (req, res) => {
     : 0
 
   // Inscripciones activas
-  const inscripciones = await prisma.inscripcion.findMany({
+  const inscripciones = await req.db.inscripcion.findMany({
     where: {
       socioId: parseInt(socioId),
       estado: 'ACTIVA'

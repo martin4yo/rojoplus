@@ -57,7 +57,7 @@ router.get('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [inscripciones, total] = await Promise.all([
-    req.prisma.inscripcion.findMany({
+    req.req.db.inscripcion.findMany({
       where,
       include: {
         socio: {
@@ -83,7 +83,7 @@ router.get('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
       skip,
       take: parseInt(limit)
     }),
-    req.prisma.inscripcion.count({ where })
+    req.req.db.inscripcion.count({ where })
   ])
 
   // Calcular edad de cada socio
@@ -129,7 +129,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar que el socio existe y está activo
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { id: parseInt(socioId) }
   })
 
@@ -177,7 +177,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
 
   // Validar cupo máximo
   if (categoria.cupoMaximo && categoria.cupoMaximo > 0) {
-    const inscriptosActivos = await req.prisma.inscripcion.count({
+    const inscriptosActivos = await req.req.db.inscripcion.count({
       where: {
         categoriaActividadId: parseInt(categoriaActividadId),
         estado: 'ACTIVA'
@@ -193,7 +193,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar que no esté ya inscripto en esta categoría
-  const inscripcionExistente = await req.prisma.inscripcion.findFirst({
+  const inscripcionExistente = await req.req.db.inscripcion.findFirst({
     where: {
       socioId: parseInt(socioId),
       categoriaActividadId: parseInt(categoriaActividadId),
@@ -206,7 +206,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Crear la inscripción
-  const inscripcion = await req.prisma.inscripcion.create({
+  const inscripcion = await req.req.db.inscripcion.create({
     data: {
       socioId: parseInt(socioId),
       categoriaActividadId: parseInt(categoriaActividadId),
@@ -247,7 +247,7 @@ router.put('/inscripciones/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { exentoCuota, porcentajeCuota, observaciones } = req.body
 
-  const inscripcion = await req.prisma.inscripcion.findUnique({
+  const inscripcion = await req.req.db.inscripcion.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -255,7 +255,7 @@ router.put('/inscripciones/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Inscripción no encontrada', 404)
   }
 
-  const inscripcionActualizada = await req.prisma.inscripcion.update({
+  const inscripcionActualizada = await req.req.db.inscripcion.update({
     where: { id: parseInt(id) },
     data: {
       exentoCuota: exentoCuota !== undefined ? (exentoCuota === true || exentoCuota === 'true') : undefined,
@@ -293,7 +293,7 @@ router.delete('/inscripciones/:id', authAdmin, asyncHandler(async (req, res) => 
   const { id } = req.params
   const { motivo } = req.body
 
-  const inscripcion = await req.prisma.inscripcion.findUnique({
+  const inscripcion = await req.req.db.inscripcion.findUnique({
     where: { id: parseInt(id) },
     include: {
       socio: true,
@@ -310,7 +310,7 @@ router.delete('/inscripciones/:id', authAdmin, asyncHandler(async (req, res) => 
   }
 
   // Dar de baja (cambiar estado a INACTIVA)
-  const inscripcionBaja = await req.prisma.inscripcion.update({
+  const inscripcionBaja = await req.req.db.inscripcion.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'INACTIVA',
@@ -354,7 +354,7 @@ router.get('/categorias-actividad/:id/plantel', authAdmin, asyncHandler(async (r
     where.estado = 'ACTIVA'
   }
 
-  const inscripciones = await req.prisma.inscripcion.findMany({
+  const inscripciones = await req.req.db.inscripcion.findMany({
     where,
     include: {
       socio: {
@@ -388,7 +388,7 @@ router.get('/categorias-actividad/:id/plantel', authAdmin, asyncHandler(async (r
   })
 
   // Obtener entrenadores asignados
-  const entrenadores = await req.prisma.entrenadorCategoria.findMany({
+  const entrenadores = await req.req.db.entrenadorCategoria.findMany({
     where: {
       categoriaActividadId: parseInt(id)
     },
@@ -439,7 +439,7 @@ router.get('/categorias-actividad/:id/plantel/excel', authAdmin, asyncHandler(as
     throw new AppError('Categoría no encontrada', 404)
   }
 
-  const inscripciones = await req.prisma.inscripcion.findMany({
+  const inscripciones = await req.req.db.inscripcion.findMany({
     where: {
       categoriaActividadId: parseInt(id),
       estado: 'ACTIVA'

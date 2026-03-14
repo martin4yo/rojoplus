@@ -47,7 +47,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
     const productosVenta = []
 
     for (const item of items) {
-      const producto = await prisma.productoBuffet.findUnique({ where: { id: item.productoBuffetId } })
+      const producto = await req.db.productoBuffet.findUnique({ where: { id: item.productoBuffetId } })
       if (!producto) continue
 
       const cantidad = item.cantidad || 1
@@ -100,12 +100,12 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
     const propinaMonto = propina && propina > 0 ? parseFloat(propina) : 0
     const totalFinal = totalItems + propinaMonto
 
-    let cuentaContable = await prisma.cuentaContable.findFirst({
+    let cuentaContable = await req.db.cuentaContable.findFirst({
       where: { codigo: { contains: 'BUFFET' }, esImputable: true }
     })
 
     if (!cuentaContable) {
-      cuentaContable = await prisma.cuentaContable.findFirst({
+      cuentaContable = await req.db.cuentaContable.findFirst({
         where: { codigo: '4.1.1.01', esImputable: true }
       })
     }
@@ -129,15 +129,15 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
 
-        const caja = await prisma.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } })
+        const caja = await req.db.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } })
         if (!caja) {
           return res.status(400).json({ success: false, error: `Caja ${pago.cajaId || cajaId} no encontrada` })
         }
 
-        const ultimoMov = await prisma.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
+        const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
         const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
 
-        const movimiento = await prisma.movimientoCaja.create({
+        const movimiento = await req.db.movimientoCaja.create({
           data: {
             numero: nuevoNumero,
             cajaId: parseInt(pago.cajaId || cajaId),
@@ -182,15 +182,15 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
 
-      const caja = await prisma.caja.findUnique({ where: { id: cajaId } })
+      const caja = await req.db.caja.findUnique({ where: { id: cajaId } })
       if (!caja) {
         return res.status(400).json({ success: false, error: 'Caja no encontrada' })
       }
 
-      const ultimoMov = await prisma.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
+      const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
       const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
 
-      const movimiento = await prisma.movimientoCaja.create({
+      const movimiento = await req.db.movimientoCaja.create({
         data: {
           numero: nuevoNumero,
           cajaId,
@@ -242,7 +242,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         const { renderTicketFiscal, toBase64 } = await import('../../services/ticketService.js')
 
         const config = await getConfiguracionFiscal()
-        const cajaUsada = await prisma.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } })
+        const cajaUsada = await req.db.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } })
         const puntoVenta = cajaUsada?.puntoVentaAfip || 1
         const tipoAfip = tipoComprobante || 11
 
@@ -356,7 +356,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         const tipoComprobanteNombre = comprobanteFiscal?.tipo || (esVentaInterna ? 'VENTA INTERNA' : 'TICKET')
 
         const cajaUsadaId = cajaId || movimientos[0]?.cajaId
-        const cajaUsada = await prisma.caja.findUnique({
+        const cajaUsada = await req.db.caja.findUnique({
           where: { id: cajaUsadaId },
           include: { cuentaContable: true }
         })
@@ -452,7 +452,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         })
 
         for (const mov of movimientos) {
-          await prisma.movimientoCaja.update({
+          await req.db.movimientoCaja.update({
             where: { id: mov.id },
             data: { movimientoContableId: movimientoContableCobro.id }
           })

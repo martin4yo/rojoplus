@@ -31,7 +31,7 @@ router.post('/regenerar-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRA
     let responseData = {}
 
     if (tipo === 'comanda') {
-      const comanda = await prisma.comanda.findUnique({
+      const comanda = await req.db.comanda.findUnique({
         where: { id: parseInt(id) },
         include: {
           mesa: true,
@@ -229,7 +229,7 @@ router.get('/preview-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRAR',
     let responseData = {}
 
     if (tipo === 'comanda') {
-      const comanda = await prisma.comanda.findUnique({
+      const comanda = await req.db.comanda.findUnique({
         where: { id: parseInt(id) },
         include: {
           mesa: true,
@@ -512,7 +512,7 @@ router.get('/menu-publico/pdf', async (req, res) => {
     }
 
     // Obtener configuración del club
-    const clubConfig = await prisma.configuracion.findMany({
+    const clubConfig = await req.db.configuracion.findMany({
       where: {
         clave: { in: ['CLUB_NOMBRE', 'CLUB_DIRECCION', 'CLUB_TELEFONO', 'CLUB_LOGO_URL'] }
       }
@@ -746,7 +746,7 @@ router.get('/menu-publico/pdf', async (req, res) => {
  */
 router.get('/config-impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
-    const configs = await prisma.configuracion.findMany({
+    const configs = await req.db.configuracion.findMany({
       where: {
         clave: {
           in: ['BUFFET_IMPRESORA_TICKETS', 'BUFFET_IMPRESORA_KIOSCO', 'BUFFET_IMPRESORA_TAKEAWAY']
@@ -799,12 +799,12 @@ router.put('/config-impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async
     for (const cfg of configs) {
       if (cfg.valor === null) {
         // Si el valor es null, eliminar la configuración
-        await prisma.configuracion.deleteMany({
+        await req.db.configuracion.deleteMany({
           where: { clave: cfg.clave }
         })
       } else {
         // Si tiene valor, hacer upsert
-        await prisma.configuracion.upsert({
+        await req.db.configuracion.upsert({
           where: { clave: cfg.clave },
           update: { valor: cfg.valor },
           create: {
@@ -855,7 +855,7 @@ router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async 
         configKey = 'BUFFET_IMPRESORA_TAKEAWAY'
       }
 
-      const config = await prisma.configuracion.findUnique({
+      const config = await req.db.configuracion.findUnique({
         where: { clave: configKey }
       })
 

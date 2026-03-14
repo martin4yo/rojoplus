@@ -398,7 +398,7 @@ export default function PortalSocioNuevo() {
       {/* Botón instalar app */}
       <InstallAppButton />
 
-      {/* ROJO IA - Chat Widget */}
+      {/* Xavi - Chat Widget */}
       <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
     </div>
   )

@@ -1532,7 +1532,7 @@ export default function Cuotas() {
         )}
       </Modal>
 
-      {/* ROJO IA - Chat Widget para Admins */}
+      {/* Xavi - Chat Widget para Admins */}
       <ChatWidget role="admin" position="bottom-right" />
     </div>
   )

@@ -83,7 +83,7 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
     // Filtro de tiempo para items LISTOS (últimos 30 minutos)
     const hace30Min = new Date(Date.now() - 30 * 60 * 1000)
 
-    const itemsComanda = await prisma.itemComanda.findMany({
+    const itemsComanda = await req.db.itemComanda.findMany({
       where: {
         estado: { in: estadosPendientes },
         productoBuffet: { categoriaMenuId: { in: categoriasIds } },
@@ -170,7 +170,7 @@ router.get('/kds/expo/todos', authAdmin, async (req, res) => {
   try {
     const hace30Min = new Date(Date.now() - 30 * 60 * 1000)
 
-    const itemsComanda = await prisma.itemComanda.findMany({
+    const itemsComanda = await req.db.itemComanda.findMany({
       where: {
         estado: { in: ['ENVIADO_COCINA', 'ENVIADO_BARRA', 'EN_PREPARACION', 'LISTO'] },
         OR: [
@@ -243,7 +243,7 @@ router.put('/kds/items/:id/entregar', authAdmin, async (req, res) => {
     const { tipo } = req.body
 
     if (tipo === 'COMANDA') {
-      await prisma.itemComanda.update({
+      await req.db.itemComanda.update({
         where: { id: parseInt(id) },
         data: { estado: 'ENTREGADO' }
       })
@@ -271,7 +271,7 @@ router.put('/kds/items/:id/preparando', authAdmin, async (req, res) => {
     const { tipo } = req.body
 
     if (tipo === 'COMANDA') {
-      await prisma.itemComanda.update({
+      await req.db.itemComanda.update({
         where: { id: parseInt(id) },
         data: { estado: 'EN_PREPARACION' }
       })
@@ -299,7 +299,7 @@ router.put('/kds/items/:id/listo', authAdmin, async (req, res) => {
     const { tipo } = req.body
 
     if (tipo === 'COMANDA') {
-      const item = await prisma.itemComanda.update({
+      const item = await req.db.itemComanda.update({
         where: { id: parseInt(id) },
         data: { estado: 'LISTO', listoAt: new Date() },
         include: {
@@ -334,7 +334,7 @@ router.put('/kds/items/:id/revertir', authAdmin, async (req, res) => {
     const { tipo, motivo } = req.body
 
     if (tipo === 'COMANDA') {
-      const item = await prisma.itemComanda.findUnique({
+      const item = await req.db.itemComanda.findUnique({
         where: { id: parseInt(id) },
         include: {
           productoBuffet: {
@@ -379,7 +379,7 @@ router.put('/kds/items/:id/revertir', authAdmin, async (req, res) => {
 
       updateData.estado = nuevoEstado
 
-      await prisma.itemComanda.update({
+      await req.db.itemComanda.update({
         where: { id: parseInt(id) },
         data: updateData
       })
@@ -454,7 +454,7 @@ router.get('/cocina/pendientes', authAdmin, checkPermiso('BUFFET_COCINA'), async
     })
     const categoriasCocinaIds = destinosCocina.map(d => d.categoriaMenuId)
 
-    const itemsComanda = await prisma.itemComanda.findMany({
+    const itemsComanda = await req.db.itemComanda.findMany({
       where: {
         estado: { in: ['ENVIADO_COCINA', 'EN_PREPARACION'] },
         productoBuffet: { categoriaMenuId: { in: categoriasCocinaIds } }
@@ -524,7 +524,7 @@ router.put('/cocina/items/:id/preparando', authAdmin, checkPermiso('BUFFET_COCIN
     const { tipo } = req.body
 
     if (tipo === 'COMANDA') {
-      await prisma.itemComanda.update({
+      await req.db.itemComanda.update({
         where: { id: parseInt(id) },
         data: { estado: 'EN_PREPARACION' }
       })
@@ -552,7 +552,7 @@ router.put('/cocina/items/:id/listo', authAdmin, checkPermiso('BUFFET_COCINA'), 
     const { tipo } = req.body
 
     if (tipo === 'COMANDA') {
-      const item = await prisma.itemComanda.update({
+      const item = await req.db.itemComanda.update({
         where: { id: parseInt(id) },
         data: { estado: 'LISTO', listoAt: new Date() },
         include: {
@@ -570,7 +570,7 @@ router.put('/cocina/items/:id/listo', authAdmin, checkPermiso('BUFFET_COCINA'), 
       )
 
       if (otrosItemsPendientes.length === 0 && item.comanda.estado === 'EN_PREPARACION') {
-        await prisma.comanda.update({
+        await req.db.comanda.update({
           where: { id: item.comanda.id },
           data: { estado: 'ABIERTA' }
         })
@@ -605,7 +605,7 @@ router.get('/barra/pendientes', authAdmin, checkPermiso('BUFFET_BARRA'), async (
     })
     const categoriasBarraIds = destinosBarra.map(d => d.categoriaMenuId)
 
-    const itemsComanda = await prisma.itemComanda.findMany({
+    const itemsComanda = await req.db.itemComanda.findMany({
       where: {
         estado: { in: ['ENVIADO_COCINA', 'EN_PREPARACION'] },
         productoBuffet: { categoriaMenuId: { in: categoriasBarraIds } }
@@ -675,7 +675,7 @@ router.put('/barra/items/:id/preparando', authAdmin, checkPermiso('BUFFET_BARRA'
     const { tipo } = req.body
 
     if (tipo === 'COMANDA') {
-      await prisma.itemComanda.update({
+      await req.db.itemComanda.update({
         where: { id: parseInt(id) },
         data: { estado: 'EN_PREPARACION' }
       })
@@ -703,7 +703,7 @@ router.put('/barra/items/:id/listo', authAdmin, checkPermiso('BUFFET_BARRA'), as
     const { tipo } = req.body
 
     if (tipo === 'COMANDA') {
-      const item = await prisma.itemComanda.update({
+      const item = await req.db.itemComanda.update({
         where: { id: parseInt(id) },
         data: { estado: 'LISTO', listoAt: new Date() },
         include: {

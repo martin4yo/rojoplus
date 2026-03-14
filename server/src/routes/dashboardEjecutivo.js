@@ -21,7 +21,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // ============ SECCIÓN SOCIOS ============
 
   // Socios activos totales
-  const sociosActivos = await req.prisma.socio.count({
+  const sociosActivos = await req.req.db.socio.count({
     where: {
       OR: [
         { estado: { contains: 'Activ', mode: 'insensitive' } },
@@ -31,21 +31,21 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Nuevos socios últimos 30 días
-  const nuevos30Dias = await req.prisma.socio.count({
+  const nuevos30Dias = await req.req.db.socio.count({
     where: {
       fechaAlta: { gte: hace30Dias },
     },
   })
 
   // Nuevos socios en los 30 días anteriores (para calcular tendencia)
-  const nuevos30DiasAnteriores = await req.prisma.socio.count({
+  const nuevos30DiasAnteriores = await req.req.db.socio.count({
     where: {
       fechaAlta: { gte: hace60Dias, lt: hace30Dias },
     },
   })
 
   // Bajas últimos 30 días
-  const bajas30Dias = await req.prisma.socio.count({
+  const bajas30Dias = await req.req.db.socio.count({
     where: {
       estado: { contains: 'Baja', mode: 'insensitive' },
       updatedAt: { gte: hace30Dias },
@@ -75,10 +75,10 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     const finMes = new Date(anio, mes + 1, 0, 23, 59, 59)
 
     const [altas, bajas] = await Promise.all([
-      req.prisma.socio.count({
+      req.req.db.socio.count({
         where: { fechaAlta: { gte: inicioMes, lte: finMes } },
       }),
-      req.prisma.socio.count({
+      req.req.db.socio.count({
         where: {
           estado: { contains: 'Baja', mode: 'insensitive' },
           updatedAt: { gte: inicioMes, lte: finMes },
@@ -105,12 +105,12 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   let cobranzaMes = { generado: 0, cobrado: 0, pendiente: 0, porcentaje: 0 }
   if (periodoActual) {
     const [cobrado, pendiente] = await Promise.all([
-      req.prisma.cargo.aggregate({
+      req.req.db.cargo.aggregate({
         where: { periodoId: periodoActual.id, estado: 'PAGADO' },
         _sum: { montoTotal: true },
         _count: true,
       }),
-      req.prisma.cargo.aggregate({
+      req.req.db.cargo.aggregate({
         where: { periodoId: periodoActual.id, estado: 'PENDIENTE' },
         _sum: { montoTotal: true },
         _count: true,
@@ -132,7 +132,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Morosidad total (todas las cuotas vencidas pendientes)
-  const morosidadResult = await req.prisma.cargo.aggregate({
+  const morosidadResult = await req.req.db.cargo.aggregate({
     where: {
       estado: 'PENDIENTE',
       fechaVencimiento: { lt: hoy },
@@ -147,7 +147,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Socios morosos (únicos)
-  const sociosMorosos = await req.prisma.cargo.findMany({
+  const sociosMorosos = await req.req.db.cargo.findMany({
     where: {
       estado: 'PENDIENTE',
       fechaVencimiento: { lt: hoy },
@@ -194,12 +194,12 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // ============ SECCIÓN ACTIVIDADES ============
 
   // Inscripciones activas totales
-  const inscripcionesActivas = await req.prisma.inscripcion.count({
+  const inscripcionesActivas = await req.req.db.inscripcion.count({
     where: { estado: 'ACTIVA' },
   })
 
   // Inscripciones por actividad (top 5)
-  const inscripcionesPorActividad = await req.prisma.inscripcion.groupBy({
+  const inscripcionesPorActividad = await req.req.db.inscripcion.groupBy({
     by: ['categoriaActividadId'],
     where: { estado: 'ACTIVA' },
     _count: true,
@@ -226,13 +226,13 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     .slice(0, 5)
 
   // Tendencia de inscripciones (últimos 3 meses)
-  const inscripcionesNuevas30Dias = await req.prisma.inscripcion.count({
+  const inscripcionesNuevas30Dias = await req.req.db.inscripcion.count({
     where: {
       fechaInicio: { gte: hace30Dias },
     },
   })
 
-  const inscripcionesNuevas30DiasAnt = await req.prisma.inscripcion.count({
+  const inscripcionesNuevas30DiasAnt = await req.req.db.inscripcion.count({
     where: {
       fechaInicio: { gte: hace60Dias, lt: hace30Dias },
     },
@@ -268,7 +268,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // ============ RESUMEN FINANCIERO RÁPIDO ============
 
   // Saldos de cajas
-  const cajas = await req.prisma.caja.findMany({
+  const cajas = await req.req.db.caja.findMany({
     where: { activo: true },
     select: { nombre: true, saldoActual: true },
   })
@@ -276,11 +276,11 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // Ingresos y egresos del mes
   const [ingresosMes, egresosMes] = await Promise.all([
-    req.prisma.movimientoCaja.aggregate({
+    req.req.db.movimientoCaja.aggregate({
       where: { tipo: 'INGRESO', fecha: { gte: inicioMesActual } },
       _sum: { monto: true },
     }),
-    req.prisma.movimientoCaja.aggregate({
+    req.req.db.movimientoCaja.aggregate({
       where: { tipo: 'EGRESO', fecha: { gte: inicioMesActual } },
       _sum: { monto: true },
     }),
@@ -380,13 +380,13 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
   const hoy = new Date()
 
   // Por estado
-  const porEstado = await req.prisma.socio.groupBy({
+  const porEstado = await req.req.db.socio.groupBy({
     by: ['estado'],
     _count: true,
   })
 
   // Por categoría de socio
-  const porCategoria = await req.prisma.socio.groupBy({
+  const porCategoria = await req.req.db.socio.groupBy({
     by: ['categoriaSocioId'],
     _count: true,
   })
@@ -398,7 +398,7 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
   categoriasInfo.forEach(c => { categoriasMap[c.id] = c.nombre })
 
   // Por tipo de socio
-  const porTipo = await req.prisma.socio.groupBy({
+  const porTipo = await req.req.db.socio.groupBy({
     by: ['tipoSocioId'],
     _count: true,
   })
@@ -411,7 +411,7 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
 
   // Grupos familiares
   const gruposFamiliares = await req.prisma.grupoFamiliar.count()
-  const sociosEnFamilia = await req.prisma.socio.count({
+  const sociosEnFamilia = await req.req.db.socio.count({
     where: { grupoFamiliarId: { not: null } },
   })
 
@@ -447,7 +447,7 @@ router.get('/ejecutivo/financiero', authAdmin, asyncHandler(async (req, res) => 
   const inicioAnio = new Date(anioActual, 0, 1)
 
   // Cobranza acumulada del año
-  const cobranzaAnio = await req.prisma.cargo.aggregate({
+  const cobranzaAnio = await req.req.db.cargo.aggregate({
     where: {
       estado: 'PAGADO',
       fechaPago: { gte: inicioAnio },
@@ -457,7 +457,7 @@ router.get('/ejecutivo/financiero', authAdmin, asyncHandler(async (req, res) => 
 
   // Recargos acumulados pendientes
   // Usar la lógica existente de cálculo de recargos
-  const cargosPendientesVencidos = await req.prisma.cargo.findMany({
+  const cargosPendientesVencidos = await req.req.db.cargo.findMany({
     where: {
       estado: 'PENDIENTE',
       fechaVencimiento: { lt: hoy },
@@ -466,7 +466,7 @@ router.get('/ejecutivo/financiero', authAdmin, asyncHandler(async (req, res) => 
   })
 
   // Obtener configuración de recargos
-  const configRecargo = await req.prisma.configuracionRecargo.findFirst({
+  const configRecargo = await req.req.db.configuracionRecargo.findFirst({
     where: { activo: true },
   })
 
@@ -491,7 +491,7 @@ router.get('/ejecutivo/financiero', authAdmin, asyncHandler(async (req, res) => 
   }
 
   // Días promedio de pago
-  const pagosConFechas = await req.prisma.cargo.findMany({
+  const pagosConFechas = await req.req.db.cargo.findMany({
     where: {
       estado: 'PAGADO',
       fechaPago: { not: null },

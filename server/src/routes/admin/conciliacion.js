@@ -20,7 +20,7 @@ router.get('/pagos-informados', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [pagos, total] = await Promise.all([
-    req.prisma.pagoInformado.findMany({
+    req.req.db.pagoInformado.findMany({
       where,
       skip,
       take: limit,
@@ -44,14 +44,14 @@ router.get('/pagos-informados', authAdmin, asyncHandler(async (req, res) => {
         },
       },
     }),
-    req.prisma.pagoInformado.count({ where }),
+    req.req.db.pagoInformado.count({ where }),
   ])
 
   // Parse cuotasIds (JSON string to array)
   const pagosConCuotas = await Promise.all(
     pagos.map(async (pago) => {
       const cuotasIds = JSON.parse(pago.cuotasIds)
-      const cuotas = await req.prisma.cargo.findMany({
+      const cuotas = await req.req.db.cargo.findMany({
         where: { id: { in: cuotasIds } },
         select: {
           id: true,
@@ -90,7 +90,7 @@ router.get('/pagos-informados', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/pagos-informados/count - Contador de pendientes
 router.get('/pagos-informados/count', authAdmin, asyncHandler(async (req, res) => {
-  const count = await req.prisma.pagoInformado.count({
+  const count = await req.req.db.pagoInformado.count({
     where: { estado: 'PENDIENTE' },
   })
 
@@ -111,7 +111,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
   }
 
   // Obtener pago informado
-  const pagoInformado = await req.prisma.pagoInformado.findUnique({
+  const pagoInformado = await req.req.db.pagoInformado.findUnique({
     where: { id: parseInt(id) },
     include: {
       socio: {
@@ -137,7 +137,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
   const cuotasIds = JSON.parse(pagoInformado.cuotasIds)
 
   // Obtener cuotas con centro de costos
-  const cuotas = await req.prisma.cargo.findMany({
+  const cuotas = await req.req.db.cargo.findMany({
     where: { id: { in: cuotasIds } },
     include: {
       categoriaActividad: {
@@ -165,7 +165,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
   // Crear pago real en la BD
   const montoTotal = pendientes.reduce((sum, c) => sum + parseFloat(c.montoTotal), 0)
 
-  const pago = await req.prisma.pago.create({
+  const pago = await req.req.db.pago.create({
     data: {
       numero: `P-${Date.now()}`,
       fecha: new Date(),
@@ -186,7 +186,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
   await Promise.all(
     pendientes.map(async (cuota) => {
       // Actualizar estado de cuota
-      await req.prisma.cargo.update({
+      await req.req.db.cargo.update({
         where: { id: cuota.id },
         data: {
           estado: 'PAGADO',
@@ -198,7 +198,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
       const centroCostoId = cuota.categoriaActividad?.actividad?.centroCostoId || null
 
       // Crear movimiento de caja
-      await req.prisma.movimientoCaja.create({
+      await req.req.db.movimientoCaja.create({
         data: {
           fecha: new Date(),
           tipo: 'INGRESO',
@@ -214,7 +214,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
   )
 
   // Marcar pago informado como CONFIRMADO
-  await req.prisma.pagoInformado.update({
+  await req.req.db.pagoInformado.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'CONFIRMADO',
@@ -243,7 +243,7 @@ router.post('/pagos-informados/:id/rechazar', authAdmin, asyncHandler(async (req
     throw new AppError('El motivo de rechazo es obligatorio', 400, 'VALIDATION_ERROR')
   }
 
-  const pagoInformado = await req.prisma.pagoInformado.findUnique({
+  const pagoInformado = await req.req.db.pagoInformado.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -255,7 +255,7 @@ router.post('/pagos-informados/:id/rechazar', authAdmin, asyncHandler(async (req
     throw new AppError('El pago ya fue procesado', 400, 'ALREADY_PROCESSED')
   }
 
-  await req.prisma.pagoInformado.update({
+  await req.req.db.pagoInformado.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'RECHAZADO',

@@ -67,17 +67,17 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
 
   // 1. KPIs Generales
   const [generado, cobrado, pendiente] = await Promise.all([
-    req.prisma.cargo.aggregate({
+    req.req.db.cargo.aggregate({
       where: { ...whereBase, estado: { not: 'ANULADO' } },
       _sum: { montoTotal: true },
       _count: true,
     }),
-    req.prisma.cargo.aggregate({
+    req.req.db.cargo.aggregate({
       where: { ...whereBase, estado: 'PAGADO' },
       _sum: { montoTotal: true },
       _count: true,
     }),
-    req.prisma.cargo.aggregate({
+    req.req.db.cargo.aggregate({
       where: { ...whereBase, estado: 'PENDIENTE' },
       _sum: { montoTotal: true },
       _count: true,
@@ -85,7 +85,7 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
   ])
 
   // Calcular días promedio de pago (solo cuotas pagadas con fechaPago)
-  const cuotasPagadas = await req.prisma.cargo.findMany({
+  const cuotasPagadas = await req.req.db.cargo.findMany({
     where: { ...whereBase, estado: 'PAGADO', fechaPago: { not: null } },
     select: { createdAt: true, fechaPago: true },
   })
@@ -100,7 +100,7 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Calcular recargo pendiente
-  const cuotasPendientesConRecargo = await req.prisma.cargo.findMany({
+  const cuotasPendientesConRecargo = await req.req.db.cargo.findMany({
     where: { ...whereBase, estado: 'PENDIENTE' },
   })
   let totalRecargoPendiente = 0
@@ -115,21 +115,21 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
   const porcentajeMorosidad = totalGenerado > 0 ? Math.round((totalPendiente / totalGenerado) * 100 * 10) / 10 : 0
 
   // 2. Datos agrupados por categoría
-  const cargosPorCategoria = await req.prisma.cargo.groupBy({
+  const cargosPorCategoria = await req.req.db.cargo.groupBy({
     by: ['categoria'],
     where: { ...whereBase, estado: { not: 'ANULADO' } },
     _sum: { montoTotal: true },
     _count: true,
   })
 
-  const cargosPagadosPorCategoria = await req.prisma.cargo.groupBy({
+  const cargosPagadosPorCategoria = await req.req.db.cargo.groupBy({
     by: ['categoria'],
     where: { ...whereBase, estado: 'PAGADO' },
     _sum: { montoTotal: true },
     _count: true,
   })
 
-  const cargosPendientesPorCategoria = await req.prisma.cargo.groupBy({
+  const cargosPendientesPorCategoria = await req.req.db.cargo.groupBy({
     by: ['categoria'],
     where: { ...whereBase, estado: 'PENDIENTE' },
     _sum: { montoTotal: true },
@@ -137,7 +137,7 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // 3. Para CUOTA_ACTIVIDAD, obtener desglose por actividad y categoría
-  const actividadesData = await req.prisma.cargo.findMany({
+  const actividadesData = await req.req.db.cargo.findMany({
     where: { ...whereBase, categoria: 'CUOTA_ACTIVIDAD', estado: { not: 'ANULADO' } },
     include: {
       categoriaActividad: {
@@ -269,7 +269,7 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
 router.get('/reportes/cobranza/vencidas', authAdmin, asyncHandler(async (req, res) => {
   const hoy = new Date()
 
-  const cuotasVencidas = await req.prisma.cargo.findMany({
+  const cuotasVencidas = await req.req.db.cargo.findMany({
     where: {
       estado: 'PENDIENTE',
       fechaVencimiento: { lt: hoy },
@@ -326,7 +326,7 @@ router.get('/reportes/cobranza/morosos', authAdmin, asyncHandler(async (req, res
   }
 
   // Obtener cuotas pendientes
-  const cuotasPendientes = await req.prisma.cargo.findMany({
+  const cuotasPendientes = await req.req.db.cargo.findMany({
     where,
     include: {
       socio: {
@@ -459,7 +459,7 @@ router.get('/reportes/cobranza/evolucion', authAdmin, asyncHandler(async (req, r
 
   for (const periodo of periodos) {
     const [generado, cobrado] = await Promise.all([
-      req.prisma.cargo.aggregate({
+      req.req.db.cargo.aggregate({
         where: {
           periodoId: periodo.id,
           estado: { not: 'ANULADO' },
@@ -468,7 +468,7 @@ router.get('/reportes/cobranza/evolucion', authAdmin, asyncHandler(async (req, r
         _sum: { montoTotal: true },
         _count: true,
       }),
-      req.prisma.cargo.aggregate({
+      req.req.db.cargo.aggregate({
         where: {
           periodoId: periodo.id,
           estado: 'PAGADO',

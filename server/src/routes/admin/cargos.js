@@ -67,7 +67,7 @@ router.get('/categorias-cargo', authAdmin, asyncHandler(async (req, res) => {
 router.get('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cargo = await req.prisma.cargo.findUnique({
+  const cargo = await req.req.db.cargo.findUnique({
     where: { id: parseInt(id) },
     include: {
       socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
@@ -100,7 +100,7 @@ router.put('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
     estado
   } = req.body
 
-  const cargo = await req.prisma.cargo.findUnique({
+  const cargo = await req.req.db.cargo.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -124,7 +124,7 @@ router.put('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
   const nuevoMontoBonificacion = montoBonificacion !== undefined ? parseFloat(montoBonificacion) : Number(cargo.montoBonificacion)
   const montoTotal = nuevoMontoOriginal + nuevoMontoRecargo - nuevoMontoBonificacion
 
-  const actualizado = await req.prisma.cargo.update({
+  const actualizado = await req.req.db.cargo.update({
     where: { id: parseInt(id) },
     data: {
       ...(categoria && { categoria }),
@@ -170,7 +170,7 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar que exista el socio
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { id: parseInt(socioId) },
     select: { id: true, titularFamiliaId: true },
   })
@@ -181,7 +181,7 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
 
   const montoTotal = parseFloat(montoOriginal) + parseFloat(montoRecargo) - parseFloat(montoBonificacion)
 
-  const cargo = await req.prisma.cargo.create({
+  const cargo = await req.req.db.cargo.create({
     data: {
       socioId: parseInt(socioId),
       grupoFamiliarId: socio.titularFamiliaId || socio.id,
@@ -210,7 +210,7 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cargo = await req.prisma.cargo.findUnique({
+  const cargo = await req.req.db.cargo.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -222,7 +222,7 @@ router.delete('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar un cargo pagado. Use nota de crédito.', 400, 'CARGO_PAGADO')
   }
 
-  await req.prisma.cargo.update({
+  await req.req.db.cargo.update({
     where: { id: parseInt(id) },
     data: { estado: 'ANULADO' },
   })
@@ -256,7 +256,7 @@ router.post('/planes-pago', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener cuotas a financiar
-  const cuotasRaw = await req.prisma.cargo.findMany({
+  const cuotasRaw = await req.req.db.cargo.findMany({
     where: {
       id: { in: cuotaIds.map(id => parseInt(id)) },
       estado: 'PENDIENTE',
@@ -290,7 +290,7 @@ router.post('/planes-pago', authAdmin, asyncHandler(async (req, res) => {
   const montoPorCuota = Math.ceil(totalAFinanciar / cantCuotas)
 
   // Obtener el socio para el grupo familiar
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { id: parseInt(socioId) },
     select: { id: true, titularFamiliaId: true, apellidoNombre: true },
   })
@@ -407,7 +407,7 @@ router.post('/planes-pago/preview', authAdmin, asyncHandler(async (req, res) => 
   const interes = parseFloat(interesPct) || 0
 
   // Obtener cuotas
-  const cuotasRaw = await req.prisma.cargo.findMany({
+  const cuotasRaw = await req.req.db.cargo.findMany({
     where: {
       id: { in: cuotaIds.map(id => parseInt(id)) },
       estado: 'PENDIENTE',

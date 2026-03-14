@@ -181,7 +181,7 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
   })
   if (!formato) throw new AppError('Formato no encontrado', 404)
 
-  const caja = await prisma.caja.findUnique({
+  const caja = await req.db.caja.findUnique({
     where: { id: parseInt(cajaId) }
   })
   if (!caja) throw new AppError('Caja no encontrada', 404)
@@ -333,7 +333,7 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
     if (hasta) whereCaja.fecha.lte = new Date(hasta)
   }
 
-  const movimientosCaja = await prisma.movimientoCaja.findMany({
+  const movimientosCaja = await req.db.movimientoCaja.findMany({
     where: whereCaja,
     orderBy: { fecha: 'asc' },
     include: {
@@ -399,7 +399,7 @@ router.post('/conciliar', asyncHandler(async (req, res) => {
     throw new AppError('Algunos movimientos de extracto no existen o ya fueron conciliados', 400)
   }
 
-  const movsCaja = await prisma.movimientoCaja.findMany({
+  const movsCaja = await req.db.movimientoCaja.findMany({
     where: { id: { in: movimientoCajaIds }, conciliado: false, anulado: false }
   })
   if (movsCaja.length !== movimientoCajaIds.length) {
@@ -522,7 +522,7 @@ router.get('/historial', asyncHandler(async (req, res) => {
 router.get('/trazabilidad/:movimientoCajaId', asyncHandler(async (req, res) => {
   const movimientoCajaId = parseInt(req.params.movimientoCajaId)
 
-  const movimientoCaja = await prisma.movimientoCaja.findUnique({
+  const movimientoCaja = await req.db.movimientoCaja.findUnique({
     where: { id: movimientoCajaId },
     include: {
       caja: true,
@@ -580,7 +580,7 @@ router.get('/resumen', asyncHandler(async (req, res) => {
   }
   if (cajaId) whereCajaPendiente.cajaId = parseInt(cajaId)
 
-  const cajasPendientes = await prisma.movimientoCaja.aggregate({
+  const cajasPendientes = await req.db.movimientoCaja.aggregate({
     where: whereCajaPendiente,
     _sum: { monto: true },
     _count: true

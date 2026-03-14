@@ -17,7 +17,7 @@ const asyncHandler = (fn) => (req, res, next) => {
 
 // GET /api/admin/debito/configuraciones - Listar configuraciones
 router.get('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
-  const configuraciones = await prisma.configuracionDebito.findMany({
+  const configuraciones = await req.db.configuracionDebito.findMany({
     orderBy: { nombre: 'asc' },
     include: {
       _count: {
@@ -61,7 +61,7 @@ router.post('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar que no exista un procesador con el mismo código
-  const existente = await prisma.configuracionDebito.findUnique({
+  const existente = await req.db.configuracionDebito.findUnique({
     where: { codigo }
   })
 
@@ -72,7 +72,7 @@ router.post('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
     })
   }
 
-  const configuracion = await prisma.configuracionDebito.create({
+  const configuracion = await req.db.configuracionDebito.create({
     data: {
       codigo,
       nombre,
@@ -103,7 +103,7 @@ router.put('/configuraciones/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const data = req.body
 
-  const configuracion = await prisma.configuracionDebito.update({
+  const configuracion = await req.db.configuracionDebito.update({
     where: { id: parseInt(id) },
     data
   })
@@ -126,7 +126,7 @@ router.delete('/configuraciones/:id', authAdmin, asyncHandler(async (req, res) =
     })
   }
 
-  await prisma.configuracionDebito.delete({
+  await req.db.configuracionDebito.delete({
     where: { id: parseInt(id) }
   })
 
@@ -146,7 +146,7 @@ router.get('/socios-disponibles', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Buscar socios con débito activo que tengan cuotas pendientes en el período
-  const socios = await prisma.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where: {
       enviaDebito: true,
       estado: 'ACTIVO',
@@ -332,7 +332,7 @@ router.post('/archivos/generar', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener configuración
-  const configuracion = await prisma.configuracionDebito.findUnique({
+  const configuracion = await req.db.configuracionDebito.findUnique({
     where: { id: parseInt(configuracionId) }
   })
 
@@ -341,7 +341,7 @@ router.post('/archivos/generar', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener socios con sus cargos pendientes
-  const socios = await prisma.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where: {
       id: { in: socioIds.map(id => parseInt(id)) },
       enviaDebito: true,
@@ -840,7 +840,7 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
   for (const item of pagosExitosos) {
     try {
       // Obtener pago completo con relaciones para el email
-      const pagoCompleto = await prisma.pago.findUnique({
+      const pagoCompleto = await req.db.pago.findUnique({
         where: { id: item.pagoId },
         include: {
           socio: {
@@ -1026,7 +1026,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
   const anioActual = anio ? parseInt(anio) : new Date().getFullYear()
 
   // Socios con débito activo
-  const sociosConDebito = await prisma.socio.count({
+  const sociosConDebito = await req.db.socio.count({
     where: {
       enviaDebito: true,
       estado: 'ACTIVO',
@@ -1493,7 +1493,7 @@ router.get('/adhesiones', authAdmin, asyncHandler(async (req, res) => {
     where.enviaDebito = true
   }
 
-  const socios = await prisma.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where,
     select: {
       id: true,
@@ -1535,7 +1535,7 @@ router.get('/adhesiones', authAdmin, asyncHandler(async (req, res) => {
 router.put('/adhesiones/:socioId/aprobar', authAdmin, asyncHandler(async (req, res) => {
   const { socioId } = req.params
 
-  const socio = await prisma.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(socioId) }
   })
 
@@ -1548,7 +1548,7 @@ router.put('/adhesiones/:socioId/aprobar', authAdmin, asyncHandler(async (req, r
     return res.status(400).json({ error: 'El socio no tiene medio de pago cargado' })
   }
 
-  await prisma.socio.update({
+  await req.db.socio.update({
     where: { id: parseInt(socioId) },
     data: {
       debitoVerificado: true,
@@ -1580,7 +1580,7 @@ router.put('/adhesiones/:socioId/rechazar', authAdmin, asyncHandler(async (req, 
   const { socioId } = req.params
   const { motivo } = req.body
 
-  const socio = await prisma.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { id: parseInt(socioId) }
   })
 
@@ -1589,7 +1589,7 @@ router.put('/adhesiones/:socioId/rechazar', authAdmin, asyncHandler(async (req, 
   }
 
   // Limpiar todos los datos de débito (CBU y tarjeta)
-  await prisma.socio.update({
+  await req.db.socio.update({
     where: { id: parseInt(socioId) },
     data: {
       debitoTipo: null,
@@ -1628,7 +1628,7 @@ router.put('/adhesiones/:socioId/desactivar', authAdmin, asyncHandler(async (req
   const { socioId } = req.params
   const { motivo } = req.body
 
-  await prisma.socio.update({
+  await req.db.socio.update({
     where: { id: parseInt(socioId) },
     data: {
       enviaDebito: false

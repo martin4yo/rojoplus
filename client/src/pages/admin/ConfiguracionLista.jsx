@@ -143,7 +143,7 @@ export default function ConfiguracionLista() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Porcentaje</th>
               )}
               {tabla === 'estados-socio' && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RojoPlus</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clubix</th>
               )}
               {tabla === 'medios-pago' && (
                 <>

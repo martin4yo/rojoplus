@@ -164,7 +164,7 @@ export default function PublicFooter() {
               </Link>
               <p className="text-gray-600 text-xs">
                 Desarrollado con <span className="text-red-500">♥</span> por{' '}
-                <span className="text-gray-400">RojoPlus</span>
+                <span className="text-gray-400">Clubix</span>
               </p>
             </div>
           </div>

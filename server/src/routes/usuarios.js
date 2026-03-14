@@ -310,7 +310,7 @@ router.put('/roles/:id/cajas', asyncHandler(async (req, res) => {
   })
 
   // Obtener cajas actualizadas
-  const cajasActualizadas = await prisma.cajaRol.findMany({
+  const cajasActualizadas = await req.db.cajaRol.findMany({
     where: { rolId: parseInt(id) },
     include: {
       caja: {
@@ -338,7 +338,7 @@ router.put('/roles/:id/cajas', asyncHandler(async (req, res) => {
 
 // GET /api/admin/cajas-disponibles - Obtener todas las cajas disponibles para asignar
 router.get('/cajas-disponibles', asyncHandler(async (req, res) => {
-  const cajas = await prisma.caja.findMany({
+  const cajas = await req.db.caja.findMany({
     where: { activo: true },
     select: {
       id: true,

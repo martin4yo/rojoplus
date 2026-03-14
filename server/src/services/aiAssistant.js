@@ -1,10 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 
 /**
- * AI Assistant Service - ROJO IA
+ * AI Assistant Service - Xavi
  *
  * Servicio para procesar comandos de lenguaje natural
- * y ejecutar acciones en RojoPlus (socios, admins, camareros)
+ * y ejecutar acciones en Clubix (socios, admins, camareros)
  */
 
 // Definición de acciones disponibles
@@ -59,7 +59,7 @@ class AIAssistantService {
 
     this.anthropic = new Anthropic({ apiKey })
     this.model = 'claude-sonnet-4-20250514'
-    console.log('✅ ROJO IA Service inicializado')
+    console.log('✅ Xavi Service inicializado')
   }
 
   /**
@@ -75,7 +75,7 @@ class AIAssistantService {
    */
   async processCommand(message, context) {
     try {
-      console.log('\n🤖 [ROJO IA] Procesando comando...')
+      console.log('\n🤖 [Xavi] Procesando comando...')
       console.log(`   Usuario: ${context.userName}`)
       console.log(`   Rol: ${context.role}`)
       console.log(`   Mensaje: "${message}"`)
@@ -123,14 +123,14 @@ class AIAssistantService {
    * Construye el prompt del sistema según el rol
    */
   buildSystemPrompt(context) {
-    const basePrompt = `Eres ROJO IA, el asistente inteligente de Club Sportivo Pilar.
+    const basePrompt = `Eres Xavi, el asistente inteligente de Club Sportivo Pilar.
 
 SOBRE TI:
-- Tu nombre es ROJO IA (pronunciado "Rojito")
+- Tu nombre es Xavi (pronunciado "Rojito")
 - Eres profesional pero cercano y amigable
 - Usás lenguaje informal argentino (vos, che, etc.)
 - Podés usar emojis moderadamente
-- Cuando te pregunten quién sos, presentate como ROJO IA, el asistente del Club
+- Cuando te pregunten quién sos, presentate como Xavi, el asistente del Club
 
 CONTEXTO DEL USUARIO:
 - Nombre: ${context.userName}

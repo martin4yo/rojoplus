@@ -980,7 +980,7 @@ router.get('/entrenamientos/:id/socios', asyncHandler(async (req, res) => {
   }
 
   // Obtener inscripciones activas de la categoria
-  const inscripciones = await prisma.inscripcion.findMany({
+  const inscripciones = await req.db.inscripcion.findMany({
     where: {
       categoriaActividadId: entrenamiento.categoriaActividadId,
       estado: 'ACTIVA',
@@ -1005,7 +1005,7 @@ router.get('/entrenamientos/:id/socios', asyncHandler(async (req, res) => {
   })
 
   // Obtener asistencias ya registradas
-  const asistencias = await prisma.asistencia.findMany({
+  const asistencias = await req.db.asistencia.findMany({
     where: { entrenamientoId: parseInt(id) }
   })
 
@@ -1057,7 +1057,7 @@ router.post('/entrenamientos/:id/asistencia', asyncHandler(async (req, res) => {
     }
 
     try {
-      const registro = await prisma.asistencia.upsert({
+      const registro = await req.db.asistencia.upsert({
         where: {
           entrenamientoId_socioId: {
             entrenamientoId: parseInt(id),
@@ -1100,7 +1100,7 @@ router.post('/entrenamientos/:id/asistencia', asyncHandler(async (req, res) => {
 router.delete('/entrenamientos/:id/asistencia/:socioId', asyncHandler(async (req, res) => {
   const { id, socioId } = req.params
 
-  await prisma.asistencia.delete({
+  await req.db.asistencia.delete({
     where: {
       entrenamientoId_socioId: {
         entrenamientoId: parseInt(id),
@@ -1138,7 +1138,7 @@ router.get('/partidos', asyncHandler(async (req, res) => {
     where.categoriaActividad = { actividadId: parseInt(actividadId) }
   }
 
-  const partidos = await prisma.partido.findMany({
+  const partidos = await req.db.partido.findMany({
     where,
     orderBy: [{ fecha: 'desc' }, { hora: 'asc' }],
     include: {
@@ -1159,7 +1159,7 @@ router.get('/partidos', asyncHandler(async (req, res) => {
 router.get('/partidos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const partido = await prisma.partido.findUnique({
+  const partido = await req.db.partido.findUnique({
     where: { id: parseInt(id) },
     include: {
       categoriaActividad: {
@@ -1208,7 +1208,7 @@ router.post('/partidos', asyncHandler(async (req, res) => {
 
   // Verificar conflicto de espacio si es local
   if (espacioId && condicion === 'LOCAL') {
-    const conflicto = await prisma.partido.findFirst({
+    const conflicto = await req.db.partido.findFirst({
       where: {
         espacioId: parseInt(espacioId),
         fecha: new Date(fecha),
@@ -1221,7 +1221,7 @@ router.post('/partidos', asyncHandler(async (req, res) => {
     }
   }
 
-  const partido = await prisma.partido.create({
+  const partido = await req.db.partido.create({
     data: {
       categoriaActividadId: parseInt(categoriaActividadId),
       fecha: new Date(fecha),
@@ -1250,12 +1250,12 @@ router.put('/partidos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { fecha, hora, tipo, condicion, rival, ubicacion, espacioId, observaciones, estado } = req.body
 
-  const existente = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.partido.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
     throw new AppError('Partido no encontrado', 404)
   }
 
-  const partido = await prisma.partido.update({
+  const partido = await req.db.partido.update({
     where: { id: parseInt(id) },
     data: {
       fecha: fecha ? new Date(fecha) : existente.fecha,
@@ -1284,7 +1284,7 @@ router.post('/partidos/:id/resultado', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { golesLocal, golesVisitante } = req.body
 
-  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  const partido = await req.db.partido.findUnique({ where: { id: parseInt(id) } })
   if (!partido) {
     throw new AppError('Partido no encontrado', 404)
   }
@@ -1293,7 +1293,7 @@ router.post('/partidos/:id/resultado', asyncHandler(async (req, res) => {
     throw new AppError('No se puede cargar resultado de un partido cancelado', 400)
   }
 
-  const updated = await prisma.partido.update({
+  const updated = await req.db.partido.update({
     where: { id: parseInt(id) },
     data: {
       golesLocal: golesLocal !== undefined ? parseInt(golesLocal) : null,
@@ -1316,12 +1316,12 @@ router.post('/partidos/:id/suspender', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { motivo } = req.body
 
-  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  const partido = await req.db.partido.findUnique({ where: { id: parseInt(id) } })
   if (!partido) {
     throw new AppError('Partido no encontrado', 404)
   }
 
-  const updated = await prisma.partido.update({
+  const updated = await req.db.partido.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'SUSPENDIDO',
@@ -1343,12 +1343,12 @@ router.post('/partidos/:id/cancelar', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { motivo } = req.body
 
-  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  const partido = await req.db.partido.findUnique({ where: { id: parseInt(id) } })
   if (!partido) {
     throw new AppError('Partido no encontrado', 404)
   }
 
-  const updated = await prisma.partido.update({
+  const updated = await req.db.partido.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'CANCELADO',
@@ -1369,7 +1369,7 @@ router.post('/partidos/:id/cancelar', asyncHandler(async (req, res) => {
 router.delete('/partidos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const partido = await prisma.partido.findUnique({
+  const partido = await req.db.partido.findUnique({
     where: { id: parseInt(id) },
     include: {
       _count: { select: { convocados: true, estadisticas: true } }
@@ -1381,7 +1381,7 @@ router.delete('/partidos/:id', asyncHandler(async (req, res) => {
   }
 
   // Eliminar convocatorias y estadísticas primero (cascade)
-  await prisma.partido.delete({ where: { id: parseInt(id) } })
+  await req.db.partido.delete({ where: { id: parseInt(id) } })
 
   res.json({ success: true, message: 'Partido eliminado correctamente' })
 }))
@@ -1394,7 +1394,7 @@ router.delete('/partidos/:id', asyncHandler(async (req, res) => {
 router.get('/partidos/:id/convocados', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const partido = await prisma.partido.findUnique({
+  const partido = await req.db.partido.findUnique({
     where: { id: parseInt(id) },
     include: { categoriaActividad: true }
   })
@@ -1404,7 +1404,7 @@ router.get('/partidos/:id/convocados', asyncHandler(async (req, res) => {
   }
 
   // Obtener inscripciones activas de la categoría
-  const inscripciones = await prisma.inscripcion.findMany({
+  const inscripciones = await req.db.inscripcion.findMany({
     where: {
       categoriaActividadId: partido.categoriaActividadId,
       estado: 'ACTIVA',
@@ -1429,7 +1429,7 @@ router.get('/partidos/:id/convocados', asyncHandler(async (req, res) => {
   })
 
   // Obtener convocatorias existentes
-  const convocatorias = await prisma.convocatoria.findMany({
+  const convocatorias = await req.db.convocatoria.findMany({
     where: { partidoId: parseInt(id) }
   })
 
@@ -1454,7 +1454,7 @@ router.post('/partidos/:id/convocar', asyncHandler(async (req, res) => {
     throw new AppError('Debe enviar un array de socioIds', 400)
   }
 
-  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  const partido = await req.db.partido.findUnique({ where: { id: parseInt(id) } })
   if (!partido) {
     throw new AppError('Partido no encontrado', 404)
   }
@@ -1463,7 +1463,7 @@ router.post('/partidos/:id/convocar', asyncHandler(async (req, res) => {
 
   for (const socioId of socioIds) {
     try {
-      const convocatoria = await prisma.convocatoria.upsert({
+      const convocatoria = await req.db.convocatoria.upsert({
         where: {
           partidoId_socioId: {
             partidoId: parseInt(id),
@@ -1489,7 +1489,7 @@ router.post('/partidos/:id/convocar', asyncHandler(async (req, res) => {
 router.delete('/partidos/:id/convocar/:socioId', asyncHandler(async (req, res) => {
   const { id, socioId } = req.params
 
-  await prisma.convocatoria.delete({
+  await req.db.convocatoria.delete({
     where: {
       partidoId_socioId: {
         partidoId: parseInt(id),
@@ -1506,7 +1506,7 @@ router.put('/partidos/:partidoId/convocatoria/:socioId', asyncHandler(async (req
   const { partidoId, socioId } = req.params
   const { confirmado, motivoRechazo } = req.body
 
-  const convocatoria = await prisma.convocatoria.findUnique({
+  const convocatoria = await req.db.convocatoria.findUnique({
     where: {
       partidoId_socioId: {
         partidoId: parseInt(partidoId),
@@ -1519,7 +1519,7 @@ router.put('/partidos/:partidoId/convocatoria/:socioId', asyncHandler(async (req
     throw new AppError('Convocatoria no encontrada', 404)
   }
 
-  const updated = await prisma.convocatoria.update({
+  const updated = await req.db.convocatoria.update({
     where: {
       partidoId_socioId: {
         partidoId: parseInt(partidoId),
@@ -1549,7 +1549,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
     throw new AppError('Debe especificar el tipo de notificación', 400)
   }
 
-  const partido = await prisma.partido.findUnique({
+  const partido = await req.db.partido.findUnique({
     where: { id: parseInt(id) },
     include: {
       categoriaActividad: {
@@ -1569,7 +1569,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
     whereConvocados.socioId = { in: socioIds.map(id => parseInt(id)) }
   }
 
-  const convocados = await prisma.convocatoria.findMany({
+  const convocados = await req.db.convocatoria.findMany({
     where: whereConvocados,
     include: {
       socio: {
@@ -1702,7 +1702,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
 
     // Actualizar convocatoria con estado de notificaciones
     if (Object.keys(updateData).length > 0) {
-      await prisma.convocatoria.update({
+      await req.db.convocatoria.update({
         where: {
           partidoId_socioId: {
             partidoId: parseInt(id),
@@ -1753,7 +1753,7 @@ router.post('/partidos/:id/estadisticas', asyncHandler(async (req, res) => {
     throw new AppError('El campo estadísticas debe ser un array', 400)
   }
 
-  const partido = await prisma.partido.findUnique({ where: { id: parseInt(id) } })
+  const partido = await req.db.partido.findUnique({ where: { id: parseInt(id) } })
   if (!partido) {
     throw new AppError('Partido no encontrado', 404)
   }
@@ -1908,7 +1908,7 @@ router.get('/estadisticas/ranking', asyncHandler(async (req, res) => {
 
   // Obtener datos de los socios
   const socioIds = estadisticas.map(e => e.socioId)
-  const socios = await prisma.socio.findMany({
+  const socios = await req.db.socio.findMany({
     where: { id: { in: socioIds } },
     select: { id: true, nroSocio: true, apellidoNombre: true, fotoUrl: true }
   })

@@ -102,7 +102,7 @@ router.post('/registro', asyncHandler(async (req, res) => {
       descuentoPct = descuentoDisponible.porcentaje
     }
   } else {
-    const config = await req.prisma.configuracion.findUnique({
+    const config = await req.req.db.configuracion.findUnique({
       where: { clave: 'descuento_default' },
     })
     if (config) descuentoPct = parseFloat(config.valor)

@@ -185,7 +185,7 @@ router.post('/', checkPermiso('STAFF_TECNICO_CREAR'), asyncHandler(async (req, r
 
   // Validar que existe la actividad
   if (actividadId) {
-    const actividad = await prisma.actividad.findUnique({
+    const actividad = await req.db.actividad.findUnique({
       where: { id: parseInt(actividadId) }
     })
     if (!actividad) {

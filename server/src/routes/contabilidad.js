@@ -134,7 +134,7 @@ router.get('/cuentas-contables', asyncHandler(async (req, res) => {
   if (activo !== undefined) where.activo = activo === 'true'
   if (tipo) where.tipo = tipo
 
-  const cuentas = await prisma.cuentaContable.findMany({
+  const cuentas = await req.db.cuentaContable.findMany({
     where,
     orderBy: [{ codigo: 'asc' }],
     include: {
@@ -173,7 +173,7 @@ router.get('/cuentas-contables', asyncHandler(async (req, res) => {
 router.get('/cuentas-contables/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cuenta = await prisma.cuentaContable.findUnique({
+  const cuenta = await req.db.cuentaContable.findUnique({
     where: { id: parseInt(id) },
     include: {
       padre: { select: { id: true, codigo: true, nombre: true } },
@@ -206,7 +206,7 @@ router.post('/cuentas-contables', asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser ACTIVO, PASIVO, PATRIMONIO, INGRESO o EGRESO', 400)
   }
 
-  const existente = await prisma.cuentaContable.findUnique({ where: { codigo } })
+  const existente = await req.db.cuentaContable.findUnique({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe una cuenta con ese codigo', 400)
   }
@@ -214,14 +214,14 @@ router.post('/cuentas-contables', asyncHandler(async (req, res) => {
   // Si tiene padre, calcular nivel automaticamente
   let nivelCalculado = nivel || 1
   if (padreId) {
-    const padre = await prisma.cuentaContable.findUnique({ where: { id: parseInt(padreId) } })
+    const padre = await req.db.cuentaContable.findUnique({ where: { id: parseInt(padreId) } })
     if (!padre) {
       throw new AppError('Cuenta padre no encontrada', 404)
     }
     nivelCalculado = padre.nivel + 1
   }
 
-  const cuenta = await prisma.cuentaContable.create({
+  const cuenta = await req.db.cuentaContable.create({
     data: {
       codigo,
       nombre,
@@ -244,7 +244,7 @@ router.put('/cuentas-contables/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, tipo, padreId, esImputable, orden, activo } = req.body
 
-  const existente = await prisma.cuentaContable.findUnique({
+  const existente = await req.db.cuentaContable.findUnique({
     where: { id: parseInt(id) },
     include: { hijos: true }
   })
@@ -255,7 +255,7 @@ router.put('/cuentas-contables/:id', asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.cuentaContable.findUnique({ where: { codigo } })
+    const duplicado = await req.db.cuentaContable.findUnique({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe una cuenta con ese codigo', 400)
     }
@@ -270,14 +270,14 @@ router.put('/cuentas-contables/:id', asyncHandler(async (req, res) => {
   let nivel = existente.nivel
   if (padreId !== undefined && padreId !== existente.padreId) {
     if (padreId) {
-      const padre = await prisma.cuentaContable.findUnique({ where: { id: parseInt(padreId) } })
+      const padre = await req.db.cuentaContable.findUnique({ where: { id: parseInt(padreId) } })
       if (padre) nivel = padre.nivel + 1
     } else {
       nivel = 1
     }
   }
 
-  const cuenta = await prisma.cuentaContable.update({
+  const cuenta = await req.db.cuentaContable.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo || existente.codigo,
@@ -301,7 +301,7 @@ router.put('/cuentas-contables/:id', asyncHandler(async (req, res) => {
 router.delete('/cuentas-contables/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cuenta = await prisma.cuentaContable.findUnique({
+  const cuenta = await req.db.cuentaContable.findUnique({
     where: { id: parseInt(id) },
     include: {
       hijos: true,
@@ -326,7 +326,7 @@ router.delete('/cuentas-contables/:id', asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar una cuenta con movimientos', 400)
   }
 
-  await prisma.cuentaContable.delete({ where: { id: parseInt(id) } })
+  await req.db.cuentaContable.delete({ where: { id: parseInt(id) } })
 
   res.json({ success: true, message: 'Cuenta eliminada correctamente' })
 }))
@@ -1146,7 +1146,7 @@ router.post('/pedidos', asyncHandler(async (req, res) => {
 
   // Verificar socio si se proporciona
   if (socioId) {
-    const socio = await prisma.socio.findUnique({ where: { id: parseInt(socioId) } })
+    const socio = await req.db.socio.findUnique({ where: { id: parseInt(socioId) } })
     if (!socio) {
       throw new AppError('Socio no encontrado', 404)
     }

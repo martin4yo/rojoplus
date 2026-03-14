@@ -1,7 +1,7 @@
 {
-  "name": "rojoplus",
+  "name": "clubix",
   "version": "1.0.0",
-  "description": "Sistema de fidelización - Club Sportivo Pilar",
+  "description": "Clubix - Gestión Inteligente",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd server && npm run dev",
@@ -10,10 +10,14 @@
     "start": "cd server && npm start",
     "kill": "kill-servers.bat"
   },
-  "keywords": ["rojoplus", "fidelizacion", "club"],
+  "keywords": [
+    "clubix",
+    "gestion",
+    "club"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.2.1"
   }
 }

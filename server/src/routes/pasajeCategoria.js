@@ -44,7 +44,7 @@ router.get('/revisar', authAdmin, async (req, res) => {
       }
     }
 
-    const inscripciones = await prisma.inscripcion.findMany({
+    const inscripciones = await req.db.inscripcion.findMany({
       where: whereInscripcion,
       include: {
         socio: {
@@ -366,7 +366,7 @@ router.get('/historial', authAdmin, async (req, res) => {
     }
 
     const [inscripciones, total] = await Promise.all([
-      prisma.inscripcion.findMany({
+      req.db.inscripcion.findMany({
         where,
         include: {
           socio: {
@@ -388,7 +388,7 @@ router.get('/historial', authAdmin, async (req, res) => {
         skip: (parseInt(page) - 1) * parseInt(limit),
         take: parseInt(limit)
       }),
-      prisma.inscripcion.count({ where })
+      req.db.inscripcion.count({ where })
     ])
 
     res.json({
@@ -419,7 +419,7 @@ router.get('/estadisticas', authAdmin, async (req, res) => {
     const finAnio = new Date(year, 11, 31, 23, 59, 59)
 
     // Total pasajes del año
-    const totalPasajes = await prisma.inscripcion.count({
+    const totalPasajes = await req.db.inscripcion.count({
       where: {
         motivoFin: 'PASAJE_CATEGORIA',
         fechaFin: {
@@ -430,7 +430,7 @@ router.get('/estadisticas', authAdmin, async (req, res) => {
     })
 
     // Pasajes por actividad
-    const pasajesPorActividad = await prisma.inscripcion.groupBy({
+    const pasajesPorActividad = await req.db.inscripcion.groupBy({
       by: ['categoriaActividadId'],
       where: {
         motivoFin: 'PASAJE_CATEGORIA',
@@ -497,7 +497,7 @@ router.post('/exceptuar/:inscripcionId', authAdmin, async (req, res) => {
     const { inscripcionId } = req.params
     const { exceptuar, motivo } = req.body
 
-    const inscripcion = await prisma.inscripcion.update({
+    const inscripcion = await req.db.inscripcion.update({
       where: { id: parseInt(inscripcionId) },
       data: {
         exceptuadoPasaje: exceptuar === true,
@@ -537,7 +537,7 @@ router.get('/excepciones', authAdmin, async (req, res) => {
       where.categoriaActividad = { actividadId: parseInt(actividadId) }
     }
 
-    const excepciones = await prisma.inscripcion.findMany({
+    const excepciones = await req.db.inscripcion.findMany({
       where,
       include: {
         socio: {

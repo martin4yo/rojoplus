@@ -64,7 +64,7 @@ router.get('/', authAdmin, checkPermiso('EVENTOS_VER'), async (req, res) => {
       ]
     }
 
-    const eventos = await prisma.evento.findMany({
+    const eventos = await req.db.evento.findMany({
       where,
       include: {
         espacio: true,
@@ -113,7 +113,7 @@ router.get('/:id', authAdmin, checkPermiso('EVENTOS_VER'), async (req, res) => {
   try {
     const { id } = req.params
 
-    const evento = await prisma.evento.findUnique({
+    const evento = await req.db.evento.findUnique({
       where: { id: parseInt(id) },
       include: {
         espacio: true,
@@ -202,7 +202,7 @@ router.post('/', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res) 
     }
 
     // Verificar que el código no exista
-    const existeCodigo = await prisma.evento.findUnique({
+    const existeCodigo = await req.db.evento.findUnique({
       where: { codigo }
     })
 
@@ -212,7 +212,7 @@ router.post('/', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res) 
 
     // Si se vincula a un partido, verificar que exista y no tenga evento
     if (partidoId) {
-      const partido = await prisma.partido.findUnique({
+      const partido = await req.db.partido.findUnique({
         where: { id: partidoId },
         include: { evento: true }
       })
@@ -226,7 +226,7 @@ router.post('/', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res) 
       }
     }
 
-    const evento = await prisma.evento.create({
+    const evento = await req.db.evento.create({
       data: {
         codigo,
         nombre,
@@ -298,7 +298,7 @@ router.put('/:id', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res
       centroCostoId
     } = req.body
 
-    const eventoExistente = await prisma.evento.findUnique({
+    const eventoExistente = await req.db.evento.findUnique({
       where: { id: parseInt(id) },
       include: { _count: { select: { entradas: true } } }
     })
@@ -316,7 +316,7 @@ router.put('/:id', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res
 
     // Si se cambia el código, verificar que no exista
     if (codigo && codigo !== eventoExistente.codigo) {
-      const existeCodigo = await prisma.evento.findUnique({
+      const existeCodigo = await req.db.evento.findUnique({
         where: { codigo }
       })
 
@@ -346,7 +346,7 @@ router.put('/:id', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, res
     if (conceptoTesoreriaId !== undefined) dataUpdate.conceptoTesoreriaId = conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null
     if (centroCostoId !== undefined) dataUpdate.centroCostoId = centroCostoId ? parseInt(centroCostoId) : null
 
-    const eventoActualizado = await prisma.evento.update({
+    const eventoActualizado = await req.db.evento.update({
       where: { id: parseInt(id) },
       data: dataUpdate,
       include: {
@@ -381,7 +381,7 @@ router.delete('/:id', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, 
   try {
     const { id } = req.params
 
-    const evento = await prisma.evento.findUnique({
+    const evento = await req.db.evento.findUnique({
       where: { id: parseInt(id) },
       include: {
         _count: {
@@ -415,7 +415,7 @@ router.delete('/:id', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), async (req, 
       })
     }
 
-    const eventoCancelado = await prisma.evento.update({
+    const eventoCancelado = await req.db.evento.update({
       where: { id: parseInt(id) },
       data: {
         estado: 'CANCELADO',
@@ -483,7 +483,7 @@ router.post('/:id/categorias', authAdmin, checkPermiso('EVENTOS_GESTIONAR'), asy
       })
     }
 
-    const evento = await prisma.evento.findUnique({
+    const evento = await req.db.evento.findUnique({
       where: { id: parseInt(id) }
     })
 
@@ -657,7 +657,7 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
 
     // Obtener evento con todas las categorías necesarias
     const categoriasIds = itemsArray.map(i => parseInt(i.categoriaId))
-    const evento = await prisma.evento.findUnique({
+    const evento = await req.db.evento.findUnique({
       where: { id: parseInt(id) },
       include: {
         categorias: {
@@ -724,13 +724,13 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
     let esSocio = false
 
     if (socioId) {
-      socio = await prisma.socio.findUnique({
+      socio = await req.db.socio.findUnique({
         where: { id: parseInt(socioId) }
       })
 
       if (socio && socio.estado === 'ACTIVO') {
         // Verificar si tiene deudas
-        const cargosImpagos = await prisma.cargo.aggregate({
+        const cargosImpagos = await req.db.cargo.aggregate({
           where: {
             OR: [
               { socioId: socio.id },
@@ -741,7 +741,7 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
           _sum: { montoTotal: true }
         })
 
-        const pagos = await prisma.pago.aggregate({
+        const pagos = await req.db.pago.aggregate({
           where: {
             OR: [
               { socioId: socio.id },
@@ -757,7 +757,7 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
         esSocio = saldo >= 0
       }
     } else if (documentoComprador) {
-      socio = await prisma.socio.findFirst({
+      socio = await req.db.socio.findFirst({
         where: {
           documento: documentoComprador,
           estado: 'ACTIVO'
@@ -766,7 +766,7 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
 
       if (socio) {
         // Verificar si tiene deudas
-        const cargosImpagos = await prisma.cargo.aggregate({
+        const cargosImpagos = await req.db.cargo.aggregate({
           where: {
             OR: [
               { socioId: socio.id },
@@ -777,7 +777,7 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
           _sum: { montoTotal: true }
         })
 
-        const pagos = await prisma.pago.aggregate({
+        const pagos = await req.db.pago.aggregate({
           where: {
             OR: [
               { socioId: socio.id },
@@ -842,7 +842,7 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
 
     // Si no tiene centro de costos, buscar por defecto según el tipo
     if (!centroCostoId) {
-      const centroCosto = await prisma.centroCosto.findFirst({
+      const centroCosto = await req.db.centroCosto.findFirst({
         where: { codigo: `EVENTOS_${evento.tipo}` }
       })
       centroCostoId = centroCosto?.id
@@ -1010,7 +1010,7 @@ router.post('/venta-kiosco', authAdmin, checkPermiso('BUFFET_COBRAR'), async (re
       const { eventoId, categoriaId, cantidad } = item
 
       // Validar evento y categoría
-      const evento = await prisma.evento.findUnique({
+      const evento = await req.db.evento.findUnique({
         where: { id: parseInt(eventoId) },
         include: {
           categorias: {
@@ -1049,7 +1049,7 @@ router.post('/venta-kiosco', authAdmin, checkPermiso('BUFFET_COBRAR'), async (re
       let precio = categoria.precioNoSocio
 
       if (socioId) {
-        socio = await prisma.socio.findUnique({
+        socio = await req.db.socio.findUnique({
           where: { id: parseInt(socioId) }
         })
 
@@ -1216,7 +1216,7 @@ router.post('/socio/:token/eventos/:eventoId/comprar', asyncHandler(async (req, 
   }
 
   // Validar token y obtener socio
-  const socio = await prisma.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { tokenPortal: token }
   })
 
@@ -1225,7 +1225,7 @@ router.post('/socio/:token/eventos/:eventoId/comprar', asyncHandler(async (req, 
   }
 
   // Obtener evento
-  const evento = await prisma.evento.findUnique({
+  const evento = await req.db.evento.findUnique({
     where: { id: parseInt(eventoId) },
     include: {
       categorias: {
@@ -1346,7 +1346,7 @@ router.get('/socio/:token/eventos', asyncHandler(async (req, res) => {
   const { token } = req.params
 
   // Validar token y obtener socio
-  const socio = await prisma.socio.findUnique({
+  const socio = await req.db.socio.findUnique({
     where: { tokenPortal: token }
   })
 
@@ -1355,7 +1355,7 @@ router.get('/socio/:token/eventos', asyncHandler(async (req, res) => {
   }
 
   // Obtener eventos con ventas habilitadas y no finalizados
-  const eventos = await prisma.evento.findMany({
+  const eventos = await req.db.evento.findMany({
     where: {
       ventasHabilitadas: true,
       estado: {
@@ -1588,7 +1588,7 @@ router.get('/public/eventos', async (req, res) => {
       where.tipo = tipo
     }
 
-    const eventos = await prisma.evento.findMany({
+    const eventos = await req.db.evento.findMany({
       where,
       include: {
         espacio: true,
@@ -1623,7 +1623,7 @@ router.get('/public/eventos/:id', async (req, res) => {
   try {
     const { id } = req.params
 
-    const evento = await prisma.evento.findUnique({
+    const evento = await req.db.evento.findUnique({
       where: { id: parseInt(id) },
       include: {
         espacio: true,
@@ -1849,7 +1849,7 @@ router.get('/:id/estadisticas', authAdmin, checkPermiso('EVENTOS_VER'), async (r
   try {
     const { id } = req.params
 
-    const evento = await prisma.evento.findUnique({
+    const evento = await req.db.evento.findUnique({
       where: { id: parseInt(id) }
     })
 
@@ -1960,7 +1960,7 @@ async function calcularEstadisticasEvento(eventoId) {
 router.post('/actualizar-contabilidad', authAdmin, async (req, res) => {
   try {
     // Buscar cuenta contable de eventos
-    const cuentaContable = await prisma.cuentaContable.findFirst({
+    const cuentaContable = await req.db.cuentaContable.findFirst({
       where: {
         OR: [
           { codigo: { contains: 'EVENTOS' } },
@@ -1976,13 +1976,13 @@ router.post('/actualizar-contabilidad', authAdmin, async (req, res) => {
     }
 
     // Buscar centros de costo
-    const centrosDeportivo = await prisma.centroCosto.findFirst({
+    const centrosDeportivo = await req.db.centroCosto.findFirst({
       where: { codigo: 'EVENTOS_DEPORTIVO' }
     })
-    const centrosSocial = await prisma.centroCosto.findFirst({
+    const centrosSocial = await req.db.centroCosto.findFirst({
       where: { codigo: 'EVENTOS_SOCIAL' }
     })
-    const centrosRecreativo = await prisma.centroCosto.findFirst({
+    const centrosRecreativo = await req.db.centroCosto.findFirst({
       where: { codigo: 'EVENTOS_RECREATIVO' }
     })
 
@@ -1991,7 +1991,7 @@ router.post('/actualizar-contabilidad', authAdmin, async (req, res) => {
 
     // Deportivos
     if (centrosDeportivo) {
-      const deportivos = await prisma.evento.updateMany({
+      const deportivos = await req.db.evento.updateMany({
         where: {
           tipo: 'DEPORTIVO',
           cuentaContableId: null
@@ -2006,7 +2006,7 @@ router.post('/actualizar-contabilidad', authAdmin, async (req, res) => {
 
     // Sociales
     if (centrosSocial) {
-      const sociales = await prisma.evento.updateMany({
+      const sociales = await req.db.evento.updateMany({
         where: {
           tipo: 'SOCIAL',
           cuentaContableId: null
@@ -2021,7 +2021,7 @@ router.post('/actualizar-contabilidad', authAdmin, async (req, res) => {
 
     // Recreativos
     if (centrosRecreativo) {
-      const recreativos = await prisma.evento.updateMany({
+      const recreativos = await req.db.evento.updateMany({
         where: {
           tipo: 'RECREATIVO',
           cuentaContableId: null

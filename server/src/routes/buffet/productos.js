@@ -88,7 +88,7 @@ router.delete('/categorias/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async
   try {
     const { id } = req.params
 
-    const productos = await prisma.productoBuffet.count({ where: { categoriaMenuId: parseInt(id) } })
+    const productos = await req.db.productoBuffet.count({ where: { categoriaMenuId: parseInt(id) } })
     if (productos > 0) {
       return res.status(400).json({ success: false, error: 'No se puede eliminar una categoría con productos' })
     }
@@ -143,7 +143,7 @@ router.get('/productos', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO', 
       ]
     }
 
-    const productos = await prisma.productoBuffet.findMany({
+    const productos = await req.db.productoBuffet.findMany({
       where,
       orderBy: [{ nombre: 'asc' }],
       include: {
@@ -195,7 +195,7 @@ router.get('/productos/barcode/:codigo', authAdmin, checkPermiso('BUFFET_VER', '
   try {
     const { codigo } = req.params
 
-    const producto = await prisma.productoBuffet.findFirst({
+    const producto = await req.db.productoBuffet.findFirst({
       where: {
         codigoBarras: codigo,
         activo: true,
@@ -298,12 +298,12 @@ router.post('/productos', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, 
       return res.status(400).json({ success: false, error: 'Producto del stock no encontrado' })
     }
 
-    const yaVinculado = await prisma.productoBuffet.findUnique({ where: { productoId } })
+    const yaVinculado = await req.db.productoBuffet.findUnique({ where: { productoId } })
     if (yaVinculado) {
       return res.status(400).json({ success: false, error: 'Este producto ya está en el menú del buffet' })
     }
 
-    const producto = await prisma.productoBuffet.create({
+    const producto = await req.db.productoBuffet.create({
       data: {
         productoId,
         categoriaMenuId,
@@ -341,7 +341,7 @@ router.put('/productos/precios', authAdmin, checkPermiso('BUFFET_CONFIG'), async
 
     const actualizaciones = await prisma.$transaction(
       productos.map(({ id, precio }) =>
-        prisma.productoBuffet.update({
+        req.db.productoBuffet.update({
           where: { id: parseInt(id) },
           data: { precio: parseFloat(precio) }
         })
@@ -364,7 +364,7 @@ router.put('/productos/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (re
     const { id } = req.params
     const { categoriaMenuId, nombre, descripcion, codigoBarras, precio, imagen, tiposVenta, disponible, destacado, orden, activo } = req.body
 
-    const producto = await prisma.productoBuffet.update({
+    const producto = await req.db.productoBuffet.update({
       where: { id: parseInt(id) },
       data: {
         categoriaMenuId,
@@ -397,7 +397,7 @@ router.delete('/productos/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async 
   try {
     const { id } = req.params
 
-    await prisma.productoBuffet.delete({ where: { id: parseInt(id) } })
+    await req.db.productoBuffet.delete({ where: { id: parseInt(id) } })
 
     res.json({ success: true, message: 'Producto eliminado' })
   } catch (error) {
@@ -415,7 +415,7 @@ router.put('/productos/:id/disponibilidad', authAdmin, checkPermiso('BUFFET_MESA
     const { id } = req.params
     const { disponible } = req.body
 
-    const producto = await prisma.productoBuffet.update({
+    const producto = await req.db.productoBuffet.update({
       where: { id: parseInt(id) },
       data: { disponible }
     })
@@ -435,7 +435,7 @@ router.get('/productos/:id/detalle', authAdmin, checkPermiso('BUFFET_VER', 'BUFF
   try {
     const { id } = req.params
 
-    const producto = await prisma.productoBuffet.findUnique({
+    const producto = await req.db.productoBuffet.findUnique({
       where: { id: parseInt(id) },
       include: {
         categoriaMenu: true,

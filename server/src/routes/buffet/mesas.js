@@ -25,7 +25,7 @@ router.get('/mesas', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) => 
     const where = {}
     if (activo !== undefined) where.activo = activo === 'true'
 
-    const mesas = await prisma.mesa.findMany({
+    const mesas = await req.db.mesa.findMany({
       where,
       orderBy: { numero: 'asc' },
       include: {
@@ -60,7 +60,7 @@ router.get('/mesas/estado', authAdmin, checkPermiso('BUFFET_VER'), async (req, r
       where.mozoAsignadoId = req.admin.id
     }
 
-    const mesas = await prisma.mesa.findMany({
+    const mesas = await req.db.mesa.findMany({
       where,
       orderBy: { numero: 'asc' },
       include: {
@@ -117,7 +117,7 @@ router.get('/mesas/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, res)
   try {
     const { id } = req.params
 
-    const mesa = await prisma.mesa.findUnique({
+    const mesa = await req.db.mesa.findUnique({
       where: { id: parseInt(id) },
       include: {
         comandas: {
@@ -142,7 +142,7 @@ router.get('/mesas/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, res)
         )
 
         if (todosProcesados) {
-          await prisma.comanda.update({
+          await req.db.comanda.update({
             where: { id: comanda.id },
             data: { estado: 'ABIERTA' }
           })
@@ -170,12 +170,12 @@ router.post('/mesas', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res)
   try {
     const { numero, nombre, capacidad, zona, esComunal } = req.body
 
-    const existente = await prisma.mesa.findUnique({ where: { numero } })
+    const existente = await req.db.mesa.findUnique({ where: { numero } })
     if (existente) {
       return res.status(400).json({ success: false, error: 'Ya existe una mesa con ese número' })
     }
 
-    const mesa = await prisma.mesa.create({
+    const mesa = await req.db.mesa.create({
       data: {
         numero,
         nombre: nombre || `Mesa ${numero}`,
@@ -212,7 +212,7 @@ router.put('/mesas/:id', authAdmin, checkPermiso('BUFFET_CONFIG', 'BUFFET_MESAS'
 
     // Si se pasa a LIBRE, cerrar todas las comandas activas
     if (estado === 'LIBRE') {
-      await prisma.comanda.updateMany({
+      await req.db.comanda.updateMany({
         where: {
           mesaId: parseInt(id),
           estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] }
@@ -225,7 +225,7 @@ router.put('/mesas/:id', authAdmin, checkPermiso('BUFFET_CONFIG', 'BUFFET_MESAS'
       })
     }
 
-    const mesa = await prisma.mesa.update({
+    const mesa = await req.db.mesa.update({
       where: { id: parseInt(id) },
       data: updateData
     })
@@ -245,7 +245,7 @@ router.delete('/mesas/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req
   try {
     const { id } = req.params
 
-    const comandasActivas = await prisma.comanda.count({
+    const comandasActivas = await req.db.comanda.count({
       where: { mesaId: parseInt(id), estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] } }
     })
 
@@ -253,7 +253,7 @@ router.delete('/mesas/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req
       return res.status(400).json({ success: false, error: 'No se puede eliminar una mesa con comandas activas' })
     }
 
-    await prisma.mesa.delete({ where: { id: parseInt(id) } })
+    await req.db.mesa.delete({ where: { id: parseInt(id) } })
 
     res.json({ success: true, message: 'Mesa eliminada' })
   } catch (error) {
@@ -277,7 +277,7 @@ router.put('/mesas/:id/estado', authAdmin, checkPermiso('BUFFET_MESAS'), async (
     }
 
     if (estado === 'LIBRE') {
-      await prisma.comanda.updateMany({
+      await req.db.comanda.updateMany({
         where: {
           mesaId: parseInt(id),
           estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] }
@@ -290,7 +290,7 @@ router.put('/mesas/:id/estado', authAdmin, checkPermiso('BUFFET_MESAS'), async (
       })
     }
 
-    const mesa = await prisma.mesa.update({
+    const mesa = await req.db.mesa.update({
       where: { id: parseInt(id) },
       data: { estado }
     })
@@ -364,7 +364,7 @@ router.post('/mesas/:id/asignar-mozo', authAdmin, checkPermiso('BUFFET_CONFIG'),
     const { id } = req.params
     const { mozoId } = req.body
 
-    const mesa = await prisma.mesa.update({
+    const mesa = await req.db.mesa.update({
       where: { id: parseInt(id) },
       data: { mozoAsignadoId: mozoId ? parseInt(mozoId) : null },
       include: {
@@ -391,7 +391,7 @@ router.post('/mesas/asignar-masivo', authAdmin, checkPermiso('BUFFET_CONFIG'), a
 
     const resultados = await Promise.all(
       asignaciones.map(({ mesaId, mozoId }) =>
-        prisma.mesa.update({
+        req.db.mesa.update({
           where: { id: parseInt(mesaId) },
           data: { mozoAsignadoId: mozoId ? parseInt(mozoId) : null }
         })
@@ -411,7 +411,7 @@ router.post('/mesas/asignar-masivo', authAdmin, checkPermiso('BUFFET_CONFIG'), a
  */
 router.post('/mesas/desasignar-todas', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
-    const resultado = await prisma.mesa.updateMany({
+    const resultado = await req.db.mesa.updateMany({
       where: { activo: true },
       data: { mozoAsignadoId: null }
     })

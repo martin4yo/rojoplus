@@ -179,7 +179,12 @@ router.get('/takeaway', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) 
   try {
     const { estado, fecha } = req.query
 
-    const where = {}
+    const where = {
+      // Excluir pedidos de BARRA (solo mostrar TakeAway reales)
+      NOT: {
+        tipoVenta: 'BARRA'
+      }
+    }
     if (estado) where.estado = estado
     if (fecha) {
       const fechaInicio = new Date(fecha)
@@ -309,7 +314,7 @@ router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
 
     if (items && items.length > 0) {
       for (const item of items) {
-        const producto = await prisma.productoBuffet.findUnique({ where: { id: item.productoBuffetId } })
+        const producto = await req.db.productoBuffet.findUnique({ where: { id: item.productoBuffetId } })
         if (!producto) continue
 
         await prisma.itemPedidoTakeAway.create({
@@ -364,7 +369,7 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     const itemsCreados = []
 
     for (const item of items) {
-      const producto = await prisma.productoBuffet.findUnique({
+      const producto = await req.db.productoBuffet.findUnique({
         where: { id: item.productoBuffetId },
         include: { categoriaMenu: true }
       })
@@ -797,11 +802,11 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     }
 
     // Cuenta contable fallback si no tiene configurada
-    let cuentaContableFallback = await prisma.cuentaContable.findFirst({
+    let cuentaContableFallback = await req.db.cuentaContable.findFirst({
       where: { codigo: { contains: 'BUFFET' }, esImputable: true }
     })
     if (!cuentaContableFallback) {
-      cuentaContableFallback = await prisma.cuentaContable.findFirst({
+      cuentaContableFallback = await req.db.cuentaContable.findFirst({
         where: { codigo: '4.1.1.01', esImputable: true }
       })
     }
@@ -825,15 +830,15 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
 
-        const caja = await prisma.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } })
+        const caja = await req.db.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } })
         if (!caja) {
           return res.status(400).json({ success: false, error: `Caja ${pago.cajaId || cajaId} no encontrada` })
         }
 
-        const ultimoMov = await prisma.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
+        const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
         const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
 
-        const movimiento = await prisma.movimientoCaja.create({
+        const movimiento = await req.db.movimientoCaja.create({
           data: {
             numero: nuevoNumero,
             cajaId: parseInt(pago.cajaId || cajaId),
@@ -893,15 +898,15 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
 
-      const caja = await prisma.caja.findUnique({ where: { id: cajaId } })
+      const caja = await req.db.caja.findUnique({ where: { id: cajaId } })
       if (!caja) {
         return res.status(400).json({ success: false, error: 'Caja no encontrada' })
       }
 
-      const ultimoMov = await prisma.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
+      const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
       const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
 
-      const movimiento = await prisma.movimientoCaja.create({
+      const movimiento = await req.db.movimientoCaja.create({
         data: {
           numero: nuevoNumero,
           cajaId,
@@ -984,7 +989,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         const { renderTicketFiscal, toBase64 } = await import('../../services/ticketService.js')
 
         const config = await getConfiguracionFiscal()
-        const cajaUsada = await prisma.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } })
+        const cajaUsada = await req.db.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } })
         const puntoVenta = cajaUsada?.puntoVentaAfip || 1
         const tipoAfip = tipoComprobante || 11
 
@@ -1128,7 +1133,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         const tipoComprobanteNombre = comprobanteFiscal?.tipo || (esVentaInterna ? 'VENTA INTERNA' : 'TICKET')
 
         const cajaUsadaId = cajaId || movimientos[0]?.cajaId
-        const cajaUsada = await prisma.caja.findUnique({
+        const cajaUsada = await req.db.caja.findUnique({
           where: { id: cajaUsadaId },
           include: { cuentaContable: true }
         })
@@ -1224,7 +1229,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         })
 
         for (const mov of movimientos) {
-          await prisma.movimientoCaja.update({
+          await req.db.movimientoCaja.update({
             where: { id: mov.id },
             data: { movimientoContableId: movimientoContableCobro.id }
           })
@@ -1240,6 +1245,19 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         console.log(`[TakeAway] Integración con Ingresos completada para pedido ${pedido.numero}`)
       } catch (mcError) {
         console.error('Error creando MovimientoContable/Asientos TakeAway:', mcError)
+      }
+    }
+
+    // Si es un pedido de BARRA, eliminarlo después de cobrar
+    if (pedido.tipoVenta === 'BARRA') {
+      try {
+        await prisma.pedidoTakeAway.delete({
+          where: { id: parseInt(id) }
+        })
+        console.log(`[TakeAway] Pedido BARRA ${pedido.numero} eliminado después de cobrar`)
+      } catch (deleteErr) {
+        console.error('Error eliminando pedido BARRA:', deleteErr)
+        // No fallar el cobro si falla la eliminación
       }
     }
 

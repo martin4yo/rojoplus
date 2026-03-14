@@ -19,7 +19,7 @@ router.get('/presupuestos', authAdmin, asyncHandler(async (req, res) => {
   const where = {}
   if (anio) where.anio = parseInt(anio)
 
-  const presupuestos = await prisma.presupuesto.findMany({
+  const presupuestos = await req.db.presupuesto.findMany({
     where,
     orderBy: [
       { anio: 'desc' },
@@ -37,7 +37,7 @@ router.get('/presupuestos', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/presupuestos/anios - Listar años disponibles con sus versiones
 router.get('/presupuestos/anios', authAdmin, asyncHandler(async (req, res) => {
-  const presupuestos = await prisma.presupuesto.findMany({
+  const presupuestos = await req.db.presupuesto.findMany({
     orderBy: [
       { anio: 'desc' },
       { version: 'asc' }
@@ -74,7 +74,7 @@ router.get('/presupuestos/anios', authAdmin, asyncHandler(async (req, res) => {
 router.get('/presupuestos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) },
     include: {
       lineas: {
@@ -103,7 +103,7 @@ router.post('/presupuestos', authAdmin, asyncHandler(async (req, res) => {
   const { anio, nombre, observaciones } = req.body
 
   // Obtener la siguiente versión para ese año
-  const ultimaVersion = await prisma.presupuesto.findFirst({
+  const ultimaVersion = await req.db.presupuesto.findFirst({
     where: { anio: parseInt(anio) },
     orderBy: { version: 'desc' }
   })
@@ -111,7 +111,7 @@ router.post('/presupuestos', authAdmin, asyncHandler(async (req, res) => {
   const nuevaVersion = ultimaVersion ? ultimaVersion.version + 1 : 1
   const esPrimero = nuevaVersion === 1
 
-  const presupuesto = await prisma.presupuesto.create({
+  const presupuesto = await req.db.presupuesto.create({
     data: {
       anio: parseInt(anio),
       version: nuevaVersion,
@@ -130,7 +130,7 @@ router.put('/presupuestos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { nombre, observaciones, estado } = req.body
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -148,7 +148,7 @@ router.put('/presupuestos/:id', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  const actualizado = await prisma.presupuesto.update({
+  const actualizado = await req.db.presupuesto.update({
     where: { id: parseInt(id) },
     data: updateData
   })
@@ -160,7 +160,7 @@ router.put('/presupuestos/:id', authAdmin, asyncHandler(async (req, res) => {
 router.post('/presupuestos/:id/set-principal', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -170,11 +170,11 @@ router.post('/presupuestos/:id/set-principal', authAdmin, asyncHandler(async (re
 
   // Quitar principal de otras versiones del mismo año y establecer esta
   await prisma.$transaction([
-    prisma.presupuesto.updateMany({
+    req.db.presupuesto.updateMany({
       where: { anio: presupuesto.anio },
       data: { esPrincipal: false }
     }),
-    prisma.presupuesto.update({
+    req.db.presupuesto.update({
       where: { id: parseInt(id) },
       data: { esPrincipal: true }
     })
@@ -187,7 +187,7 @@ router.post('/presupuestos/:id/set-principal', authAdmin, asyncHandler(async (re
 router.delete('/presupuestos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -199,7 +199,7 @@ router.delete('/presupuestos/:id', authAdmin, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Solo se pueden eliminar presupuestos en estado BORRADOR' })
   }
 
-  await prisma.presupuesto.delete({
+  await req.db.presupuesto.delete({
     where: { id: parseInt(id) }
   })
 
@@ -215,7 +215,7 @@ router.post('/presupuestos/:id/lineas', authAdmin, asyncHandler(async (req, res)
   const { id } = req.params
   const { cuentaContableId, conceptoId, mes, montoPresupuestado, observaciones } = req.body
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -282,7 +282,7 @@ router.post('/presupuestos/:id/lineas/bulk', authAdmin, asyncHandler(async (req,
   const { id } = req.params
   const { lineas } = req.body
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -350,7 +350,7 @@ router.post('/presupuestos/:id/lineas/bulk', authAdmin, asyncHandler(async (req,
 router.delete('/presupuestos/:presupuestoId/lineas/:lineaId', authAdmin, asyncHandler(async (req, res) => {
   const { presupuestoId, lineaId } = req.params
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(presupuestoId) }
   })
 
@@ -381,7 +381,7 @@ router.delete('/presupuestos/:presupuestoId/lineas/:lineaId', authAdmin, asyncHa
 router.get('/presupuestos/:id/ejecucion', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) },
     include: {
       lineas: {
@@ -419,7 +419,7 @@ router.get('/presupuestos/:id/ejecucion', authAdmin, asyncHandler(async (req, re
   }
 
   // Obtener todos los asientos del año que involucren esas cuentas
-  const asientoLineas = await prisma.asientoLinea.findMany({
+  const asientoLineas = await req.db.asientoLinea.findMany({
     where: {
       cuentaContableId: { in: Array.from(cuentasIds) },
       asiento: {
@@ -511,7 +511,7 @@ router.get('/presupuestos/:id/ejecucion', authAdmin, asyncHandler(async (req, re
 router.get('/presupuestos/:id/resumen', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const presupuesto = await prisma.presupuesto.findUnique({
+  const presupuesto = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) },
     include: {
       lineas: {
@@ -579,7 +579,7 @@ router.post('/presupuestos/:id/copiar', authAdmin, asyncHandler(async (req, res)
   const { id } = req.params
   const { anioDestino, porcentajeAjuste = 0, nombre } = req.body
 
-  const presupuestoOrigen = await prisma.presupuesto.findUnique({
+  const presupuestoOrigen = await req.db.presupuesto.findUnique({
     where: { id: parseInt(id) },
     include: { lineas: true }
   })
@@ -591,7 +591,7 @@ router.post('/presupuestos/:id/copiar', authAdmin, asyncHandler(async (req, res)
   const anioFinal = anioDestino ? parseInt(anioDestino) : presupuestoOrigen.anio
 
   // Obtener la siguiente versión para el año destino
-  const ultimaVersion = await prisma.presupuesto.findFirst({
+  const ultimaVersion = await req.db.presupuesto.findFirst({
     where: { anio: anioFinal },
     orderBy: { version: 'desc' }
   })
@@ -601,7 +601,7 @@ router.post('/presupuestos/:id/copiar', authAdmin, asyncHandler(async (req, res)
   // Crear nuevo presupuesto con lineas ajustadas
   const factorAjuste = 1 + (parseFloat(porcentajeAjuste) / 100)
 
-  const nuevoPresupuesto = await prisma.presupuesto.create({
+  const nuevoPresupuesto = await req.db.presupuesto.create({
     data: {
       anio: anioFinal,
       version: nuevaVersion,

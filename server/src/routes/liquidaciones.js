@@ -555,7 +555,7 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
 
     // Generar asiento contable (fuera de la transacción para no fallar el pago si hay error)
     try {
-      const caja = await prisma.caja.findUnique({
+      const caja = await req.db.caja.findUnique({
         where: { id: parseInt(cajaId) },
         include: { cuentaContable: true }
       })
@@ -629,7 +629,7 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
       return res.status(400).json({ error: 'No hay items pendientes de pago' })
     }
 
-    const cuentaContable = await prisma.cuentaContable.findFirst({
+    const cuentaContable = await req.db.cuentaContable.findFirst({
       where: { activo: true }
     })
 

@@ -28,7 +28,7 @@ router.use(authAdmin)
  * Permitido para quienes pueden cobrar en buffet/kiosco o configurar facturación
  */
 router.get('/config', checkPermiso('FACTURACION_CONFIG', 'BUFFET_COBRAR', 'BUFFET_KIOSCO', 'COBRANZAS_COBRAR'), asyncHandler(async (req, res) => {
-  const config = await prisma.configuracionFiscal.findFirst({
+  const config = await req.db.configuracionFiscal.findFirst({
     where: { activo: true }
   })
 
@@ -63,13 +63,13 @@ router.put('/config', checkPermiso('FACTURACION_CONFIG'), asyncHandler(async (re
   }
 
   // Buscar configuración existente
-  const existente = await prisma.configuracionFiscal.findFirst({
+  const existente = await req.db.configuracionFiscal.findFirst({
     where: { activo: true }
   })
 
   let config
   if (existente) {
-    config = await prisma.configuracionFiscal.update({
+    config = await req.db.configuracionFiscal.update({
       where: { id: existente.id },
       data: {
         cuit,
@@ -82,7 +82,7 @@ router.put('/config', checkPermiso('FACTURACION_CONFIG'), asyncHandler(async (re
       }
     })
   } else {
-    config = await prisma.configuracionFiscal.create({
+    config = await req.db.configuracionFiscal.create({
       data: {
         cuit,
         razonSocial,
@@ -110,7 +110,7 @@ router.post('/config/certificado', checkPermiso('FACTURACION_CONFIG'), asyncHand
     throw new AppError('Certificado y clave privada son requeridos', 400)
   }
 
-  const config = await prisma.configuracionFiscal.findFirst({
+  const config = await req.db.configuracionFiscal.findFirst({
     where: { activo: true }
   })
 
@@ -130,7 +130,7 @@ router.post('/config/certificado', checkPermiso('FACTURACION_CONFIG'), asyncHand
   await fs.writeFile(keyPath, clavePrivada)
 
   // Actualizar paths en la configuración
-  await prisma.configuracionFiscal.update({
+  await req.db.configuracionFiscal.update({
     where: { id: config.id },
     data: {
       certificadoPath: certPath,
@@ -162,7 +162,7 @@ router.post('/test-conexion', checkPermiso('FACTURACION_CONFIG'), async (req, re
     // Paso 1: Verificar configuración
     pasos.push({ paso: 'Verificar configuración fiscal', estado: 'ejecutando' })
 
-    const config = await prisma.configuracionFiscal.findFirst({
+    const config = await req.db.configuracionFiscal.findFirst({
       where: { activo: true }
     })
 

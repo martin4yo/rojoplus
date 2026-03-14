@@ -15,7 +15,7 @@ export async function generarNumeroComanda() {
   const hoy = new Date()
   const prefijo = `C${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, '0')}${String(hoy.getDate()).padStart(2, '0')}`
 
-  const ultima = await prisma.comanda.findFirst({
+  const ultima = await req.db.comanda.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -82,13 +82,13 @@ export async function generarNumeroMC() {
  * Recalcula subtotal y total de una comanda
  */
 export async function recalcularTotalesComanda(comandaId) {
-  const items = await prisma.itemComanda.findMany({
+  const items = await req.db.itemComanda.findMany({
     where: { comandaId, estado: { not: 'ANULADO' } }
   })
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0)
 
-  await prisma.comanda.update({
+  await req.db.comanda.update({
     where: { id: comandaId },
     data: { subtotal, total: subtotal }
   })

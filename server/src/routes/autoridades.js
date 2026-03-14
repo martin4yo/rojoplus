@@ -11,7 +11,7 @@ const router = express.Router()
 // GET /api/public/autoridades - Listado público de autoridades
 router.get('/public', async (req, res) => {
   try {
-    const autoridades = await prisma.autoridad.findMany({
+    const autoridades = await req.db.autoridad.findMany({
       where: { activo: true },
       orderBy: [
         { seccion: 'asc' },
@@ -20,7 +20,7 @@ router.get('/public', async (req, res) => {
     })
 
     // Obtener período de la configuración
-    const configPeriodo = await prisma.configuracion.findUnique({
+    const configPeriodo = await req.db.configuracion.findUnique({
       where: { clave: 'PERIODO_COMISION_DIRECTIVA' }
     })
 
@@ -47,7 +47,7 @@ router.get('/public', async (req, res) => {
 // GET /api/admin/autoridades/config/periodo - Obtener período
 router.get('/config/periodo', authAdmin, async (req, res) => {
   try {
-    const config = await prisma.configuracion.findUnique({
+    const config = await req.db.configuracion.findUnique({
       where: { clave: 'PERIODO_COMISION_DIRECTIVA' }
     })
     res.json({ success: true, data: { periodo: config?.valor || 'Período 2024 - 2026' } })
@@ -62,7 +62,7 @@ router.put('/config/periodo', authAdmin, async (req, res) => {
   try {
     const { periodo } = req.body
 
-    await prisma.configuracion.upsert({
+    await req.db.configuracion.upsert({
       where: { clave: 'PERIODO_COMISION_DIRECTIVA' },
       update: { valor: periodo },
       create: { clave: 'PERIODO_COMISION_DIRECTIVA', valor: periodo, descripcion: 'Período de la Comisión Directiva' }
@@ -83,7 +83,7 @@ router.get('/', authAdmin, async (req, res) => {
     const where = {}
     if (seccion) where.seccion = seccion
 
-    const autoridades = await prisma.autoridad.findMany({
+    const autoridades = await req.db.autoridad.findMany({
       where,
       orderBy: [
         { seccion: 'asc' },
@@ -103,7 +103,7 @@ router.get('/:id', authAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
-    const autoridad = await prisma.autoridad.findUnique({
+    const autoridad = await req.db.autoridad.findUnique({
       where: { id: parseInt(id) }
     })
 
@@ -143,14 +143,14 @@ router.post('/', authAdmin, async (req, res) => {
     // Obtener el máximo orden para la sección si no se especifica
     let ordenFinal = orden
     if (ordenFinal === undefined || ordenFinal === null) {
-      const maxOrden = await prisma.autoridad.aggregate({
+      const maxOrden = await req.db.autoridad.aggregate({
         where: { seccion },
         _max: { orden: true }
       })
       ordenFinal = (maxOrden._max.orden || 0) + 1
     }
 
-    const autoridad = await prisma.autoridad.create({
+    const autoridad = await req.db.autoridad.create({
       data: {
         seccion,
         cargo: cargo || null,
@@ -193,7 +193,7 @@ router.put('/:id', authAdmin, async (req, res) => {
       activo
     } = req.body
 
-    const autoridad = await prisma.autoridad.update({
+    const autoridad = await req.db.autoridad.update({
       where: { id: parseInt(id) },
       data: {
         seccion,
@@ -223,7 +223,7 @@ router.delete('/:id', authAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
-    await prisma.autoridad.delete({
+    await req.db.autoridad.delete({
       where: { id: parseInt(id) }
     })
 
@@ -245,7 +245,7 @@ router.put('/reordenar/batch', authAdmin, async (req, res) => {
 
     // Actualizar orden de cada item
     for (const item of items) {
-      await prisma.autoridad.update({
+      await req.db.autoridad.update({
         where: { id: item.id },
         data: { orden: item.orden }
       })
@@ -262,7 +262,7 @@ router.put('/reordenar/batch', authAdmin, async (req, res) => {
 router.post('/seed', authAdmin, async (req, res) => {
   try {
     // Verificar si ya hay datos
-    const count = await prisma.autoridad.count()
+    const count = await req.db.autoridad.count()
     if (count > 0) {
       return res.status(400).json({ error: 'Ya existen autoridades cargadas. Elimínelas primero si desea reiniciar.' })
     }
@@ -298,7 +298,7 @@ router.post('/seed', authAdmin, async (req, res) => {
     ]
 
     // Insertar todos
-    await prisma.autoridad.createMany({
+    await req.db.autoridad.createMany({
       data: datosIniciales.map(d => ({
         ...d,
         activo: true

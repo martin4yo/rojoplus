@@ -363,7 +363,7 @@ export default function ConfiguracionForm() {
                 className="rounded border-gray-300"
               />
               <label htmlFor="permiteDescuentos" className="text-sm text-green-800">
-                Permite usar descuentos en comercios (RojoPlus)
+                Permite usar descuentos en comercios (Clubix)
               </label>
             </div>
           )}

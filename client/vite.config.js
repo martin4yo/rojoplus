@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['images/logo.png', 'images/icon-192.png', 'images/icon-512.png'],
       manifest: {
-        name: 'Rojo Plus - Club Sportivo Pilar',
-        short_name: 'Rojo Plus',
-        description: 'Portal de socios del Club Sportivo Pilar - Gestión de cuotas, actividades y beneficios',
+        name: 'Clubix - Gestión Inteligente',
+        short_name: 'Clubix',
+        description: 'Clubix - Gestión Inteligente - Administración de cuotas, actividades y beneficios',
         theme_color: '#DC2626',
         background_color: '#F9FAFB',
         display: 'standalone',

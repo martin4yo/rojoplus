@@ -294,7 +294,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
 
   // Validar socio si se proporciona
   if (socioId) {
-    const socio = await prisma.socio.findUnique({ where: { id: parseInt(socioId) } })
+    const socio = await req.db.socio.findUnique({ where: { id: parseInt(socioId) } })
     if (!socio) {
       throw new AppError('Socio no encontrado', 404)
     }
@@ -306,7 +306,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
     if (!cajaId) {
       throw new AppError('Se requiere una caja para pagos y cobros', 400)
     }
-    const caja = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+    const caja = await req.db.caja.findUnique({ where: { id: parseInt(cajaId) } })
     if (!caja) {
       throw new AppError('Caja no encontrada', 404)
     }
@@ -545,7 +545,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
       }).catch(err => console.error('Error generando asiento factura venta:', err))
     } else if (tipo === 'ORDEN_PAGO') {
       const caja = resultado.caja
-        ? await prisma.caja.findUnique({
+        ? await req.db.caja.findUnique({
             where: { id: resultado.caja.id },
             include: { cuentaContable: true }
           })
@@ -557,7 +557,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
       }).catch(err => console.error('Error generando asiento orden pago:', err))
     } else if (tipo === 'RECIBO_COBRO') {
       const caja = resultado.caja
-        ? await prisma.caja.findUnique({
+        ? await req.db.caja.findUnique({
             where: { id: resultado.caja.id },
             include: { cuentaContable: true }
           })
@@ -940,7 +940,7 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
     if (!pago.cajaId) {
       throw new AppError('Cada pago debe tener una caja asignada', 400)
     }
-    const caja = await prisma.caja.findUnique({
+    const caja = await req.db.caja.findUnique({
       where: { id: parseInt(pago.cajaId) },
       include: { cuentaContable: true }
     })
@@ -1155,7 +1155,7 @@ router.post('/recibos-cobro', asyncHandler(async (req, res) => {
   }
 
   // Verificar caja
-  const caja = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+  const caja = await req.db.caja.findUnique({ where: { id: parseInt(cajaId) } })
   if (!caja) {
     throw new AppError('Caja no encontrada', 404)
   }
@@ -1276,7 +1276,7 @@ router.post('/recibos-cobro', asyncHandler(async (req, res) => {
   })
 
   // Generar asiento contable automático para el recibo de cobro
-  const cajaConCuenta = await prisma.caja.findUnique({
+  const cajaConCuenta = await req.db.caja.findUnique({
     where: { id: parseInt(cajaId) },
     include: { cuentaContable: true }
   })

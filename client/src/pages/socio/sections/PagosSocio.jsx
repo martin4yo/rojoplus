@@ -830,7 +830,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
 
       {ModalComponent}
 
-      {/* ROJO IA - Chat Widget */}
+      {/* Xavi - Chat Widget */}
       <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
     </div>
   )

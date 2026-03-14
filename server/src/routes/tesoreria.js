@@ -38,7 +38,7 @@ router.get('/cajas', asyncHandler(async (req, res) => {
     where.id = { in: cajasPermitidas }
   }
 
-  const cajas = await prisma.caja.findMany({
+  const cajas = await req.db.caja.findMany({
     where,
     include: { centroCosto: true },
     orderBy: { nombre: 'asc' }
@@ -47,12 +47,12 @@ router.get('/cajas', asyncHandler(async (req, res) => {
   // Calcular saldo real desde movimientos para cada caja
   const cajasConSaldo = await Promise.all(cajas.map(async (caja) => {
     // Sumar ingresos
-    const ingresos = await prisma.movimientoCaja.aggregate({
+    const ingresos = await req.db.movimientoCaja.aggregate({
       where: { cajaId: caja.id, tipo: 'INGRESO', anulado: false },
       _sum: { monto: true }
     })
     // Sumar egresos
-    const egresos = await prisma.movimientoCaja.aggregate({
+    const egresos = await req.db.movimientoCaja.aggregate({
       where: { cajaId: caja.id, tipo: 'EGRESO', anulado: false },
       _sum: { monto: true }
     })
@@ -92,7 +92,7 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
     }
   }
 
-  const caja = await prisma.caja.findUnique({
+  const caja = await req.db.caja.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -101,11 +101,11 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
   }
 
   // Calcular saldo real desde movimientos
-  const ingresos = await prisma.movimientoCaja.aggregate({
+  const ingresos = await req.db.movimientoCaja.aggregate({
     where: { cajaId: caja.id, tipo: 'INGRESO', anulado: false },
     _sum: { monto: true }
   })
-  const egresos = await prisma.movimientoCaja.aggregate({
+  const egresos = await req.db.movimientoCaja.aggregate({
     where: { cajaId: caja.id, tipo: 'EGRESO', anulado: false },
     _sum: { monto: true }
   })
@@ -137,12 +137,12 @@ router.post('/cajas', asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser EFECTIVO, BANCO, MERCADOPAGO, VALORES_PENDIENTES u OTRO', 400)
   }
 
-  const existente = await prisma.caja.findUnique({ where: { codigo } })
+  const existente = await req.db.caja.findUnique({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe una caja con ese codigo', 400)
   }
 
-  const caja = await prisma.caja.create({
+  const caja = await req.db.caja.create({
     data: {
       codigo,
       nombre,
@@ -180,14 +180,14 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
     puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja
   } = req.body
 
-  const existente = await prisma.caja.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.caja.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
     throw new AppError('Caja no encontrada', 404)
   }
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.caja.findUnique({ where: { codigo } })
+    const duplicado = await req.db.caja.findUnique({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe una caja con ese codigo', 400)
     }
@@ -227,7 +227,7 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
     }
   }
 
-  const caja = await prisma.caja.update({
+  const caja = await req.db.caja.update({
     where: { id: parseInt(id) },
     data: updateData
   })
@@ -247,7 +247,7 @@ async function generarNumeroMovimiento() {
   const anio = new Date().getFullYear()
   const prefijo = `MV-${anio}-`
 
-  const ultimo = await prisma.movimientoCaja.findFirst({
+  const ultimo = await req.db.movimientoCaja.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -303,7 +303,7 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [movimientos, total] = await Promise.all([
-    prisma.movimientoCaja.findMany({
+    req.db.movimientoCaja.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -319,7 +319,7 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
         }
       }
     }),
-    prisma.movimientoCaja.count({ where })
+    req.db.movimientoCaja.count({ where })
   ])
 
   const movimientosFormateados = movimientos.map(m => ({
@@ -343,7 +343,7 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
 router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const movimiento = await prisma.movimientoCaja.findUnique({
+  const movimiento = await req.db.movimientoCaja.findUnique({
     where: { id: parseInt(id) },
     include: {
       caja: true,
@@ -397,7 +397,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser INGRESO o EGRESO', 400)
   }
 
-  const caja = await prisma.caja.findUnique({
+  const caja = await req.db.caja.findUnique({
     where: { id: parseInt(cajaId) },
     include: { cuentaContable: true }
   })
@@ -429,7 +429,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
   }
 
   // Cargar cuenta contable
-  const cuentaContable = await prisma.cuentaContable.findUnique({
+  const cuentaContable = await req.db.cuentaContable.findUnique({
     where: { id: parseInt(cuentaContableId) }
   })
   if (!cuentaContable) {
@@ -495,7 +495,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
 router.post('/movimientos-caja/:id/anular', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const movimiento = await prisma.movimientoCaja.findUnique({
+  const movimiento = await req.db.movimientoCaja.findUnique({
     where: { id: parseInt(id) },
     include: { caja: true }
   })
@@ -705,8 +705,8 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
 
   // Verificar cajas
   const [cajaOrigen, cajaDestino] = await Promise.all([
-    prisma.caja.findUnique({ where: { id: parseInt(cajaOrigenId) }, include: { cuentaContable: true } }),
-    prisma.caja.findUnique({ where: { id: parseInt(cajaDestinoId) }, include: { cuentaContable: true } })
+    req.db.caja.findUnique({ where: { id: parseInt(cajaOrigenId) }, include: { cuentaContable: true } }),
+    req.db.caja.findUnique({ where: { id: parseInt(cajaDestinoId) }, include: { cuentaContable: true } })
   ])
 
   if (!cajaOrigen) {
@@ -903,7 +903,7 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { desde, hasta } = req.query
 
-  const caja = await prisma.caja.findUnique({
+  const caja = await req.db.caja.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -943,12 +943,12 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
 
   // Obtener totales por tipo
   const [ingresos, egresos] = await Promise.all([
-    prisma.movimientoCaja.aggregate({
+    req.db.movimientoCaja.aggregate({
       where: { ...whereMovimientos, tipo: 'INGRESO' },
       _sum: { monto: true },
       _count: true
     }),
-    prisma.movimientoCaja.aggregate({
+    req.db.movimientoCaja.aggregate({
       where: { ...whereMovimientos, tipo: 'EGRESO' },
       _sum: { monto: true },
       _count: true
@@ -956,7 +956,7 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
   ])
 
   // Ultimos movimientos
-  const ultimosMovimientos = await prisma.movimientoCaja.findMany({
+  const ultimosMovimientos = await req.db.movimientoCaja.findMany({
     where: whereMovimientos,
     orderBy: { fecha: 'desc' },
     take: 10,
@@ -1018,7 +1018,7 @@ router.get('/pendientes-conciliar', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [movimientos, total] = await Promise.all([
-    prisma.movimientoCaja.findMany({
+    req.db.movimientoCaja.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -1034,7 +1034,7 @@ router.get('/pendientes-conciliar', asyncHandler(async (req, res) => {
         }
       }
     }),
-    prisma.movimientoCaja.count({ where })
+    req.db.movimientoCaja.count({ where })
   ])
 
   const movimientosFormateados = movimientos.map(m => ({
@@ -1057,7 +1057,7 @@ router.get('/pendientes-conciliar', asyncHandler(async (req, res) => {
 // GET /api/admin/pendientes-conciliar/resumen - Resumen de valores pendientes
 router.get('/pendientes-conciliar/resumen', asyncHandler(async (req, res) => {
   // Obtener cajas que requieren conciliación
-  const cajas = await prisma.caja.findMany({
+  const cajas = await req.db.caja.findMany({
     where: {
       requiereConciliacion: true,
       activo: true
@@ -1067,7 +1067,7 @@ router.get('/pendientes-conciliar/resumen', asyncHandler(async (req, res) => {
   const resumenPorCaja = []
 
   for (const caja of cajas) {
-    const pendientes = await prisma.movimientoCaja.aggregate({
+    const pendientes = await req.db.movimientoCaja.aggregate({
       where: {
         cajaId: caja.id,
         conciliado: false,
@@ -1077,7 +1077,7 @@ router.get('/pendientes-conciliar/resumen', asyncHandler(async (req, res) => {
       _count: true
     })
 
-    const conciliados = await prisma.movimientoCaja.aggregate({
+    const conciliados = await req.db.movimientoCaja.aggregate({
       where: {
         cajaId: caja.id,
         conciliado: true,
@@ -1128,7 +1128,7 @@ router.post('/pendientes-conciliar/conciliar', asyncHandler(async (req, res) => 
   }
 
   // Verificar que todos los movimientos existen y están pendientes
-  const movimientos = await prisma.movimientoCaja.findMany({
+  const movimientos = await req.db.movimientoCaja.findMany({
     where: {
       id: { in: movimientoIds.map(id => parseInt(id)) },
       conciliado: false,
@@ -1150,7 +1150,7 @@ router.post('/pendientes-conciliar/conciliar', asyncHandler(async (req, res) => 
   }
 
   // Marcar como conciliados
-  await prisma.movimientoCaja.updateMany({
+  await req.db.movimientoCaja.updateMany({
     where: {
       id: { in: movimientoIds.map(id => parseInt(id)) }
     },
@@ -1182,7 +1182,7 @@ router.post('/pendientes-conciliar/transferir', asyncHandler(async (req, res) =>
   }
 
   // Obtener los movimientos conciliados
-  const movimientos = await prisma.movimientoCaja.findMany({
+  const movimientos = await req.db.movimientoCaja.findMany({
     where: {
       id: { in: movimientoIds.map(id => parseInt(id)) },
       cajaId: parseInt(cajaOrigenId),
@@ -1199,8 +1199,8 @@ router.post('/pendientes-conciliar/transferir', asyncHandler(async (req, res) =>
 
   // Verificar cajas
   const [cajaOrigen, cajaDestino] = await Promise.all([
-    prisma.caja.findUnique({ where: { id: parseInt(cajaOrigenId) } }),
-    prisma.caja.findUnique({ where: { id: parseInt(cajaDestinoId) } })
+    req.db.caja.findUnique({ where: { id: parseInt(cajaOrigenId) } }),
+    req.db.caja.findUnique({ where: { id: parseInt(cajaDestinoId) } })
   ])
 
   if (!cajaOrigen || !cajaDestino) {

@@ -257,7 +257,7 @@ router.post('/impresoras/:id/test', authAdmin, checkPermiso('BUFFET_CONFIG'), as
       0x1B, 0x40,              // Inicializar impresora
       0x1B, 0x61, 0x01,        // Centrar texto
       ...Buffer.from('TEST DE IMPRESION\n'),
-      ...Buffer.from('RojoPlus Print Agent\n'),
+      ...Buffer.from('Clubix Print Agent\n'),
       ...Buffer.from('===================\n'),
       0x1B, 0x61, 0x00,        // Alinear a la izquierda
       ...Buffer.from(`Impresora: ${impresora.nombre}\n`),
@@ -291,7 +291,7 @@ router.post('/impresoras/:id/test', authAdmin, checkPermiso('BUFFET_CONFIG'), as
 router.get('/impresoras-tickets', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_KIOSCO'), async (req, res) => {
   try {
     // Obtener configuración de impresoras
-    const configs = await prisma.configuracion.findMany({
+    const configs = await req.db.configuracion.findMany({
       where: {
         clave: {
           in: ['BUFFET_IMPRESORA_TICKETS', 'BUFFET_IMPRESORA_KIOSCO', 'BUFFET_IMPRESORA_TAKEAWAY']
@@ -589,7 +589,7 @@ router.post('/imprimir-ticket-directo', authAdmin, checkPermiso('BUFFET_COBRAR',
       configKey = 'BUFFET_IMPRESORA_TAKEAWAY'
     }
 
-    const config = await prisma.configuracion.findUnique({
+    const config = await req.db.configuracion.findUnique({
       where: { clave: configKey }
     })
 

@@ -1,7 +1,7 @@
 {
-  "name": "RojoPlus - Control de Accesos",
-  "short_name": "RojoPlus Accesos",
-  "description": "Sistema de control de accesos para Club Sportivo Pilar",
+  "name": "Clubix - Gestión Inteligente",
+  "short_name": "Clubix",
+  "description": "Clubix - Gestión Inteligente",
   "start_url": "/admin/accesos/control-pwa",
   "display": "standalone",
   "background_color": "#111827",

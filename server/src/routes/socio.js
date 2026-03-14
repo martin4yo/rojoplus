@@ -19,7 +19,7 @@ router.post('/enviar-qr', asyncHandler(async (req, res) => {
     throw new AppError('Ingresa tu número de socio o DNI', 400, 'VALIDATION_ERROR')
   }
 
-  const socio = await req.prisma.socio.findFirst({
+  const socio = await req.req.db.socio.findFirst({
     where: {
       OR: [
         { nroSocio: busqueda.trim() },
@@ -100,7 +100,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
     ? { email: valor.trim().toLowerCase() }
     : { documento: valor.trim() }
 
-  const socio = await req.prisma.socio.findFirst({
+  const socio = await req.req.db.socio.findFirst({
     where,
     select: {
       id: true,
@@ -134,7 +134,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   expiracion.setHours(expiracion.getHours() + 24)
 
   // Guardar token en BD (usaremos tokenPortal + tokenPortalExpira)
-  await req.prisma.socio.update({
+  await req.req.db.socio.update({
     where: { id: socio.id },
     data: {
       tokenPortal: token,
@@ -155,7 +155,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
 router.get('/validar-token/:token', asyncHandler(async (req, res) => {
   const { token } = req.params
 
-  const socio = await req.prisma.socio.findFirst({
+  const socio = await req.req.db.socio.findFirst({
     where: {
       tokenPortal: token,
     },
@@ -223,7 +223,7 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
     select: {
       id: true,
@@ -313,7 +313,7 @@ router.put('/:tokenPortal/perfil', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
   const { email, celular, domicilio, ciudad, provincia } = req.body
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -322,7 +322,7 @@ router.put('/:tokenPortal/perfil', asyncHandler(async (req, res) => {
   }
 
   // Actualizar datos permitidos
-  const updated = await req.prisma.socio.update({
+  const updated = await req.req.db.socio.update({
     where: { id: socio.id },
     data: {
       email: email?.trim().toLowerCase(),
@@ -358,7 +358,7 @@ router.put('/:tokenPortal/perfil', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -366,7 +366,7 @@ router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const inscripciones = await req.prisma.inscripcion.findMany({
+  const inscripciones = await req.req.db.inscripcion.findMany({
     where: {
       socioId: socio.id,
       estado: 'ACTIVA',
@@ -427,7 +427,7 @@ router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -436,7 +436,7 @@ router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res
   }
 
   // Obtener IDs de categorías en las que ya está inscripto
-  const inscripciones = await req.prisma.inscripcion.findMany({
+  const inscripciones = await req.req.db.inscripcion.findMany({
     where: {
       socioId: socio.id,
       estado: 'ACTIVA',
@@ -459,7 +459,7 @@ router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res
         { cupoMaximo: null },
         {
           cupoMaximo: {
-            gt: await req.prisma.inscripcion.count({
+            gt: await req.req.db.inscripcion.count({
               where: {
                 categoriaActividadId: { in: undefined }, // Se calculará por categoría
                 estado: 'ACTIVA',
@@ -532,7 +532,7 @@ router.post('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
   const { categoriaActividadId } = req.body
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -564,7 +564,7 @@ router.post('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
   }
 
   // Verificar que no esté ya inscripto
-  const inscripcionExistente = await req.prisma.inscripcion.findFirst({
+  const inscripcionExistente = await req.req.db.inscripcion.findFirst({
     where: {
       socioId: socio.id,
       categoriaActividadId: parseInt(categoriaActividadId),
@@ -577,7 +577,7 @@ router.post('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
   }
 
   // Crear inscripción
-  const inscripcion = await req.prisma.inscripcion.create({
+  const inscripcion = await req.req.db.inscripcion.create({
     data: {
       socioId: socio.id,
       categoriaActividadId: parseInt(categoriaActividadId),
@@ -605,7 +605,7 @@ router.post('/:tokenPortal/inscripciones/:id/baja', asyncHandler(async (req, res
   const { tokenPortal, id } = req.params
   const { motivo } = req.body
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -613,7 +613,7 @@ router.post('/:tokenPortal/inscripciones/:id/baja', asyncHandler(async (req, res
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const inscripcion = await req.prisma.inscripcion.findFirst({
+  const inscripcion = await req.req.db.inscripcion.findFirst({
     where: {
       id: parseInt(id),
       socioId: socio.id,
@@ -626,7 +626,7 @@ router.post('/:tokenPortal/inscripciones/:id/baja', asyncHandler(async (req, res
   }
 
   // Dar de baja
-  await req.prisma.inscripcion.update({
+  await req.req.db.inscripcion.update({
     where: { id: inscripcion.id },
     data: {
       estado: 'BAJA',
@@ -649,7 +649,7 @@ router.post('/:tokenPortal/inscripciones/:id/baja', asyncHandler(async (req, res
 router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -658,7 +658,7 @@ router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
   }
 
   // Contar cuotas pendientes
-  const cuotasPendientes = await req.prisma.cargo.count({
+  const cuotasPendientes = await req.req.db.cargo.count({
     where: {
       socioId: socio.id,
       estado: {
@@ -668,7 +668,7 @@ router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
   })
 
   // Calcular monto total pendiente
-  const cargos = await req.prisma.cargo.findMany({
+  const cargos = await req.req.db.cargo.findMany({
     where: {
       socioId: socio.id,
       estado: {
@@ -680,7 +680,7 @@ router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
   const montoPendiente = cargos.reduce((sum, c) => sum + parseFloat(c.montoTotal), 0)
 
   // Contar actividades activas
-  const actividadesActivas = await req.prisma.inscripcion.count({
+  const actividadesActivas = await req.req.db.inscripcion.count({
     where: {
       socioId: socio.id,
       estado: 'ACTIVA',
@@ -701,7 +701,7 @@ router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/proximos-eventos', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -710,7 +710,7 @@ router.get('/:tokenPortal/proximos-eventos', asyncHandler(async (req, res) => {
   }
 
   // Obtener inscripciones activas del socio
-  const inscripciones = await req.prisma.inscripcion.findMany({
+  const inscripciones = await req.req.db.inscripcion.findMany({
     where: {
       socioId: socio.id,
       estado: 'ACTIVA',
@@ -743,7 +743,7 @@ router.get('/:tokenPortal/proximos-eventos', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/cuotas/pendientes', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -751,7 +751,7 @@ router.get('/:tokenPortal/cuotas/pendientes', asyncHandler(async (req, res) => {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const cargos = await req.prisma.cargo.findMany({
+  const cargos = await req.req.db.cargo.findMany({
     where: {
       socioId: socio.id,
       estado: {
@@ -802,7 +802,7 @@ router.get('/:tokenPortal/cuotas/pendientes', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/pagos/historial', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -810,7 +810,7 @@ router.get('/:tokenPortal/pagos/historial', asyncHandler(async (req, res) => {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const pagos = await req.prisma.pago.findMany({
+  const pagos = await req.req.db.pago.findMany({
     where: {
       socioId: socio.id,
       estado: 'CONFIRMADO',
@@ -860,7 +860,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
   const { tokenPortal, cuotaId } = req.params
   const { metodoPago } = req.body // 'MERCADOPAGO' | 'MODO'
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -868,7 +868,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const cargo = await req.prisma.cargo.findFirst({
+  const cargo = await req.req.db.cargo.findFirst({
     where: {
       id: parseInt(cuotaId),
       socioId: socio.id,
@@ -950,7 +950,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
   const { tokenPortal } = req.params
   const { cuotasIds, metodoPago } = req.body
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -962,7 +962,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
     throw new AppError('Debe seleccionar al menos una cuota', 400, 'NO_CUOTAS')
   }
 
-  const cargos = await req.prisma.cargo.findMany({
+  const cargos = await req.req.db.cargo.findMany({
     where: {
       id: {
         in: cuotasIds.map(id => parseInt(id)),
@@ -1066,7 +1066,7 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
   const { token } = req.params
   const { incluirFamilia } = req.query
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal: token },
     select: {
       id: true,
@@ -1088,7 +1088,7 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
   }
 
   // Obtener cargos
-  const cargos = await req.prisma.cargo.findMany({
+  const cargos = await req.req.db.cargo.findMany({
     where: { socioId: { in: socioIds } },
     include: {
       periodo: { select: { nombre: true, mes: true, anio: true } },
@@ -1100,7 +1100,7 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
   })
 
   // Obtener pagos
-  const pagos = await req.prisma.pago.findMany({
+  const pagos = await req.req.db.pago.findMany({
     where: { socioId: { in: socioIds } },
     include: {
       socio: { select: { nroSocio: true, apellidoNombre: true } },
@@ -1194,7 +1194,7 @@ router.get('/:token/config-pagos', asyncHandler(async (req, res) => {
   const { token } = req.params
 
   // Validar socio
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal: token },
     select: { id: true },
   })
@@ -1204,7 +1204,7 @@ router.get('/:token/config-pagos', asyncHandler(async (req, res) => {
   }
 
   // Obtener configuración de pagos
-  const configs = await req.prisma.configuracion.findMany({
+  const configs = await req.req.db.configuracion.findMany({
     where: {
       clave: {
         in: ['PAGO_CBU', 'PAGO_ALIAS', 'PAGO_TELEFONO', 'PAGO_TITULAR'],
@@ -1241,7 +1241,7 @@ router.post('/:token/informar-pago', asyncHandler(async (req, res) => {
   const { cuotasIds, monto, comprobante, comprobanteOriginal, observaciones } = req.body
 
   // Validar socio
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal: token },
     select: { id: true, nroSocio: true, apellidoNombre: true },
   })
@@ -1288,7 +1288,7 @@ router.post('/:token/informar-pago', asyncHandler(async (req, res) => {
   }
 
   // Crear registro de pago informado
-  const pagoInformado = await req.prisma.pagoInformado.create({
+  const pagoInformado = await req.req.db.pagoInformado.create({
     data: {
       socioId: socio.id,
       cuotasIds: JSON.stringify(cuotasIds),
@@ -1313,7 +1313,7 @@ router.get('/:tokenPortal/pagos/:pagoId/pdf', asyncHandler(async (req, res) => {
   const { tokenPortal, pagoId } = req.params
 
   // Verificar socio
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -1322,7 +1322,7 @@ router.get('/:tokenPortal/pagos/:pagoId/pdf', asyncHandler(async (req, res) => {
   }
 
   // Buscar el pago
-  const pago = await req.prisma.pago.findFirst({
+  const pago = await req.req.db.pago.findFirst({
     where: {
       id: parseInt(pagoId),
       socioId: socio.id,
@@ -1347,7 +1347,7 @@ router.get('/:tokenPortal/pagos/:pagoId/pdf', asyncHandler(async (req, res) => {
   }
 
   // Obtener configuración del club
-  const configs = await req.prisma.configuracion.findMany({
+  const configs = await req.req.db.configuracion.findMany({
     where: {
       clave: {
         in: ['CLUB_NOMBRE', 'CLUB_DIRECCION', 'CLUB_TELEFONO', 'CLUB_EMAIL', 'CLUB_LEMA'],
@@ -1398,7 +1398,7 @@ router.get('/:tokenPortal/cuenta-corriente', asyncHandler(async (req, res) => {
   const { desde, hasta, limite = 100 } = req.query
 
   // Verificar socio
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -1416,7 +1416,7 @@ router.get('/:tokenPortal/cuenta-corriente', asyncHandler(async (req, res) => {
   }
 
   // Obtener cargos (débitos)
-  const cargos = await req.prisma.cargo.findMany({
+  const cargos = await req.req.db.cargo.findMany({
     where: {
       socioId: socio.id,
       ...(desde || hasta ? { fechaGeneracion: filtroFecha } : {}),
@@ -1437,7 +1437,7 @@ router.get('/:tokenPortal/cuenta-corriente', asyncHandler(async (req, res) => {
   })
 
   // Obtener pagos (créditos)
-  const pagos = await req.prisma.pago.findMany({
+  const pagos = await req.req.db.pago.findMany({
     where: {
       socioId: socio.id,
       estado: 'CONFIRMADO',
@@ -1541,7 +1541,7 @@ router.get('/:tokenPortal/cuenta-corriente', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/debito-automatico', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
     select: {
       id: true,
@@ -1633,7 +1633,7 @@ router.post('/:tokenPortal/debito-automatico/solicitar', asyncHandler(async (req
     }
   }
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -1682,7 +1682,7 @@ router.post('/:tokenPortal/debito-automatico/solicitar', asyncHandler(async (req
   }
 
   // Actualizar socio con datos de débito
-  await req.prisma.socio.update({
+  await req.req.db.socio.update({
     where: { id: socio.id },
     data: updateData,
   })
@@ -1713,7 +1713,7 @@ router.post('/:tokenPortal/debito-automatico/baja', asyncHandler(async (req, res
   const { tokenPortal } = req.params
   const { motivo } = req.body
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal },
   })
 
@@ -1726,7 +1726,7 @@ router.post('/:tokenPortal/debito-automatico/baja', asyncHandler(async (req, res
   }
 
   // Marcar como baja pendiente (el admin debe confirmar)
-  await req.prisma.socio.update({
+  await req.req.db.socio.update({
     where: { id: socio.id },
     data: {
       enviaDebito: false,
@@ -1761,7 +1761,7 @@ router.post('/:tokenPortal/debito-automatico/baja', asyncHandler(async (req, res
 router.get('/:token/conversaciones', asyncHandler(async (req, res) => {
   const { token } = req.params
 
-  const socio = await req.prisma.socio.findFirst({
+  const socio = await req.req.db.socio.findFirst({
     where: { tokenPortal: token }
   })
 
@@ -1769,7 +1769,7 @@ router.get('/:token/conversaciones', asyncHandler(async (req, res) => {
     throw new AppError('Token inválido', 401)
   }
 
-  const conversaciones = await req.prisma.conversacion.findMany({
+  const conversaciones = await req.req.db.conversacion.findMany({
     where: {
       socioId: socio.id,
       estado: { not: 'CERRADA' }
@@ -1832,7 +1832,7 @@ router.post('/:token/conversaciones', asyncHandler(async (req, res) => {
   const { token } = req.params
   const { entrenadorId, categoriaActividadId, asunto, mensaje } = req.body
 
-  const socio = await req.prisma.socio.findFirst({
+  const socio = await req.req.db.socio.findFirst({
     where: { tokenPortal: token }
   })
 
@@ -1845,7 +1845,7 @@ router.post('/:token/conversaciones', asyncHandler(async (req, res) => {
   }
 
   // Verificar que el entrenador existe
-  const entrenador = await req.prisma.entrenador.findUnique({
+  const entrenador = await req.req.db.entrenador.findUnique({
     where: { id: parseInt(entrenadorId) }
   })
 
@@ -1854,7 +1854,7 @@ router.post('/:token/conversaciones', asyncHandler(async (req, res) => {
   }
 
   // Verificar si ya existe una conversación con este entrenador
-  let conversacion = await req.prisma.conversacion.findFirst({
+  let conversacion = await req.req.db.conversacion.findFirst({
     where: {
       socioId: socio.id,
       entrenadorId: parseInt(entrenadorId),
@@ -1865,7 +1865,7 @@ router.post('/:token/conversaciones', asyncHandler(async (req, res) => {
 
   // Si no existe, crear nueva conversación
   if (!conversacion) {
-    conversacion = await req.prisma.conversacion.create({
+    conversacion = await req.req.db.conversacion.create({
       data: {
         socioId: socio.id,
         entrenadorId: parseInt(entrenadorId),
@@ -1877,7 +1877,7 @@ router.post('/:token/conversaciones', asyncHandler(async (req, res) => {
   }
 
   // Crear el primer mensaje
-  const nuevoMensaje = await req.prisma.mensaje.create({
+  const nuevoMensaje = await req.req.db.mensaje.create({
     data: {
       conversacionId: conversacion.id,
       emisorTipo: 'SOCIO',
@@ -1887,7 +1887,7 @@ router.post('/:token/conversaciones', asyncHandler(async (req, res) => {
   })
 
   // Actualizar timestamp de la conversación
-  await req.prisma.conversacion.update({
+  await req.req.db.conversacion.update({
     where: { id: conversacion.id },
     data: { ultimoMensaje: new Date() }
   })
@@ -1908,7 +1908,7 @@ router.post('/:token/conversaciones', asyncHandler(async (req, res) => {
 router.get('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res) => {
   const { token, id } = req.params
 
-  const socio = await req.prisma.socio.findFirst({
+  const socio = await req.req.db.socio.findFirst({
     where: { tokenPortal: token }
   })
 
@@ -1917,7 +1917,7 @@ router.get('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res) 
   }
 
   // Verificar que la conversación pertenece al socio
-  const conversacion = await req.prisma.conversacion.findFirst({
+  const conversacion = await req.req.db.conversacion.findFirst({
     where: {
       id: parseInt(id),
       socioId: socio.id
@@ -1944,13 +1944,13 @@ router.get('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res) 
   }
 
   // Obtener mensajes
-  const mensajes = await req.prisma.mensaje.findMany({
+  const mensajes = await req.req.db.mensaje.findMany({
     where: { conversacionId: parseInt(id) },
     orderBy: { createdAt: 'asc' }
   })
 
   // Marcar como leídos los mensajes del entrenador
-  await req.prisma.mensaje.updateMany({
+  await req.req.db.mensaje.updateMany({
     where: {
       conversacionId: parseInt(id),
       emisorTipo: 'ENTRENADOR',
@@ -1963,7 +1963,7 @@ router.get('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res) 
   })
 
   // Resetear contador de no leídos
-  await req.prisma.conversacion.update({
+  await req.req.db.conversacion.update({
     where: { id: parseInt(id) },
     data: { mensajesNoLeidos: 0 }
   })
@@ -1998,7 +1998,7 @@ router.post('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res)
   const { token, id } = req.params
   const { contenido } = req.body
 
-  const socio = await req.prisma.socio.findFirst({
+  const socio = await req.req.db.socio.findFirst({
     where: { tokenPortal: token }
   })
 
@@ -2011,7 +2011,7 @@ router.post('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res)
   }
 
   // Verificar que la conversación pertenece al socio
-  const conversacion = await req.prisma.conversacion.findFirst({
+  const conversacion = await req.req.db.conversacion.findFirst({
     where: {
       id: parseInt(id),
       socioId: socio.id,
@@ -2024,7 +2024,7 @@ router.post('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res)
   }
 
   // Crear mensaje
-  const mensaje = await req.prisma.mensaje.create({
+  const mensaje = await req.req.db.mensaje.create({
     data: {
       conversacionId: parseInt(id),
       emisorTipo: 'SOCIO',
@@ -2034,7 +2034,7 @@ router.post('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res)
   })
 
   // Actualizar conversación
-  await req.prisma.conversacion.update({
+  await req.req.db.conversacion.update({
     where: { id: parseInt(id) },
     data: { ultimoMensaje: new Date() }
   })
@@ -2058,7 +2058,7 @@ router.post('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res)
 router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => {
   const { token } = req.params
 
-  const socio = await req.prisma.socio.findFirst({
+  const socio = await req.req.db.socio.findFirst({
     where: { tokenPortal: token }
   })
 
@@ -2067,7 +2067,7 @@ router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => 
   }
 
   // Obtener categorías donde está inscripto el socio
-  const inscripciones = await req.prisma.inscripcion.findMany({
+  const inscripciones = await req.req.db.inscripcion.findMany({
     where: {
       socioId: socio.id,
       activo: true
@@ -2087,7 +2087,7 @@ router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => 
   const categoriaIds = inscripciones.map(i => i.categoriaActividadId)
 
   // Obtener entrenadores de esas categorías
-  const entrenadoresCategorias = await req.prisma.entrenadorCategoria.findMany({
+  const entrenadoresCategorias = await req.req.db.entrenadorCategoria.findMany({
     where: {
       categoriaActividadId: { in: categoriaIds },
       activo: true,
@@ -2145,7 +2145,7 @@ router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => 
 router.get('/:token/preferencias-notificaciones', asyncHandler(async (req, res) => {
   const { token } = req.params
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal: token },
     select: {
       id: true,
@@ -2194,7 +2194,7 @@ router.put('/:token/preferencias-notificaciones', asyncHandler(async (req, res) 
   const { token } = req.params
   const { cuotasYGeneral, deportivas } = req.body
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal: token },
     select: { id: true }
   })
@@ -2245,7 +2245,7 @@ router.put('/:token/preferencias-notificaciones', asyncHandler(async (req, res) 
   }
 
   // Actualizar
-  await req.prisma.socio.update({
+  await req.req.db.socio.update({
     where: { id: socio.id },
     data: updateData
   })
@@ -2261,7 +2261,7 @@ router.get('/:token/convocatorias', asyncHandler(async (req, res) => {
   const { token } = req.params
   const { estado } = req.query // 'pendiente', 'confirmada', 'rechazada', 'todas'
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal: token },
     select: { id: true }
   })
@@ -2283,7 +2283,7 @@ router.get('/:token/convocatorias', asyncHandler(async (req, res) => {
     }
   }
 
-  const convocatorias = await req.prisma.convocatoria.findMany({
+  const convocatorias = await req.req.db.convocatoria.findMany({
     where,
     include: {
       partido: {
@@ -2351,7 +2351,7 @@ router.put('/:token/convocatorias/:partidoId', asyncHandler(async (req, res) => 
     throw new AppError('El campo confirmado es requerido y debe ser booleano', 400)
   }
 
-  const socio = await req.prisma.socio.findUnique({
+  const socio = await req.req.db.socio.findUnique({
     where: { tokenPortal: token },
     select: { id: true, apellidoNombre: true, nroSocio: true }
   })
@@ -2361,7 +2361,7 @@ router.put('/:token/convocatorias/:partidoId', asyncHandler(async (req, res) => 
   }
 
   // Buscar convocatoria
-  const convocatoria = await req.prisma.convocatoria.findUnique({
+  const convocatoria = await req.req.db.convocatoria.findUnique({
     where: {
       partidoId_socioId: {
         partidoId: parseInt(partidoId),
@@ -2392,7 +2392,7 @@ router.put('/:token/convocatorias/:partidoId', asyncHandler(async (req, res) => 
   }
 
   // Actualizar convocatoria
-  const convocatoriaActualizada = await req.prisma.convocatoria.update({
+  const convocatoriaActualizada = await req.req.db.convocatoria.update({
     where: {
       partidoId_socioId: {
         partidoId: parseInt(partidoId),

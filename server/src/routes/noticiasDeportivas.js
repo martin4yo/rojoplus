@@ -86,7 +86,7 @@ router.get('/', checkPermiso('NOTICIAS_DEPORTIVAS_VER'), asyncHandler(async (req
   }
 
   const [noticias, total] = await Promise.all([
-    prisma.noticiaDeportiva.findMany({
+    req.db.noticiaDeportiva.findMany({
       where,
       include: {
         actividad: {
@@ -111,7 +111,7 @@ router.get('/', checkPermiso('NOTICIAS_DEPORTIVAS_VER'), asyncHandler(async (req
       take: parseInt(limit),
       skip: parseInt(offset)
     }),
-    prisma.noticiaDeportiva.count({ where })
+    req.db.noticiaDeportiva.count({ where })
   ])
 
   res.json({
@@ -133,7 +133,7 @@ router.get('/', checkPermiso('NOTICIAS_DEPORTIVAS_VER'), asyncHandler(async (req
 router.get('/:id', checkPermiso('NOTICIAS_DEPORTIVAS_VER'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const noticia = await prisma.noticiaDeportiva.findUnique({
+  const noticia = await req.db.noticiaDeportiva.findUnique({
     where: { id: parseInt(id) },
     include: {
       actividad: {
@@ -193,7 +193,7 @@ router.post('/', checkPermiso('NOTICIAS_DEPORTIVAS_CREAR'), asyncHandler(async (
 
   // Validar que existe la actividad (si se especifica)
   if (actividadId) {
-    const actividad = await prisma.actividad.findUnique({
+    const actividad = await req.db.actividad.findUnique({
       where: { id: parseInt(actividadId) }
     })
     if (!actividad) {
@@ -211,7 +211,7 @@ router.post('/', checkPermiso('NOTICIAS_DEPORTIVAS_CREAR'), asyncHandler(async (
     }
   }
 
-  const noticia = await prisma.noticiaDeportiva.create({
+  const noticia = await req.db.noticiaDeportiva.create({
     data: {
       actividadId: actividadId ? parseInt(actividadId) : null,
       categoriaId: categoriaId ? parseInt(categoriaId) : null,
@@ -259,7 +259,7 @@ router.put('/:id', checkPermiso('NOTICIAS_DEPORTIVAS_EDITAR'), asyncHandler(asyn
     activo
   } = req.body
 
-  const existente = await prisma.noticiaDeportiva.findUnique({
+  const existente = await req.db.noticiaDeportiva.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -275,7 +275,7 @@ router.put('/:id', checkPermiso('NOTICIAS_DEPORTIVAS_EDITAR'), asyncHandler(asyn
     }
   }
 
-  const noticia = await prisma.noticiaDeportiva.update({
+  const noticia = await req.db.noticiaDeportiva.update({
     where: { id: parseInt(id) },
     data: {
       actividadId: actividadId !== undefined ? (actividadId ? parseInt(actividadId) : null) : undefined,
@@ -313,7 +313,7 @@ router.put('/:id', checkPermiso('NOTICIAS_DEPORTIVAS_EDITAR'), asyncHandler(asyn
 router.delete('/:id', checkPermiso('NOTICIAS_DEPORTIVAS_ELIMINAR'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const existente = await prisma.noticiaDeportiva.findUnique({
+  const existente = await req.db.noticiaDeportiva.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -322,7 +322,7 @@ router.delete('/:id', checkPermiso('NOTICIAS_DEPORTIVAS_ELIMINAR'), asyncHandler
   }
 
   // Soft delete
-  await prisma.noticiaDeportiva.update({
+  await req.db.noticiaDeportiva.update({
     where: { id: parseInt(id) },
     data: { activo: false }
   })

@@ -135,7 +135,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
       if (nombreActividad === 'Socio sin actividad') continue
 
       try {
-        const actividad = await req.prisma.actividad.findFirst({
+        const actividad = await req.req.db.actividad.findFirst({
           where: {
             nombre: { contains: nombreActividad, mode: 'insensitive' },
             activo: true
@@ -156,7 +156,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
           })
 
           if (categoriaApropiada) {
-            await req.prisma.inscripcion.create({
+            await req.req.db.inscripcion.create({
               data: {
                 socio: { connect: { id: socioId } },
                 categoriaActividad: { connect: { id: categoriaApropiada.id } },
@@ -174,7 +174,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
 
   // Generar números de socio para todos (titular + familiares)
   // Obtenemos todos los nroSocio y buscamos el máximo numérico
-  const socios = await req.prisma.socio.findMany({
+  const socios = await req.req.db.socio.findMany({
     select: { nroSocio: true }
   })
 
@@ -190,7 +190,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   const esMenorTitular = edadTitular < 18
 
   // PASO 1: Crear el socio titular
-  const nuevoSocio = await req.prisma.socio.create({
+  const nuevoSocio = await req.req.db.socio.create({
     data: {
       nroSocio: proximoNumero.toString(),
       apellido: solicitud.apellidos,
@@ -229,7 +229,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     const edadFamiliar = Math.floor((new Date() - fechaNacFamiliar) / (365.25 * 24 * 60 * 60 * 1000))
     const esMenorFamiliar = edadFamiliar < 18
 
-    const socioFamiliar = await req.prisma.socio.create({
+    const socioFamiliar = await req.req.db.socio.create({
       data: {
         nroSocio: proximoNumero.toString(),
         apellido: familiar.apellidos,
@@ -291,7 +291,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
 
     // GENERAR CUOTA SOCIAL: Solo para el titular (cubre a toda la familia)
     if (tipoSocio && tipoSocio.cuotaMensual && parseFloat(tipoSocio.cuotaMensual) > 0) {
-      const cargoSocial = await req.prisma.cargo.create({
+      const cargoSocial = await req.req.db.cargo.create({
         data: {
           socio: { connect: { id: nuevoSocio.id } },
           periodo: { connect: { id: periodoActual.id } },
@@ -309,7 +309,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     // GENERAR CUOTAS DE ACTIVIDADES: Para cada integrante (titular + familiares)
     for (const socio of sociosCreados) {
       // Obtener inscripciones activas del socio
-      const inscripciones = await req.prisma.inscripcion.findMany({
+      const inscripciones = await req.req.db.inscripcion.findMany({
         where: {
           socioId: socio.id,
           estado: 'ACTIVA'
@@ -332,7 +332,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
             : parseFloat(categoria.cuotaMensual) * (insc.porcentajeCuota || 100) / 100
 
           if (montoCuota > 0) {
-            const cargoActividad = await req.prisma.cargo.create({
+            const cargoActividad = await req.req.db.cargo.create({
               data: {
                 socio: { connect: { id: socio.id } },
                 periodo: { connect: { id: periodoActual.id } },

@@ -88,7 +88,7 @@ router.post(
     if (!assistant) {
       return res.status(503).json({
         success: false,
-        message: '🚧 El asistente ROJO IA no está disponible en este momento. Por favor, intentá más tarde.',
+        message: '🚧 El asistente Xavi no está disponible en este momento. Por favor, intentá más tarde.',
         error: 'AI Assistant no está configurado. Verifica ANTHROPIC_API_KEY en .env'
       })
     }
@@ -104,7 +104,7 @@ router.post(
     // Determinar contexto según el token/auth
     if (tokenPortal) {
       // Es un socio
-      const socio = await req.prisma.socio.findUnique({
+      const socio = await req.req.db.socio.findUnique({
         where: { tokenPortal }
       })
 
@@ -201,7 +201,7 @@ router.get('/health', (req, res) => {
   const assistant = getAIAssistant()
   return res.json({
     available: assistant !== null,
-    service: 'ROJO IA - Chat Assistant',
+    service: 'Xavi - Chat Assistant',
     model: assistant ? 'claude-sonnet-4-20250514' : null
   })
 })
@@ -229,7 +229,7 @@ router.post(
     }
 
     // Validar socio
-    const socio = await req.prisma.socio.findUnique({
+    const socio = await req.req.db.socio.findUnique({
       where: { tokenPortal },
       select: { id: true, nroSocio: true, apellidoNombre: true }
     })

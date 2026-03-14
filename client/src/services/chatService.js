@@ -1,5 +1,5 @@
 /**
- * Chat Service - ROJO IA
+ * Chat Service - Xavi
  * Servicio para comunicación con el asistente inteligente
  */
 

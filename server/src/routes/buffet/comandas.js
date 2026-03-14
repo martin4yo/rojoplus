@@ -195,7 +195,7 @@ router.get('/comandas', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) 
       where.horaApertura = { gte: fechaInicio, lte: fechaFin }
     }
 
-    const comandas = await prisma.comanda.findMany({
+    const comandas = await req.db.comanda.findMany({
       where,
       orderBy: { horaApertura: 'desc' },
       include: {
@@ -221,7 +221,7 @@ router.get('/comandas/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, r
   try {
     const { id } = req.params
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: {
         mesa: true,
@@ -260,14 +260,14 @@ router.post('/comandas', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
   try {
     const { mesaId, socioId, observaciones, centroCostoId } = req.body
 
-    const mesa = await prisma.mesa.findUnique({ where: { id: mesaId } })
+    const mesa = await req.db.mesa.findUnique({ where: { id: mesaId } })
     if (!mesa) {
       return res.status(404).json({ success: false, error: 'Mesa no encontrada' })
     }
 
     // Para mesas NO comunitarias, verificar que no haya comanda abierta
     if (!mesa.esComunal) {
-      const comandaExistente = await prisma.comanda.findFirst({
+      const comandaExistente = await req.db.comanda.findFirst({
         where: { mesaId, estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] } }
       })
 
@@ -278,7 +278,7 @@ router.post('/comandas', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
 
     const numero = await generarNumeroComanda()
 
-    const comanda = await prisma.comanda.create({
+    const comanda = await req.db.comanda.create({
       data: {
         numero,
         mesaId,
@@ -290,7 +290,7 @@ router.post('/comandas', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
       include: { mesa: true, socio: true }
     })
 
-    await prisma.mesa.update({
+    await req.db.mesa.update({
       where: { id: mesaId },
       data: { estado: 'OCUPADA' }
     })
@@ -311,7 +311,7 @@ router.put('/comandas/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (req,
     const { id } = req.params
     const { socioId, observaciones } = req.body
 
-    const comanda = await prisma.comanda.findUnique({ where: { id: parseInt(id) } })
+    const comanda = await req.db.comanda.findUnique({ where: { id: parseInt(id) } })
 
     if (!comanda) {
       return res.status(404).json({ success: false, error: 'Comanda no encontrada' })
@@ -321,7 +321,7 @@ router.put('/comandas/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (req,
       return res.status(400).json({ success: false, error: 'No se puede editar una comanda cerrada' })
     }
 
-    const comandaActualizada = await prisma.comanda.update({
+    const comandaActualizada = await req.db.comanda.update({
       where: { id: parseInt(id) },
       data: {
         socioId: socioId || null,
@@ -352,7 +352,7 @@ router.delete('/comandas/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (r
   try {
     const { id } = req.params
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: { items: true, mesa: true }
     })
@@ -369,9 +369,9 @@ router.delete('/comandas/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (r
       return res.status(400).json({ success: false, error: 'No se puede eliminar una comanda cerrada o anulada' })
     }
 
-    await prisma.comanda.delete({ where: { id: parseInt(id) } })
+    await req.db.comanda.delete({ where: { id: parseInt(id) } })
 
-    const otrasComandas = await prisma.comanda.findFirst({
+    const otrasComandas = await req.db.comanda.findFirst({
       where: {
         mesaId: comanda.mesaId,
         estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] }
@@ -379,7 +379,7 @@ router.delete('/comandas/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (r
     })
 
     if (!otrasComandas) {
-      await prisma.mesa.update({
+      await req.db.mesa.update({
         where: { id: comanda.mesaId },
         data: { estado: 'LIBRE' }
       })
@@ -405,7 +405,7 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     const { id } = req.params
     const { items } = req.body
 
-    const comanda = await prisma.comanda.findUnique({ where: { id: parseInt(id) } })
+    const comanda = await req.db.comanda.findUnique({ where: { id: parseInt(id) } })
     if (!comanda) {
       return res.status(404).json({ success: false, error: 'Comanda no encontrada' })
     }
@@ -421,7 +421,7 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     const itemsCreados = []
 
     for (const item of items) {
-      const producto = await prisma.productoBuffet.findUnique({
+      const producto = await req.db.productoBuffet.findUnique({
         where: { id: item.productoBuffetId },
         include: { categoriaMenu: true }
       })
@@ -459,7 +459,7 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
       const precioUnitarioTotal = Number(producto.precio) + precioAdicionalOpciones
       const cantidad = item.cantidad || 1
 
-      const itemCreado = await prisma.itemComanda.create({
+      const itemCreado = await req.db.itemComanda.create({
         data: {
           comandaId: parseInt(id),
           productoBuffetId: item.productoBuffetId,
@@ -494,7 +494,7 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
 
     // Imprimir comanda en los destinos correspondientes
     if (itemsCreados.length > 0) {
-      const comandaConMesa = await prisma.comanda.findUnique({
+      const comandaConMesa = await req.db.comanda.findUnique({
         where: { id: parseInt(id) },
         include: { mesa: true, socio: true }
       })
@@ -518,7 +518,7 @@ router.put('/comandas/:comandaId/items/:itemId', authAdmin, checkPermiso('BUFFET
     const { comandaId, itemId } = req.params
     const { cantidad, observaciones } = req.body
 
-    const item = await prisma.itemComanda.findUnique({
+    const item = await req.db.itemComanda.findUnique({
       where: { id: parseInt(itemId) },
       include: { productoBuffet: true }
     })
@@ -531,7 +531,7 @@ router.put('/comandas/:comandaId/items/:itemId', authAdmin, checkPermiso('BUFFET
       return res.status(400).json({ success: false, error: 'Solo se pueden modificar items pendientes' })
     }
 
-    const itemActualizado = await prisma.itemComanda.update({
+    const itemActualizado = await req.db.itemComanda.update({
       where: { id: parseInt(itemId) },
       data: {
         cantidad,
@@ -558,7 +558,7 @@ router.delete('/comandas/:comandaId/items/:itemId', authAdmin, checkPermiso('BUF
   try {
     const { comandaId, itemId } = req.params
 
-    const item = await prisma.itemComanda.findUnique({ where: { id: parseInt(itemId) } })
+    const item = await req.db.itemComanda.findUnique({ where: { id: parseInt(itemId) } })
 
     if (!item || item.comandaId !== parseInt(comandaId)) {
       return res.status(404).json({ success: false, error: 'Item no encontrado' })
@@ -568,7 +568,7 @@ router.delete('/comandas/:comandaId/items/:itemId', authAdmin, checkPermiso('BUF
       return res.status(400).json({ success: false, error: 'No se pueden anular items entregados' })
     }
 
-    await prisma.itemComanda.update({
+    await req.db.itemComanda.update({
       where: { id: parseInt(itemId) },
       data: { estado: 'ANULADO' }
     })
@@ -590,7 +590,7 @@ router.post('/comandas/:comandaId/items/:itemId/entregar', authAdmin, checkPermi
   try {
     const { comandaId, itemId } = req.params
 
-    const item = await prisma.itemComanda.findUnique({
+    const item = await req.db.itemComanda.findUnique({
       where: { id: parseInt(itemId) },
       include: { comanda: true }
     })
@@ -607,7 +607,7 @@ router.post('/comandas/:comandaId/items/:itemId/entregar', authAdmin, checkPermi
       return res.status(400).json({ success: false, error: 'El item ya fue entregado' })
     }
 
-    const itemActualizado = await prisma.itemComanda.update({
+    const itemActualizado = await req.db.itemComanda.update({
       where: { id: parseInt(itemId) },
       data: {
         estado: 'ENTREGADO',
@@ -635,7 +635,7 @@ router.post('/comandas/:id/enviar-cocina', authAdmin, checkPermiso('BUFFET_MESAS
   try {
     const { id } = req.params
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: {
         items: {
@@ -654,12 +654,12 @@ router.post('/comandas/:id/enviar-cocina', authAdmin, checkPermiso('BUFFET_MESAS
       return res.status(400).json({ success: false, error: 'No hay items pendientes para enviar' })
     }
 
-    await prisma.itemComanda.updateMany({
+    await req.db.itemComanda.updateMany({
       where: { comandaId: parseInt(id), estado: 'PENDIENTE' },
       data: { estado: 'ENVIADO_COCINA', enviadoCocinaAt: new Date() }
     })
 
-    const comandaActualizada = await prisma.comanda.update({
+    const comandaActualizada = await req.db.comanda.update({
       where: { id: parseInt(id) },
       data: { estado: 'EN_PREPARACION' },
       include: { mesa: true }
@@ -685,7 +685,7 @@ router.post('/comandas/:id/pedir-cuenta', authAdmin, checkPermiso('BUFFET_MESAS'
     const { id } = req.params
     const { imprimirTicket } = req.body
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: {
         mesa: true,
@@ -708,13 +708,13 @@ router.post('/comandas/:id/pedir-cuenta', authAdmin, checkPermiso('BUFFET_MESAS'
     // Calcular descuento si el socio está al día
     let descuentoInfo = { porcentaje: 0, monto: 0 }
     if (comanda.socioId) {
-      const configDescuento = await prisma.configuracion.findUnique({
+      const configDescuento = await req.db.configuracion.findUnique({
         where: { clave: 'BUFFET_DESCUENTO_SOCIO' }
       })
       const descuentoPorcentaje = configDescuento ? parseFloat(configDescuento.valor) : 0
 
       if (descuentoPorcentaje > 0) {
-        const cargoPendiente = await prisma.cargo.findFirst({
+        const cargoPendiente = await req.db.cargo.findFirst({
           where: {
             socioId: comanda.socioId,
             estado: 'PENDIENTE',
@@ -731,13 +731,13 @@ router.post('/comandas/:id/pedir-cuenta', authAdmin, checkPermiso('BUFFET_MESAS'
       }
     }
 
-    const comandaActualizada = await prisma.comanda.update({
+    const comandaActualizada = await req.db.comanda.update({
       where: { id: parseInt(id) },
       data: { estado: 'CUENTA_PEDIDA' },
       include: { mesa: true, socio: true }
     })
 
-    await prisma.mesa.update({
+    await req.db.mesa.update({
       where: { id: comanda.mesaId },
       data: { estado: 'CUENTA_PEDIDA' }
     })
@@ -798,7 +798,7 @@ router.post('/comandas/:id/reabrir', authAdmin, checkPermiso('BUFFET_MESAS'), as
   try {
     const { id } = req.params
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: { mesa: true }
     })
@@ -811,7 +811,7 @@ router.post('/comandas/:id/reabrir', authAdmin, checkPermiso('BUFFET_MESAS'), as
       return res.status(400).json({ success: false, error: 'Solo se pueden reabrir comandas con cuenta pedida' })
     }
 
-    const comandaActualizada = await prisma.comanda.update({
+    const comandaActualizada = await req.db.comanda.update({
       where: { id: parseInt(id) },
       data: { estado: 'EN_PREPARACION' },
       include: {
@@ -825,7 +825,7 @@ router.post('/comandas/:id/reabrir', authAdmin, checkPermiso('BUFFET_MESAS'), as
       }
     })
 
-    await prisma.mesa.update({
+    await req.db.mesa.update({
       where: { id: comanda.mesaId },
       data: { estado: 'OCUPADA' }
     })
@@ -845,7 +845,7 @@ router.post('/comandas/:id/cancelar', authAdmin, checkPermiso('BUFFET_MESAS'), a
   try {
     const { id } = req.params
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: {
         mesa: true,
@@ -870,7 +870,7 @@ router.post('/comandas/:id/cancelar', authAdmin, checkPermiso('BUFFET_MESAS'), a
     }
 
     // Cerrar la comanda
-    const comandaCancelada = await prisma.comanda.update({
+    const comandaCancelada = await req.db.comanda.update({
       where: { id: parseInt(id) },
       data: {
         estado: 'CERRADA',
@@ -883,7 +883,7 @@ router.post('/comandas/:id/cancelar', authAdmin, checkPermiso('BUFFET_MESAS'), a
     })
 
     // Liberar la mesa
-    await prisma.mesa.update({
+    await req.db.mesa.update({
       where: { id: comanda.mesaId },
       data: { estado: 'LIBRE' }
     })
@@ -911,7 +911,7 @@ router.get('/comandas/:id/descuento', authAdmin, checkPermiso('BUFFET_COBRAR'), 
   try {
     const { id } = req.params
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: { socio: true }
     })
@@ -929,14 +929,14 @@ router.get('/comandas/:id/descuento', authAdmin, checkPermiso('BUFFET_COBRAR'), 
     }
 
     if (comanda.socioId) {
-      const configDescuento = await prisma.configuracion.findUnique({
+      const configDescuento = await req.db.configuracion.findUnique({
         where: { clave: 'BUFFET_DESCUENTO_SOCIO' }
       })
 
       const porcentajeDescuento = configDescuento ? parseFloat(configDescuento.valor) : 0
 
       if (porcentajeDescuento > 0) {
-        const cargoPendiente = await prisma.cargo.findFirst({
+        const cargoPendiente = await req.db.cargo.findFirst({
           where: {
             socioId: comanda.socioId,
             estado: 'PENDIENTE',
@@ -990,7 +990,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       tipoCliente
     } = req.body
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: { mesa: true, socio: true, items: { include: { productoBuffet: true } } }
     })
@@ -1028,14 +1028,14 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     let descuentoPorcentaje = 0
 
     if (aplicarDescuento && comanda.socioId) {
-      const configDescuento = await prisma.configuracion.findUnique({
+      const configDescuento = await req.db.configuracion.findUnique({
         where: { clave: 'BUFFET_DESCUENTO_SOCIO' }
       })
 
       descuentoPorcentaje = configDescuento ? parseFloat(configDescuento.valor) : 0
 
       if (descuentoPorcentaje > 0) {
-        const cargoPendiente = await prisma.cargo.findFirst({
+        const cargoPendiente = await req.db.cargo.findFirst({
           where: {
             socioId: comanda.socioId,
             estado: 'PENDIENTE',
@@ -1064,11 +1064,11 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     }
 
     // Cuenta contable fallback si no tiene configurada
-    let cuentaContableFallback = await prisma.cuentaContable.findFirst({
+    let cuentaContableFallback = await req.db.cuentaContable.findFirst({
       where: { codigo: { contains: 'BUFFET' }, esImputable: true }
     })
     if (!cuentaContableFallback) {
-      cuentaContableFallback = await prisma.cuentaContable.findFirst({
+      cuentaContableFallback = await req.db.cuentaContable.findFirst({
         where: { codigo: '4.1.1.01', esImputable: true }
       })
     }
@@ -1093,15 +1093,15 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
 
-        const caja = await prisma.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } })
+        const caja = await req.db.caja.findUnique({ where: { id: parseInt(pago.cajaId || cajaId) } })
         if (!caja) {
           return res.status(400).json({ success: false, error: `Caja ${pago.cajaId || cajaId} no encontrada` })
         }
 
-        const ultimoMov = await prisma.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
+        const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
         const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
 
-        const movimiento = await prisma.movimientoCaja.create({
+        const movimiento = await req.db.movimientoCaja.create({
           data: {
             numero: nuevoNumero,
             cajaId: parseInt(pago.cajaId || cajaId),
@@ -1162,15 +1162,15 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
 
-      const caja = await prisma.caja.findUnique({ where: { id: cajaId } })
+      const caja = await req.db.caja.findUnique({ where: { id: cajaId } })
       if (!caja) {
         return res.status(400).json({ success: false, error: 'Caja no encontrada' })
       }
 
-      const ultimoMov = await prisma.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
+      const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
       const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
 
-      const movimiento = await prisma.movimientoCaja.create({
+      const movimiento = await req.db.movimientoCaja.create({
         data: {
           numero: nuevoNumero,
           cajaId,
@@ -1226,7 +1226,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     }
 
     // Actualizar y cerrar comanda
-    const comandaActualizada = await prisma.comanda.update({
+    const comandaActualizada = await req.db.comanda.update({
       where: { id: parseInt(id) },
       data: {
         estado: 'CERRADA',
@@ -1254,7 +1254,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 
         const config = await getConfiguracionFiscal()
 
-        const cajaUsada = await prisma.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } })
+        const cajaUsada = await req.db.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } })
         const puntoVenta = cajaUsada?.puntoVentaAfip || 1
 
         // Determinar tipo de comprobante según condición IVA
@@ -1470,7 +1470,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         const tipoComprobanteNombre = comprobanteFiscal?.tipo || (esVentaInterna ? 'VENTA INTERNA' : 'TICKET')
 
         const cajaUsadaId = cajaId || movimientos[0]?.cajaId
-        const cajaUsada = await prisma.caja.findUnique({
+        const cajaUsada = await req.db.caja.findUnique({
           where: { id: cajaUsadaId },
           include: { cuentaContable: true }
         })
@@ -1583,7 +1583,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 
         // Vincular MovimientoCaja con MovimientoContable
         for (const mov of movimientos) {
-          await prisma.movimientoCaja.update({
+          await req.db.movimientoCaja.update({
             where: { id: mov.id },
             data: { movimientoContableId: movimientoContableCobro.id }
           })
@@ -1604,7 +1604,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     }
 
     // Liberar mesa
-    const mesaActualizada = await prisma.mesa.update({
+    const mesaActualizada = await req.db.mesa.update({
       where: { id: comanda.mesaId },
       data: { estado: 'LIMPIEZA' }
     })
@@ -1640,7 +1640,7 @@ router.post('/comandas/:id/cerrar', authAdmin, checkPermiso('BUFFET_MESAS'), asy
   try {
     const { id } = req.params
 
-    const comanda = await prisma.comanda.findUnique({
+    const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
       include: { mesa: true }
     })
@@ -1649,7 +1649,7 @@ router.post('/comandas/:id/cerrar', authAdmin, checkPermiso('BUFFET_MESAS'), asy
       return res.status(404).json({ success: false, error: 'Comanda no encontrada' })
     }
 
-    await prisma.comanda.update({
+    await req.db.comanda.update({
       where: { id: parseInt(id) },
       data: {
         estado: 'CERRADA',
@@ -1658,7 +1658,7 @@ router.post('/comandas/:id/cerrar', authAdmin, checkPermiso('BUFFET_MESAS'), asy
       }
     })
 
-    const comandasActivas = await prisma.comanda.count({
+    const comandasActivas = await req.db.comanda.count({
       where: {
         mesaId: comanda.mesaId,
         estado: { in: ['ABIERTA', 'EN_PREPARACION', 'CUENTA_PEDIDA'] }
@@ -1666,7 +1666,7 @@ router.post('/comandas/:id/cerrar', authAdmin, checkPermiso('BUFFET_MESAS'), asy
     })
 
     if (comandasActivas === 0) {
-      await prisma.mesa.update({
+      await req.db.mesa.update({
         where: { id: comanda.mesaId },
         data: { estado: 'LIBRE' }
       })

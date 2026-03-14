@@ -592,7 +592,7 @@ export default function BuffetDashboard() {
         />
       )}
 
-      {/* ROJO IA - Chat Widget para Camareros */}
+      {/* Xavi - Chat Widget para Camareros */}
       <ChatWidget role="camarero" position="bottom-right" />
     </div>
   )

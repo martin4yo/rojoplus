@@ -238,14 +238,14 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
 
           if (cargosIds.length > 0) {
             // Obtener los cargos
-            const cargos = await req.prisma.cargo.findMany({
+            const cargos = await req.req.db.cargo.findMany({
               where: {
                 id: { in: cargosIds },
               },
             })
 
             // Crear el pago con datos de MercadoPago para conciliación
-            const pago = await req.prisma.pago.create({
+            const pago = await req.req.db.pago.create({
               data: {
                 socioId: linkPago.socioId,
                 fecha: new Date(),
@@ -270,7 +270,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
               })
 
               // Marcar cargo como PAGADO
-              await req.prisma.cargo.update({
+              await req.req.db.cargo.update({
                 where: { id: cargo.id },
                 data: { estado: 'PAGADO' },
               })

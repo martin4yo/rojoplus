@@ -45,7 +45,7 @@ router.get('/config/cajas/:puntoVenta', authAdmin, checkPermiso('BUFFET_VER', 'B
       where.id = { in: cajasPermitidas }
     }
 
-    const cajas = await prisma.caja.findMany({
+    const cajas = await req.db.caja.findMany({
       where,
       orderBy: { nombre: 'asc' },
       select: { id: true, codigo: true, nombre: true, tipo: true, puntoVentaAfip: true, mediosPagoPermitidos: true }
@@ -112,7 +112,7 @@ router.get('/clientes/buscar', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_
     const busqueda = q.toLowerCase()
 
     // Buscar socios
-    const socios = await prisma.socio.findMany({
+    const socios = await req.db.socio.findMany({
       where: {
         OR: [
           { nroSocio: { contains: busqueda } },

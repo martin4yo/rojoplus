@@ -22,7 +22,7 @@ export default function ChatMessage({ message, isUser }) {
               R
             </div>
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-              ROJO IA
+              Xavi
             </span>
           </div>
         )}

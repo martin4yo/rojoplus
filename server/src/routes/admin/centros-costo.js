@@ -23,7 +23,7 @@ router.get('/centros-costo', authAdmin, asyncHandler(async (req, res) => {
   if (activo !== undefined) where.activo = activo === 'true'
   if (tipo) where.tipo = tipo
 
-  const centros = await req.prisma.centroCosto.findMany({
+  const centros = await req.db.centroCosto.findMany({
     where,
     orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
     include: {
@@ -47,7 +47,7 @@ router.get('/centros-costo', authAdmin, asyncHandler(async (req, res) => {
 router.get('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const centro = await req.prisma.centroCosto.findUnique({
+  const centro = await req.db.centroCosto.findUnique({
     where: { id: parseInt(id) },
     include: {
       actividades: {
@@ -87,7 +87,7 @@ router.post('/centros-costo', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar código único
-  const existente = await req.prisma.centroCosto.findUnique({
+  const existente = await req.db.centroCosto.findUnique({
     where: { codigo },
   })
 
@@ -95,7 +95,7 @@ router.post('/centros-costo', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Ya existe un centro de costo con ese código', 400, 'DUPLICATE_CODE')
   }
 
-  const centro = await req.prisma.centroCosto.create({
+  const centro = await req.db.centroCosto.create({
     data: {
       codigo,
       nombre,
@@ -117,7 +117,7 @@ router.put('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, descripcion, tipo, activo, orden } = req.body
 
-  const centroExistente = await req.prisma.centroCosto.findUnique({
+  const centroExistente = await req.db.centroCosto.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -127,7 +127,7 @@ router.put('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Si se cambió el código, verificar que no exista otro con ese código
   if (codigo && codigo !== centroExistente.codigo) {
-    const codigoExistente = await req.prisma.centroCosto.findUnique({
+    const codigoExistente = await req.db.centroCosto.findUnique({
       where: { codigo },
     })
 
@@ -141,7 +141,7 @@ router.put('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser OPERATIVO o ADMINISTRATIVO', 400, 'VALIDATION_ERROR')
   }
 
-  const centro = await req.prisma.centroCosto.update({
+  const centro = await req.db.centroCosto.update({
     where: { id: parseInt(id) },
     data: {
       ...(codigo && { codigo }),
@@ -163,7 +163,7 @@ router.put('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const centro = await req.prisma.centroCosto.findUnique({
+  const centro = await req.db.centroCosto.findUnique({
     where: { id: parseInt(id) },
     include: {
       _count: {
@@ -187,7 +187,7 @@ router.delete('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => 
     centro._count.actividades > 0
   ) {
     // En lugar de eliminar, desactivar
-    const centroDesactivado = await req.prisma.centroCosto.update({
+    const centroDesactivado = await req.db.centroCosto.update({
       where: { id: parseInt(id) },
       data: { activo: false },
     })
@@ -199,7 +199,7 @@ router.delete('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => 
     })
   } else {
     // Si no tiene nada asociado, se puede eliminar
-    await req.prisma.centroCosto.delete({
+    await req.db.centroCosto.delete({
       where: { id: parseInt(id) },
     })
 
@@ -215,7 +215,7 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
   const { id } = req.params
   const { fechaDesde, fechaHasta } = req.query
 
-  const centro = await req.prisma.centroCosto.findUnique({
+  const centro = await req.db.centroCosto.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -238,12 +238,12 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
 
   // Obtener movimientos de caja por tipo
   const [ingresosCaja, egresosCaja] = await Promise.all([
-    req.prisma.movimientoCaja.aggregate({
+    req.req.db.movimientoCaja.aggregate({
       where: { ...whereMovCaja, tipo: 'INGRESO' },
       _sum: { monto: true },
       _count: true,
     }),
-    req.prisma.movimientoCaja.aggregate({
+    req.req.db.movimientoCaja.aggregate({
       where: { ...whereMovCaja, tipo: 'EGRESO' },
       _sum: { monto: true },
       _count: true,
@@ -340,7 +340,7 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
 router.get('/centros-costo-reporte-comparativo', authAdmin, asyncHandler(async (req, res) => {
   const { fechaDesde, fechaHasta } = req.query
 
-  const centros = await req.prisma.centroCosto.findMany({
+  const centros = await req.db.centroCosto.findMany({
     where: { activo: true },
     orderBy: [{ tipo: 'asc' }, { orden: 'asc' }],
   })
@@ -369,11 +369,11 @@ router.get('/centros-costo-reporte-comparativo', authAdmin, asyncHandler(async (
     centros.map(async centro => {
       // Movimientos de caja
       const [ingresosCaja, egresosCaja] = await Promise.all([
-        req.prisma.movimientoCaja.aggregate({
+        req.req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'INGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
         }),
-        req.prisma.movimientoCaja.aggregate({
+        req.req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'EGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
         }),
@@ -478,7 +478,7 @@ router.get('/centros-costo-evolucion-temporal', authAdmin, asyncHandler(async (r
 
   // Obtener todos los movimientos
   const [movimientosCaja, movimientosContables] = await Promise.all([
-    req.prisma.movimientoCaja.findMany({
+    req.req.db.movimientoCaja.findMany({
       where: whereMovCaja,
       select: {
         fecha: true,
@@ -589,7 +589,7 @@ router.get('/centros-costo-rentabilidad-actividades', authAdmin, asyncHandler(as
 
   const whereCentro = centroCostoId ? { id: parseInt(centroCostoId) } : { activo: true }
 
-  const centros = await req.prisma.centroCosto.findMany({
+  const centros = await req.db.centroCosto.findMany({
     where: whereCentro,
     include: {
       actividades: {
@@ -671,7 +671,7 @@ router.get('/centros-costo-presupuesto-vs-real', authAdmin, asyncHandler(async (
   }
 
   // Obtener presupuesto principal del año
-  const presupuesto = await req.prisma.presupuesto.findFirst({
+  const presupuesto = await req.req.db.presupuesto.findFirst({
     where: {
       anio: parseInt(anio),
       esPrincipal: true,
@@ -719,7 +719,7 @@ router.get('/centros-costo-presupuesto-vs-real', authAdmin, asyncHandler(async (
   const fechaHasta = new Date(`${anio}-12-31`)
 
   const [movimientosCaja, movimientosContables] = await Promise.all([
-    req.prisma.movimientoCaja.findMany({
+    req.req.db.movimientoCaja.findMany({
       where: {
         fecha: { gte: fechaDesde, lte: fechaHasta },
         anulado: false,
@@ -833,7 +833,7 @@ router.get('/centros-costo-dashboard-ejecutivo', authAdmin, asyncHandler(async (
   const fechaHasta = new Date(anioActual, mesActual, 0, 23, 59, 59)
 
   // Obtener datos del período actual
-  const centros = await req.prisma.centroCosto.findMany({
+  const centros = await req.db.centroCosto.findMany({
     where: { activo: true },
     include: {
       movimientosCaja: {
@@ -928,7 +928,7 @@ router.get('/centros-costo-export-comparativo', authAdmin, asyncHandler(async (r
   const { fechaDesde, fechaHasta, formato } = req.query
 
   // Obtener datos del reporte
-  const centros = await req.prisma.centroCosto.findMany({
+  const centros = await req.db.centroCosto.findMany({
     where: { activo: true },
     orderBy: [{ tipo: 'asc' }, { orden: 'asc' }],
   })
@@ -954,11 +954,11 @@ router.get('/centros-costo-export-comparativo', authAdmin, asyncHandler(async (r
   const dataCentros = await Promise.all(
     centros.map(async centro => {
       const [ingresosCaja, egresosCaja] = await Promise.all([
-        req.prisma.movimientoCaja.aggregate({
+        req.req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'INGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
         }),
-        req.prisma.movimientoCaja.aggregate({
+        req.req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'EGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
         }),
@@ -1044,7 +1044,7 @@ router.get('/centros-costo-export-evolucion', authAdmin, asyncHandler(async (req
   }
 
   const [movimientosCaja, movimientosContables] = await Promise.all([
-    req.prisma.movimientoCaja.findMany({
+    req.req.db.movimientoCaja.findMany({
       where: whereMovCaja,
       select: {
         fecha: true,
@@ -1129,7 +1129,7 @@ router.get('/centros-costo-export-rentabilidad', authAdmin, asyncHandler(async (
 
   const whereCentro = centroCostoId ? { id: parseInt(centroCostoId) } : { activo: true }
 
-  const centros = await req.prisma.centroCosto.findMany({
+  const centros = await req.db.centroCosto.findMany({
     where: whereCentro,
     include: {
       actividades: {
@@ -1197,7 +1197,7 @@ router.get('/centros-costo-export-presupuesto', authAdmin, asyncHandler(async (r
     throw new AppError('El año es requerido', 400, 'VALIDATION_ERROR')
   }
 
-  const presupuesto = await req.prisma.presupuesto.findFirst({
+  const presupuesto = await req.req.db.presupuesto.findFirst({
     where: { anio: parseInt(anio), esPrincipal: true, estado: 'APROBADO' },
     include: {
       lineas: {

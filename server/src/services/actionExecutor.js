@@ -4,7 +4,7 @@ import { ACCIONES } from './aiAssistant.js'
  * Action Executor Service
  *
  * Ejecuta las acciones identificadas por el AI Assistant
- * llamando a las APIs correspondientes de RojoPlus
+ * llamando a las APIs correspondientes de Clubix
  */
 
 class ActionExecutor {

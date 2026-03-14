@@ -47,7 +47,7 @@ router.post('/:token/push/subscribe', async (req, res) => {
     }
 
     // Buscar socio por token
-    const socio = await prisma.socio.findFirst({
+    const socio = await req.db.socio.findFirst({
       where: {
         tokenPortal: token,
         estado: 'ACTIVO'
@@ -100,7 +100,7 @@ router.post('/:token/push/subscribe', async (req, res) => {
     })
 
     // Actualizar preferencia del socio
-    await prisma.socio.update({
+    await req.db.socio.update({
       where: { id: socio.id },
       data: { notificarPush: true }
     })
@@ -127,7 +127,7 @@ router.delete('/:token/push/unsubscribe', async (req, res) => {
 
   try {
     // Buscar socio por token
-    const socio = await prisma.socio.findFirst({
+    const socio = await req.db.socio.findFirst({
       where: { tokenPortal: token }
     })
 
@@ -175,7 +175,7 @@ router.get('/:token/push/status', async (req, res) => {
 
   try {
     // Buscar socio por token
-    const socio = await prisma.socio.findFirst({
+    const socio = await req.db.socio.findFirst({
       where: { tokenPortal: token },
       select: {
         id: true,
@@ -227,7 +227,7 @@ router.put('/:token/push/toggle', async (req, res) => {
 
   try {
     // Buscar socio por token
-    const socio = await prisma.socio.findFirst({
+    const socio = await req.db.socio.findFirst({
       where: { tokenPortal: token }
     })
 
@@ -239,7 +239,7 @@ router.put('/:token/push/toggle', async (req, res) => {
     }
 
     // Actualizar preferencia
-    await prisma.socio.update({
+    await req.db.socio.update({
       where: { id: socio.id },
       data: { notificarPush: habilitado }
     })

@@ -70,7 +70,7 @@ router.get('/public/noticias', async (req, res) => {
     }
 
     const [noticias, total] = await Promise.all([
-      prisma.noticia.findMany({
+      req.db.noticia.findMany({
         where,
         select: {
           id: true,
@@ -89,7 +89,7 @@ router.get('/public/noticias', async (req, res) => {
         take: parseInt(limit),
         skip: parseInt(offset)
       }),
-      prisma.noticia.count({ where })
+      req.db.noticia.count({ where })
     ])
 
     res.json({
@@ -111,7 +111,7 @@ router.get('/public/noticias/:slug', async (req, res) => {
   try {
     const { slug } = req.params
 
-    const noticia = await prisma.noticia.findFirst({
+    const noticia = await req.db.noticia.findFirst({
       where: {
         slug,
         publicada: true,
@@ -129,7 +129,7 @@ router.get('/public/noticias/:slug', async (req, res) => {
     }
 
     // Obtener noticias relacionadas (misma categoría)
-    const relacionadas = await prisma.noticia.findMany({
+    const relacionadas = await req.db.noticia.findMany({
       where: {
         publicada: true,
         fechaPublicacion: { lte: new Date() },
@@ -184,7 +184,7 @@ router.get('/admin/noticias', authAdmin, async (req, res) => {
     }
 
     const [noticias, total] = await Promise.all([
-      prisma.noticia.findMany({
+      req.db.noticia.findMany({
         where,
         include: {
           autor: {
@@ -195,7 +195,7 @@ router.get('/admin/noticias', authAdmin, async (req, res) => {
         take: parseInt(limit),
         skip: parseInt(offset)
       }),
-      prisma.noticia.count({ where })
+      req.db.noticia.count({ where })
     ])
 
     res.json({
@@ -217,7 +217,7 @@ router.get('/admin/noticias/:id', authAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
-    const noticia = await prisma.noticia.findUnique({
+    const noticia = await req.db.noticia.findUnique({
       where: { id: parseInt(id) },
       include: {
         autor: {
@@ -260,12 +260,12 @@ router.post('/admin/noticias', authAdmin, async (req, res) => {
 
     // Generar slug único
     let slug = generarSlug(titulo)
-    const existeSlug = await prisma.noticia.findUnique({ where: { slug } })
+    const existeSlug = await req.db.noticia.findUnique({ where: { slug } })
     if (existeSlug) {
       slug = `${slug}-${Date.now()}`
     }
 
-    const noticia = await prisma.noticia.create({
+    const noticia = await req.db.noticia.create({
       data: {
         titulo,
         slug,
@@ -310,7 +310,7 @@ router.put('/admin/noticias/:id', authAdmin, async (req, res) => {
       fechaPublicacion
     } = req.body
 
-    const noticiaExistente = await prisma.noticia.findUnique({
+    const noticiaExistente = await req.db.noticia.findUnique({
       where: { id: parseInt(id) }
     })
 
@@ -322,7 +322,7 @@ router.put('/admin/noticias/:id', authAdmin, async (req, res) => {
     let slug = noticiaExistente.slug
     if (titulo && titulo !== noticiaExistente.titulo) {
       slug = generarSlug(titulo)
-      const existeSlug = await prisma.noticia.findFirst({
+      const existeSlug = await req.db.noticia.findFirst({
         where: { slug, id: { not: parseInt(id) } }
       })
       if (existeSlug) {
@@ -338,7 +338,7 @@ router.put('/admin/noticias/:id', authAdmin, async (req, res) => {
       fechaPub = new Date(fechaPublicacion)
     }
 
-    const noticia = await prisma.noticia.update({
+    const noticia = await req.db.noticia.update({
       where: { id: parseInt(id) },
       data: {
         titulo: titulo || noticiaExistente.titulo,
@@ -373,7 +373,7 @@ router.delete('/admin/noticias/:id', authAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
-    const noticia = await prisma.noticia.findUnique({
+    const noticia = await req.db.noticia.findUnique({
       where: { id: parseInt(id) }
     })
 
@@ -381,7 +381,7 @@ router.delete('/admin/noticias/:id', authAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Noticia no encontrada' })
     }
 
-    await prisma.noticia.delete({
+    await req.db.noticia.delete({
       where: { id: parseInt(id) }
     })
 
@@ -401,7 +401,7 @@ router.post('/admin/noticias/:id/publicar', authAdmin, async (req, res) => {
     const { id } = req.params
     const { publicar } = req.body // true para publicar, false para despublicar
 
-    const noticia = await prisma.noticia.findUnique({
+    const noticia = await req.db.noticia.findUnique({
       where: { id: parseInt(id) }
     })
 
@@ -409,7 +409,7 @@ router.post('/admin/noticias/:id/publicar', authAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Noticia no encontrada' })
     }
 
-    const updated = await prisma.noticia.update({
+    const updated = await req.db.noticia.update({
       where: { id: parseInt(id) },
       data: {
         publicada: publicar,

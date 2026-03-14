@@ -47,7 +47,7 @@ router.get('/', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [gestiones, total] = await Promise.all([
-    req.prisma.gestionCobranza.findMany({
+    req.req.db.gestionCobranza.findMany({
       where,
       skip,
       take: parseInt(limit),
@@ -77,7 +77,7 @@ router.get('/', authAdmin, asyncHandler(async (req, res) => {
         { diasAtraso: 'desc' }
       ]
     }),
-    req.prisma.gestionCobranza.count({ where })
+    req.req.db.gestionCobranza.count({ where })
   ])
 
   res.json({
@@ -100,16 +100,16 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
     porEstado,
     totalDeuda
   ] = await Promise.all([
-    req.prisma.gestionCobranza.count(),
-    req.prisma.gestionCobranza.groupBy({
+    req.req.db.gestionCobranza.count(),
+    req.req.db.gestionCobranza.groupBy({
       by: ['prioridad'],
       _count: true
     }),
-    req.prisma.gestionCobranza.groupBy({
+    req.req.db.gestionCobranza.groupBy({
       by: ['estado'],
       _count: true
     }),
-    req.prisma.gestionCobranza.aggregate({
+    req.req.db.gestionCobranza.aggregate({
       _sum: { montoDeuda: true }
     })
   ])
@@ -129,7 +129,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
 router.get('/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const gestion = await req.prisma.gestionCobranza.findUnique({
+  const gestion = await req.req.db.gestionCobranza.findUnique({
     where: { id: parseInt(id) },
     include: {
       socio: {
@@ -190,7 +190,7 @@ router.post('/:id/acciones', authAdmin, asyncHandler(async (req, res) => {
     fechaProxima
   } = req.body
 
-  const gestion = await req.prisma.gestionCobranza.findUnique({
+  const gestion = await req.req.db.gestionCobranza.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -199,7 +199,7 @@ router.post('/:id/acciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Crear la acción
-  const accion = await req.prisma.accionCobranza.create({
+  const accion = await req.req.db.accionCobranza.create({
     data: {
       gestionId: parseInt(id),
       tipo,
@@ -230,7 +230,7 @@ router.post('/:id/acciones', authAdmin, asyncHandler(async (req, res) => {
     resultado === 'PAGO_REALIZADO' ? 'RESUELTO' :
     contactado ? 'EN_GESTION' : gestion.estado
 
-  await req.prisma.gestionCobranza.update({
+  await req.req.db.gestionCobranza.update({
     where: { id: parseInt(id) },
     data: {
       ultimaAccion: tipo,
@@ -254,7 +254,7 @@ router.put('/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { estado, responsableId, proximaAccion, fechaProximaAccion } = req.body
 
-  const updated = await req.prisma.gestionCobranza.update({
+  const updated = await req.req.db.gestionCobranza.update({
     where: { id: parseInt(id) },
     data: {
       estado,
@@ -292,7 +292,7 @@ router.put('/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const gestion = await req.prisma.gestionCobranza.findUnique({
+  const gestion = await req.req.db.gestionCobranza.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -304,7 +304,7 @@ router.delete('/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Solo se pueden eliminar gestiones resueltas', 400, 'INVALID_STATE')
   }
 
-  await req.prisma.gestionCobranza.delete({
+  await req.req.db.gestionCobranza.delete({
     where: { id: parseInt(id) }
   })
 

@@ -5,7 +5,7 @@ import chatService from '../../services/chatService'
 
 /**
  * ChatWidget Component
- * Widget flotante de chat con ROJO IA
+ * Widget flotante de chat con Xavi
  *
  * Props:
  * - tokenPortal: Token del socio (para rol socio)
@@ -51,7 +51,7 @@ export default function ChatWidget({
     setIsAvailable(health.available)
 
     if (!health.available) {
-      console.warn('⚠️  ROJO IA no disponible')
+      console.warn('⚠️  Xavi no disponible')
     }
   }
 
@@ -137,7 +137,7 @@ export default function ChatWidget({
   const getWelcomeMessage = () => {
     switch (role) {
       case 'socio':
-        return `👋 ¡Hola! Soy **ROJO IA**, tu asistente del Club Sportivo Pilar.
+        return `👋 ¡Hola! Soy **Xavi**, tu asistente del Club Sportivo Pilar.
 
 Puedo ayudarte con:
 • 💳 Consultar tu deuda y generar links de pago
@@ -153,7 +153,7 @@ Puedo ayudarte con:
 • "Ver menú del buffet"`
 
       case 'camarero':
-        return `👋 ¡Hola! Soy **ROJO IA**, tu asistente para el buffet.
+        return `👋 ¡Hola! Soy **Xavi**, tu asistente para el buffet.
 
 Puedo ayudarte con:
 • 🍽️ Ver estado de mesas
@@ -169,7 +169,7 @@ Puedo ayudarte con:
 • "Ver cuenta de mesa 7"`
 
       case 'admin':
-        return `👋 ¡Hola! Soy **ROJO IA**, tu asistente administrativo.
+        return `👋 ¡Hola! Soy **Xavi**, tu asistente administrativo.
 
 Puedo ayudarte con:
 • 📊 Consultas y reportes
@@ -181,7 +181,7 @@ Puedo ayudarte con:
 • "Ventas del buffet hoy"`
 
       default:
-        return '👋 ¡Hola! Soy ROJO IA, ¿en qué puedo ayudarte?'
+        return '👋 ¡Hola! Soy Xavi, ¿en qué puedo ayudarte?'
     }
   }
 
@@ -230,7 +230,7 @@ Puedo ayudarte con:
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <div>
-                <h3 className="font-semibold">ROJO IA</h3>
+                <h3 className="font-semibold">Xavi</h3>
                 <p className="text-xs opacity-90">
                   {isAvailable ? 'Conectado' : 'No disponible'}
                 </p>

@@ -48,7 +48,7 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 
   // Obtener todos los items de menú activos (padres)
-  const menuItems = await req.prisma.menuItem.findMany({
+  const menuItems = await req.req.db.menuItem.findMany({
     where: {
       activo: true,
       parentId: null
@@ -125,7 +125,7 @@ router.get('/', asyncHandler(async (req, res) => {
  * Solo usuarios con permiso USUARIOS_GESTIONAR
  */
 router.get('/admin', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req, res) => {
-  const menuItems = await req.prisma.menuItem.findMany({
+  const menuItems = await req.req.db.menuItem.findMany({
     where: { parentId: null },
     include: {
       children: {
@@ -195,7 +195,7 @@ router.post('/', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req, re
 
   // Si tiene parentId, verificar que existe
   if (parentId) {
-    const parent = await req.prisma.menuItem.findUnique({
+    const parent = await req.req.db.menuItem.findUnique({
       where: { id: parseInt(parentId) }
     })
     if (!parent) {
@@ -203,7 +203,7 @@ router.post('/', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req, re
     }
   }
 
-  const menuItem = await req.prisma.menuItem.create({
+  const menuItem = await req.req.db.menuItem.create({
     data: {
       parentId: parentId ? parseInt(parentId) : null,
       titulo,
@@ -231,7 +231,7 @@ router.put('/:id', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req, 
   const { id } = req.params
   const { parentId, titulo, icono, url, descripcion, orden, activo, soloSuperAdmin } = req.body
 
-  const existing = await req.prisma.menuItem.findUnique({
+  const existing = await req.req.db.menuItem.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -244,7 +244,7 @@ router.put('/:id', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req, 
     throw new AppError('Un item no puede ser su propio padre', 400)
   }
 
-  const menuItem = await req.prisma.menuItem.update({
+  const menuItem = await req.req.db.menuItem.update({
     where: { id: parseInt(id) },
     data: {
       parentId: parentId !== undefined ? (parentId ? parseInt(parentId) : null) : undefined,
@@ -272,7 +272,7 @@ router.put('/:id', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req, 
 router.delete('/:id', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const existing = await req.prisma.menuItem.findUnique({
+  const existing = await req.req.db.menuItem.findUnique({
     where: { id: parseInt(id) },
     include: { children: true }
   })
@@ -282,7 +282,7 @@ router.delete('/:id', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (re
   }
 
   // El cascade delete se encarga de los hijos
-  await req.prisma.menuItem.delete({
+  await req.req.db.menuItem.delete({
     where: { id: parseInt(id) }
   })
 
@@ -304,7 +304,7 @@ router.patch('/:id/roles', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(asyn
     throw new AppError('rolesIds debe ser un array', 400)
   }
 
-  const existing = await req.prisma.menuItem.findUnique({
+  const existing = await req.req.db.menuItem.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -324,11 +324,11 @@ router.patch('/:id/roles', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(asyn
 
   // Eliminar roles actuales y agregar los nuevos
   await req.prisma.$transaction([
-    req.prisma.menuItemRol.deleteMany({
+    req.req.db.menuItemRol.deleteMany({
       where: { menuItemId: parseInt(id) }
     }),
     ...rolesIds.map(rolId =>
-      req.prisma.menuItemRol.create({
+      req.req.db.menuItemRol.create({
         data: {
           menuItemId: parseInt(id),
           rolId: parseInt(rolId)
@@ -338,7 +338,7 @@ router.patch('/:id/roles', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(asyn
   ])
 
   // Obtener el item actualizado
-  const updated = await req.prisma.menuItem.findUnique({
+  const updated = await req.req.db.menuItem.findUnique({
     where: { id: parseInt(id) },
     include: {
       roles: {
@@ -369,7 +369,7 @@ router.patch('/:id/reorder', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(as
     throw new AppError('orden debe ser un número', 400)
   }
 
-  const menuItem = await req.prisma.menuItem.update({
+  const menuItem = await req.req.db.menuItem.update({
     where: { id: parseInt(id) },
     data: { orden }
   })
@@ -525,7 +525,7 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
   ]
 
   // Obtener items existentes para comparar
-  const existingItems = await req.prisma.menuItem.findMany({
+  const existingItems = await req.req.db.menuItem.findMany({
     include: { children: true }
   })
 
@@ -556,7 +556,7 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
 
     if (!parent) {
       // Crear el padre
-      parent = await req.prisma.menuItem.create({
+      parent = await req.req.db.menuItem.create({
         data: {
           titulo: item.titulo,
           icono: item.icono,
@@ -570,7 +570,7 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
     } else {
       existentes++
       // Buscar el item real en la BD si existe
-      const realParent = await req.prisma.menuItem.findFirst({
+      const realParent = await req.req.db.menuItem.findFirst({
         where: item.url ? { url: item.url } : { titulo: item.titulo, parentId: null }
       })
       if (realParent) parent = realParent
@@ -579,12 +579,12 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
     // Procesar hijos
     if (item.children && parent.id) {
       for (const child of item.children) {
-        const childExists = await req.prisma.menuItem.findFirst({
+        const childExists = await req.req.db.menuItem.findFirst({
           where: { url: child.url }
         })
 
         if (!childExists) {
-          await req.prisma.menuItem.create({
+          await req.req.db.menuItem.create({
             data: {
               parentId: parent.id,
               titulo: child.titulo,
@@ -603,7 +603,7 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
     }
   }
 
-  const total = await req.prisma.menuItem.count()
+  const total = await req.req.db.menuItem.count()
 
   res.status(201).json({
     success: true,
