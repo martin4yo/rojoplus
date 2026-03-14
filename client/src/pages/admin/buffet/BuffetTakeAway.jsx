@@ -4,6 +4,7 @@ import { Plus, Clock, Phone, Truck, ShoppingBag, X, Users, CheckCircle, Trash2 }
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import { useConfirm } from '../../../hooks/useConfirm.jsx'
 import PageHeader from '../../../components/PageHeader'
 import { formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
@@ -13,6 +14,7 @@ import ChatWidget from '../../../components/chat/ChatWidget'
 
 export default function BuffetTakeAway() {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
 
   // Estados principales
   const [modoVista, setModoVista] = useState('dashboard') // 'dashboard' | 'detalle'
@@ -203,9 +205,15 @@ export default function BuffetTakeAway() {
   async function eliminarPedido(pedido, e) {
     e.stopPropagation() // Evitar abrir el detalle
 
-    if (!confirm(`¿Eliminar el pedido #${pedido.numero}?`)) {
-      return
-    }
+    const confirmado = await confirm({
+      title: 'Eliminar Pedido',
+      message: `¿Estás seguro de que deseas eliminar el pedido #${pedido.numero}?`,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      isDangerous: true
+    })
+
+    if (!confirmado) return
 
     try {
       await api.delete(`/admin/buffet/takeaway/${pedido.id}`)
@@ -568,9 +576,6 @@ export default function BuffetTakeAway() {
           </button>
         </form>
       </Modal>
-
-      {/* ROJO IA - Chat Widget para Camareros */}
-      <ChatWidget role="camarero" position="bottom-right" />
     </div>
   )
 }

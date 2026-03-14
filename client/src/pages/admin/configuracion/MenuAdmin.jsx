@@ -210,9 +210,15 @@ export default function MenuAdmin() {
   }
 
   async function handleDelete(item) {
-    if (!confirm(`¿Eliminar "${item.titulo}"${item.children?.length > 0 ? ` y sus ${item.children.length} subitems` : ''}?`)) {
-      return
-    }
+    const confirmado = await confirm({
+      title: 'Eliminar Item de Menú',
+      message: `¿Eliminar "${item.titulo}"${item.children?.length > 0 ? ` y sus ${item.children.length} subitems` : ''}?`,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      isDangerous: true
+    })
+
+    if (!confirmado) return
 
     try {
       await api.delete(`/admin/menu/${item.id}`)
@@ -264,9 +270,14 @@ export default function MenuAdmin() {
   }
 
   async function handleSeedMenu() {
-    if (!confirm('¿Crear el menú inicial? Solo funciona si la tabla está vacía.')) {
-      return
-    }
+    const confirmado = await confirm({
+      title: 'Crear Menú Inicial',
+      message: '¿Crear el menú inicial? Solo funciona si la tabla está vacía.',
+      confirmText: 'Crear',
+      cancelText: 'Cancelar'
+    })
+
+    if (!confirmado) return
 
     try {
       await api.post('/admin/menu/seed')
@@ -769,6 +780,9 @@ export default function MenuAdmin() {
           </div>
         </div>
       )}
+
+      {/* Dialog de confirmación */}
+      <ConfirmDialog />
     </div>
   )
 }
