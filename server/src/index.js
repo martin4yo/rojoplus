@@ -51,6 +51,7 @@ import importacionRoutes from './routes/importacion.js'
 import facturacionRoutes from './routes/facturacion.js'
 import menuRoutes from './routes/menu.js'
 import chatRoutes from './routes/chat.js'
+import superAdminRoutes from './routes/super-admin/index.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -59,6 +60,8 @@ import { initSocket } from './services/socketService.js'
 
 // Middlewares
 import { errorHandler } from './middleware/errorHandler.js'
+import { extractTenant, extractTenantOptional, requireSuperAdmin } from './middleware/extractTenant.js'
+import { createTenantPrisma } from './lib/tenantPrisma.js'
 
 const app = express()
 const httpServer = createServer(app)
@@ -83,6 +86,39 @@ app.use((req, res, next) => {
   req.prisma = prisma
   next()
 })
+
+// ===== MULTI-TENANT SETUP =====
+// Rutas que requieren tenant context
+app.use('/api/admin/*', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+})
+app.use('/api/socio/*', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+})
+app.use('/api/buffet/*', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+})
+
+// Rutas públicas con tenant opcional
+app.use('/api/public/*', extractTenantOptional, (req, res, next) => {
+  if (req.tenantId) {
+    req.db = createTenantPrisma(req.tenantId)
+  }
+  next()
+})
+
+// Rutas super-admin (sin tenant scope)
+app.use('/api/super-admin/*', requireSuperAdmin)
+
+// Endpoint de tenant actual (necesario para frontend)
+app.get('/api/tenant/current', extractTenant, (req, res) => {
+  res.json(req.tenant)
+})
+
+// ===== FIN MULTI-TENANT SETUP =====
 
 // Rutas
 app.use('/api/rubros', rubrosRoutes)
@@ -127,6 +163,7 @@ app.use('/api/importacion', importacionRoutes)
 app.use('/api/admin/facturacion', facturacionRoutes)
 app.use('/api/admin/menu', menuRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/super-admin', superAdminRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -142,7 +179,7 @@ const io = initSocket(httpServer)
 // Iniciar servidor
 httpServer.listen(PORT, 'localhost', async () => {
   console.log(`
-🚀 Servidor RojoPlus iniciado
+🚀 Servidor Clubix iniciado
 📍 Puerto: ${PORT}
 🔗 API: http://localhost:${PORT}/api
 🔌 Socket.io: Activo

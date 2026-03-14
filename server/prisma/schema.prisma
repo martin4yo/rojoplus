@@ -7,6 +7,113 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===== MULTI-TENANT CORE =====
+
+model Tenant {
+  id                    Int       @id @default(autoincrement())
+
+  // Identificación
+  nombre                String
+  subdomain             String    @unique
+  slug                  String    @unique
+
+  // Contacto
+  email                 String?
+  telefono              String?
+  direccion             String?
+  ciudad                String?
+  provincia             String?
+  codigoPostal          String?   @map("codigo_postal")
+
+  // Branding
+  logoUrl               String?   @map("logo_url")
+  faviconUrl            String?   @map("favicon_url")
+  colores               Json      @default("{}")
+
+  // Sitio público
+  descripcion           String?   @db.Text
+  slogan                String?
+  horarios              String?   @db.Text
+  redesSociales         Json      @default("{}") @map("redes_sociales")
+
+  // Configuración técnica
+  timezone              String    @default("America/Argentina/Buenos_Aires")
+  moneda                String    @default("ARS")
+
+  // Plan y límites
+  plan                  String    @default("TRIAL")
+  maxSocios             Int?      @map("max_socios")
+  maxAdmins             Int?      @map("max_admins")
+  maxStorageMb          Int?      @map("max_storage_mb")
+
+  // Estado
+  estado                String    @default("PENDING_APPROVAL")
+  activo                Boolean   @default(false)
+  fechaAprobacion       DateTime? @map("fecha_aprobacion")
+  fechaSuspension       DateTime? @map("fecha_suspension")
+  motivoSuspension      String?   @map("motivo_suspension") @db.Text
+
+  // Facturación del tenant
+  razonSocial           String?   @map("razon_social")
+  cuit                  String?
+  condicionIva          String?   @map("condicion_iva")
+
+  // Auditoría
+  creadoPor             Int?      @map("creado_por")
+  aprobadoPor           Int?      @map("aprobado_por")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  tenantUsuarios        TenantUsuario[]
+  configuraciones       TenantConfiguracion[]
+
+  @@index([subdomain])
+  @@index([estado])
+  @@index([activo])
+  @@map("tenants")
+}
+
+model TenantUsuario {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int      @map("tenant_id")
+  adminId       Int      @map("admin_id")
+
+  // Rol en este tenant específico
+  rol           String   @default("ADMIN")
+  permisos      Json     @default("[]")
+
+  activo        Boolean  @default(true)
+  fechaIngreso  DateTime @default(now()) @map("fecha_ingreso")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  admin         Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, adminId])
+  @@index([tenantId])
+  @@index([adminId])
+  @@map("tenant_usuarios")
+}
+
+model TenantConfiguracion {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  clave       String
+  valor       String   @db.Text
+  tipo        String   @default("STRING")
+  descripcion String?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, clave])
+  @@index([tenantId])
+  @@map("tenant_configuracion")
+}
+
+// ===== END MULTI-TENANT CORE =====
+
 model ConceptoTesoreria {
   id                   Int                  @id @default(autoincrement())
   codigo               String               @unique
@@ -1140,6 +1247,7 @@ model Admin {
   accionesRecuperoRealizadas AccionRecupero[]  @relation("AccionesRecupero")
   campanasRecuperoCreadas CampanaRecupero[]    @relation("CampanasRecupero")
   campanasComunicacionCreadas CampanaComunicacion[] @relation("CampanasComunicacion")
+  tenantUsuarios          TenantUsuario[]
 
   @@map("admins")
 }
