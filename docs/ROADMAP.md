@@ -1298,14 +1298,33 @@ npm run dev
 *Ultima actualizacion: 12 de Marzo 2026*
 
 **FASES COMPLETADAS RECIENTEMENTE:**
-- ✅ FASE 40: ROJO IA - Asistente Inteligente (12/03/2026)
-  - **⭐ NUEVO:** Asistente conversacional con Claude Sonnet 4
+- ✅ FASE 41: Módulos de Gestión Integral (13/03/2026)
+  - **⭐ NUEVO:** Cobranzas, Recupero de Socios, Comunicaciones
+  - Backend: API completa con seguimiento de deudas, encuestas de baja, campañas multi-canal
+  - Frontend: GestionCobranzas, GestionRecupero, GestionComunicaciones
+  - Modelos: gestiones_cobranza, acciones_cobranza, encuestas_baja, campanas_recupero, campanas_comunicacion
+  - Servicio de gestión de cobranzas integrado
+
+- ✅ FASE 42: Sitio Web de Marketing Clubix (13/03/2026)
+  - **⭐ NUEVO:** Landing page profesional en /web
+  - Rebranding completo: RojoPlus → Clubix
+  - Paleta navy-cyan basada en logo oficial
+  - 12 módulos destacados con badges "Nuevo"
+  - Sección Xavi IA con énfasis en análisis predictivo
+  - Parallax scrolling, animaciones modernas, responsive design
+  - SEO optimizado: "Sistema inteligente que hace crecer tu club"
+  - Mensajería enfocada en IA predictiva e informes estratégicos
+
+- ✅ FASE 40: Xavi IA - Asistente Inteligente (12/03/2026)
+  - **Renombrado:** ROJO IA → Xavi
+  - Asistente conversacional con Claude Sonnet 4
   - Backend: aiAssistant.js (400 líneas), actionExecutor.js (800 líneas), chat.js (260 líneas)
   - Frontend: ChatWidget, ChatMessage con Markdown, chatService
   - 23 acciones implementadas para socios, camareros y admins
   - Integrado en 6 páginas: Portal Socio, Buffet (3), Admin (2)
   - Documentación completa: README, PROPUESTA, SETUP
   - Costo estimado: USD 15-40/mes
+
 - ✅ FASE 31: Control de Accesos (molinetes con QR/DNI/RFID, modo offline, PWA móvil)
 - ✅ FASE 39: Módulo Buffet/Restaurant MVP (Mesas/Comandas, Take Away, Kiosco, Cocina KDS, Impresoras Térmicas, Socket.io)
   - Mejoras POS completadas al 100% (22/02/2026)
@@ -1316,3 +1335,250 @@ npm run dev
 - Frontend: 9 páginas + 6 componentes nuevos en `client/src/pages/admin/buffet/` y `client/src/components/buffet/`
 - Docs mejoras POS: `MEJORAS_POS_COMPLETADO.md`, `BACKEND_PAGOS_MULTIPLES_COMPLETADO.md`, `TESTING_MEJORAS_POS.md`
 - Modelos: Mesa, Comanda, ItemComanda, PedidoTakeAway, ProductoBuffet, ZonaBuffet
+
+
+---
+
+## 📅 FASES FUTURAS PLANIFICADAS
+
+### 🎨 FASE 43: Sistema de Personalización de Estilos (Planificada - 1 semana)
+> Branding y temas visuales parametrizables por tenant
+
+**Documentación:** `docs/PLAN_IMPLEMENTACION_MULTITENANT.md` (Semana 1)
+
+**Objetivo:** Permitir a cada club personalizar completamente la apariencia del sistema.
+
+#### Backend (Días 1-3)
+- [ ] **43.1** Diseñar estructura JSON de colores (15-20 variables)
+- [ ] **43.2** Agregar campo `colores JSONB` a tabla tenants
+- [ ] **43.3** API de branding: GET/PUT colores, POST logo/favicon
+- [ ] **43.4** Servicio de validación de colores (hex, contraste WCAG)
+- [ ] **43.5** Upload y storage de logo/favicon (max 2MB)
+
+#### Frontend (Día 4)
+- [ ] **43.6** Context `TenantThemeContext` con CSS variables dinámicas
+- [ ] **43.7** Hook `useTenantTheme()` para aplicar tema
+- [ ] **43.8** Componente `EditorBranding` con color pickers
+- [ ] **43.9** Preview en tiempo real de cambios
+- [ ] **43.10** Componente `LogoUploader` con drag & drop
+- [ ] **43.11** Actualizar Tailwind config para variables dinámicas
+
+#### Testing y Polish (Día 5)
+- [ ] **43.12** Validación de contraste automática
+- [ ] **43.13** Caché de tema en localStorage
+- [ ] **43.14** 3 presets de ejemplo (Rojo, Azul, Verde)
+- [ ] **43.15** Documentación de usuario
+
+**Entregables:**
+- Panel de configuración de branding completo
+- Editor visual de colores con preview
+- Logo y favicon personalizables
+- Tema aplicado globalmente en toda la app
+
+---
+
+### 🏢 FASE 44-46: Multi-Tenant (Planificada - 3 semanas)
+> Conversión a arquitectura multi-tenant con subdominios
+
+**Documentación Completa:** 
+- `docs/ARQUITECTURA_MULTITENANT.md` - Diseño técnico completo
+- `docs/PLAN_IMPLEMENTACION_MULTITENANT.md` - Plan día por día
+
+**Objetivo:** Permitir múltiples clubes independientes en una sola instalación.
+
+---
+
+#### 📊 FASE 44: Base de Datos Multi-Tenant (Semana 2 - 5 días)
+
+**Arquitectura:**
+- Identificación por subdomain (ej: `sportivo-pilar.clubix.com`)
+- Base de datos compartida con `tenant_id`
+- Usuarios compartidos entre tenants
+- Aislamiento automático vía middleware
+
+##### Día 1: Diseño y Planificación
+- [ ] **44.1** Crear tabla `tenants` (nombre, subdomain, logo, colores, contacto, plan, límites)
+- [ ] **44.2** Crear tabla `tenant_usuarios` (relación N:N usuarios ↔ clubes)
+- [ ] **44.3** Crear tabla `tenant_configuracion` (config específica por club)
+- [ ] **44.4** Actualizar `email_templates` (globales + override por tenant)
+- [ ] **44.5** Listar 35+ tablas que necesitan `tenant_id`
+
+##### Día 2-3: Migración de Base de Datos
+- [ ] **44.6** Agregar `tenant_id` a todas las tablas existentes
+- [ ] **44.7** Crear tenant "sportivo-pilar" con datos actuales
+- [ ] **44.8** Migrar datos existentes → tenant_id = 1
+- [ ] **44.9** Agregar constraints NOT NULL y foreign keys
+- [ ] **44.10** Crear índices compuestos `(tenant_id, id)`
+
+##### Día 4: Prisma Schema + Middleware
+- [ ] **44.11** Actualizar Prisma schema con relaciones tenant
+- [ ] **44.12** Generar cliente Prisma
+- [ ] **44.13** Crear `tenantMiddleware.js` para inyección/filtrado automático
+- [ ] **44.14** Tests de aislamiento entre tenants
+
+##### Día 5: Express Middleware + Auth
+- [ ] **44.15** Crear `extractTenant.js` (extrae subdomain del host)
+- [ ] **44.16** Aplicar middleware a todas las rutas protegidas
+- [ ] **44.17** Actualizar JWT para incluir `tenantId`
+- [ ] **44.18** Manejo de desarrollo local (`*.localhost`)
+
+**Entregables Fase 44:**
+- Base de datos 100% multi-tenant
+- Aislamiento automático por tenant_id
+- Middleware Prisma y Express funcionando
+- 0 cruces de datos entre tenants
+
+---
+
+#### 🎨 FASE 45: Frontend Multi-Tenant + Onboarding (Semana 3 - 5 días)
+
+##### Día 1: Context y Branding Dinámico
+- [ ] **45.1** Context `TenantContext` con info del club actual
+- [ ] **45.2** Hook `useTenant()` global
+- [ ] **45.3** Endpoint `GET /api/tenant/current`
+- [ ] **45.4** Header/Footer con logo y nombre dinámicos
+- [ ] **45.5** Favicon dinámico por tenant
+- [ ] **45.6** Título de página personalizado
+
+##### Día 2-3: Sistema de Registro de Clubes
+- [ ] **45.7** Página pública `/registro-club` (formulario multi-paso)
+- [ ] **45.8** Validación de subdomain en tiempo real
+- [ ] **45.9** API `POST /api/public/registro-club`
+- [ ] **45.10** Crear tenant + admin + relación en una transacción
+- [ ] **45.11** Estado inicial: `PENDING_APPROVAL`
+- [ ] **45.12** Email a registrante: "Solicitud recibida"
+- [ ] **45.13** Email a super-admin: "Nuevo club pendiente"
+
+##### Día 4: Panel Super-Admin
+- [ ] **45.14** Ruta especial para super-admin (`admin.clubix.com`)
+- [ ] **45.15** Middleware `requireSuperAdmin`
+- [ ] **45.16** Panel `GestionTenants` con lista completa
+- [ ] **45.17** Filtros por estado (PENDING, ACTIVE, SUSPENDED)
+- [ ] **45.18** Acciones: Aprobar, Rechazar, Suspender, Activar
+- [ ] **45.19** Vista detalle con estadísticas del club
+- [ ] **45.20** Modo debug: "Acceder como admin" a cualquier tenant
+
+##### Día 5: Sitio Público por Tenant
+- [ ] **45.21** Página `TenantHome` con info del club
+- [ ] **45.22** Routing: raíz = público, /admin = panel, /s/token = socio
+- [ ] **45.23** API `GET /api/public/tenant-info` (sin auth)
+- [ ] **45.24** Formulario de contacto público
+- [ ] **45.25** Mapa con ubicación del club
+
+**Entregables Fase 45:**
+- Onboarding completo de nuevos clubes
+- Panel super-admin operativo
+- Sitio público simple por tenant
+- Branding dinámico en toda la app
+
+---
+
+#### 🚀 FASE 46: DNS, Testing y Deploy (Semana 4 - 5 días)
+
+##### Día 1: Testing de Aislamiento
+- [ ] **46.1** Crear tenant "demo" para testing
+- [ ] **46.2** Suite de tests: verificar no hay cruces de datos
+- [ ] **46.3** Tests de performance (queries con índices)
+- [ ] **46.4** EXPLAIN ANALYZE de queries críticas
+
+##### Día 2: Duplicación de Datos
+- [ ] **46.5** Script `duplicateTenant.js` para clonar tenants
+- [ ] **46.6** Duplicar Sportivo Pilar → Demo (con datos anonimizados)
+- [ ] **46.7** Validar integridad de datos duplicados
+
+##### Día 3: Configuración DNS y Subdominios
+- [ ] **46.8** Configurar wildcard DNS: `*.clubix.com → IP servidor`
+- [ ] **46.9** Nginx config para proxy de subdominios
+- [ ] **46.10** SSL wildcard certificate con Let's Encrypt
+- [ ] **46.11** Testing: sportivo-pilar.clubix.com, demo.clubix.com
+
+##### Día 4: Documentación
+- [ ] **46.12** Guía técnica de arquitectura multi-tenant
+- [ ] **46.13** Guía de usuario: registro de club
+- [ ] **46.14** Guía de usuario: personalización de branding
+- [ ] **46.15** Video tutorial de onboarding
+- [ ] **46.16** Guía de migración futura (schemas separados)
+
+##### Día 5: Deploy a Producción
+- [ ] **46.17** Backup completo de base de datos
+- [ ] **46.18** Ejecutar migraciones en producción
+- [ ] **46.19** Smoke tests: login, registro, aprobación
+- [ ] **46.20** Configurar monitoreo y alertas
+- [ ] **46.21** Dashboard de métricas por tenant
+- [ ] **46.22** Documentar plan de rollback
+
+**Entregables Fase 46:**
+- Sistema multi-tenant en producción
+- Subdominios funcionando con SSL
+- 2 tenants operativos: sportivo-pilar + demo
+- Monitoreo activo
+- Documentación completa
+
+---
+
+### 📊 Resumen Implementación Multi-Tenant
+
+**Duración Total:** 4 semanas
+- **Semana 1:** Colores Parametrizables (FASE 43)
+- **Semana 2:** Base de Datos Multi-Tenant (FASE 44)
+- **Semana 3:** Frontend + Onboarding (FASE 45)
+- **Semana 4:** Testing + Deploy (FASE 46)
+
+**Decisiones de Arquitectura:**
+- ✅ Subdomain por tenant (`club.clubix.com`)
+- ✅ Base de datos compartida con `tenant_id`
+- ✅ Usuarios compartidos (pueden trabajar en múltiples clubes)
+- ✅ Login fijado por contexto de subdomain
+- ✅ Onboarding: auto-registro + aprobación manual
+- ✅ Branding completo: colores, logo, favicon, contacto
+
+**Tablas Nuevas:**
+- `tenants` - Info y config de cada club
+- `tenant_usuarios` - Relación N:N usuarios ↔ clubes con roles
+- `tenant_configuracion` - Config específica por tenant
+- `email_templates` actualizada - Globales + override
+
+**Migraciones:**
+- 35+ tablas reciben `tenant_id`
+- Índices compuestos para performance
+- Datos actuales → tenant "sportivo-pilar"
+- Clonar a tenant "demo" para testing
+
+**Features Multi-Tenant:**
+- 🎨 Editor visual de colores con preview en tiempo real
+- 📤 Upload de logo y favicon por tenant
+- 🏢 Registro público de clubes con aprobación manual
+- ⚙️ Panel super-admin para gestionar tenants
+- 🌐 Sitio público simple personalizado por tenant
+- 🔒 Aislamiento total garantizado por middleware
+- 📊 Límites configurables: max_socios, max_storage, plan
+
+---
+
+## 🎯 Próximos Pasos Post Multi-Tenant
+
+### FASE 47: Sistema de Facturación por Tenant (2 semanas)
+- Tabla `suscripciones` con planes
+- Integración con gateway de pago (Mercado Pago/Stripe)
+- Facturación automática mensual
+- Límites por plan (socios, storage, módulos)
+- Panel de facturación para super-admin
+
+### FASE 48: Analytics y Reportes Globales (1 semana)
+- Dashboard de métricas globales (todos los tenants)
+- Comparativas entre clubes
+- Reportes de uso por módulo
+- Métricas de retención y churn
+
+### FASE 49: Optimizaciones de Performance (ongoing)
+- Migrar a PostgreSQL schemas separados (si escala)
+- CDN para assets estáticos (logos, favicons)
+- Cache Redis de branding y configuración
+- Optimización de queries con tenant_id
+
+---
+
+*Documentación completa en:*
+- `docs/ARQUITECTURA_MULTITENANT.md`
+- `docs/PLAN_IMPLEMENTACION_MULTITENANT.md`
+
