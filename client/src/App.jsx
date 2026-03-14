@@ -2,6 +2,8 @@ import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import ScrollToTop from './components/ScrollToTop'
 import ErrorBoundary from './components/ErrorBoundary'
+import TenantStyles from './components/TenantStyles'
+import { TenantProvider } from './contexts/TenantContext'
 import { TicketProvider } from './contexts/TicketContext'
 import { NotificacionBuffetProvider } from './contexts/NotificacionBuffetContext'
 
@@ -224,11 +226,13 @@ import AdminLayout from './components/AdminLayout'
 function App() {
   return (
     <ErrorBoundary>
-      <TicketProvider>
-        <NotificacionBuffetProvider>
-          <ScrollToTop />
-          <Toaster position="top-right" />
-          <Routes>
+      <TenantProvider>
+        <TenantStyles />
+        <TicketProvider>
+          <NotificacionBuffetProvider>
+            <ScrollToTop />
+            <Toaster position="top-right" />
+            <Routes>
         {/* Sitio web público del club */}
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<HomePublic />} />
@@ -464,11 +468,12 @@ function App() {
         {/* Gestión de Comunicaciones */}
         <Route path="comunicaciones" element={<GestionComunicaciones />} />
       </Route>
-        </Routes>
-        </NotificacionBuffetProvider>
-      </TicketProvider>
-    </ErrorBoundary>
-  )
-}
+            </Routes>
+            </NotificacionBuffetProvider>
+          </TicketProvider>
+        </TenantProvider>
+      </ErrorBoundary>
+    )
+  }
 
 export default App

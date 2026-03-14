@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import api from '../services/api'
 import { cargarPermisos, limpiarPermisos, getPermisos, esAdmin } from '../services/permisos'
+import TenantLogo from './TenantLogo'
+import { useTenant } from '../contexts/TenantContext'
 
 // Mapeo de nombres de iconos a componentes
 const ICONOS = {
@@ -20,6 +22,7 @@ const ICONOS = {
 export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { tenant } = useTenant()
   const [admin, setAdmin] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -238,14 +241,14 @@ export default function AdminLayout() {
       `}>
         <div className={`flex-shrink-0 p-4 border-b border-gray-200 bg-white flex items-center ${sidebarCollapsed ? 'md:justify-center' : 'justify-between'}`}>
           <Link to="/admin" className={`flex items-center gap-3 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
-            <img src="/images/logo.png" alt="Logo" className="h-14" />
+            <TenantLogo className="h-14" />
             <div>
               <span className="font-bold text-primary text-lg whitespace-nowrap">Sportivo Pilar</span>
               <p className="text-xs text-gray-500">Admin</p>
             </div>
           </Link>
           <Link to="/admin" className={`hidden ${sidebarCollapsed ? 'md:block' : 'md:hidden'}`}>
-            <img src="/images/logo.png" alt="Logo" className="h-10" />
+            <TenantLogo className="h-10" />
           </Link>
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -438,7 +441,7 @@ export default function AdminLayout() {
             </button>
             <div className="md:hidden">
               <Link to="/admin" className="flex items-center gap-2">
-                <img src="/images/logo.png" alt="Logo" className="h-8" />
+                <TenantLogo className="h-8" />
                 <span className="font-bold text-primary whitespace-nowrap">Rojo Plus</span>
               </Link>
             </div>
