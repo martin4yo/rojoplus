@@ -96,10 +96,12 @@ app.use((req, res, next) => {
 // ===== MULTI-TENANT SETUP =====
 // Rutas que requieren tenant context
 // BUT: login endpoint bypasses extractTenant
+// Routes that bypass tenant extraction (work without subdomain)
+const TENANT_FREE_ROUTES = ['/api/admin/login', '/api/admin/mis-permisos', '/api/admin/menu']
+
 app.use('/api/admin/*', (req, res, next) => {
-  // Skip extractTenant for login endpoint
-  // Check originalUrl to get the full path including /api/admin
-  if (req.originalUrl.includes('/api/admin/login')) {
+  // Skip extractTenant for routes that work without tenant context
+  if (TENANT_FREE_ROUTES.some(route => req.originalUrl.startsWith(route))) {
     return next()
   }
   // Apply tenant extraction for all other admin routes
