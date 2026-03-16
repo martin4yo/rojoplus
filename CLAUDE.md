@@ -7,15 +7,24 @@ Frontend: React + Vite + Tailwind | Backend: Node.js + Express + Prisma + Socket
 ```
 client/src/pages/{admin,socio,comercio,public}/
 server/src/{routes,services,jobs}/
-server/prisma/schema.prisma  # 35+ modelos
-ROADMAP.md                   # Fases técnicas
+server/prisma/schema.prisma  # 135+ modelos
+docs/ROADMAP.md              # Fases técnicas (39 fases)
+ESTADO_PROYECTO.md           # ⭐ Estado actualizado con pendientes detallados
 ```
 
-## Estado: 99% Completo
+## Estado: Multi-Tenant Clubix activo
 
-**Completados:** Socios (con Cuenta Corriente), Cuotas, Cobranzas (con Adjuntos), Portal Socio (PWA), Deportes, Financiero, Débito Automático, Conciliación Bancaria, Sitio Institucional, Permisos, **Buffet MVP ✅**, **Control de Accesos ✅**, Centro de Costos (90%).
+**Completados (100%):** Socios, Cuotas, Cobranzas, Recupero, Comunicaciones, Portal Socio (PWA), Deportes, Financiero, Débito Automático (Prisma), Conciliación Bancaria, Sitio Institucional, Permisos/Roles, Buffet MVP, Control de Accesos, Centro de Costos, Eventos, Facturación Electrónica, Branding, Multi-Tenant (Fases 1-6), Super-Admin Panel, Registro Público Club.
 
-**Pendientes:** Centro Costos Reportes (32.10), Payway (35.10-14), Débito Bancario (35.15-20), Testing (18).
+**Pendientes:** Payway (35.10-14), Débito Bancario por banco (35.15-20), Testing automatizado, Deploy (Multi-Tenant Fase 7), bcrypt en `/register`.
+
+## Multi-Tenant — Rutas sin tenant (TENANT_FREE_ROUTES)
+```javascript
+// server/src/index.js — estas rutas bypasean extractTenant:
+const TENANT_FREE_ROUTES = ['/api/admin/login', '/api/admin/mis-permisos', '/api/admin/menu']
+// Usan prisma global directamente (no req.db)
+// Super-admin usa estas rutas desde localhost sin subdomain
+```
 
 ## Buffet MVP - Archivos Clave
 - `server/src/routes/buffet/` - Rutas divididas: comandas.js, takeaway.js, tickets.js, impresoras.js
