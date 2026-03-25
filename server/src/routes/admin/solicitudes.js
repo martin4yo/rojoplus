@@ -456,7 +456,7 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
 
   // Enviar email de rechazo
   try {
-    const clubNombre = (await req.prisma.configuracion.findUnique({
+    const clubNombre = (await req.db.configuracion.findFirst({
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
 

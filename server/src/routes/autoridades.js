@@ -20,7 +20,7 @@ router.get('/public', async (req, res) => {
     })
 
     // Obtener período de la configuración
-    const configPeriodo = await req.db.configuracion.findUnique({
+    const configPeriodo = await req.db.configuracion.findFirst({
       where: { clave: 'PERIODO_COMISION_DIRECTIVA' }
     })
 
@@ -47,7 +47,7 @@ router.get('/public', async (req, res) => {
 // GET /api/admin/autoridades/config/periodo - Obtener período
 router.get('/config/periodo', authAdmin, async (req, res) => {
   try {
-    const config = await req.db.configuracion.findUnique({
+    const config = await req.db.configuracion.findFirst({
       where: { clave: 'PERIODO_COMISION_DIRECTIVA' }
     })
     res.json({ success: true, data: { periodo: config?.valor || 'Período 2024 - 2026' } })
@@ -63,7 +63,7 @@ router.put('/config/periodo', authAdmin, async (req, res) => {
     const { periodo } = req.body
 
     await req.db.configuracion.upsert({
-      where: { clave: 'PERIODO_COMISION_DIRECTIVA' },
+      where: { tenantId_clave: { tenantId: req.tenantId, clave: 'PERIODO_COMISION_DIRECTIVA' } },
       update: { valor: periodo },
       create: { clave: 'PERIODO_COMISION_DIRECTIVA', valor: periodo, descripcion: 'Período de la Comisión Directiva' }
     })

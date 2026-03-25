@@ -107,7 +107,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
 
   // Enviar email de confirmación al solicitante
   try {
-    const clubNombre = (await req.db.configuracion.findUnique({
+    const clubNombre = (await req.db.configuracion.findFirst({
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
 
@@ -133,7 +133,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
       select: { email: true }
     })
 
-    const clubNombre = (await req.db.configuracion.findUnique({
+    const clubNombre = (await req.db.configuracion.findFirst({
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
 

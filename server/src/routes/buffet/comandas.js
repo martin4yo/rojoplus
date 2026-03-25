@@ -708,7 +708,7 @@ router.post('/comandas/:id/pedir-cuenta', authAdmin, checkPermiso('BUFFET_MESAS'
     // Calcular descuento si el socio está al día
     let descuentoInfo = { porcentaje: 0, monto: 0 }
     if (comanda.socioId) {
-      const configDescuento = await req.db.configuracion.findUnique({
+      const configDescuento = await req.db.configuracion.findFirst({
         where: { clave: 'BUFFET_DESCUENTO_SOCIO' }
       })
       const descuentoPorcentaje = configDescuento ? parseFloat(configDescuento.valor) : 0
@@ -929,7 +929,7 @@ router.get('/comandas/:id/descuento', authAdmin, checkPermiso('BUFFET_COBRAR'), 
     }
 
     if (comanda.socioId) {
-      const configDescuento = await req.db.configuracion.findUnique({
+      const configDescuento = await req.db.configuracion.findFirst({
         where: { clave: 'BUFFET_DESCUENTO_SOCIO' }
       })
 
@@ -1028,7 +1028,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     let descuentoPorcentaje = 0
 
     if (aplicarDescuento && comanda.socioId) {
-      const configDescuento = await req.db.configuracion.findUnique({
+      const configDescuento = await req.db.configuracion.findFirst({
         where: { clave: 'BUFFET_DESCUENTO_SOCIO' }
       })
 

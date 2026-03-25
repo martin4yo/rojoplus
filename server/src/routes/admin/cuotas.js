@@ -174,10 +174,10 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
     fechaVenc = new Date(fechaVencimiento)
   } else {
     // Obtener configuración
-    const configDia = await req.prisma.configuracion.findUnique({
+    const configDia = await req.db.configuracion.findFirst({
       where: { clave: 'CUOTA_DIA_VENCIMIENTO' }
     })
-    const configMismoMes = await req.prisma.configuracion.findUnique({
+    const configMismoMes = await req.db.configuracion.findFirst({
       where: { clave: 'CUOTA_VENCE_MISMO_MES' }
     })
 
@@ -949,7 +949,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
 
     // Si no se encontró concepto específico, usar el fallback de configuración
     if (!conceptoCobranza) {
-      const configConcepto = await tx.configuracion.findUnique({
+      const configConcepto = await tx.configuracion.findFirst({
         where: { clave: 'CONCEPTO_COBRANZA_CUOTAS' }
       })
 

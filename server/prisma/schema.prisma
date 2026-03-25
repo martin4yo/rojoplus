@@ -140,6 +140,8 @@ model ConceptoTesoreria {
   tiposSocioMora       TipoSocio[]          @relation("TipoSocioConceptoMora")
   tiposSocio           TipoSocio[]          @relation("TipoSocioConcepto")
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("conceptos_tesoreria")
 }
 
@@ -159,6 +161,8 @@ model TipoSocio {
   conceptoMora        ConceptoTesoreria? @relation("TipoSocioConceptoMora", fields: [conceptoMoraId], references: [id])
   conceptoTesoreria   ConceptoTesoreria? @relation("TipoSocioConcepto", fields: [conceptoTesoreriaId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("tipos_socio")
 }
 
@@ -174,6 +178,8 @@ model CategoriaSocio {
   porcentajeDescuento Decimal  @default(0) @map("porcentaje_descuento") @db.Decimal(5, 2)
   socios              Socio[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("categorias_socio")
 }
 
@@ -189,6 +195,8 @@ model EstadoSocio {
   createdAt         DateTime @default(now()) @map("created_at")
   socios            Socio[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("estados_socio")
 }
 
@@ -332,6 +340,7 @@ model Socio {
   accionesRecupero             AccionRecupero[]       @relation("AccionesRecupero")
   enviosCampana                EnvioCampana[]         @relation("EnviosCampana")
 
+  tenantId    Int      @map("tenant_id")
   @@index([documento])
   @@index([apellidoNombre])
   @@index([estado])
@@ -342,6 +351,7 @@ model Socio {
   @@index([cobradorId])
   @@index([zona])
   @@index([titularFamiliaId], map: "idx_socios_titular_familia_id")
+  @@index([tenantId])
   @@map("socios")
 }
 
@@ -364,9 +374,11 @@ model DocumentoSocio {
   updatedAt        DateTime  @updatedAt @map("updated_at")
   socio            Socio     @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([tipo])
   @@index([fechaVencimiento])
+  @@index([tenantId])
   @@map("documentos_socio")
 }
 
@@ -384,6 +396,8 @@ model AutorizacionMenor {
   createdAt         DateTime  @default(now()) @map("created_at")
   socio             Socio     @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("autorizaciones_menores")
 }
 
@@ -400,6 +414,8 @@ model Cobrador {
   pagos       Pago[]
   socios      Socio[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("cobradores")
 }
 
@@ -427,6 +443,8 @@ model Actividad {
   staff               StaffTecnico[]
   espacios            EspacioDeportivo[]   @relation("ActividadToEspacioDeportivo")
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("actividades")
 }
 
@@ -461,7 +479,9 @@ model CategoriaActividad {
   partidos             Partido[]
   staff                StaffTecnico[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([actividadId])
+  @@index([tenantId])
   @@map("categorias_actividad")
 }
 
@@ -491,11 +511,13 @@ model Inscripcion {
   centroCosto          CentroCosto?       @relation(fields: [centroCostoId], references: [id])
   socio                Socio              @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@unique([socioId, categoriaActividadId, fechaInicio])
   @@index([socioId])
   @@index([categoriaActividadId])
   @@index([estado])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("inscripciones")
 }
 
@@ -524,6 +546,8 @@ model Entrenador {
   entidad         Entidad?              @relation(fields: [entidadId], references: [id])
   categorias      EntrenadorCategoria[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("entrenadores")
 }
 
@@ -539,7 +563,9 @@ model EntrenadorCategoria {
   categoriaActividad   CategoriaActividad @relation(fields: [categoriaActividadId], references: [id])
   entrenador           Entrenador         @relation(fields: [entrenadorId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@unique([entrenadorId, categoriaActividadId])
+  @@index([tenantId])
   @@map("entrenadores_categorias")
 }
 
@@ -553,6 +579,8 @@ model ConfiguracionRecargo {
   topeMaximo Decimal? @map("tope_maximo") @db.Decimal(5, 2)
   updatedAt  DateTime @updatedAt @map("updated_at")
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("configuracion_recargos")
 }
 
@@ -568,7 +596,9 @@ model Periodo {
   createdAt        DateTime  @default(now()) @map("created_at")
   cargos           Cargo[]
 
+  tenantId    Int      @map("tenant_id")
   @@unique([anio, mes])
+  @@index([tenantId])
   @@map("periodos")
 }
 
@@ -608,6 +638,7 @@ model Cargo {
   socio                Socio?              @relation(fields: [socioId], references: [id])
   notificaciones       NotificacionLog[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([periodoId])
   @@index([socioId])
   @@index([grupoFamiliarId])
@@ -616,6 +647,7 @@ model Cargo {
   @@index([fechaVencimiento])
   @@index([cargoOrigenId])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("cargos")
 }
 
@@ -636,7 +668,9 @@ model MedioPago {
   pagos              Pago[]
   cuentaContable     CuentaContable? @relation(fields: [cuentaContableId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([cuentaContableId])
+  @@index([tenantId])
   @@map("medios_pago")
 }
 
@@ -682,11 +716,13 @@ model Pago {
   socio             Socio                @relation(fields: [socioId], references: [id])
   saldosGenerados   SaldoFavor[]         @relation("SaldoOrigen")
 
+  tenantId    Int      @map("tenant_id")
   @@index([fecha])
   @@index([socioId])
   @@index([estado])
   @@index([origen])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("pagos")
 }
 
@@ -706,8 +742,10 @@ model SaldoFavor {
   pagoOrigen        Pago?             @relation("SaldoOrigen", fields: [pagoOrigenId], references: [id])
   socio             Socio?            @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([grupo_familiar_id])
+  @@index([tenantId])
   @@map("saldos_favor")
 }
 
@@ -720,6 +758,8 @@ model AplicacionSaldo {
   pago         Pago       @relation("SaldoAplicado", fields: [pagoId], references: [id])
   saldoFavor   SaldoFavor @relation(fields: [saldoFavorId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("aplicaciones_saldo")
 }
 
@@ -748,6 +788,8 @@ model ConfiguracionDebito {
   updatedAt           DateTime        @updatedAt @map("updated_at")
   archivos            ArchivoDebito[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("configuracion_debito")
 }
 
@@ -773,8 +815,10 @@ model ArchivoDebito {
   detalles          DetalleDebito[]
   cobranzas         ImportacionCobranza[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([periodoAnio, periodoMes])
   @@index([estado])
+  @@index([tenantId])
   @@map("archivos_debito")
 }
 
@@ -793,9 +837,11 @@ model DetalleDebito {
   archivo         ArchivoDebito @relation(fields: [archivoId], references: [id])
   socio           Socio         @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([archivoId])
   @@index([socioId])
   @@index([estado])
+  @@index([tenantId])
   @@map("detalles_debito")
 }
 
@@ -818,6 +864,8 @@ model ImportacionCobranza {
   detalles            DetalleCobranza[]
   archivoDebito       ArchivoDebito?    @relation(fields: [archivoDebitoId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("importaciones_cobranza")
 }
 
@@ -837,9 +885,11 @@ model DetalleCobranza {
   importacion    ImportacionCobranza @relation(fields: [importacionId], references: [id])
   socio          Socio?              @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([importacionId])
   @@index([socioId])
   @@index([estado])
+  @@index([tenantId])
   @@map("detalles_cobranza")
 }
 
@@ -878,7 +928,9 @@ model Caja {
   roles                  CajaRol[]
   comprobantes           ComprobanteElectronico[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([cuentaContableId])
+  @@index([tenantId])
   @@map("cajas")
 }
 
@@ -898,9 +950,11 @@ model TransferenciaCaja {
   cajaDestino     Caja     @relation("CajaDestino", fields: [cajaDestinoId], references: [id])
   registrador     Admin    @relation(fields: [registradoPor], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([cajaOrigenId])
   @@index([cajaDestinoId])
   @@index([fecha])
+  @@index([tenantId])
   @@map("transferencias_caja")
 }
 
@@ -918,6 +972,8 @@ model CuentaBancaria {
   sucursal     String?
   caja         Caja    @relation(fields: [cajaId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("cuentas_bancarias")
 }
 
@@ -942,6 +998,8 @@ model CuentaContable {
   mediosPago         MedioPago[]
   productosBuffet    ProductoBuffet[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("cuentas_contables")
 }
 
@@ -964,8 +1022,10 @@ model Asiento {
   anulador        Admin?               @relation("AsientoAnulador", fields: [anuladoPor], references: [id])
   registrador     Admin                @relation("AsientoRegistrador", fields: [registradoPor], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([fecha])
   @@index([tipoOrigen, origenId])
+  @@index([tenantId])
   @@map("asientos")
 }
 
@@ -982,9 +1042,11 @@ model AsientoLinea {
   centroCosto      CentroCosto?   @relation(fields: [centroCostoId], references: [id])
   cuentaContable   CuentaContable @relation(fields: [cuentaContableId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([asientoId])
   @@index([cuentaContableId])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("asiento_lineas")
 }
 
@@ -1033,6 +1095,7 @@ model MovimientoCaja {
   registrador             Admin                @relation(fields: [registradoPor], references: [id])
   entradas                Entrada[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([cajaId])
   @@index([fecha])
   @@index([comandaId])
@@ -1042,6 +1105,7 @@ model MovimientoCaja {
   @@index([centroCostoId])
   @@index([conciliado])
   @@index([movimientoContableId])
+  @@index([tenantId])
   @@map("movimientos_caja")
 }
 
@@ -1057,6 +1121,8 @@ model FormatoExtracto {
   updatedAt     DateTime           @updatedAt @map("updated_at")
   extractos     ExtractoBancario[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("formatos_extracto")
 }
 
@@ -1083,9 +1149,11 @@ model ExtractoBancario {
   formato             FormatoExtracto?     @relation(fields: [formatoId], references: [id])
   movimientos         MovimientoExtracto[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([cajaId])
   @@index([formatoId])
   @@index([periodoDesde, periodoHasta])
+  @@index([tenantId])
   @@map("extractos_bancarios")
 }
 
@@ -1109,10 +1177,12 @@ model MovimientoExtracto {
   conciliacion      Conciliacion?    @relation(fields: [conciliacionId], references: [id])
   extracto          ExtractoBancario @relation(fields: [extractoId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([extractoId])
   @@index([fecha])
   @@index([conciliado])
   @@index([movimientoCajaId])
+  @@index([tenantId])
   @@map("movimientos_extracto")
 }
 
@@ -1130,6 +1200,8 @@ model Conciliacion {
   movimientosCaja        MovimientoCaja[]
   movimientosExtracto    MovimientoExtracto[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("conciliaciones")
 }
 
@@ -1171,12 +1243,14 @@ model ECheq {
   registrador        Admin           @relation(fields: [registradoPor], references: [id])
   socio              Socio?          @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([tipo])
   @@index([estado])
   @@index([fechaVencimiento])
   @@index([entidadId])
   @@index([cajaOrigenId])
   @@index([cajaDestinoId])
+  @@index([tenantId])
   @@map("echeqs")
 }
 
@@ -1203,9 +1277,11 @@ model LinkPago {
   socio           Socio     @relation(fields: [socioId], references: [id])
   pagos           Pago[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([codigo])
   @@index([estado])
+  @@index([tenantId])
   @@map("links_pago")
 }
 
@@ -1365,8 +1441,10 @@ model Comercio {
   rubro                 Rubro                @relation(fields: [rubroId], references: [id])
   ventas                Venta[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([estado])
   @@index([plan])
+  @@index([tenantId])
   @@map("comercios")
 }
 
@@ -1380,6 +1458,8 @@ model DescuentoDisponible {
   createdAt   DateTime   @default(now()) @map("created_at")
   comercios   Comercio[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("descuentos_disponibles")
 }
 
@@ -1410,16 +1490,19 @@ model Venta {
   comercio          Comercio     @relation(fields: [comercioId], references: [id])
   socio             Socio        @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([comercioId])
   @@index([socioId])
   @@index([fecha])
   @@index([comercioId, socioId, fecha])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("ventas")
 }
 
 model Configuracion {
-  clave       String   @id
+  id          Int      @id @default(autoincrement())
+  clave       String
   valor       String
   descripcion String?
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -1427,6 +1510,9 @@ model Configuracion {
   modulo      String?
   tipo        String   @default("STRING")
 
+  tenantId    Int      @map("tenant_id")
+  @@unique([tenantId, clave])
+  @@index([tenantId])
   @@map("configuracion")
 }
 
@@ -1442,9 +1528,11 @@ model AuditLog {
   userAgent       String?  @map("user_agent")
   createdAt       DateTime @default(now()) @map("created_at")
 
+  tenantId    Int      @map("tenant_id")
   @@index([tabla, registroId])
   @@index([usuarioId])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("audit_log")
 }
 
@@ -1458,6 +1546,8 @@ model CargoPersonal {
   createdAt   DateTime  @default(now()) @map("created_at")
   entidades   Entidad[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("cargos_personal")
 }
 
@@ -1496,9 +1586,11 @@ model Entidad {
   ordenesCompra        OrdenCompra[]
   pedidos              Pedido[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([tipo])
   @@index([documento])
   @@index([cargoPersonalId])
+  @@index([tenantId])
   @@map("entidades")
 }
 
@@ -1523,10 +1615,12 @@ model OrdenCompra {
   movimientosContables MovimientoContable[]
   entidad              Entidad              @relation(fields: [entidadId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([entidadId])
   @@index([estado])
   @@index([fecha])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("ordenes_compra")
 }
 
@@ -1543,7 +1637,9 @@ model ItemOrdenCompra {
   ordenCompra        OrdenCompra       @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
   productoVariante   ProductoVariante? @relation(fields: [productoVarianteId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([ordenCompraId])
+  @@index([tenantId])
   @@map("items_orden_compra")
 }
 
@@ -1571,11 +1667,13 @@ model Pedido {
   entidad       Entidad?             @relation(fields: [entidadId], references: [id])
   socio         Socio?               @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([entidadId])
   @@index([socioId])
   @@index([estado])
   @@index([fecha])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("pedidos")
 }
 
@@ -1592,7 +1690,9 @@ model ItemPedido {
   pedido             Pedido            @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   productoVariante   ProductoVariante? @relation(fields: [productoVarianteId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([pedidoId])
+  @@index([tenantId])
   @@map("items_pedido")
 }
 
@@ -1603,6 +1703,8 @@ model CategoriaProducto {
   activo    Boolean    @default(true)
   productos Producto[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("categorias_producto")
 }
 
@@ -1627,9 +1729,11 @@ model Producto {
   conceptoVenta    ConceptoTesoreria? @relation("ProductoConceptoVenta", fields: [conceptoVentaId], references: [id])
   productoBuffet   ProductoBuffet?
 
+  tenantId    Int      @map("tenant_id")
   @@index([categoriaId])
   @@index([conceptoCompraId])
   @@index([conceptoVentaId])
+  @@index([tenantId])
   @@map("productos")
 }
 
@@ -1652,8 +1756,10 @@ model ProductoVariante {
   movimientos      MovimientoStock[]
   producto         Producto          @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@unique([productoId, talle, color])
   @@index([productoId])
+  @@index([tenantId])
   @@map("producto_variantes")
 }
 
@@ -1666,7 +1772,9 @@ model ProductoFoto {
   createdAt   DateTime @default(now()) @map("created_at")
   producto    Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@index([productoId])
+  @@index([tenantId])
   @@map("producto_fotos")
 }
 
@@ -1685,9 +1793,11 @@ model MovimientoStock {
   movimientoContable   MovimientoContable? @relation(fields: [movimientoContableId], references: [id])
   productoVariante     ProductoVariante    @relation(fields: [productoVarianteId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([productoVarianteId])
   @@index([fecha])
   @@index([movimientoContableId])
+  @@index([tenantId])
   @@map("movimientos_stock")
 }
 
@@ -1735,6 +1845,7 @@ model MovimientoContable {
   socio             Socio?               @relation(fields: [socioId], references: [id])
   movimientosStock  MovimientoStock[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([tipo])
   @@index([entidadId])
   @@index([socioId])
@@ -1743,6 +1854,7 @@ model MovimientoContable {
   @@index([centroCostoId])
   @@index([estado])
   @@index([fecha])
+  @@index([tenantId])
   @@map("movimientos_contables")
 }
 
@@ -1762,9 +1874,11 @@ model ItemMovimiento {
   movimientoContable   MovimientoContable @relation(fields: [movimientoContableId], references: [id], onDelete: Cascade)
   productoVariante     ProductoVariante?  @relation(fields: [productoVarianteId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([movimientoContableId])
   @@index([productoVarianteId])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("items_movimiento")
 }
 
@@ -1781,6 +1895,8 @@ model ConceptoLiquidacion {
   activo      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("conceptos_liquidacion")
 }
 
@@ -1802,8 +1918,10 @@ model LiquidacionSueldo {
   updatedAt        DateTime          @updatedAt @map("updated_at")
   items            ItemLiquidacion[]
 
+  tenantId    Int      @map("tenant_id")
   @@unique([mes, anio])
   @@index([estado])
+  @@index([tenantId])
   @@map("liquidaciones_sueldo")
 }
 
@@ -1824,9 +1942,11 @@ model ItemLiquidacion {
   entidad              Entidad           @relation(fields: [entidadId], references: [id])
   liquidacion          LiquidacionSueldo @relation(fields: [liquidacionId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@index([liquidacionId])
   @@index([entidadId])
   @@index([estado])
+  @@index([tenantId])
   @@map("items_liquidacion")
 }
 
@@ -1840,6 +1960,8 @@ model TipoEspacio {
   createdAt   DateTime           @default(now()) @map("created_at")
   espacios    EspacioDeportivo[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("tipos_espacio")
 }
 
@@ -1863,6 +1985,8 @@ model EspacioDeportivo {
   actividades            Actividad[]             @relation("ActividadToEspacioDeportivo")
   eventos                Evento[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("espacios_deportivos")
 }
 
@@ -1876,7 +2000,9 @@ model HorarioDisponibilidad {
   createdAt          DateTime         @default(now()) @map("created_at")
   espacioDeportivo   EspacioDeportivo @relation(fields: [espacioDeportivoId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@unique([espacioDeportivoId, diaSemana])
+  @@index([tenantId])
   @@map("horarios_disponibilidad")
 }
 
@@ -1898,9 +2024,11 @@ model Entrenamiento {
   categoriaActividad   CategoriaActividad @relation(fields: [categoriaActividadId], references: [id])
   espacio              EspacioDeportivo?  @relation(fields: [espacioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([categoriaActividadId])
   @@index([fecha])
   @@index([estado])
+  @@index([tenantId])
   @@map("entrenamientos")
 }
 
@@ -1915,7 +2043,9 @@ model HorarioRecurrente {
   createdAt            DateTime           @default(now()) @map("created_at")
   categoriaActividad   CategoriaActividad @relation(fields: [categoriaActividadId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([categoriaActividadId])
+  @@index([tenantId])
   @@map("horarios_recurrentes")
 }
 
@@ -1931,8 +2061,10 @@ model Asistencia {
   entrenamiento   Entrenamiento @relation(fields: [entrenamientoId], references: [id], onDelete: Cascade)
   socio           Socio         @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@unique([entrenamientoId, socioId])
   @@index([socioId])
+  @@index([tenantId])
   @@map("asistencias")
 }
 
@@ -1959,9 +2091,11 @@ model Partido {
   espacio              EspacioDeportivo?    @relation(fields: [espacioId], references: [id])
   evento               Evento?
 
+  tenantId    Int      @map("tenant_id")
   @@index([categoriaActividadId])
   @@index([fecha])
   @@index([estado])
+  @@index([tenantId])
   @@map("partidos")
 }
 
@@ -1982,8 +2116,10 @@ model Convocatoria {
   partido            Partido   @relation(fields: [partidoId], references: [id], onDelete: Cascade)
   socio              Socio     @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@unique([partidoId, socioId])
   @@index([socioId])
+  @@index([tenantId])
   @@map("convocatorias")
 }
 
@@ -2000,8 +2136,10 @@ model EstadisticaPartido {
   partido         Partido @relation(fields: [partidoId], references: [id], onDelete: Cascade)
   socio           Socio   @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@unique([partidoId, socioId])
   @@index([socioId])
+  @@index([tenantId])
   @@map("estadisticas_partidos")
 }
 
@@ -2019,7 +2157,9 @@ model Presupuesto {
   version         Int                @default(1)
   lineas          LineaPresupuesto[]
 
+  tenantId    Int      @map("tenant_id")
   @@unique([anio, version])
+  @@index([tenantId])
   @@map("presupuestos")
 }
 
@@ -2038,11 +2178,13 @@ model LineaPresupuesto {
   centroCosto        CentroCosto?       @relation(fields: [centroCostoId], references: [id])
   presupuesto        Presupuesto        @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@unique([presupuestoId, cuentaContableId, conceptoId, centroCostoId, mes])
   @@index([presupuestoId])
   @@index([cuentaContableId])
   @@index([conceptoId])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("lineas_presupuesto")
 }
 
@@ -2073,6 +2215,8 @@ model CentroCosto {
   cajas                Caja[]
   lineasPresupuesto    LineaPresupuesto[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("centros_costo")
 }
 
@@ -2096,9 +2240,11 @@ model PagoInformado {
   admin               Admin?    @relation(fields: [procesadoPor], references: [id])
   socio               Socio     @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([estado])
   @@index([fechaInformado])
+  @@index([tenantId])
   @@map("pagos_informados")
 }
 
@@ -2116,6 +2262,8 @@ model EmailTemplate {
   updatedAt   DateTime @updatedAt @map("updated_at")
   campanasComunicacion CampanaComunicacion[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("email_templates")
 }
 
@@ -2133,6 +2281,8 @@ model PdfTemplate {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("pdf_templates")
 }
 
@@ -2156,11 +2306,13 @@ model NotificacionLog {
   cargo           Cargo?    @relation(fields: [cargoId], references: [id])
   socio           Socio?    @relation(fields: [socioId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([cargoId])
   @@index([eventType])
   @@index([enviado])
   @@index([fechaProgramado])
+  @@index([tenantId])
   @@map("notificaciones_log")
 }
 
@@ -2195,10 +2347,12 @@ model SolicitudSocio {
   respondidoPorAdmin       Admin?              @relation(fields: [respondidoPor], references: [id])
   socioCreatedRel          Socio?              @relation(fields: [socioCreado], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([estado])
   @@index([fechaSolicitud])
   @@index([documento])
   @@index([email])
+  @@index([tenantId])
   @@map("solicitudes_socio")
 }
 
@@ -2217,8 +2371,10 @@ model FamiliarSolicitud {
   socioCreatedRel          Socio?         @relation("FamiliarSolicitudSocio", fields: [socioCreado], references: [id])
   solicitud                SolicitudSocio @relation(fields: [solicitudSocioId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@index([solicitudSocioId])
   @@index([documento])
+  @@index([tenantId])
   @@map("familiares_solicitud")
 }
 
@@ -2243,9 +2399,11 @@ model CierreCaja {
   adminCerrado        Admin     @relation("CierreCajaCerradoPor", fields: [cerradoPor], references: [id])
   adminFirmado        Admin?    @relation("CierreCajaFirmadoPor", fields: [firmadoPor], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([cajaId])
   @@index([fecha])
   @@index([cerradoPor])
+  @@index([tenantId])
   @@map("cierres_caja")
 }
 
@@ -2261,8 +2419,10 @@ model PushSubscription {
   updatedAt DateTime @updatedAt @map("updated_at")
   socio     Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([activa])
+  @@index([tenantId])
   @@map("push_subscriptions")
 }
 
@@ -2283,7 +2443,9 @@ model Sponsor {
   updatedAt        DateTime @updatedAt @map("updated_at")
   banners          Banner[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([activo])
+  @@index([tenantId])
   @@map("sponsors")
 }
 
@@ -2310,9 +2472,11 @@ model Banner {
   ubicaciones   String[]  @default([])
   sponsor       Sponsor?  @relation(fields: [sponsorId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([tipo])
   @@index([activo])
   @@index([fechaInicio, fechaFin])
+  @@index([tenantId])
   @@map("banners")
 }
 
@@ -2332,10 +2496,12 @@ model Noticia {
   updatedAt        DateTime  @updatedAt @map("updated_at")
   autor            Admin?    @relation(fields: [autorId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([publicada])
   @@index([categoria])
   @@index([fechaPublicacion])
   @@index([destacada])
+  @@index([tenantId])
   @@map("noticias")
 }
 
@@ -2356,8 +2522,10 @@ model Autoridad {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  tenantId    Int      @map("tenant_id")
   @@index([seccion])
   @@index([activo])
+  @@index([tenantId])
   @@map("autoridades")
 }
 
@@ -2377,11 +2545,13 @@ model Conversacion {
   socio                Socio               @relation(fields: [socioId], references: [id], onDelete: Cascade)
   mensajes             Mensaje[]
 
+  tenantId    Int      @map("tenant_id")
   @@unique([socioId, entrenadorId, categoriaActividadId])
   @@index([socioId])
   @@index([entrenadorId])
   @@index([estado])
   @@index([ultimoMensaje])
+  @@index([tenantId])
   @@map("conversaciones")
 }
 
@@ -2396,9 +2566,11 @@ model Mensaje {
   createdAt      DateTime     @default(now()) @map("created_at")
   conversacion   Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@index([conversacionId])
   @@index([leido])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("mensajes")
 }
 
@@ -2417,9 +2589,11 @@ model Mesa {
   comandas       Comanda[]
   mozoAsignado   Admin?    @relation("MesasAsignadas", fields: [mozoAsignadoId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([estado])
   @@index([activo])
   @@index([mozoAsignadoId])
+  @@index([tenantId])
   @@map("mesas")
 }
 
@@ -2437,6 +2611,8 @@ model CategoriaMenu {
   destinosImpresion DestinoImpresion[]
   productos         ProductoBuffet[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("categorias_menu")
 }
 
@@ -2465,12 +2641,14 @@ model ProductoBuffet {
   gruposOpciones   GrupoOpcionProducto[]
   esOpcionDe       OpcionProducto[]     @relation("ProductoComoOpcion") // Este producto puede ser opción de otros (ej: empanada individual es opción de docena)
 
+  tenantId    Int      @map("tenant_id")
   @@index([categoriaMenuId])
   @@index([disponible])
   @@index([activo])
   @@index([tiposVenta])
   @@index([codigoBarras])
   @@index([cuentaContableId])
+  @@index([tenantId])
   @@map("productos_buffet")
 }
 
@@ -2494,7 +2672,9 @@ model GrupoOpcionProducto {
   productoBuffet    ProductoBuffet    @relation(fields: [productoBuffetId], references: [id], onDelete: Cascade)
   opciones          OpcionProducto[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([productoBuffetId])
+  @@index([tenantId])
   @@map("grupos_opcion_producto")
 }
 
@@ -2516,8 +2696,10 @@ model OpcionProducto {
   opcionesComanda         OpcionItemComanda[]
   opcionesTakeAway        OpcionItemTakeAway[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([grupoId])
   @@index([productoRefId])
+  @@index([tenantId])
   @@map("opciones_producto")
 }
 
@@ -2549,11 +2731,13 @@ model Comanda {
   movimientosCaja MovimientoCaja[]
   comprobantes    ComprobanteElectronico[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([mesaId])
   @@index([socioId])
   @@index([estado])
   @@index([horaApertura])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("comandas")
 }
 
@@ -2576,8 +2760,10 @@ model ItemComanda {
   productoBuffet   ProductoBuffet      @relation(fields: [productoBuffetId], references: [id])
   opcionesSeleccionadas OpcionItemComanda[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([comandaId])
   @@index([estado])
+  @@index([tenantId])
   @@map("items_comanda")
 }
 
@@ -2591,8 +2777,10 @@ model OpcionItemComanda {
   itemComanda     ItemComanda    @relation(fields: [itemComandaId], references: [id], onDelete: Cascade)
   opcion          OpcionProducto @relation(fields: [opcionId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([itemComandaId])
   @@index([opcionId])
+  @@index([tenantId])
   @@map("opciones_item_comanda")
 }
 
@@ -2626,11 +2814,13 @@ model PedidoTakeAway {
   socio           Socio?               @relation(fields: [socioId], references: [id])
   comprobantes    ComprobanteElectronico[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([estado])
   @@index([tipo])
   @@index([horaRecibido])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("pedidos_takeaway")
 }
 
@@ -2650,8 +2840,10 @@ model ItemPedidoTakeAway {
   productoBuffet   ProductoBuffet       @relation(fields: [productoBuffetId], references: [id])
   opcionesSeleccionadas OpcionItemTakeAway[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([pedidoId])
   @@index([estado])
+  @@index([tenantId])
   @@map("items_pedido_takeaway")
 }
 
@@ -2665,8 +2857,10 @@ model OpcionItemTakeAway {
   itemTakeAway    ItemPedidoTakeAway @relation(fields: [itemTakeAwayId], references: [id], onDelete: Cascade)
   opcion          OpcionProducto     @relation(fields: [opcionId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([itemTakeAwayId])
   @@index([opcionId])
+  @@index([tenantId])
   @@map("opciones_item_takeaway")
 }
 
@@ -2682,6 +2876,8 @@ model SectorBuffet {
   updatedAt  DateTime           @updatedAt @map("updated_at")
   impresoras ImpresoraTermica[]
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("sectores_buffet")
 }
 
@@ -2700,6 +2896,8 @@ model ImpresoraTermica {
   destinosImpresion DestinoImpresion[]
   sector            SectorBuffet?      @relation(fields: [sectorId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("impresoras_termicas")
 }
 
@@ -2712,7 +2910,9 @@ model DestinoImpresion {
   categoriaMenu        CategoriaMenu    @relation(fields: [categoriaMenuId], references: [id], onDelete: Cascade)
   impresora            ImpresoraTermica @relation(fields: [impresoraId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@unique([categoriaMenuId, impresoraId])
+  @@index([tenantId])
   @@map("destinos_impresion")
 }
 
@@ -2729,9 +2929,11 @@ model NotificacionBuffet {
   paraUsuario   Admin?              @relation("NotificacionesRecibidas", fields: [paraUsuarioId], references: [id])
   vistas        NotificacionVista[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([paraUsuarioId])
   @@index([paraDestino])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("notificaciones_buffet")
 }
 
@@ -2742,7 +2944,9 @@ model NotificacionVista {
   admin          Admin              @relation("NotificacionesVistas", fields: [adminId], references: [id])
   notificacion   NotificacionBuffet @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@id([notificacionId, adminId])
+  @@index([tenantId])
   @@map("notificaciones_vistas")
 }
 
@@ -2769,12 +2973,14 @@ model AdjuntoComprobante {
   pedido               Pedido?             @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   admin                Admin               @relation(fields: [subidoPor], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([movimientoContableId])
   @@index([movimientoCajaId])
   @@index([ordenCompraId])
   @@index([pedidoId])
   @@index([asientoId])
   @@index([pagoId])
+  @@index([tenantId])
   @@map("adjuntos_comprobantes")
 }
 
@@ -2797,9 +3003,11 @@ model StaffTecnico {
   actividad            Actividad?          @relation(fields: [actividadId], references: [id], onDelete: Cascade)
   categoriaActividad   CategoriaActividad? @relation(fields: [categoriaActividadId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@index([actividadId])
   @@index([categoriaActividadId])
   @@index([activo])
+  @@index([tenantId])
   @@map("staff_tecnico")
 }
 
@@ -2821,11 +3029,13 @@ model NoticiaDeportiva {
   actividad        Actividad?          @relation(fields: [actividadId], references: [id], onDelete: Cascade)
   categoria        CategoriaActividad? @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@index([actividadId])
   @@index([categoriaId])
   @@index([fechaPublicacion])
   @@index([activo])
   @@index([tipo])
+  @@index([tenantId])
   @@map("noticias_deportivas")
 }
 
@@ -2843,8 +3053,10 @@ model ArticuloReglamento {
   updatedAt          DateTime               @updatedAt @map("updated_at")
   aceptaciones       AceptacionReglamento[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([seccion])
   @@index([activo])
+  @@index([tenantId])
   @@map("articulos_reglamento")
 }
 
@@ -2858,9 +3070,11 @@ model AceptacionReglamento {
   articulo        ArticuloReglamento @relation(fields: [articuloId], references: [id], onDelete: Cascade)
   socio           Socio              @relation(fields: [socioId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@unique([socioId, articuloId, version])
   @@index([socioId])
   @@index([articuloId])
+  @@index([tenantId])
   @@map("aceptaciones_reglamento")
 }
 
@@ -2879,9 +3093,11 @@ model MensajeEntrenador {
   socio      Socio?       @relation(fields: [socioId], references: [id])
   staff      StaffTecnico @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
+  tenantId    Int      @map("tenant_id")
   @@index([staffId])
   @@index([leido])
   @@index([socioId])
+  @@index([tenantId])
   @@map("mensajes_entrenador")
 }
 
@@ -2911,7 +3127,9 @@ model DispositivoAcceso {
   intentosDenegados IntentoAccesoDenegado[]
   ingresosEntradas  IngresoEntrada[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([activo])
+  @@index([tenantId])
   @@map("dispositivos_acceso")
 }
 
@@ -2930,11 +3148,13 @@ model RegistroAcceso {
   socio                  Socio?                @relation(fields: [socioId], references: [id])
   habilitacionTemporal   HabilitacionTemporal? @relation(fields: [habilitacionTemporalId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([habilitacionTemporalId])
   @@index([dispositivoId])
   @@index([fecha])
   @@index([resultado])
+  @@index([tenantId])
   @@map("registros_acceso")
 }
 
@@ -2959,9 +3179,11 @@ model HabilitacionTemporal {
   registros         RegistroAcceso[]
   intentosResueltos IntentoAccesoDenegado[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([documento])
   @@index([fechaHasta])
   @@index([activo])
+  @@index([tenantId])
   @@map("habilitaciones_temporales")
 }
 
@@ -2979,9 +3201,11 @@ model IntentoAccesoDenegado {
   dispositivo     DispositivoAcceso     @relation(fields: [dispositivoId], references: [id])
   habilitacion    HabilitacionTemporal? @relation(fields: [habilitacionId], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([resuelto, fecha])
   @@index([valorLeido])
   @@index([dispositivoId])
+  @@index([tenantId])
   @@map("intentos_acceso_denegado")
 }
 
@@ -3023,6 +3247,7 @@ model Evento {
   entradas            Entrada[]
   ingresos            IngresoEntrada[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([tipo])
   @@index([fecha])
   @@index([estado])
@@ -3030,6 +3255,7 @@ model Evento {
   @@index([espacioId])
   @@index([conceptoTesoreriaId])
   @@index([centroCostoId])
+  @@index([tenantId])
   @@map("eventos")
 }
 
@@ -3049,8 +3275,10 @@ model CategoriaEntrada {
   evento            Evento     @relation(fields: [eventoId], references: [id], onDelete: Cascade)
   entradas          Entrada[]
 
+  tenantId    Int      @map("tenant_id")
   @@index([eventoId])
   @@index([activo])
+  @@index([tenantId])
   @@map("categorias_entrada")
 }
 
@@ -3082,6 +3310,7 @@ model Entrada {
   vendedor            Admin?             @relation("EntradaVendedor", fields: [vendidoPor], references: [id])
   ingreso             IngresoEntrada?
 
+  tenantId    Int      @map("tenant_id")
   @@index([eventoId])
   @@index([socioId])
   @@index([estado])
@@ -3089,6 +3318,7 @@ model Entrada {
   @@index([categoriaId])
   @@index([fechaVenta])
   @@index([movimientoCajaId])
+  @@index([tenantId])
   @@map("entradas")
 }
 
@@ -3106,9 +3336,11 @@ model IngresoEntrada {
   dispositivo     DispositivoAcceso?  @relation(fields: [dispositivoId], references: [id])
   validador       Admin?              @relation("IngresoValidador", fields: [validadoPor], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@index([eventoId])
   @@index([fecha])
   @@index([dispositivoId])
+  @@index([tenantId])
   @@map("ingresos_entradas")
 }
 
@@ -3131,6 +3363,8 @@ model ConfiguracionFiscal {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
   @@map("configuracion_fiscal")
 }
 
@@ -3174,6 +3408,7 @@ model ComprobanteElectronico {
   pedidoTakeaway       PedidoTakeAway? @relation(fields: [pedidoTakeawayId], references: [id])
   emitidor             Admin     @relation(fields: [emitidoPor], references: [id])
 
+  tenantId    Int      @map("tenant_id")
   @@unique([puntoVenta, tipo, numero])
   @@index([fecha])
   @@index([cae])
@@ -3182,6 +3417,7 @@ model ComprobanteElectronico {
   @@index([comandaId])
   @@index([pedidoTakeawayId])
   @@index([estado])
+  @@index([tenantId])
   @@map("comprobantes_electronicos")
 }
 
@@ -3224,11 +3460,13 @@ model GestionCobranza {
   createdAt             DateTime              @default(now()) @map("created_at")
   updatedAt             DateTime              @updatedAt @map("updated_at")
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([estado])
   @@index([prioridad])
   @@index([responsableId])
   @@index([fechaProximaAccion])
+  @@index([tenantId])
   @@map("gestiones_cobranza")
 }
 
@@ -3292,9 +3530,11 @@ model AccionCobranza {
 
   createdAt         DateTime              @default(now()) @map("created_at")
 
+  tenantId    Int      @map("tenant_id")
   @@index([gestionId])
   @@index([fecha])
   @@index([responsableId])
+  @@index([tenantId])
   @@map("acciones_cobranza")
 }
 
@@ -3343,9 +3583,11 @@ model EncuestaBaja {
   // Metadata
   fechaEncuesta     DateTime    @default(now()) @map("fecha_encuesta")
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([motivoPrincipal])
   @@index([fechaEncuesta])
+  @@index([tenantId])
   @@map("encuestas_baja")
 }
 
@@ -3394,10 +3636,12 @@ model AccionRecupero {
 
   createdAt       DateTime              @default(now()) @map("created_at")
 
+  tenantId    Int      @map("tenant_id")
   @@index([socioId])
   @@index([fecha])
   @@index([campanaId])
   @@index([responsableId])
+  @@index([tenantId])
   @@map("acciones_recupero")
 }
 
@@ -3464,9 +3708,11 @@ model CampanaRecupero {
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
+  tenantId    Int      @map("tenant_id")
   @@index([activa])
   @@index([fechaInicio])
   @@index([fechaFin])
+  @@index([tenantId])
   @@map("campanas_recupero")
 }
 
@@ -3521,9 +3767,11 @@ model CampanaComunicacion {
   createdAt           DateTime              @default(now()) @map("created_at")
   updatedAt           DateTime              @updatedAt @map("updated_at")
 
+  tenantId    Int      @map("tenant_id")
   @@index([tipo])
   @@index([estado])
   @@index([fechaProgramada])
+  @@index([tenantId])
   @@map("campanas_comunicacion")
 }
 
@@ -3577,10 +3825,12 @@ model EnvioCampana {
   createdAt       DateTime              @default(now()) @map("created_at")
   updatedAt       DateTime              @updatedAt @map("updated_at")
 
+  tenantId    Int      @map("tenant_id")
   @@index([campanaId])
   @@index([socioId])
   @@index([estado])
   @@index([messageId])
+  @@index([tenantId])
   @@map("envios_campana")
 }
 

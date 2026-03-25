@@ -7,7 +7,12 @@ import prisma from '../lib/prisma.js';
 export async function extractTenant(req, res, next) {
   try {
     const host = req.get('host');
-    const subdomain = extractSubdomain(host);
+    let subdomain = extractSubdomain(host);
+
+    // En desarrollo sin subdomain, usar tenant default para permitir acceso local
+    if (!subdomain && process.env.NODE_ENV !== 'production') {
+      subdomain = process.env.DEFAULT_TENANT_SUBDOMAIN || 'sportivo-pilar';
+    }
 
     if (!subdomain) {
       return res.status(400).json({

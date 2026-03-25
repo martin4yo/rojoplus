@@ -805,7 +805,7 @@ router.put('/config-impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async
       } else {
         // Si tiene valor, hacer upsert
         await req.db.configuracion.upsert({
-          where: { clave: cfg.clave },
+          where: { tenantId_clave: { tenantId: req.tenantId, clave: cfg.clave } },
           update: { valor: cfg.valor },
           create: {
             clave: cfg.clave,
@@ -855,7 +855,7 @@ router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async 
         configKey = 'BUFFET_IMPRESORA_TAKEAWAY'
       }
 
-      const config = await req.db.configuracion.findUnique({
+      const config = await req.db.configuracion.findFirst({
         where: { clave: configKey }
       })
 

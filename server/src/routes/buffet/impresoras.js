@@ -589,7 +589,7 @@ router.post('/imprimir-ticket-directo', authAdmin, checkPermiso('BUFFET_COBRAR',
       configKey = 'BUFFET_IMPRESORA_TAKEAWAY'
     }
 
-    const config = await req.db.configuracion.findUnique({
+    const config = await req.db.configuracion.findFirst({
       where: { clave: configKey }
     })
 

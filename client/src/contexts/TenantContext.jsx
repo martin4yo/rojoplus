@@ -15,11 +15,12 @@ export function TenantProvider({ children }) {
   async function fetchCurrentTenant() {
     try {
       setLoading(true)
-      const response = await api.get('/api/tenant/current')
-      setTenant(response.data)
-      applyTheme(response.data.colores)
-      applyFavicon(response.data.faviconUrl)
-      applyTitle(response.data.nombre)
+      const response = await api.getFull('/tenant/current')
+      const tenantData = response?.data || response
+      setTenant(tenantData)
+      applyTheme(tenantData?.colores)
+      applyFavicon(tenantData?.faviconUrl)
+      applyTitle(tenantData?.nombre)
       setError(null)
     } catch (err) {
       console.error('Error cargando tenant:', err)

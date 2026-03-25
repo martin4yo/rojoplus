@@ -3687,10 +3687,10 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
     fechaVenc = new Date(fechaVencimiento)
   } else {
     // Obtener configuración
-    const configDia = await req.db.configuracion.findUnique({
+    const configDia = await req.db.configuracion.findFirst({
       where: { clave: 'CUOTA_DIA_VENCIMIENTO' }
     })
-    const configMismoMes = await req.db.configuracion.findUnique({
+    const configMismoMes = await req.db.configuracion.findFirst({
       where: { clave: 'CUOTA_VENCE_MISMO_MES' }
     })
 
@@ -4637,7 +4637,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
 
     // Si no se encontró concepto específico, usar el fallback de configuración
     if (!conceptoCobranza) {
-      const configConcepto = await tx.configuracion.findUnique({
+      const configConcepto = await tx.configuracion.findFirst({
         where: { clave: 'CONCEPTO_COBRANZA_CUOTAS' }
       })
 
@@ -5346,7 +5346,7 @@ router.get('/sistema/configuracion', authAdmin, asyncHandler(async (req, res) =>
 router.get('/sistema/configuracion/:clave', authAdmin, asyncHandler(async (req, res) => {
   const { clave } = req.params
 
-  const config = await req.db.configuracion.findUnique({
+  const config = await req.db.configuracion.findFirst({
     where: { clave },
   })
 
@@ -5363,7 +5363,7 @@ router.put('/sistema/configuracion/:clave', authAdmin, asyncHandler(async (req, 
   const { valor, tipo, modulo, descripcion } = req.body
 
   // Verificar si existe y si es editable
-  const existing = await req.db.configuracion.findUnique({
+  const existing = await req.db.configuracion.findFirst({
     where: { clave },
   })
 
@@ -5373,7 +5373,7 @@ router.put('/sistema/configuracion/:clave', authAdmin, asyncHandler(async (req, 
 
   // Upsert: actualizar si existe, crear si no
   const updated = await req.db.configuracion.upsert({
-    where: { clave },
+    where: { tenantId_clave: { tenantId: req.tenantId, clave } },
     update: { valor: String(valor) },
     create: {
       clave,
@@ -5393,7 +5393,7 @@ router.put('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
 
   // Actualizar MODO_DEMO
   await req.db.configuracion.upsert({
-    where: { clave: 'MODO_DEMO' },
+    where: { tenantId_clave: { tenantId: req.tenantId, clave: 'MODO_DEMO' } },
     update: { valor: activo ? 'true' : 'false' },
     create: {
       clave: 'MODO_DEMO',
@@ -5407,7 +5407,7 @@ router.put('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
   // Actualizar EMAIL_DEMO si se proporciona
   if (email !== undefined) {
     await req.db.configuracion.upsert({
-      where: { clave: 'EMAIL_DEMO' },
+      where: { tenantId_clave: { tenantId: req.tenantId, clave: 'EMAIL_DEMO' } },
       update: { valor: email || '' },
       create: {
         clave: 'EMAIL_DEMO',
@@ -5425,8 +5425,8 @@ router.put('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
 // GET /api/admin/sistema/modo-demo - Obtener estado del modo demo
 router.get('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
   const [modoDemo, emailDemo] = await Promise.all([
-    req.db.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
-    req.db.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
+    req.db.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
+    req.db.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
   ])
 
   res.json({
@@ -6703,7 +6703,7 @@ router.put('/configuracion/:clave', authAdmin, asyncHandler(async (req, res) => 
   }
 
   const config = await req.db.configuracion.upsert({
-    where: { clave },
+    where: { tenantId_clave: { tenantId: req.tenantId, clave } },
     update: { valor },
     create: {
       clave,
@@ -7171,7 +7171,7 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
 
   // Enviar email de rechazo
   try {
-    const clubNombre = (await req.db.configuracion.findUnique({
+    const clubNombre = (await req.db.configuracion.findFirst({
       where: { clave: 'CLUB_NOMBRE' }
     }))?.valor || 'Club Sportivo Pilar'
 
