@@ -92,13 +92,13 @@ export default function Galeria() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Hero */}
-      <div className="bg-red-600 text-white py-12">
+      <div className="bg-primary text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <Camera className="w-12 h-12" />
             <div>
               <h1 className="text-3xl md:text-4xl font-bold">Galería de Fotos</h1>
-              <p className="text-red-100 mt-1">Los mejores momentos del club</p>
+              <p className="text-primary-100 mt-1">Los mejores momentos del club</p>
             </div>
           </div>
         </div>
@@ -112,7 +112,7 @@ export default function Galeria() {
           <div className="mb-6">
             <button
               onClick={volverAAlbumes}
-              className="flex items-center gap-2 text-red-600 hover:text-red-700 font-medium"
+              className="flex items-center gap-2 text-primary hover:text-primary-dark font-medium"
             >
               <ChevronLeft className="w-5 h-5" />
               Volver a álbumes
@@ -126,7 +126,7 @@ export default function Galeria() {
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-red-600 border-t-transparent rounded-full" />
+            <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
           </div>
         ) : !albumActivo && albumes.length > 0 ? (
           /* Vista de álbumes */

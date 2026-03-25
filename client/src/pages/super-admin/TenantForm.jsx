@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, Upload, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 
@@ -9,6 +9,10 @@ export default function TenantForm() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(!!id)
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingHero, setUploadingHero] = useState(false)
+  const logoInputRef = useRef()
+  const heroInputRef = useRef()
   const [form, setForm] = useState({
     nombre: '',
     subdomain: '',
@@ -35,11 +39,11 @@ export default function TenantForm() {
 
   async function cargarTenant() {
     try {
-      const data = await api.get(`/super-admin/tenants/${id}`)
+      const data = await api.getFull(`/super-admin/tenants/${id}`)
       setForm(data)
     } catch (error) {
       toast.error('Error cargando tenant: ' + error.message)
-      navigate('/super-admin/tenants')
+      navigate('/admin/tenants')
     } finally {
       setLoading(false)
     }
@@ -68,11 +72,60 @@ export default function TenantForm() {
         : await api.post('/super-admin/tenants', form)
 
       toast.success(id ? 'Tenant actualizado' : 'Tenant creado')
-      navigate('/super-admin/tenants')
+      navigate('/admin/tenants')
     } catch (error) {
       toast.error('Error guardando tenant: ' + error.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function subirHero(file) {
+    if (!id) { toast.error('Guardá el tenant primero'); return }
+    try {
+      setUploadingHero(true)
+      const formData = new FormData()
+      formData.append('hero', file)
+      const token = localStorage.getItem('adminToken')
+      const res = await fetch(`/api/super-admin/tenants/${id}/hero`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setForm(prev => ({ ...prev, heroImageUrl: data.heroImageUrl }))
+      toast.success('Imagen de fondo actualizada')
+    } catch (error) {
+      toast.error('Error subiendo imagen: ' + error.message)
+    } finally {
+      setUploadingHero(false)
+    }
+  }
+
+  async function subirLogo(file) {
+    if (!id) {
+      toast.error('Guardá el tenant primero para poder subir el logo')
+      return
+    }
+    try {
+      setUploadingLogo(true)
+      const formData = new FormData()
+      formData.append('logo', file)
+      const token = localStorage.getItem('adminToken')
+      const res = await fetch(`/api/super-admin/tenants/${id}/logo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setForm(prev => ({ ...prev, logoUrl: data.logoUrl }))
+      toast.success('Logo actualizado')
+    } catch (error) {
+      toast.error('Error subiendo logo: ' + error.message)
+    } finally {
+      setUploadingLogo(false)
     }
   }
 
@@ -89,7 +142,7 @@ export default function TenantForm() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/super-admin/tenants')}
+          onClick={() => navigate('/admin/tenants')}
           className="p-2 hover:bg-gray-100 rounded"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -173,6 +226,92 @@ export default function TenantForm() {
           </div>
         </div>
 
+        {/* Logo */}
+        {id && (
+          <div>
+            <h2 className="text-xl font-bold mb-4">Logo</h2>
+            <div className="flex items-center gap-6">
+              <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
+                {form.logoUrl ? (
+                  <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <span className="text-xs text-gray-400 text-center px-2">Sin logo</span>
+                )}
+              </div>
+              <div className="space-y-2">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files[0] && subirLogo(e.target.files[0])}
+                />
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current.click()}
+                  disabled={uploadingLogo}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm"
+                >
+                  <Upload className="w-4 h-4" />
+                  {uploadingLogo ? 'Subiendo...' : 'Subir logo'}
+                </button>
+                {form.logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, logoUrl: null }))}
+                    className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm"
+                  >
+                    <X className="w-4 h-4" />
+                    Quitar logo
+                  </button>
+                )}
+                <p className="text-xs text-gray-500">PNG, JPG o SVG. Máx 2MB.</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Imagen de fondo (Hero)</label>
+              <div className="flex items-center gap-6">
+                <div className="w-40 h-24 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
+                  {form.heroImageUrl ? (
+                    <img src={form.heroImageUrl} alt="Hero" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-gray-400 text-center px-2">Sin imagen</span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <input
+                    ref={heroInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => e.target.files[0] && subirHero(e.target.files[0])}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => heroInputRef.current.click()}
+                    disabled={uploadingHero}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {uploadingHero ? 'Subiendo...' : 'Subir imagen'}
+                  </button>
+                  {form.heroImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, heroImageUrl: null }))}
+                      className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm"
+                    >
+                      <X className="w-4 h-4" />
+                      Quitar imagen
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-500">JPG, PNG. Máx 5MB.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Ubicación */}
         <div>
           <h2 className="text-xl font-bold mb-4">Ubicación</h2>
@@ -211,6 +350,53 @@ export default function TenantForm() {
                 value={form.codigoPostal || ''}
                 onChange={(e) => setForm({ ...form, codigoPostal: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Contacto y Redes */}
+        <div>
+          <h2 className="text-xl font-bold mb-4">Contacto y Redes</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-2">Horarios de atención</label>
+              <textarea
+                value={form.horarios || ''}
+                onChange={(e) => setForm({ ...form, horarios: e.target.value })}
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                placeholder={"Lunes a Viernes: 9 a 20hs\nSábados: 9 a 13hs"}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Facebook (URL)</label>
+              <input
+                type="url"
+                value={form.redesSociales?.facebook || ''}
+                onChange={(e) => setForm({ ...form, redesSociales: { ...form.redesSociales, facebook: e.target.value } })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                placeholder="https://facebook.com/miclub"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Instagram (URL)</label>
+              <input
+                type="url"
+                value={form.redesSociales?.instagram || ''}
+                onChange={(e) => setForm({ ...form, redesSociales: { ...form.redesSociales, instagram: e.target.value } })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                placeholder="https://instagram.com/miclub"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">WhatsApp (número con código de país)</label>
+              <input
+                type="text"
+                value={form.redesSociales?.whatsapp || ''}
+                onChange={(e) => setForm({ ...form, redesSociales: { ...form.redesSociales, whatsapp: e.target.value } })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                placeholder="5491112345678"
               />
             </div>
           </div>
@@ -288,7 +474,7 @@ export default function TenantForm() {
         {/* Botones */}
         <div className="flex gap-2 justify-end pt-6 border-t">
           <button
-            onClick={() => navigate('/super-admin/tenants')}
+            onClick={() => navigate('/admin/tenants')}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             Cancelar

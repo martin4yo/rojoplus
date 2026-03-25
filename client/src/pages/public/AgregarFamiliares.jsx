@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { useConfirm } from '../../hooks/useConfirm'
+import TenantLogo from '../../components/TenantLogo'
 
 export default function AgregarFamiliares() {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -167,11 +168,7 @@ export default function AgregarFamiliares() {
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <img
-              src="/images/logo.png"
-              alt="Club Sportivo Pilar"
-              className="h-16 mx-auto mb-4"
-            />
+            <TenantLogo className="h-12 w-auto mx-auto mb-4" />
             <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
               <svg className="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
@@ -224,7 +221,7 @@ export default function AgregarFamiliares() {
                     </div>
                     <button
                       onClick={() => handleEliminar(familiar.id)}
-                      className="text-red-600 hover:text-red-800"
+                      className="text-primary hover:text-primary-dark"
                     >
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -262,7 +259,7 @@ export default function AgregarFamiliares() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Apellidos <span className="text-red-500">*</span>
+                    Apellidos <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -270,13 +267,13 @@ export default function AgregarFamiliares() {
                     value={formData.apellidos}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombres <span className="text-red-500">*</span>
+                    Nombres <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -284,13 +281,13 @@ export default function AgregarFamiliares() {
                     value={formData.nombres}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Número de Documento <span className="text-red-500">*</span>
+                    Número de Documento <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -299,13 +296,13 @@ export default function AgregarFamiliares() {
                     onChange={handleChange}
                     required
                     minLength="7"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Fecha de Nacimiento <span className="text-red-500">*</span>
+                    Fecha de Nacimiento <span className="text-primary">*</span>
                   </label>
                   <input
                     type="date"
@@ -313,7 +310,7 @@ export default function AgregarFamiliares() {
                     value={formData.fechaNacimiento}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                   {formData.fechaNacimiento && (
                     <p className="text-sm text-gray-500 mt-1">
@@ -324,14 +321,14 @@ export default function AgregarFamiliares() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Parentesco <span className="text-red-500">*</span>
+                    Parentesco <span className="text-primary">*</span>
                   </label>
                   <select
                     name="parentesco"
                     value={formData.parentesco}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   >
                     <option value="">Seleccionar...</option>
                     <option value="CONYUGE">Cónyuge</option>
@@ -341,7 +338,7 @@ export default function AgregarFamiliares() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Actividades <span className="text-red-500">*</span>
+                    Actividades <span className="text-primary">*</span>
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {actividades.map(act => (
@@ -357,7 +354,7 @@ export default function AgregarFamiliares() {
                     ))}
                   </div>
                   {formData.actividadesSeleccionadas.length === 0 && (
-                    <p className="text-sm text-red-500 mt-1">Debes seleccionar al menos una actividad</p>
+                    <p className="text-sm text-primary mt-1">Debes seleccionar al menos una actividad</p>
                   )}
                 </div>
               </div>

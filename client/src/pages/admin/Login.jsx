@@ -5,6 +5,7 @@ import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { cargarPermisos } from '../../services/permisos'
+import TenantLogo from '../../components/TenantLogo'
 
 export default function AdminLogin() {
   const navigate = useNavigate()
@@ -37,14 +38,10 @@ export default function AdminLogin() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link to="/">
-            <img
-              src="/images/logo.png"
-              alt="Club Sportivo Pilar"
-              className="h-16 mx-auto mb-4"
-            />
+            <TenantLogo className="h-16 mx-auto mb-4" />
           </Link>
           <h1 className="text-2xl font-bold text-gray-800">
-            Rojo Plus Admin
+            Admin
           </h1>
           <p className="text-gray-500">Ingresá tus credenciales</p>
         </div>

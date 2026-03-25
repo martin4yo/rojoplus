@@ -43,12 +43,12 @@ export default function Contacto() {
   return (
     <div className="bg-gray-300">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-red-600 to-red-700 py-6 md:py-8">
+      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
             Contacto
           </h1>
-          <p className="text-base text-red-100 max-w-2xl mx-auto">
+          <p className="text-base text-primary-100 max-w-2xl mx-auto">
             Estamos para ayudarte. Escribinos y te responderemos a la brevedad.
           </p>
         </div>
@@ -66,8 +66,8 @@ export default function Contacto() {
 
               {/* Dirección */}
               <div className="bg-gray-200 rounded-xl p-5 flex gap-4">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Dirección</h3>
@@ -78,12 +78,12 @@ export default function Contacto() {
 
               {/* Teléfono */}
               <div className="bg-gray-200 rounded-xl p-5 flex gap-4">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Teléfono</h3>
-                  <a href="tel:02304420297" className="text-red-600 hover:underline">
+                  <a href="tel:02304420297" className="text-primary hover:underline">
                     0230 442-0297
                   </a>
                 </div>
@@ -91,12 +91,12 @@ export default function Contacto() {
 
               {/* Email */}
               <div className="bg-gray-200 rounded-xl p-5 flex gap-4">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Email</h3>
-                  <a href="mailto:info@sportivopilar.com.ar" className="text-red-600 hover:underline">
+                  <a href="mailto:info@sportivopilar.com.ar" className="text-primary hover:underline">
                     info@sportivopilar.com.ar
                   </a>
                 </div>
@@ -104,8 +104,8 @@ export default function Contacto() {
 
               {/* Horarios */}
               <div className="bg-gray-200 rounded-xl p-5 flex gap-4">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Horarios</h3>
@@ -164,7 +164,7 @@ export default function Contacto() {
                         type="text"
                         value={formData.nombre}
                         onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
                         placeholder="Tu nombre"
                         required
                       />
@@ -177,7 +177,7 @@ export default function Contacto() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
                         placeholder="tu@email.com"
                         required
                       />
@@ -193,7 +193,7 @@ export default function Contacto() {
                         type="tel"
                         value={formData.telefono}
                         onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
                         placeholder="Tu teléfono (opcional)"
                       />
                     </div>
@@ -204,7 +204,7 @@ export default function Contacto() {
                       <select
                         value={formData.asunto}
                         onChange={(e) => setFormData({ ...formData, asunto: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
                       >
                         <option value="">Seleccionar...</option>
                         <option value="inscripcion">Inscripción de socio</option>
@@ -224,7 +224,7 @@ export default function Contacto() {
                       value={formData.mensaje}
                       onChange={(e) => setFormData({ ...formData, mensaje: e.target.value })}
                       rows={5}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white resize-none"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white resize-none"
                       placeholder="¿En qué podemos ayudarte?"
                       required
                     />
@@ -233,7 +233,7 @@ export default function Contacto() {
                   <button
                     type="submit"
                     disabled={enviando}
-                    className="w-full md:w-auto px-8 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full md:w-auto px-8 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {enviando ? (
                       'Enviando...'

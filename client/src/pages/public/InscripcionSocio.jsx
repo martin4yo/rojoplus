@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import TenantLogo from '../../components/TenantLogo'
 
 export default function InscripcionSocio() {
   const navigate = useNavigate()
@@ -133,11 +134,7 @@ export default function InscripcionSocio() {
         <div className="bg-white rounded-lg shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <img
-              src="/images/logo.png"
-              alt="Club Sportivo Pilar"
-              className="h-20 mx-auto mb-6"
-            />
+            <TenantLogo className="h-12 w-auto mx-auto mb-6" />
             <h1 className="text-4xl font-bold text-gray-900 mb-2">
               ¡Bienvenido a la gran familia de Sportivo!
             </h1>
@@ -148,15 +145,15 @@ export default function InscripcionSocio() {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded">
+            <div className="mb-6 bg-primary-50 border-l-4 border-primary p-4 rounded">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-5 w-5 text-primary-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-red-700">{error}</p>
+                  <p className="text-sm text-primary-dark">{error}</p>
                 </div>
               </div>
             </div>
@@ -171,7 +168,7 @@ export default function InscripcionSocio() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Apellidos <span className="text-red-500">*</span>
+                    Apellidos <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -179,13 +176,13 @@ export default function InscripcionSocio() {
                     value={formData.apellidos}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombres <span className="text-red-500">*</span>
+                    Nombres <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -193,13 +190,13 @@ export default function InscripcionSocio() {
                     value={formData.nombres}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Número de Documento <span className="text-red-500">*</span>
+                    Número de Documento <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -207,13 +204,13 @@ export default function InscripcionSocio() {
                     value={formData.documento}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Fecha de Nacimiento <span className="text-red-500">*</span>
+                    Fecha de Nacimiento <span className="text-primary">*</span>
                   </label>
                   <input
                     type="date"
@@ -221,7 +218,7 @@ export default function InscripcionSocio() {
                     value={formData.fechaNacimiento}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                   {formData.fechaNacimiento && (
                     <p className="text-sm text-gray-500 mt-1">
@@ -232,7 +229,7 @@ export default function InscripcionSocio() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email <span className="text-red-500">*</span>
+                    Email <span className="text-primary">*</span>
                   </label>
                   <input
                     type="email"
@@ -240,13 +237,13 @@ export default function InscripcionSocio() {
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Teléfono <span className="text-red-500">*</span>
+                    Teléfono <span className="text-primary">*</span>
                   </label>
                   <input
                     type="tel"
@@ -254,7 +251,7 @@ export default function InscripcionSocio() {
                     value={formData.telefono}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
@@ -267,7 +264,7 @@ export default function InscripcionSocio() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Calle <span className="text-red-500">*</span>
+                    Calle <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -275,13 +272,13 @@ export default function InscripcionSocio() {
                     value={formData.direccionCalle}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Número <span className="text-red-500">*</span>
+                    Número <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -289,13 +286,13 @@ export default function InscripcionSocio() {
                     value={formData.direccionNumero}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
                 <div className="md:col-span-3">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Localidad <span className="text-red-500">*</span>
+                    Localidad <span className="text-primary">*</span>
                   </label>
                   <input
                     type="text"
@@ -303,7 +300,7 @@ export default function InscripcionSocio() {
                     value={formData.localidad}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
@@ -324,7 +321,7 @@ export default function InscripcionSocio() {
                         type="checkbox"
                         checked={formData.actividadesSeleccionadas.includes(actividad)}
                         onChange={() => handleActividadChange(actividad)}
-                        className="mr-3 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                        className="mr-3 h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                       />
                       <span className="text-sm text-gray-900">{actividad}</span>
                     </label>
@@ -345,7 +342,7 @@ export default function InscripcionSocio() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ¿Tenés enfermedades que debamos conocer? <span className="text-red-500">*</span>
+                    ¿Tenés enfermedades que debamos conocer? <span className="text-primary">*</span>
                   </label>
                   <div className="flex gap-4">
                     <label className="flex items-center">
@@ -383,7 +380,7 @@ export default function InscripcionSocio() {
                       value={formData.detalleEnfermedades}
                       onChange={handleChange}
                       rows="4"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                       placeholder="Por favor, describe las condiciones médicas que debamos conocer..."
                     />
                   </div>
@@ -402,7 +399,7 @@ export default function InscripcionSocio() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Apellidos del Tutor <span className="text-red-500">*</span>
+                      Apellidos del Tutor <span className="text-primary">*</span>
                     </label>
                     <input
                       type="text"
@@ -410,13 +407,13 @@ export default function InscripcionSocio() {
                       value={formData.tutorApellidos}
                       onChange={handleChange}
                       required={esMenor}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombres del Tutor <span className="text-red-500">*</span>
+                      Nombres del Tutor <span className="text-primary">*</span>
                     </label>
                     <input
                       type="text"
@@ -424,13 +421,13 @@ export default function InscripcionSocio() {
                       value={formData.tutorNombres}
                       onChange={handleChange}
                       required={esMenor}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Documento del Tutor <span className="text-red-500">*</span>
+                      Documento del Tutor <span className="text-primary">*</span>
                     </label>
                     <input
                       type="text"
@@ -438,13 +435,13 @@ export default function InscripcionSocio() {
                       value={formData.tutorDocumento}
                       onChange={handleChange}
                       required={esMenor}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Teléfono del Tutor <span className="text-red-500">*</span>
+                      Teléfono del Tutor <span className="text-primary">*</span>
                     </label>
                     <input
                       type="tel"
@@ -452,7 +449,7 @@ export default function InscripcionSocio() {
                       value={formData.tutorTelefono}
                       onChange={handleChange}
                       required={esMenor}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -464,7 +461,7 @@ export default function InscripcionSocio() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold text-lg"
+                className="w-full bg-primary text-white py-3 px-6 rounded-lg hover:bg-primary-dark transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold text-lg"
               >
                 {loading ? 'Enviando...' : 'Enviar Solicitud'}
               </button>

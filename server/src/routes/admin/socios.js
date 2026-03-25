@@ -156,7 +156,7 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
     req.db.socio.findMany({
       where,
       orderBy: { nroSocio: 'asc' },
-      skip: (page - 1) * parseInt(limit),
+      skip: Math.max(0, (parseInt(page) - 1) * parseInt(limit)),
       take: parseInt(limit),
       select: {
         id: true,

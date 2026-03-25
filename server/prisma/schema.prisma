@@ -28,6 +28,7 @@ model Tenant {
   // Branding
   logoUrl               String?   @map("logo_url")
   faviconUrl            String?   @map("favicon_url")
+  heroImageUrl          String?   @map("hero_image_url")
   colores               Json      @default("{}")
 
   // Sitio público

@@ -17,11 +17,11 @@ export default function TenantDetail() {
 
   async function cargarTenant() {
     try {
-      const data = await api.get(`/super-admin/tenants/${id}`)
+      const data = await api.getFull(`/super-admin/tenants/${id}`)
       setTenant(data)
     } catch (error) {
       toast.error('Error cargando tenant: ' + error.message)
-      navigate('/super-admin/tenants')
+      navigate('/admin/tenants')
     } finally {
       setLoading(false)
     }
@@ -56,7 +56,7 @@ export default function TenantDetail() {
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/super-admin/tenants')}
+            onClick={() => navigate('/admin/tenants')}
             className="p-2 hover:bg-gray-100 rounded"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -67,7 +67,7 @@ export default function TenantDetail() {
           </div>
         </div>
         <button
-          onClick={() => navigate(`/super-admin/tenants/${tenant.id}/editar`)}
+          onClick={() => navigate(`/admin/tenants/${tenant.id}/editar`)}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark flex items-center gap-2"
         >
           <Edit className="w-4 h-4" />

@@ -18,12 +18,12 @@ export default function SuperAdminDashboard() {
     try {
       setLoading(true)
       const [statsData, tenantsData] = await Promise.all([
-        api.get('/super-admin/stats'),
-        api.get('/super-admin/tenants?estado=PENDING_APPROVAL')
+        api.getFull('/super-admin/stats'),
+        api.getFull('/super-admin/tenants?estado=PENDING_APPROVAL')
       ])
 
       setStats(statsData)
-      setTenants(tenantsData || [])
+      setTenants(Array.isArray(tenantsData) ? tenantsData : tenantsData?.data || [])
     } catch (error) {
       toast.error('Error cargando datos: ' + error.message)
     } finally {
@@ -45,14 +45,14 @@ export default function SuperAdminDashboard() {
       value: stats?.tenants || 0,
       icon: Building2,
       color: 'bg-blue-50 text-blue-600',
-      action: () => navigate('/super-admin/tenants')
+      action: () => navigate('/admin/tenants')
     },
     {
       title: 'Tenants Activos',
       value: stats?.activeTenants || 0,
       icon: Activity,
       color: 'bg-green-50 text-green-600',
-      action: () => navigate('/super-admin/tenants?filter=active')
+      action: () => navigate('/admin/tenants?filter=active')
     },
     {
       title: 'Total Admins',
@@ -121,7 +121,7 @@ export default function SuperAdminDashboard() {
                   <p className="text-sm text-gray-600">{tenant.email}</p>
                 </div>
                 <button
-                  onClick={() => navigate(`/super-admin/tenants/${tenant.id}`)}
+                  onClick={() => navigate(`/admin/tenants/${tenant.id}`)}
                   className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark text-sm"
                 >
                   Revisar
@@ -142,13 +142,13 @@ export default function SuperAdminDashboard() {
           <h3 className="font-bold mb-4">Acciones Rápidas</h3>
           <div className="space-y-2">
             <button
-              onClick={() => navigate('/super-admin/tenants')}
+              onClick={() => navigate('/admin/tenants')}
               className="w-full px-4 py-2 text-left border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
             >
               Ver todos los tenants
             </button>
             <button
-              onClick={() => navigate('/super-admin/tenants/nuevo')}
+              onClick={() => navigate('/admin/tenants/nuevo')}
               className="w-full px-4 py-2 text-left border border-primary text-primary rounded-lg hover:bg-primary hover:text-white text-sm transition"
             >
               Crear nuevo tenant

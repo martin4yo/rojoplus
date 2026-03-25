@@ -51,12 +51,12 @@ export default function Historia() {
   return (
     <div className="bg-gray-300">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-red-600 to-red-700 py-6 md:py-8">
+      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
             Nuestra Historia
           </h1>
-          <p className="text-base text-red-100 max-w-3xl mx-auto">
+          <p className="text-base text-primary-100 max-w-3xl mx-auto">
             Desde 1932 formando deportistas y construyendo comunidad en Pilar
           </p>
         </div>
@@ -99,9 +99,9 @@ export default function Historia() {
                 alt="Historia del Club"
                 className="rounded-2xl shadow-xl"
               />
-              <div className="absolute -bottom-6 -left-6 bg-red-600 text-white rounded-xl p-6 shadow-lg">
+              <div className="absolute -bottom-6 -left-6 bg-primary text-white rounded-xl p-6 shadow-lg">
                 <p className="text-4xl font-bold">+90</p>
-                <p className="text-red-100">años de historia</p>
+                <p className="text-primary-100">años de historia</p>
               </div>
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function Historia() {
 
           <div className="relative">
             {/* Línea central */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-red-200 hidden md:block" />
+            <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-primary-200 hidden md:block" />
 
             <div className="space-y-12">
               {hitos.map((hito, index) => {
@@ -127,16 +127,16 @@ export default function Historia() {
                 return (
                   <div key={hito.anio} className="relative">
                     {/* Punto en la línea */}
-                    <div className="absolute left-1/2 transform -translate-x-1/2 w-4 h-4 bg-red-600 rounded-full border-4 border-white shadow hidden md:block" />
+                    <div className="absolute left-1/2 transform -translate-x-1/2 w-4 h-4 bg-primary rounded-full border-4 border-white shadow hidden md:block" />
 
                     <div className={`md:w-5/12 ${isLeft ? 'md:mr-auto md:pr-12' : 'md:ml-auto md:pl-12'}`}>
                       <div className="bg-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-center gap-4 mb-4">
-                          <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-                            <Icono className="w-6 h-6 text-red-600" />
+                          <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <Icono className="w-6 h-6 text-primary" />
                           </div>
                           <div>
-                            <span className="text-red-600 font-bold text-lg">{hito.anio}</span>
+                            <span className="text-primary font-bold text-lg">{hito.anio}</span>
                             <h3 className="text-xl font-semibold text-gray-900">{hito.titulo}</h3>
                           </div>
                         </div>
@@ -165,12 +165,12 @@ export default function Historia() {
             {palmares.map((logro) => {
               const Icono = logro.icono
               return (
-                <div key={logro.titulo} className="bg-gradient-to-br from-red-600 to-red-700 rounded-2xl p-6 text-center text-white shadow-lg">
+                <div key={logro.titulo} className="bg-gradient-to-br from-primary to-primary-dark rounded-2xl p-6 text-center text-white shadow-lg">
                   <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Icono className="w-8 h-8" />
                   </div>
                   <h3 className="text-lg font-bold mb-1">{logro.titulo}</h3>
-                  <p className="text-red-200 text-sm">{logro.anios}</p>
+                  <p className="text-primary-200 text-sm">{logro.anios}</p>
                 </div>
               )
             })}
@@ -183,19 +183,19 @@ export default function Historia() {
             </h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl p-4 text-center">
-                <p className="text-red-600 font-bold text-lg">Cat. 2012</p>
+                <p className="text-primary font-bold text-lg">Cat. 2012</p>
                 <p className="text-gray-600 text-sm">Tricampeón + Mendoza Cup</p>
               </div>
               <div className="bg-white rounded-xl p-4 text-center">
-                <p className="text-red-600 font-bold text-lg">Cat. 2014</p>
+                <p className="text-primary font-bold text-lg">Cat. 2014</p>
                 <p className="text-gray-600 text-sm">Campeón Divisional</p>
               </div>
               <div className="bg-white rounded-xl p-4 text-center">
-                <p className="text-red-600 font-bold text-lg">Cat. 2017</p>
+                <p className="text-primary font-bold text-lg">Cat. 2017</p>
                 <p className="text-gray-600 text-sm">Campeón Divisional</p>
               </div>
               <div className="bg-white rounded-xl p-4 text-center">
-                <p className="text-red-600 font-bold text-lg">Femenino</p>
+                <p className="text-primary font-bold text-lg">Femenino</p>
                 <p className="text-gray-600 text-sm">Campeón 2025</p>
               </div>
             </div>
@@ -221,7 +221,7 @@ export default function Historia() {
               { titulo: 'Pasión', descripcion: 'La Caldera se enciende con el fervor de nuestra gente.' },
             ].map((valor) => (
               <div key={valor.titulo} className="bg-gray-200 rounded-xl p-6 text-center hover:shadow-lg transition-shadow">
-                <h3 className="text-xl font-semibold text-red-600 mb-2">{valor.titulo}</h3>
+                <h3 className="text-xl font-semibold text-primary mb-2">{valor.titulo}</h3>
                 <p className="text-gray-600 text-sm">{valor.descripcion}</p>
               </div>
             ))}
@@ -233,17 +233,17 @@ export default function Historia() {
       <BannerPublicitario tipo="FOOTER" ubicacion="HISTORIA" />
 
       {/* CTA */}
-      <section className="py-16 bg-red-600">
+      <section className="py-16 bg-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
             Sumate a La Caldera
           </h2>
-          <p className="text-red-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-primary-100 mb-8 max-w-2xl mx-auto">
             Sé parte de la familia de Sportivo Pilar y viví la pasión junto a nosotros.
           </p>
           <a
             href="/inscripcion-socio"
-            className="inline-flex items-center px-8 py-4 bg-white text-red-600 rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
+            className="inline-flex items-center px-8 py-4 bg-white text-primary rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
           >
             Quiero ser Socio
           </a>

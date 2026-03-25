@@ -243,7 +243,7 @@ export default function AdminLayout() {
           <Link to="/admin" className={`flex items-center gap-3 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
             <TenantLogo className="h-14" />
             <div>
-              <span className="font-bold text-primary text-lg whitespace-nowrap">Sportivo Pilar</span>
+              <span className="font-bold text-primary text-lg whitespace-nowrap">{tenant?.nombre || 'Admin'}</span>
               <p className="text-xs text-gray-500">Admin</p>
             </div>
           </Link>
@@ -390,10 +390,25 @@ export default function AdminLayout() {
               )
             })
           )}
+          {admin?.esSuperAdmin && (
+            <a
+              href="/admin/tenants"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${sidebarCollapsed ? 'md:justify-center' : ''} text-yellow-400 hover:bg-gray-700 hover:text-yellow-300 relative group`}
+              title={sidebarCollapsed ? 'Gestión de Tenants' : ''}
+            >
+              <Shield className="w-5 h-5 flex-shrink-0" />
+              <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>Gestión de Tenants</span>
+              {sidebarCollapsed && (
+                <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
+                  <span className="text-sm text-white">Gestión de Tenants</span>
+                </div>
+              )}
+            </a>
+          )}
         </nav>
 
-        {/* Link al sitio público */}
-        <div className="px-3 py-4 border-t border-gray-700">
+        {/* Links de pie de sidebar */}
+        <div className="px-3 py-4 border-t border-gray-700 space-y-1">
           <a
             href="/"
             target="_blank"
@@ -442,11 +457,11 @@ export default function AdminLayout() {
             <div className="md:hidden">
               <Link to="/admin" className="flex items-center gap-2">
                 <TenantLogo className="h-8" />
-                <span className="font-bold text-primary whitespace-nowrap">Rojo Plus</span>
+                <span className="font-bold text-primary whitespace-nowrap">{tenant?.nombre || 'Admin'}</span>
               </Link>
             </div>
             <div className="hidden md:block">
-              <span className="text-2xl font-bold text-gray-400 italic">El equipo de la ciudad</span>
+              <span className="text-2xl font-bold text-gray-400 italic">{tenant?.slogan || ''}</span>
             </div>
           </div>
           <div className="hidden md:flex items-center gap-4">

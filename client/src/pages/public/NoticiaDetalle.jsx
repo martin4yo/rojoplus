@@ -94,7 +94,7 @@ export default function NoticiaDetalle() {
   if (loading) {
     return (
       <div className="bg-gray-300 min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
@@ -111,7 +111,7 @@ export default function NoticiaDetalle() {
           </p>
           <Link
             to="/noticias"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary-dark transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
             Ver todas las noticias
@@ -132,7 +132,7 @@ export default function NoticiaDetalle() {
             className="w-full h-auto max-h-[500px] object-contain mx-auto"
           />
         ) : (
-          <div className="w-full h-72 bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
+          <div className="w-full h-72 bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center">
             <span className="text-white text-8xl font-bold opacity-20">SP</span>
           </div>
         )}
@@ -174,7 +174,7 @@ export default function NoticiaDetalle() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link
             to="/noticias"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
             Volver a noticias
@@ -220,7 +220,7 @@ export default function NoticiaDetalle() {
         <div className="max-w-4xl mx-auto px-4">
           {/* Extracto */}
           {noticia.extracto && (
-            <p className="text-xl text-gray-600 mb-8 font-medium leading-relaxed border-l-4 border-red-600 pl-6">
+            <p className="text-xl text-gray-600 mb-8 font-medium leading-relaxed border-l-4 border-primary pl-6">
               {noticia.extracto}
             </p>
           )}
@@ -230,9 +230,9 @@ export default function NoticiaDetalle() {
             className="prose prose-lg prose-gray max-w-none
               prose-headings:text-gray-900
               prose-p:text-gray-700
-              prose-a:text-red-600 prose-a:no-underline hover:prose-a:underline
+              prose-a:text-primary prose-a:no-underline hover:prose-a:underline
               prose-img:rounded-xl prose-img:shadow-lg
-              prose-blockquote:border-red-600 prose-blockquote:bg-gray-100 prose-blockquote:py-2 prose-blockquote:rounded-r-lg
+              prose-blockquote:border-primary prose-blockquote:bg-gray-100 prose-blockquote:py-2 prose-blockquote:rounded-r-lg
             "
             dangerouslySetInnerHTML={{ __html: noticia.contenido }}
           />
@@ -265,7 +265,7 @@ export default function NoticiaDetalle() {
                         className="w-full h-auto group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-40 flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
+                      <div className="w-full h-40 flex items-center justify-center bg-gradient-to-br from-primary to-primary">
                         <span className="text-white text-3xl font-bold opacity-30">SP</span>
                       </div>
                     )}
@@ -274,7 +274,7 @@ export default function NoticiaDetalle() {
                     <p className="text-gray-500 text-sm mb-2">
                       {formatFecha(rel.fechaPublicacion)}
                     </p>
-                    <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 group-hover:text-red-600 transition-colors">
+                    <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 group-hover:text-primary transition-colors">
                       {rel.titulo}
                     </h3>
                   </div>
@@ -286,12 +286,12 @@ export default function NoticiaDetalle() {
       )}
 
       {/* CTA */}
-      <section className="py-12 bg-red-600">
+      <section className="py-12 bg-primary">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold text-white mb-4">
             Seguí las novedades del club
           </h2>
-          <p className="text-red-100 mb-6">
+          <p className="text-primary-100 mb-6">
             Enterate de todas las novedades siguiéndonos en redes sociales
           </p>
           <div className="flex justify-center gap-4">
@@ -299,7 +299,7 @@ export default function NoticiaDetalle() {
               href="https://www.instagram.com/sportivopilaroficial"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-6 py-3 bg-white text-red-600 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
+              className="px-6 py-3 bg-white text-primary rounded-xl font-semibold hover:bg-gray-100 transition-colors"
             >
               Instagram
             </a>
@@ -307,7 +307,7 @@ export default function NoticiaDetalle() {
               href="https://www.facebook.com/sportivopilaroficial"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-6 py-3 bg-red-700 text-white border border-red-500 rounded-xl font-semibold hover:bg-red-800 transition-colors"
+              className="px-6 py-3 bg-primary-dark text-white border border-primary rounded-xl font-semibold hover:bg-primary-dark transition-colors"
             >
               Facebook
             </a>

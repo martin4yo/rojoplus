@@ -478,11 +478,8 @@ function App() {
 
         {/* Gestión de Comunicaciones */}
         <Route path="comunicaciones" element={<GestionComunicaciones />} />
-      </Route>
 
-      {/* Super-Admin */}
-      <Route path="/super-admin" element={<SuperAdminLayout />}>
-        <Route index element={<SuperAdminDashboard />} />
+        {/* Gestión de Tenants (solo superadmin) */}
         <Route path="tenants" element={<TenantsList />} />
         <Route path="tenants/nuevo" element={<TenantForm />} />
         <Route path="tenants/:id" element={<TenantDetail />} />

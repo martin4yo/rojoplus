@@ -67,7 +67,7 @@ export default function Calendario() {
 
   function getTipoColor(tipo) {
     switch (tipo?.toUpperCase()) {
-      case 'PARTIDO': return 'bg-red-500'
+      case 'PARTIDO': return 'bg-primary'
       case 'ENTRENAMIENTO': return 'bg-blue-500'
       case 'EVENTO': return 'bg-green-500'
       case 'REUNION': return 'bg-purple-500'
@@ -81,13 +81,13 @@ export default function Calendario() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Hero */}
-      <div className="bg-red-600 text-white py-12">
+      <div className="bg-primary text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <Calendar className="w-12 h-12" />
             <div>
               <h1 className="text-3xl md:text-4xl font-bold">Calendario</h1>
-              <p className="text-red-100 mt-1">Eventos, partidos y actividades del club</p>
+              <p className="text-primary-100 mt-1">Eventos, partidos y actividades del club</p>
             </div>
           </div>
         </div>
@@ -142,7 +142,7 @@ export default function Calendario() {
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-red-600 border-t-transparent rounded-full" />
+            <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
           </div>
         ) : vista === 'mes' ? (
           /* Vista Calendario */
@@ -163,13 +163,13 @@ export default function Calendario() {
                   key={idx}
                   className={`min-h-[100px] border-b border-r p-2 ${
                     item.dia === null ? 'bg-gray-50' : ''
-                  } ${item.fecha === hoy ? 'bg-red-50' : ''}`}
+                  } ${item.fecha === hoy ? 'bg-primary-50' : ''}`}
                 >
                   {item.dia && (
                     <>
                       <span className={`inline-flex items-center justify-center w-7 h-7 text-sm ${
                         item.fecha === hoy
-                          ? 'bg-red-600 text-white rounded-full font-bold'
+                          ? 'bg-primary text-white rounded-full font-bold'
                           : 'text-gray-700'
                       }`}>
                         {item.dia}
@@ -266,7 +266,7 @@ export default function Calendario() {
           <h3 className="text-sm font-medium text-gray-700 mb-3">Tipos de eventos</h3>
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <div className="w-3 h-3 rounded-full bg-primary" />
               <span className="text-sm text-gray-600">Partidos</span>
             </div>
             <div className="flex items-center gap-2">

@@ -38,12 +38,12 @@ export default function Mision() {
   return (
     <div className="bg-gray-300 min-h-screen">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-red-600 to-red-700 py-6 md:py-8">
+      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
             Misión y Valores
           </h1>
-          <p className="text-base text-red-100 max-w-3xl mx-auto">
+          <p className="text-base text-primary-100 max-w-3xl mx-auto">
             Los principios que guían cada paso de Club Sportivo Pilar desde 1932
           </p>
         </div>
@@ -54,7 +54,7 @@ export default function Mision() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="inline-flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-full text-sm font-semibold mb-6">
+              <div className="inline-flex items-center gap-2 bg-primary-100 text-primary-dark px-4 py-2 rounded-full text-sm font-semibold mb-6">
                 <Target className="w-4 h-4" />
                 Nuestra Misión
               </div>
@@ -84,9 +84,9 @@ export default function Mision() {
                 alt="Misión del Club"
                 className="rounded-2xl shadow-xl"
               />
-              <div className="absolute -bottom-6 -right-6 bg-red-600 text-white rounded-xl p-6 shadow-lg hidden md:block">
+              <div className="absolute -bottom-6 -right-6 bg-primary text-white rounded-xl p-6 shadow-lg hidden md:block">
                 <p className="text-3xl font-bold">+90</p>
-                <p className="text-red-100 text-sm">años formando deportistas</p>
+                <p className="text-primary-100 text-sm">años formando deportistas</p>
               </div>
             </div>
           </div>
@@ -111,15 +111,15 @@ export default function Mision() {
             </p>
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-gray-200 rounded-xl p-6">
-                <p className="text-red-600 text-3xl font-bold mb-2">1000+</p>
+                <p className="text-primary text-3xl font-bold mb-2">1000+</p>
                 <p className="text-gray-600">Socios activos</p>
               </div>
               <div className="bg-gray-200 rounded-xl p-6">
-                <p className="text-red-600 text-3xl font-bold mb-2">10+</p>
+                <p className="text-primary text-3xl font-bold mb-2">10+</p>
                 <p className="text-gray-600">Disciplinas deportivas</p>
               </div>
               <div className="bg-gray-200 rounded-xl p-6">
-                <p className="text-red-600 text-3xl font-bold mb-2">200+</p>
+                <p className="text-primary text-3xl font-bold mb-2">200+</p>
                 <p className="text-gray-600">Deportistas formados por año</p>
               </div>
             </div>
@@ -147,8 +147,8 @@ export default function Mision() {
                   key={idx}
                   className="bg-gray-200 rounded-2xl p-6 hover:shadow-lg transition-shadow group"
                 >
-                  <div className="w-14 h-14 bg-red-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-red-600 transition-colors">
-                    <Icono className="w-7 h-7 text-red-600 group-hover:text-white transition-colors" />
+                  <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary transition-colors">
+                    <Icono className="w-7 h-7 text-primary group-hover:text-white transition-colors" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-3">
                     {valor.titulo}
@@ -167,24 +167,24 @@ export default function Mision() {
       <BannerPublicitario tipo="FOOTER" ubicacion="MISION" />
 
       {/* CTA */}
-      <section className="py-16 bg-red-600">
+      <section className="py-16 bg-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
             Compartí nuestros valores
           </h2>
-          <p className="text-red-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-primary-100 mb-8 max-w-2xl mx-auto">
             Sumate a la familia de Sportivo Pilar y viví la pasión del deporte junto a nosotros.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
               href="/inscripcion-socio"
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-red-600 rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
+              className="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
             >
               Quiero ser Socio
             </a>
             <a
               href="/historia"
-              className="inline-flex items-center justify-center px-8 py-4 bg-red-700 text-white border border-red-500 rounded-xl text-lg font-semibold hover:bg-red-800 transition-colors"
+              className="inline-flex items-center justify-center px-8 py-4 bg-primary-dark text-white border border-primary rounded-xl text-lg font-semibold hover:bg-primary-dark transition-colors"
             >
               Conocer nuestra Historia
             </a>

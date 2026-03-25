@@ -10,6 +10,29 @@ function handleInvalidToken() {
   }
 }
 
+/**
+ * Extrae el subdomain del hostname actual del browser.
+ * Ej: clubix-sport.localhost → clubix-sport
+ *     sportivopilar.localhost → sportivopilar
+ *     localhost → null (usa DEFAULT_TENANT_SUBDOMAIN del backend)
+ */
+function getCurrentTenantSlug() {
+  // Prioridad 1: superadmin seleccionó un tenant manualmente
+  const selected = localStorage.getItem('superadmin_tenant_slug')
+  if (selected) return selected
+
+  // Prioridad 2: subdomain del hostname actual
+  const hostname = window.location.hostname
+  if (hostname.includes('localhost')) {
+    const match = hostname.match(/^([^.]+)\.localhost/)
+    return match ? match[1] : null
+  }
+  // Producción: clubix-sport.clubix.com → clubix-sport
+  const parts = hostname.split('.')
+  if (parts.length > 2 && parts[0] !== 'www') return parts[0]
+  return null
+}
+
 async function request(endpoint, options = {}, returnFullResponse = false) {
   const url = `${API_URL}${endpoint}`
 
@@ -25,6 +48,12 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
   const token = localStorage.getItem('adminToken')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+
+  // Enviar tenant slug como header para que el backend identifique el tenant
+  const tenantSlug = getCurrentTenantSlug()
+  if (tenantSlug) {
+    config.headers['X-Tenant-Slug'] = tenantSlug
   }
 
   try {

@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colores por defecto (se sobreescriben por el tenant via JS) */
+:root {
+  --color-primary: #3B9FF3;
+  --color-primary-dark: #0F1F3D;
+  --color-primary-light: #7DC4F8;
+  --color-primary-50: color-mix(in srgb, #3B9FF3 8%, white);
+  --color-primary-100: color-mix(in srgb, #3B9FF3 15%, white);
+  --color-primary-200: color-mix(in srgb, #3B9FF3 25%, white);
+  --color-primary-300: color-mix(in srgb, #3B9FF3 40%, white);
+  --color-primary-400: color-mix(in srgb, #3B9FF3 65%, white);
+  --color-secondary: #0F1F3D;
+  --color-secondary-dark: #060e1c;
+  --color-secondary-light: #1e3a6e;
+  --color-accent: #00C9A7;
+}
+
 /* Estilos base */
 body {
   font-family: 'Inter', system-ui, sans-serif;

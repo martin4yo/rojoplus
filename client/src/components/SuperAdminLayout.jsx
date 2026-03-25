@@ -29,7 +29,6 @@ export default function SuperAdminLayout() {
   const menuItems = [
     { path: '/super-admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/super-admin/tenants', label: 'Gestión de Tenants', icon: Building2 },
-    { path: '/super-admin/configuracion', label: 'Configuración', icon: Settings }
   ]
 
   function isActive(path) {
@@ -114,7 +113,7 @@ export default function SuperAdminLayout() {
           )}
           <button
             onClick={handleLogout}
-            className="w-full mt-3 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm flex items-center justify-center gap-2 transition"
+            className="w-full mt-3 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm flex items-center justify-center gap-2 transition"
           >
             <LogOut className="w-4 h-4" />
             {!sidebarCollapsed && 'Salir'}

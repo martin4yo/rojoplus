@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin, Phone, Mail, ChevronRight, Users, Trophy, Heart, Calendar } from 'lucide-react'
+import { useTenant } from '../../contexts/TenantContext'
 import HeroSection from '../../components/public/HeroSection'
 import ActividadesGrid from '../../components/public/ActividadesGrid'
 import SponsorsSection from '../../components/public/SponsorsSection'
@@ -8,6 +9,7 @@ import BannerPublicitario from '../../components/public/BannerPublicitario'
 import api from '../../services/api'
 
 export default function Home() {
+  const { tenant } = useTenant()
   const [noticias, setNoticias] = useState([])
   const [loadingNoticias, setLoadingNoticias] = useState(true)
 
@@ -70,14 +72,14 @@ export default function Home() {
       <BannerPublicitario tipo="MEDIO" ubicacion="HOME" />
 
       {/* CTA Section - Hacete Socio */}
-      <section className="py-16 md:py-24 bg-red-600">
+      <section className="py-16 md:py-24 bg-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
                 ¿Todavía no sos socio?
               </h2>
-              <p className="text-red-100 text-lg mb-8 leading-relaxed">
+              <p className="text-primary-100 text-lg mb-8 leading-relaxed">
                 Sumate a la familia de Sportivo Pilar y disfrutá de todos los beneficios:
                 actividades deportivas, instalaciones, eventos y mucho más.
               </p>
@@ -89,7 +91,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-semibold text-white">Actividades</p>
-                    <p className="text-red-200 text-sm">+10 deportes</p>
+                    <p className="text-primary-200 text-sm">+10 deportes</p>
                   </div>
                 </div>
 
@@ -99,7 +101,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-semibold text-white">Comunidad</p>
-                    <p className="text-red-200 text-sm">+1000 socios</p>
+                    <p className="text-primary-200 text-sm">+1000 socios</p>
                   </div>
                 </div>
 
@@ -109,7 +111,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-semibold text-white">Beneficios</p>
-                    <p className="text-red-200 text-sm">Descuentos exclusivos</p>
+                    <p className="text-primary-200 text-sm">Descuentos exclusivos</p>
                   </div>
                 </div>
 
@@ -119,7 +121,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-semibold text-white">Eventos</p>
-                    <p className="text-red-200 text-sm">Todo el año</p>
+                    <p className="text-primary-200 text-sm">Todo el año</p>
                   </div>
                 </div>
               </div>
@@ -127,14 +129,14 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
                   to="/inscripcion-socio"
-                  className="inline-flex items-center justify-center px-8 py-4 bg-gray-200 text-red-600 rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
+                  className="inline-flex items-center justify-center px-8 py-4 bg-gray-200 text-primary rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
                 >
                   Quiero ser Socio
                   <ChevronRight className="w-5 h-5 ml-2" />
                 </Link>
                 <Link
                   to="/mi-qr"
-                  className="inline-flex items-center justify-center px-8 py-4 bg-red-700 text-white border border-red-500 rounded-xl text-lg font-semibold hover:bg-red-800 transition-colors"
+                  className="inline-flex items-center justify-center px-8 py-4 bg-primary-dark text-white border border-primary rounded-xl text-lg font-semibold hover:bg-primary-dark transition-colors"
                 >
                   Ya soy Socio
                 </Link>
@@ -166,46 +168,48 @@ export default function Home() {
 
           <div className="grid md:grid-cols-3 gap-8">
             {/* Teléfono */}
-            <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Phone className="w-8 h-8 text-red-600" />
+            {tenant?.telefono && (
+              <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
+                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Phone className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Llamanos</h3>
+                <a href={`tel:${tenant.telefono.replace(/\D/g,'')}`} className="text-primary font-medium text-lg hover:underline">
+                  {tenant.telefono}
+                </a>
+                {tenant?.horarios && (
+                  <p className="text-gray-500 text-sm mt-2 whitespace-pre-line">{tenant.horarios}</p>
+                )}
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Llamanos</h3>
-              <a
-                href="tel:02304420297"
-                className="text-red-600 font-medium text-lg hover:underline"
-              >
-                0230 442-0297
-              </a>
-              <p className="text-gray-500 text-sm mt-2">Lunes a Viernes de 9 a 20hs</p>
-            </div>
+            )}
 
             {/* Dirección */}
-            <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <MapPin className="w-8 h-8 text-red-600" />
+            {tenant?.direccion && (
+              <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
+                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <MapPin className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Donde Estamos</h3>
+                <p className="text-gray-700">{tenant.direccion}</p>
+                {(tenant.ciudad || tenant.provincia) && (
+                  <p className="text-gray-500 text-sm mt-2">{[tenant.ciudad, tenant.provincia].filter(Boolean).join(', ')}</p>
+                )}
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Donde Estamos</h3>
-              <p className="text-gray-700">
-                Av. Tomás Márquez 1125
-              </p>
-              <p className="text-gray-500 text-sm mt-2">Pilar, Buenos Aires</p>
-            </div>
+            )}
 
             {/* Email */}
-            <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Mail className="w-8 h-8 text-red-600" />
+            {tenant?.email && (
+              <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
+                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Mail className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Escribinos</h3>
+                <a href={`mailto:${tenant.email}`} className="text-primary font-medium hover:underline">
+                  {tenant.email}
+                </a>
+                <p className="text-gray-500 text-sm mt-2">Respondemos en 24hs</p>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Escribinos</h3>
-              <a
-                href="mailto:info@sportivopilar.com.ar"
-                className="text-red-600 font-medium hover:underline"
-              >
-                info@sportivopilar.com.ar
-              </a>
-              <p className="text-gray-500 text-sm mt-2">Respondemos en 24hs</p>
-            </div>
+            )}
           </div>
 
           {/* Mapa */}
@@ -242,7 +246,7 @@ export default function Home() {
 
           {loadingNoticias ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : noticias.length === 0 ? (
             <div className="grid md:grid-cols-3 gap-6">
@@ -278,7 +282,7 @@ export default function Home() {
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary">
                         <span className="text-white text-4xl font-bold opacity-30">SP</span>
                       </div>
                     )}
@@ -287,7 +291,7 @@ export default function Home() {
                         Destacada
                       </span>
                     )}
-                    <span className="absolute top-3 left-3 px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
+                    <span className="absolute top-3 left-3 px-3 py-1 bg-primary-100 text-primary-dark text-xs font-medium rounded-full">
                       {noticia.categoria}
                     </span>
                   </div>
@@ -298,7 +302,7 @@ export default function Home() {
                       {formatFecha(noticia.fechaPublicacion)}
                     </div>
 
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-primary transition-colors">
                       {noticia.titulo}
                     </h3>
 
@@ -308,7 +312,7 @@ export default function Home() {
 
                     <Link
                       to={`/noticias/${noticia.slug}`}
-                      className="inline-flex items-center text-red-600 font-medium text-sm hover:text-red-700"
+                      className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark"
                     >
                       Leer más
                       <ChevronRight className="w-4 h-4 ml-1" />

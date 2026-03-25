@@ -148,7 +148,7 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
                     )}
                   </div>
 
-                  <span className="text-red-600 font-medium text-sm flex items-center gap-1 group-hover:text-red-700">
+                  <span className="text-primary font-medium text-sm flex items-center gap-1 group-hover:text-primary-dark">
                     Ver más
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </span>
@@ -162,7 +162,7 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
           <div className="text-center mt-10">
             <Link
               to="/actividades"
-              className="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors"
+              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary-dark transition-colors"
             >
               Ver todas las actividades
               <ChevronRight className="w-5 h-5 ml-2" />

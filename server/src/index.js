@@ -67,7 +67,7 @@ import { createTenantPrisma } from './lib/tenantPrisma.js'
 
 const app = express()
 const httpServer = createServer(app)
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3000
 
 // Middlewares globales
 app.use(helmet({

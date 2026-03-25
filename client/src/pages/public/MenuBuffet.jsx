@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { UtensilsCrossed, Phone, MapPin, Clock, ArrowLeft, Star, Coffee, Pizza, Sandwich, IceCream, Salad, Wine, ChevronDown, X, Download } from 'lucide-react'
+import TenantLogo from '../../components/TenantLogo'
 
 // Imágenes de ejemplo por categoría (usando URLs de imágenes libres de derechos)
 const imagenesPorCategoria = {
@@ -85,7 +86,7 @@ export default function MenuBuffet() {
     return (
       <div className="min-h-screen bg-gray-200 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-600 border-t-transparent mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
           <p className="text-gray-500">Cargando menú...</p>
         </div>
       </div>
@@ -100,11 +101,7 @@ export default function MenuBuffet() {
           <div className="flex items-center justify-between">
             {/* Logo y título */}
             <div className="flex items-center gap-4">
-              <img
-                src="/images/club/pngwing.com.png"
-                alt="Club Sportivo Pilar"
-                className="h-16 md:h-20 w-auto drop-shadow-lg"
-              />
+              <TenantLogo className="h-10 w-auto drop-shadow-lg" />
               <div className="text-left">
                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
                   Buffet del Club
@@ -118,7 +115,7 @@ export default function MenuBuffet() {
             {/* Botón descargar PDF */}
             <button
               onClick={descargarPDF}
-              className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-lg transition-all duration-200 hover:scale-105 font-medium"
+              className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg shadow-lg transition-all duration-200 hover:scale-105 font-medium"
               title="Descargar menú en PDF"
             >
               <Download size={20} />
@@ -178,14 +175,14 @@ export default function MenuBuffet() {
                     }}
                     className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${
                       categoriaActiva === cat.id
-                        ? 'bg-red-50 text-red-600'
+                        ? 'bg-primary-50 text-primary'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <Icono size={18} />
                     <span className="flex-1 text-left font-medium">{cat.nombre}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      categoriaActiva === cat.id ? 'bg-red-100' : 'bg-gray-100'
+                      categoriaActiva === cat.id ? 'bg-primary-100' : 'bg-gray-100'
                     }`}>
                       {cat.productos?.length || 0}
                     </span>
@@ -281,7 +278,7 @@ export default function MenuBuffet() {
                           <Star size={14} className="text-amber-500 fill-amber-500" />
                         )}
                       </h3>
-                      <span className="text-lg font-bold text-red-600 whitespace-nowrap">
+                      <span className="text-lg font-bold text-primary whitespace-nowrap">
                         ${Number(prod.precio).toLocaleString('es-AR')}
                       </span>
                     </div>
@@ -318,11 +315,7 @@ export default function MenuBuffet() {
             {/* Logo y descripción */}
             <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
-                <img
-                  src="/images/club/pngwing.com.png"
-                  alt="Club Sportivo Pilar"
-                  className="h-12 w-auto brightness-0 invert opacity-80"
-                />
+                <TenantLogo className="h-10 w-auto brightness-0 invert opacity-80" />
                 <div>
                   <h3 className="font-bold text-lg">Club Sportivo Pilar</h3>
                   <p className="text-stone-400 text-sm">El Rojo de la Avenida - Desde 1912</p>
@@ -337,7 +330,7 @@ export default function MenuBuffet() {
             {/* Horarios */}
             <div>
               <h4 className="font-semibold mb-4 flex items-center gap-2">
-                <Clock size={18} className="text-red-500" />
+                <Clock size={18} className="text-primary" />
                 Horarios
               </h4>
               <ul className="text-stone-400 text-sm space-y-2">
@@ -361,11 +354,11 @@ export default function MenuBuffet() {
               <h4 className="font-semibold mb-4">Contacto</h4>
               <ul className="text-stone-400 text-sm space-y-3">
                 <li className="flex items-center gap-2">
-                  <Phone size={16} className="text-red-500" />
+                  <Phone size={16} className="text-primary" />
                   (0230) 442-0297
                 </li>
                 <li className="flex items-start gap-2">
-                  <MapPin size={16} className="text-red-500 mt-0.5" />
+                  <MapPin size={16} className="text-primary mt-0.5" />
                   <span>Av. Tomás Márquez 1125<br/>Pilar, Buenos Aires</span>
                 </li>
               </ul>

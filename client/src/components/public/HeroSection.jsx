@@ -1,14 +1,17 @@
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
+import { useTenant } from '../../contexts/TenantContext'
 
 export default function HeroSection() {
+  const { tenant } = useTenant()
+
   return (
     <section className="relative min-h-[600px] md:min-h-[700px] flex items-center">
       {/* Background Image - Fixed parallax effect */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat bg-fixed"
         style={{
-          backgroundImage: 'url(/images/club/IMG_2915.JPG)',
+          backgroundImage: `url(${tenant?.heroImageUrl || '/images/club/IMG_2915.JPG'})`,
         }}
       >
         {/* Overlay */}
@@ -18,24 +21,22 @@ export default function HeroSection() {
       {/* Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="max-w-2xl">
-          <p className="text-red-400 font-semibold text-sm md:text-base uppercase tracking-wider mb-4 animate-fade-in">
+          <p className="text-primary-400 font-semibold text-sm md:text-base uppercase tracking-wider mb-4 animate-fade-in">
             Bienvenidos
           </p>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
-            Club Sportivo <span className="text-red-500">Pilar</span>
+            <span className="text-primary">{tenant?.nombre || 'Bienvenidos'}</span>
           </h1>
 
           <p className="text-lg md:text-xl text-gray-300 mb-8 leading-relaxed">
-            Desde 1932, "La Caldera" es el hogar de la pasión deportiva de Pilar.
-            Referentes del básquet nacional y un espacio de inclusión
-            para toda la familia.
+            {tenant?.descripcion || tenant?.slogan || ''}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
               to="/inscripcion-socio"
-              className="inline-flex items-center justify-center px-8 py-4 bg-red-600 text-white rounded-xl text-lg font-semibold hover:bg-red-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              className="inline-flex items-center justify-center px-8 py-4 bg-primary text-white rounded-xl text-lg font-semibold hover:bg-primary-dark transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
             >
               Quiero ser Socio
               <ChevronRight className="w-5 h-5 ml-2" />

@@ -1,12 +1,56 @@
 import express from 'express'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 import prisma from '../../lib/prisma.js'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 const router = express.Router()
+
+// Directorio para logos de tenants
+const uploadDirTenants = path.join(__dirname, '../../../uploads/tenants')
+if (!fs.existsSync(uploadDirTenants)) {
+  fs.mkdirSync(uploadDirTenants, { recursive: true })
+}
+
+// Configurar multer para logos de tenants
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDirTenants),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname)
+    cb(null, `tenant-${req.params.id}-logo${ext}`)
+  }
+})
+const upload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true)
+    else cb(new Error('Solo se permiten imágenes'))
+  }
+})
 
 /**
  * GET /api/super-admin/tenants
  * Listar todos los tenants con filtrado opcional
  */
+router.get('/stats', async (req, res) => {
+  try {
+    const [tenantCount, adminCount, socioCount] = await Promise.all([
+      prisma.tenant.count(),
+      prisma.admin.count(),
+      prisma.socio.count()
+    ])
+    const activeTenants = await prisma.tenant.count({ where: { activo: true } })
+    res.json({ tenants: tenantCount, activeTenants, admins: adminCount, socios: socioCount })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 router.get('/', async (req, res) => {
   try {
     const { estado, activo } = req.query
@@ -222,7 +266,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const { nombre, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, plan, maxSocios, maxAdmins, timezone, moneda } = req.body
+    const { nombre, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, plan, maxSocios, maxAdmins, timezone, moneda, logoUrl, horarios, redesSociales } = req.body
 
     const tenant = await prisma.tenant.update({
       where: { id: parseInt(id) },
@@ -240,7 +284,11 @@ router.put('/:id', async (req, res) => {
         maxSocios,
         maxAdmins,
         timezone,
-        moneda
+        moneda,
+        ...(logoUrl !== undefined && { logoUrl }),
+        ...(horarios !== undefined && { horarios }),
+        ...(redesSociales !== undefined && { redesSociales }),
+        ...(req.body.heroImageUrl !== undefined && { heroImageUrl: req.body.heroImageUrl }),
       }
     })
 
@@ -337,31 +385,64 @@ router.post('/register', async (req, res) => {
 })
 
 /**
- * GET /api/super-admin/stats
- * Estadísticas globales del sistema
+ * POST /api/super-admin/tenants/:id/logo
+ * Subir logo de un tenant
  */
-router.get('/stats', async (req, res) => {
+const uploadHero = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDirTenants),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname)
+      cb(null, `tenant-${req.params.id}-hero${ext}`)
+    }
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true)
+    else cb(new Error('Solo se permiten imágenes'))
+  }
+})
+
+router.post('/:id/hero', uploadHero.single('hero'), async (req, res) => {
   try {
-    const [tenantCount, adminCount, socioCount] = await Promise.all([
-      prisma.tenant.count(),
-      prisma.admin.count(),
-      prisma.socio.count()
-    ])
+    if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' })
 
-    const activeTenants = await prisma.tenant.count({
-      where: { activo: true }
+    const heroImageUrl = `/uploads/tenants/${req.file.filename}`
+
+    const tenant = await prisma.tenant.update({
+      where: { id: parseInt(req.params.id) },
+      data: { heroImageUrl }
     })
 
-    res.json({
-      tenants: tenantCount,
-      activeTenants,
-      admins: adminCount,
-      socios: socioCount
-    })
+    res.json({ success: true, heroImageUrl, tenant })
   } catch (error) {
-    console.error('Error fetching stats:', error)
+    console.error('Error subiendo hero:', error)
     res.status(500).json({ error: error.message })
   }
 })
 
+router.post('/:id/logo', upload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se recibió ningún archivo' })
+    }
+
+    const logoUrl = `/uploads/tenants/${req.file.filename}`
+
+    const tenant = await prisma.tenant.update({
+      where: { id: parseInt(req.params.id) },
+      data: { logoUrl }
+    })
+
+    res.json({ success: true, logoUrl, tenant })
+  } catch (error) {
+    console.error('Error subiendo logo:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * GET /api/super-admin/stats
+ * Estadísticas globales del sistema
+ */
 export default router

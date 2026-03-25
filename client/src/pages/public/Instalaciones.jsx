@@ -107,12 +107,12 @@ export default function Instalaciones() {
   return (
     <div className="bg-gray-300 min-h-screen">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-red-600 to-red-700 py-6 md:py-8">
+      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
             Nuestras Instalaciones
           </h1>
-          <p className="text-base text-red-100 max-w-2xl mx-auto">
+          <p className="text-base text-primary-100 max-w-2xl mx-auto">
             Conocé los espacios donde entrenamos, competimos y compartimos como familia
           </p>
         </div>
@@ -146,7 +146,7 @@ export default function Instalaciones() {
 
                 {/* Contenido */}
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-red-600 transition-colors">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-primary transition-colors">
                     {inst.nombre}
                   </h3>
                   <p className="text-gray-600 text-sm line-clamp-2 mb-4">
@@ -181,14 +181,14 @@ export default function Instalaciones() {
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                      <MapPin className="w-5 h-5 text-red-600" />
+                    <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-primary" />
                     </div>
                     <span className="text-gray-700">Av. Tomás Márquez 1125, Pilar</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                      <Clock className="w-5 h-5 text-red-600" />
+                    <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-primary" />
                     </div>
                     <span className="text-gray-700">Consultas: Lunes a Viernes 9:00 - 18:00</span>
                   </div>
@@ -197,7 +197,7 @@ export default function Instalaciones() {
               <div className="text-center md:text-right">
                 <a
                   href="/contacto"
-                  className="inline-flex items-center px-8 py-4 bg-red-600 text-white rounded-xl text-lg font-semibold hover:bg-red-700 transition-colors shadow-lg"
+                  className="inline-flex items-center px-8 py-4 bg-primary text-white rounded-xl text-lg font-semibold hover:bg-primary-dark transition-colors shadow-lg"
                 >
                   Consultar Disponibilidad
                 </a>
@@ -275,14 +275,14 @@ export default function Instalaciones() {
               {/* Info */}
               <div className="grid md:grid-cols-2 gap-4 mb-6">
                 <div className="bg-gray-100 rounded-xl p-4 flex items-center gap-3">
-                  <Users className="w-6 h-6 text-red-600" />
+                  <Users className="w-6 h-6 text-primary" />
                   <div>
                     <p className="text-sm text-gray-500">Capacidad</p>
                     <p className="font-semibold text-gray-900">{selectedInstalacion.capacidad}</p>
                   </div>
                 </div>
                 <div className="bg-gray-100 rounded-xl p-4 flex items-center gap-3">
-                  <Clock className="w-6 h-6 text-red-600" />
+                  <Clock className="w-6 h-6 text-primary" />
                   <div>
                     <p className="text-sm text-gray-500">Horario</p>
                     <p className="font-semibold text-gray-900">{selectedInstalacion.horario}</p>
@@ -296,7 +296,7 @@ export default function Instalaciones() {
                 <div className="grid grid-cols-2 gap-2">
                   {selectedInstalacion.caracteristicas.map((car, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-red-600 rounded-full" />
+                      <div className="w-2 h-2 bg-primary rounded-full" />
                       <span className="text-gray-600">{car}</span>
                     </div>
                   ))}

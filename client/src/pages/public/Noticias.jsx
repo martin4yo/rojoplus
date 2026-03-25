@@ -137,12 +137,12 @@ export default function Noticias() {
   return (
     <div className="bg-gray-300 min-h-screen">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-red-600 to-red-700 py-6 md:py-8">
+      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
             Noticias
           </h1>
-          <p className="text-base text-red-100 max-w-2xl mx-auto">
+          <p className="text-base text-primary-100 max-w-2xl mx-auto">
             Enterate de las últimas novedades del club
           </p>
         </div>
@@ -160,7 +160,7 @@ export default function Noticias() {
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 placeholder="Buscar noticias..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
               />
             </div>
 
@@ -168,7 +168,7 @@ export default function Noticias() {
             <select
               value={filtroCategoria}
               onChange={(e) => setFiltroCategoria(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white"
             >
               {CATEGORIAS.map(cat => (
                 <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -183,7 +183,7 @@ export default function Noticias() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : noticiasFiltradas.length === 0 ? (
             <div className="text-center py-12">
@@ -205,7 +205,7 @@ export default function Noticias() {
                         className="w-full h-auto group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600">
+                      <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-primary to-primary">
                         <span className="text-white text-4xl font-bold opacity-30">SP</span>
                       </div>
                     )}
@@ -221,7 +221,7 @@ export default function Noticias() {
                       {formatFecha(noticia.fechaPublicacion)}
                     </div>
 
-                    <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-primary transition-colors">
                       {noticia.titulo}
                     </h2>
 
@@ -231,7 +231,7 @@ export default function Noticias() {
 
                     <Link
                       to={`/noticias/${noticia.slug}`}
-                      className="inline-flex items-center text-red-600 font-medium text-sm hover:text-red-700"
+                      className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark"
                     >
                       Leer más
                       <ChevronRight className="w-4 h-4 ml-1" />
@@ -248,9 +248,9 @@ export default function Noticias() {
       <BannerPublicitario tipo="FOOTER" ubicacion="NOTICIAS" />
 
       {/* Info - Redes sociales */}
-      <section className="py-8 bg-red-50 border-t border-red-100">
+      <section className="py-8 bg-primary-50 border-t border-primary-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-red-800 text-sm">
+          <p className="text-primary-dark text-sm">
             <strong>Seguinos en redes:</strong> Para más novedades del club, seguinos en{' '}
             <a href="https://www.instagram.com/sportivopilaroficial" target="_blank" rel="noopener noreferrer" className="underline font-medium">
               Instagram

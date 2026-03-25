@@ -173,7 +173,7 @@ export default function Cronograma() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Hero */}
-      <div className="bg-gradient-to-br from-red-600 to-red-700 py-8 md:py-12">
+      <div className="bg-gradient-to-br from-primary to-primary-dark py-8 md:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4 mb-6">
             <Calendar className="w-10 h-10 md:w-12 md:h-12 text-white" />
@@ -181,7 +181,7 @@ export default function Cronograma() {
               <h1 className="text-2xl md:text-4xl font-bold text-white">
                 Cronograma de Actividades
               </h1>
-              <p className="text-red-100 mt-1 text-sm md:text-base">
+              <p className="text-primary-100 mt-1 text-sm md:text-base">
                 Entrenamientos, partidos y eventos del club
               </p>
             </div>
@@ -194,14 +194,14 @@ export default function Cronograma() {
                 onClick={() => setMostrarFiltros(!mostrarFiltros)}
                 className={`px-4 py-2 rounded-full font-medium transition-colors flex items-center gap-2 ${
                   mostrarFiltros || cantidadFiltrosActivos > 0
-                    ? 'bg-red-600 text-white'
+                    ? 'bg-primary text-white'
                     : 'hover:bg-gray-100 text-gray-700'
                 }`}
               >
                 <Filter className="w-4 h-4" />
                 Filtros
                 {cantidadFiltrosActivos > 0 && (
-                  <span className="bg-white text-red-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                  <span className="bg-white text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
                     {cantidadFiltrosActivos}
                   </span>
                 )}
@@ -243,7 +243,7 @@ export default function Cronograma() {
                     onClick={() => setPresetFecha(preset.id)}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
                       presetFecha === preset.id
-                        ? 'bg-red-600 text-white'
+                        ? 'bg-primary text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
@@ -262,7 +262,7 @@ export default function Cronograma() {
                       type="date"
                       value={fechaDesde}
                       onChange={(e) => setFechaDesde(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
                   <div>
@@ -273,7 +273,7 @@ export default function Cronograma() {
                       type="date"
                       value={fechaHasta}
                       onChange={(e) => setFechaHasta(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -295,7 +295,7 @@ export default function Cronograma() {
                     onClick={() => toggleActividad(act.id)}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
                       actividadesSeleccionadas.includes(act.id)
-                        ? 'bg-red-600 text-white'
+                        ? 'bg-primary text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
@@ -310,7 +310,7 @@ export default function Cronograma() {
               <div>
                 <button
                   onClick={() => setMostrarCategorias(!mostrarCategorias)}
-                  className="w-full flex items-center justify-between font-semibold text-gray-900 mb-3 text-sm md:text-base hover:text-red-600 transition-colors"
+                  className="w-full flex items-center justify-between font-semibold text-gray-900 mb-3 text-sm md:text-base hover:text-primary transition-colors"
                 >
                   <span>
                     Categorías
@@ -348,7 +348,7 @@ export default function Cronograma() {
         {/* Resultados */}
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-red-600 border-t-transparent rounded-full" />
+            <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
           </div>
         ) : todosEventos.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
@@ -362,7 +362,7 @@ export default function Cronograma() {
             {cantidadFiltrosActivos > 0 && (
               <button
                 onClick={limpiarFiltros}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium"
               >
                 Limpiar filtros
               </button>
@@ -378,7 +378,7 @@ export default function Cronograma() {
                   {eventos.entrenamientos.length} entrenamientos
                 </span>
                 <span className="flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-red-600" />
+                  <Trophy className="w-4 h-4 text-primary" />
                   {eventos.partidos.length} partidos
                 </span>
                 {eventos.eventos?.length > 0 && (
@@ -407,7 +407,7 @@ export default function Cronograma() {
                         esTipoEntrenamiento
                           ? 'bg-blue-500'
                           : esTipoPartido
-                          ? 'bg-red-500'
+                          ? 'bg-primary'
                           : 'bg-green-500'
                       }`}
                     />
@@ -420,7 +420,7 @@ export default function Cronograma() {
                           esTipoEntrenamiento
                             ? 'bg-blue-100 text-blue-800'
                             : esTipoPartido
-                            ? 'bg-red-100 text-red-800'
+                            ? 'bg-primary-100 text-primary-dark'
                             : 'bg-green-100 text-green-800'
                         }`}
                       >

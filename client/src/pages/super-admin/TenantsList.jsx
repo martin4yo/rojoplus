@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Eye, Edit, Trash2, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react'
+import { Eye, Trash2, CheckCircle, XCircle, AlertCircle, Plus, Building2, Users, Activity, TrendingUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
@@ -7,8 +7,9 @@ import api from '../../services/api'
 export default function TenantsList() {
   const navigate = useNavigate()
   const [tenants, setTenants] = useState([])
+  const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all') // all, pending, active, suspended
+  const [filter, setFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
@@ -21,16 +22,17 @@ export default function TenantsList() {
       const params = new URLSearchParams()
 
       if (filter !== 'all') {
-        const estadoMap = {
-          pending: 'PENDING_APPROVAL',
-          active: 'ACTIVE',
-          suspended: 'SUSPENDED'
-        }
+        const estadoMap = { pending: 'PENDING_APPROVAL', active: 'ACTIVE', suspended: 'SUSPENDED' }
         params.append('estado', estadoMap[filter])
       }
 
-      const data = await api.get(`/super-admin/tenants?${params.toString()}`)
-      setTenants(data || [])
+      const [data, statsData] = await Promise.all([
+        api.getFull(`/super-admin/tenants?${params.toString()}`),
+        filter === 'all' ? api.getFull('/super-admin/tenants/stats') : Promise.resolve(null)
+      ])
+
+      setTenants(Array.isArray(data) ? data : data.data || [])
+      if (statsData) setStats(statsData)
     } catch (error) {
       toast.error('Error cargando tenants: ' + error.message)
       setTenants([])
@@ -130,13 +132,33 @@ export default function TenantsList() {
           <p className="text-gray-600">Administra todos los clubs del sistema</p>
         </div>
         <button
-          onClick={() => navigate('/super-admin/tenants/nuevo')}
+          onClick={() => navigate('/admin/tenants/nuevo')}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Nuevo Tenant
         </button>
       </div>
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Tenants', value: stats.tenants, icon: Building2, color: 'text-blue-600 bg-blue-50' },
+            { label: 'Activos', value: stats.activeTenants, icon: Activity, color: 'text-green-600 bg-green-50' },
+            { label: 'Admins', value: stats.admins, icon: Users, color: 'text-purple-600 bg-purple-50' },
+            { label: 'Socios', value: stats.socios, icon: TrendingUp, color: 'text-orange-600 bg-orange-50' },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className={`rounded-lg p-4 ${color} flex items-center gap-4`}>
+              <Icon className="w-8 h-8 opacity-60" />
+              <div>
+                <p className="text-sm font-medium opacity-75">{label}</p>
+                <p className="text-2xl font-bold">{value ?? 0}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4 space-y-4">
@@ -204,7 +226,7 @@ export default function TenantsList() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => navigate(`/super-admin/tenants/${tenant.id}`)}
+                        onClick={() => navigate(`/admin/tenants/${tenant.id}`)}
                         className="p-2 hover:bg-blue-50 rounded text-blue-600"
                         title="Ver"
                       >
@@ -264,31 +286,6 @@ export default function TenantsList() {
         )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600">Total Tenants</p>
-          <p className="text-3xl font-bold text-primary">{tenants.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600">Activos</p>
-          <p className="text-3xl font-bold text-green-600">
-            {tenants.filter(t => t.estado === 'ACTIVE').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600">Pendientes</p>
-          <p className="text-3xl font-bold text-yellow-600">
-            {tenants.filter(t => t.estado === 'PENDING_APPROVAL').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-gray-600">Suspendidos</p>
-          <p className="text-3xl font-bold text-red-600">
-            {tenants.filter(t => t.estado === 'SUSPENDED').length}
-          </p>
-        </div>
-      </div>
     </div>
   )
 }

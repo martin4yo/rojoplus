@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, ChevronDown } from 'lucide-react'
+import { useTenant } from '../../../contexts/TenantContext'
+import TenantLogo from '../../../components/TenantLogo'
 
 export default function PublicHeader() {
+  const { tenant } = useTenant()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [socioMenuOpen, setSocioMenuOpen] = useState(false)
   const [clubMenuOpen, setClubMenuOpen] = useState(false)
@@ -30,14 +33,10 @@ export default function PublicHeader() {
         <div className="flex justify-between items-center h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 flex-shrink-0 relative z-10">
-            <img
-              src="/images/club/pngwing.com.png"
-              alt="Club Sportivo Pilar"
-              className="h-12 md:h-14 w-auto"
-            />
+            <TenantLogo className="h-12 md:h-14 w-auto" fallbackSrc="/images/LogoClubixSolo.png" />
             <div className="hidden sm:block">
-              <h1 className="text-lg md:text-xl font-bold text-gray-900 whitespace-nowrap">Club Sportivo Pilar</h1>
-              <p className="text-xs text-red-600 font-medium whitespace-nowrap">El Rojo de la Avenida</p>
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 whitespace-nowrap">{tenant?.nombre || ''}</h1>
+              {tenant?.slogan && <p className="text-xs text-primary font-medium whitespace-nowrap">{tenant.slogan}</p>}
             </div>
           </Link>
 
@@ -51,7 +50,7 @@ export default function PublicHeader() {
                     onBlur={() => setTimeout(() => setClubMenuOpen(false), 150)}
                     className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                       link.submenu.some(sub => isActive(sub.path))
-                        ? 'bg-red-50 text-red-600'
+                        ? 'bg-primary-50 text-primary'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -65,7 +64,7 @@ export default function PublicHeader() {
                         <Link
                           key={sub.path}
                           to={sub.path}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary"
                         >
                           {sub.label}
                         </Link>
@@ -79,7 +78,7 @@ export default function PublicHeader() {
                   to={link.path}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                     isActive(link.path)
-                      ? 'bg-red-50 text-red-600'
+                      ? 'bg-primary-50 text-primary'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -103,13 +102,13 @@ export default function PublicHeader() {
                 <div className="absolute right-0 mt-2 w-56 bg-gray-200 rounded-lg shadow-lg border border-gray-300 py-2 z-50">
                   <Link
                     to="/mi-qr"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary"
                   >
                     Mi QR de Socio
                   </Link>
                   <Link
                     to="/login-socio"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary"
                   >
                     Portal del Socio
                   </Link>
@@ -120,7 +119,7 @@ export default function PublicHeader() {
             {/* CTA Button */}
             <Link
               to="/inscripcion-socio"
-              className="ml-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm whitespace-nowrap"
+              className="ml-3 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-dark transition-colors shadow-sm whitespace-nowrap"
             >
               Quiero ser Socio
             </Link>
@@ -150,7 +149,7 @@ export default function PublicHeader() {
                         onClick={() => setMobileMenuOpen(false)}
                         className={`px-6 py-3 rounded-lg text-sm font-medium transition-colors ${
                           isActive(sub.path)
-                            ? 'bg-red-50 text-red-600'
+                            ? 'bg-primary-50 text-primary'
                             : 'text-gray-700 hover:bg-gray-100'
                         }`}
                       >
@@ -165,7 +164,7 @@ export default function PublicHeader() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                       isActive(link.path)
-                        ? 'bg-red-50 text-red-600'
+                        ? 'bg-primary-50 text-primary'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -195,7 +194,7 @@ export default function PublicHeader() {
               <Link
                 to="/inscripcion-socio"
                 onClick={() => setMobileMenuOpen(false)}
-                className="mx-4 mt-2 px-5 py-3 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors text-center"
+                className="mx-4 mt-2 px-5 py-3 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-dark transition-colors text-center"
               >
                 Quiero ser Socio
               </Link>

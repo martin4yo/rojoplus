@@ -18,6 +18,7 @@ router.post('/login', asyncHandler(async (req, res) => {
 
   const admin = await req.prisma.admin.findUnique({
     where: { email },
+    include: { rol: { select: { esSuperAdmin: true } } }
   })
 
   if (!admin || !admin.activo) {
@@ -48,6 +49,7 @@ router.post('/login', asyncHandler(async (req, res) => {
         apellido: admin.apellido,
         rol: admin.rol,
         permisos: admin.permisos,
+        esSuperAdmin: admin.rol?.esSuperAdmin || false,
       },
     },
   })

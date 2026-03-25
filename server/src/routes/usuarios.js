@@ -368,6 +368,7 @@ router.get('/usuarios', asyncHandler(async (req, res) => {
   const where = {}
   if (activo !== undefined) where.activo = activo === 'true'
   if (rolId) where.rolId = parseInt(rolId)
+  if (req.tenantId) where.tenantUsuarios = { some: { tenantId: req.tenantId } }
 
   const usuarios = await prisma.admin.findMany({
     where,
@@ -444,7 +445,10 @@ router.post('/usuarios', asyncHandler(async (req, res) => {
       nombre,
       apellido,
       telefono,
-      rolId: rolId ? parseInt(rolId) : null
+      rolId: rolId ? parseInt(rolId) : null,
+      ...(req.tenantId && {
+        tenantUsuarios: { create: { tenantId: req.tenantId, rol: 'ADMIN' } }
+      })
     },
     select: {
       id: true,

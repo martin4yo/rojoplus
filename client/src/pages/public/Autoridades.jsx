@@ -68,7 +68,7 @@ export default function Autoridades() {
   if (loading) {
     return (
       <div className="bg-gray-300 min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
@@ -76,12 +76,12 @@ export default function Autoridades() {
   return (
     <div className="bg-gray-300 min-h-screen">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-red-600 to-red-700 py-6 md:py-8">
+      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
             Autoridades del Club
           </h1>
-          <p className="text-base text-red-100 max-w-2xl mx-auto">
+          <p className="text-base text-primary-100 max-w-2xl mx-auto">
             Conocé a quienes lideran y trabajan por el crecimiento de Sportivo Pilar
           </p>
         </div>
@@ -108,7 +108,7 @@ export default function Autoridades() {
               >
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
-                  <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {miembro.foto ? (
                       <img src={miembro.foto} alt={miembro.nombre} className="w-full h-full object-cover" />
                     ) : (
@@ -120,7 +120,7 @@ export default function Autoridades() {
 
                   {/* Info */}
                   <div className="flex-1">
-                    <span className="text-red-600 text-sm font-semibold uppercase tracking-wide">
+                    <span className="text-primary text-sm font-semibold uppercase tracking-wide">
                       {miembro.cargo}
                     </span>
                     <h3 className="text-lg font-bold text-gray-900 mt-1">
@@ -133,7 +133,7 @@ export default function Autoridades() {
                     {miembro.email && (
                       <a
                         href={`mailto:${miembro.email}`}
-                        className="inline-flex items-center gap-1 text-red-600 text-sm mt-2 hover:underline"
+                        className="inline-flex items-center gap-1 text-primary text-sm mt-2 hover:underline"
                       >
                         <Mail className="w-4 h-4" />
                         {miembro.email}
@@ -158,11 +158,11 @@ export default function Autoridades() {
                 {autoridades.VOCALES.map((vocal) => (
                   <div key={vocal.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center overflow-hidden">
+                      <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center overflow-hidden">
                         {vocal.foto ? (
                           <img src={vocal.foto} alt={vocal.nombre} className="w-full h-full object-cover" />
                         ) : (
-                          <span className="text-red-600 font-semibold text-sm">
+                          <span className="text-primary font-semibold text-sm">
                             {getIniciales(vocal.nombre)}
                           </span>
                         )}
@@ -228,7 +228,7 @@ export default function Autoridades() {
             {autoridades.SUBCOMISIONES.map((sub) => (
               <div
                 key={sub.id}
-                className="bg-gray-200 rounded-2xl p-6 border-l-4 border-red-600 hover:shadow-lg transition-shadow"
+                className="bg-gray-200 rounded-2xl p-6 border-l-4 border-primary hover:shadow-lg transition-shadow"
               >
                 <h3 className="text-lg font-bold text-gray-900 mb-2">{sub.nombre}</h3>
                 {sub.descripcion && (
@@ -237,7 +237,7 @@ export default function Autoridades() {
                 {sub.responsable && (
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-gray-500">Responsable:</span>
-                    <span className="font-medium text-red-600">{sub.responsable}</span>
+                    <span className="font-medium text-primary">{sub.responsable}</span>
                   </div>
                 )}
               </div>
@@ -247,18 +247,18 @@ export default function Autoridades() {
       </section>
 
       {/* Contacto */}
-      <section className="py-12 bg-red-600">
+      <section className="py-12 bg-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl font-bold text-white mb-4">
             ¿Querés ser parte?
           </h2>
-          <p className="text-red-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-primary-100 mb-8 max-w-2xl mx-auto">
             Si querés sumarte como voluntario o tenés propuestas para el club,
             no dudes en contactarnos.
           </p>
           <a
             href="/contacto"
-            className="inline-flex items-center justify-center px-8 py-4 bg-white text-red-600 rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
+            className="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
           >
             Contactar al Club
           </a>

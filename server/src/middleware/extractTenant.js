@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { authAdmin } from './auth.js';
 
 /**
  * Extrae el tenant basándose en el subdomain del host
@@ -9,9 +10,15 @@ export async function extractTenant(req, res, next) {
     const host = req.get('host');
     let subdomain = extractSubdomain(host);
 
+    // Header X-Tenant-Slug tiene prioridad (enviado por el frontend desde el subdomain del browser)
+    const tenantSlugHeader = req.get('X-Tenant-Slug');
+    if (tenantSlugHeader) {
+      subdomain = tenantSlugHeader;
+    }
+
     // En desarrollo sin subdomain, usar tenant default para permitir acceso local
     if (!subdomain && process.env.NODE_ENV !== 'production') {
-      subdomain = process.env.DEFAULT_TENANT_SUBDOMAIN || 'sportivo-pilar';
+      subdomain = process.env.DEFAULT_TENANT_SUBDOMAIN || 'sportivopilar';
     }
 
     if (!subdomain) {
@@ -55,7 +62,8 @@ export async function extractTenant(req, res, next) {
 export async function extractTenantOptional(req, res, next) {
   try {
     const host = req.get('host');
-    const subdomain = extractSubdomain(host);
+    const tenantSlugHeader = req.get('X-Tenant-Slug');
+    const subdomain = tenantSlugHeader || extractSubdomain(host);
 
     if (!subdomain) {
       // No hay subdomain, continuar sin tenant
@@ -111,13 +119,29 @@ function extractSubdomain(host) {
 }
 
 /**
- * Middleware para validar que el usuario es super-admin
+ * Middleware para validar que el usuario es super-admin.
+ * Debe usarse DESPUÉS de authAdmin.
  */
-export function requireSuperAdmin(req, res, next) {
-  if (!req.user?.esSuperAdmin) {
-    return res.status(403).json({
-      error: 'Acceso denegado: requiere permisos de super-admin'
-    });
-  }
-  next();
+export async function requireSuperAdmin(req, res, next) {
+  // Primero verificar JWT
+  authAdmin(req, res, async (err) => {
+    if (err) return next(err);
+
+    try {
+      const admin = await prisma.admin.findUnique({
+        where: { id: req.admin.id },
+        select: { rol: { select: { esSuperAdmin: true } } }
+      });
+
+      if (!admin?.rol?.esSuperAdmin) {
+        return res.status(403).json({
+          error: 'Acceso denegado: requiere permisos de super-admin'
+        });
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
 }

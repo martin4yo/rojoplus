@@ -138,7 +138,7 @@ export default function ActividadDetalle() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin h-12 w-12 border-4 border-red-600 border-t-transparent rounded-full" />
+        <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     )
   }
@@ -147,7 +147,7 @@ export default function ActividadDetalle() {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
         <p className="text-gray-600 mb-4">{error || 'Actividad no encontrada'}</p>
-        <Link to="/actividades" className="text-red-600 hover:underline flex items-center gap-2">
+        <Link to="/actividades" className="text-primary hover:underline flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" />
           Volver a actividades
         </Link>
@@ -208,7 +208,7 @@ export default function ActividadDetalle() {
                       onClick={() => setTabActivo(tab.id)}
                       className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 font-medium transition-colors whitespace-nowrap ${
                         tabActivo === tab.id
-                          ? 'border-b-2 border-red-600 text-red-600'
+                          ? 'border-b-2 border-primary text-primary'
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                       }`}
                     >
@@ -224,7 +224,7 @@ export default function ActividadDetalle() {
             <div className="space-y-6">
               {loadingTab ? (
                 <div className="bg-white rounded-xl shadow-sm p-12 flex justify-center">
-                  <div className="animate-spin h-8 w-8 border-4 border-red-600 border-t-transparent rounded-full" />
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
                 </div>
               ) : (
                 <>
@@ -294,7 +294,7 @@ export default function ActividadDetalle() {
                       {noticias.length > 0 ? (
                         <div className="space-y-4">
                           {noticias.map(noticia => (
-                            <div key={noticia.id} className="border border-gray-200 rounded-lg p-4 hover:border-red-300 transition-colors">
+                            <div key={noticia.id} className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
                               {noticia.imagen && (
                                 <img
                                   src={noticia.imagen}
@@ -304,7 +304,7 @@ export default function ActividadDetalle() {
                               )}
                               <div className="flex items-center gap-2 mb-2">
                                 <span className={`px-2 py-1 text-xs font-medium rounded ${
-                                  noticia.tipo === 'RESULTADO' ? 'bg-red-100 text-red-800' :
+                                  noticia.tipo === 'RESULTADO' ? 'bg-primary-100 text-primary-dark' :
                                   noticia.tipo === 'COMUNICADO' ? 'bg-blue-100 text-blue-800' :
                                   'bg-gray-100 text-gray-800'
                                 }`}>
@@ -343,7 +343,7 @@ export default function ActividadDetalle() {
                           <h2 className="text-xl font-bold text-gray-900">Próximos Partidos</h2>
                           <Link
                             to={`/cronograma?actividad=${id}`}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center gap-1"
+                            className="text-primary hover:text-primary-dark text-sm font-medium flex items-center gap-1"
                           >
                             Ver cronograma completo
                             <ChevronRight className="w-4 h-4" />
@@ -431,7 +431,7 @@ export default function ActividadDetalle() {
                                 <h3 className="font-bold text-gray-900">
                                   {miembro.nombre} {miembro.apellido}
                                 </h3>
-                                <p className="text-sm text-red-600 font-medium">{miembro.rol}</p>
+                                <p className="text-sm text-primary font-medium">{miembro.rol}</p>
                                 {miembro.biografia && (
                                   <p className="text-sm text-gray-600 mt-2 line-clamp-3">
                                     {miembro.biografia}
@@ -470,7 +470,7 @@ export default function ActividadDetalle() {
                                 </h3>
                                 <div className="space-y-3">
                                   {articulos.map(art => (
-                                    <div key={art.id} className="pl-4 border-l-2 border-red-200">
+                                    <div key={art.id} className="pl-4 border-l-2 border-primary-200">
                                       <h4 className="font-semibold text-gray-900">{art.titulo}</h4>
                                       <p className="text-sm text-gray-600 mt-1">{art.contenido}</p>
                                       {art.requiereAceptacion && (
@@ -501,14 +501,14 @@ export default function ActividadDetalle() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* CTA Inscripción */}
-            <div className="bg-red-600 rounded-xl p-6 text-white">
+            <div className="bg-primary rounded-xl p-6 text-white">
               <h3 className="text-lg font-bold mb-2">¿Querés sumarte?</h3>
-              <p className="text-red-100 text-sm mb-4">
+              <p className="text-primary-100 text-sm mb-4">
                 Completá el formulario de inscripción y empezá a disfrutar de {actividad.nombre} en nuestro club.
               </p>
               <Link
                 to="/inscripcion-socio"
-                className="block w-full bg-white text-red-600 font-semibold py-3 px-4 rounded-lg text-center hover:bg-red-50 transition-colors"
+                className="block w-full bg-white text-primary font-semibold py-3 px-4 rounded-lg text-center hover:bg-primary-50 transition-colors"
               >
                 Solicitar inscripción
               </Link>
@@ -519,15 +519,15 @@ export default function ActividadDetalle() {
               <h3 className="font-bold text-gray-900 mb-4">Información</h3>
               <ul className="space-y-3 text-sm text-gray-600">
                 <li className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <span>Las prácticas se realizan en las instalaciones del club</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Users className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <Users className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <span>Profesores capacitados para todas las edades</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <Calendar className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <span>Inscripciones abiertas todo el año</span>
                 </li>
               </ul>
@@ -538,7 +538,7 @@ export default function ActividadDetalle() {
               <h3 className="font-bold text-gray-900 mb-4">Otras actividades</h3>
               <Link
                 to="/actividades"
-                className="flex items-center justify-between text-red-600 hover:text-red-700 font-medium"
+                className="flex items-center justify-between text-primary hover:text-primary-dark font-medium"
               >
                 Ver todas las actividades
                 <ChevronRight className="w-5 h-5" />
