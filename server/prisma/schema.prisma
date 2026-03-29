@@ -122,6 +122,7 @@ model ConceptoTesoreria {
   descripcion          String?
   tipo                 String               @default("INGRESO")
   cuentaContableId     Int?                 @map("cuenta_contable_id")
+  centroCostoId        Int?                 @map("centro_costo_id")
   activo               Boolean              @default(true)
   orden                Int                  @default(0)
   createdAt            DateTime             @default(now()) @map("created_at")
@@ -133,6 +134,7 @@ model ConceptoTesoreria {
   actividades          Actividad[]          @relation("ActividadConcepto")
   categoriasActividad  CategoriaActividad[]
   cuentaContable       CuentaContable?      @relation(fields: [cuentaContableId], references: [id])
+  centroCosto          CentroCosto?         @relation("ConceptoTesoreriaCentroCosto", fields: [centroCostoId], references: [id])
   eventos              Evento[]
   lineasPresupuesto    LineaPresupuesto[]
   movimientosContables MovimientoContable[]
@@ -1083,6 +1085,7 @@ model MovimientoCaja {
   observacionConciliacion String?              @map("observacion_conciliacion")
   comandaId               Int?                 @map("comanda_id")
   pedidoTakeAwayId        Int?                 @map("pedido_takeaway_id")
+  medioPago               String?              @map("medio_pago")
   adjuntos                AdjuntoComprobante[]
   echeq                   ECheq?
   caja                    Caja                 @relation(fields: [cajaId], references: [id])
@@ -2215,6 +2218,7 @@ model CentroCosto {
   ventas               Venta[]
   cajas                Caja[]
   lineasPresupuesto    LineaPresupuesto[]
+  conceptosTesoreria   ConceptoTesoreria[]  @relation("ConceptoTesoreriaCentroCosto")
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
@@ -2891,6 +2895,7 @@ model ImpresoraTermica {
   destino           String?            // Para USB (/dev/usb/lp0) o CUPS (nombre impresora)
   puestoId          String?            @map("puesto_id") // Identificador del puesto que maneja esta impresora
   activo            Boolean            @default(true)
+  imprimirComanda   Boolean            @default(true) @map("imprimir_comanda")
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
   sectorId          Int?               @map("sector_id")

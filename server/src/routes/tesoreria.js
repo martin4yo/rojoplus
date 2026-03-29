@@ -2,7 +2,7 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
-import { generarAsientoMovimientoCaja } from '../services/asientosContables.js'
+import { generarAsientoMovimientoCaja, crearAsientoTransferencia } from '../services/asientosContables.js'
 
 const router = Router()
 
@@ -40,7 +40,7 @@ router.get('/cajas', asyncHandler(async (req, res) => {
 
   const cajas = await req.db.caja.findMany({
     where,
-    include: { centroCosto: true },
+    include: { centroCosto: true, cuentaContable: true },
     orderBy: { nombre: 'asc' }
   })
 
@@ -243,11 +243,11 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
 // =============================================================================
 
 // Generar numero de movimiento
-async function generarNumeroMovimiento() {
+async function generarNumeroMovimiento(db) {
   const anio = new Date().getFullYear()
   const prefijo = `MV-${anio}-`
 
-  const ultimo = await req.db.movimientoCaja.findFirst({
+  const ultimo = await db.movimientoCaja.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -264,7 +264,7 @@ async function generarNumeroMovimiento() {
 
 // GET /api/admin/movimientos-caja - Listar movimientos
 router.get('/movimientos-caja', asyncHandler(async (req, res) => {
-  const { cajaId, tipo, desde, hasta, page = 1, limit = 50 } = req.query
+  const { cajaId, tipo, desde, hasta, medioPago, page = 1, limit = 50 } = req.query
 
   // Obtener cajas permitidas según rol del usuario
   const admin = await prisma.admin.findUnique({
@@ -297,7 +297,20 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
   if (desde || hasta) {
     where.fecha = {}
     if (desde) where.fecha.gte = new Date(desde)
-    if (hasta) where.fecha.lte = new Date(hasta)
+    if (hasta) where.fecha.lte = new Date(hasta + 'T23:59:59.999Z')
+  }
+
+  if (medioPago) {
+    where.medioPago = medioPago === 'SIN_ESPECIFICAR' ? null : medioPago
+  }
+
+  const { busqueda } = req.query
+  if (busqueda) {
+    where.OR = [
+      { numero: { contains: busqueda, mode: 'insensitive' } },
+      { concepto: { contains: busqueda, mode: 'insensitive' } },
+      { descripcion: { contains: busqueda, mode: 'insensitive' } }
+    ]
   }
 
   const skip = (parseInt(page) - 1) * parseInt(limit)
@@ -387,10 +400,16 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/movimientos-caja - Crear movimiento manual
 router.post('/movimientos-caja', asyncHandler(async (req, res) => {
-  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion, centroCostoId } = req.body
+  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion, centroCostoId, medioPago, fecha } = req.body
 
   if (!cajaId || !tipo || !monto || !cuentaContableId) {
     throw new AppError('Caja, tipo, monto y cuenta contable son requeridos', 400)
+  }
+  if (!medioPago) {
+    throw new AppError('El medio de pago es requerido', 400)
+  }
+  if (!centroCostoId) {
+    throw new AppError('El centro de costo es requerido. Verificá que el concepto seleccionado tenga un centro de costo asignado.', 400)
   }
 
   if (!['INGRESO', 'EGRESO'].includes(tipo)) {
@@ -428,7 +447,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     }
   }
 
-  // Cargar cuenta contable
+  // Cargar cuenta contable del movimiento
   const cuentaContable = await req.db.cuentaContable.findUnique({
     where: { id: parseInt(cuentaContableId) }
   })
@@ -436,54 +455,76 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     throw new AppError('Cuenta contable no encontrada', 404)
   }
 
-  // Verificar saldo suficiente para egresos
-  const montoNum = parseFloat(monto)
-  if (tipo === 'EGRESO' && Number(caja.saldoActual) < montoNum) {
-    throw new AppError('Saldo insuficiente en la caja', 400)
+  // Validar que la caja tenga cuenta contable para poder generar el asiento
+  if (!caja.cuentaContable?.codigo) {
+    // Intentar resolver por tipo como fallback
+    const codigoFallback = caja.tipo === 'BANCO' ? '1.1.1.02' : '1.1.1.01'
+    const cuentaCajaExiste = await req.db.cuentaContable.findUnique({ where: { codigo: codigoFallback } })
+    if (!cuentaCajaExiste) {
+      throw new AppError(`La caja no tiene cuenta contable configurada y no existe la cuenta genérica (${codigoFallback}). Asignale una cuenta contable a la caja antes de registrar movimientos.`, 400)
+    }
   }
 
-  // Crear movimiento y actualizar saldo en transaccion
-  const resultado = await prisma.$transaction(async (tx) => {
-    const numero = await generarNumeroMovimiento()
+  // Verificar saldo suficiente para egresos — filtrado por medio de pago
+  const montoNum = parseFloat(monto)
+  if (tipo === 'EGRESO') {
+    const whereBase = { cajaId: parseInt(cajaId), anulado: false, medioPago }
+    const [ingresosAgg, egresosAgg] = await Promise.all([
+      req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'INGRESO' }, _sum: { monto: true } }),
+      req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
+    ])
+    const saldoMedio = (Number(ingresosAgg._sum.monto) || 0) - (Number(egresosAgg._sum.monto) || 0)
+    if (saldoMedio < montoNum) {
+      const LABELS = { EFECTIVO: 'Efectivo', MERCADOPAGO: 'MercadoPago', QR: 'QR / MercadoPago', TRANSFERENCIA: 'Transferencia', CHEQUE: 'Cheque', TARJETA: 'Tarjeta', TARJETA_CREDITO: 'Tarjeta Crédito', TARJETA_DEBITO: 'Tarjeta Débito', CUENTA_CORRIENTE: 'Cuenta Corriente', OTRO: 'Otro' }
+      throw new AppError(`Saldo insuficiente en ${caja.nombre} para ${LABELS[medioPago] || medioPago}. Disponible: $${saldoMedio.toLocaleString('es-AR')}`, 400)
+    }
+  }
 
-    const movimiento = await tx.movimientoCaja.create({
-      data: {
-        numero,
-        cajaId: parseInt(cajaId),
-        fecha: new Date(),
-        tipo,
-        monto: montoNum,
-        cuentaContableId: parseInt(cuentaContableId),
-        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
-        concepto: concepto || cuentaContable.nombre,
-        descripcion: descripcion || null,
-        registradoPor: req.admin.id
-      },
-      include: {
-        caja: { select: { id: true, codigo: true, nombre: true } },
-        cuentaContable: { select: { id: true, codigo: true, nombre: true } }
-      }
+  // Crear movimiento y actualizar saldo
+  const numero = await generarNumeroMovimiento(req.db)
+
+  const resultado = await req.db.movimientoCaja.create({
+    data: {
+      numero,
+      cajaId: parseInt(cajaId),
+      fecha: fecha ? new Date(fecha + 'T12:00:00') : new Date(),
+      tipo,
+      monto: montoNum,
+      cuentaContableId: parseInt(cuentaContableId),
+      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
+      concepto: concepto || cuentaContable.nombre,
+      descripcion: descripcion || null,
+      medioPago: medioPago || null,
+      registradoPor: req.admin.id
+    },
+    include: {
+      caja: { select: { id: true, codigo: true, nombre: true } },
+      cuentaContable: { select: { id: true, codigo: true, nombre: true } }
+    }
+  })
+
+  const incremento = tipo === 'INGRESO' ? montoNum : -montoNum
+  await req.db.caja.update({
+    where: { id: parseInt(cajaId) },
+    data: { saldoActual: { increment: incremento } }
+  })
+
+  // Generar asiento contable — obligatorio, si falla se revierte el movimiento
+  try {
+    await generarAsientoMovimientoCaja(req.db, {
+      movimiento: resultado,
+      caja,
+      registradoPor: req.admin.id,
     })
-
-    // Actualizar saldo de caja
-    const incremento = tipo === 'INGRESO' ? montoNum : -montoNum
-    await tx.caja.update({
+  } catch (err) {
+    // Revertir: eliminar el movimiento y restaurar el saldo
+    await req.db.movimientoCaja.update({ where: { id: resultado.id }, data: { anulado: true } })
+    await req.db.caja.update({
       where: { id: parseInt(cajaId) },
-      data: { saldoActual: { increment: incremento } }
+      data: { saldoActual: { increment: -incremento } }
     })
-
-    return movimiento
-  })
-
-  // Generar asiento contable automático (fuera de transacción)
-  generarAsientoMovimientoCaja(prisma, {
-    movimiento: resultado,
-    caja,
-    cuentaContable,
-    registradoPor: req.admin.id,
-  }).catch(err => {
-    console.error('Error generando asiento contable para movimiento caja:', err)
-  })
+    throw new AppError(`No se pudo generar el asiento contable: ${err.message}`, 400)
+  }
 
   res.status(201).json({
     success: true,
@@ -533,21 +574,18 @@ router.post('/movimientos-caja/:id/anular', asyncHandler(async (req, res) => {
   }
 
   // Anular y revertir saldo
-  await prisma.$transaction(async (tx) => {
-    await tx.movimientoCaja.update({
-      where: { id: parseInt(id) },
-      data: { anulado: true }
-    })
+  await req.db.movimientoCaja.update({
+    where: { id: parseInt(id) },
+    data: { anulado: true }
+  })
 
-    // Revertir el saldo
-    const incremento = movimiento.tipo === 'INGRESO'
-      ? -Number(movimiento.monto)
-      : Number(movimiento.monto)
+  const incremento = movimiento.tipo === 'INGRESO'
+    ? -Number(movimiento.monto)
+    : Number(movimiento.monto)
 
-    await tx.caja.update({
-      where: { id: movimiento.cajaId },
-      data: { saldoActual: { increment: incremento } }
-    })
+  await req.db.caja.update({
+    where: { id: movimiento.cajaId },
+    data: { saldoActual: { increment: incremento } }
   })
 
   res.json({ success: true, message: 'Movimiento anulado correctamente' })
@@ -558,11 +596,11 @@ router.post('/movimientos-caja/:id/anular', asyncHandler(async (req, res) => {
 // =============================================================================
 
 // Generar numero de transferencia
-async function generarNumeroTransferencia() {
+async function generarNumeroTransferencia(db) {
   const anio = new Date().getFullYear()
   const prefijo = `TC-${anio}-`
 
-  const ultimo = await prisma.transferenciaCaja.findFirst({
+  const ultimo = await db.transferenciaCaja.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -607,7 +645,7 @@ router.get('/transferencias', asyncHandler(async (req, res) => {
   if (desde || hasta) {
     where.fecha = {}
     if (desde) where.fecha.gte = new Date(desde)
-    if (hasta) where.fecha.lte = new Date(hasta)
+    if (hasta) where.fecha.lte = new Date(hasta + 'T23:59:59.999Z')
   }
 
   const skip = (parseInt(page) - 1) * parseInt(limit)
@@ -688,10 +726,20 @@ router.get('/transferencias/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/transferencias - Crear transferencia
 router.post('/transferencias', asyncHandler(async (req, res) => {
-  const { cajaOrigenId, cajaDestinoId, monto, concepto, descripcion } = req.body
+  const { cajaOrigenId, cajaDestinoId, monto, medioPago, conceptoId, concepto, descripcion,
+          cuentaContableOrigenId, cuentaContableDestinoId, centroCostoId } = req.body
 
   if (!cajaOrigenId || !cajaDestinoId || !monto) {
     throw new AppError('Caja origen, caja destino y monto son requeridos', 400)
+  }
+  if (!medioPago) {
+    throw new AppError('El medio de pago es obligatorio', 400)
+  }
+  if (!conceptoId) {
+    throw new AppError('El concepto es obligatorio', 400)
+  }
+  if (!descripcion?.trim()) {
+    throw new AppError('La descripción es obligatoria', 400)
   }
 
   if (parseInt(cajaOrigenId) === parseInt(cajaDestinoId)) {
@@ -744,80 +792,125 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
     }
   }
 
-  // Verificar saldo suficiente
-  if (Number(cajaOrigen.saldoActual) < montoNum) {
-    throw new AppError('Saldo insuficiente en la caja origen', 400)
+  // Verificar saldo suficiente por medio de pago
+  {
+    const whereBase = { cajaId: parseInt(cajaOrigenId), anulado: false, medioPago }
+    const [ingAgg, egrAgg] = await Promise.all([
+      req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'INGRESO' }, _sum: { monto: true } }),
+      req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
+    ])
+    const saldoMedio = (Number(ingAgg._sum.monto) || 0) - (Number(egrAgg._sum.monto) || 0)
+    if (saldoMedio < montoNum) {
+      const LABELS = { EFECTIVO: 'Efectivo', MERCADOPAGO: 'MercadoPago', QR: 'QR / MercadoPago', TRANSFERENCIA: 'Transferencia', CHEQUE: 'Cheque', TARJETA: 'Tarjeta', TARJETA_CREDITO: 'Tarjeta Crédito', TARJETA_DEBITO: 'Tarjeta Débito', CUENTA_CORRIENTE: 'Cuenta Corriente', OTRO: 'Otro' }
+      throw new AppError(`Saldo insuficiente en ${cajaOrigen.nombre} para ${LABELS[medioPago] || medioPago}. Disponible: $${saldoMedio.toLocaleString('es-AR')}`, 400)
+    }
   }
 
-  // Crear transferencia y movimientos en transaccion
-  const resultado = await prisma.$transaction(async (tx) => {
-    const numero = await generarNumeroTransferencia()
-    const numeroMovOrigen = await generarNumeroMovimiento()
-    const numeroMovDestino = `MV-${new Date().getFullYear()}-${String(parseInt(numeroMovOrigen.split('-')[2]) + 1).padStart(5, '0')}`
+  // Resolver cuentas contables: usar las enviadas o las de las cajas como fallback
+  const cuentaOrigenId = cuentaContableOrigenId
+    ? parseInt(cuentaContableOrigenId)
+    : cajaOrigen.cuentaContableId
+  const cuentaDestinoId = cuentaContableDestinoId
+    ? parseInt(cuentaContableDestinoId)
+    : cajaDestino.cuentaContableId
 
-    // Crear transferencia
-    const transferencia = await tx.transferenciaCaja.create({
-      data: {
-        numero,
-        cajaOrigenId: parseInt(cajaOrigenId),
-        cajaDestinoId: parseInt(cajaDestinoId),
-        fecha: new Date(),
-        monto: montoNum,
-        concepto: concepto || 'Transferencia entre cajas',
-        descripcion: descripcion || null,
-        estado: 'CONFIRMADO',
-        registradoPor: req.admin.id
-      },
-      include: {
-        cajaOrigen: { select: { id: true, codigo: true, nombre: true } },
-        cajaDestino: { select: { id: true, codigo: true, nombre: true } }
-      }
-    })
+  if (!cuentaOrigenId) {
+    throw new AppError('La caja origen no tiene cuenta contable configurada', 400)
+  }
+  if (!cuentaDestinoId) {
+    throw new AppError('La caja destino no tiene cuenta contable configurada',400)
+  }
 
-    // Crear movimiento de egreso en caja origen
-    await tx.movimientoCaja.create({
-      data: {
-        numero: numeroMovOrigen,
-        cajaId: parseInt(cajaOrigenId),
-        fecha: new Date(),
-        tipo: 'EGRESO',
-        monto: montoNum,
-        cuentaContableId: cajaDestino.cuentaContableId || cajaOrigen.cuentaContableId,
-        concepto: `Transferencia a ${cajaDestino.nombre}`,
-        descripcion: `${numero}`,
-        cajaDestinoId: parseInt(cajaDestinoId),
-        registradoPor: req.admin.id
-      }
-    })
 
-    // Crear movimiento de ingreso en caja destino
-    await tx.movimientoCaja.create({
-      data: {
-        numero: numeroMovDestino,
-        cajaId: parseInt(cajaDestinoId),
-        fecha: new Date(),
-        tipo: 'INGRESO',
-        monto: montoNum,
-        cuentaContableId: cajaOrigen.cuentaContableId || cajaDestino.cuentaContableId,
-        concepto: `Transferencia desde ${cajaOrigen.nombre}`,
-        descripcion: `${numero}`,
-        registradoPor: req.admin.id
-      }
-    })
+  // Cargar códigos de cuentas para el asiento
+  const [cuentaOrigen, cuentaDestino] = await Promise.all([
+    req.db.cuentaContable.findUnique({ where: { id: cuentaOrigenId } }),
+    req.db.cuentaContable.findUnique({ where: { id: cuentaDestinoId } }),
+  ])
 
-    // Actualizar saldos
-    await tx.caja.update({
-      where: { id: parseInt(cajaOrigenId) },
-      data: { saldoActual: { decrement: montoNum } }
-    })
+  // Crear transferencia y movimientos
+  const numero = await generarNumeroTransferencia(req.db)
+  const numeroMovOrigen = await generarNumeroMovimiento(req.db)
+  const numeroMovDestino = `MV-${new Date().getFullYear()}-${String(parseInt(numeroMovOrigen.split('-')[2]) + 1).padStart(5, '0')}`
+  const conceptoTexto = concepto || 'Transferencia entre cajas'
 
-    await tx.caja.update({
-      where: { id: parseInt(cajaDestinoId) },
-      data: { saldoActual: { increment: montoNum } }
-    })
-
-    return transferencia
+  const resultado = await req.db.transferenciaCaja.create({
+    data: {
+      numero,
+      cajaOrigenId: parseInt(cajaOrigenId),
+      cajaDestinoId: parseInt(cajaDestinoId),
+      fecha: new Date(),
+      monto: montoNum,
+      concepto: conceptoTexto,
+      descripcion: descripcion || null,
+      registradoPor: req.admin.id
+    },
+    include: {
+      cajaOrigen: { select: { id: true, codigo: true, nombre: true } },
+      cajaDestino: { select: { id: true, codigo: true, nombre: true } }
+    }
   })
+
+  await req.db.movimientoCaja.create({
+    data: {
+      numero: numeroMovOrigen,
+      cajaId: parseInt(cajaOrigenId),
+      fecha: new Date(),
+      tipo: 'EGRESO',
+      monto: montoNum,
+      medioPago,
+      cuentaContableId: cuentaOrigenId,
+      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
+      concepto: `Transferencia a ${cajaDestino.nombre}`,
+      descripcion: descripcion || null,
+      cajaDestinoId: parseInt(cajaDestinoId),
+      registradoPor: req.admin.id
+    }
+  })
+
+  await req.db.movimientoCaja.create({
+    data: {
+      numero: numeroMovDestino,
+      cajaId: parseInt(cajaDestinoId),
+      fecha: new Date(),
+      tipo: 'INGRESO',
+      monto: montoNum,
+      medioPago,
+      cuentaContableId: cuentaDestinoId,
+      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
+      concepto: `Transferencia desde ${cajaOrigen.nombre}`,
+      descripcion: descripcion || null,
+      registradoPor: req.admin.id
+    }
+  })
+
+  await req.db.caja.update({
+    where: { id: parseInt(cajaOrigenId) },
+    data: { saldoActual: { decrement: montoNum } }
+  })
+
+  await req.db.caja.update({
+    where: { id: parseInt(cajaDestinoId) },
+    data: { saldoActual: { increment: montoNum } }
+  })
+
+  // Generar asiento contable — D: caja destino (activo aumenta) / H: caja origen (activo disminuye)
+  try {
+    await crearAsientoTransferencia(req.db, {
+      transferencia: resultado,
+      cuentaOrigen,
+      cuentaDestino,
+      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
+      descripcion: descripcion || null,
+      registradoPor: req.admin.id,
+    })
+  } catch (err) {
+    // Revertir todo
+    await req.db.transferenciaCaja.update({ where: { id: resultado.id }, data: { estado: 'ANULADO' } })
+    await req.db.caja.update({ where: { id: parseInt(cajaOrigenId) }, data: { saldoActual: { increment: montoNum } } })
+    await req.db.caja.update({ where: { id: parseInt(cajaDestinoId) }, data: { saldoActual: { decrement: montoNum } } })
+    throw new AppError(`No se pudo generar el asiento contable: ${err.message}`, 400)
+  }
 
   res.status(201).json({
     success: true,
@@ -873,22 +966,19 @@ router.post('/transferencias/:id/anular', asyncHandler(async (req, res) => {
   }
 
   // Anular y revertir saldos
-  await prisma.$transaction(async (tx) => {
-    await tx.transferenciaCaja.update({
-      where: { id: parseInt(id) },
-      data: { estado: 'ANULADO' }
-    })
+  await req.db.transferenciaCaja.update({
+    where: { id: parseInt(id) },
+    data: { estado: 'ANULADO' }
+  })
 
-    // Revertir saldos
-    await tx.caja.update({
-      where: { id: transferencia.cajaOrigenId },
-      data: { saldoActual: { increment: montoNum } }
-    })
+  await req.db.caja.update({
+    where: { id: transferencia.cajaOrigenId },
+    data: { saldoActual: { increment: montoNum } }
+  })
 
-    await tx.caja.update({
-      where: { id: transferencia.cajaDestinoId },
-      data: { saldoActual: { decrement: montoNum } }
-    })
+  await req.db.caja.update({
+    where: { id: transferencia.cajaDestinoId },
+    data: { saldoActual: { decrement: montoNum } }
   })
 
   res.json({ success: true, message: 'Transferencia anulada correctamente' })
@@ -938,7 +1028,7 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
   if (desde || hasta) {
     whereMovimientos.fecha = {}
     if (desde) whereMovimientos.fecha.gte = new Date(desde)
-    if (hasta) whereMovimientos.fecha.lte = new Date(hasta)
+    if (hasta) whereMovimientos.fecha.lte = new Date(hasta + 'T23:59:59.999Z')
   }
 
   // Obtener totales por tipo
@@ -965,10 +1055,48 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
     }
   })
 
+  // Agrupado por medio de pago
+  const movsPorMedioPago = await req.db.movimientoCaja.groupBy({
+    by: ['medioPago', 'tipo'],
+    where: whereMovimientos,
+    _sum: { monto: true },
+    _count: true
+  })
+
+  const medioPagoMap = {}
+  for (const row of movsPorMedioPago) {
+    const key = row.medioPago || 'SIN_ESPECIFICAR'
+    if (!medioPagoMap[key]) {
+      medioPagoMap[key] = { medioPago: row.medioPago, ingresos: 0, egresos: 0, cantIngresos: 0, cantEgresos: 0 }
+    }
+    if (row.tipo === 'INGRESO') {
+      medioPagoMap[key].ingresos = Number(row._sum.monto || 0)
+      medioPagoMap[key].cantIngresos = row._count._all
+    } else {
+      medioPagoMap[key].egresos = Number(row._sum.monto || 0)
+      medioPagoMap[key].cantEgresos = row._count._all
+    }
+  }
+  const porMedioPago = Object.values(medioPagoMap)
+    .map(m => ({ ...m, neto: m.ingresos - m.egresos }))
+    .sort((a, b) => (a.medioPago || 'ZZZ').localeCompare(b.medioPago || 'ZZZ'))
+
+  // Saldo real calculado desde todos los movimientos activos (sin filtro de periodo)
+  const [totalesHistoricos] = await Promise.all([
+    req.db.movimientoCaja.groupBy({
+      by: ['tipo'],
+      where: { cajaId: parseInt(id), anulado: false },
+      _sum: { monto: true }
+    })
+  ])
+  const ingresosHist = totalesHistoricos.find(r => r.tipo === 'INGRESO')?._sum?.monto || 0
+  const egresosHist  = totalesHistoricos.find(r => r.tipo === 'EGRESO')?._sum?.monto  || 0
+  const saldoCalculado = Number(caja.saldoInicial) + Number(ingresosHist) - Number(egresosHist)
+
   res.json({
     success: true,
     data: {
-      caja: { ...caja, saldoActual: Number(caja.saldoActual) },
+      caja: { ...caja, saldoActual: saldoCalculado },
       periodo: { desde, hasta },
       ingresos: {
         total: Number(ingresos._sum.monto || 0),
@@ -979,6 +1107,7 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
         cantidad: egresos._count
       },
       saldoMovimientos: Number(ingresos._sum.monto || 0) - Number(egresos._sum.monto || 0),
+      porMedioPago,
       ultimosMovimientos: ultimosMovimientos.map(m => ({
         ...m,
         monto: Number(m.monto)
@@ -1012,7 +1141,7 @@ router.get('/pendientes-conciliar', asyncHandler(async (req, res) => {
   if (desde || hasta) {
     where.fecha = {}
     if (desde) where.fecha.gte = new Date(desde)
-    if (hasta) where.fecha.lte = new Date(hasta)
+    if (hasta) where.fecha.lte = new Date(hasta + 'T23:59:59.999Z')
   }
 
   const skip = (parseInt(page) - 1) * parseInt(limit)
@@ -1212,71 +1341,63 @@ router.post('/pendientes-conciliar/transferir', asyncHandler(async (req, res) =>
   }
 
   // Crear transferencia
-  const resultado = await prisma.$transaction(async (tx) => {
-    const numero = await generarNumeroTransferencia()
-    const numeroMovOrigen = await generarNumeroMovimiento()
-    const numeroMovDestino = `MV-${new Date().getFullYear()}-${String(parseInt(numeroMovOrigen.split('-')[2]) + 1).padStart(5, '0')}`
+  const numero = await generarNumeroTransferencia(req.db)
+  const numeroMovOrigen = await generarNumeroMovimiento(req.db)
+  const numeroMovDestino = `MV-${new Date().getFullYear()}-${String(parseInt(numeroMovOrigen.split('-')[2]) + 1).padStart(5, '0')}`
 
-    // Crear transferencia
-    const transferencia = await tx.transferenciaCaja.create({
-      data: {
-        numero,
-        cajaOrigenId: parseInt(cajaOrigenId),
-        cajaDestinoId: parseInt(cajaDestinoId),
-        fecha: new Date(),
-        monto: montoTotal,
-        concepto: concepto || 'Acreditación de valores conciliados',
-        descripcion: `Transferencia de ${movimientos.length} movimientos conciliados`,
-        estado: 'CONFIRMADO',
-        registradoPor: req.admin.id
-      }
-    })
+  const resultado = await req.db.transferenciaCaja.create({
+    data: {
+      numero,
+      cajaOrigenId: parseInt(cajaOrigenId),
+      cajaDestinoId: parseInt(cajaDestinoId),
+      fecha: new Date(),
+      monto: montoTotal,
+      concepto: concepto || 'Acreditación de valores conciliados',
+      descripcion: `Transferencia de ${movimientos.length} movimientos conciliados`,
+      estado: 'CONFIRMADO',
+      registradoPor: req.admin.id
+    }
+  })
 
-    // Crear movimiento de egreso en caja origen
-    await tx.movimientoCaja.create({
-      data: {
-        numero: numeroMovOrigen,
-        cajaId: parseInt(cajaOrigenId),
-        fecha: new Date(),
-        tipo: 'EGRESO',
-        monto: montoTotal,
-        cuentaContableId: cajaDestino.cuentaContableId || cajaOrigen.cuentaContableId,
-        concepto: `Transferencia a ${cajaDestino.nombre}`,
-        descripcion: `Acreditación ${numero}`,
-        cajaDestinoId: parseInt(cajaDestinoId),
-        registradoPor: req.admin.id,
-        conciliado: true // Este movimiento ya está conciliado
-      }
-    })
+  await req.db.movimientoCaja.create({
+    data: {
+      numero: numeroMovOrigen,
+      cajaId: parseInt(cajaOrigenId),
+      fecha: new Date(),
+      tipo: 'EGRESO',
+      monto: montoTotal,
+      cuentaContableId: cajaDestino.cuentaContableId || cajaOrigen.cuentaContableId,
+      concepto: `Transferencia a ${cajaDestino.nombre}`,
+      descripcion: `Acreditación ${numero}`,
+      cajaDestinoId: parseInt(cajaDestinoId),
+      registradoPor: req.admin.id,
+      conciliado: true
+    }
+  })
 
-    // Crear movimiento de ingreso en caja destino
-    await tx.movimientoCaja.create({
-      data: {
-        numero: numeroMovDestino,
-        cajaId: parseInt(cajaDestinoId),
-        fecha: new Date(),
-        tipo: 'INGRESO',
-        monto: montoTotal,
-        cuentaContableId: cajaOrigen.cuentaContableId || cajaDestino.cuentaContableId,
-        concepto: `Acreditación desde ${cajaOrigen.nombre}`,
-        descripcion: `Acreditación ${numero}`,
-        registradoPor: req.admin.id,
-        conciliado: !cajaDestino.requiereConciliacion // Según config de caja destino
-      }
-    })
+  await req.db.movimientoCaja.create({
+    data: {
+      numero: numeroMovDestino,
+      cajaId: parseInt(cajaDestinoId),
+      fecha: new Date(),
+      tipo: 'INGRESO',
+      monto: montoTotal,
+      cuentaContableId: cajaOrigen.cuentaContableId || cajaDestino.cuentaContableId,
+      concepto: `Acreditación desde ${cajaOrigen.nombre}`,
+      descripcion: `Acreditación ${numero}`,
+      registradoPor: req.admin.id,
+      conciliado: !cajaDestino.requiereConciliacion
+    }
+  })
 
-    // Actualizar saldos
-    await tx.caja.update({
-      where: { id: parseInt(cajaOrigenId) },
-      data: { saldoActual: { decrement: montoTotal } }
-    })
+  await req.db.caja.update({
+    where: { id: parseInt(cajaOrigenId) },
+    data: { saldoActual: { decrement: montoTotal } }
+  })
 
-    await tx.caja.update({
-      where: { id: parseInt(cajaDestinoId) },
-      data: { saldoActual: { increment: montoTotal } }
-    })
-
-    return transferencia
+  await req.db.caja.update({
+    where: { id: parseInt(cajaDestinoId) },
+    data: { saldoActual: { increment: montoTotal } }
   })
 
   res.json({

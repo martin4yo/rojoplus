@@ -11,7 +11,7 @@ const router = Router()
 // Generar número de asiento único
 async function generarNumeroAsiento(prisma) {
   const anio = new Date().getFullYear()
-  const ultimo = await req.db.asiento.findFirst({
+  const ultimo = await prisma.asiento.findFirst({
     where: { numero: { startsWith: `AST-${anio}` } },
     orderBy: { numero: 'desc' }
   })
@@ -601,7 +601,8 @@ export async function generarAsientoAutomatico(prisma, {
 
   const numero = await generarNumeroAsiento(prisma)
 
-  const asiento = await req.db.asiento.create({
+  // Crear asiento sin líneas anidadas para que el tenant extension inyecte tenantId en ambas tablas
+  const asiento = await prisma.asiento.create({
     data: {
       numero,
       fecha: fecha || new Date(),
@@ -609,17 +610,20 @@ export async function generarAsientoAutomatico(prisma, {
       tipoOrigen,
       origenId,
       estado: 'CONFIRMADO',
-      registradoPor,
-      lineas: {
-        create: lineas.map((l, idx) => ({
-          cuentaContableId: l.cuentaContableId,
-          descripcion: l.descripcion || null,
-          debe: l.debe || 0,
-          haber: l.haber || 0,
-          orden: idx
-        }))
-      }
+      registradoPor
     }
+  })
+
+  await prisma.asientoLinea.createMany({
+    data: lineas.map((l, idx) => ({
+      asientoId: asiento.id,
+      cuentaContableId: l.cuentaContableId,
+      descripcion: l.descripcion || null,
+      debe: l.debe || 0,
+      haber: l.haber || 0,
+      orden: idx,
+      centroCostoId: l.centroCostoId || null
+    }))
   })
 
   return asiento

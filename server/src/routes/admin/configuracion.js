@@ -513,6 +513,7 @@ router.get('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => {
     where,
     include: {
       cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+      centroCosto: { select: { id: true, codigo: true, nombre: true } },
     },
     orderBy: { orden: 'asc' },
   })
@@ -526,6 +527,7 @@ router.get('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) 
     where: { id: parseInt(req.params.id) },
     include: {
       cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+      centroCosto: { select: { id: true, codigo: true, nombre: true } },
     },
   })
   if (!concepto) throw new AppError('Concepto no encontrado', 404, 'NOT_FOUND')
@@ -534,12 +536,14 @@ router.get('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) 
 
 // POST /api/admin/conceptos-tesoreria
 router.post('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, descripcion, tipo, usaEnCompras, usaEnVentas, usaEnTesoreria, cuentaContableId, orden } = req.body
+  const { codigo, nombre, descripcion, tipo, usaEnCompras, usaEnVentas, usaEnTesoreria, cuentaContableId, centroCostoId, orden } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
-
+  if (!cuentaContableId) {
+    throw new AppError('La cuenta contable es requerida', 400, 'VALIDATION_ERROR')
+  }
   const existente = await req.db.conceptoTesoreria.findUnique({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un concepto con ese código', 400, 'DUPLICATE')
 
@@ -552,11 +556,13 @@ router.post('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => 
       usaEnCompras: usaEnCompras || false,
       usaEnVentas: usaEnVentas || false,
       usaEnTesoreria: usaEnTesoreria !== false,
-      cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null,
+      cuentaContableId: parseInt(cuentaContableId),
+      centroCostoId: parseInt(centroCostoId),
       orden: orden || 0,
     },
     include: {
       cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+      centroCosto: { select: { id: true, codigo: true, nombre: true } },
     },
   })
 
@@ -566,7 +572,7 @@ router.post('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => 
 // PUT /api/admin/conceptos-tesoreria/:id
 router.put('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, tipo, usaEnCompras, usaEnVentas, usaEnTesoreria, cuentaContableId, orden, activo } = req.body
+  const { codigo, nombre, descripcion, tipo, usaEnCompras, usaEnVentas, usaEnTesoreria, cuentaContableId, centroCostoId, orden, activo } = req.body
 
   const concepto = await req.db.conceptoTesoreria.update({
     where: { id: parseInt(id) },
@@ -579,11 +585,13 @@ router.put('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) 
       usaEnVentas,
       usaEnTesoreria,
       cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null,
+      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       orden,
       activo,
     },
     include: {
       cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+      centroCosto: { select: { id: true, codigo: true, nombre: true } },
     },
   })
 

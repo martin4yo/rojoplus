@@ -3,9 +3,11 @@ import { Eye, Trash2, CheckCircle, XCircle, AlertCircle, Plus, Building2, Users,
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
+import { useConfirm } from '../../hooks/useConfirm.jsx'
 
 export default function TenantsList() {
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useConfirm()
   const [tenants, setTenants] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -83,7 +85,7 @@ export default function TenantsList() {
       return
     }
 
-    if (!confirm('¿Eliminar este tenant? Esta acción no se puede deshacer.')) return
+    if (!await confirm('Eliminar tenant', '¿Eliminar este tenant? Esta acción no se puede deshacer.', { variant: 'danger', confirmText: 'Eliminar' })) return
 
     try {
       await api.delete(`/super-admin/tenants/${id}`)
@@ -124,6 +126,7 @@ export default function TenantsList() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -287,5 +290,7 @@ export default function TenantsList() {
       </div>
 
     </div>
+    <ConfirmDialog />
+    </>
   )
 }

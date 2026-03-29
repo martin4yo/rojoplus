@@ -22,7 +22,7 @@ import api from '../services/api'
 export default function CentroCostoSelector({
   value,
   onChange,
-  label = 'Centro de Costo',
+  label = null,
   required = false,
   tipo = null, // OPERATIVO, ADMINISTRATIVO, o null para todos
   className = '',
@@ -38,13 +38,14 @@ export default function CentroCostoSelector({
   const cargarCentros = async () => {
     try {
       setLoading(true)
-      const params = { activo: true }
-      if (tipo) params.tipo = tipo
+      const params = new URLSearchParams({ activo: true })
+      if (tipo) params.set('tipo', tipo)
 
-      const response = await api.get('/admin/centros-costo', { params })
-      setCentros(response.data)
+      const response = await api.get(`/admin/centros-costo?${params}`)
+      setCentros(Array.isArray(response) ? response : (response?.data || []))
     } catch (err) {
       console.error('Error cargando centros de costo:', err)
+      setCentros([])
     } finally {
       setLoading(false)
     }
@@ -52,17 +53,19 @@ export default function CentroCostoSelector({
 
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
       <select
         value={value || ''}
         onChange={(e) => onChange(e.target.value ? parseInt(e.target.value) : null)}
         required={required}
         disabled={disabled || loading}
-        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 disabled:bg-gray-100"
+        className="input-field w-full"
       >
-        <option value="">-- Seleccionar --</option>
+        <option value="">Seleccionar centro de costo...</option>
         {centros
           .filter(c => c.tipo === 'OPERATIVO')
           .map(centro => (
@@ -82,9 +85,6 @@ export default function CentroCostoSelector({
             </option>
           ))}
       </select>
-      <p className="mt-1 text-xs text-gray-500">
-        Para análisis de rentabilidad por área
-      </p>
     </div>
   )
 }

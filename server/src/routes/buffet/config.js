@@ -197,4 +197,87 @@ router.get('/clientes/buscar', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_
   }
 })
 
+// ============================================================================
+// OPCIONES DE IMPRESIÓN - Confirmar ticket + Imprimir comanda por POS
+// ============================================================================
+
+const CLAVES_OPCIONES_IMPRESION = [
+  'BUFFET_CONFIRMAR_TICKET_MESA',
+  'BUFFET_CONFIRMAR_TICKET_KIOSCO',
+  'BUFFET_CONFIRMAR_TICKET_TAKEAWAY',
+  'BUFFET_COMANDA_MESA',
+  'BUFFET_COMANDA_KIOSCO',
+  'BUFFET_COMANDA_TAKEAWAY',
+]
+
+/**
+ * GET /config/opciones-impresion
+ */
+router.get('/config/opciones-impresion', authAdmin, async (req, res) => {
+  try {
+    const rows = await req.db.configuracion.findMany({
+      where: { clave: { in: CLAVES_OPCIONES_IMPRESION } },
+      select: { clave: true, valor: true }
+    })
+    const map = Object.fromEntries(rows.map(r => [r.clave, r.valor === 'true']))
+    // Defaults
+    const result = {
+      confirmarTicketMesa:     map['BUFFET_CONFIRMAR_TICKET_MESA']     ?? false,
+      confirmarTicketKiosco:   map['BUFFET_CONFIRMAR_TICKET_KIOSCO']   ?? true,
+      confirmarTicketTakeaway: map['BUFFET_CONFIRMAR_TICKET_TAKEAWAY'] ?? false,
+      imprimirComandaMesa:     map['BUFFET_COMANDA_MESA']              ?? true,
+      imprimirComandaKiosco:   map['BUFFET_COMANDA_KIOSCO']            ?? false,
+      imprimirComandaTakeaway: map['BUFFET_COMANDA_TAKEAWAY']          ?? true,
+    }
+    res.json({ success: true, data: result })
+  } catch (error) {
+    console.error('Error al obtener opciones de impresión:', error)
+    res.status(500).json({ success: false, error: 'Error al obtener opciones de impresión' })
+  }
+})
+
+/**
+ * PUT /config/opciones-impresion
+ */
+router.put('/config/opciones-impresion', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const {
+      confirmarTicketMesa, confirmarTicketKiosco, confirmarTicketTakeaway,
+      imprimirComandaMesa, imprimirComandaKiosco, imprimirComandaTakeaway
+    } = req.body
+
+    const updates = [
+      ['BUFFET_CONFIRMAR_TICKET_MESA',     confirmarTicketMesa],
+      ['BUFFET_CONFIRMAR_TICKET_KIOSCO',   confirmarTicketKiosco],
+      ['BUFFET_CONFIRMAR_TICKET_TAKEAWAY', confirmarTicketTakeaway],
+      ['BUFFET_COMANDA_MESA',              imprimirComandaMesa],
+      ['BUFFET_COMANDA_KIOSCO',            imprimirComandaKiosco],
+      ['BUFFET_COMANDA_TAKEAWAY',          imprimirComandaTakeaway],
+    ]
+
+    for (const [clave, valor] of updates) {
+      if (valor === undefined) continue
+      const existing = await req.db.configuracion.findFirst({ where: { clave } })
+      if (existing) {
+        await req.db.configuracion.update({
+          where: { id: existing.id },
+          data: { valor: String(valor), updatedAt: new Date() }
+        })
+      } else {
+        await req.db.configuracion.create({
+          data: {
+            clave, valor: String(valor), editable: true,
+            modulo: 'BUFFET', tipo: 'BOOLEAN', updatedAt: new Date()
+          }
+        })
+      }
+    }
+
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Error al guardar opciones de impresión:', error)
+    res.status(500).json({ success: false, error: 'Error al guardar opciones de impresión' })
+  }
+})
+
 export default router

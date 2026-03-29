@@ -3,15 +3,16 @@ import { ChevronRight } from 'lucide-react'
 import { useTenant } from '../../contexts/TenantContext'
 
 export default function HeroSection() {
-  const { tenant } = useTenant()
+  const { tenant, loading } = useTenant()
 
   return (
     <section className="relative min-h-[600px] md:min-h-[700px] flex items-center">
       {/* Background Image - Fixed parallax effect */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat bg-fixed"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat bg-fixed transition-opacity duration-300"
         style={{
-          backgroundImage: `url(${tenant?.heroImageUrl || '/images/club/IMG_2915.JPG'})`,
+          backgroundImage: tenant?.heroImageUrl ? `url(${tenant.heroImageUrl})` : undefined,
+          opacity: loading ? 0 : 1,
         }}
       >
         {/* Overlay */}

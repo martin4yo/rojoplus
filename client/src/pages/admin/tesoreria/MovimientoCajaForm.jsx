@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, X } from 'lucide-react'
+import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import api from '../../../services/api'
@@ -17,16 +17,19 @@ export default function MovimientoCajaForm() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [datosContablesOpen, setDatosContablesOpen] = useState(false)
 
   const [form, setForm] = useState({
     cajaId: cajaIdParam || '',
     tipo: tipoParam || 'INGRESO',
+    fecha: new Date().toISOString().split('T')[0],
     monto: '',
     conceptoId: '',
     cuentaContableId: '',
     centroCostoId: null,
     concepto: '',
-    descripcion: ''
+    descripcion: '',
+    medioPago: ''
   })
 
   useEffect(() => {
@@ -39,7 +42,8 @@ export default function MovimientoCajaForm() {
     codigo: '',
     nombre: '',
     tipo: 'INGRESO',
-    cuentaContableId: ''
+    cuentaContableId: '',
+    centroCostoId: null
   })
   const [savingConcepto, setSavingConcepto] = useState(false)
 
@@ -51,10 +55,21 @@ export default function MovimientoCajaForm() {
         api.getFull('/admin/cuentas-contables?flat=true'),
         api.getFull('/admin/conceptos-tesoreria')
       ])
-      setCajas(cajasRes.data || [])
-      // Filtrar solo cuentas imputables
+      const cajasData = cajasRes.data || []
+      setCajas(cajasData)
       setCuentasContables((cuentasRes.data || []).filter(c => c.esImputable))
       setConceptos(conceptosRes.data || [])
+
+      // Si hay cajaId en la URL, poblar solo el centro de costo de la caja (la cuenta contable la da el concepto)
+      if (cajaIdParam) {
+        const caja = cajasData.find(c => c.id === parseInt(cajaIdParam))
+        if (caja) {
+          setForm(prev => ({
+            ...prev,
+            centroCostoId: caja.centroCostoId || prev.centroCostoId
+          }))
+        }
+      }
     } catch (err) {
       console.error('Error cargando datos:', err)
       setError('Error al cargar datos')
@@ -67,14 +82,27 @@ export default function MovimientoCajaForm() {
     const { name, value } = e.target
     setForm(prev => ({ ...prev, [name]: value }))
 
-    // Si se selecciona un concepto, auto-rellenar la cuenta contable asociada
+    // Al cambiar de caja, solo poblar centro de costo (la cuenta contable la da el concepto)
+    if (name === 'cajaId' && value) {
+      const caja = cajas.find(c => c.id === parseInt(value))
+      if (caja) {
+        setForm(prev => ({
+          ...prev,
+          cajaId: value,
+          centroCostoId: caja.centroCostoId || prev.centroCostoId
+        }))
+      }
+    }
+
+    // Al seleccionar concepto, sobreescribir cuenta contable y centro de costo desde el concepto
     if (name === 'conceptoId' && value) {
       const concepto = conceptos.find(c => c.id === parseInt(value))
       if (concepto) {
         setForm(prev => ({
           ...prev,
           concepto: concepto.nombre,
-          cuentaContableId: concepto.cuentaContableId ? String(concepto.cuentaContableId) : prev.cuentaContableId
+          cuentaContableId: concepto.cuentaContableId ? String(concepto.cuentaContableId) : prev.cuentaContableId,
+          centroCostoId: concepto.centroCostoId || prev.centroCostoId
         }))
       }
     }
@@ -85,6 +113,10 @@ export default function MovimientoCajaForm() {
       setError('Código, nombre y cuenta contable son requeridos para el concepto')
       return
     }
+    if (!nuevoConcepto.centroCostoId) {
+      setError('El centro de costo es requerido para el concepto')
+      return
+    }
 
     setSavingConcepto(true)
     try {
@@ -92,24 +124,23 @@ export default function MovimientoCajaForm() {
         codigo: nuevoConcepto.codigo,
         nombre: nuevoConcepto.nombre,
         tipo: nuevoConcepto.tipo,
-        cuentaContableId: parseInt(nuevoConcepto.cuentaContableId)
+        cuentaContableId: parseInt(nuevoConcepto.cuentaContableId),
+        centroCostoId: parseInt(nuevoConcepto.centroCostoId)
       })
 
-      // Agregar el nuevo concepto a la lista
       const conceptoCreado = res
       setConceptos(prev => [...prev, conceptoCreado])
 
-      // Seleccionar el nuevo concepto
       setForm(prev => ({
         ...prev,
         conceptoId: String(conceptoCreado.id),
         concepto: conceptoCreado.nombre,
-        cuentaContableId: String(conceptoCreado.cuentaContableId)
+        cuentaContableId: String(conceptoCreado.cuentaContableId),
+        centroCostoId: conceptoCreado.centroCostoId || prev.centroCostoId
       }))
 
-      // Cerrar modal y resetear
       setShowConceptoModal(false)
-      setNuevoConcepto({ codigo: '', nombre: '', tipo: 'INGRESO', cuentaContableId: '' })
+      setNuevoConcepto({ codigo: '', nombre: '', tipo: 'INGRESO', cuentaContableId: '', centroCostoId: null })
       setError(null)
     } catch (err) {
       setError(err.message || 'Error al crear concepto')
@@ -127,6 +158,21 @@ export default function MovimientoCajaForm() {
       return
     }
 
+    if (!form.medioPago) {
+      setError('El medio de pago es obligatorio')
+      return
+    }
+
+    if (!form.descripcion?.trim()) {
+      setError('La observación es obligatoria')
+      return
+    }
+
+    if (!form.centroCostoId) {
+      setError('El centro de costo es requerido. Verificá que la caja o el concepto tengan un centro de costo asignado.')
+      return
+    }
+
     const montoNum = parseFloat(form.monto)
     if (montoNum <= 0) {
       setError('El monto debe ser mayor a cero')
@@ -138,14 +184,15 @@ export default function MovimientoCajaForm() {
       await api.post('/admin/movimientos-caja', {
         cajaId: parseInt(form.cajaId),
         tipo: form.tipo,
+        fecha: form.fecha || undefined,
         monto: montoNum,
         cuentaContableId: parseInt(form.cuentaContableId),
         centroCostoId: form.centroCostoId || null,
         concepto: form.concepto || null,
-        descripcion: form.descripcion || null
+        descripcion: form.descripcion || null,
+        medioPago: form.medioPago || null
       })
 
-      // Volver a la caja si veniamos de ahi, sino a la lista
       if (cajaIdParam) {
         navigate(`/admin/tesoreria/cajas/${cajaIdParam}`)
       } else {
@@ -159,6 +206,7 @@ export default function MovimientoCajaForm() {
   }
 
   const cajaSeleccionada = cajas.find(c => c.id === parseInt(form.cajaId))
+  const cuentaSeleccionada = cuentasContables.find(c => c.id === parseInt(form.cuentaContableId))
 
   if (loading) {
     return (
@@ -198,7 +246,7 @@ export default function MovimientoCajaForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           {/* Tipo de movimiento */}
           <div className="flex gap-4 mb-6">
@@ -229,10 +277,9 @@ export default function MovimientoCajaForm() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Caja */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Caja *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Caja *</label>
               <select
                 name="cajaId"
                 value={form.cajaId}
@@ -248,10 +295,10 @@ export default function MovimientoCajaForm() {
                 ))}
               </select>
             </div>
+
+            {/* Monto */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Monto *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
               <input
                 type="number"
                 name="monto"
@@ -264,10 +311,42 @@ export default function MovimientoCajaForm() {
                 required
               />
             </div>
+
+            {/* Fecha */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Concepto *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+              <input
+                type="date"
+                name="fecha"
+                value={form.fecha}
+                onChange={handleChange}
+                className="input-field w-full"
+              />
+            </div>
+
+            {/* Medio de Pago */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago *</label>
+              <select
+                name="medioPago"
+                value={form.medioPago}
+                onChange={handleChange}
+                className="input-field w-full"
+                required
+              >
+                <option value="">Seleccionar...</option>
+                <option value="EFECTIVO">Efectivo</option>
+                <option value="MERCADOPAGO">MercadoPago</option>
+                <option value="TRANSFERENCIA">Transferencia</option>
+                <option value="CHEQUE">Cheque</option>
+                <option value="TARJETA">Tarjeta</option>
+                <option value="OTRO">Otro</option>
+              </select>
+            </div>
+
+            {/* Concepto */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Concepto *</label>
               <div className="flex gap-2">
                 <select
                   name="conceptoId"
@@ -298,55 +377,25 @@ export default function MovimientoCajaForm() {
                 </button>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cuenta Contable *
-              </label>
-              <select
-                name="cuentaContableId"
-                value={form.cuentaContableId}
-                onChange={handleChange}
-                className="input-field w-full"
-                required
-              >
-                <option value="">Seleccionar cuenta...</option>
-                {cuentasContables.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.codigo} - {c.nombre}
-                  </option>
-                ))}
-              </select>
-              {form.conceptoId && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Auto-seleccionada desde el concepto
-                </p>
-              )}
-            </div>
-            <div>
-              <CentroCostoSelector
-                value={form.centroCostoId}
-                onChange={(id) => setForm(prev => ({ ...prev, centroCostoId: id }))}
-                label="Centro de Costo"
-              />
-            </div>
+
+            {/* Observación */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripción adicional
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Observación *</label>
               <textarea
                 name="descripcion"
                 value={form.descripcion}
                 onChange={handleChange}
                 className="input-field w-full"
                 rows={2}
-                placeholder="Detalles adicionales..."
+                placeholder="Detalle obligatorio del movimiento..."
+                required
               />
             </div>
           </div>
 
           {/* Preview */}
           {form.cajaId && form.monto && (
-            <div className={`mt-6 p-4 rounded-lg ${form.tipo === 'INGRESO' ? 'bg-green-50' : 'bg-red-50'}`}>
+            <div className={`mt-4 p-4 rounded-lg ${form.tipo === 'INGRESO' ? 'bg-green-50' : 'bg-red-50'}`}>
               <p className="text-sm text-gray-600 mb-1">
                 {form.tipo === 'INGRESO' ? 'Se sumará' : 'Se restará'} de <strong>{cajaSeleccionada?.nombre}</strong>:
               </p>
@@ -358,6 +407,66 @@ export default function MovimientoCajaForm() {
                   El monto excede el saldo disponible (${cajaSeleccionada.saldoActual.toLocaleString()})
                 </p>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Acordeón: Datos Contables */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setDatosContablesOpen(o => !o)}
+            className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition"
+          >
+            <div className="flex items-center gap-2">
+              {datosContablesOpen
+                ? <ChevronDown className="w-4 h-4 text-gray-500" />
+                : <ChevronRight className="w-4 h-4 text-gray-500" />
+              }
+              <span className="text-sm font-medium text-gray-700">Datos contables</span>
+              {!datosContablesOpen && (form.cuentaContableId || form.centroCostoId) && (
+                <span className="text-xs text-gray-400 ml-2">
+                  {[
+                    cuentaSeleccionada ? `${cuentaSeleccionada.codigo} ${cuentaSeleccionada.nombre}` : null,
+                    form.centroCostoId ? `CC asignado` : null
+                  ].filter(Boolean).join(' · ')}
+                </span>
+              )}
+              {!datosContablesOpen && !form.cuentaContableId && !form.centroCostoId && (
+                <span className="text-xs text-amber-500 ml-2">Se completan automáticamente desde la caja o el concepto</span>
+              )}
+            </div>
+          </button>
+
+          {datosContablesOpen && (
+            <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Contable *</label>
+                <select
+                  name="cuentaContableId"
+                  value={form.cuentaContableId}
+                  onChange={handleChange}
+                  className="input-field w-full"
+                  required
+                >
+                  <option value="">Seleccionar cuenta...</option>
+                  {cuentasContables.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.codigo} - {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Centro de Costo *
+                </label>
+                <CentroCostoSelector
+                  value={form.centroCostoId}
+                  onChange={(id) => setForm(prev => ({ ...prev, centroCostoId: id }))}
+                  required
+                />
+              </div>
             </div>
           )}
         </div>
@@ -390,9 +499,7 @@ export default function MovimientoCajaForm() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Código *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Código *</label>
                 <input
                   type="text"
                   value={nuevoConcepto.codigo}
@@ -402,9 +509,7 @@ export default function MovimientoCajaForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
                 <input
                   type="text"
                   value={nuevoConcepto.nombre}
@@ -414,9 +519,7 @@ export default function MovimientoCajaForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                 <select
                   value={nuevoConcepto.tipo}
                   onChange={(e) => setNuevoConcepto(prev => ({ ...prev, tipo: e.target.value }))}
@@ -428,9 +531,7 @@ export default function MovimientoCajaForm() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cuenta Contable *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Contable *</label>
                 <select
                   value={nuevoConcepto.cuentaContableId}
                   onChange={(e) => setNuevoConcepto(prev => ({ ...prev, cuentaContableId: e.target.value }))}
@@ -443,6 +544,16 @@ export default function MovimientoCajaForm() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Centro de Costo *
+                </label>
+                <CentroCostoSelector
+                  value={nuevoConcepto.centroCostoId}
+                  onChange={(id) => setNuevoConcepto(prev => ({ ...prev, centroCostoId: id }))}
+                  required
+                />
               </div>
             </div>
 

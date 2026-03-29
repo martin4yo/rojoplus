@@ -1,5 +1,6 @@
 /**
- * Script para importar inscripciones de socios a actividades desde StatusActividades.xlsx
+ * Script para importar inscripciones de socios a actividades desde ActividadesStatus.xlsx
+ * IMPORTANTE: Ejecutar DESPUÉS de importar-actividades.js
  * Ejecutar con: node scripts/importar-inscripciones.js
  */
 
@@ -12,116 +13,111 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const prisma = new PrismaClient()
+const TENANT_SLUG = 'sportivopilar'
+
+function excelDateToJS(val) {
+  if (!val) return new Date()
+  if (typeof val === 'number') return new Date((val - 25569) * 86400 * 1000)
+  const parsed = new Date(val)
+  return isNaN(parsed.getTime()) ? new Date() : parsed
+}
 
 async function importarInscripciones() {
   try {
-    // Leer el Excel
-    const filePath = path.join(__dirname, '../../brio/StatusActividades.xlsx')
+    const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })
+    if (!tenant) throw new Error(`Tenant "${TENANT_SLUG}" no encontrado`)
+    const tenantId = tenant.id
+    console.log(`Tenant: ${tenant.nombre} (id=${tenantId})`)
+
+    // Limpiar inscripciones del tenant
+    console.log('\nLimpiando inscripciones...')
+    const deleted = await prisma.inscripcion.deleteMany({ where: { tenantId } })
+    console.log(`  Inscripciones eliminadas: ${deleted.count}`)
+
+    // Leer Excel con encabezados reales (fila 2, índice 2)
+    const filePath = path.join(__dirname, '../../brio/ActividadesStatus.xlsx')
     const workbook = XLSX.readFile(filePath)
-    const sheetName = workbook.SheetNames[0]
-    const sheet = workbook.Sheets[sheetName]
-    const data = XLSX.utils.sheet_to_json(sheet)
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const data = XLSX.utils.sheet_to_json(sheet, { range: 2 })
 
-    console.log(`Leyendo ${data.length} registros del Excel...`)
+    console.log(`Registros en el Excel: ${data.length}`)
 
-    // Cargar todas las categorías de actividad en memoria para búsqueda rápida
+    // Cargar categorías del tenant indexadas por código (ACTIVIDAD_CATEGORIA)
     const categorias = await prisma.categoriaActividad.findMany({
+      where: { tenantId },
       include: { actividad: true }
     })
     const categoriasPorCodigo = new Map()
     categorias.forEach(c => {
       categoriasPorCodigo.set(c.codigo, c)
-      // También mapear por nombre para mayor flexibilidad
-      categoriasPorCodigo.set(c.nombre.toUpperCase(), c)
     })
+    console.log(`Categorías cargadas: ${categorias.length}`)
 
-    // Cargar todos los socios en memoria
+    // Cargar socios del tenant indexados por nroSocio
     const socios = await prisma.socio.findMany({
+      where: { tenantId },
       select: { id: true, nroSocio: true }
     })
     const sociosPorNro = new Map()
     socios.forEach(s => {
-      sociosPorNro.set(s.nroSocio, s)
+      if (s.nroSocio) sociosPorNro.set(s.nroSocio.toString().trim(), s)
     })
-
-    console.log(`Categorías cargadas: ${categorias.length}`)
     console.log(`Socios cargados: ${socios.length}`)
 
     let importados = 0
-    let errores = 0
     let duplicados = 0
+    let errores = 0
     const erroresDetalle = []
 
-    // Procesar cada fila (saltando la primera que son encabezados)
-    for (let i = 1; i < data.length; i++) {
+    for (let i = 0; i < data.length; i++) {
       const row = data[i]
 
-      const nroSocio = row['__EMPTY_2']?.toString().trim()
-      const categoriaNombre = row['__EMPTY_1']?.toString().trim()
-      const becado = row['__EMPTY_13']?.toString().toUpperCase() === 'SI'
-      const federado = row['__EMPTY_14']?.toString().toUpperCase() === 'SI'
-      const generaCuota = row['__EMPTY_15']?.toString().toUpperCase() !== 'NO'
-      const porcentaje = parseFloat(row['__EMPTY_18']) || 100
-      const importe = parseFloat(row['__EMPTY_19']) || 0
-      const fechaAltaStr = row['__EMPTY_20']
+      const nroSocio = row['Nro Socio']?.toString().trim()
+      const actividadNombre = row['Actividad']?.toString().trim()
+      const categoriaNombre = row['Cat. Actividad']?.toString().trim()
+      const becado = row['Becado']?.toString().toUpperCase() === 'SI'
+      const federado = row['Federado']?.toString().toUpperCase() === 'SI'
+      const generaCuota = row['Genera Cuota']?.toString().toUpperCase() !== 'NO'
+      const porcentaje = parseFloat(row['Porcentaje']) || 100
+      const importe = parseFloat(row['Importe']) || 0
+      const fechaAltaRaw = row['Fecha de Alta Actividad']
 
-      // Validar datos requeridos
-      if (!nroSocio || !categoriaNombre) {
-        continue // Fila vacía o incompleta
-      }
+      if (!nroSocio || !actividadNombre || !categoriaNombre) continue
 
-      // Buscar el socio
+      // Buscar socio
       const socio = sociosPorNro.get(nroSocio)
       if (!socio) {
         errores++
-        erroresDetalle.push(`Fila ${i + 1}: Socio ${nroSocio} no encontrado`)
+        erroresDetalle.push(`Fila ${i + 3}: Socio ${nroSocio} no encontrado`)
         continue
       }
 
-      // Buscar la categoría
-      const codigoCategoria = categoriaNombre.toUpperCase().replace(/\s+/g, '_')
-      let categoria = categoriasPorCodigo.get(codigoCategoria)
-      if (!categoria) {
-        categoria = categoriasPorCodigo.get(categoriaNombre.toUpperCase())
-      }
+      // Buscar categoría por código compuesto ACTIVIDAD_CATEGORIA
+      const catCodigo = (actividadNombre.toUpperCase().replace(/\s+/g, '_') + '_' +
+        categoriaNombre.toUpperCase().replace(/\s+/g, '_')).substring(0, 50)
+
+      const categoria = categoriasPorCodigo.get(catCodigo)
       if (!categoria) {
         errores++
-        erroresDetalle.push(`Fila ${i + 1}: Categoría "${categoriaNombre}" no encontrada`)
+        erroresDetalle.push(`Fila ${i + 3}: Categoría "${categoriaNombre}" de actividad "${actividadNombre}" no encontrada (código: ${catCodigo})`)
         continue
       }
 
-      // Parsear fecha de alta
-      let fechaInicio = new Date()
-      if (fechaAltaStr) {
-        if (typeof fechaAltaStr === 'number') {
-          // Excel serial date
-          fechaInicio = new Date((fechaAltaStr - 25569) * 86400 * 1000)
-        } else {
-          const parsed = new Date(fechaAltaStr)
-          if (!isNaN(parsed.getTime())) {
-            fechaInicio = parsed
-          }
-        }
-      }
+      const fechaInicio = excelDateToJS(fechaAltaRaw)
 
-      // Verificar si ya existe la inscripción
+      // Verificar duplicado
       const existente = await prisma.inscripcion.findFirst({
-        where: {
-          socioId: socio.id,
-          categoriaActividadId: categoria.id,
-          estado: 'ACTIVA'
-        }
+        where: { tenantId, socioId: socio.id, categoriaActividadId: categoria.id, estado: 'ACTIVA' }
       })
-
       if (existente) {
         duplicados++
         continue
       }
 
-      // Crear la inscripción
       try {
         await prisma.inscripcion.create({
           data: {
+            tenantId,
             socioId: socio.id,
             categoriaActividadId: categoria.id,
             fechaInicio,
@@ -135,39 +131,31 @@ async function importarInscripciones() {
           }
         })
         importados++
-
-        if (importados % 50 === 0) {
-          console.log(`  Procesados: ${importados}...`)
-        }
+        if (importados % 50 === 0) console.log(`  Procesados: ${importados}...`)
       } catch (err) {
         errores++
-        erroresDetalle.push(`Fila ${i + 1}: Error al crear inscripción - ${err.message}`)
+        erroresDetalle.push(`Fila ${i + 3}: Error al crear inscripción socio ${nroSocio} - ${err.message}`)
       }
     }
 
-    // Resumen final
     console.log('\n' + '='.repeat(50))
-    console.log('IMPORTACIÓN COMPLETADA')
-    console.log('='.repeat(50))
+    console.log('LISTO')
     console.log(`Inscripciones importadas: ${importados}`)
-    console.log(`Duplicados omitidos: ${duplicados}`)
-    console.log(`Errores: ${errores}`)
+    console.log(`Duplicados omitidos:      ${duplicados}`)
+    console.log(`Errores:                  ${errores}`)
 
-    if (erroresDetalle.length > 0 && erroresDetalle.length <= 20) {
+    if (erroresDetalle.length > 0) {
+      const muestra = erroresDetalle.slice(0, 20)
       console.log('\nDetalle de errores:')
-      erroresDetalle.forEach(e => console.log(`  - ${e}`))
-    } else if (erroresDetalle.length > 20) {
-      console.log(`\nPrimeros 20 errores:`)
-      erroresDetalle.slice(0, 20).forEach(e => console.log(`  - ${e}`))
-      console.log(`  ... y ${erroresDetalle.length - 20} más`)
+      muestra.forEach(e => console.log(`  - ${e}`))
+      if (erroresDetalle.length > 20) console.log(`  ... y ${erroresDetalle.length - 20} más`)
     }
 
-    // Estadísticas finales
-    const totalInscripciones = await prisma.inscripcion.count({ where: { estado: 'ACTIVA' } })
-    console.log(`\nTotal inscripciones activas en BD: ${totalInscripciones}`)
+    const total = await prisma.inscripcion.count({ where: { tenantId, estado: 'ACTIVA' } })
+    console.log(`\nTotal inscripciones activas en BD (${TENANT_SLUG}): ${total}`)
 
   } catch (error) {
-    console.error('Error durante la importación:', error)
+    console.error('Error:', error)
     throw error
   } finally {
     await prisma.$disconnect()

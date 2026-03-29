@@ -3,23 +3,47 @@ import api from '../services/api'
 
 const TenantContext = createContext()
 
-// Clave de cache en localStorage por slug de tenant
-function getCacheKey() {
-  const hostname = window.location.hostname
-  let slug = null
-  if (hostname.includes('localhost')) {
-    const match = hostname.match(/^([^.]+)\.localhost/)
-    slug = match ? match[1] : (localStorage.getItem('superadmin_tenant_slug') || 'default')
-  } else {
-    const parts = hostname.split('.')
-    slug = (parts.length > 2 && parts[0] !== 'www') ? parts[0] : 'default'
-  }
-  return `tenant_colores_${slug}`
-}
+const DEFAULT_SLUG = import.meta.env.VITE_DEFAULT_TENANT_SLUG || 'clubix-sport'
 
 /**
- * Aplica los colores del tenant como CSS variables en el DOM
+ * Devuelve el slug efectivo del tenant actual (mismo criterio que api.js).
+ * Prioridad: subdomain real > superadmin_tenant_slug > DEFAULT_SLUG
  */
+function getEffectiveSlug() {
+  // Prioridad 1: subdomain real en la URL (siempre gana)
+  const hostname = window.location.hostname
+  if (hostname.includes('localhost')) {
+    const match = hostname.match(/^([^.]+)\.localhost/)
+    if (match) return match[1]
+  } else {
+    const parts = hostname.split('.')
+    if (parts.length > 2 && parts[0] !== 'www') return parts[0]
+  }
+
+  // Prioridad 2: superadmin eligió un tenant (solo cuando no hay subdomain)
+  const selected = localStorage.getItem('superadmin_tenant_slug')
+  if (selected) return selected
+
+  return DEFAULT_SLUG
+}
+
+function getCacheKey(slug) {
+  return `tenant_colores_${slug || getEffectiveSlug()}`
+}
+
+const CSS_VARS = [
+  '--color-primary', '--color-primary-dark', '--color-primary-light',
+  '--color-secondary', '--color-secondary-dark', '--color-secondary-light',
+  '--color-accent', '--color-success', '--color-warning', '--color-error', '--color-info',
+  '--color-bg-primary', '--color-bg-secondary', '--color-text-primary', '--color-text-secondary', '--color-border',
+  '--color-primary-50', '--color-primary-100', '--color-primary-200', '--color-primary-300', '--color-primary-400'
+]
+
+function resetTheme() {
+  const root = document.documentElement
+  CSS_VARS.forEach(v => root.style.removeProperty(v))
+}
+
 function applyTheme(colores) {
   if (!colores || typeof colores !== 'object' || Object.keys(colores).length === 0) {
     return
@@ -59,9 +83,17 @@ function applyTheme(colores) {
   root.style.setProperty('--color-primary-400', `color-mix(in srgb, ${primario} 65%, white)`)
 }
 
-// Aplicar colores desde cache ANTES del primer render (evita FOUC)
+// Aplicar colores desde cache ANTES del primer render (evita FOUC).
+// Usamos getEffectiveSlug() que replica la misma lógica que api.js,
+// así el cache coincide exactamente con lo que devolverá la API.
 try {
-  const cached = localStorage.getItem(getCacheKey())
+  const currentKey = getCacheKey()
+  // Limpiar claves stale de otros tenants (pueden causar flash incorrecto)
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('tenant_colores_') && k !== currentKey)
+    .forEach(k => localStorage.removeItem(k))
+
+  const cached = localStorage.getItem(currentKey)
   if (cached) applyTheme(JSON.parse(cached))
 } catch (_) {}
 
@@ -81,12 +113,17 @@ export function TenantProvider({ children }) {
       const tenantData = response?.data || response
       setTenant(tenantData)
 
-      if (tenantData?.colores) {
-        applyTheme(tenantData.colores)
-        try {
-          localStorage.setItem(getCacheKey(), JSON.stringify(tenantData.colores))
-        } catch (_) {}
-      }
+      // Resetear CSS vars del tenant anterior antes de aplicar las nuevas
+      resetTheme()
+
+      const colores = tenantData?.colores || {}
+      applyTheme(colores)
+
+      // Siempre actualizar el cache (incluso si está vacío),
+      // así la próxima visita no aplica datos stale de otra sesión
+      try {
+        localStorage.setItem(getCacheKey(), JSON.stringify(colores))
+      } catch (_) {}
 
       applyFavicon(tenantData?.faviconUrl || tenantData?.logoUrl)
       applyTitle(tenantData?.nombre)

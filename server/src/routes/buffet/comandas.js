@@ -135,7 +135,7 @@ async function imprimirComandaPorDestinos(comanda, items) {
       const producto = item.productoBuffet
       if (!producto?.categoriaMenuId) continue
 
-      const destino = await prisma.destinoImpresion.findFirst({
+      const destino = await req.db.destinoImpresion.findFirst({
         where: { categoriaMenuId: producto.categoriaMenuId },
         include: {
           impresora: {
@@ -161,6 +161,10 @@ async function imprimirComandaPorDestinos(comanda, items) {
 
     // Imprimir en cada destino
     for (const [impresoraId, data] of itemsPorDestino) {
+      if (!data.impresora.imprimirComanda) {
+        console.log(`[Print] Impresora ${data.impresora.nombre} tiene comandas desactivadas, omitiendo`)
+        continue
+      }
       console.log(`[Print] Enviando a impresora ${data.impresora.nombre} (sector: ${data.sectorNombre})`)
       const ticketData = generarComandaESCPOS(comanda, data.items, data.sectorNombre)
       const base64Data = ticketData.toString('base64')
@@ -276,7 +280,7 @@ router.post('/comandas', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
       }
     }
 
-    const numero = await generarNumeroComanda()
+    const numero = await generarNumeroComanda(req.db)
 
     const comanda = await req.db.comanda.create({
       data: {
@@ -430,12 +434,12 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
       // Determinar estado inicial según destino de impresión
       let estadoInicial = 'PENDIENTE'
       if (producto.categoriaMenuId) {
-        const destino = await prisma.destinoImpresion.findFirst({
+        const destino = await req.db.destinoImpresion.findFirst({
           where: { categoriaMenuId: producto.categoriaMenuId },
           include: { impresora: { include: { sector: true } } }
         })
 
-        if (destino && destino.impresora) {
+        if (destino && destino.impresora && !destino.saltarControlCocina) {
           const codigoSector = destino.impresora.sector?.codigo
           if (codigoSector === 'COCINA') {
             estadoInicial = 'ENVIADO_COCINA'
@@ -449,7 +453,7 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
       let precioAdicionalOpciones = 0
       if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
         for (const opSel of item.opcionesSeleccionadas) {
-          const opcion = await prisma.opcionProducto.findUnique({ where: { id: opSel.opcionId } })
+          const opcion = await req.db.opcionProducto.findUnique({ where: { id: opSel.opcionId } })
           if (opcion) {
             precioAdicionalOpciones += Number(opcion.precioAdicional) * (opSel.cantidad || 1)
           }
@@ -490,16 +494,23 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
       itemsCreados.push(itemCreado)
     }
 
-    await recalcularTotalesComanda(parseInt(id))
+    await recalcularTotalesComanda(parseInt(id), req.db)
 
-    // Imprimir comanda en los destinos correspondientes
+    // Imprimir comanda en los destinos correspondientes (si está habilitado)
     if (itemsCreados.length > 0) {
-      const comandaConMesa = await req.db.comanda.findUnique({
-        where: { id: parseInt(id) },
-        include: { mesa: true, socio: true }
+      const cfgComanda = await req.db.configuracion.findFirst({
+        where: { clave: 'BUFFET_COMANDA_MESA' },
+        select: { valor: true }
       })
-      // Ejecutar impresión de forma asíncrona (no bloquea la respuesta)
-      imprimirComandaPorDestinos(comandaConMesa, itemsCreados)
+      const debeImprimirComanda = cfgComanda ? cfgComanda.valor === 'true' : true
+      if (debeImprimirComanda) {
+        const comandaConMesa = await req.db.comanda.findUnique({
+          where: { id: parseInt(id) },
+          include: { mesa: true, socio: true }
+        })
+        // Ejecutar impresión de forma asíncrona (no bloquea la respuesta)
+        imprimirComandaPorDestinos(comandaConMesa, itemsCreados)
+      }
     }
 
     res.status(201).json({ success: true, data: itemsCreados })
@@ -541,7 +552,7 @@ router.put('/comandas/:comandaId/items/:itemId', authAdmin, checkPermiso('BUFFET
       include: { productoBuffet: true }
     })
 
-    await recalcularTotalesComanda(parseInt(comandaId))
+    await recalcularTotalesComanda(parseInt(comandaId), req.db)
 
     res.json({ success: true, data: itemActualizado })
   } catch (error) {
@@ -573,7 +584,7 @@ router.delete('/comandas/:comandaId/items/:itemId', authAdmin, checkPermiso('BUF
       data: { estado: 'ANULADO' }
     })
 
-    await recalcularTotalesComanda(parseInt(comandaId))
+    await recalcularTotalesComanda(parseInt(comandaId), req.db)
 
     res.json({ success: true, message: 'Item anulado' })
   } catch (error) {
@@ -750,7 +761,7 @@ router.post('/comandas/:id/pedir-cuenta', authAdmin, checkPermiso('BUFFET_MESAS'
 
         let mozoNombre = null
         if (comanda.creadoPorId) {
-          const mozo = await prisma.admin.findUnique({
+          const mozo = await req.db.admin.findUnique({
             where: { id: comanda.creadoPorId },
             select: { nombre: true, apellido: true }
           })
@@ -992,7 +1003,17 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 
     const comanda = await req.db.comanda.findUnique({
       where: { id: parseInt(id) },
-      include: { mesa: true, socio: true, items: { include: { productoBuffet: true } } }
+      include: {
+        mesa: true,
+        socio: true,
+        items: {
+          include: {
+            productoBuffet: {
+              include: { producto: { include: { conceptoVenta: true } } }
+            }
+          }
+        }
+      }
     })
 
     if (!comanda) {
@@ -1004,7 +1025,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     }
 
     // Validar acceso a la caja según el rol del usuario
-    const admin = await prisma.admin.findUnique({
+    const admin = await req.db.admin.findUnique({
       where: { id: req.admin.id },
       include: {
         rol: { include: { cajas: { select: { cajaId: true } } } }
@@ -1053,23 +1074,32 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     const propinaMonto = propina && propina > 0 ? parseFloat(propina) : 0
     const totalFinal = Number(comanda.subtotal) - descuentoMonto + propinaMonto
 
-    // Agrupar items por cuenta contable del producto para asientos
+    // Agrupar items por cuenta contable del concepto de venta del producto para asientos
     const itemsPorCuenta = {}
     for (const item of comanda.items) {
-      const cuentaId = item.productoBuffet?.cuentaContableId
+      const cuentaId = item.productoBuffet?.producto?.conceptoVenta?.cuentaContableId
+                    || item.productoBuffet?.cuentaContableId
       if (!itemsPorCuenta[cuentaId]) {
         itemsPorCuenta[cuentaId] = 0
       }
-      itemsPorCuenta[cuentaId] += Number(item.total)
+      itemsPorCuenta[cuentaId] += Number(item.subtotal)
     }
 
-    // Cuenta contable fallback si no tiene configurada
+    // Cuenta contable fallback para items sin concepto configurado
     let cuentaContableFallback = await req.db.cuentaContable.findFirst({
       where: { codigo: { contains: 'BUFFET' }, esImputable: true }
     })
     if (!cuentaContableFallback) {
       cuentaContableFallback = await req.db.cuentaContable.findFirst({
         where: { codigo: '4.1.1.01', esImputable: true }
+      })
+    }
+    // El fallback solo es obligatorio si algún item no tiene cuenta propia
+    const algunItemSinCuenta = Object.keys(itemsPorCuenta).some(k => !k || k === 'null' || k === 'undefined')
+    if (algunItemSinCuenta && !cuentaContableFallback) {
+      return res.status(400).json({
+        success: false,
+        error: 'Hay productos sin cuenta contable de ventas configurada. Configure el concepto de venta en los productos o cree una cuenta con código 4.1.1.01.'
       })
     }
 
@@ -1088,7 +1118,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       }
 
       for (const pago of pagosParciales) {
-        const medioPago = await prisma.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
+        const medioPago = await req.db.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
         if (!medioPago) {
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
@@ -1106,9 +1136,10 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             numero: nuevoNumero,
             cajaId: parseInt(pago.cajaId || cajaId),
             tipo: 'INGRESO',
-            cuentaContableId: cuentaContable?.id || 1,
+            cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
             centroCostoId: caja.centroCostoId,
             monto: parseFloat(pago.monto),
+            medioPago: medioPago.codigo,
             concepto: `Venta Buffet - Comanda ${comanda.numero} - ${medioPago.nombre}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
             comandaId: parseInt(id),
@@ -1123,6 +1154,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
             debe: parseFloat(pago.monto),
             haber: 0,
+            centroCostoId: caja.centroCostoId || null,
             descripcion: `Ingreso por venta buffet - ${medioPago.nombre}`
           }
         ]
@@ -1130,7 +1162,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         // Distribuir el monto del pago proporcionalmente entre las cuentas contables
         const totalComanda = Number(comanda.subtotal)
         for (const [cuentaId, montoItems] of Object.entries(itemsPorCuenta)) {
-          const cuentaContableId = cuentaId !== 'null' && cuentaId ? parseInt(cuentaId) : cuentaContableFallback?.id
+          const cuentaContableId = (cuentaId && cuentaId !== 'null' && cuentaId !== 'undefined') ? parseInt(cuentaId) : cuentaContableFallback?.id
           if (!cuentaContableId) continue
 
           // Proporción del monto de este pago que corresponde a esta cuenta
@@ -1141,11 +1173,12 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cuentaContableId,
             debe: 0,
             haber: montoCuenta,
+            centroCostoId: caja.centroCostoId || null,
             descripcion: `Venta buffet - Comanda ${comanda.numero}`
           })
         }
 
-        await generarAsientoAutomatico(prisma, {
+        await generarAsientoAutomatico(req.db, {
           fecha: new Date(),
           concepto: `Venta Buffet - Comanda ${comanda.numero} - ${medioPago.nombre}`,
           tipoOrigen: 'VENTA_BUFFET',
@@ -1157,7 +1190,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         movimientos.push(movimiento)
       }
     } else {
-      const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } })
+      const medioPago = await req.db.medioPago.findUnique({ where: { id: medioPagoId } })
       if (!medioPago) {
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
@@ -1175,9 +1208,10 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           numero: nuevoNumero,
           cajaId,
           tipo: 'INGRESO',
-          cuentaContableId: cuentaContable?.id || 1,
+          cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
           centroCostoId: caja.centroCostoId,
           monto: totalFinal,
+          medioPago: medioPago.codigo,
           concepto: `Venta Buffet - Comanda ${comanda.numero}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
           comandaId: parseInt(id),
@@ -1191,6 +1225,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
           debe: totalFinal,
           haber: 0,
+          centroCostoId: caja.centroCostoId || null,
           descripcion: `Ingreso por venta buffet - ${medioPago.nombre}`
         }
       ]
@@ -1209,11 +1244,12 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cuentaContableId,
           debe: 0,
           haber: montoCuenta,
+          centroCostoId: caja.centroCostoId || null,
           descripcion: `Venta buffet - Comanda ${comanda.numero}`
         })
       }
 
-      await generarAsientoAutomatico(prisma, {
+      await generarAsientoAutomatico(req.db, {
         fecha: new Date(),
         concepto: `Venta Buffet - Comanda ${comanda.numero}`,
         tipoOrigen: 'VENTA_BUFFET',
@@ -1301,7 +1337,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           3: 'NOTA DE CREDITO A', 8: 'NOTA DE CREDITO B', 13: 'NOTA DE CREDITO C'
         }
 
-        comprobanteFiscal = await prisma.comprobanteElectronico.create({
+        comprobanteFiscal = await req.db.comprobanteElectronico.create({
           data: {
             tipo: tiposNombre[tipoAfip] || 'FACTURA B',
             tipoAfip,
@@ -1386,14 +1422,14 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 
         let cajeroNombre = null
         if (req.admin?.id) {
-          const cajero = await prisma.admin.findUnique({
+          const cajero = await req.db.admin.findUnique({
             where: { id: req.admin.id },
             select: { nombre: true, apellido: true }
           })
           if (cajero) cajeroNombre = `${cajero.nombre} ${cajero.apellido || ''}`.trim()
         }
 
-        const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId || pagosParciales?.[0]?.medioPagoId } })
+        const medioPago = await req.db.medioPago.findUnique({ where: { id: medioPagoId || pagosParciales?.[0]?.medioPagoId } })
 
         const ticketData = renderTicketNoFiscal({
           empresa: { razonSocial: 'CLUB SPORTIVO PILAR' },
@@ -1428,7 +1464,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 
       let mozoNombre = null
       if (comanda.creadoPorId) {
-        const mozo = await prisma.admin.findUnique({
+        const mozo = await req.db.admin.findUnique({
           where: { id: comanda.creadoPorId },
           select: { nombre: true, apellido: true }
         })
@@ -1475,13 +1511,13 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           include: { cuentaContable: true }
         })
 
-        const medioPagoUsado = await prisma.medioPago.findUnique({
+        const medioPagoUsado = await req.db.medioPago.findUnique({
           where: { id: medioPagoId || pagosParciales?.[0]?.medioPagoId }
         })
 
         // Crear MovimientoContable - Factura Venta
-        const numeroMCVenta = await generarNumeroMC()
-        movimientoContableVenta = await prisma.movimientoContable.create({
+        const numeroMCVenta = await generarNumeroMC(req.db)
+        movimientoContableVenta = await req.db.movimientoContable.create({
           data: {
             numero: numeroMCVenta,
             tipo: 'FACTURA_VENTA',
@@ -1536,8 +1572,8 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         }
 
         // Crear MovimientoContable - Recibo Cobro
-        const numeroMCCobro = await generarNumeroMC()
-        movimientoContableCobro = await prisma.movimientoContable.create({
+        const numeroMCCobro = await generarNumeroMC(req.db)
+        movimientoContableCobro = await req.db.movimientoContable.create({
           data: {
             numero: numeroMCCobro,
             tipo: 'RECIBO_COBRO',
@@ -1591,7 +1627,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 
         // Vincular ComprobanteElectronico
         if (comprobanteFiscal) {
-          await prisma.comprobanteElectronico.update({
+          await req.db.comprobanteElectronico.update({
             where: { id: comprobanteFiscal.id },
             data: { movimientoContableId: movimientoContableVenta.id }
           })
@@ -1628,7 +1664,9 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     })
   } catch (error) {
     console.error('Error al cobrar comanda:', error)
-    res.status(500).json({ success: false, error: 'Error al cobrar comanda' })
+    const statusCode = error.statusCode || 500
+    const message = statusCode < 500 ? error.message : 'Error al cobrar comanda'
+    res.status(statusCode).json({ success: false, error: message })
   }
 })
 

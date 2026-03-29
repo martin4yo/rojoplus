@@ -42,6 +42,19 @@ export default function BuffetTakeAway() {
   const [sociosBusqueda, setSociosBusqueda] = useState([])
   const [buscandoSocio, setBuscandoSocio] = useState(false)
 
+  async function limpiarPedidosBarra() {
+    const ok = await confirm('¿Eliminar todos los pedidos de Venta Barra de la lista?')
+    if (!ok) return
+    try {
+      const res = await api.delete('/admin/buffet/takeaway/limpiar-barra')
+      const eliminados = res?.eliminados ?? 0
+      toast.success(`${eliminados} pedido${eliminados !== 1 ? 's' : ''} eliminado${eliminados !== 1 ? 's' : ''}`)
+      cargarPedidos()
+    } catch (err) {
+      toast.error(err.message || 'Error al limpiar pedidos')
+    }
+  }
+
   const cargarPedidos = useCallback(async () => {
     try {
       const res = await api.get('/admin/buffet/takeaway')
@@ -292,13 +305,23 @@ export default function BuffetTakeAway() {
         </div>
 
         {tienePermiso(PERMISOS.BUFFET_MESAS) && (
-          <button
-            onClick={() => setModalNuevoPedido(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-          >
-            <Plus size={18} />
-            Nuevo Pedido
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={limpiarPedidosBarra}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium text-sm"
+              title="Eliminar pedidos de Venta Barra de la lista"
+            >
+              <Trash2 size={16} />
+              Limpiar Barra
+            </button>
+            <button
+              onClick={() => setModalNuevoPedido(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+            >
+              <Plus size={18} />
+              Nuevo Pedido
+            </button>
+          </div>
         )}
       </PageHeader>
 
@@ -576,6 +599,8 @@ export default function BuffetTakeAway() {
           </button>
         </form>
       </Modal>
+
+      <ConfirmDialog />
     </div>
   )
 }

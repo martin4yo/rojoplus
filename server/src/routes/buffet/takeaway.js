@@ -119,7 +119,7 @@ function generarComandaTakeAwayESCPOS(pedido, items, sectorNombre = 'TAKE AWAY')
 /**
  * Imprime comanda de TakeAway en los destinos correspondientes
  */
-async function imprimirComandaTakeAway(pedido, items) {
+async function imprimirComandaTakeAway(db, pedido, items) {
   try {
     console.log(`[Print TakeAway] Iniciando impresión. Items: ${items.length}`)
 
@@ -130,7 +130,7 @@ async function imprimirComandaTakeAway(pedido, items) {
       const producto = item.productoBuffet
       if (!producto?.categoriaMenuId) continue
 
-      const destino = await prisma.destinoImpresion.findFirst({
+      const destino = await db.destinoImpresion.findFirst({
         where: { categoriaMenuId: producto.categoriaMenuId },
         include: {
           impresora: {
@@ -156,6 +156,10 @@ async function imprimirComandaTakeAway(pedido, items) {
 
     // Imprimir en cada destino
     for (const [impresoraId, data] of itemsPorDestino) {
+      if (!data.impresora.imprimirComanda) {
+        console.log(`[Print TakeAway] Impresora ${data.impresora.nombre} tiene comandas desactivadas, omitiendo`)
+        continue
+      }
       console.log(`[Print TakeAway] Enviando a impresora ${data.impresora.nombre} (sector: ${data.sectorNombre})`)
       const ticketData = generarComandaTakeAwayESCPOS(pedido, data.items, data.sectorNombre)
       const base64Data = ticketData.toString('base64')
@@ -182,7 +186,7 @@ router.get('/takeaway', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) 
     const where = {
       // Excluir pedidos de BARRA (solo mostrar TakeAway reales)
       NOT: {
-        tipoVenta: 'BARRA'
+        tipo: 'BARRA'
       }
     }
     if (estado) where.estado = estado
@@ -194,7 +198,7 @@ router.get('/takeaway', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) 
       where.horaRecibido = { gte: fechaInicio, lte: fechaFin }
     }
 
-    const pedidos = await prisma.pedidoTakeAway.findMany({
+    const pedidos = await req.db.pedidoTakeAway.findMany({
       where,
       orderBy: { horaRecibido: 'desc' },
       include: {
@@ -234,7 +238,7 @@ router.get('/takeaway/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, r
   try {
     const { id } = req.params
 
-    const pedido = await prisma.pedidoTakeAway.findUnique({
+    const pedido = await req.db.pedidoTakeAway.findUnique({
       where: { id: parseInt(id) },
       include: {
         items: {
@@ -269,7 +273,7 @@ router.get('/takeaway/:id', authAdmin, checkPermiso('BUFFET_VER'), async (req, r
       )
 
       if (todosProcesados) {
-        await prisma.pedidoTakeAway.update({
+        await req.db.pedidoTakeAway.update({
           where: { id: pedido.id },
           data: { estado: 'LISTO', horaListo: new Date() }
         })
@@ -296,9 +300,9 @@ router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
     // Validar campo requerido
     const nombreClienteFinal = nombreCliente || 'Sin nombre'
 
-    const numero = await generarNumeroPedido()
+    const numero = await generarNumeroPedido(req.db)
 
-    const pedido = await prisma.pedidoTakeAway.create({
+    const pedido = await req.db.pedidoTakeAway.create({
       data: {
         numero,
         nombreCliente: nombreClienteFinal,
@@ -317,7 +321,7 @@ router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
         const producto = await req.db.productoBuffet.findUnique({ where: { id: item.productoBuffetId } })
         if (!producto) continue
 
-        await prisma.itemPedidoTakeAway.create({
+        await req.db.itemPedidoTakeAway.create({
           data: {
             pedidoId: pedido.id,
             productoBuffetId: item.productoBuffetId,
@@ -329,10 +333,10 @@ router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
         })
       }
 
-      await recalcularTotalesPedido(pedido.id)
+      await recalcularTotalesPedido(pedido.id, req.db)
     }
 
-    const pedidoCompleto = await prisma.pedidoTakeAway.findUnique({
+    const pedidoCompleto = await req.db.pedidoTakeAway.findUnique({
       where: { id: pedido.id },
       include: { items: { include: { productoBuffet: true } } }
     })
@@ -357,7 +361,7 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
     const { id } = req.params
     const { items } = req.body
 
-    const pedido = await prisma.pedidoTakeAway.findUnique({ where: { id: parseInt(id) } })
+    const pedido = await req.db.pedidoTakeAway.findUnique({ where: { id: parseInt(id) } })
     if (!pedido) {
       return res.status(404).json({ success: false, error: 'Pedido no encontrado' })
     }
@@ -377,12 +381,12 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
 
       let estadoInicial = 'PENDIENTE'
       if (producto.categoriaMenuId) {
-        const destino = await prisma.destinoImpresion.findFirst({
+        const destino = await req.db.destinoImpresion.findFirst({
           where: { categoriaMenuId: producto.categoriaMenuId },
           include: { impresora: { include: { sector: true } } }
         })
 
-        if (destino && destino.impresora) {
+        if (destino && destino.impresora && !destino.saltarControlCocina) {
           const codigoSector = destino.impresora.sector?.codigo
           if (codigoSector === 'COCINA') {
             estadoInicial = 'ENVIADO_COCINA'
@@ -396,7 +400,7 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
       let precioAdicionalOpciones = 0
       if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
         for (const opSel of item.opcionesSeleccionadas) {
-          const opcion = await prisma.opcionProducto.findUnique({ where: { id: opSel.opcionId } })
+          const opcion = await req.db.opcionProducto.findUnique({ where: { id: opSel.opcionId } })
           if (opcion) {
             precioAdicionalOpciones += Number(opcion.precioAdicional) * (opSel.cantidad || 1)
           }
@@ -406,7 +410,7 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
       const precioUnitarioTotal = Number(producto.precio) + precioAdicionalOpciones
       const cantidad = item.cantidad || 1
 
-      const itemCreado = await prisma.itemPedidoTakeAway.create({
+      const itemCreado = await req.db.itemPedidoTakeAway.create({
         data: {
           pedidoId: parseInt(id),
           productoBuffetId: item.productoBuffetId,
@@ -418,16 +422,24 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
           // Guardar opciones removidas (ingredientes que vienen por defecto y se quitaron)
           opcionesRemovidas: item.opcionesRemovidas && item.opcionesRemovidas.length > 0
             ? item.opcionesRemovidas
-            : undefined,
-          // Crear opciones seleccionadas si existen
-          opcionesSeleccionadas: item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0 ? {
-            create: item.opcionesSeleccionadas.map(opSel => ({
-              opcionId: opSel.opcionId,
-              cantidad: opSel.cantidad || 1,
-              precioAdicional: opSel.precioAdicional || 0
-            }))
-          } : undefined
-        },
+            : undefined
+        }
+      })
+
+      // Crear opciones seleccionadas por separado para que el tenant extension inyecte tenantId
+      if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
+        await req.db.opcionItemTakeAway.createMany({
+          data: item.opcionesSeleccionadas.map(opSel => ({
+            itemTakeAwayId: itemCreado.id,
+            opcionId: opSel.opcionId,
+            cantidad: opSel.cantidad || 1,
+            precioAdicional: opSel.precioAdicional || 0
+          }))
+        })
+      }
+
+      const itemCreadoConRelaciones = await req.db.itemPedidoTakeAway.findUnique({
+        where: { id: itemCreado.id },
         include: {
           productoBuffet: true,
           opcionesSeleccionadas: {
@@ -440,20 +452,27 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
         }
       })
 
-      itemsCreados.push(itemCreado)
+      itemsCreados.push(itemCreadoConRelaciones)
     }
 
-    await recalcularTotalesPedido(parseInt(id))
+    await recalcularTotalesPedido(parseInt(id), req.db)
 
-    // Imprimir comanda en destinos correspondientes
+    // Imprimir comanda en destinos correspondientes (si está habilitado)
     if (itemsCreados.length > 0) {
-      const pedidoConSocio = await prisma.pedidoTakeAway.findUnique({
-        where: { id: parseInt(id) },
-        include: {
-          socio: { select: { apellidoNombre: true } }
-        }
+      const cfgComanda = await req.db.configuracion.findFirst({
+        where: { clave: 'BUFFET_COMANDA_TAKEAWAY' },
+        select: { valor: true }
       })
-      imprimirComandaTakeAway(pedidoConSocio, itemsCreados)
+      const debeImprimirComanda = cfgComanda ? cfgComanda.valor === 'true' : true
+      if (debeImprimirComanda) {
+        const pedidoConSocio = await req.db.pedidoTakeAway.findUnique({
+          where: { id: parseInt(id) },
+          include: {
+            socio: { select: { apellidoNombre: true } }
+          }
+        })
+        imprimirComandaTakeAway(req.db, pedidoConSocio, itemsCreados)
+      }
     }
 
     res.status(201).json({ success: true, data: itemsCreados })
@@ -473,7 +492,7 @@ router.put('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'
     const { cantidad } = req.body
 
     // Verificar estado del pedido
-    const pedido = await prisma.pedidoTakeAway.findUnique({ where: { id: parseInt(id) } })
+    const pedido = await req.db.pedidoTakeAway.findUnique({ where: { id: parseInt(id) } })
     if (!pedido) {
       return res.status(404).json({ success: false, error: 'Pedido no encontrado' })
     }
@@ -481,7 +500,7 @@ router.put('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'
       return res.status(400).json({ success: false, error: 'No se pueden modificar items de este pedido' })
     }
 
-    const item = await prisma.itemPedidoTakeAway.findUnique({
+    const item = await req.db.itemPedidoTakeAway.findUnique({
       where: { id: parseInt(itemId) },
       include: { productoBuffet: true }
     })
@@ -496,7 +515,7 @@ router.put('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'
 
     const nuevoSubtotal = Number(item.precioUnitario) * parseInt(cantidad)
 
-    const itemActualizado = await prisma.itemPedidoTakeAway.update({
+    const itemActualizado = await req.db.itemPedidoTakeAway.update({
       where: { id: parseInt(itemId) },
       data: {
         cantidad: parseInt(cantidad),
@@ -505,7 +524,7 @@ router.put('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MESAS'
       include: { productoBuffet: true }
     })
 
-    await recalcularTotalesPedido(parseInt(id))
+    await recalcularTotalesPedido(parseInt(id), req.db)
 
     res.json({ success: true, data: itemActualizado })
   } catch (error) {
@@ -523,7 +542,7 @@ router.delete('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MES
     const { id, itemId } = req.params
 
     // Verificar estado del pedido
-    const pedido = await prisma.pedidoTakeAway.findUnique({ where: { id: parseInt(id) } })
+    const pedido = await req.db.pedidoTakeAway.findUnique({ where: { id: parseInt(id) } })
     if (!pedido) {
       return res.status(404).json({ success: false, error: 'Pedido no encontrado' })
     }
@@ -531,7 +550,7 @@ router.delete('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MES
       return res.status(400).json({ success: false, error: 'No se pueden anular items de este pedido' })
     }
 
-    const item = await prisma.itemPedidoTakeAway.findUnique({
+    const item = await req.db.itemPedidoTakeAway.findUnique({
       where: { id: parseInt(itemId) }
     })
 
@@ -543,17 +562,58 @@ router.delete('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MES
       return res.status(400).json({ success: false, error: 'No se pueden anular items entregados' })
     }
 
-    await prisma.itemPedidoTakeAway.update({
+    await req.db.itemPedidoTakeAway.update({
       where: { id: parseInt(itemId) },
       data: { estado: 'ANULADO' }
     })
 
-    await recalcularTotalesPedido(parseInt(id))
+    await recalcularTotalesPedido(parseInt(id), req.db)
 
     res.json({ success: true, message: 'Item anulado' })
   } catch (error) {
     console.error('Error al anular item:', error)
     res.status(500).json({ success: false, error: 'Error al anular item' })
+  }
+})
+
+/**
+ * DELETE /takeaway/limpiar-barra
+ * Elimina todos los pedidos BARRA (y huérfanos de venta rápida) para limpiar la lista
+ * DEBE ir antes de DELETE /takeaway/:id para que Express no lo capture como parámetro
+ */
+router.delete('/takeaway/limpiar-barra', authAdmin, async (req, res) => {
+  try {
+    const pedidos = await req.db.pedidoTakeAway.findMany({
+      where: {
+        OR: [
+          { tipo: 'BARRA' },
+          { nombreCliente: { contains: 'Venta Barra' } },
+          { observaciones: { contains: 'venta rápida en barra' } }
+        ]
+      },
+      select: { id: true }
+    })
+
+    const ids = pedidos.map(p => p.id)
+
+    if (ids.length === 0) {
+      return res.json({ success: true, eliminados: 0 })
+    }
+
+    await req.db.movimientoCaja.updateMany({
+      where: { pedidoTakeAwayId: { in: ids } },
+      data: { pedidoTakeAwayId: null }
+    })
+    await req.db.comprobanteElectronico.updateMany({
+      where: { pedidoTakeawayId: { in: ids } },
+      data: { pedidoTakeawayId: null }
+    })
+    await req.db.pedidoTakeAway.deleteMany({ where: { id: { in: ids } } })
+
+    res.json({ success: true, eliminados: ids.length })
+  } catch (error) {
+    console.error('Error limpiando pedidos BARRA:', error)
+    res.status(500).json({ success: false, error: 'Error al limpiar pedidos' })
   }
 })
 
@@ -566,7 +626,7 @@ router.delete('/takeaway/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (r
     const { id } = req.params
 
     // Verificar que el pedido existe
-    const pedido = await prisma.pedidoTakeAway.findUnique({
+    const pedido = await req.db.pedidoTakeAway.findUnique({
       where: { id: parseInt(id) },
       include: {
         items: true
@@ -583,7 +643,7 @@ router.delete('/takeaway/:id', authAdmin, checkPermiso('BUFFET_MESAS'), async (r
     }
 
     // Eliminar el pedido (los items se eliminan en cascada)
-    await prisma.pedidoTakeAway.delete({
+    await req.db.pedidoTakeAway.delete({
       where: { id: parseInt(id) }
     })
 
@@ -602,7 +662,7 @@ router.post('/takeaway/:id/items/:itemId/entregar', authAdmin, checkPermiso('BUF
   try {
     const { id, itemId } = req.params
 
-    const item = await prisma.itemPedidoTakeAway.findUnique({
+    const item = await req.db.itemPedidoTakeAway.findUnique({
       where: { id: parseInt(itemId) },
       include: { pedido: true }
     })
@@ -619,7 +679,7 @@ router.post('/takeaway/:id/items/:itemId/entregar', authAdmin, checkPermiso('BUF
       return res.status(400).json({ success: false, error: 'El item ya fue entregado' })
     }
 
-    const itemActualizado = await prisma.itemPedidoTakeAway.update({
+    const itemActualizado = await req.db.itemPedidoTakeAway.update({
       where: { id: parseInt(itemId) },
       data: {
         estado: 'ENTREGADO',
@@ -647,7 +707,7 @@ router.post('/takeaway/:id/enviar-cocina', authAdmin, checkPermiso('BUFFET_MESAS
   try {
     const { id } = req.params
 
-    const pedido = await prisma.pedidoTakeAway.findUnique({
+    const pedido = await req.db.pedidoTakeAway.findUnique({
       where: { id: parseInt(id) },
       include: { items: { where: { estado: 'PENDIENTE' } } }
     })
@@ -660,12 +720,12 @@ router.post('/takeaway/:id/enviar-cocina', authAdmin, checkPermiso('BUFFET_MESAS
       return res.status(400).json({ success: false, error: 'No hay items pendientes' })
     }
 
-    await prisma.itemPedidoTakeAway.updateMany({
+    await req.db.itemPedidoTakeAway.updateMany({
       where: { pedidoId: parseInt(id), estado: 'PENDIENTE' },
       data: { estado: 'EN_PREPARACION' }
     })
 
-    await prisma.pedidoTakeAway.update({
+    await req.db.pedidoTakeAway.update({
       where: { id: parseInt(id) },
       data: { estado: 'EN_PREPARACION' }
     })
@@ -685,12 +745,12 @@ router.put('/takeaway/:id/listo', authAdmin, checkPermiso('BUFFET_COCINA'), asyn
   try {
     const { id } = req.params
 
-    await prisma.itemPedidoTakeAway.updateMany({
+    await req.db.itemPedidoTakeAway.updateMany({
       where: { pedidoId: parseInt(id), estado: 'EN_PREPARACION' },
       data: { estado: 'LISTO' }
     })
 
-    const pedido = await prisma.pedidoTakeAway.update({
+    const pedido = await req.db.pedidoTakeAway.update({
       where: { id: parseInt(id) },
       data: { estado: 'LISTO', horaListo: new Date() }
     })
@@ -710,7 +770,7 @@ router.post('/takeaway/:id/entregar', authAdmin, checkPermiso('BUFFET_MESAS'), a
   try {
     const { id } = req.params
 
-    const pedido = await prisma.pedidoTakeAway.findUnique({
+    const pedido = await req.db.pedidoTakeAway.findUnique({
       where: { id: parseInt(id) },
       include: { items: true }
     })
@@ -727,7 +787,7 @@ router.post('/takeaway/:id/entregar', authAdmin, checkPermiso('BUFFET_MESAS'), a
       return res.status(400).json({ success: false, error: 'Solo se pueden entregar pedidos pagados' })
     }
 
-    const pedidoActualizado = await prisma.pedidoTakeAway.update({
+    const pedidoActualizado = await req.db.pedidoTakeAway.update({
       where: { id: parseInt(id) },
       data: {
         estado: 'ENTREGADO',
@@ -767,9 +827,17 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       tipoCliente
     } = req.body
 
-    const pedido = await prisma.pedidoTakeAway.findUnique({
+    const pedido = await req.db.pedidoTakeAway.findUnique({
       where: { id: parseInt(id) },
-      include: { items: { include: { productoBuffet: true } } }
+      include: {
+        items: {
+          include: {
+            productoBuffet: {
+              include: { producto: { include: { conceptoVenta: true } } }
+            }
+          }
+        }
+      }
     })
 
     if (!pedido) {
@@ -791,23 +859,32 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     const propinaMonto = propina && propina > 0 ? parseFloat(propina) : 0
     const totalFinal = Number(pedido.total) + propinaMonto
 
-    // Agrupar items por cuenta contable del producto para asientos
+    // Agrupar items por cuenta contable del concepto de venta del producto para asientos
     const itemsPorCuenta = {}
     for (const item of pedido.items) {
-      const cuentaId = item.productoBuffet?.cuentaContableId
+      const cuentaId = item.productoBuffet?.producto?.conceptoVenta?.cuentaContableId
+                    || item.productoBuffet?.cuentaContableId
       if (!itemsPorCuenta[cuentaId]) {
         itemsPorCuenta[cuentaId] = 0
       }
-      itemsPorCuenta[cuentaId] += Number(item.total)
+      itemsPorCuenta[cuentaId] += Number(item.subtotal)
     }
 
-    // Cuenta contable fallback si no tiene configurada
+    // Cuenta contable fallback para items sin concepto configurado
     let cuentaContableFallback = await req.db.cuentaContable.findFirst({
       where: { codigo: { contains: 'BUFFET' }, esImputable: true }
     })
     if (!cuentaContableFallback) {
       cuentaContableFallback = await req.db.cuentaContable.findFirst({
         where: { codigo: '4.1.1.01', esImputable: true }
+      })
+    }
+    // El fallback solo es obligatorio si algún item no tiene cuenta propia
+    const algunItemSinCuenta = Object.keys(itemsPorCuenta).some(k => !k || k === 'null' || k === 'undefined')
+    if (algunItemSinCuenta && !cuentaContableFallback) {
+      return res.status(400).json({
+        success: false,
+        error: 'Hay productos sin cuenta contable de ventas configurada. Configure el concepto de venta en los productos o cree una cuenta con código 4.1.1.01.'
       })
     }
 
@@ -825,7 +902,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       }
 
       for (const pago of pagosParciales) {
-        const medioPago = await prisma.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
+        const medioPago = await req.db.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
         if (!medioPago) {
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
@@ -843,9 +920,10 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             numero: nuevoNumero,
             cajaId: parseInt(pago.cajaId || cajaId),
             tipo: 'INGRESO',
-            cuentaContableId: cuentaContable?.id || 1,
+            cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
             centroCostoId: caja.centroCostoId,
             monto: parseFloat(pago.monto),
+            medioPago: medioPago.codigo,
             concepto: `Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
             pedidoTakeAwayId: parseInt(id),
@@ -859,6 +937,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
             debe: parseFloat(pago.monto),
             haber: 0,
+            centroCostoId: caja.centroCostoId || null,
             descripcion: `Ingreso por venta take away - ${medioPago.nombre}`
           }
         ]
@@ -866,7 +945,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         // Distribuir el monto del pago proporcionalmente entre las cuentas contables
         const totalPedido = Number(pedido.total)
         for (const [cuentaId, montoItems] of Object.entries(itemsPorCuenta)) {
-          const cuentaContableId = cuentaId !== 'null' && cuentaId ? parseInt(cuentaId) : cuentaContableFallback?.id
+          const cuentaContableId = (cuentaId && cuentaId !== 'null' && cuentaId !== 'undefined') ? parseInt(cuentaId) : cuentaContableFallback?.id
           if (!cuentaContableId) continue
 
           // Proporción del monto de este pago que corresponde a esta cuenta
@@ -877,11 +956,12 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cuentaContableId,
             debe: 0,
             haber: montoCuenta,
+            centroCostoId: caja.centroCostoId || null,
             descripcion: `Venta take away - Pedido ${pedido.numero}`
           })
         }
 
-        await generarAsientoAutomatico(prisma, {
+        await generarAsientoAutomatico(req.db, {
           fecha: new Date(),
           concepto: `Venta Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}`,
           tipoOrigen: 'VENTA_TAKEAWAY',
@@ -893,7 +973,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         movimientos.push(movimiento)
       }
     } else {
-      const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } })
+      const medioPago = await req.db.medioPago.findUnique({ where: { id: medioPagoId } })
       if (!medioPago) {
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
@@ -911,9 +991,10 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           numero: nuevoNumero,
           cajaId,
           tipo: 'INGRESO',
-          cuentaContableId: cuentaContable?.id || 1,
+          cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
           centroCostoId: caja.centroCostoId,
           monto: totalFinal,
+          medioPago: medioPago.codigo,
           concepto: `Take Away - Pedido ${pedido.numero}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
           pedidoTakeAwayId: parseInt(id),
@@ -927,6 +1008,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
           debe: totalFinal,
           haber: 0,
+          centroCostoId: caja.centroCostoId || null,
           descripcion: `Ingreso por venta take away - ${medioPago.nombre}`
         }
       ]
@@ -945,11 +1027,12 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cuentaContableId,
           debe: 0,
           haber: montoCuenta,
+          centroCostoId: caja.centroCostoId || null,
           descripcion: `Venta take away - Pedido ${pedido.numero}`
         })
       }
 
-      await generarAsientoAutomatico(prisma, {
+      await generarAsientoAutomatico(req.db, {
         fecha: new Date(),
         concepto: `Venta Take Away - Pedido ${pedido.numero}`,
         tipoOrigen: 'VENTA_TAKEAWAY',
@@ -962,10 +1045,9 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     }
 
     // Detectar si es venta de barra (venta instantánea)
-    const esVentaBarra = pedido.nombreCliente?.includes('Venta Barra') ||
-                        pedido.observaciones?.toLowerCase().includes('venta rápida en barra')
+    const esVentaBarra = pedido.tipo === 'BARRA'
 
-    const pedidoActualizado = await prisma.pedidoTakeAway.update({
+    const pedidoActualizado = await req.db.pedidoTakeAway.update({
       where: { id: parseInt(id) },
       data: {
         estado: esVentaBarra ? 'ENTREGADO' : 'PAGADO',
@@ -1024,7 +1106,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
 
         const tiposNombre = { 1: 'FACTURA A', 6: 'FACTURA B', 11: 'FACTURA C' }
 
-        comprobanteFiscal = await prisma.comprobanteElectronico.create({
+        comprobanteFiscal = await req.db.comprobanteElectronico.create({
           data: {
             tipo: tiposNombre[tipoAfip] || 'FACTURA C',
             tipoAfip,
@@ -1087,7 +1169,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         // Obtener nombre del cajero
         let cajeroNombre = null
         if (req.admin?.id) {
-          const cajero = await prisma.admin.findUnique({
+          const cajero = await req.db.admin.findUnique({
             where: { id: req.admin.id },
             select: { nombre: true, apellido: true }
           })
@@ -1095,7 +1177,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         }
 
         // Obtener nombre del medio de pago
-        const medioPagoUsado = await prisma.medioPago.findUnique({
+        const medioPagoUsado = await req.db.medioPago.findUnique({
           where: { id: medioPagoId || pagosParciales?.[0]?.medioPagoId }
         })
 
@@ -1138,12 +1220,12 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           include: { cuentaContable: true }
         })
 
-        const medioPagoUsado = await prisma.medioPago.findUnique({
+        const medioPagoUsado = await req.db.medioPago.findUnique({
           where: { id: medioPagoId || pagosParciales?.[0]?.medioPagoId }
         })
 
-        const numeroMCVenta = await generarNumeroMC()
-        movimientoContableVenta = await prisma.movimientoContable.create({
+        const numeroMCVenta = await generarNumeroMC(req.db)
+        movimientoContableVenta = await req.db.movimientoContable.create({
           data: {
             numero: numeroMCVenta,
             tipo: 'FACTURA_VENTA',
@@ -1192,8 +1274,8 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           registradoPor: req.admin.id
         })
 
-        const numeroMCCobro = await generarNumeroMC()
-        movimientoContableCobro = await prisma.movimientoContable.create({
+        const numeroMCCobro = await generarNumeroMC(req.db)
+        movimientoContableCobro = await req.db.movimientoContable.create({
           data: {
             numero: numeroMCCobro,
             tipo: 'RECIBO_COBRO',
@@ -1236,7 +1318,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         }
 
         if (comprobanteFiscal) {
-          await prisma.comprobanteElectronico.update({
+          await req.db.comprobanteElectronico.update({
             where: { id: comprobanteFiscal.id },
             data: { movimientoContableId: movimientoContableVenta.id }
           })
@@ -1248,12 +1330,19 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       }
     }
 
-    // Si es un pedido de BARRA, eliminarlo después de cobrar
-    if (pedido.tipoVenta === 'BARRA') {
+    // Si es un pedido de BARRA, eliminarlo después de cobrar para no ensuciar la gestión
+    if (pedido.tipo === 'BARRA') {
       try {
-        await prisma.pedidoTakeAway.delete({
-          where: { id: parseInt(id) }
+        // Quitar referencias FK antes de borrar
+        await req.db.movimientoCaja.updateMany({
+          where: { pedidoTakeAwayId: parseInt(id) },
+          data: { pedidoTakeAwayId: null }
         })
+        await req.db.comprobanteElectronico.updateMany({
+          where: { pedidoTakeawayId: parseInt(id) },
+          data: { pedidoTakeawayId: null }
+        })
+        await req.db.pedidoTakeAway.delete({ where: { id: parseInt(id) } })
         console.log(`[TakeAway] Pedido BARRA ${pedido.numero} eliminado después de cobrar`)
       } catch (deleteErr) {
         console.error('Error eliminando pedido BARRA:', deleteErr)
@@ -1274,7 +1363,9 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     })
   } catch (error) {
     console.error('Error al cobrar pedido:', error)
-    res.status(500).json({ success: false, error: 'Error al cobrar pedido' })
+    const statusCode = error.statusCode || 500
+    const message = statusCode < 500 ? error.message : 'Error al cobrar pedido'
+    res.status(statusCode).json({ success: false, error: message })
   }
 })
 

@@ -11,11 +11,12 @@ import prisma from '../../lib/prisma.js'
  * Genera número único para comanda
  * Formato: CYYYYMMDD-NNNN
  */
-export async function generarNumeroComanda() {
+export async function generarNumeroComanda(db) {
+  const client = db || prisma
   const hoy = new Date()
   const prefijo = `C${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, '0')}${String(hoy.getDate()).padStart(2, '0')}`
 
-  const ultima = await req.db.comanda.findFirst({
+  const ultima = await client.comanda.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -33,11 +34,12 @@ export async function generarNumeroComanda() {
  * Genera número único para pedido take away
  * Formato: TAYYYYMMDD-NNNN
  */
-export async function generarNumeroPedido() {
+export async function generarNumeroPedido(db) {
+  const client = db || prisma
   const hoy = new Date()
   const prefijo = `TA${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, '0')}${String(hoy.getDate()).padStart(2, '0')}`
 
-  const ultimo = await prisma.pedidoTakeAway.findFirst({
+  const ultimo = await client.pedidoTakeAway.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -55,11 +57,12 @@ export async function generarNumeroPedido() {
  * Genera número de movimiento contable
  * Formato: MC-YYYY-NNNNN
  */
-export async function generarNumeroMC() {
+export async function generarNumeroMC(db) {
+  const client = db || prisma
   const anio = new Date().getFullYear()
   const prefijo = `MC-${anio}-`
 
-  const ultimo = await prisma.movimientoContable.findFirst({
+  const ultimo = await client.movimientoContable.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -81,14 +84,15 @@ export async function generarNumeroMC() {
 /**
  * Recalcula subtotal y total de una comanda
  */
-export async function recalcularTotalesComanda(comandaId) {
-  const items = await req.db.itemComanda.findMany({
+export async function recalcularTotalesComanda(comandaId, db) {
+  const client = db || prisma
+  const items = await client.itemComanda.findMany({
     where: { comandaId, estado: { not: 'ANULADO' } }
   })
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0)
 
-  await req.db.comanda.update({
+  await client.comanda.update({
     where: { id: comandaId },
     data: { subtotal, total: subtotal }
   })
@@ -99,14 +103,15 @@ export async function recalcularTotalesComanda(comandaId) {
 /**
  * Recalcula subtotal y total de un pedido take away
  */
-export async function recalcularTotalesPedido(pedidoId) {
-  const items = await prisma.itemPedidoTakeAway.findMany({
+export async function recalcularTotalesPedido(pedidoId, db) {
+  const client = db || prisma
+  const items = await client.itemPedidoTakeAway.findMany({
     where: { pedidoId }
   })
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0)
 
-  await prisma.pedidoTakeAway.update({
+  await client.pedidoTakeAway.update({
     where: { id: pedidoId },
     data: { subtotal, total: subtotal }
   })

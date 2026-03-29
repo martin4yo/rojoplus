@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChefHat, Clock, Check, AlertCircle, RefreshCw, Coffee, Flame, Package, UtensilsCrossed, FileText, Volume2, VolumeX, Eye, ArrowRight, Undo2 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
@@ -138,6 +139,18 @@ export default function BuffetCocina() {
     const interval = setInterval(cargarPendientes, 5000) // Más frecuente para mejor UX
     return () => clearInterval(interval)
   }, [cargarPendientes])
+
+  async function limpiarKDS() {
+    try {
+      const res = await api.postFull('/admin/buffet/kds/limpiar-sin-control')
+      const actualizados = res?.actualizados ?? 0
+      toast.success(actualizados > 0 ? `${actualizados} items limpiados del KDS` : 'KDS ya estaba limpio')
+      await cargarPendientes()
+    } catch (err) {
+      console.error('Error limpiando KDS:', err)
+      toast.error(err.message || 'Error al limpiar KDS')
+    }
+  }
 
   // Avanzar al siguiente estado con un solo tap
   async function avanzarEstado(item) {
@@ -434,7 +447,7 @@ export default function BuffetCocina() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
+    <div className="h-screen overflow-hidden bg-gray-900 text-white p-4 flex flex-col">
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
         <div className="flex items-center gap-3">
@@ -516,6 +529,14 @@ export default function BuffetCocina() {
           <NotificacionBuffet />
 
           <button
+            onClick={limpiarKDS}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm"
+            title="Limpiar items sin control de cocina"
+          >
+            Limpiar KDS
+          </button>
+
+          <button
             onClick={cargarPendientes}
             className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
           >
@@ -532,7 +553,7 @@ export default function BuffetCocina() {
       )}
 
       {/* Vista Kanban - 3 columnas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-180px)]">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 min-h-0 pb-10">
         {/* Columna NUEVOS */}
         <div className="flex flex-col">
           <div className="flex items-center gap-2 mb-3 px-2">

@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ArrowLeft, Plus, Minus, Send, DollarSign, Clock, User, ShoppingCart, UtensilsCrossed, Coffee, Search, X, Users, Percent, CheckCircle, AlertCircle, Trash2, Edit3, FileText, Package, Check, LayoutGrid, List, Receipt, RotateCcw, DoorOpen } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { useTicket } from '../../contexts/TicketContext'
 import { usePrompt } from '../../hooks/usePrompt.jsx'
+import { useConfirm } from '../../hooks/useConfirm'
 import StatusBadge from '../StatusBadge'
 import { formatCurrency } from '../../utils/formatters'
 import Modal from '../Modal'
@@ -31,6 +32,8 @@ import ModalOpcionesProducto from './ModalOpcionesProducto'
 export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualizar, useFlexHeight = false, hideHeader = false }) {
   const { generarTicketComanda, generarTicketFiscal, imprimirTicket } = useTicket()
   const { prompt, PromptDialog } = usePrompt()
+  const { confirm, ConfirmDialog } = useConfirm()
+  const opcionesImpresionRef = useRef({ confirmarTicketMesa: false, confirmarTicketTakeaway: false })
 
   // Estados principales
   const [entidad, setEntidad] = useState(null) // Mesa o Pedido
@@ -127,6 +130,16 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   useEffect(() => {
     localStorage.setItem('buffetVistaProductos', vistaProductos)
   }, [vistaProductos])
+
+  // Cargar opciones de impresión al montar
+  useEffect(() => {
+    api.get('/admin/buffet/config/opciones-impresion')
+      .then(res => {
+        const d = res.data || res || {}
+        opcionesImpresionRef.current = d
+      })
+      .catch(() => {})
+  }, [])
 
   // ==================== CARGA DE DATOS ====================
 
@@ -513,38 +526,32 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       console.log('[DEBUG Cobro] Ticket pre-generado:', !!ticketPreGenerado)
 
       // Imprimir ticket (fiscal o no fiscal)
-      if (esFiscal && ticketPreGenerado) {
-        // Usar el ticket pre-generado del backend (ya tiene QR incluido)
-        try {
-          const tipoTicket = tipo === 'takeaway' ? 'TAKEAWAY' : 'FISCAL'
-          const res = await api.postFull('/admin/buffet/imprimir-ticket-directo', {
-            ticketBase64: ticketPreGenerado,
-            tipoTicket
-          })
-          if (res?.success) {
-            toast.success(`Ticket enviado a ${res.impresora || 'impresora'}`)
-          } else {
-            toast.error(res?.error || 'Error al imprimir ticket')
+      if (ticketPreGenerado) {
+        const confirmarKey = tipo === 'takeaway' ? 'confirmarTicketTakeaway' : 'confirmarTicketMesa'
+        const debeConfirmar = opcionesImpresionRef.current[confirmarKey] ?? false
+        const totalCobrado = data?.total || comandaActiva?.total || 0
+        const debeImprimir = debeConfirmar
+          ? await confirm('¿Imprimir ticket?', `Total: $${Number(totalCobrado).toLocaleString('es-AR')}`, { variant: 'primary', confirmText: 'Imprimir', cancelText: 'No imprimir' })
+          : true
+
+        if (debeImprimir) {
+          const tipoTicket = esFiscal
+            ? (tipo === 'takeaway' ? 'TAKEAWAY' : 'FISCAL')
+            : (tipo === 'takeaway' ? 'TAKEAWAY' : 'CUENTA')
+          try {
+            const res = await api.postFull('/admin/buffet/imprimir-ticket-directo', {
+              ticketBase64: ticketPreGenerado,
+              tipoTicket
+            })
+            if (res?.success) {
+              toast.success(`Ticket enviado a ${res.impresora || 'impresora'}`)
+            } else {
+              toast.error(res?.error || 'Error al imprimir ticket')
+            }
+          } catch (printErr) {
+            console.error('Error imprimiendo ticket:', printErr)
+            toast.error('Error al enviar ticket a impresora')
           }
-        } catch (printErr) {
-          console.error('Error imprimiendo ticket fiscal:', printErr)
-          toast.error('Error al enviar ticket a impresora')
-        }
-      } else if (!esFiscal && ticketPreGenerado) {
-        // Imprimir ticket NO fiscal (cierre de cuenta sin factura)
-        try {
-          const tipoTicket = tipo === 'takeaway' ? 'TAKEAWAY' : 'CUENTA'
-          const res = await api.postFull('/admin/buffet/imprimir-ticket-directo', {
-            ticketBase64: ticketPreGenerado,
-            tipoTicket
-          })
-          if (res?.success) {
-            toast.success(`Ticket enviado a ${res.impresora || 'impresora'}`)
-          } else {
-            console.warn('No se pudo imprimir ticket no fiscal:', res?.error)
-          }
-        } catch (printErr) {
-          console.error('Error imprimiendo ticket no fiscal:', printErr)
         }
       }
 
@@ -563,7 +570,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       }, 1500)
     } catch (err) {
       console.error('Error al cobrar:', err)
-      toast.error(err.response?.data?.error || 'Error al procesar el cobro')
+      toast.error(err.message || 'Error al procesar el cobro')
     } finally {
       setCobrando(false)
     }
@@ -2365,6 +2372,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
       {/* Dialog de prompt para devoluciones */}
       <PromptDialog />
+      <ConfirmDialog />
 
       {/* Modal de opciones de producto */}
       {modalOpciones && productoConOpciones && (

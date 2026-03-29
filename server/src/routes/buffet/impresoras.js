@@ -194,7 +194,7 @@ router.post('/impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req,
 router.put('/impresoras/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
     const { id } = req.params
-    const { nombre, sectorId, tipoConexion, ip, puerto, destino, puestoId, activo } = req.body
+    const { nombre, sectorId, tipoConexion, ip, puerto, destino, puestoId, activo, imprimirComanda } = req.body
 
     const impresora = await prisma.impresoraTermica.update({
       where: { id: parseInt(id) },
@@ -206,7 +206,8 @@ router.put('/impresoras/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (r
         puerto,
         destino,
         puestoId,
-        activo
+        activo,
+        imprimirComanda: imprimirComanda !== undefined ? imprimirComanda : undefined
       },
       include: { sector: true }
     })

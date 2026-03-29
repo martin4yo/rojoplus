@@ -1126,21 +1126,23 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   const categoriasUnicas = [...new Set(todosLosSocios.map(s => s.categoria).filter(Boolean))]
   const estadosUnicos = [...new Set(todosLosSocios.map(s => s.estado).filter(Boolean))]
 
+  const tenantId = req.tenantId
+
   // Crear tipos de socio que no existan
   for (const tipo of tiposUnicos) {
     const codigo = tipo.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
-    const existente = await req.prisma.tipoSocio.findFirst({
-      where: { OR: [{ codigo }, { nombre: tipo }] }
+    const existente = await req.db.tipoSocio.findFirst({
+      where: { tenantId, OR: [{ codigo }, { nombre: tipo }] }
     })
     if (!existente) {
-      await req.prisma.tipoSocio.create({
-        data: { codigo, nombre: tipo, color: 'blue' }
+      await req.db.tipoSocio.create({
+        data: { tenantId, codigo, nombre: tipo, color: 'blue' }
       })
     }
   }
 
   // Obtener mapeo de tipos de socio (nombre -> id)
-  const tiposSocio = await req.prisma.tipoSocio.findMany()
+  const tiposSocio = await req.db.tipoSocio.findMany({ where: { tenantId } })
   const mapeoTipoSocio = {}
   for (const tipo of tiposSocio) {
     mapeoTipoSocio[tipo.nombre] = tipo.id
@@ -1150,18 +1152,18 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   // Crear categorías de socio que no existan
   for (const cat of categoriasUnicas) {
     const codigo = cat.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
-    const existente = await req.prisma.categoriaSocio.findFirst({
-      where: { OR: [{ codigo }, { nombre: cat }] }
+    const existente = await req.db.categoriaSocio.findFirst({
+      where: { tenantId, OR: [{ codigo }, { nombre: cat }] }
     })
     if (!existente) {
-      await req.prisma.categoriaSocio.create({
-        data: { codigo, nombre: cat, color: 'blue' }
+      await req.db.categoriaSocio.create({
+        data: { tenantId, codigo, nombre: cat, color: 'blue' }
       })
     }
   }
 
   // Obtener mapeo de categorías de socio (nombre -> id)
-  const categoriasSocio = await req.prisma.categoriaSocio.findMany()
+  const categoriasSocio = await req.db.categoriaSocio.findMany({ where: { tenantId } })
   const mapeoCategoriaSocio = {}
   for (const cat of categoriasSocio) {
     mapeoCategoriaSocio[cat.nombre] = cat.id
@@ -1171,15 +1173,16 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   // Crear estados de socio que no existan
   for (const estado of estadosUnicos) {
     const codigo = estado.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
-    const existente = await req.prisma.estadoSocio.findFirst({
-      where: { OR: [{ codigo }, { nombre: estado }] }
+    const existente = await req.db.estadoSocio.findFirst({
+      where: { tenantId, OR: [{ codigo }, { nombre: estado }] }
     })
     if (!existente) {
       // Determinar si permite descuentos basado en el nombre
       const permiteDescuentos = estado.toLowerCase().includes('activ') ||
         estado.toLowerCase().includes('vigent')
-      await req.prisma.estadoSocio.create({
+      await req.db.estadoSocio.create({
         data: {
+          tenantId,
           codigo,
           nombre: estado,
           color: permiteDescuentos ? 'green' : 'red',
@@ -1190,7 +1193,7 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   }
 
   // Obtener mapeo de estados de socio (nombre -> id)
-  const estadosSocio = await req.prisma.estadoSocio.findMany()
+  const estadosSocio = await req.db.estadoSocio.findMany({ where: { tenantId } })
   const mapeoEstadoSocio = {}
   for (const est of estadosSocio) {
     mapeoEstadoSocio[est.nombre] = est.id

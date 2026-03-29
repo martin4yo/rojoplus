@@ -11,6 +11,12 @@ export default function BuffetBarra() {
   const [mostrarSelectorCliente, setMostrarSelectorCliente] = useState(false)
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
   const creandoPedido = useRef(false)
+  const pedidoActivoRef = useRef(null)
+
+  // Mantener ref sincronizado con el estado para usarlo en cleanup
+  useEffect(() => {
+    pedidoActivoRef.current = pedidoActivo
+  }, [pedidoActivo])
 
   // Al montar, crear un pedido temporal automáticamente
   useEffect(() => {
@@ -20,20 +26,18 @@ export default function BuffetBarra() {
     }
   }, [])
 
-  // Limpiar pedido BARRA al desmontar o refrescar la página
+  // Limpiar pedido BARRA al desmontar el componente (solo unmount, no en cada cambio)
   useEffect(() => {
     return () => {
-      // Cleanup: eliminar pedido BARRA si existe y está vacío
-      if (pedidoActivo?.id && pedidoActivo.tipoVenta === 'BARRA') {
-        const items = pedidoActivo.items || []
-        if (items.length === 0 || pedidoActivo.estado === 'PENDIENTE') {
-          api.delete(`/admin/buffet/takeaway/${pedidoActivo.id}`).catch(() => {
-            console.log('Pedido BARRA ya fue eliminado o no existe')
-          })
+      const pedido = pedidoActivoRef.current
+      if (pedido?.id && pedido.tipo === 'BARRA') {
+        const items = pedido.items || []
+        if (items.length === 0) {
+          api.delete(`/admin/buffet/takeaway/${pedido.id}`).catch(() => {})
         }
       }
     }
-  }, [pedidoActivo])
+  }, [])
 
   async function crearPedidoBarra(cliente = null) {
     try {
@@ -42,8 +46,7 @@ export default function BuffetBarra() {
       const res = await api.post('/admin/buffet/takeaway', {
         nombreCliente: cliente?.razonSocial || 'Venta Barra',
         telefono: cliente?.telefono || '',
-        tipo: 'RETIRO',
-        tipoVenta: 'BARRA', // Identificador especial
+        tipo: 'BARRA',
         horaEstimada: ahora.toISOString(),
         observaciones: cliente ? `Cliente: ${cliente.razonSocial}` : 'Venta rápida en barra',
         socioId: cliente?.socioId || null,

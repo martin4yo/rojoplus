@@ -45,13 +45,13 @@ export default function MovimientosCajaLista() {
   async function cargarMovimientos() {
     setLoading(true)
     try {
-      const params = { page, limit: 30 }
-      if (filtros.cajaId) params.cajaId = filtros.cajaId
-      if (filtros.tipo) params.tipo = filtros.tipo
-      if (filtros.desde) params.desde = filtros.desde
-      if (filtros.hasta) params.hasta = filtros.hasta
+      const params = new URLSearchParams({ page, limit: 30 })
+      if (filtros.cajaId) params.set('cajaId', filtros.cajaId)
+      if (filtros.tipo) params.set('tipo', filtros.tipo)
+      if (filtros.desde) params.set('desde', filtros.desde)
+      if (filtros.hasta) params.set('hasta', filtros.hasta)
 
-      const res = await api.getFull('/admin/movimientos-caja', { params })
+      const res = await api.getFull(`/admin/movimientos-caja?${params.toString()}`)
       setMovimientos(res.data || [])
       if (res.pagination) {
         setPagination({

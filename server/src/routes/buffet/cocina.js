@@ -44,7 +44,7 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
     const { incluirListos } = req.query
 
     const sectorId = parseInt(sector)
-    const sectorData = await prisma.sectorBuffet.findFirst({
+    const sectorData = await req.db.sectorBuffet.findFirst({
       where: isNaN(sectorId)
         ? { codigo: sector.toUpperCase(), activo: true }
         : { id: sectorId, activo: true }
@@ -54,9 +54,10 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
       return res.json({ success: true, data: [] })
     }
 
-    const destinos = await prisma.destinoImpresion.findMany({
+    const destinos = await req.db.destinoImpresion.findMany({
       where: {
-        impresora: { sectorId: sectorData.id, activo: true }
+        impresora: { sectorId: sectorData.id, activo: true },
+        saltarControlCocina: false
       },
       select: { categoriaMenuId: true }
     })
@@ -104,7 +105,7 @@ router.get('/kds/:sector/pendientes', authAdmin, async (req, res) => {
       orderBy: { enviadoCocinaAt: 'asc' }
     })
 
-    const itemsTakeAway = await prisma.itemPedidoTakeAway.findMany({
+    const itemsTakeAway = await req.db.itemPedidoTakeAway.findMany({
       where: {
         estado: { in: estadosPendientes },
         productoBuffet: { categoriaMenuId: { in: categoriasIds } }
@@ -185,7 +186,7 @@ router.get('/kds/expo/todos', authAdmin, async (req, res) => {
       orderBy: { enviadoCocinaAt: 'asc' }
     })
 
-    const itemsTakeAway = await prisma.itemPedidoTakeAway.findMany({
+    const itemsTakeAway = await req.db.itemPedidoTakeAway.findMany({
       where: {
         estado: { in: ['ENVIADO_COCINA', 'ENVIADO_BARRA', 'EN_PREPARACION', 'LISTO'] }
       },
@@ -466,7 +467,7 @@ router.get('/cocina/pendientes', authAdmin, checkPermiso('BUFFET_COCINA'), async
       orderBy: { enviadoCocinaAt: 'asc' }
     })
 
-    const itemsTakeAway = await prisma.itemPedidoTakeAway.findMany({
+    const itemsTakeAway = await req.db.itemPedidoTakeAway.findMany({
       where: {
         estado: { in: ['EN_PREPARACION'] },
         productoBuffet: { categoriaMenuId: { in: categoriasCocinaIds } }
@@ -617,7 +618,7 @@ router.get('/barra/pendientes', authAdmin, checkPermiso('BUFFET_BARRA'), async (
       orderBy: { enviadoCocinaAt: 'asc' }
     })
 
-    const itemsTakeAway = await prisma.itemPedidoTakeAway.findMany({
+    const itemsTakeAway = await req.db.itemPedidoTakeAway.findMany({
       where: {
         estado: { in: ['EN_PREPARACION'] },
         productoBuffet: { categoriaMenuId: { in: categoriasBarraIds } }
@@ -724,6 +725,32 @@ router.put('/barra/items/:id/listo', authAdmin, checkPermiso('BUFFET_BARRA'), as
   } catch (error) {
     console.error('Error al marcar listo:', error)
     res.status(500).json({ success: false, error: 'Error al actualizar item' })
+  }
+})
+
+/**
+ * POST /kds/limpiar-sin-control
+ * Limpia TODOS los items actualmente en el KDS (ENVIADO_COCINA, ENVIADO_BARRA, EN_PREPARACION → PENDIENTE)
+ * Útil para limpiar acumulación de pedidos de prueba o resetear el KDS
+ */
+router.post('/kds/limpiar-sin-control', authAdmin, async (req, res) => {
+  try {
+    const estadosKDS = ['ENVIADO_COCINA', 'ENVIADO_BARRA', 'EN_PREPARACION', 'LISTO']
+
+    const r1 = await req.db.itemComanda.updateMany({
+      where: { estado: { in: estadosKDS } },
+      data: { estado: 'PENDIENTE' }
+    })
+
+    const r2 = await req.db.itemPedidoTakeAway.updateMany({
+      where: { estado: { in: estadosKDS } },
+      data: { estado: 'PENDIENTE' }
+    })
+
+    res.json({ success: true, actualizados: r1.count + r2.count })
+  } catch (error) {
+    console.error('Error limpiando KDS:', error)
+    res.status(500).json({ success: false, error: 'Error al limpiar KDS' })
   }
 })
 

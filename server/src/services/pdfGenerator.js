@@ -323,11 +323,10 @@ export async function generarPDFCierreCaja(cierreData) {
       const esInformePrevio = cierreData.esInformePrevio || false
       const pageWidth = doc.page.width - 80 // Ancho útil (descontando márgenes)
 
-      // ==================== ENCABEZADO CON DISEÑO MEJORADO ====================
+      // ==================== ENCABEZADO ====================
 
-      // Fondo del encabezado
-      doc.rect(40, 40, pageWidth, 100)
-         .fill('#F3F4F6')
+      // Borde superior fino
+      doc.rect(40, 40, pageWidth, 3).fill('#1F2937')
 
       // Logo del club (si existe)
       let logoLoaded = false
@@ -337,92 +336,91 @@ export async function generarPDFCierreCaja(cierreData) {
             ? cierreData.clubLogoUrl
             : `./public${cierreData.clubLogoUrl}`
 
-          doc.image(logoPath, 55, 55, { width: 70, height: 70 })
+          doc.image(logoPath, 55, 55, { width: 60, height: 60 })
           logoLoaded = true
         } catch (err) {
           console.log('No se pudo cargar el logo del club:', err.message)
         }
       }
 
-      // Nombre del club y título
-      const textStartX = logoLoaded ? 145 : 55
+      const textStartX = logoLoaded ? 130 : 55
 
-      doc.fontSize(16)
-         .fillColor('#1F2937')
-         .font('Helvetica-Bold')
-         .text(cierreData.clubNombre || 'Club Sportivo Pilar', textStartX, 55, { align: 'left' })
+      doc.fontSize(11)
+         .fillColor('#6B7280')
+         .font('Helvetica')
+         .text(cierreData.clubNombre || '', textStartX, 55, { align: 'left' })
 
       const tituloInforme = esInformePrevio ? 'INFORME PREVIO AL CIERRE' : 'INFORME DE CIERRE DE CAJA'
 
-      doc.fontSize(20)
-         .fillColor('#DC2626')
+      doc.fontSize(18)
+         .fillColor('#1F2937')
          .font('Helvetica-Bold')
-         .text(tituloInforme, textStartX, 80, { align: 'left' })
+         .text(tituloInforme, textStartX, 72, { align: 'left' })
 
       if (esInformePrevio) {
-        doc.fontSize(9)
-           .fillColor('#F59E0B')
-           .font('Helvetica-Bold')
-           .text('* Documento no oficial - Solo para referencia', textStartX, 105, { align: 'left' })
+        doc.fontSize(8)
+           .fillColor('#9CA3AF')
+           .font('Helvetica')
+           .text('Documento no oficial — solo para referencia', textStartX, 96, { align: 'left' })
       }
 
-      doc.fillColor('#000') // Reset color
+      doc.fillColor('#000')
 
       // ==================== INFO DE LA CAJA ====================
 
-      doc.y = 160
+      doc.y = 155
 
       // Caja con información de la caja y fecha
-      doc.roundedRect(40, doc.y, pageWidth, 65, 5)
-         .lineWidth(1)
-         .strokeColor('#E5E7EB')
+      doc.roundedRect(40, doc.y, pageWidth, 65, 4)
+         .lineWidth(0.5)
+         .strokeColor('#D1D5DB')
          .stroke()
 
-      doc.roundedRect(40, doc.y, pageWidth, 25, 5)
-         .fill('#DC2626')
+      doc.roundedRect(40, doc.y, pageWidth, 24, 4)
+         .fill('#374151')
 
-      doc.fontSize(14)
+      doc.fontSize(12)
          .fillColor('#FFFFFF')
          .font('Helvetica-Bold')
-         .text(cierreData.cajaNombre || 'Caja', 50, doc.y - 23 + 7, { align: 'left' })
+         .text(cierreData.cajaNombre || 'Caja', 50, doc.y - 22 + 7, { align: 'left' })
 
-      doc.y = 160 + 35
+      doc.y = 155 + 34
 
       // Información en dos columnas
-      doc.fontSize(9)
-         .fillColor('#6B7280')
+      doc.fontSize(8)
+         .fillColor('#9CA3AF')
          .font('Helvetica')
          .text('FECHA:', 50, doc.y)
 
-      doc.fontSize(11)
+      doc.fontSize(10)
          .fillColor('#1F2937')
          .font('Helvetica-Bold')
-         .text(cierreData.fecha, 130, doc.y)
+         .text(cierreData.fecha, 120, doc.y)
 
       if (!esInformePrevio && cierreData.cerradoPor) {
-        doc.fontSize(9)
-           .fillColor('#6B7280')
+        doc.fontSize(8)
+           .fillColor('#9CA3AF')
            .font('Helvetica')
            .text('CERRADO POR:', 300, doc.y)
 
-        doc.fontSize(11)
+        doc.fontSize(10)
            .fillColor('#1F2937')
            .font('Helvetica-Bold')
-           .text(cierreData.cerradoPor, 380, doc.y, { width: 160 })
+           .text(cierreData.cerradoPor, 385, doc.y, { width: 150 })
       }
 
-      doc.y += 20
+      doc.y += 18
 
       if (!esInformePrevio && cierreData.firmadoPor) {
-        doc.fontSize(9)
-           .fillColor('#6B7280')
+        doc.fontSize(8)
+           .fillColor('#9CA3AF')
            .font('Helvetica')
            .text('FIRMADO POR:', 300, doc.y)
 
-        doc.fontSize(11)
-           .fillColor('#16A34A')
+        doc.fontSize(10)
+           .fillColor('#1F2937')
            .font('Helvetica-Bold')
-           .text(cierreData.firmadoPor, 380, doc.y, { width: 160 })
+           .text(cierreData.firmadoPor, 385, doc.y, { width: 150 })
       }
 
       doc.moveDown(3)
@@ -447,9 +445,9 @@ export async function generarPDFCierreCaja(cierreData) {
 
       // Header de la tarjeta
       doc.roundedRect(40, startY, cardWidth, 30, 5)
-         .fill('#3B82F6')
+         .fill('#4B5563')
 
-      doc.fontSize(11)
+      doc.fontSize(10)
          .fillColor('#FFFFFF')
          .font('Helvetica-Bold')
          .text('MOVIMIENTOS DEL DIA', 50, startY + 10)
@@ -478,7 +476,7 @@ export async function generarPDFCierreCaja(cierreData) {
          .text('^ Total Ingresos', 50, cardY)
 
       doc.fontSize(13)
-         .fillColor('#16A34A')
+         .fillColor('#166534')
          .font('Helvetica-Bold')
          .text(`$${cierreData.totalIngresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 50, cardY + 12)
 
@@ -491,7 +489,7 @@ export async function generarPDFCierreCaja(cierreData) {
          .text('v Total Egresos', 50, cardY)
 
       doc.fontSize(13)
-         .fillColor('#DC2626')
+         .fillColor('#7F1D1D')
          .font('Helvetica-Bold')
          .text(`$${cierreData.totalEgresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 50, cardY + 12)
 
@@ -520,9 +518,9 @@ export async function generarPDFCierreCaja(cierreData) {
       if (esInformePrevio) {
         // Header para informe previo
         doc.roundedRect(rightCardX, startY, cardWidth, 30, 5)
-           .fill('#F59E0B')
+           .fill('#4B5563')
 
-        doc.fontSize(11)
+        doc.fontSize(10)
            .fillColor('#FFFFFF')
            .font('Helvetica-Bold')
            .text('SALDO ESPERADO', rightCardX + 10, startY + 10)
@@ -534,8 +532,8 @@ export async function generarPDFCierreCaja(cierreData) {
            .font('Helvetica')
            .text('Efectivo que debe haber', rightCardX + 10, resultY)
 
-        doc.fontSize(24)
-           .fillColor('#F59E0B')
+        doc.fontSize(22)
+           .fillColor('#1F2937')
            .font('Helvetica-Bold')
            .text(`$${cierreData.saldoEsperado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, rightCardX + 10, resultY + 20)
 
@@ -548,7 +546,7 @@ export async function generarPDFCierreCaja(cierreData) {
       } else {
         // Header para cierre final
         const diferencia = cierreData.diferencia
-        const headerColor = diferencia === 0 ? '#16A34A' : diferencia > 0 ? '#3B82F6' : '#DC2626'
+        const headerColor = diferencia === 0 ? '#374151' : diferencia > 0 ? '#374151' : '#374151'
         const headerText = diferencia === 0 ? 'CAJA BALANCEADA' : diferencia > 0 ? 'SOBRANTE' : 'FALTANTE'
 
         doc.roundedRect(rightCardX, startY, cardWidth, 30, 5)
@@ -598,8 +596,9 @@ export async function generarPDFCierreCaja(cierreData) {
            .font('Helvetica')
            .text('Diferencia', rightCardX + 20, resultY)
 
+        const diferenciaColor = diferencia === 0 ? '#166534' : diferencia > 0 ? '#166534' : '#7F1D1D'
         doc.fontSize(18)
-           .fillColor(headerColor)
+           .fillColor(diferenciaColor)
            .font('Helvetica-Bold')
            .text(`${diferencia >= 0 ? '+' : ''}$${diferencia.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, rightCardX + 20, resultY + 14)
       }
@@ -662,13 +661,13 @@ export async function generarPDFCierreCaja(cierreData) {
              .text(item.nombre, 50, currentRowY + 9, { width: 180 })
 
           doc.font('Helvetica-Bold')
-             .fillColor('#16A34A')
+             .fillColor('#166534')
              .text(`$${item.ingresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 240, currentRowY + 9, { width: 100, align: 'right' })
 
-          doc.fillColor('#DC2626')
+          doc.fillColor('#7F1D1D')
              .text(`$${item.egresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 350, currentRowY + 9, { width: 100, align: 'right' })
 
-          const totalColor = item.total >= 0 ? '#1F2937' : '#DC2626'
+          const totalColor = item.total >= 0 ? '#1F2937' : '#7F1D1D'
           doc.fillColor(totalColor)
              .text(`$${item.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 460, currentRowY + 9, { width: 80, align: 'right' })
 
@@ -759,10 +758,10 @@ export async function generarPDFCierreCaja(cierreData) {
              .fillColor('#6B7280')
              .text(item.cantidad.toString(), 260, currentRowY + 11, { width: 50, align: 'center' })
 
-          doc.fillColor('#16A34A')
+          doc.fillColor('#166534')
              .text(`$${item.ingresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 320, currentRowY + 11, { width: 100, align: 'right' })
 
-          doc.fillColor('#DC2626')
+          doc.fillColor('#7F1D1D')
              .text(`$${item.egresos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 430, currentRowY + 11, { width: 100, align: 'right' })
 
           currentRowY += rowHeight
@@ -789,10 +788,10 @@ export async function generarPDFCierreCaja(cierreData) {
         const obsY = doc.y
 
         doc.rect(40, obsY, pageWidth, 25)
-           .fill('#FEF3C7')
+           .fill('#F3F4F6')
 
         doc.fontSize(10)
-           .fillColor('#92400E')
+           .fillColor('#374151')
            .font('Helvetica-Bold')
            .text('OBSERVACIONES', 50, obsY + 7)
 
@@ -859,7 +858,7 @@ export async function generarPDFCierreCaja(cierreData) {
          .text('Sistema:', 350, footerTextY, { align: 'right', width: 185 })
 
       doc.fontSize(8)
-         .fillColor('#DC2626')
+         .fillColor('#6B7280')
          .font('Helvetica-Bold')
          .text('Clubix - Gestion de Club', 350, footerTextY + 10, { align: 'right', width: 185 })
 

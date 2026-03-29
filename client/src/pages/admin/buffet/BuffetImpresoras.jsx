@@ -76,9 +76,21 @@ export default function BuffetImpresoras() {
   })
   const [guardandoConfig, setGuardandoConfig] = useState(false)
 
+  // Opciones de impresión (confirmar + comanda por POS)
+  const [opcionesImpresion, setOpcionesImpresion] = useState({
+    confirmarTicketMesa: false,
+    confirmarTicketKiosco: true,
+    confirmarTicketTakeaway: false,
+    imprimirComandaMesa: true,
+    imprimirComandaKiosco: false,
+    imprimirComandaTakeaway: true,
+  })
+  const [guardandoOpciones, setGuardandoOpciones] = useState(false)
+
   useEffect(() => {
     cargarDatos()
     cargarConfigTickets()
+    cargarOpcionesImpresion()
   }, [])
 
   async function cargarDatos() {
@@ -109,6 +121,29 @@ export default function BuffetImpresoras() {
       toast.success('Puestos actualizados')
     } catch (err) {
       console.error('Error refrescando puestos:', err)
+    }
+  }
+
+  async function cargarOpcionesImpresion() {
+    try {
+      const res = await api.get('/admin/buffet/config/opciones-impresion')
+      const data = res.data || res || {}
+      setOpcionesImpresion(prev => ({ ...prev, ...data }))
+    } catch (err) {
+      console.error('Error cargando opciones de impresión:', err)
+    }
+  }
+
+  async function guardarOpcionesImpresion() {
+    setGuardandoOpciones(true)
+    try {
+      await api.put('/admin/buffet/config/opciones-impresion', opcionesImpresion)
+      toast.success('Opciones de impresión guardadas')
+    } catch (err) {
+      console.error('Error guardando opciones:', err)
+      toast.error('Error al guardar opciones')
+    } finally {
+      setGuardandoOpciones(false)
     }
   }
 
@@ -291,6 +326,15 @@ export default function BuffetImpresoras() {
   async function toggleActivo(impresora) {
     try {
       await api.put(`/admin/buffet/impresoras/${impresora.id}`, { activo: !impresora.activo })
+      cargarDatos()
+    } catch (err) {
+      console.error('Error actualizando impresora:', err)
+    }
+  }
+
+  async function toggleImprimirComanda(impresora) {
+    try {
+      await api.put(`/admin/buffet/impresoras/${impresora.id}`, { imprimirComanda: !impresora.imprimirComanda })
       cargarDatos()
     } catch (err) {
       console.error('Error actualizando impresora:', err)
@@ -489,12 +533,21 @@ export default function BuffetImpresoras() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => toggleActivo(imp)}
-                    className={imp.activo ? 'text-green-600' : 'text-gray-400'}
-                  >
-                    {imp.activo ? <Wifi size={20} /> : <WifiOff size={20} />}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleImprimirComanda(imp)}
+                      className={`text-xs px-2 py-1 rounded border transition ${imp.imprimirComanda !== false ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-400'}`}
+                      title={imp.imprimirComanda !== false ? 'Comanda activada' : 'Comanda desactivada'}
+                    >
+                      Comanda
+                    </button>
+                    <button
+                      onClick={() => toggleActivo(imp)}
+                      className={imp.activo ? 'text-green-600' : 'text-gray-400'}
+                    >
+                      {imp.activo ? <Wifi size={20} /> : <WifiOff size={20} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="text-sm text-gray-600 mb-3">
@@ -746,6 +799,58 @@ export default function BuffetImpresoras() {
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
             >
               {guardandoConfig ? 'Guardando...' : 'Guardar Configuración'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============== OPCIONES DE IMPRESIÓN ============== */}
+      {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-bold mb-1">Opciones de Impresión por Punto de Venta</h2>
+          <p className="text-sm text-gray-500 mb-5">Configurá si se pide confirmación antes de imprimir el ticket y si se imprime la comanda de cocina/barra.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { label: '🍽️ Mesas (Buffet)', confirmarKey: 'confirmarTicketMesa', comandaKey: 'imprimirComandaMesa' },
+              { label: '🏪 Kiosco', confirmarKey: 'confirmarTicketKiosco', comandaKey: 'imprimirComandaKiosco' },
+              { label: '🥡 TakeAway', confirmarKey: 'confirmarTicketTakeaway', comandaKey: 'imprimirComandaTakeaway' },
+            ].map(({ label, confirmarKey, comandaKey }) => (
+              <div key={confirmarKey} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                <p className="font-semibold text-gray-800">{label}</p>
+
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="text-sm text-gray-700">Confirmar antes de imprimir ticket</span>
+                  <button
+                    type="button"
+                    onClick={() => setOpcionesImpresion(prev => ({ ...prev, [confirmarKey]: !prev[confirmarKey] }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${opcionesImpresion[confirmarKey] ? 'bg-red-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${opcionesImpresion[confirmarKey] ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </label>
+
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="text-sm text-gray-700">Imprimir comanda de cocina/barra</span>
+                  <button
+                    type="button"
+                    onClick={() => setOpcionesImpresion(prev => ({ ...prev, [comandaKey]: !prev[comandaKey] }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${opcionesImpresion[comandaKey] ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${opcionesImpresion[comandaKey] ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              onClick={guardarOpcionesImpresion}
+              disabled={guardandoOpciones}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {guardandoOpciones ? 'Guardando...' : 'Guardar Opciones'}
             </button>
           </div>
         </div>

@@ -13,9 +13,7 @@ import { PrismaClient } from '@prisma/client'
 const globalForPrisma = globalThis
 
 const prisma = globalForPrisma.prisma || new PrismaClient({
-  log: process.env.NODE_ENV === 'development'
-    ? ['query', 'error', 'warn']
-    : ['error'],
+  log: ['error'],
   // Configuración de connection pool
   datasources: {
     db: {

@@ -12,6 +12,76 @@ import {
   generarAsientoReciboCobro
 } from '../../services/asientosContables.js'
 import { generarNumeroMC } from './helpers.js'
+import { enviarImpresion } from './impresoras.js'
+
+/**
+ * Genera ESC/POS de comanda para kiosco y la envía a las impresoras destino.
+ */
+async function imprimirComandaKiosco(db, items, observaciones) {
+  try {
+    // Agrupar items por destino de impresión
+    const itemsPorDestino = new Map()
+    for (const item of items) {
+      if (!item.categoriaMenuId) continue
+      const destino = await db.destinoImpresion.findFirst({
+        where: { categoriaMenuId: item.categoriaMenuId },
+        include: { impresora: { include: { sector: true } } }
+      })
+      if (!destino?.impresora || !destino.impresora.activo) continue
+      if (!destino.impresora.imprimirComanda) continue
+      const impresoraId = destino.impresora.id
+      if (!itemsPorDestino.has(impresoraId)) {
+        itemsPorDestino.set(impresoraId, {
+          impresora: destino.impresora,
+          sectorNombre: destino.impresora.sector?.nombre || 'KIOSCO',
+          items: []
+        })
+      }
+      itemsPorDestino.get(impresoraId).items.push(item)
+    }
+    for (const [impresoraId, data] of itemsPorDestino) {
+      // Construir ticket ESC/POS simple para kiosco
+      const ESC = 0x1b, GS = 0x1d
+      const buffer = []
+      const cmd = (...bytes) => bytes.forEach(b => buffer.push(b))
+      const txt = s => [...Buffer.from(s, 'latin1')].forEach(b => buffer.push(b))
+      const LF = () => buffer.push(0x0a)
+      cmd(ESC, 0x40) // init
+      cmd(ESC, 0x61, 0x01) // center
+      cmd(GS, 0x21, 0x11) // double
+      txt(`*** ${data.sectorNombre.toUpperCase()} ***`)
+      LF()
+      cmd(GS, 0x21, 0x00)
+      cmd(ESC, 0x61, 0x00) // left
+      cmd(ESC, 0x45, 1) // bold
+      txt('KIOSCO')
+      LF()
+      cmd(ESC, 0x45, 0)
+      LF()
+      for (const item of data.items) {
+        txt(`${item.cantidad}x ${item.nombre.toUpperCase()}`)
+        LF()
+        if (item.opciones?.length) {
+          for (const op of item.opciones) {
+            txt(`   >> ${op}`)
+            LF()
+          }
+        }
+      }
+      if (observaciones) {
+        LF()
+        txt(`>> ${observaciones}`)
+        LF()
+      }
+      LF(); LF(); LF()
+      cmd(ESC, 0x64, 3) // cut
+      const base64Data = Buffer.from(buffer).toString('base64')
+      await enviarImpresion(impresoraId, base64Data, 'COMANDA')
+    }
+  } catch (err) {
+    console.error('[Kiosco Comanda] Error:', err)
+  }
+}
 
 const router = express.Router()
 
@@ -58,7 +128,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
 
       if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
         for (const opSel of item.opcionesSeleccionadas) {
-          const opcion = await prisma.opcionProducto.findUnique({
+          const opcion = await req.db.opcionProducto.findUnique({
             where: { id: opSel.opcionId },
             include: { productoRef: true }
           })
@@ -93,7 +163,8 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         cantidad,
         precioUnitario: precioUnitarioTotal,
         subtotal,
-        opcionesInfo // Para el ticket
+        opcionesInfo, // Para el ticket
+        categoriaMenuId: producto.categoriaMenuId // Para ruteo de comanda
       })
     }
 
@@ -124,7 +195,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       }
 
       for (const pago of pagosParciales) {
-        const medioPago = await prisma.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
+        const medioPago = await req.db.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
         if (!medioPago) {
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
@@ -152,7 +223,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         })
 
         // Generar asiento contable automático
-        await generarAsientoAutomatico(prisma, {
+        await generarAsientoAutomatico(req.db, {
           fecha: new Date(),
           concepto: `Venta Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}`,
           tipoOrigen: 'VENTA_KIOSCO',
@@ -177,7 +248,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         movimientos.push(movimiento)
       }
     } else {
-      const medioPago = await prisma.medioPago.findUnique({ where: { id: medioPagoId } })
+      const medioPago = await req.db.medioPago.findUnique({ where: { id: medioPagoId } })
       if (!medioPago) {
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
@@ -205,7 +276,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       })
 
       // Generar asiento contable automático
-      await generarAsientoAutomatico(prisma, {
+      await generarAsientoAutomatico(req.db, {
         fecha: new Date(),
         concepto: `Venta Kiosco - ${detalleItems.join(', ')}`,
         tipoOrigen: 'VENTA_KIOSCO',
@@ -277,7 +348,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
 
         const tiposNombre = { 1: 'FACTURA A', 6: 'FACTURA B', 11: 'FACTURA C' }
 
-        comprobanteFiscal = await prisma.comprobanteElectronico.create({
+        comprobanteFiscal = await req.db.comprobanteElectronico.create({
           data: {
             tipo: tiposNombre[tipoAfip] || 'FACTURA C',
             tipoAfip,
@@ -361,12 +432,12 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           include: { cuentaContable: true }
         })
 
-        const medioPagoUsado = await prisma.medioPago.findUnique({
+        const medioPagoUsado = await req.db.medioPago.findUnique({
           where: { id: medioPagoId || pagosParciales?.[0]?.medioPagoId }
         })
 
-        const numeroMCVenta = await generarNumeroMC()
-        movimientoContableVenta = await prisma.movimientoContable.create({
+        const numeroMCVenta = await generarNumeroMC(req.db)
+        movimientoContableVenta = await req.db.movimientoContable.create({
           data: {
             numero: numeroMCVenta,
             tipo: 'FACTURA_VENTA',
@@ -415,8 +486,8 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           registradoPor: req.admin.id
         })
 
-        const numeroMCCobro = await generarNumeroMC()
-        movimientoContableCobro = await prisma.movimientoContable.create({
+        const numeroMCCobro = await generarNumeroMC(req.db)
+        movimientoContableCobro = await req.db.movimientoContable.create({
           data: {
             numero: numeroMCCobro,
             tipo: 'RECIBO_COBRO',
@@ -459,7 +530,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         }
 
         if (comprobanteFiscal) {
-          await prisma.comprobanteElectronico.update({
+          await req.db.comprobanteElectronico.update({
             where: { id: comprobanteFiscal.id },
             data: { movimientoContableId: movimientoContableVenta.id }
           })
@@ -469,6 +540,25 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       } catch (mcError) {
         console.error('Error creando MovimientoContable/Asientos Kiosco:', mcError)
       }
+    }
+
+    // Imprimir comanda de kiosco si está habilitado
+    try {
+      const cfgComanda = await req.db.configuracion.findFirst({
+        where: { clave: 'BUFFET_COMANDA_KIOSCO' }, select: { valor: true }
+      })
+      if (cfgComanda?.valor === 'true') {
+        // Construir items con categoriaMenuId para el ruteo de destinos
+        const itemsParaComanda = productosVenta.map(p => ({
+          categoriaMenuId: p.categoriaMenuId,
+          cantidad: p.cantidad,
+          nombre: p.nombre,
+          opciones: p.opciones || []
+        }))
+        imprimirComandaKiosco(req.db, itemsParaComanda, observaciones)
+      }
+    } catch (cmdErr) {
+      console.error('[Kiosco] Error al imprimir comanda:', cmdErr)
     }
 
     res.json({

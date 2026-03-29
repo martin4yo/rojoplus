@@ -24,7 +24,7 @@ export default function ConfiguracionPagos() {
   async function cargarConfiguracion() {
     setLoading(true)
     try {
-      const data = await api.get('/admin/configuracion')
+      const data = await api.get('/admin/sistema/configuracion')
 
       const configMap = {}
       data?.forEach(item => {
@@ -51,10 +51,10 @@ export default function ConfiguracionPagos() {
     try {
       // Guardar cada configuración por separado
       await Promise.all([
-        api.put('/admin/configuracion/PAGO_CBU', { valor: config.PAGO_CBU }),
-        api.put('/admin/configuracion/PAGO_ALIAS', { valor: config.PAGO_ALIAS }),
-        api.put('/admin/configuracion/PAGO_TELEFONO', { valor: config.PAGO_TELEFONO }),
-        api.put('/admin/configuracion/PAGO_TITULAR', { valor: config.PAGO_TITULAR }),
+        api.put('/admin/sistema/configuracion/PAGO_CBU', { valor: config.PAGO_CBU }),
+        api.put('/admin/sistema/configuracion/PAGO_ALIAS', { valor: config.PAGO_ALIAS }),
+        api.put('/admin/sistema/configuracion/PAGO_TELEFONO', { valor: config.PAGO_TELEFONO }),
+        api.put('/admin/sistema/configuracion/PAGO_TITULAR', { valor: config.PAGO_TITULAR }),
       ])
 
       setSuccess('Configuración guardada correctamente')

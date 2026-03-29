@@ -19,11 +19,16 @@ router.get('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     estado,
     socioId,
     search,
+    q,
     page = 1,
     limit = 50
   } = req.query
 
-  const skip = (parseInt(page) - 1) * parseInt(limit)
+  const searchTerm = search || q
+
+  const pageNum = Math.max(1, parseInt(page) || 1)
+  const limitNum = Math.max(1, parseInt(limit) || 50)
+  const skip = (pageNum - 1) * limitNum
 
   // Construir filtros
   const where = {}
@@ -46,12 +51,12 @@ router.get('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  if (search) {
+  if (searchTerm) {
     where.socio = {
       OR: [
-        { apellidoNombre: { contains: search, mode: 'insensitive' } },
-        { documento: { contains: search } },
-        { nroSocio: { contains: search } }
+        { apellidoNombre: { contains: searchTerm, mode: 'insensitive' } },
+        { documento: { contains: searchTerm } },
+        { nroSocio: { contains: searchTerm } }
       ]
     }
   }
@@ -81,7 +86,7 @@ router.get('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
         { fechaInicio: 'desc' }
       ],
       skip,
-      take: parseInt(limit)
+      take: limitNum
     }),
     req.db.inscripcion.count({ where })
   ])

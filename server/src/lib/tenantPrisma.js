@@ -5,17 +5,17 @@ import prisma from './prisma.js';
  * Son modelos globales compartidos entre todos los tenants.
  */
 const GLOBAL_MODELS = new Set([
-  'tenant',
-  'tenantUsuario',
-  'tenantConfiguracion',
-  'admin',
-  'rol',
-  'permiso',
-  'permisoRol',
-  'cajaRol',
-  'menuItem',
-  'menuItemRol',
-  'rubro',
+  'Tenant',
+  'TenantUsuario',
+  'TenantConfiguracion',
+  'Admin',
+  'Rol',
+  'Permiso',
+  'PermisoRol',
+  'CajaRol',
+  'MenuItem',
+  'MenuItemRol',
+  'Rubro',
 ]);
 
 /**

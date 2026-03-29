@@ -17,19 +17,20 @@ function handleInvalidToken() {
  *     localhost → null (usa DEFAULT_TENANT_SUBDOMAIN del backend)
  */
 function getCurrentTenantSlug() {
-  // Prioridad 1: superadmin seleccionó un tenant manualmente
-  const selected = localStorage.getItem('superadmin_tenant_slug')
-  if (selected) return selected
-
-  // Prioridad 2: subdomain del hostname actual
+  // Prioridad 1: subdomain real en la URL (siempre gana)
   const hostname = window.location.hostname
   if (hostname.includes('localhost')) {
     const match = hostname.match(/^([^.]+)\.localhost/)
-    return match ? match[1] : null
+    if (match) return match[1]
+  } else {
+    const parts = hostname.split('.')
+    if (parts.length > 2 && parts[0] !== 'www') return parts[0]
   }
-  // Producción: clubix-sport.clubix.com → clubix-sport
-  const parts = hostname.split('.')
-  if (parts.length > 2 && parts[0] !== 'www') return parts[0]
+
+  // Prioridad 2: superadmin seleccionó un tenant (solo cuando no hay subdomain)
+  const selected = localStorage.getItem('superadmin_tenant_slug')
+  if (selected) return selected
+
   return null
 }
 

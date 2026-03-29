@@ -115,7 +115,7 @@ async function crearAsiento(prisma, datos) {
     }))
   )
 
-  // Crear asiento
+  // Crear asiento sin lineas (nested create no recibe tenantId del extension)
   const asiento = await prisma.asiento.create({
     data: {
       numero: await generarNumeroAsiento(prisma),
@@ -125,14 +125,15 @@ async function crearAsiento(prisma, datos) {
       tipoOrigen,
       origenId,
       registradoPor,
-      lineas: {
-        create: lineasConIds,
-      },
     },
-    include: { lineas: true },
   })
 
-  return asiento
+  // Crear lineas por separado para que el extension inyecte tenantId
+  await prisma.asientoLinea.createMany({
+    data: lineasConIds.map(l => ({ ...l, asientoId: asiento.id })),
+  })
+
+  return { ...asiento, lineas: lineasConIds }
 }
 
 /**
@@ -247,53 +248,50 @@ async function generarAsientoPagoCuota(prisma, datos) {
  *   H: Caja           $monto
  */
 async function generarAsientoMovimientoCaja(prisma, datos) {
-  const { movimiento, caja, concepto, registradoPor } = datos
+  const { movimiento, caja, registradoPor } = datos
 
-  try {
-    // Obtener código de cuenta de la caja
-    let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
-    if (caja.cuentaContable?.codigo) {
-      cuentaCajaCodigo = caja.cuentaContable.codigo
-    } else if (caja.tipo === 'BANCO') {
-      cuentaCajaCodigo = CUENTAS.BANCO_CC
-    }
-
-    // Obtener cuenta del concepto (si tiene) o usar genérica
-    let cuentaConceptoCodigo = movimiento.tipo === 'INGRESO'
-      ? CUENTAS.OTROS_INGRESOS
-      : CUENTAS.GASTOS_VARIOS
-
-    if (concepto?.cuentaContable?.codigo) {
-      cuentaConceptoCodigo = concepto.cuentaContable.codigo
-    }
-
-    const monto = Number(movimiento.monto)
-    const lineas = movimiento.tipo === 'INGRESO'
-      ? [
-          { cuentaCodigo: cuentaCajaCodigo, debe: monto, haber: 0 },
-          { cuentaCodigo: cuentaConceptoCodigo, debe: 0, haber: monto },
-        ]
-      : [
-          { cuentaCodigo: cuentaConceptoCodigo, debe: monto, haber: 0 },
-          { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto },
-        ]
-
-    const asiento = await crearAsiento(prisma, {
-      concepto: `${movimiento.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}: ${movimiento.concepto}`,
-      fecha: movimiento.fecha,
-      tipoOrigen: 'MOV_CAJA',
-      origenId: movimiento.id,
-      registradoPor,
-      centroCostoId: movimiento.centroCostoId || null, // Usar centro de costo del movimiento
-      lineas,
-    })
-
-    console.log(`[AsientoContable] Creado asiento ${asiento.numero} para movimiento caja ${movimiento.numero}`)
-    return asiento
-  } catch (error) {
-    console.error(`[AsientoContable] Error generando asiento para mov caja ${movimiento.id}:`, error.message)
-    return null
+  // Cuenta de la caja (lado cash del asiento)
+  let cuentaCajaCodigo = null
+  if (caja.cuentaContable?.codigo) {
+    cuentaCajaCodigo = caja.cuentaContable.codigo
+  } else if (caja.tipo === 'BANCO') {
+    cuentaCajaCodigo = CUENTAS.BANCO_CC
+  } else {
+    cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
   }
+
+  // Cuenta del concepto (contracuenta: gasto/ingreso) — viene del include del movimiento
+  const cuentaConceptoCodigo = movimiento.cuentaContable?.codigo
+  if (!cuentaConceptoCodigo) {
+    throw new Error('La cuenta contable del movimiento es requerida para generar el asiento')
+  }
+
+
+
+  const monto = Number(movimiento.monto)
+  const obs = movimiento.descripcion || null
+  const lineas = movimiento.tipo === 'INGRESO'
+    ? [
+        { cuentaCodigo: cuentaCajaCodigo,      debe: monto, haber: 0,     descripcion: obs },
+        { cuentaCodigo: cuentaConceptoCodigo,   debe: 0,     haber: monto, descripcion: obs },
+      ]
+    : [
+        { cuentaCodigo: cuentaConceptoCodigo,   debe: monto, haber: 0,     descripcion: obs },
+        { cuentaCodigo: cuentaCajaCodigo,       debe: 0,     haber: monto, descripcion: obs },
+      ]
+
+  const asiento = await crearAsiento(prisma, {
+    concepto: `${movimiento.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}: ${movimiento.concepto}`,
+    fecha: movimiento.fecha,
+    tipoOrigen: 'MOV_CAJA',
+    origenId: movimiento.id,
+    registradoPor,
+    centroCostoId: movimiento.centroCostoId || null,
+    lineas,
+  })
+
+  console.log(`[AsientoContable] Creado asiento ${asiento.numero} para movimiento caja ${movimiento.numero}`)
+  return asiento
 }
 
 /**
@@ -659,9 +657,46 @@ async function anularAsiento(prisma, tipoOrigen, origenId, anuladoPor, motivo) {
   }
 }
 
+/**
+ * Genera asiento para transferencia entre cajas
+ *
+ * Asiento:
+ *   D: Cuenta caja destino   $monto  (activo aumenta en destino)
+ *   H: Cuenta caja origen    $monto  (activo disminuye en origen)
+ */
+async function crearAsientoTransferencia(prisma, datos) {
+  const { transferencia, cuentaOrigen, cuentaDestino, centroCostoId, descripcion, registradoPor } = datos
+
+  if (!cuentaOrigen?.codigo) {
+    throw new Error('La cuenta contable de la caja origen es requerida para el asiento')
+  }
+  if (!cuentaDestino?.codigo) {
+    throw new Error('La cuenta contable de la caja destino es requerida para el asiento')
+  }
+
+  const monto = Number(transferencia.monto)
+
+  const asiento = await crearAsiento(prisma, {
+    concepto: `Transferencia ${transferencia.cajaOrigen?.nombre || ''} → ${transferencia.cajaDestino?.nombre || ''}`,
+    fecha: transferencia.fecha,
+    tipoOrigen: 'TRANSFERENCIA',
+    origenId: transferencia.id,
+    registradoPor,
+    centroCostoId: centroCostoId || null,
+    lineas: [
+      { cuentaCodigo: cuentaDestino.codigo, debe: monto, haber: 0,    descripcion: descripcion || null },
+      { cuentaCodigo: cuentaOrigen.codigo,  debe: 0,    haber: monto, descripcion: descripcion || null },
+    ],
+  })
+
+  console.log(`[AsientoContable] Creado asiento ${asiento.numero} para transferencia ${transferencia.numero}`)
+  return asiento
+}
+
 export {
   generarAsientoPagoCuota,
   generarAsientoMovimientoCaja,
+  crearAsientoTransferencia,
   generarAsientoFacturaCompra,
   generarAsientoFacturaVenta,
   generarAsientoOrdenPago,
