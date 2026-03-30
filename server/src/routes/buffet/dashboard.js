@@ -333,28 +333,36 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
       .sort((a, b) => b.cantidad - a.cantidad)
       .slice(0, 10)
 
-    // Ventas por hora (solo si es un día)
-    let ventasPorHora = null
+    // Ventas por hora (siempre)
+    const ventasPorHora = {}
     let maxVentaHora = 0
-    const diffHoras = (fechaHasta - fechaDesde) / (1000 * 60 * 60)
-    if (diffHoras <= 24) {
-      ventasPorHora = {}
-      for (let h = 0; h < 24; h++) {
-        ventasPorHora[h] = { cantidad: 0, total: 0 }
-      }
-      comandas.forEach(c => {
-        const hora = new Date(c.horaCierre).getHours()
-        ventasPorHora[hora].cantidad++
-        ventasPorHora[hora].total += Number(c.total)
-        if (ventasPorHora[hora].total > maxVentaHora) maxVentaHora = ventasPorHora[hora].total
-      })
-      takeaway.forEach(t => {
-        const hora = new Date(t.horaPagado).getHours()
-        ventasPorHora[hora].cantidad++
-        ventasPorHora[hora].total += Number(t.total)
-        if (ventasPorHora[hora].total > maxVentaHora) maxVentaHora = ventasPorHora[hora].total
-      })
+    for (let h = 0; h < 24; h++) {
+      ventasPorHora[h] = { cantidad: 0, total: 0 }
     }
+    comandas.forEach(c => {
+      const hora = new Date(c.horaCierre).getHours()
+      ventasPorHora[hora].cantidad++
+      ventasPorHora[hora].total += Number(c.total)
+      if (ventasPorHora[hora].total > maxVentaHora) maxVentaHora = ventasPorHora[hora].total
+    })
+    takeaway.forEach(t => {
+      const hora = new Date(t.horaPagado).getHours()
+      ventasPorHora[hora].cantidad++
+      ventasPorHora[hora].total += Number(t.total)
+      if (ventasPorHora[hora].total > maxVentaHora) maxVentaHora = ventasPorHora[hora].total
+    })
+
+    // Ventas por día
+    const ventasPorDiaMap = {}
+    const addDia = (fecha, total) => {
+      const d = new Date(fecha)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      if (!ventasPorDiaMap[key]) ventasPorDiaMap[key] = { fecha: key, label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, total: 0 }
+      ventasPorDiaMap[key].total += total
+    }
+    comandas.forEach(c => addDia(c.horaCierre, Number(c.total)))
+    takeaway.forEach(t => addDia(t.horaPagado, Number(t.total)))
+    const ventasPorDia = Object.values(ventasPorDiaMap).sort((a, b) => a.fecha.localeCompare(b.fecha))
 
     res.json({
       success: true,
@@ -384,7 +392,10 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
 
         // Por hora
         ventasPorHora,
-        maxVentaHora
+        maxVentaHora,
+
+        // Por día
+        ventasPorDia
       }
     })
   } catch (error) {

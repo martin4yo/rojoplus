@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, Receipt,
-  Clock, ChefHat, Coffee, Truck, Calendar, RefreshCw, ArrowRight,
-  CreditCard, Banknote, QrCode, Eye, FileText, Printer, BarChart3
+  TrendingUp, TrendingDown, DollarSign, ShoppingCart,
+  ChefHat, Coffee, Truck, RefreshCw, ArrowRight,
+  CreditCard, Banknote, QrCode, BarChart3
 } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
-import TicketPreview from '../../../components/buffet/TicketPreview'
 import PageHeader from '../../../components/PageHeader'
 import ChatWidget from '../../../components/chat/ChatWidget'
 
@@ -57,19 +57,12 @@ const RANGOS_FECHA = [
 
 export default function BuffetDashboard() {
   const puedeVerDashboard = tienePermiso(PERMISOS.BUFFET_VER) || tienePermiso(PERMISOS.BUFFET_CONFIG)
-  const puedeCobrar = tienePermiso(PERMISOS.BUFFET_COBRAR) || tienePermiso(PERMISOS.BUFFET_KIOSCO)
 
   const [rangoSeleccionado, setRangoSeleccionado] = useState('hoy')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
   const [loading, setLoading] = useState(true)
   const [kpis, setKpis] = useState(null)
-  const [ventas, setVentas] = useState([])
-  const [cargandoVentas, setCargandoVentas] = useState(false)
-
-  // Preview de ticket
-  const [previewTicket, setPreviewTicket] = useState(null)
-  const [cargandoPreview, setCargandoPreview] = useState(false)
 
   // Obtener fechas según el rango seleccionado
   const obtenerFechas = useCallback(() => {
@@ -111,102 +104,9 @@ export default function BuffetDashboard() {
     }
   }, [obtenerFechas, puedeVerDashboard])
 
-  // Cargar ventas del período
-  const cargarVentas = useCallback(async () => {
-    if (!puedeCobrar) return
-
-    setCargandoVentas(true)
-    try {
-      const { desde, hasta } = obtenerFechas()
-      if (!desde || !hasta) {
-        setCargandoVentas(false)
-        return
-      }
-
-      const params = new URLSearchParams({
-        desde: desde.toISOString(),
-        hasta: hasta.toISOString(),
-        limit: '50'
-      })
-
-      const res = await api.get(`/admin/buffet/ventas-periodo?${params}`)
-      const data = res?.data || res || []
-      setVentas(data)
-    } catch (err) {
-      console.error('Error cargando ventas:', err)
-    } finally {
-      setCargandoVentas(false)
-    }
-  }, [obtenerFechas, puedeCobrar])
-
   useEffect(() => {
     cargarDatos()
-    cargarVentas()
-  }, [cargarDatos, cargarVentas])
-
-  // Ver preview del ticket
-  const verPreviewTicket = async (venta) => {
-    setCargandoPreview(true)
-    try {
-      const tipo = venta.tipo === 'COMANDA' ? 'comanda' : 'takeaway'
-      const data = await api.getFull(`/admin/buffet/preview-ticket/${tipo}/${venta.id}`)
-
-      if (data.comprobante?.cae) {
-        setPreviewTicket({
-          tipo: 'FISCAL',
-          empresa: data.empresa || {},
-          comprobante: {
-            tipo: data.comprobante.tipo,
-            puntoVenta: data.comprobante.puntoVenta,
-            numero: data.comprobante.numero,
-            fecha: data.comprobante.fecha || venta.fecha,
-            cae: data.comprobante.cae,
-            fechaVtoCae: data.comprobante.fechaVtoCae
-          },
-          cliente: {
-            nombre: data.comprobante.nombreReceptor || 'Consumidor Final',
-            documento: data.comprobante.docReceptor,
-            tipoDoc: data.comprobante.tipoDocReceptor || 99,
-            condicionIva: data.comprobante.condicionIvaReceptor === 5 ? 'Consumidor Final' :
-                          data.comprobante.condicionIvaReceptor === 1 ? 'IVA Responsable Inscripto' :
-                          data.comprobante.condicionIvaReceptor === 6 ? 'Responsable Monotributo' : 'Consumidor Final'
-          },
-          items: (data.items || []).map(item => ({
-            cantidad: item.cantidad,
-            nombre: item.nombre,
-            precio: Number(item.precioUnitario || item.precio || 0),
-            subtotal: Number(item.subtotal || (item.cantidad * (item.precioUnitario || item.precio || 0)))
-          })),
-          subtotal: Number(data.comprobante.neto || 0),
-          iva: Number(data.comprobante.iva || 0),
-          total: Number(data.comprobante.total || venta.total),
-          discriminaIva: data.comprobante.tipoAfip === 1,
-          medioPago: data.medioPago || 'VARIOS',
-          qrUrl: data.qrUrl
-        })
-      } else {
-        setPreviewTicket({
-          tipo: venta.tipo === 'COMANDA' ? 'CUENTA' : 'TAKEAWAY',
-          numero: data.comanda?.numero || data.pedido?.numero || venta.numero,
-          mesa: venta.mesa,
-          cliente: venta.socio || venta.cliente,
-          fecha: venta.fecha,
-          items: (data.items || []).map(item => ({
-            cantidad: item.cantidad,
-            nombre: item.nombre,
-            precio: Number(item.precioUnitario || item.precio || 0)
-          })),
-          total: venta.total,
-          medioPago: data.medioPago || 'VARIOS'
-        })
-      }
-    } catch (err) {
-      console.error('Error cargando preview:', err)
-      toast.error('Error al cargar preview del ticket')
-    } finally {
-      setCargandoPreview(false)
-    }
-  }
+  }, [cargarDatos])
 
   // Formatear moneda
   const formatMoney = (value) => {
@@ -249,7 +149,7 @@ export default function BuffetDashboard() {
           </button>
         ))}
         <button
-          onClick={() => { cargarDatos(); cargarVentas() }}
+          onClick={() => cargarDatos()}
           className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
           title="Actualizar"
         >
@@ -279,7 +179,7 @@ export default function BuffetDashboard() {
             />
           </div>
           <button
-            onClick={() => { cargarDatos(); cargarVentas() }}
+            onClick={() => cargarDatos()}
             disabled={!fechaDesde || !fechaHasta}
             className="px-4 py-1.5 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 disabled:opacity-50"
           >
@@ -401,6 +301,29 @@ export default function BuffetDashboard() {
             </div>
           </div>
 
+          {/* Evolución de ventas por día */}
+          {kpis.ventasPorDia && kpis.ventasPorDia.length > 1 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="font-semibold text-gray-800 mb-4">Evolución de ventas por día</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={kpis.ventasPorDia} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={v => `$${(v / 1000).toFixed(0)}k`}
+                    width={48}
+                  />
+                  <Tooltip
+                    formatter={(value) => [`$${Number(value).toLocaleString('es-AR')}`, 'Ventas']}
+                    labelFormatter={label => `Día ${label}`}
+                  />
+                  <Bar dataKey="total" fill="#ea580c" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
           {/* Productos más vendidos y Ventas por hora */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* Top Productos */}
@@ -431,8 +354,8 @@ export default function BuffetDashboard() {
               </div>
             )}
 
-            {/* Ventas por hora (solo para hoy) */}
-            {kpis.ventasPorHora && rangoSeleccionado === 'hoy' && (
+            {/* Ventas por hora */}
+            {kpis.ventasPorHora && Object.values(kpis.ventasPorHora).some(v => v.total > 0) && (
               <div className="bg-white rounded-xl shadow p-4">
                 <h3 className="font-semibold text-gray-800 mb-4">Ventas por hora</h3>
                 <div className="space-y-2">
@@ -464,95 +387,6 @@ export default function BuffetDashboard() {
         </div>
       )}
 
-      {/* Tabla de Ventas */}
-      {puedeCobrar && (
-        <div className="bg-white rounded-xl shadow">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-              <Receipt className="text-green-600" size={20} />
-              Ventas del Período
-              {ventas.length > 0 && (
-                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
-                  {ventas.length}
-                </span>
-              )}
-            </h3>
-            {cargandoVentas && (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
-            )}
-          </div>
-
-          {ventas.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">
-              No hay ventas en el período seleccionado
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha/Hora</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Comprobante</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {ventas.map(venta => (
-                    <tr key={`${venta.tipo}-${venta.id}`} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {new Date(venta.fecha).toLocaleString('es-AR', {
-                          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-                        })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded font-medium ${
-                          venta.tipo === 'COMANDA' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                        }`}>
-                          {venta.tipo === 'COMANDA' ? `Mesa ${venta.mesa}` : 'TakeAway'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium">{venta.numero}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {venta.socio || venta.cliente || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {venta.comprobante ? (
-                          <span className="text-green-600 flex items-center gap-1">
-                            <FileText size={14} />
-                            {venta.comprobante.tipo} {venta.comprobante.puntoVenta}-{venta.comprobante.numero}
-                          </span>
-                        ) : venta.esVentaInterna ? (
-                          <span className="text-amber-600">Venta Interna</span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-green-600">
-                        {formatMoney(venta.total)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => verPreviewTicket(venta)}
-                          disabled={cargandoPreview}
-                          className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors disabled:opacity-50"
-                          title="Ver ticket"
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Link a mesas */}
       <div className="flex justify-center">
         <Link
@@ -562,35 +396,6 @@ export default function BuffetDashboard() {
           Ir al mapa de mesas <ArrowRight size={18} />
         </Link>
       </div>
-
-      {/* Preview Ticket */}
-      {previewTicket && (
-        <TicketPreview
-          ticket={previewTicket}
-          onClose={() => setPreviewTicket(null)}
-          onPrint={() => setPreviewTicket(null)}
-          onPrintAsImage={async (imageBase64, impresoraId) => {
-            console.log('[Dashboard] onPrintAsImage - impresoraId:', impresoraId)
-            try {
-              const res = await api.postFull('/admin/buffet/imprimir-imagen', {
-                imagen: imageBase64,
-                impresoraId
-              })
-              console.log('[Dashboard] Respuesta del servidor:', res)
-              if (res?.success) {
-                toast.success(`Ticket enviado a ${res.impresora || 'impresora'}`)
-                setPreviewTicket(null)
-              } else {
-                console.log('[Dashboard] Error en respuesta:', res?.error)
-                toast.error(res?.error || 'Error al imprimir')
-              }
-            } catch (err) {
-              console.error('[Dashboard] Error enviando imagen:', err)
-              toast.error(err.message || 'Error al enviar a impresora')
-            }
-          }}
-        />
-      )}
 
       {/* Xavi - Chat Widget para Camareros */}
       <ChatWidget role="camarero" position="bottom-right" />

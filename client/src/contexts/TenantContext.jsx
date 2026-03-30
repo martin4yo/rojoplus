@@ -138,15 +138,16 @@ export function TenantProvider({ children }) {
 
   function applyFavicon(faviconUrl) {
     const src = faviconUrl || '/images/LogoClubixSolo.png'
-    const link = document.querySelector("link[rel~='icon']") || document.querySelector("link[rel='icon']")
-    if (link) {
-      link.href = src
-    } else {
-      const newLink = document.createElement('link')
-      newLink.rel = 'icon'
-      newLink.href = src
-      document.head.appendChild(newLink)
-    }
+    const srcWithBust = src + (src.includes('?') ? '&' : '?') + 'v=' + Date.now()
+
+    // Remover todos los links de favicon existentes para forzar recarga
+    document.querySelectorAll("link[rel*='icon']").forEach(el => el.remove())
+
+    const link = document.createElement('link')
+    link.rel = 'icon'
+    link.type = src.endsWith('.ico') ? 'image/x-icon' : 'image/png'
+    link.href = srcWithBust
+    document.head.appendChild(link)
   }
 
   function applyTitle(nombre) {
