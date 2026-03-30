@@ -5,6 +5,7 @@ import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatCurrency } from '../../utils/formatters'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Colores para los gráficos
 const COLORES_COBRADO = ['#22c55e', '#16a34a', '#15803d', '#166534', '#14532d']
@@ -359,9 +360,7 @@ export default function ReporteCuotas() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import {
+import LoadingSpinner from '../../components/LoadingSpinner'
   PlusIcon,
   TrashIcon,
   ArrowUpIcon,
@@ -362,9 +363,7 @@ export default function ContenidoPaginas() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

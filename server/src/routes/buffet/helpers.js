@@ -39,18 +39,24 @@ export async function generarNumeroPedido(db) {
   const hoy = new Date()
   const prefijo = `TA${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, '0')}${String(hoy.getDate()).padStart(2, '0')}`
 
-  const ultimo = await client.pedidoTakeAway.findFirst({
-    where: { numero: { startsWith: prefijo } },
-    orderBy: { numero: 'desc' }
+  // Contar todos los pedidos del día para obtener el siguiente número real
+  const count = await client.pedidoTakeAway.count({
+    where: { numero: { startsWith: prefijo } }
   })
 
-  let secuencia = 1
-  if (ultimo) {
-    const partes = ultimo.numero.split('-')
-    secuencia = parseInt(partes[1] || '0') + 1
-  }
+  // Buscar un número libre a partir del count+1 (evita colisiones por race condition)
+  let secuencia = count + 1
+  let candidato = `${prefijo}-${String(secuencia).padStart(4, '0')}`
 
-  return `${prefijo}-${String(secuencia).padStart(4, '0')}`
+  while (true) {
+    const existe = await client.pedidoTakeAway.findFirst({
+      where: { numero: candidato },
+      select: { id: true }
+    })
+    if (!existe) return candidato
+    secuencia++
+    candidato = `${prefijo}-${String(secuencia).padStart(4, '0')}`
+  }
 }
 
 /**

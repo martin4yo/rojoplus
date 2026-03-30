@@ -16,6 +16,7 @@ import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { usePagination } from '../../hooks/usePagination'
 import ChatWidget from '../../components/chat/ChatWidget'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Componente Avatar con fallback si la imagen no carga
 function AvatarSocio({ foto, nombre }) {
@@ -445,9 +446,7 @@ export default function AdminSocios() {
       {error && <Alert type="error" className="mb-6">{error}</Alert>}
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner />
       ) : socios.length === 0 ? (
         <div className="text-center text-gray-500 py-12 bg-white rounded-lg border border-gray-200">
           No hay socios para mostrar.

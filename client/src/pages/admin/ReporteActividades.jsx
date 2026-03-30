@@ -4,6 +4,7 @@ import { ArrowLeft, Users, ChevronRight, Search, X, User, PieChart as PieChartIc
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Colores para el gráfico de torta
 const COLORES_TORTA = [
@@ -182,9 +183,7 @@ export default function ReporteActividades() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

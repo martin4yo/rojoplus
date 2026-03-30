@@ -4,6 +4,7 @@ import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, X, ChevronDown, Chevro
 import { Button } from '../../../components/Button'
 import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function MovimientoCajaForm() {
   const navigate = useNavigate()
@@ -210,9 +211,7 @@ export default function MovimientoCajaForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

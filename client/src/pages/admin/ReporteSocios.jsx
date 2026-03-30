@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Users, UserCheck, UserX, UserPlus, TrendingUp, TrendingDown, Dumbbell, AlertCircle, Clock, Calendar } from 'lucide-react'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Generar lista de períodos (últimos 24 meses)
 function generarPeriodos() {
@@ -212,9 +213,7 @@ export default function ReporteSocios() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

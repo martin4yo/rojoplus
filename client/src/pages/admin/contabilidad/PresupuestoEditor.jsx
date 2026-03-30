@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Plus, Trash2, Calculator, AlertCircle, Star } from 'lu
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -270,9 +271,7 @@ export default function PresupuestoEditor() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

@@ -9,6 +9,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function DashboardEjecutivo() {
   const [data, setData] = useState(null)
@@ -38,9 +39,7 @@ export default function DashboardEjecutivo() {
 
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

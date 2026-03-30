@@ -9,6 +9,7 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function SocioForm() {
   const { id } = useParams()
@@ -381,9 +382,7 @@ export default function SocioForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

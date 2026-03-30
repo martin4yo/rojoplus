@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Save, X, ChevronUp, ChevronDown, Upload, User, AlertTriangle, Users } from 'lucide-react'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Modal de confirmación personalizado
 function ConfirmModal({ open, onClose, onConfirm, title, message }) {
@@ -468,9 +469,7 @@ export default function Autoridades() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

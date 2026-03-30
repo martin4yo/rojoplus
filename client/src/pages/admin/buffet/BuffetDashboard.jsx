@@ -10,6 +10,7 @@ import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import Modal from '../../../components/Modal'
 import { useConfirm } from '../../../hooks/useConfirm'
 import ChatWidget from '../../../components/chat/ChatWidget'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetMesas() {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -292,9 +293,7 @@ export default function BuffetMesas() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

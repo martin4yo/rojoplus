@@ -4,6 +4,7 @@ import { ArrowLeft, DollarSign, Calendar, User, CheckCircle, Clock, CreditCard, 
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const ESTADOS = {
   PENDIENTE: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -211,9 +212,7 @@ export default function LiquidacionDetalle() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

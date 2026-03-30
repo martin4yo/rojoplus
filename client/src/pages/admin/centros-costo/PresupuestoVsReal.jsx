@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { Download, RefreshCw, AlertCircle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function PresupuestoVsReal() {
   const [data, setData] = useState(null)
@@ -133,9 +134,7 @@ export default function PresupuestoVsReal() {
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-        </div>
+        <LoadingSpinner />
       )}
 
       {data && !loading && (

@@ -4,6 +4,7 @@ import { ArrowLeft, Save, CreditCard, Building2, FileText, Check, AlertCircle, P
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function OrdenPagoForm() {
   const navigate = useNavigate()
@@ -330,9 +331,7 @@ export default function OrdenPagoForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

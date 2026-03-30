@@ -10,6 +10,7 @@ import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { formatDate, formatCurrency } from '../../../utils/formatters'
 import toast from 'react-hot-toast'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function VentaEntradas() {
   const navigate = useNavigate()
@@ -427,9 +428,7 @@ export default function VentaEntradas() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

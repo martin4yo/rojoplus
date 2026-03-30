@@ -6,6 +6,7 @@ import Pagination from '../../../components/Pagination'
 import Modal from '../../../components/Modal'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../../hooks/useConfirm'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function Habilitaciones() {
   const [habilitaciones, setHabilitaciones] = useState([])
@@ -192,9 +193,7 @@ export default function Habilitaciones() {
       {/* Tabla */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
+          <LoadingSpinner />
         ) : habilitaciones.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <UserPlus className="w-12 h-12 mx-auto mb-4 opacity-50" />

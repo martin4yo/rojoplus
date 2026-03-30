@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../../services/api'
 import { Download, RefreshCw } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function EvolucionTemporal() {
   const [data, setData] = useState(null)
@@ -181,9 +182,7 @@ export default function EvolucionTemporal() {
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-        </div>
+        <LoadingSpinner />
       )}
 
       {data && !loading && (

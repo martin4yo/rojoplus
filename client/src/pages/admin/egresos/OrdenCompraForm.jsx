@@ -9,6 +9,7 @@ import SearchInput from '../../../components/SearchInput'
 import { formatCurrency, formatDateForInput } from '../../../utils/formatters'
 import { useApiData } from '../../../hooks/useApiData'
 import StatusBadge from '../../../components/StatusBadge'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function OrdenCompraForm() {
   const { id } = useParams()
@@ -199,9 +200,7 @@ export default function OrdenCompraForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

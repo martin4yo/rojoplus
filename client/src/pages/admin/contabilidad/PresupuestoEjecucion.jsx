@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChart2, Star } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -63,9 +64,7 @@ export default function PresupuestoEjecucion() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

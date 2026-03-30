@@ -5,6 +5,7 @@ import { Alert } from '../../components/Alert'
 import { Button } from '../../components/Button'
 import api from '../../services/api'
 import { useConfirm } from '../../hooks/useConfirm'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function ReporteActividadDetalle() {
   const { id } = useParams()
@@ -155,9 +156,7 @@ export default function ReporteActividadDetalle() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

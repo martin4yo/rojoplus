@@ -4,6 +4,7 @@ import { ArrowLeft, Save } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const COLORES = [
   { value: 'green', label: 'Verde', class: 'bg-green-100 text-green-800' },
@@ -227,9 +228,7 @@ export default function ConfiguracionForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

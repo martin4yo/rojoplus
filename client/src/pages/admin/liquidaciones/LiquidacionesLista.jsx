@@ -4,6 +4,7 @@ import { Plus, Eye, Calendar, DollarSign, Users, CheckCircle, Clock, XCircle } f
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const ESTADOS = {
   PENDIENTE: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -96,9 +97,7 @@ export default function LiquidacionesLista() {
       {/* Lista */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
+          <LoadingSpinner />
         ) : liquidaciones.length === 0 ? (
           <div className="text-center py-12">
             <DollarSign className="w-16 h-16 mx-auto text-gray-300 mb-4" />

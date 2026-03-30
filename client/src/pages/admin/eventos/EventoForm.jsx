@@ -5,6 +5,7 @@ import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import toast from 'react-hot-toast'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function EventoForm({ eventoId, onClose, isModal = false }) {
   const { id: paramId } = useParams()
@@ -160,9 +161,7 @@ export default function EventoForm({ eventoId, onClose, isModal = false }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

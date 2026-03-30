@@ -300,21 +300,30 @@ router.post('/takeaway', authAdmin, checkPermiso('BUFFET_MESAS'), async (req, re
     // Validar campo requerido
     const nombreClienteFinal = nombreCliente || 'Sin nombre'
 
-    const numero = await generarNumeroPedido(req.db)
-
-    const pedido = await req.db.pedidoTakeAway.create({
-      data: {
-        numero,
-        nombreCliente: nombreClienteFinal,
-        telefono: telefono || null,
-        socioId: socioId ? parseInt(socioId) : null,
-        tipo: tipo || 'RETIRO',
-        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
-        horaEstimada: horaEstimada ? new Date(horaEstimada) : null,
-        observaciones: observaciones || null,
-        atendidoPor: req.admin.id
+    // Reintentar si hay colisión de número (race condition entre requests simultáneos)
+    let pedido, intentos = 0
+    while (!pedido && intentos < 5) {
+      intentos++
+      const numero = await generarNumeroPedido(req.db)
+      try {
+        pedido = await req.db.pedidoTakeAway.create({
+          data: {
+            numero,
+            nombreCliente: nombreClienteFinal,
+            telefono: telefono || null,
+            socioId: socioId ? parseInt(socioId) : null,
+            tipo: tipo || 'RETIRO',
+            centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
+            horaEstimada: horaEstimada ? new Date(horaEstimada) : null,
+            observaciones: observaciones || null,
+            atendidoPor: req.admin.id
+          }
+        })
+      } catch (e) {
+        if (e.code === 'P2002' && intentos < 5) continue
+        throw e
       }
-    })
+    }
 
     if (items && items.length > 0) {
       for (const item of items) {

@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Plus, Trash2, BookOpen, AlertCircle } from 'lucide-rea
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function AsientoForm() {
   const navigate = useNavigate()
@@ -168,9 +169,7 @@ export default function AsientoForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

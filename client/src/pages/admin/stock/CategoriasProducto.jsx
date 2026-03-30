@@ -4,6 +4,7 @@ import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function CategoriasProducto() {
   const [categorias, setCategorias] = useState([])
@@ -150,9 +151,7 @@ export default function CategoriasProducto() {
 
       {/* Lista */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner />
       ) : categorias.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
           <Tags className="w-12 h-12 mx-auto mb-4 opacity-50" />

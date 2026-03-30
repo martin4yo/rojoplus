@@ -11,6 +11,7 @@ import Pagination from '../../../components/Pagination'
 import { useApiData } from '../../../hooks/useApiData'
 import { useConfirm } from '../../../hooks/useConfirm'
 import toast from 'react-hot-toast'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function MovimientosCajaLista() {
   const navigate = useNavigate()
@@ -267,9 +268,7 @@ export default function MovimientosCajaLista() {
       {/* Tabla */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
+          <LoadingSpinner />
         ) : movimientos.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <ArrowRightLeft className="w-12 h-12 mx-auto mb-4 opacity-50" />

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 // Este componente busca el presupuesto vigente (principal del año actual)
 // y redirige a su vista de ejecución
@@ -59,9 +60,7 @@ export default function PresupuestoVigente() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

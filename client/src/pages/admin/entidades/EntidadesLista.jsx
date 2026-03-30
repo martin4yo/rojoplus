@@ -5,6 +5,7 @@ import { Button } from '../../../components/Button'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { usePagination } from '../../../hooks/usePagination'
 import Pagination from '../../../components/Pagination'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TIPO_CONFIG = {
   PROVEEDOR: {
@@ -145,9 +146,7 @@ export default function EntidadesLista({ tipo }) {
       {/* Tabla */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
+          <LoadingSpinner />
         ) : entidades.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <Icon className="w-12 h-12 mx-auto mb-4 opacity-50" />

@@ -11,6 +11,7 @@ import SelectorMedioPago from '../../../components/buffet/SelectorMedioPago'
 import ClienteSelector from '../../../components/buffet/ClienteSelector'
 import MenuProductos from '../../../components/buffet/MenuProductos'
 import ModalOpcionesProducto from '../../../components/buffet/ModalOpcionesProducto'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetKiosco() {
   const { generarTicketKiosco, generarTicketFiscal, imprimirTicket } = useTicket()
@@ -590,9 +591,7 @@ export default function BuffetKiosco() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

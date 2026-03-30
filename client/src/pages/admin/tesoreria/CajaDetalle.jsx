@@ -8,6 +8,7 @@ import {
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TIPO_ICONS = {
   EFECTIVO: Wallet,
@@ -259,9 +260,7 @@ export default function CajaDetalle() {
 
   if (loadingCaja) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

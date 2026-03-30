@@ -6,6 +6,7 @@ import { Alert } from '../../components/Alert'
 import { useModal } from '../../components/Modal'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -231,9 +232,7 @@ export default function Periodos() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

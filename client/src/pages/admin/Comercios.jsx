@@ -6,6 +6,7 @@ import { Alert } from '../../components/Alert'
 import { useModal } from '../../components/Modal'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function AdminComercios() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -130,9 +131,7 @@ export default function AdminComercios() {
       {error && <Alert type="error" className="mb-6">{error}</Alert>}
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner />
       ) : comercios.length === 0 ? (
         <div className="text-center text-gray-500 py-12">
           No hay comercios para mostrar

@@ -6,6 +6,7 @@ import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { useConfirm } from '../../hooks/useConfirm'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function ActividadesLista() {
   const navigate = useNavigate()
@@ -68,9 +69,7 @@ export default function ActividadesLista() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

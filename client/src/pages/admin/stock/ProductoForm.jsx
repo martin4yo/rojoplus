@@ -7,6 +7,7 @@ import { Alert } from '../../../components/Alert'
 import { MultiImageUpload } from '../../../components/ImageUpload'
 import api from '../../../services/api'
 import { useConfirm } from '../../../hooks/useConfirm'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TALLES_DEFAULT = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'UNICO']
 
@@ -283,9 +284,7 @@ export default function ProductoForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

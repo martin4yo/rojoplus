@@ -4,6 +4,7 @@ import { ArrowLeft, Save, BookOpen } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TIPOS = [
   { value: 'ACTIVO', label: 'Activo', color: 'bg-blue-100 text-blue-700 border-blue-300' },
@@ -144,9 +145,7 @@ export default function CuentaContableForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

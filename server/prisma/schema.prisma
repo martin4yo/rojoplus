@@ -2791,7 +2791,7 @@ model OpcionItemComanda {
 
 model PedidoTakeAway {
   id              Int                  @id @default(autoincrement())
-  numero          String               @unique
+  numero          String
   nombreCliente   String               @map("nombre_cliente")
   telefono        String?
   socioId         Int?                 @map("socio_id")
@@ -2820,6 +2820,7 @@ model PedidoTakeAway {
   comprobantes    ComprobanteElectronico[]
 
   tenantId    Int      @map("tenant_id")
+  @@unique([tenantId, numero])
   @@index([socioId])
   @@index([estado])
   @@index([tipo])

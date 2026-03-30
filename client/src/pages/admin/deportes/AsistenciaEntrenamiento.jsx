@@ -6,6 +6,7 @@ import Modal from '../../../components/Modal'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const ESTADOS_ASISTENCIA = [
   { value: 'PRESENTE', label: 'Presente', icon: Check, color: 'text-green-600 bg-green-100' },
@@ -153,9 +154,7 @@ export default function AsistenciaEntrenamiento() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

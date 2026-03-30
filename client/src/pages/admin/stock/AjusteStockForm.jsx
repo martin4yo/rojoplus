@@ -4,6 +4,7 @@ import { ArrowLeft, RefreshCw, Save, TrendingUp, TrendingDown, Target } from 'lu
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TIPOS = [
   { value: 'INGRESO', label: 'Ingreso', description: 'Agregar stock', icon: TrendingUp, color: 'bg-green-100 text-green-700 border-green-300' },
@@ -134,9 +135,7 @@ export default function AjusteStockForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { DollarSign, Search, Filter, Percent, Save, X, Check, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetPrecios() {
   const [productos, setProductos] = useState([])
@@ -178,9 +179,7 @@ export default function BuffetPrecios() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

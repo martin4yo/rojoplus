@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { CreditCard, Check, ArrowRight, RefreshCw, Calendar, Search, Wallet, AlertCircle } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 function formatMoney(amount) {
   return new Intl.NumberFormat('es-AR', {
@@ -374,9 +375,7 @@ export default function PendientesConciliar() {
           {/* Tabla de movimientos */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-              </div>
+              <LoadingSpinner />
             ) : movimientos.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <CreditCard className="w-12 h-12 mx-auto mb-3 text-gray-300" />

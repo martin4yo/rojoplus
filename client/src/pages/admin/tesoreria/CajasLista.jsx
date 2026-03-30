@@ -4,6 +4,7 @@ import { Plus, Wallet, Building, CreditCard, Eye, Edit, TrendingUp, TrendingDown
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TIPO_ICONS = {
   EFECTIVO: Wallet,
@@ -86,9 +87,7 @@ export default function CajasLista() {
 
       {/* Grid de Cajas */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner />
       ) : cajas.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
           <Wallet className="w-12 h-12 mx-auto mb-4 opacity-50" />

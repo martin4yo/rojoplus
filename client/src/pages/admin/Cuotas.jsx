@@ -15,6 +15,7 @@ import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
 import { useConfirm } from '../../hooks/useConfirm'
 import ChatWidget from '../../components/chat/ChatWidget'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Cuotas() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -533,9 +534,7 @@ export default function Cuotas() {
         {success && <Alert type="success" className="mb-4" onClose={() => setSuccess(null)}>{success}</Alert>}
 
         {cargandoCobranza ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
+          <LoadingSpinner />
         ) : cobranzaData?.cuotas?.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
             <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
@@ -951,9 +950,7 @@ export default function Cuotas() {
 
       {/* Tabla de cuotas o pagos informados */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner />
       ) : estado === 'A_CONCILIAR' ? (
         /* Vista de pagos informados */
         pagosInformados.length === 0 ? (

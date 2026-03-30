@@ -3,6 +3,7 @@ import { Palette, Upload, RotateCcw, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import { useTenant } from '../../contexts/TenantContext'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Branding() {
   const { tenant } = useTenant()
@@ -105,9 +106,7 @@ export default function Branding() {
 
   if (loading && Object.keys(colores).length === 0) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

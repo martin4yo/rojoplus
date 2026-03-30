@@ -4,6 +4,7 @@ import { Users, Dumbbell, UserX, Receipt, LayoutDashboard } from 'lucide-react'
 import { Alert } from '../../components/Alert'
 import CashFlowPanel from '../../components/CashFlowPanel'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -26,9 +27,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

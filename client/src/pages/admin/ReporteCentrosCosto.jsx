@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import { ChartBarIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { BarChart3 } from 'lucide-react'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function ReporteCentrosCosto() {
   const [data, setData] = useState(null)
@@ -98,9 +99,7 @@ export default function ReporteCentrosCosto() {
 
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

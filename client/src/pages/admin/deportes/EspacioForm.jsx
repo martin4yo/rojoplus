@@ -4,6 +4,7 @@ import { ArrowLeft, Save, MapPin, CheckCircle, XCircle, Sun, Moon, Users, Settin
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const DIAS_SEMANA = [
   { value: 1, label: 'Lunes', short: 'Lun' },
@@ -185,9 +186,7 @@ export default function EspacioForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

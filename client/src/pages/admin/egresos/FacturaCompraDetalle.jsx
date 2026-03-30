@@ -8,6 +8,7 @@ import StatusBadge from '../../../components/StatusBadge'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
 import { useApiData } from '../../../hooks/useApiData'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TIPOS = {
   FACTURA_COMPRA: { label: 'Factura de Compra', color: 'bg-blue-100 text-blue-700' },
@@ -207,9 +208,7 @@ export default function FacturaCompraDetalle() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

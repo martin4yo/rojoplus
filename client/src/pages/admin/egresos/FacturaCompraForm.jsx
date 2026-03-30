@@ -14,6 +14,7 @@ import {
 import { formatCurrency, formatDate } from '../../../utils/formatters'
 import { useApiData } from '../../../hooks/useApiData'
 import SelectCentroCosto from '../../../components/SelectCentroCosto'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const MEDIOS_PAGO = [
   { value: 'EFECTIVO', label: 'Efectivo' },
@@ -556,9 +557,7 @@ export default function FacturaCompraForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

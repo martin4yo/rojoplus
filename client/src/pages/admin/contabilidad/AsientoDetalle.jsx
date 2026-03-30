@@ -7,6 +7,7 @@ import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import StatusBadge from '../../../components/StatusBadge'
 import { formatCurrency, formatDateTime } from '../../../utils/formatters'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function AsientoDetalle() {
   const { id } = useParams()
@@ -63,9 +64,7 @@ export default function AsientoDetalle() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

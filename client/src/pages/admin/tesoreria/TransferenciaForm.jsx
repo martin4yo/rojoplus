@@ -4,6 +4,7 @@ import { ArrowLeft, Save, ArrowRightLeft, ArrowRight, ChevronDown, ChevronRight 
 import { Button } from '../../../components/Button'
 import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function TransferenciaForm() {
   const navigate = useNavigate()
@@ -201,9 +202,7 @@ export default function TransferenciaForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

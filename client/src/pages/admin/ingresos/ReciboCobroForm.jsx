@@ -4,6 +4,7 @@ import { ArrowLeft, CreditCard, Search, User, Building2, FileText, Check } from 
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const MEDIOS_PAGO = [
   { value: 'EFECTIVO', label: 'Efectivo' },
@@ -283,9 +284,7 @@ export default function ReciboCobroForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

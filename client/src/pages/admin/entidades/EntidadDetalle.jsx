@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Edit, Building2, UserCheck, Briefcase, Mail, Phone, MapPin, CreditCard, FileText } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TIPO_CONFIG = {
   PROVEEDOR: {
@@ -61,9 +62,7 @@ export default function EntidadDetalle({ tipo }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

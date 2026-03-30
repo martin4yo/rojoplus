@@ -7,6 +7,7 @@ import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import StatusBadge from '../../../components/StatusBadge'
 import { formatCurrency, formatDate, formatDateTime } from '../../../utils/formatters'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function FacturaVentaDetalle() {
   const { id } = useParams()
@@ -59,9 +60,7 @@ export default function FacturaVentaDetalle() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

@@ -9,6 +9,7 @@ import { formatCurrency, formatDateForInput } from '../../utils/formatters'
 import { useApiData } from '../../hooks/useApiData'
 import api from '../../services/api'
 import { useConfirm } from '../../hooks/useConfirm'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function EntrenadorForm() {
   const { id } = useParams()
@@ -251,9 +252,7 @@ export default function EntrenadorForm() {
 
   if (loadingData) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 

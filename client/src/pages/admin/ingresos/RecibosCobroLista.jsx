@@ -8,6 +8,7 @@ import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
 import { usePagination } from '../../../hooks/usePagination'
 import Pagination from '../../../components/Pagination'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const MEDIOS_PAGO = [
   { value: '', label: 'Todos' },
@@ -284,9 +285,7 @@ export default function RecibosCobroLista() {
       {/* Tabla */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
+          <LoadingSpinner />
         ) : recibos.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <CreditCard className="w-12 h-12 mx-auto mb-4 opacity-50" />

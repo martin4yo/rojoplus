@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AlertTriangle, Package, RefreshCw, ExternalLink } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function AlertasStock() {
   const [alertas, setAlertas] = useState([])
@@ -71,9 +72,7 @@ export default function AlertasStock() {
 
       {/* Contenido */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner />
       ) : alertas.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border border-green-200 p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
