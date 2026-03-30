@@ -1054,7 +1054,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Enviar recibo por email (fuera de transacción, async)
-  enviarReciboPago(pagoCompleto).catch(err => {
+  enviarReciboPago(pagoCompleto, req.db).catch(err => {
     console.error('Error enviando recibo por email:', err)
   })
 

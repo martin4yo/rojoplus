@@ -18,6 +18,7 @@ import {
   CalendarIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline'
+import { Newspaper } from 'lucide-react'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 
 const CATEGORIAS = [
@@ -134,14 +135,19 @@ export default function Noticias() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Noticias</h1>
-          <p className="text-gray-500">Gestiona las noticias y novedades del club</p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Newspaper className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Noticias</h1>
+            <p className="text-sm text-gray-500">Gestiona las noticias y novedades del club</p>
+          </div>
         </div>
         {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
           <button
             onClick={handleNueva}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
           >
             <PlusIcon className="w-5 h-5" />
             Nueva Noticia
@@ -160,7 +166,7 @@ export default function Noticias() {
               value={filtros.busqueda}
               onChange={e => setFiltros({ ...filtros, busqueda: e.target.value })}
               placeholder="Buscar por título..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
 
@@ -168,7 +174,7 @@ export default function Noticias() {
           <select
             value={filtros.categoria}
             onChange={e => setFiltros({ ...filtros, categoria: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
           >
             <option value="">Todas las categorías</option>
             {CATEGORIAS.map(cat => (
@@ -180,7 +186,7 @@ export default function Noticias() {
           <select
             value={filtros.publicada}
             onChange={e => setFiltros({ ...filtros, publicada: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
           >
             <option value="">Todos los estados</option>
             <option value="true">Publicadas</option>
@@ -200,7 +206,7 @@ export default function Noticias() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-600"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
           </div>
         ) : noticias.length === 0 ? (
           <div className="text-center py-12">
@@ -208,7 +214,7 @@ export default function Noticias() {
             <p className="text-gray-500">No hay noticias</p>
             <button
               onClick={handleNueva}
-              className="mt-4 text-red-600 hover:text-red-700 font-medium"
+              className="mt-4 text-primary hover:text-primary-dark font-medium"
             >
               Crear la primera noticia
             </button>
@@ -279,7 +285,7 @@ export default function Noticias() {
                   {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
                     <button
                       onClick={() => handleEditar(noticia)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                       title="Editar"
                     >
                       <PencilSquareIcon className="w-5 h-5" />
@@ -288,7 +294,7 @@ export default function Noticias() {
                   {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
                     <button
                       onClick={() => handleEliminar(noticia.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                       title="Eliminar"
                     >
                       <TrashIcon className="w-5 h-5" />
@@ -467,7 +473,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
                   type="text"
                   value={form.titulo}
                   onChange={e => setForm({ ...form, titulo: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   placeholder="Título de la noticia"
                   required
                 />
@@ -481,7 +487,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
                 <textarea
                   value={form.extracto}
                   onChange={e => setForm({ ...form, extracto: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   rows={2}
                   placeholder="Breve descripción que aparece en el listado..."
                 />
@@ -495,7 +501,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
                 <textarea
                   value={form.contenido}
                   onChange={e => setForm({ ...form, contenido: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 font-mono text-sm"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary font-mono text-sm"
                   rows={10}
                   placeholder="Contenido de la noticia (puede usar HTML básico)..."
                   required
@@ -530,7 +536,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
                 <select
                   value={form.categoria}
                   onChange={e => setForm({ ...form, categoria: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 >
                   {CATEGORIAS.map(cat => (
                     <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -547,7 +553,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
                 <select
                   value={form.actividadId || ''}
                   onChange={e => setForm({ ...form, actividadId: e.target.value ? parseInt(e.target.value) : null })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 >
                   <option value="">-- Ninguna --</option>
                   {actividades.map(act => (
@@ -569,7 +575,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
                   <select
                     value={form.categoriaActividadId || ''}
                     onChange={e => setForm({ ...form, categoriaActividadId: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   >
                     <option value="">-- Todas las categorías --</option>
                     {categorias.map(cat => (
@@ -591,7 +597,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
                   type="datetime-local"
                   value={form.fechaPublicacion}
                   onChange={e => setForm({ ...form, fechaPublicacion: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Dejar vacío para publicar inmediatamente
@@ -674,7 +680,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors"
             >
               {saving ? 'Guardando...' : (form.id ? 'Actualizar' : 'Crear')}
             </button>

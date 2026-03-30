@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Search, Calendar, ChevronDown, ArrowLeft, TrendingUp, TrendingDown, Eye } from 'lucide-react'
+import { BookOpen, Search, Calendar, ChevronDown, TrendingUp, TrendingDown, Eye } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 
@@ -127,12 +127,6 @@ export default function LibroMayor() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link
-            to="/admin/contabilidad/asientos"
-            className="p-2 hover:bg-gray-100 rounded-lg transition"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
           <div className="p-2 bg-primary/10 rounded-lg">
             <BookOpen className="w-6 h-6 text-primary" />
           </div>

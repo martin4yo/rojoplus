@@ -74,7 +74,7 @@ export default function ConfiguracionPagos() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">

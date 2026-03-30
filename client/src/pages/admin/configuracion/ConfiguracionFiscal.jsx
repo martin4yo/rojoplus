@@ -200,7 +200,7 @@ export default function ConfiguracionFiscal() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div>
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <div className="p-2 rounded-lg bg-primary/10">

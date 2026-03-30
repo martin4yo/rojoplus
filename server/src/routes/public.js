@@ -1038,4 +1038,16 @@ router.get('/reglamento', asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/public/pagina/:slug — contenido editable de páginas del sitio
+router.get('/pagina/:slug', asyncHandler(async (req, res) => {
+  const { slug } = req.params
+  const VALIDAS = ['historia']
+  if (!VALIDAS.includes(slug)) return res.status(404).json({ error: 'Página no encontrada' })
+
+  const clave = `PAGINA_${slug.toUpperCase()}`
+  const config = await req.db.configuracion.findFirst({ where: { clave } })
+
+  res.json({ success: true, data: config?.valor ? JSON.parse(config.valor) : null })
+}))
+
 export default router

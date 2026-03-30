@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Shield, Edit, ArrowLeft, Users } from 'lucide-react'
+import { Plus, Shield, Edit, Users } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -35,11 +35,8 @@ export default function RolesLista() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/admin/configuracion')} className="p-2 hover:bg-gray-100 rounded-lg">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="p-2 rounded-lg bg-purple-100">
-            <Shield className="w-6 h-6 text-purple-600" />
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Shield className="w-6 h-6 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Roles</h1>

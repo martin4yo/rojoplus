@@ -21,7 +21,7 @@ export default function ChatWidget({
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isAvailable, setIsAvailable] = useState(true)
+  const [isAvailable, setIsAvailable] = useState(null) // null = cargando
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -200,19 +200,19 @@ Puedo ayudarte con:
     return `${baseClasses} ${positionMap[position] || positionMap['bottom-right']} z-50`
   }
 
+  // No renderizar hasta confirmar disponibilidad; ocultar si no hay API key
+  if (!isAvailable) return null
+
   return (
     <div className={getPositionClasses()}>
       {/* Botón flotante */}
       {!isOpen && position !== 'sidebar' && (
         <button
           onClick={toggleOpen}
-          className="w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110"
+          className="w-14 h-14 bg-primary hover:bg-primary-dark text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110"
           aria-label="Abrir chat de IA"
         >
           <MessageCircle className="w-6 h-6" />
-          {!isAvailable && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full border-2 border-white"></span>
-          )}
         </button>
       )}
 
@@ -226,7 +226,7 @@ Puedo ayudarte con:
           }`}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-4 rounded-t-2xl flex items-center justify-between">
+          <div className="bg-gradient-to-r from-primary to-primary-dark text-white p-4 rounded-t-2xl flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <div>
@@ -288,13 +288,13 @@ Puedo ayudarte con:
                     : 'Asistente no disponible'
                 }
                 disabled={isLoading || !isAvailable}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 dark:text-white disabled:opacity-50"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:text-white disabled:opacity-50"
               />
 
               <button
                 onClick={handleSend}
                 disabled={!inputValue.trim() || isLoading || !isAvailable}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 aria-label="Enviar mensaje"
               >
                 {isLoading ? (

@@ -489,9 +489,14 @@ export default function MenuAdmin() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Administración de Menú</h1>
-          <p className="text-gray-500">Configura la estructura del menú y asigna permisos por rol</p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Menu className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Administración de Menú</h1>
+            <p className="text-sm text-gray-500">Configura la estructura del menú y asigna permisos por rol</p>
+          </div>
         </div>
         <div className="flex gap-2">
           {menuItems.length === 0 && (

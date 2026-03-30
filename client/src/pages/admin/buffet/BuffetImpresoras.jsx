@@ -390,7 +390,7 @@ export default function BuffetImpresoras() {
   }
 
   if (loading) {
-    return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>
+    return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
   }
 
   return (
@@ -401,7 +401,7 @@ export default function BuffetImpresoras() {
           {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
             <button
               onClick={() => abrirModalSector()}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
             >
               <Plus size={18} />
               Nuevo Sector
@@ -484,7 +484,7 @@ export default function BuffetImpresoras() {
           {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
             <button
               onClick={() => abrirModal()}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
               disabled={sectores.length === 0}
             >
               <Plus size={18} />
@@ -576,7 +576,7 @@ export default function BuffetImpresoras() {
                         {dest.categoriaMenu?.nombre}
                         <button
                           onClick={() => eliminarDestino(dest.id)}
-                          className="hover:text-red-600"
+                          className="hover:text-primary"
                         >
                           ×
                         </button>
@@ -695,7 +695,7 @@ export default function BuffetImpresoras() {
                               type="checkbox"
                               checked={destino.saltarControlCocina || false}
                               onChange={() => toggleSaltarControl(destino.id, destino.saltarControlCocina)}
-                              className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
                             />
                             <span className="text-xs text-gray-600">
                               {destino.saltarControlCocina
@@ -796,7 +796,7 @@ export default function BuffetImpresoras() {
             <button
               onClick={guardarConfigTickets}
               disabled={guardandoConfig}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
             >
               {guardandoConfig ? 'Guardando...' : 'Guardar Configuración'}
             </button>
@@ -824,7 +824,7 @@ export default function BuffetImpresoras() {
                   <button
                     type="button"
                     onClick={() => setOpcionesImpresion(prev => ({ ...prev, [confirmarKey]: !prev[confirmarKey] }))}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${opcionesImpresion[confirmarKey] ? 'bg-red-600' : 'bg-gray-300'}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${opcionesImpresion[confirmarKey] ? 'bg-primary' : 'bg-gray-300'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${opcionesImpresion[confirmarKey] ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -835,7 +835,7 @@ export default function BuffetImpresoras() {
                   <button
                     type="button"
                     onClick={() => setOpcionesImpresion(prev => ({ ...prev, [comandaKey]: !prev[comandaKey] }))}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${opcionesImpresion[comandaKey] ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${opcionesImpresion[comandaKey] ? 'bg-primary' : 'bg-gray-300'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${opcionesImpresion[comandaKey] ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -848,7 +848,7 @@ export default function BuffetImpresoras() {
             <button
               onClick={guardarOpcionesImpresion}
               disabled={guardandoOpciones}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
             >
               {guardandoOpciones ? 'Guardando...' : 'Guardar Opciones'}
             </button>
@@ -939,7 +939,7 @@ export default function BuffetImpresoras() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
                 >
                   Guardar
                 </button>
@@ -1056,7 +1056,7 @@ export default function BuffetImpresoras() {
                       <button
                         type="button"
                         onClick={refrescarPuestos}
-                        className="ml-2 text-blue-600 hover:text-blue-700"
+                        className="ml-2 text-primary hover:text-primary-dark"
                         title="Refrescar puestos"
                       >
                         <RefreshCw size={14} className="inline" />
@@ -1144,7 +1144,7 @@ export default function BuffetImpresoras() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
                 >
                   Guardar
                 </button>

@@ -69,6 +69,7 @@ router.post('/enviar-qr', asyncHandler(async (req, res) => {
     nroSocio: socio.nroSocio,
     qrUrl,
     portalUrl,
+    db: req.db,
   })
 
   // Ocultar parte del email para la respuesta
@@ -143,7 +144,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   })
 
   // Enviar email con Magic Link
-  await enviarMagicLinkSocio(socio, token)
+  await enviarMagicLinkSocio(socio, token, req.db)
 
   res.json({
     success: true,

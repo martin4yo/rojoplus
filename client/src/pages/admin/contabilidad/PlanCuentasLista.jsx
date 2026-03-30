@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, ChevronRight, ChevronDown, Edit2, Trash2, BookOpen, Layers } from 'lucide-react'
+import { Plus, ChevronRight, ChevronDown, Edit2, Trash2, BookOpen, Layers } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { useModal } from '../../../components/Modal'
@@ -311,21 +311,13 @@ export default function PlanCuentasLista() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/admin/configuracion')}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-indigo-100">
-              <BookOpen className="w-6 h-6 text-indigo-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Plan de Cuentas</h1>
-              <p className="text-gray-500 text-sm">Estructura contable del club</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <BookOpen className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Plan de Cuentas</h1>
+            <p className="text-gray-500 text-sm">Estructura contable del club</p>
           </div>
         </div>
 {tienePermiso(PERMISOS.CONTABILIDAD_ASIENTOS) && (

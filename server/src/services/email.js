@@ -1,7 +1,8 @@
 import nodemailer from 'nodemailer'
 import prisma from '../lib/prisma.js'
 
-const transporter = nodemailer.createTransport({
+// Transporter global (fallback desde variables de entorno)
+const globalTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT) || 587,
   secure: false,
@@ -13,12 +14,70 @@ const transporter = nodemailer.createTransport({
 
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
-// Verificar si está en modo demo y obtener el email de prueba
-async function getModoDemo() {
+// Cache de transporters por host:port:user para no recrearlos en cada email
+const transporterCache = new Map()
+
+/**
+ * Obtiene la configuración de mail del tenant (o globals como fallback).
+ * Claves en tabla configuracion: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
+ * SMTP_SECURE, SMTP_FROM, SMTP_FROM_NAME, EMAIL_CONTACTO, NOMBRE_CLUB
+ */
+async function getMailConfig(db) {
+  const globalFrom = `"${process.env.SMTP_FROM_NAME || 'Clubix'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`
+  const globalEmailContacto = process.env.EMAIL_CONTACTO || process.env.SMTP_USER
+
+  if (!db) {
+    return { transporter: globalTransporter, from: globalFrom, emailContacto: globalEmailContacto }
+  }
+
   try {
+    const configs = await db.configuracion.findMany({
+      where: {
+        clave: { in: ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_SECURE', 'SMTP_FROM', 'SMTP_FROM_NAME', 'EMAIL_CONTACTO', 'NOMBRE_CLUB'] }
+      }
+    })
+    const cfg = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
+
+    const fromName = cfg.SMTP_FROM_NAME || cfg.NOMBRE_CLUB || process.env.SMTP_FROM_NAME || 'Clubix'
+    const emailContacto = cfg.EMAIL_CONTACTO || globalEmailContacto
+
+    if (!cfg.SMTP_HOST || !cfg.SMTP_USER) {
+      // Sin config SMTP propia: usar transporter global pero con nombre del tenant
+      return {
+        transporter: globalTransporter,
+        from: `"${fromName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+        emailContacto,
+      }
+    }
+
+    const cacheKey = `${cfg.SMTP_HOST}:${cfg.SMTP_PORT || 587}:${cfg.SMTP_USER}`
+    if (!transporterCache.has(cacheKey)) {
+      transporterCache.set(cacheKey, nodemailer.createTransport({
+        host: cfg.SMTP_HOST,
+        port: parseInt(cfg.SMTP_PORT) || 587,
+        secure: cfg.SMTP_SECURE === 'true',
+        auth: { user: cfg.SMTP_USER, pass: cfg.SMTP_PASS },
+      }))
+    }
+
+    return {
+      transporter: transporterCache.get(cacheKey),
+      from: `"${fromName}" <${cfg.SMTP_FROM || cfg.SMTP_USER}>`,
+      emailContacto,
+    }
+  } catch (err) {
+    console.error('Error obteniendo config SMTP del tenant:', err.message)
+    return { transporter: globalTransporter, from: globalFrom, emailContacto: globalEmailContacto }
+  }
+}
+
+// Verificar si está en modo demo y obtener el email de prueba
+async function getModoDemo(db) {
+  try {
+    const dbToUse = db || prisma
     const [modoDemo, emailDemo] = await Promise.all([
-      prisma.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
-      prisma.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
+      dbToUse.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
+      dbToUse.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
     ])
     return {
       activo: modoDemo?.valor === 'true',
@@ -30,29 +89,31 @@ async function getModoDemo() {
   }
 }
 
-// Función helper para enviar email (maneja modo demo)
-async function enviarEmail({ to, subject, html }) {
-  const modoDemo = await getModoDemo()
+// Función helper para enviar email (maneja modo demo y SMTP por tenant)
+export async function enviarEmail({ to, subject, html, db }) {
+  const [modoDemo, mailConfig] = await Promise.all([
+    getModoDemo(db),
+    getMailConfig(db),
+  ])
 
   let destinatario = to
   let subjectFinal = subject
 
   if (modoDemo.activo && modoDemo.email) {
-    // En modo demo, redirigir al email de prueba
     destinatario = modoDemo.email
     subjectFinal = `[DEMO - Para: ${to}] ${subject}`
     console.log(`📧 MODO DEMO: Redirigiendo email de ${to} a ${modoDemo.email}`)
   }
 
-  await transporter.sendMail({
-    from: `"Rojo Plus" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+  await mailConfig.transporter.sendMail({
+    from: mailConfig.from,
     to: destinatario,
     subject: subjectFinal,
     html,
   })
 }
 
-export async function enviarEmailAprobacion(comercio) {
+export async function enviarEmailAprobacion(comercio, db) {
   const linkAcceso = `${frontendUrl}/comercio/${comercio.token}`
 
   const html = `
@@ -104,10 +165,11 @@ export async function enviarEmailAprobacion(comercio) {
     to: comercio.email,
     subject: '¡Tu comercio fue aprobado! - Rojo Plus',
     html,
+    db,
   })
 }
 
-export async function enviarEmailRechazo(comercio, motivo) {
+export async function enviarEmailRechazo(comercio, motivo, db) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #DC2626; padding: 20px; text-align: center;">
@@ -145,10 +207,11 @@ export async function enviarEmailRechazo(comercio, motivo) {
     to: comercio.email,
     subject: 'Actualización de tu solicitud - Rojo Plus',
     html,
+    db,
   })
 }
 
-export async function enviarEmailLinkAcceso(comercio) {
+export async function enviarEmailLinkAcceso(comercio, db) {
   const linkAcceso = `${frontendUrl}/comercio/${comercio.token}`
 
   const html = `
@@ -192,11 +255,12 @@ export async function enviarEmailLinkAcceso(comercio) {
     to: comercio.email,
     subject: 'Tu link de acceso - Rojo Plus',
     html,
+    db,
   })
 }
 
 // Enviar recibo de pago por email
-export async function enviarReciboPago(pago) {
+export async function enviarReciboPago(pago, db) {
   // Si el socio no tiene email, no enviar
   if (!pago.socio?.email) {
     console.log(`📧 Recibo ${pago.numero}: socio sin email, no se envía`)
@@ -296,6 +360,7 @@ export async function enviarReciboPago(pago) {
       to: pago.socio.email,
       subject: `Recibo de Pago #${pago.numero} - Club Sportivo Pilar`,
       html,
+      db,
     })
     console.log(`📧 Recibo ${pago.numero} enviado a ${pago.socio.email}`)
     return true
@@ -306,7 +371,7 @@ export async function enviarReciboPago(pago) {
 }
 
 // Enviar Magic Link al socio para acceso al portal
-export async function enviarMagicLinkSocio(socio, token) {
+export async function enviarMagicLinkSocio(socio, token, db) {
   const linkAcceso = `${frontendUrl}/portal-socio/${token}`
 
   const html = `
@@ -370,11 +435,12 @@ export async function enviarMagicLinkSocio(socio, token) {
     to: socio.email,
     subject: 'Tu link de acceso al Portal del Socio',
     html,
+    db,
   })
 }
 
 // Enviar QR al socio por email (acceso seguro)
-export async function enviarEmailQRSocio({ to, socioNombre, nroSocio, qrUrl, portalUrl }) {
+export async function enviarEmailQRSocio({ to, socioNombre, nroSocio, qrUrl, portalUrl, db }) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #DC2626; padding: 20px; text-align: center;">
@@ -434,6 +500,7 @@ export async function enviarEmailQRSocio({ to, socioNombre, nroSocio, qrUrl, por
     to,
     subject: `Tu código QR - Socio #${nroSocio} - Rojo Plus`,
     html,
+    db,
   })
 
   console.log(`📧 QR enviado a ${to} (Socio #${nroSocio})`)
@@ -442,8 +509,10 @@ export async function enviarEmailQRSocio({ to, socioNombre, nroSocio, qrUrl, por
 /**
  * Envía email desde formulario de contacto
  */
-export async function enviarEmailContacto({ nombre, email, telefono, asunto, mensaje }) {
-  // Email al club
+export async function enviarEmailContacto({ nombre, email, telefono, asunto, mensaje, db }) {
+  const mailConfig = await getMailConfig(db)
+  const emailClub = mailConfig.emailContacto
+
   const asuntoMap = {
     inscripcion: 'Inscripción de socio',
     actividades: 'Consulta sobre actividades',
@@ -453,7 +522,6 @@ export async function enviarEmailContacto({ nombre, email, telefono, asunto, men
   }
 
   const asuntoTexto = asuntoMap[asunto] || asunto || 'Consulta general'
-  const emailClub = process.env.EMAIL_CONTACTO || process.env.SMTP_USER
 
   const htmlClub = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb;">
@@ -511,6 +579,7 @@ export async function enviarEmailContacto({ nombre, email, telefono, asunto, men
     to: emailClub,
     subject: `[Contacto Web] ${asuntoTexto} - ${nombre}`,
     html: htmlClub,
+    db,
   })
 
   // Email de confirmación al usuario
@@ -552,15 +621,16 @@ export async function enviarEmailContacto({ nombre, email, telefono, asunto, men
     to: email,
     subject: 'Recibimos tu mensaje - Club Sportivo Pilar',
     html: htmlUsuario,
+    db,
   })
 
   console.log(`📧 Email de contacto procesado: ${nombre} <${email}>`)
 }
 
-// Verificar conexión SMTP al iniciar
+// Verificar conexión SMTP al iniciar (usa config global)
 export async function verificarConexionSMTP() {
   try {
-    await transporter.verify()
+    await globalTransporter.verify()
     console.log('📧 Conexión SMTP verificada')
     return true
   } catch (error) {

@@ -16,6 +16,7 @@ import {
   XCircleIcon,
   InformationCircleIcon
 } from '@heroicons/react/24/outline'
+import { Megaphone } from 'lucide-react'
 import { BANNER_SIZES } from '../../components/public/BannerPublicitario'
 import Modal from '../../components/Modal'
 import ImageUpload from '../../components/ImageUpload'
@@ -117,7 +118,7 @@ export default function Publicidad() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
@@ -125,10 +126,15 @@ export default function Publicidad() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Publicidad</h1>
-          <p className="text-gray-500">Gestiona banners y sponsors del sitio</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Megaphone className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Publicidad</h1>
+            <p className="text-sm text-gray-500">Gestiona banners y sponsors del sitio</p>
+          </div>
         </div>
       </div>
 
@@ -163,7 +169,7 @@ export default function Publicidad() {
               onClick={() => setTab('banners')}
               className={`px-6 py-4 text-sm font-medium border-b-2 ${
                 tab === 'banners'
-                  ? 'border-red-600 text-red-600'
+                  ? 'border-primary text-primary'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -174,7 +180,7 @@ export default function Publicidad() {
               onClick={() => setTab('sponsors')}
               className={`px-6 py-4 text-sm font-medium border-b-2 ${
                 tab === 'sponsors'
-                  ? 'border-red-600 text-red-600'
+                  ? 'border-primary text-primary'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -185,7 +191,7 @@ export default function Publicidad() {
               onClick={() => setTab('estadisticas')}
               className={`px-6 py-4 text-sm font-medium border-b-2 ${
                 tab === 'estadisticas'
-                  ? 'border-red-600 text-red-600'
+                  ? 'border-primary text-primary'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -203,7 +209,7 @@ export default function Publicidad() {
                 <div className="flex justify-end">
                   <button
                     onClick={() => setModalBanner({ open: true, data: null })}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
                   >
                     <PlusIcon className="w-5 h-5" />
                     Nuevo Banner
@@ -277,14 +283,14 @@ export default function Publicidad() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => setModalBanner({ open: true, data: banner })}
-                            className="p-2 text-gray-400 hover:text-blue-600"
+                            className="p-2 text-gray-400 hover:text-primary"
                             title="Editar"
                           >
                             <PencilSquareIcon className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => handleDeleteBanner(banner.id)}
-                            className="p-2 text-gray-400 hover:text-red-600"
+                            className="p-2 text-gray-400 hover:text-danger"
                             title="Eliminar"
                           >
                             <TrashIcon className="w-5 h-5" />
@@ -305,7 +311,7 @@ export default function Publicidad() {
                 <div className="flex justify-end">
                   <button
                     onClick={() => setModalSponsor({ open: true, data: null })}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
                   >
                     <PlusIcon className="w-5 h-5" />
                     Nuevo Sponsor
@@ -360,7 +366,7 @@ export default function Publicidad() {
                             href={sponsor.sitioWeb}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-2 text-gray-400 hover:text-blue-600"
+                            className="p-2 text-gray-400 hover:text-primary"
                             title="Ver sitio web"
                           >
                             <GlobeAltIcon className="w-5 h-5" />
@@ -369,7 +375,7 @@ export default function Publicidad() {
                         {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
                           <button
                             onClick={() => setModalSponsor({ open: true, data: sponsor })}
-                            className="p-2 text-gray-400 hover:text-blue-600"
+                            className="p-2 text-gray-400 hover:text-primary"
                             title="Editar"
                           >
                             <PencilSquareIcon className="w-5 h-5" />
@@ -378,7 +384,7 @@ export default function Publicidad() {
                         {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
                           <button
                             onClick={() => handleDeleteSponsor(sponsor.id)}
-                            className="p-2 text-gray-400 hover:text-red-600"
+                            className="p-2 text-gray-400 hover:text-danger"
                             title="Eliminar"
                           >
                             <TrashIcon className="w-5 h-5" />
@@ -622,7 +628,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                   type="text"
                   value={form.titulo}
                   onChange={e => setForm({ ...form, titulo: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
@@ -634,7 +640,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                 <select
                   value={form.sponsorId}
                   onChange={e => setForm({ ...form, sponsorId: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 >
                   <option value="">Sin sponsor</option>
                   {sponsors.map(s => (
@@ -650,7 +656,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                 <select
                   value={form.tipo}
                   onChange={e => setForm({ ...form, tipo: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 >
                   <option value="HERO">Hero - {BANNER_SIZES.HERO.label}</option>
                   <option value="HEADER">Header - {BANNER_SIZES.HEADER.label}</option>
@@ -686,7 +692,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                           type="checkbox"
                           checked={(form.ubicaciones || []).includes(ub.value)}
                           onChange={() => handleUbicacionToggle(ub.value)}
-                          className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                          className="rounded border-gray-300 text-primary focus:ring-primary"
                         />
                         <span className="text-sm text-gray-700">{ub.label}</span>
                       </label>
@@ -703,7 +709,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                   type="number"
                   value={form.orden}
                   onChange={e => setForm({ ...form, orden: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -713,7 +719,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                 </label>
                 {uploading.desktop ? (
                   <div className="flex items-center justify-center gap-2 p-8 border-2 border-dashed border-gray-300 rounded-lg">
-                    <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                    <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
                     <span className="text-gray-500">Subiendo imagen...</span>
                   </div>
                 ) : (
@@ -756,7 +762,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                 </label>
                 {uploading.mobile ? (
                   <div className="flex items-center justify-center gap-2 p-8 border-2 border-dashed border-gray-300 rounded-lg">
-                    <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                    <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
                     <span className="text-gray-500">Subiendo imagen...</span>
                   </div>
                 ) : (
@@ -787,7 +793,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                   type="url"
                   value={form.linkDestino}
                   onChange={e => setForm({ ...form, linkDestino: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   placeholder="https://..."
                 />
               </div>
@@ -800,7 +806,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                   type="text"
                   value={form.textoAlt}
                   onChange={e => setForm({ ...form, textoAlt: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -813,7 +819,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                   type="date"
                   value={form.fechaInicio}
                   onChange={e => setForm({ ...form, fechaInicio: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -825,7 +831,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                   type="date"
                   value={form.fechaFin}
                   onChange={e => setForm({ ...form, fechaFin: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -838,7 +844,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                   type="number"
                   value={form.montoMensual}
                   onChange={e => setForm({ ...form, montoMensual: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   placeholder="0.00"
                   step="0.01"
                 />
@@ -852,7 +858,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                   type="month"
                   value={form.mesContratado}
                   onChange={e => setForm({ ...form, mesContratado: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -862,7 +868,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
                     type="checkbox"
                     checked={form.activo}
                     onChange={e => setForm({ ...form, activo: e.target.checked })}
-                    className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                    className="rounded border-gray-300 text-primary focus:ring-primary"
                   />
                   <span className="text-sm text-gray-700">Activo</span>
                 </label>
@@ -890,7 +896,7 @@ function ModalBannerContent({ data, sponsors, onClose, onSave }) {
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
           >
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
@@ -968,7 +974,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                   type="text"
                   value={form.nombre}
                   onChange={e => setForm({ ...form, nombre: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
@@ -981,7 +987,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                   type="text"
                   value={form.razonSocial}
                   onChange={e => setForm({ ...form, razonSocial: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -993,7 +999,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                   type="text"
                   value={form.cuit}
                   onChange={e => setForm({ ...form, cuit: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   placeholder="XX-XXXXXXXX-X"
                 />
               </div>
@@ -1006,7 +1012,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                   type="text"
                   value={form.contactoNombre}
                   onChange={e => setForm({ ...form, contactoNombre: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -1018,7 +1024,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                   type="tel"
                   value={form.contactoTelefono}
                   onChange={e => setForm({ ...form, contactoTelefono: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -1030,7 +1036,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                   type="email"
                   value={form.contactoEmail}
                   onChange={e => setForm({ ...form, contactoEmail: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -1042,7 +1048,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                   type="text"
                   value={form.direccion}
                   onChange={e => setForm({ ...form, direccion: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -1052,7 +1058,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                 </label>
                 {uploading ? (
                   <div className="flex items-center justify-center gap-2 p-8 border-2 border-dashed border-gray-300 rounded-lg">
-                    <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                    <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
                     <span className="text-gray-500">Subiendo logo...</span>
                   </div>
                 ) : (
@@ -1082,7 +1088,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                   type="url"
                   value={form.sitioWeb}
                   onChange={e => setForm({ ...form, sitioWeb: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   placeholder="https://..."
                 />
               </div>
@@ -1094,7 +1100,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                 <textarea
                   value={form.observaciones}
                   onChange={e => setForm({ ...form, observaciones: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   rows={3}
                 />
               </div>
@@ -1105,7 +1111,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
                     type="checkbox"
                     checked={form.activo}
                     onChange={e => setForm({ ...form, activo: e.target.checked })}
-                    className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                    className="rounded border-gray-300 text-primary focus:ring-primary"
                   />
                   <span className="text-sm text-gray-700">Activo</span>
                 </label>
@@ -1123,7 +1129,7 @@ function ModalSponsorContent({ data, onClose, onSave }) {
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
           >
             {saving ? 'Guardando...' : 'Guardar'}
           </button>

@@ -45,7 +45,8 @@ router.post('/public/contacto', async (req, res) => {
       email: email.trim().toLowerCase(),
       telefono: telefono?.trim() || null,
       asunto: asunto || 'otro',
-      mensaje: mensaje.trim()
+      mensaje: mensaje.trim(),
+      db: req.db,
     })
 
     res.json({

@@ -575,7 +575,7 @@ export default function ReportesDeportivos() {
             <button
               onClick={exportarPDF}
               disabled={loading || !hayDatosParaExportar()}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
               title="Exportar a PDF"
             >
               <FileText className="w-4 h-4" />
@@ -601,7 +601,7 @@ export default function ReportesDeportivos() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors
                 ${activeTab === tab.id
-                  ? 'text-red-600 border-b-2 border-red-600 bg-red-50/50'
+                  ? 'text-primary border-b-2 border-primary bg-primary/5'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
@@ -808,7 +808,7 @@ function TabAsistencia({ data }) {
                 </td>
                 <td className="px-4 py-3 text-gray-600">{s.categoria || '-'}</td>
                 <td className="px-4 py-3 text-center font-medium text-green-600">{s.asistencias}</td>
-                <td className="px-4 py-3 text-center font-medium text-red-600">{s.inasistencias}</td>
+                <td className="px-4 py-3 text-center font-medium text-primary">{s.inasistencias}</td>
                 <td className="px-4 py-3 text-center">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                     s.porcentajeAsistencia >= 80
@@ -943,7 +943,7 @@ function TabRanking({ goleadores, asistidores }) {
           onClick={() => setSubTab('goleadores')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             subTab === 'goleadores'
-              ? 'bg-red-600 text-white'
+              ? 'bg-primary text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
@@ -953,7 +953,7 @@ function TabRanking({ goleadores, asistidores }) {
           onClick={() => setSubTab('asistidores')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             subTab === 'asistidores'
-              ? 'bg-red-600 text-white'
+              ? 'bg-primary text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
@@ -993,7 +993,7 @@ function TabRanking({ goleadores, asistidores }) {
                 <td className="px-4 py-3 text-gray-600">{jugador.categoria || '-'}</td>
                 <td className="px-4 py-3 text-center text-gray-600">{jugador.partidos}</td>
                 <td className="px-4 py-3 text-center">
-                  <span className="font-bold text-lg text-red-600">
+                  <span className="font-bold text-lg text-primary">
                     {subTab === 'goleadores' ? jugador.goles : jugador.asistencias}
                   </span>
                 </td>
@@ -1088,15 +1088,15 @@ function TabJugador({
       {stats ? (
         <div className="space-y-6">
           {/* Info del jugador */}
-          <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-6 text-white">
+          <div className="bg-gradient-to-r from-primary to-primary-dark rounded-xl p-6 text-white">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
                 <User className="w-8 h-8" />
               </div>
               <div>
                 <h2 className="text-xl font-bold">{stats.jugador?.apellido}, {stats.jugador?.nombre}</h2>
-                <p className="text-red-200">#{stats.jugador?.numeroSocio}</p>
-                <p className="text-sm text-red-200 mt-1">{stats.jugador?.categoria || 'Sin categoría'}</p>
+                <p className="text-primary-100">#{stats.jugador?.numeroSocio}</p>
+                <p className="text-sm text-primary-100 mt-1">{stats.jugador?.categoria || 'Sin categoría'}</p>
               </div>
             </div>
           </div>

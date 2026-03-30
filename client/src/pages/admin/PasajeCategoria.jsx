@@ -223,7 +223,7 @@ export default function PasajeCategoria() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors
                 ${activeTab === tab.id
-                  ? 'text-red-600 border-b-2 border-red-600 bg-red-50/50'
+                  ? 'text-primary border-b-2 border-primary bg-primary/5'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
@@ -381,7 +381,7 @@ function TabRevisar({
           <p className="text-xs text-gray-500">Requieren Pasaje</p>
         </div>
         <div className="bg-red-50 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-red-700">{formatNumber(estadisticas.sinCategoriaDisponible)}</p>
+          <p className="text-2xl font-bold text-primary-dark">{formatNumber(estadisticas.sinCategoriaDisponible)}</p>
           <p className="text-xs text-gray-500">Sin Categoría Disponible</p>
         </div>
       </div>
@@ -500,7 +500,7 @@ function TabRevisar({
                 disabled={seleccionados.size === 0 || ejecutando}
                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium ${
                   seleccionados.size > 0
-                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    ? 'bg-primary text-white hover:bg-primary-dark'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
@@ -632,7 +632,7 @@ function TabEstadisticas({ estadisticas }) {
   return (
     <div className="space-y-6">
       {/* KPI Total */}
-      <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-6 text-white">
+      <div className="bg-gradient-to-r from-primary to-primary-dark rounded-xl p-6 text-white">
         <h2 className="text-lg font-medium">Total de Pasajes en {estadisticas.anio}</h2>
         <p className="text-4xl font-bold mt-2">{formatNumber(estadisticas.totalPasajes)}</p>
       </div>
@@ -649,7 +649,7 @@ function TabEstadisticas({ estadisticas }) {
                     <span className="font-medium text-gray-700">{item.categoria}</span>
                     <p className="text-xs text-gray-500">{item.actividad}</p>
                   </div>
-                  <span className="font-bold text-red-600">{formatNumber(item.cantidad)}</span>
+                  <span className="font-bold text-primary">{formatNumber(item.cantidad)}</span>
                 </div>
               ))}
             </div>
@@ -666,7 +666,7 @@ function TabEstadisticas({ estadisticas }) {
               {estadisticas.porMes.map((item) => (
                 <div key={item.mes} className="flex items-center justify-between p-3 bg-white rounded-lg">
                   <span className="font-medium text-gray-700">{meses[item.mes - 1]}</span>
-                  <span className="font-bold text-red-600">{formatNumber(item.cantidad)}</span>
+                  <span className="font-bold text-primary">{formatNumber(item.cantidad)}</span>
                 </div>
               ))}
             </div>

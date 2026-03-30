@@ -11,14 +11,14 @@ export default function ChatMessage({ message, isUser }) {
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 ${
           isUser
-            ? 'bg-red-600 text-white'
+            ? 'bg-primary text-white'
             : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
         }`}
       >
         {/* Avatar */}
         {!isUser && (
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
               R
             </div>
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
@@ -53,7 +53,7 @@ export default function ChatMessage({ message, isUser }) {
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-red-600 hover:text-red-700 underline dark:text-red-400"
+                      className="text-primary hover:text-primary-dark underline"
                     >
                       {children}
                     </a>
@@ -69,7 +69,7 @@ export default function ChatMessage({ message, isUser }) {
         {/* Timestamp */}
         <div
           className={`text-xs mt-1 ${
-            isUser ? 'text-red-100' : 'text-gray-500 dark:text-gray-400'
+            isUser ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
           }`}
         >
           {new Date(message.timestamp).toLocaleTimeString('es-AR', {

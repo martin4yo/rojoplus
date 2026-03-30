@@ -104,7 +104,7 @@ export default function BuffetMesas() {
   }
 
   if (loading) {
-    return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>
+    return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
   }
 
   return (
@@ -113,7 +113,7 @@ export default function BuffetMesas() {
         {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
           <button
             onClick={() => abrirModal()}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
           >
             <Plus size={18} />
             Nueva Mesa
@@ -180,13 +180,13 @@ export default function BuffetMesas() {
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => abrirModal(mesa)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        className="p-2 text-primary hover:bg-primary/10 rounded"
                       >
                         <Edit size={16} />
                       </button>
                       <button
                         onClick={() => eliminar(mesa.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        className="p-2 text-danger hover:bg-red-50 rounded"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -285,7 +285,7 @@ export default function BuffetMesas() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
                 >
                   Guardar
                 </button>

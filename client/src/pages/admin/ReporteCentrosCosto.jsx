@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import { ChartBarIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
+import { BarChart3 } from 'lucide-react'
 
 export default function ReporteCentrosCosto() {
   const [data, setData] = useState(null)
@@ -107,11 +108,14 @@ export default function ReporteCentrosCosto() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Estado de Resultados por Centro de Costo</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Análisis multidimensional de ingresos y egresos
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <BarChart3 className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Estado de Resultados por Centro de Costo</h1>
+            <p className="text-sm text-gray-500">Análisis multidimensional de ingresos y egresos</p>
+          </div>
         </div>
         {data && (
           <div className="flex gap-2">

@@ -66,7 +66,7 @@ export default function CajasLista() {
       </div>
 
       {/* Resumen */}
-      <div className="bg-gradient-to-r from-primary to-red-700 rounded-lg shadow-sm p-6 mb-6 text-white">
+      <div className="bg-gradient-to-r from-primary to-primary-light rounded-lg shadow-sm p-6 mb-6 text-white">
         <p className="text-white/80 text-sm mb-1">Saldo Total ({cajas.length} cajas)</p>
         <p className="text-3xl font-bold">${totalSaldo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
       </div>

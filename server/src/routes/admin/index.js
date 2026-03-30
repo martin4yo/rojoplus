@@ -18,6 +18,7 @@ import inscripcionesRoutes from './inscripciones.js'
 import cobranzasRoutes from './cobranzas.js'
 import recuperoRoutes from './recupero.js'
 import comunicacionesRoutes from './comunicaciones.js'
+import paginasRoutes from './paginas.js'
 
 const router = Router()
 
@@ -39,5 +40,6 @@ router.use(inscripcionesRoutes)
 router.use('/cobranzas', cobranzasRoutes)
 router.use('/recupero', recuperoRoutes)
 router.use('/comunicaciones', comunicacionesRoutes)
+router.use(paginasRoutes)
 
 export default router

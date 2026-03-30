@@ -61,6 +61,7 @@ import AdminCierreCaja from './pages/admin/CierreCaja'
 import AdminDebitoAutomatico from './pages/admin/DebitoAutomatico'
 import AdminPublicidad from './pages/admin/Publicidad'
 import AdminNoticias from './pages/admin/Noticias'
+import ContenidoPaginas from './pages/admin/ContenidoPaginas'
 import AdminAutoridades from './pages/admin/Autoridades'
 import AdminConfiguracionLista from './pages/admin/ConfiguracionLista'
 import AdminConfiguracionForm from './pages/admin/ConfiguracionForm'
@@ -302,6 +303,8 @@ function App() {
         <Route path="debito-automatico" element={<AdminDebitoAutomatico />} />
         <Route path="publicidad" element={<AdminPublicidad />} />
         <Route path="noticias" element={<AdminNoticias />} />
+        <Route path="contenido/paginas/:slug" element={<ContenidoPaginas />} />
+        <Route path="contenido/paginas" element={<ContenidoPaginas />} />
         <Route path="reportes" element={<AdminReportes />} />
         <Route path="reportes/actividades" element={<AdminReporteActividades />} />
         <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />

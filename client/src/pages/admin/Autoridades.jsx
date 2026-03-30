@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Save, X, ChevronUp, ChevronDown, Upload, User, AlertTriangle } from 'lucide-react'
+import { Plus, Edit2, Trash2, Save, X, ChevronUp, ChevronDown, Upload, User, AlertTriangle, Users } from 'lucide-react'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 
@@ -26,7 +26,7 @@ function ConfirmModal({ open, onClose, onConfirm, title, message }) {
           </button>
           <button
             onClick={() => { onConfirm(); onClose(); }}
-            className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+            className="px-4 py-2 text-white bg-primary rounded-lg hover:bg-primary-dark"
           >
             Eliminar
           </button>
@@ -237,7 +237,7 @@ export default function Autoridades() {
     const esSubcomision = seccion === 'SUBCOMISIONES'
 
     return (
-      <div className="bg-white p-4 rounded-lg border-2 border-blue-300 shadow-lg">
+      <div className="bg-white p-4 rounded-lg border-2 border-primary/30 shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Foto */}
           <div className="md:col-span-2 flex items-center gap-4">
@@ -264,7 +264,7 @@ export default function Autoridades() {
               type="text"
               value={formData.nombre || ''}
               onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
               placeholder={esSubcomision ? 'Ej: Subcomisión de Básquet' : 'Ej: Juan Pérez'}
             />
           </div>
@@ -277,7 +277,7 @@ export default function Autoridades() {
                 type="text"
                 value={formData.cargo || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, cargo: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="Ej: Presidente"
               />
             </div>
@@ -290,7 +290,7 @@ export default function Autoridades() {
               <select
                 value={formData.tipo || 'TITULAR'}
                 onChange={(e) => setFormData(prev => ({ ...prev, tipo: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
               >
                 {TIPOS.map(t => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -307,7 +307,7 @@ export default function Autoridades() {
                 type="text"
                 value={formData.responsable || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, responsable: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="Nombre del responsable"
               />
             </div>
@@ -321,7 +321,7 @@ export default function Autoridades() {
                 type="text"
                 value={formData.desde || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, desde: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="2024"
               />
             </div>
@@ -335,7 +335,7 @@ export default function Autoridades() {
                 type="email"
                 value={formData.email || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="email@ejemplo.com"
               />
             </div>
@@ -348,7 +348,7 @@ export default function Autoridades() {
               <textarea
                 value={formData.descripcion || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 rows={2}
                 placeholder="Descripción de las funciones..."
               />
@@ -404,7 +404,7 @@ export default function Autoridades() {
           {/* Info */}
           <div className="flex-1 min-w-0">
             {esComision && (
-              <span className="text-red-600 text-xs font-semibold uppercase">{autoridad.cargo}</span>
+              <span className="text-primary text-xs font-semibold uppercase">{autoridad.cargo}</span>
             )}
             {esVocalRevisor && (
               <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -447,14 +447,14 @@ export default function Autoridades() {
               </button>
               <button
                 onClick={() => handleEdit(autoridad)}
-                className="p-1 hover:bg-blue-100 rounded"
+                className="p-1 hover:bg-primary/10 rounded"
                 title="Editar"
               >
                 <Edit2 className="w-4 h-4 text-blue-600" />
               </button>
               <button
                 onClick={() => handleDeleteClick(autoridad.id)}
-                className="p-1 hover:bg-red-100 rounded"
+                className="p-1 hover:bg-primary/10 rounded"
                 title="Eliminar"
               >
                 <Trash2 className="w-4 h-4 text-red-600" />
@@ -469,23 +469,28 @@ export default function Autoridades() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
 
   return (
-    <div className="p-6">
+    <div>
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Autoridades del Club</h1>
-          <p className="text-gray-600">Gestiona la información de las autoridades</p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Users className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Autoridades del Club</h1>
+            <p className="text-sm text-gray-500">Gestiona la información de las autoridades</p>
+          </div>
         </div>
         {autoridades?.length === 0 && (
           <button
             onClick={handleSeedClick}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
           >
             Cargar datos de ejemplo
           </button>
@@ -517,7 +522,7 @@ export default function Autoridades() {
                           type="text"
                           value={periodoComision}
                           onChange={(e) => setPeriodoComision(e.target.value)}
-                          className="px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-red-500"
+                          className="px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-primary"
                           placeholder="Ej: Período 2024 - 2026"
                         />
                         <button
@@ -551,7 +556,7 @@ export default function Autoridades() {
               {tienePermiso(PERMISOS.CONTENIDO_GESTIONAR) && (
                 <button
                   onClick={() => handleAgregar(seccion.key)}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-1 text-sm"
+                  className="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary-dark flex items-center gap-1 text-sm"
                 >
                   <Plus className="w-4 h-4" />
                   Agregar

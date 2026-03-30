@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, ChevronLeft, ChevronRight, MapPin, Users, Clock } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import { useTenant } from '../../contexts/TenantContext'
 
 const instalaciones = [
   {
@@ -73,6 +74,7 @@ const instalaciones = [
 ]
 
 export default function Instalaciones() {
+  const { tenant } = useTenant()
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedInstalacion, setSelectedInstalacion] = useState(null)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -180,18 +182,24 @@ export default function Instalaciones() {
                   Consultá disponibilidad y tarifas.
                 </p>
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                      <MapPin className="w-5 h-5 text-primary" />
+                  {(tenant?.direccion || tenant?.ciudad) && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                        <MapPin className="w-5 h-5 text-primary" />
+                      </div>
+                      <span className="text-gray-700">
+                        {[tenant.direccion, tenant.ciudad].filter(Boolean).join(', ')}
+                      </span>
                     </div>
-                    <span className="text-gray-700">Av. Tomás Márquez 1125, Pilar</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                      <Clock className="w-5 h-5 text-primary" />
+                  )}
+                  {tenant?.horarios && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Clock className="w-5 h-5 text-primary" />
+                      </div>
+                      <span className="text-gray-700 text-sm whitespace-pre-line">{tenant.horarios}</span>
                     </div>
-                    <span className="text-gray-700">Consultas: Lunes a Viernes 9:00 - 18:00</span>
-                  </div>
+                  )}
                 </div>
               </div>
               <div className="text-center md:text-right">

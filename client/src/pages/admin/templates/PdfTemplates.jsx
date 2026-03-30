@@ -157,22 +157,19 @@ export default function PdfTemplates() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 80px)' }}>
       <ConfirmDialog />
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-            <FileText className="w-6 h-6 text-gray-600" />
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <FileText className="w-6 h-6 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Templates de PDF</h1>
-            <p className="text-gray-600">
-              Personaliza los PDFs que se generan automáticamente
-            </p>
+            <p className="text-sm text-gray-500">Personaliza los PDFs que se generan automáticamente</p>
           </div>
         </div>
-
         <button
           onClick={fetchTemplates}
           className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
@@ -183,7 +180,7 @@ export default function PdfTemplates() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Sidebar - Lista de templates */}
         <div className="w-80 border-r border-gray-200 bg-white overflow-y-auto">
           {isLoading ? (

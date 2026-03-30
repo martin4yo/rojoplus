@@ -8,10 +8,11 @@
 | OS | Ubuntu 22.04 LTS |
 | Dominio principal | www.clubix.com.ar |
 | Dominio tenants | `<slug>`.clubix.com.ar |
+| Usuario SSH | axiomacloud |
 | Usuario sistema | clubixapp |
 | Usuario PostgreSQL | clubixuser |
 | Base de datos | clubix_db |
-| Backend puerto | 5300 |
+| Backend puerto | 5400 |
 | Repo | https://github.com/martin4yo/rojoplus |
 | Tenant demo | clubix-sport.clubix.com.ar |
 
@@ -30,7 +31,7 @@
                      │                           │
              ┌───────▼────────┐         ┌────────▼────────┐
              │ Static files   │         │   Backend API   │
-             │ /var/www/clubix│         │  Express :5300  │
+             │ /var/www/clubix│         │  Express :5400  │
              │ client/dist/   │         │  (PM2)          │
              └────────────────┘         └────────┬────────┘
                                                  │
@@ -51,29 +52,15 @@ Flujo de tenant:
 ## 0. Conectarse al servidor
 
 ```bash
-ssh root@66.97.45.210
+ssh axiomacloud@66.97.45.210
 ```
 
 ---
 
-## 1. Configurar usuario administrador y seguridad SSH
+## 1. Verificar acceso sudo
 
 ```bash
-# Crear usuario administrador
-adduser clubixadmin
-usermod -aG sudo clubixadmin
-
-# Copiar tu clave SSH pública al nuevo usuario
-# (desde tu máquina local)
-ssh-copy-id clubixadmin@66.97.45.210
-
-# Deshabilitar login root por SSH
-nano /etc/ssh/sshd_config
-# Cambiar: PermitRootLogin yes  →  PermitRootLogin no
-sudo systemctl restart sshd
-
-# Verificar en OTRA terminal antes de cerrar la actual:
-ssh clubixadmin@66.97.45.210
+# Verificar que axiomacloud tiene sudo
 sudo whoami  # debe retornar: root
 ```
 
@@ -151,8 +138,7 @@ SQL
 sudo su - clubixapp
 
 cd /var/www/clubix
-git clone https://github.com/martin4yo/rojoplus.git app
-cd app
+git clone https://github.com/martin4yo/rojoplus.git .
 ```
 
 ---
@@ -167,7 +153,7 @@ JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')
 echo "JWT_SECRET generado: $JWT_SECRET"
 # Guardar este valor antes de continuar
 
-cat > /var/www/clubix/app/server/.env << EOF
+cat > /var/www/clubix/server/.env << EOF
 # Base de datos
 DATABASE_URL=postgresql://clubixuser:Q27G4B98@localhost:5432/clubix_db?schema=public
 
@@ -184,7 +170,7 @@ SMTP_FROM=noreply@clubix.com.ar
 
 # General
 NODE_ENV=production
-PORT=5300
+PORT=5400
 FRONTEND_URL=https://www.clubix.com.ar
 
 # Tenant default (cuando no hay subdomain, solo en dev)
@@ -206,7 +192,7 @@ VAPID_PRIVATE_KEY=xiN8gl8k8tixQKXKdW4i9x6YgwEtZq4gFsAjhWaj-5U
 VAPID_MAILTO=mailto:admin@clubix.com.ar
 EOF
 
-chmod 600 /var/www/clubix/app/server/.env
+chmod 600 /var/www/clubix/server/.env
 ```
 
 ### Frontend
@@ -214,11 +200,11 @@ chmod 600 /var/www/clubix/app/server/.env
 ```bash
 # VITE_API_URL vacío = usa /api relativo al mismo dominio
 # Funciona para TODOS los subdominios automáticamente
-cat > /var/www/clubix/app/client/.env << 'EOF'
+cat > /var/www/clubix/client/.env << 'EOF'
 VITE_API_URL=/api
 EOF
 
-chmod 600 /var/www/clubix/app/client/.env
+chmod 600 /var/www/clubix/client/.env
 ```
 
 ---
@@ -227,7 +213,7 @@ chmod 600 /var/www/clubix/app/client/.env
 
 ```bash
 # Como clubixapp
-cd /var/www/clubix/app
+cd /var/www/clubix
 
 # Backend
 cd server
@@ -251,12 +237,12 @@ cd ..
 El frontend lo sirve Nginx directamente desde `client/dist/` — no necesita proceso PM2.
 
 ```bash
-cat > /var/www/clubix/app/ecosystem.config.js << 'EOF'
+cat > /var/www/clubix/ecosystem.config.js << 'EOF'
 module.exports = {
   apps: [
     {
       name: 'clubix-backend',
-      cwd: '/var/www/clubix/app/server',
+      cwd: '/var/www/clubix/server',
       script: 'src/index.js',
       instances: 1,
       exec_mode: 'fork',
@@ -265,7 +251,7 @@ module.exports = {
       max_memory_restart: '500M',
       env: {
         NODE_ENV: 'production',
-        PORT: 5300
+        PORT: 5400
       },
       error_file: '/var/log/clubix/backend-error.log',
       out_file:   '/var/log/clubix/backend-out.log',
@@ -277,7 +263,7 @@ module.exports = {
 EOF
 
 # Iniciar
-pm2 start /var/www/clubix/app/ecosystem.config.js
+pm2 start /var/www/clubix/ecosystem.config.js
 pm2 save
 
 # Verificar
@@ -409,7 +395,7 @@ server {
 
     # ── API Backend ──────────────────────────────────────────────────────────
     location /api {
-        proxy_pass http://127.0.0.1:5300;
+        proxy_pass http://127.0.0.1:5400;
         proxy_http_version 1.1;
 
         # WebSocket (Socket.io)
@@ -428,7 +414,7 @@ server {
 
     # ── Socket.io (WebSocket nativo) ─────────────────────────────────────────
     location /socket.io {
-        proxy_pass http://127.0.0.1:5300;
+        proxy_pass http://127.0.0.1:5400;
         proxy_http_version 1.1;
         proxy_set_header Upgrade    $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -438,13 +424,13 @@ server {
 
     # ── Archivos subidos por tenants ──────────────────────────────────────────
     location /uploads {
-        alias /var/www/clubix/app/server/uploads;
+        alias /var/www/clubix/server/uploads;
         expires 30d;
         add_header Cache-Control "public";
     }
 
     # ── Frontend (React SPA — archivos estáticos) ────────────────────────────
-    root /var/www/clubix/app/client/dist;
+    root /var/www/clubix/client/dist;
     index index.html;
 
     location / {
@@ -490,9 +476,9 @@ sudo systemctl reload nginx
 
 ```bash
 sudo su - clubixapp
-cd /var/www/clubix/app/server
+cd /var/www/clubix/server
 
-node << 'JS'
+node --input-type=module << 'JS'
 import bcrypt from 'bcryptjs'
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
@@ -505,6 +491,7 @@ async function main() {
   if (!rol) {
     rol = await prisma.rol.create({
       data: {
+        codigo: 'SUPER_ADMIN',
         nombre: 'Super Admin',
         descripcion: 'Administrador global del sistema',
         esSuperAdmin: true,
@@ -546,7 +533,7 @@ JS
 
 ```bash
 sudo su - clubixapp
-cd /var/www/clubix/app/server
+cd /var/www/clubix/server
 
 node << 'JS'
 import { PrismaClient } from '@prisma/client'
@@ -608,7 +595,7 @@ echo | openssl s_client -connect clubix-sport.clubix.com.ar:443 \
 
 ```bash
 sudo su - clubixapp
-cd /var/www/clubix/app
+cd /var/www/clubix
 
 # Traer cambios
 git pull origin main
@@ -699,7 +686,7 @@ sudo -u clubixapp pm2 logs clubix-backend --lines 50 | grep -i tenant
 sudo -u clubixapp pm2 logs clubix-backend --err --lines 50
 
 # Verificar .env
-cat /var/www/clubix/app/server/.env
+cat /var/www/clubix/server/.env
 
 # Verificar DB
 psql -U clubixuser -h localhost -d clubix_db -c "SELECT 1;"
@@ -709,14 +696,14 @@ psql -U clubixuser -h localhost -d clubix_db -c "SELECT 1;"
 
 ```bash
 # Verificar que el build existe
-ls -la /var/www/clubix/app/client/dist/
+ls -la /var/www/clubix/client/dist/
 
 # Ver errores Nginx
 sudo tail -50 /var/log/nginx/clubix-error.log
 
 # Verificar permisos
-sudo chown -R clubixapp:www-data /var/www/clubix/app/client/dist
-sudo chmod -R 755 /var/www/clubix/app/client/dist
+sudo chown -R clubixapp:www-data /var/www/clubix/client/dist
+sudo chmod -R 755 /var/www/clubix/client/dist
 ```
 
 ### Certificado SSL expirado o renovación
@@ -763,9 +750,7 @@ sudo systemctl reload nginx
 ## Checklist de deployment
 
 ### Servidor
-- [ ] Usuario `clubixadmin` creado con sudo
-- [ ] Clave SSH configurada
-- [ ] Login root SSH deshabilitado
+- [ ] Acceso SSH con usuario `axiomacloud` verificado
 - [ ] Node.js 20, PostgreSQL 15, Nginx, PM2 instalados
 
 ### Base de datos
@@ -774,7 +759,7 @@ sudo systemctl reload nginx
 - [ ] `prisma db push` ejecutado sin errores
 
 ### Aplicación
-- [ ] Repo clonado en `/var/www/clubix/app`
+- [ ] Repo clonado en `/var/www/clubix` (directo con `git clone ... .`)
 - [ ] `server/.env` configurado y con permisos 600
 - [ ] `client/.env` configurado (`VITE_API_URL=/api`)
 - [ ] `npm ci` en server y client

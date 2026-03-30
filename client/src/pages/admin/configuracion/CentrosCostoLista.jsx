@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../../services/api'
 import toast from 'react-hot-toast'
 import { PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
+import { Layers } from 'lucide-react'
 import CentroCostoForm from './CentroCostoForm'
 import { useConfirm } from '../../../hooks/useConfirm'
 
@@ -81,7 +82,7 @@ export default function CentrosCostoLista() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
@@ -90,15 +91,18 @@ export default function CentrosCostoLista() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Centros de Costo</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Gestiona los centros de costo para análisis de rentabilidad
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Layers className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Centros de Costo</h1>
+            <p className="text-sm text-gray-500">Gestiona los centros de costo para análisis de rentabilidad</p>
+          </div>
         </div>
         <button
           onClick={handleNuevo}
-          className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
           Nuevo Centro
@@ -121,7 +125,7 @@ export default function CentrosCostoLista() {
             <select
               value={filtroTipo}
               onChange={(e) => setFiltroTipo(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
             >
               <option value="">Todos</option>
               <option value="OPERATIVO">Operativo</option>
@@ -135,7 +139,7 @@ export default function CentrosCostoLista() {
             <select
               value={filtroActivo}
               onChange={(e) => setFiltroActivo(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
             >
               <option value="todos">Todos</option>
               <option value="activos">Activos</option>
@@ -181,14 +185,14 @@ export default function CentrosCostoLista() {
                   <div className="flex items-center space-x-2 ml-4">
                     <button
                       onClick={() => handleEditar(centro)}
-                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                      className="p-2 text-gray-400 hover:text-primary transition-colors"
                       title="Editar"
                     >
                       <PencilIcon className="h-5 w-5" />
                     </button>
                     <button
                       onClick={() => handleEliminar(centro)}
-                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      className="p-2 text-gray-400 hover:text-danger transition-colors"
                       title="Desactivar"
                     >
                       <TrashIcon className="h-5 w-5" />
@@ -236,14 +240,14 @@ export default function CentrosCostoLista() {
                   <div className="flex items-center space-x-2 ml-4">
                     <button
                       onClick={() => handleEditar(centro)}
-                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                      className="p-2 text-gray-400 hover:text-primary transition-colors"
                       title="Editar"
                     >
                       <PencilIcon className="h-5 w-5" />
                     </button>
                     <button
                       onClick={() => handleEliminar(centro)}
-                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      className="p-2 text-gray-400 hover:text-danger transition-colors"
                       title="Desactivar"
                     >
                       <TrashIcon className="h-5 w-5" />
@@ -261,7 +265,7 @@ export default function CentrosCostoLista() {
           <p className="text-gray-500">No se encontraron centros de costo</p>
           <button
             onClick={handleNuevo}
-            className="mt-4 inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="mt-4 inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
           >
             <PlusIcon className="h-5 w-5 mr-2" />
             Crear Primer Centro

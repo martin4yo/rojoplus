@@ -301,7 +301,7 @@ export default function CajaDetalle() {
       </div>
 
       {/* Saldo actual */}
-      <div className="bg-gradient-to-r from-primary to-red-700 rounded-lg shadow-sm p-6 mb-6 text-white">
+      <div className="bg-gradient-to-r from-primary to-primary-light rounded-lg shadow-sm p-6 mb-6 text-white">
         <p className="text-white/80 text-sm mb-1">Saldo Actual</p>
         <p className={`text-4xl font-bold ${caja.saldoActual < 0 ? 'text-yellow-200' : ''}`}>
           ${caja.saldoActual.toLocaleString()}

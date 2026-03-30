@@ -591,7 +591,7 @@ export default function BuffetKiosco() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
@@ -611,7 +611,7 @@ export default function BuffetKiosco() {
               value={cantidadAgregar}
               onChange={(e) => setCantidadAgregar(Math.max(1, parseInt(e.target.value) || 1))}
               onFocus={(e) => e.target.select()}
-              className="w-16 text-center text-lg font-bold border-2 border-gray-300 rounded-lg px-2 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+              className="w-16 text-center text-lg font-bold border-2 border-gray-300 rounded-lg px-2 py-2.5 focus:border-primary focus:ring-2 focus:ring-primary/30 outline-none"
               title="Cantidad a agregar (usar +/- para modificar)"
             />
           </div>
@@ -635,7 +635,7 @@ export default function BuffetKiosco() {
             <button
               onClick={() => buscarProducto(busqueda)}
               disabled={!busqueda || buscando}
-              className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
+              className="p-3 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 flex-shrink-0"
             >
               <Search size={20} />
             </button>
@@ -645,14 +645,14 @@ export default function BuffetKiosco() {
           <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setVistaProductos('shop')}
-              className={`p-2 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`p-2 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               title="Vista Tarjetas"
             >
               <LayoutGrid className="w-5 h-5" />
             </button>
             <button
               onClick={() => setVistaProductos('lista')}
-              className={`p-2 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`p-2 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               title="Vista Lista"
             >
               <List className="w-5 h-5" />
@@ -669,7 +669,7 @@ export default function BuffetKiosco() {
           >
             <FileText size={20} />
             {ultimasVentas.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center font-bold">
                 {ultimasVentas.length}
               </span>
             )}
@@ -697,7 +697,7 @@ export default function BuffetKiosco() {
             <button
               onClick={() => buscarProducto(busqueda)}
               disabled={!busqueda || buscando}
-              className="p-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
+              className="p-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 flex-shrink-0"
             >
               <Search size={18} />
             </button>
@@ -713,20 +713,20 @@ export default function BuffetKiosco() {
                 value={cantidadAgregar}
                 onChange={(e) => setCantidadAgregar(Math.max(1, parseInt(e.target.value) || 1))}
                 onFocus={(e) => e.target.select()}
-                className="w-14 text-center text-base font-bold border-2 border-gray-300 rounded-lg px-1 py-1.5 focus:border-blue-500 outline-none"
+                className="w-14 text-center text-base font-bold border-2 border-gray-300 rounded-lg px-1 py-1.5 focus:border-primary outline-none"
               />
             </div>
 
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
               <button
                 onClick={() => setVistaProductos('shop')}
-                className={`p-1.5 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
+                className={`p-1.5 rounded-md transition ${vistaProductos === 'shop' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'}`}
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setVistaProductos('lista')}
-                className={`p-1.5 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
+                className={`p-1.5 rounded-md transition ${vistaProductos === 'lista' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'}`}
               >
                 <List className="w-4 h-4" />
               </button>
@@ -740,7 +740,7 @@ export default function BuffetKiosco() {
               >
                 <FileText size={18} />
                 {ultimasVentas.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-bold">
                     {ultimasVentas.length}
                   </span>
                 )}
@@ -794,7 +794,7 @@ export default function BuffetKiosco() {
                 <ShoppingCart size={20} />
                 Carrito
                 {carrito.length > 0 && (
-                  <span className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                  <span className="bg-primary text-white text-xs font-bold rounded-full px-2 py-0.5">
                     {carrito.reduce((sum, item) => sum + item.cantidad, 0)} items
                   </span>
                 )}
@@ -927,14 +927,14 @@ export default function BuffetKiosco() {
             onClick={() => setTabActivo('carrito')}
             className={`flex-1 px-4 py-3 font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
               tabActivo === 'carrito'
-                ? 'bg-white text-red-600 border-b-2 border-red-600'
+                ? 'bg-white text-primary border-b-2 border-primary'
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}
           >
             <ShoppingCart size={18} />
             Carrito
             {carrito.length > 0 && (
-              <span className="bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="bg-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                 {carrito.length}
               </span>
             )}
@@ -963,7 +963,7 @@ export default function BuffetKiosco() {
                 {carrito.length > 0 && (
                   <button
                     onClick={limpiarCarrito}
-                    className="text-red-600 text-sm hover:underline font-medium"
+                    className="text-primary text-sm hover:underline font-medium"
                   >
                     Limpiar todo
                   </button>
@@ -1021,7 +1021,7 @@ export default function BuffetKiosco() {
                           min="1"
                           value={item.cantidad}
                           onChange={(e) => cambiarCantidadDirecta(item.id, e.target.value)}
-                          className="w-14 text-center font-bold border border-gray-300 rounded px-1 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none"
+                          className="w-14 text-center font-bold border border-gray-300 rounded px-1 py-1 focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none"
                         />
                         <button
                           onClick={() => modificarCantidad(item.id, 1)}
@@ -1173,8 +1173,8 @@ export default function BuffetKiosco() {
                           onClick={() => setTipoComprobante('facturaB')}
                           className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
                             tipoComprobante === 'facturaB'
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+                              ? 'bg-primary text-white border-primary'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-primary/50'
                           }`}
                         >
                           <Receipt size={12} className="inline mr-1" />
@@ -1276,7 +1276,7 @@ export default function BuffetKiosco() {
               ultimasVentas.map(venta => (
                 <div
                   key={venta.id}
-                  className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition"
+                  className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-primary/40 transition"
                 >
                   <div className="flex justify-between items-start">
                     <div>

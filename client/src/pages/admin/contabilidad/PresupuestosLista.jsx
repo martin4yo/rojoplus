@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Calendar, Edit, Trash2, Copy, Eye, CheckCircle, Lock, FileText, Star, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Calendar, Edit, Trash2, Copy, Eye, CheckCircle, Lock, FileText, Star, ChevronDown, ChevronRight, BarChart3 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
@@ -231,10 +231,15 @@ export default function PresupuestosLista() {
       {ModalComponent}
 
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Presupuestos Anuales</h1>
-          <p className="text-gray-500 mt-1">Gestión de presupuestos con múltiples versiones por año</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <BarChart3 className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Presupuestos Anuales</h1>
+            <p className="text-sm text-gray-500">Gestión de presupuestos con múltiples versiones por año</p>
+          </div>
         </div>
 {tienePermiso(PERMISOS.CONTABILIDAD_PRESUPUESTO) && (
           <Button onClick={crearPresupuesto}>

@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom'
 import { Search, QrCode, AlertCircle, Store, CheckCircle, Mail } from 'lucide-react'
 import { Button } from '../../components/Button'
 import api from '../../services/api'
+import { useTenant } from '../../contexts/TenantContext'
+import TenantLogo from '../../components/TenantLogo'
 
 export default function AccesoSocio() {
+  const { tenant } = useTenant()
   const [busqueda, setBusqueda] = useState('')
   const [buscando, setBuscando] = useState(false)
   const [error, setError] = useState(null)
@@ -40,11 +43,11 @@ export default function AccesoSocio() {
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-md mx-auto px-4 py-3">
             <div className="flex items-center gap-3">
-              <img src="/images/logo.png" alt="Logo" className="h-14" />
+              <Link to="/"><TenantLogo className="h-14 w-auto" /></Link>
               <div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-primary font-bold text-lg whitespace-nowrap">Rojo Plus</span>
-                  <span className="text-xs text-gray-400 italic whitespace-nowrap">Tu pasion tiene recompensas</span>
+                  <span className="text-primary font-bold text-lg whitespace-nowrap">{tenant?.nombre || ''}</span>
+                  {tenant?.slogan && <span className="text-xs text-gray-400 italic whitespace-nowrap">{tenant.slogan}</span>}
                 </div>
                 <span className="text-gray-600 text-sm block">Acceso para Socios</span>
               </div>
@@ -106,11 +109,11 @@ export default function AccesoSocio() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-md mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
-            <img src="/images/logo.png" alt="Logo" className="h-14" />
+            <Link to="/"><TenantLogo className="h-14 w-auto" /></Link>
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="text-primary font-bold text-lg whitespace-nowrap">Rojo Plus</span>
-                <span className="text-xs text-gray-400 italic whitespace-nowrap">Tu pasion tiene recompensas</span>
+                <span className="text-primary font-bold text-lg whitespace-nowrap">{tenant?.nombre || ''}</span>
+                {tenant?.slogan && <span className="text-xs text-gray-400 italic whitespace-nowrap">{tenant.slogan}</span>}
               </div>
               <span className="text-gray-600 text-sm block">Acceso para Socios</span>
             </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../../services/api'
 import {
   EnvelopeIcon,
@@ -8,23 +9,11 @@ import {
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline'
 import { Lightbulb, Smartphone } from 'lucide-react'
+import { useTenant } from '../../contexts/TenantContext'
+import TenantLogo from '../../components/TenantLogo'
 
-/**
- * Login del Socio con Magic Link
- *
- * Sistema seguro de autenticación sin contraseñas:
- * 1. Socio ingresa email o DNI
- * 2. Se envía un link mágico al email
- * 3. Socio hace clic en el link y accede directamente
- * 4. Link válido por 24 horas
- *
- * Ventajas:
- * - Sin contraseñas que recordar
- * - Seguro (token único temporal)
- * - Simple de usar
- * - Acceso desde cualquier dispositivo
- */
 export default function LoginSocio() {
+  const { tenant } = useTenant()
   const [metodo, setMetodo] = useState('email') // 'email' | 'dni'
   const [valor, setValor] = useState('')
   const [loading, setLoading] = useState(false)
@@ -97,7 +86,7 @@ export default function LoginSocio() {
               setLinkEnviado(false)
               setValor('')
             }}
-            className="mt-6 text-red-600 hover:text-red-700 font-medium"
+            className="mt-6 text-primary hover:text-primary-dark font-medium"
           >
             Volver
           </button>
@@ -108,35 +97,35 @@ export default function LoginSocio() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-      <div className="rounded-2xl shadow-xl overflow-hidden max-w-4xl w-full grid grid-cols-1 md:grid-cols-2">
+      <div className="rounded-2xl shadow-xl overflow-hidden max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 border border-primary-dark">
         {/* Panel izquierdo - Info */}
-        <div className="bg-gradient-to-br from-red-600 to-red-700 p-8 md:p-12 text-white">
+        <div className="bg-primary-dark p-8 md:p-12">
           <div className="mb-8">
-            <img src="/images/logo.png" alt="Logo" className="h-16 mb-4" />
-            <h1 className="text-3xl font-bold mb-2">Portal del Socio</h1>
-            <p className="text-red-100 text-lg">Tu pasión tiene recompensas</p>
+            <Link to="/"><TenantLogo className="h-16 mb-4 w-auto" fallbackSrc="/images/LogoClubixSolo.png" /></Link>
+            <h1 className="text-3xl font-bold text-white mb-2">Portal del Socio</h1>
+            <p className="text-white/80 text-lg">{tenant?.slogan || ''}</p>
           </div>
 
           <div className="space-y-6">
             <div className="flex items-start space-x-3">
-              <div className="bg-white bg-opacity-20 rounded-lg p-2">
-                <ShieldCheckIcon className="h-6 w-6" />
+              <div className="bg-white/20 rounded-lg p-2">
+                <ShieldCheckIcon className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Acceso seguro sin contraseñas</h3>
-                <p className="text-red-100 text-sm">
+                <h3 className="font-semibold mb-1 text-white">Acceso seguro sin contraseñas</h3>
+                <p className="text-white/70 text-sm">
                   Ingresa tu email o DNI y te enviaremos un link de acceso directo
                 </p>
               </div>
             </div>
 
             <div className="flex items-start space-x-3">
-              <div className="bg-white bg-opacity-20 rounded-lg p-2">
-                <CheckCircleIcon className="h-6 w-6" />
+              <div className="bg-white/20 rounded-lg p-2">
+                <CheckCircleIcon className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Todo en un solo lugar</h3>
-                <p className="text-red-100 text-sm">
+                <h3 className="font-semibold mb-1 text-white">Todo en un solo lugar</h3>
+                <p className="text-white/70 text-sm">
                   Gestiona tus datos, inscripciones, pagos y mucho más
                 </p>
               </div>
@@ -162,12 +151,12 @@ export default function LoginSocio() {
                 onClick={() => setMetodo('email')}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   metodo === 'email'
-                    ? 'border-red-600 bg-red-50'
+                    ? 'border-primary bg-primary/10'
                     : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
               >
-                <EnvelopeIcon className={`h-8 w-8 mx-auto mb-2 ${metodo === 'email' ? 'text-red-600' : 'text-gray-400'}`} />
-                <p className={`text-sm font-medium ${metodo === 'email' ? 'text-red-600' : 'text-gray-600'}`}>
+                <EnvelopeIcon className={`h-8 w-8 mx-auto mb-2 ${metodo === 'email' ? 'text-primary' : 'text-gray-400'}`} />
+                <p className={`text-sm font-medium ${metodo === 'email' ? 'text-primary' : 'text-gray-600'}`}>
                   Por Email
                 </p>
               </button>
@@ -177,12 +166,12 @@ export default function LoginSocio() {
                 onClick={() => setMetodo('dni')}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   metodo === 'dni'
-                    ? 'border-red-600 bg-red-50'
+                    ? 'border-primary bg-primary/10'
                     : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
               >
-                <IdentificationIcon className={`h-8 w-8 mx-auto mb-2 ${metodo === 'dni' ? 'text-red-600' : 'text-gray-400'}`} />
-                <p className={`text-sm font-medium ${metodo === 'dni' ? 'text-red-600' : 'text-gray-600'}`}>
+                <IdentificationIcon className={`h-8 w-8 mx-auto mb-2 ${metodo === 'dni' ? 'text-primary' : 'text-gray-400'}`} />
+                <p className={`text-sm font-medium ${metodo === 'dni' ? 'text-primary' : 'text-gray-600'}`}>
                   Por DNI
                 </p>
               </button>
@@ -199,7 +188,7 @@ export default function LoginSocio() {
                 onChange={(e) => setValor(e.target.value)}
                 placeholder={metodo === 'email' ? 'socio@ejemplo.com' : '12345678'}
                 required
-                className="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                className="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               />
               <p className="mt-2 text-xs text-gray-500">
                 {metodo === 'email'
@@ -212,7 +201,7 @@ export default function LoginSocio() {
             <button
               type="submit"
               disabled={loading || !valor.trim()}
-              className="w-full inline-flex items-center justify-center px-6 py-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg"
+              className="w-full inline-flex items-center justify-center px-6 py-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg"
             >
               {loading ? (
                 <>

@@ -578,7 +578,7 @@ router.post('/comercios/:id/aprobar', authAdmin, asyncHandler(async (req, res) =
 
   // Enviar email con link de acceso
   try {
-    await enviarEmailAprobacion(comercio)
+    await enviarEmailAprobacion(comercio, req.db)
   } catch (emailError) {
     console.error('Error enviando email de aprobación:', emailError)
   }
@@ -609,7 +609,7 @@ router.post('/comercios/:id/rechazar', authAdmin, asyncHandler(async (req, res) 
 
   // Enviar email de rechazo
   try {
-    await enviarEmailRechazo(comercio, motivo)
+    await enviarEmailRechazo(comercio, motivo, req.db)
   } catch (emailError) {
     console.error('Error enviando email de rechazo:', emailError)
   }
@@ -682,7 +682,7 @@ router.post('/comercios/:id/reenviar-link', authAdmin, asyncHandler(async (req, 
 
   // Enviar email con link de acceso
   try {
-    await enviarEmailLinkAcceso(comercio)
+    await enviarEmailLinkAcceso(comercio, req.db)
   } catch (emailError) {
     console.error('Error enviando email:', emailError)
     throw new AppError('Error al enviar el email', 500, 'EMAIL_ERROR')
@@ -4742,7 +4742,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Enviar recibo por email (fuera de transacción, async)
-  enviarReciboPago(pagoCompleto).catch(err => {
+  enviarReciboPago(pagoCompleto, req.db).catch(err => {
     console.error('Error enviando recibo por email:', err)
   })
 

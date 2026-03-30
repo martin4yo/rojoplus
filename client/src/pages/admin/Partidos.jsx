@@ -226,17 +226,22 @@ export default function Partidos() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Partidos</h1>
-          <p className="text-gray-600">Gestión de partidos y eventos deportivos</p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Trophy className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Partidos</h1>
+            <p className="text-sm text-gray-500">Gestión de partidos y eventos deportivos</p>
+          </div>
         </div>
         {tienePermiso(PERMISOS.DEPORTES_PARTIDOS) && (
           <button
             onClick={() => { resetForm(); setShowModal(true) }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
           >
             <Plus className="w-5 h-5" />
             Nuevo Partido
@@ -257,7 +262,7 @@ export default function Partidos() {
                 if (e.target.value) fetchCategorias(e.target.value)
                 else setCategorias([])
               }}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
             >
               <option value="">Todas</option>
               {actividades.map(a => (
@@ -271,7 +276,7 @@ export default function Partidos() {
             <select
               value={filtroCategoria}
               onChange={(e) => setFiltroCategoria(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
               disabled={!filtroActividad}
             >
               <option value="">Todas</option>
@@ -286,7 +291,7 @@ export default function Partidos() {
             <select
               value={filtroEstado}
               onChange={(e) => setFiltroEstado(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
             >
               <option value="">Todos</option>
               {ESTADOS_PARTIDO.map(e => (
@@ -300,7 +305,7 @@ export default function Partidos() {
             <select
               value={filtroCondicion}
               onChange={(e) => setFiltroCondicion(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
             >
               <option value="">Todas</option>
               <option value="LOCAL">Local</option>
@@ -314,7 +319,7 @@ export default function Partidos() {
               type="date"
               value={fechaDesde}
               onChange={(e) => setFechaDesde(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -324,7 +329,7 @@ export default function Partidos() {
               type="date"
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
             />
           </div>
         </div>
@@ -334,7 +339,7 @@ export default function Partidos() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full mx-auto"></div>
+            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
           </div>
         ) : partidos.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
@@ -350,7 +355,7 @@ export default function Partidos() {
                     <div className="flex-1">
                       {/* Categoría y tipo */}
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-red-600">
+                        <span className="text-sm font-medium text-primary">
                           {partido.categoriaActividad?.actividad?.nombre} - {partido.categoriaActividad?.nombre}
                         </span>
                         <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
@@ -405,7 +410,7 @@ export default function Partidos() {
                     <div className="flex items-center gap-2">
                       <Link
                         to={`/admin/partidos/${partido.id}`}
-                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-gray-600 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                         title="Ver detalle"
                       >
                         <ChevronRight className="w-5 h-5" />
@@ -414,7 +419,7 @@ export default function Partidos() {
                         <>
                           <button
                             onClick={() => handleEdit(partido)}
-                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-600 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                             title="Editar"
                           >
                             <Edit className="w-5 h-5" />
@@ -428,7 +433,7 @@ export default function Partidos() {
                           </button>
                           <button
                             onClick={() => handleCancelar(partido)}
-                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-600 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                             title="Cancelar"
                           >
                             <X className="w-5 h-5" />
@@ -438,7 +443,7 @@ export default function Partidos() {
                       {tienePermiso(PERMISOS.DEPORTES_PARTIDOS) && (
                         <button
                           onClick={() => handleDelete(partido)}
-                          className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-gray-600 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                           title="Eliminar"
                         >
                           <Trash2 className="w-5 h-5" />
@@ -477,7 +482,7 @@ export default function Partidos() {
                         setForm({ ...form, categoriaActividadId: '' })
                         fetchCategorias(e.target.value)
                       }}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                     >
                       <option value="">Seleccionar...</option>
                       {actividades.map(a => (
@@ -494,7 +499,7 @@ export default function Partidos() {
                       required
                       value={form.categoriaActividadId}
                       onChange={(e) => setForm({ ...form, categoriaActividadId: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                     >
                       <option value="">Seleccionar...</option>
                       {categorias.map(c => (
@@ -516,7 +521,7 @@ export default function Partidos() {
                     required
                     value={form.fecha}
                     onChange={(e) => setForm({ ...form, fecha: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -528,7 +533,7 @@ export default function Partidos() {
                     required
                     value={form.hora}
                     onChange={(e) => setForm({ ...form, hora: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -542,7 +547,7 @@ export default function Partidos() {
                   <select
                     value={form.tipo}
                     onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   >
                     {TIPOS_PARTIDO.map(t => (
                       <option key={t.value} value={t.value}>{t.label}</option>
@@ -557,7 +562,7 @@ export default function Partidos() {
                     required
                     value={form.condicion}
                     onChange={(e) => setForm({ ...form, condicion: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   >
                     <option value="LOCAL">Local</option>
                     <option value="VISITANTE">Visitante</option>
@@ -576,7 +581,7 @@ export default function Partidos() {
                   value={form.rival}
                   onChange={(e) => setForm({ ...form, rival: e.target.value })}
                   placeholder="Nombre del equipo rival"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -589,7 +594,7 @@ export default function Partidos() {
                   <select
                     value={form.espacioId}
                     onChange={(e) => setForm({ ...form, espacioId: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   >
                     <option value="">Seleccionar...</option>
                     {espacios.map(e => (
@@ -607,7 +612,7 @@ export default function Partidos() {
                     value={form.ubicacion}
                     onChange={(e) => setForm({ ...form, ubicacion: e.target.value })}
                     placeholder="Dirección del partido"
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                   />
                 </div>
               )}
@@ -621,7 +626,7 @@ export default function Partidos() {
                   value={form.observaciones}
                   onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -636,7 +641,7 @@ export default function Partidos() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
                 >
                   {editando ? 'Guardar cambios' : 'Crear partido'}
                 </button>
