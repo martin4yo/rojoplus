@@ -304,9 +304,23 @@ export default function BuffetDashboard() {
           {/* Evolución de ventas por día */}
           {kpis.ventasPorDia && kpis.ventasPorDia.length > 1 && (
             <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-4">Evolución de ventas por día</h3>
+              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                Evolución de ventas por día
+                <span className="text-xs font-normal text-gray-400">Clic en una barra para filtrar ese día</span>
+              </h3>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={kpis.ventasPorDia} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                <BarChart
+                  data={kpis.ventasPorDia}
+                  margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
+                  onClick={(chartData) => {
+                    if (!chartData?.activePayload?.[0]) return
+                    const fecha = chartData.activePayload[0].payload.fecha
+                    setFechaDesde(fecha)
+                    setFechaHasta(fecha)
+                    setRangoSeleccionado('personalizado')
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis
