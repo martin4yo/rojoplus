@@ -302,7 +302,7 @@ export default function BuffetDashboard() {
           </div>
 
           {/* Evolución de ventas por día */}
-          {kpis.ventasPorDia && kpis.ventasPorDia.length > 1 && (
+          {kpis.ventasPorDia && kpis.ventasPorDia.length >= 1 && (
             <div className="bg-white rounded-xl shadow p-4">
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 Evolución de ventas por día
