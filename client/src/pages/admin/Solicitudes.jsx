@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState([])
@@ -262,9 +263,7 @@ export default function Solicitudes() {
       {/* Tabla */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
-          </div>
+          <LoadingSpinner />
         ) : solicitudes.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             No se encontraron solicitudes

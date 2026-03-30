@@ -21,6 +21,7 @@ import { BANNER_SIZES } from '../../components/public/BannerPublicitario'
 import Modal from '../../components/Modal'
 import ImageUpload from '../../components/ImageUpload'
 import { useConfirm } from '../../hooks/useConfirm'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Publicidad() {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -118,7 +119,7 @@ export default function Publicidad() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <LoadingSpinner />
       </div>
     )
   }

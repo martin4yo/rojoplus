@@ -7,6 +7,7 @@ import ActividadesGrid from '../../components/public/ActividadesGrid'
 import SponsorsSection from '../../components/public/SponsorsSection'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Home() {
   const { tenant } = useTenant()
@@ -246,7 +247,7 @@ export default function Home() {
 
           {loadingNoticias ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <LoadingSpinner />
             </div>
           ) : noticias.length === 0 ? (
             <div className="grid md:grid-cols-3 gap-6">

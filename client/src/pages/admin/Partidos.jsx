@@ -9,6 +9,7 @@ import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { useConfirm } from '../../hooks/useConfirm'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const TIPOS_PARTIDO = [
   { value: 'LIGA', label: 'Liga' },
@@ -338,9 +339,7 @@ export default function Partidos() {
       {/* Lista de partidos */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
-          </div>
+          <LoadingSpinner />
         ) : partidos.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             No hay partidos para mostrar

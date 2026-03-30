@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import api from '../../services/api'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -137,9 +138,7 @@ export default function ActividadDetalle() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner />
     )
   }
 
@@ -224,7 +223,7 @@ export default function ActividadDetalle() {
             <div className="space-y-6">
               {loadingTab ? (
                 <div className="bg-white rounded-xl shadow-sm p-12 flex justify-center">
-                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                  <LoadingSpinner />
                 </div>
               ) : (
                 <>

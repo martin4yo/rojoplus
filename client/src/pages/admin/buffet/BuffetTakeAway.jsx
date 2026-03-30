@@ -11,6 +11,7 @@ import StatusBadge from '../../../components/StatusBadge'
 import Modal from '../../../components/Modal'
 import GestionPedido from '../../../components/buffet/GestionPedido'
 import ChatWidget from '../../../components/chat/ChatWidget'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetTakeAway() {
   const navigate = useNavigate()
@@ -244,7 +245,7 @@ export default function BuffetTakeAway() {
   }
 
   if (loading) {
-    return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
+    return <LoadingSpinner />
   }
 
   // ==================== VISTA DETALLE ====================

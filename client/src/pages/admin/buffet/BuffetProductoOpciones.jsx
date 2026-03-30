@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import PageHeader from '../../../components/PageHeader'
 import { useConfirm } from '../../../hooks/useConfirm'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetProductoOpciones() {
   const { productoId } = useParams()
@@ -204,7 +205,7 @@ export default function BuffetProductoOpciones() {
   }
 
   if (loading) {
-    return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>
+    return <LoadingSpinner />
   }
 
   if (!producto) {

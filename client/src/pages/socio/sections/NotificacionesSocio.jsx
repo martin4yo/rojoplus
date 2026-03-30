@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BellIcon, EnvelopeIcon, DevicePhoneMobileIcon, TrophyIcon, CalendarIcon, XCircleIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
 import api from '../../../services/api'
 import toast from 'react-hot-toast'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function NotificacionesSocio({ tokenPortal }) {
   const [preferencias, setPreferencias] = useState(null)
@@ -54,7 +55,7 @@ export default function NotificacionesSocio({ tokenPortal }) {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+        <LoadingSpinner />
       </div>
     )
   }

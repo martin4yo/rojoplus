@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const api = {
   get: async (url) => {
@@ -296,7 +297,7 @@ export default function PasajeCategoria() {
         <div className="p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+              <LoadingSpinner />
             </div>
           ) : error ? (
             <div className="text-center py-12 text-red-600">

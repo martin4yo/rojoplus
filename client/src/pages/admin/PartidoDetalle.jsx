@@ -8,6 +8,7 @@ import {
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function PartidoDetalle() {
   const { id } = useParams()
@@ -157,7 +158,7 @@ export default function PartidoDetalle() {
   if (loading) {
     return (
       <div className="p-6 flex justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full"></div>
+        <LoadingSpinner />
       </div>
     )
   }

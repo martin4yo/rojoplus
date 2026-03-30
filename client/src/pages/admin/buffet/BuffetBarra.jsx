@@ -5,6 +5,7 @@ import api from '../../../services/api'
 import GestionPedido from '../../../components/buffet/GestionPedido'
 import ClienteSelector from '../../../components/buffet/ClienteSelector'
 import ChatWidget from '../../../components/chat/ChatWidget'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetBarra() {
   const [pedidoActivo, setPedidoActivo] = useState(null)
@@ -113,10 +114,7 @@ export default function BuffetBarra() {
   if (!pedidoActivo) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Preparando venta...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     )
   }

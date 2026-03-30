@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetContext'
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 // Iconos disponibles para sectores
 const ICONOS_DISPONIBLES = {
@@ -239,9 +240,7 @@ export default function BuffetCocina() {
 
   if (loadingSectores) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

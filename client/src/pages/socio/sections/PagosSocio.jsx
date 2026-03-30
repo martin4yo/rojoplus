@@ -20,6 +20,7 @@ import { useModal } from '../../../components/Modal'
 import { formatDate, formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
 import ChatWidget from '../../../components/chat/ChatWidget'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [cuotas, setCuotas] = useState([])
@@ -286,9 +287,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 
@@ -686,10 +685,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
       {tab === 'cuenta-corriente' && (
         <div className="space-y-4">
           {loading ? (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-              <div className="animate-spin h-12 w-12 border-4 border-red-600 border-t-transparent rounded-full mx-auto"></div>
-              <p className="text-gray-600 mt-4">Cargando cuenta corriente...</p>
-            </div>
+            <LoadingSpinner />
           ) : cuentaCorriente ? (
             <>
               {/* Resumen */}

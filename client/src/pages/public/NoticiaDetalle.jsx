@@ -4,6 +4,7 @@ import { Calendar, ChevronLeft, Share2, Facebook, Twitter, Copy, Check } from 'l
 import BannerPublicitario from '../../components/public/BannerPublicitario'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function NoticiaDetalle() {
   const { slug } = useParams()
@@ -93,9 +94,7 @@ export default function NoticiaDetalle() {
 
   if (loading) {
     return (
-      <div className="bg-gray-300 min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

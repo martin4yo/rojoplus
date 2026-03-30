@@ -3,6 +3,7 @@ import { Camera, QrCode, CheckCircle, XCircle, Smartphone, Wifi, WifiOff } from 
 import { Button } from '../../../components/Button'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import toast from 'react-hot-toast'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function ControlPWA() {
   const [scanning, setScanning] = useState(false)
@@ -396,7 +397,7 @@ export default function ControlPWA() {
         {loading && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-gray-800 rounded-xl p-6 max-w-sm mx-4">
-              <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+              <LoadingSpinner />
               <p className="text-center text-white font-medium">Procesando...</p>
             </div>
           </div>

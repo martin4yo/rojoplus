@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import {
   Users,
   UserPlus,
@@ -210,7 +211,7 @@ export default function DashboardEjecutivo() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
-          <RefreshCw className="w-8 h-8 text-red-600 animate-spin" />
+          <LoadingSpinner />
           <p className="text-gray-600">Cargando dashboard...</p>
         </div>
       </div>

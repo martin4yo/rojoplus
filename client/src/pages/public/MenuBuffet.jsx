@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { UtensilsCrossed, Phone, MapPin, Clock, ArrowLeft, Star, Coffee, Pizza, Sandwich, IceCream, Salad, Wine, ChevronDown, X, Download } from 'lucide-react'
 import TenantLogo from '../../components/TenantLogo'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Imágenes de ejemplo por categoría (usando URLs de imágenes libres de derechos)
 const imagenesPorCategoria = {
@@ -85,10 +86,7 @@ export default function MenuBuffet() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-200 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-500">Cargando menú...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     )
   }

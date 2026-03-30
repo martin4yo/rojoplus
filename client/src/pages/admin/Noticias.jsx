@@ -20,6 +20,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { Newspaper } from 'lucide-react'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const CATEGORIAS = [
   { value: 'INSTITUCIONAL', label: 'Institucional', color: 'bg-blue-100 text-blue-700' },
@@ -206,7 +207,7 @@ export default function Noticias() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+            <LoadingSpinner />
           </div>
         ) : noticias.length === 0 ? (
           <div className="text-center py-12">

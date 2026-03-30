@@ -3,6 +3,7 @@ import { Mail, Save, RefreshCw, Eye, Send, ChevronDown, ChevronUp, Loader, FileT
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const EVENT_TYPE_LABELS = {
   COMPROBANTE_PAGO: {
@@ -166,7 +167,7 @@ export default function EmailTemplates() {
         <div className="w-80 border-r border-gray-200 bg-white overflow-y-auto">
           {isLoading ? (
             <div className="p-8 text-center">
-              <Loader className="w-8 h-8 animate-spin mx-auto text-blue-500" />
+              <LoadingSpinner />
               <p className="mt-4 text-gray-500">Cargando templates...</p>
             </div>
           ) : (

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Camera, X, ChevronLeft, ChevronRight, Calendar, Tag } from 'lucide-react'
 import api from '../../services/api'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Galeria() {
   const [albumes, setAlbumes] = useState([])
@@ -126,7 +127,7 @@ export default function Galeria() {
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
+            <LoadingSpinner />
           </div>
         ) : !albumActivo && albumes.length > 0 ? (
           /* Vista de álbumes */

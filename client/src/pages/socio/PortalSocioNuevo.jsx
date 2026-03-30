@@ -41,6 +41,7 @@ import BeneficiosSocio from './sections/BeneficiosSocio'
 import DebitoAutomaticoSocio from './sections/DebitoAutomaticoSocio'
 import NotificacionesSocio from './sections/NotificacionesSocio'
 import EventosSocio from './sections/EventosSocio'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function PortalSocioNuevo() {
   const { tokenPortal } = useParams()
@@ -194,10 +195,7 @@ export default function PortalSocioNuevo() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando tu información...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     )
   }

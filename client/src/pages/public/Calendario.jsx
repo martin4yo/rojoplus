@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Calendar, ChevronLeft, ChevronRight, MapPin, Clock, Users } from 'lucide-react'
 import api from '../../services/api'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -142,7 +143,7 @@ export default function Calendario() {
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
+            <LoadingSpinner />
           </div>
         ) : vista === 'mes' ? (
           /* Vista Calendario */

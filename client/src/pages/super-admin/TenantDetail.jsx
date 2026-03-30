@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Edit, Users, Settings, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function TenantDetail() {
   const { id } = useParams()
@@ -29,9 +30,7 @@ export default function TenantDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

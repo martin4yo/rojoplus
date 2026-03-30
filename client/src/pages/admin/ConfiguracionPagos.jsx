@@ -4,6 +4,7 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function ConfiguracionPagos() {
   const [loading, setLoading] = useState(true)
@@ -68,7 +69,7 @@ export default function ConfiguracionPagos() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader className="w-8 h-8 animate-spin text-primary" />
+        <LoadingSpinner />
       </div>
     )
   }

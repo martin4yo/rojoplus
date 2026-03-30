@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../../services/api'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../../hooks/useConfirm'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 import {
   TrophyIcon,
   CalendarIcon,
@@ -69,9 +70,7 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

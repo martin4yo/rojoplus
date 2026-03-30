@@ -35,6 +35,7 @@ import {
   Legend,
 } from 'recharts'
 import * as XLSX from 'xlsx'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const api = {
   get: async (url) => {
@@ -681,7 +682,7 @@ export default function ReportesDeportivos() {
         <div className="p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+              <LoadingSpinner />
             </div>
           ) : error ? (
             <div className="text-center py-12 text-red-600">

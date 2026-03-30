@@ -26,6 +26,7 @@ import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatte
 import api from '../../services/api'
 import { useConfirm } from '../../hooks/useConfirm'
 import ChatWidget from '../../components/chat/ChatWidget'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function DetalleGestion() {
   const { id } = useParams()
@@ -232,7 +233,7 @@ export default function DetalleGestion() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+        <LoadingSpinner />
         <p className="ml-3 text-gray-600">Cargando gestión...</p>
       </div>
     )

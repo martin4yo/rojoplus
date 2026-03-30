@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { useConfirm } from '../../../hooks/useConfirm'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 const TIPO_LABELS = {
   RECIBO: {
@@ -185,7 +186,7 @@ export default function PdfTemplates() {
         <div className="w-80 border-r border-gray-200 bg-white overflow-y-auto">
           {isLoading ? (
             <div className="p-8 text-center">
-              <Loader className="w-8 h-8 animate-spin mx-auto text-gray-500" />
+              <LoadingSpinner />
               <p className="mt-4 text-gray-500">Cargando templates...</p>
             </div>
           ) : (

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import api from '../../services/api'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 const PRESETS_FECHA = [
   { id: 'esta-semana', label: 'Esta semana' },
@@ -348,7 +349,7 @@ export default function Cronograma() {
         {/* Resultados */}
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
+            <LoadingSpinner />
           </div>
         ) : todosEventos.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">

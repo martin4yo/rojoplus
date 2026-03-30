@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { MapPin, Phone, Navigation, Store, Percent } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Fix para el icono de Leaflet
 delete L.Icon.Default.prototype._getIconUrl
@@ -229,10 +230,7 @@ export default function ComerciosList({ showHeader = true, showInfo = true, clas
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-gray-600">Cargando comercios...</p>
-            </div>
+            <LoadingSpinner />
           </div>
         ) : vista === 'lista' ? (
           /* Vista Lista */

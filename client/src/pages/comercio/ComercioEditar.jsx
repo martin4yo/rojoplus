@@ -9,6 +9,7 @@ import { Alert } from '../../components/Alert'
 import ImageUpload from '../../components/ImageUpload'
 import api from '../../services/api'
 import { MapPin, ChevronLeft, ChevronRight, Check, ArrowLeft } from 'lucide-react'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Fix para el icono de Leaflet
 delete L.Icon.Default.prototype._getIconUrl
@@ -212,10 +213,7 @@ export default function ComercioEditar() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-gray-600">Cargando datos...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     )
   }

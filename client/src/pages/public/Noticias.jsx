@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Calendar, ChevronRight, Search } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Noticias de ejemplo (fallback si no hay datos en la BD)
 const noticiasEjemplo = [
@@ -183,7 +184,7 @@ export default function Noticias() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <LoadingSpinner />
             </div>
           ) : noticiasFiltradas.length === 0 ? (
             <div className="text-center py-12">

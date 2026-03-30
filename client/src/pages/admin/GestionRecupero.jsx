@@ -23,6 +23,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters'
 import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
 import ChatWidget from '../../components/chat/ChatWidget'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function GestionRecupero() {
   const navigate = useNavigate()
@@ -217,10 +218,7 @@ export default function GestionRecupero() {
       {/* Lista de Campañas */}
       <div className="space-y-4">
         {loading ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-            <p className="mt-2 text-gray-600">Cargando campañas...</p>
-          </div>
+          <LoadingSpinner />
         ) : campanas.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
             <Target className="w-12 h-12 mx-auto mb-3 text-gray-400" />

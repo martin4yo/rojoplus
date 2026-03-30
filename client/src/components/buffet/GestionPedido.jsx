@@ -16,6 +16,7 @@ import PagoMultiple from './PagoMultiple'
 import ClienteSelector from './ClienteSelector'
 import MenuProductos from './MenuProductos'
 import ModalOpcionesProducto from './ModalOpcionesProducto'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 /**
  * Componente universal para gestión de pedidos
@@ -875,9 +876,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

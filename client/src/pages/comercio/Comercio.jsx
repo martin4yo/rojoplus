@@ -6,6 +6,7 @@ import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
 import QrScanner from '../../components/QrScanner'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Comercio() {
   const { token } = useParams()
@@ -162,10 +163,7 @@ export default function Comercio() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-gray-600">Cargando...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     )
   }

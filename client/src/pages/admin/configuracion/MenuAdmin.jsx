@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import api from '../../../services/api'
 import { useConfirm } from '../../../hooks/useConfirm'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 // Mapeo de nombres de iconos a componentes
 const ICONOS = {
@@ -480,7 +481,7 @@ export default function MenuAdmin() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+        <LoadingSpinner />
       </div>
     )
   }

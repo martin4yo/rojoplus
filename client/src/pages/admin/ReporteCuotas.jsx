@@ -708,9 +708,7 @@ export default function ReporteCuotas() {
 
             <div className="flex-1 overflow-auto p-6">
               {loadingMorosos ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-                </div>
+                <LoadingSpinner />
               ) : morososData?.morosos?.length > 0 ? (
                 <>
                   {/* Totales */}

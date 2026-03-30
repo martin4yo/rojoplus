@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Mail } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 // Datos de ejemplo (fallback si no hay datos en la BD)
 const datosFallback = {
@@ -67,9 +68,7 @@ export default function Autoridades() {
 
   if (loading) {
     return (
-      <div className="bg-gray-300 min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

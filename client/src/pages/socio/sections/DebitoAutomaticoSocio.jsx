@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline'
 import api from '../../../services/api'
 import toast from 'react-hot-toast'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 // Detectar marca de tarjeta por número
 const detectarMarca = (numero) => {
@@ -207,7 +208,7 @@ export default function DebitoAutomaticoSocio({ tokenPortal }) {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+        <LoadingSpinner />
       </div>
     )
   }

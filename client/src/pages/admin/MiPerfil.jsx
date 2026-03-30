@@ -5,6 +5,7 @@ import { Input } from '../../components/Input'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { getUsuarioActual, getRolActual } from '../../services/permisos'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function MiPerfil() {
   const [usuario, setUsuario] = useState(null)
@@ -90,7 +91,7 @@ export default function MiPerfil() {
   if (!usuario) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <LoadingSpinner />
       </div>
     )
   }

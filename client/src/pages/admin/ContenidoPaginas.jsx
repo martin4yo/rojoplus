@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
-import {
 import LoadingSpinner from '../../components/LoadingSpinner'
+import {
   PlusIcon,
   TrashIcon,
   ArrowUpIcon,

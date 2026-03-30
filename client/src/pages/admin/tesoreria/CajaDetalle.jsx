@@ -138,7 +138,7 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
 
           {loading ? (
             <div className="flex justify-center py-6">
-              <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
+              <LoadingSpinner />
             </div>
           ) : movimientos.length === 0 ? (
             <p className="text-center text-gray-400 text-sm py-4">Sin movimientos</p>
@@ -412,7 +412,7 @@ export default function CajaDetalle() {
         <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-3">Por Medio de Pago</h2>
         {loadingResumen ? (
           <div className="flex items-center justify-center py-10">
-            <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
+            <LoadingSpinner />
           </div>
         ) : resumen?.porMedioPago?.length > 0 ? (
           <div className="space-y-2">
