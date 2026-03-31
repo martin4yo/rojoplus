@@ -14,8 +14,8 @@ model Tenant {
 
   // Identificación
   nombre                String
-  subdomain             String   
-  slug                  String   
+  subdomain             String    @unique
+  slug                  String    @unique
 
   // Contacto
   email                 String?
