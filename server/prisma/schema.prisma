@@ -1357,7 +1357,7 @@ model Admin {
 
 model Rol {
   id           Int           @id @default(autoincrement())
-  codigo       String       
+  codigo       String        @unique
   nombre       String
   descripcion  String?
   esSuperAdmin Boolean       @default(false) @map("es_super_admin")

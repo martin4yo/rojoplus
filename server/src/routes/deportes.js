@@ -62,7 +62,7 @@ router.post('/tipos-espacio', asyncHandler(async (req, res) => {
   }
 
   // Verificar codigo unico
-  const existente = await prisma.tipoEspacio.findUnique({ where: { codigo } })
+  const existente = await prisma.tipoEspacio.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un tipo con ese codigo', 400)
   }
@@ -98,7 +98,7 @@ router.put('/tipos-espacio/:id', asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.tipoEspacio.findUnique({ where: { codigo } })
+    const duplicado = await prisma.tipoEspacio.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un tipo con ese codigo', 400)
     }
@@ -204,7 +204,7 @@ router.post('/espacios-deportivos', asyncHandler(async (req, res) => {
   }
 
   // Verificar codigo unico
-  const existente = await prisma.espacioDeportivo.findUnique({ where: { codigo } })
+  const existente = await prisma.espacioDeportivo.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un espacio con ese codigo', 400)
   }
@@ -251,7 +251,7 @@ router.put('/espacios-deportivos/:id', asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.espacioDeportivo.findUnique({ where: { codigo } })
+    const duplicado = await prisma.espacioDeportivo.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un espacio con ese codigo', 400)
     }

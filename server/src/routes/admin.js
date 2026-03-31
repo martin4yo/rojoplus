@@ -2202,7 +2202,7 @@ router.post('/actividades', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.db.actividad.findUnique({ where: { codigo } })
+  const existente = await req.db.actividad.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una actividad con ese código', 400, 'DUPLICATE')
 
   const actividad = await req.db.actividad.create({
@@ -2232,7 +2232,7 @@ router.put('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
   if (!existente) throw new AppError('Actividad no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.db.actividad.findUnique({ where: { codigo } })
+    const duplicado = await req.db.actividad.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una actividad con ese código', 400, 'DUPLICATE')
   }
 
@@ -2341,7 +2341,7 @@ router.post('/categorias-actividad', authAdmin, asyncHandler(async (req, res) =>
     throw new AppError('Actividad, código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.categoriaActividad.findUnique({ where: { codigo } })
+  const existente = await req.prisma.categoriaActividad.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
 
   const actividad = await req.db.actividad.findUnique({ where: { id: parseInt(actividadId) } })
@@ -2390,7 +2390,7 @@ router.put('/categorias-actividad/:id', authAdmin, asyncHandler(async (req, res)
   if (!existente) throw new AppError('Categoría no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.categoriaActividad.findUnique({ where: { codigo } })
+    const duplicado = await req.prisma.categoriaActividad.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
   }
 
@@ -2485,7 +2485,7 @@ router.post('/cargos-personal', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Codigo y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.db.cargoPersonal.findUnique({ where: { codigo } })
+  const existente = await req.db.cargoPersonal.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un cargo con ese codigo', 400, 'DUPLICATE')
   }
@@ -2512,7 +2512,7 @@ router.put('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const otro = await req.db.cargoPersonal.findUnique({ where: { codigo } })
+    const otro = await req.db.cargoPersonal.findFirst({ where: { codigo } })
     if (otro) throw new AppError('Ya existe un cargo con ese codigo', 400, 'DUPLICATE')
   }
 
@@ -3016,7 +3016,7 @@ router.post('/tipos-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.tipoSocio.findUnique({ where: { codigo } })
+  const existente = await req.prisma.tipoSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un tipo con ese código', 400, 'DUPLICATE')
 
   const tipo = await req.prisma.tipoSocio.create({
@@ -3046,7 +3046,7 @@ router.put('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   if (!existente) throw new AppError('Tipo de socio no encontrado', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.tipoSocio.findUnique({ where: { codigo } })
+    const duplicado = await req.prisma.tipoSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe un tipo con ese código', 400, 'DUPLICATE')
   }
 
@@ -3128,7 +3128,7 @@ router.post('/categorias-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.categoriaSocio.findUnique({ where: { codigo } })
+  const existente = await req.prisma.categoriaSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
 
   const categoria = await req.prisma.categoriaSocio.create({
@@ -3154,7 +3154,7 @@ router.put('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => 
   if (!existente) throw new AppError('Categoría de socio no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.categoriaSocio.findUnique({ where: { codigo } })
+    const duplicado = await req.prisma.categoriaSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
   }
 
@@ -3222,7 +3222,7 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.estadoSocio.findUnique({ where: { codigo } })
+  const existente = await req.prisma.estadoSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
 
   const estado = await req.prisma.estadoSocio.create({
@@ -3248,7 +3248,7 @@ router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   if (!existente) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.estadoSocio.findUnique({ where: { codigo } })
+    const duplicado = await req.prisma.estadoSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
   }
 
@@ -3494,7 +3494,7 @@ router.post('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => 
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.conceptoTesoreria.findUnique({ where: { codigo } })
+  const existente = await req.prisma.conceptoTesoreria.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un concepto con ese código', 400, 'DUPLICATE')
 
   const concepto = await req.prisma.conceptoTesoreria.create({
@@ -4783,7 +4783,7 @@ router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar código único
-  const existente = await req.prisma.medioPago.findUnique({ where: { codigo } })
+  const existente = await req.prisma.medioPago.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
   }
@@ -4817,7 +4817,7 @@ router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Verificar código único (si cambió)
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.medioPago.findUnique({ where: { codigo } })
+    const duplicado = await req.prisma.medioPago.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
     }

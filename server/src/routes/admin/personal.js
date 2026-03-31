@@ -53,7 +53,7 @@ router.post('/cargos-personal', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Codigo y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.db.cargoPersonal.findUnique({ where: { codigo } })
+  const existente = await req.db.cargoPersonal.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un cargo con ese codigo', 400, 'DUPLICATE')
   }
@@ -80,7 +80,7 @@ router.put('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const otro = await req.db.cargoPersonal.findUnique({ where: { codigo } })
+    const otro = await req.db.cargoPersonal.findFirst({ where: { codigo } })
     if (otro) throw new AppError('Ya existe un cargo con ese codigo', 400, 'DUPLICATE')
   }
 

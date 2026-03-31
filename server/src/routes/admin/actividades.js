@@ -79,7 +79,7 @@ router.post('/actividades', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.db.actividad.findUnique({ where: { codigo } })
+  const existente = await req.db.actividad.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una actividad con ese código', 400, 'DUPLICATE')
 
   const actividad = await req.db.actividad.create({
@@ -109,7 +109,7 @@ router.put('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
   if (!existente) throw new AppError('Actividad no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.db.actividad.findUnique({ where: { codigo } })
+    const duplicado = await req.db.actividad.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una actividad con ese código', 400, 'DUPLICATE')
   }
 
@@ -218,7 +218,7 @@ router.post('/categorias-actividad', authAdmin, asyncHandler(async (req, res) =>
     throw new AppError('Actividad, código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.categoriaActividad.findUnique({ where: { codigo } })
+  const existente = await req.prisma.categoriaActividad.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
 
   const actividad = await req.db.actividad.findUnique({ where: { id: parseInt(actividadId) } })
@@ -267,7 +267,7 @@ router.put('/categorias-actividad/:id', authAdmin, asyncHandler(async (req, res)
   if (!existente) throw new AppError('Categoría no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.categoriaActividad.findUnique({ where: { codigo } })
+    const duplicado = await req.prisma.categoriaActividad.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
   }
 

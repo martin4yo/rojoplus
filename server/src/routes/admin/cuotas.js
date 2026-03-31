@@ -1095,7 +1095,7 @@ router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar código único
-  const existente = await req.prisma.medioPago.findUnique({ where: { codigo } })
+  const existente = await req.prisma.medioPago.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
   }
@@ -1129,7 +1129,7 @@ router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Verificar código único (si cambió)
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.medioPago.findUnique({ where: { codigo } })
+    const duplicado = await req.prisma.medioPago.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
     }

@@ -75,7 +75,7 @@ router.post('/categorias-producto', asyncHandler(async (req, res) => {
     throw new AppError('Codigo y nombre son requeridos', 400)
   }
 
-  const existente = await prisma.categoriaProducto.findUnique({ where: { codigo } })
+  const existente = await prisma.categoriaProducto.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe una categoria con ese codigo', 400)
   }
@@ -98,7 +98,7 @@ router.put('/categorias-producto/:id', asyncHandler(async (req, res) => {
   }
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.categoriaProducto.findUnique({ where: { codigo } })
+    const duplicado = await prisma.categoriaProducto.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe una categoria con ese codigo', 400)
     }
@@ -236,7 +236,7 @@ router.post('/productos', asyncHandler(async (req, res) => {
     throw new AppError('Codigo y nombre son requeridos', 400)
   }
 
-  const existente = await prisma.producto.findUnique({ where: { codigo } })
+  const existente = await prisma.producto.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un producto con ese codigo', 400)
   }
@@ -296,7 +296,7 @@ router.put('/productos/:id', asyncHandler(async (req, res) => {
   }
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.producto.findUnique({ where: { codigo } })
+    const duplicado = await prisma.producto.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un producto con ese codigo', 400)
     }
@@ -371,7 +371,7 @@ router.post('/productos/:id/variantes', asyncHandler(async (req, res) => {
 
   // Verificar SKU unico si se proporciona
   if (sku) {
-    const skuExistente = await prisma.productoVariante.findUnique({ where: { sku } })
+    const skuExistente = await prisma.productoVariante.findFirst({ where: { sku } })
     if (skuExistente) {
       throw new AppError('Ya existe una variante con ese SKU', 400)
     }
@@ -425,7 +425,7 @@ router.put('/producto-variantes/:id', asyncHandler(async (req, res) => {
 
   // Verificar SKU unico si cambia
   if (sku && sku !== existente.sku) {
-    const skuExistente = await prisma.productoVariante.findUnique({ where: { sku } })
+    const skuExistente = await prisma.productoVariante.findFirst({ where: { sku } })
     if (skuExistente) {
       throw new AppError('Ya existe una variante con ese SKU', 400)
     }

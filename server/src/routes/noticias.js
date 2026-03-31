@@ -260,7 +260,7 @@ router.post('/admin/noticias', authAdmin, async (req, res) => {
 
     // Generar slug único
     let slug = generarSlug(titulo)
-    const existeSlug = await req.db.noticia.findUnique({ where: { slug } })
+    const existeSlug = await req.db.noticia.findFirst({ where: { slug } })
     if (existeSlug) {
       slug = `${slug}-${Date.now()}`
     }

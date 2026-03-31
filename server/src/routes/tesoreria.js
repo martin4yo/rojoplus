@@ -137,7 +137,7 @@ router.post('/cajas', asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser EFECTIVO, BANCO, MERCADOPAGO, VALORES_PENDIENTES u OTRO', 400)
   }
 
-  const existente = await req.db.caja.findUnique({ where: { codigo } })
+  const existente = await req.db.caja.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe una caja con ese codigo', 400)
   }
@@ -187,7 +187,7 @@ router.put('/cajas/:id', asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.db.caja.findUnique({ where: { codigo } })
+    const duplicado = await req.db.caja.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe una caja con ese codigo', 400)
     }
@@ -459,7 +459,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
   if (!caja.cuentaContable?.codigo) {
     // Intentar resolver por tipo como fallback
     const codigoFallback = caja.tipo === 'BANCO' ? '1.1.1.02' : '1.1.1.01'
-    const cuentaCajaExiste = await req.db.cuentaContable.findUnique({ where: { codigo: codigoFallback } })
+    const cuentaCajaExiste = await req.db.cuentaContable.findFirst({ where: { codigo: codigoFallback } })
     if (!cuentaCajaExiste) {
       throw new AppError(`La caja no tiene cuenta contable configurada y no existe la cuenta genérica (${codigoFallback}). Asignale una cuenta contable a la caja antes de registrar movimientos.`, 400)
     }

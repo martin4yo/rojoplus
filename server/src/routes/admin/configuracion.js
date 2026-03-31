@@ -62,7 +62,7 @@ router.post('/tipos-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.db.tipoSocio.findUnique({ where: { codigo } })
+  const existente = await req.db.tipoSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un tipo con ese código', 400, 'DUPLICATE')
 
   const tipo = await req.db.tipoSocio.create({
@@ -92,7 +92,7 @@ router.put('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   if (!existente) throw new AppError('Tipo de socio no encontrado', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.db.tipoSocio.findUnique({ where: { codigo } })
+    const duplicado = await req.db.tipoSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe un tipo con ese código', 400, 'DUPLICATE')
   }
 
@@ -174,7 +174,7 @@ router.post('/categorias-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.db.categoriaSocio.findUnique({ where: { codigo } })
+  const existente = await req.db.categoriaSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
 
   const categoria = await req.db.categoriaSocio.create({
@@ -200,7 +200,7 @@ router.put('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => 
   if (!existente) throw new AppError('Categoría de socio no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.db.categoriaSocio.findUnique({ where: { codigo } })
+    const duplicado = await req.db.categoriaSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
   }
 
@@ -268,7 +268,7 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.db.estadoSocio.findUnique({ where: { codigo } })
+  const existente = await req.db.estadoSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
 
   const estado = await req.db.estadoSocio.create({
@@ -294,7 +294,7 @@ router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   if (!existente) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.db.estadoSocio.findUnique({ where: { codigo } })
+    const duplicado = await req.db.estadoSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
   }
 
@@ -544,7 +544,7 @@ router.post('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => 
   if (!cuentaContableId) {
     throw new AppError('La cuenta contable es requerida', 400, 'VALIDATION_ERROR')
   }
-  const existente = await req.db.conceptoTesoreria.findUnique({ where: { codigo } })
+  const existente = await req.db.conceptoTesoreria.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un concepto con ese código', 400, 'DUPLICATE')
 
   const concepto = await req.db.conceptoTesoreria.create({

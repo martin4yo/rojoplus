@@ -62,7 +62,7 @@ router.post('/conceptos', asyncHandler(async (req, res) => {
     throw new AppError('Codigo, nombre y tipo son requeridos', 400)
   }
 
-  const existente = await prisma.conceptoTesoreria.findUnique({ where: { codigo } })
+  const existente = await prisma.conceptoTesoreria.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un concepto con ese codigo', 400)
   }
@@ -96,7 +96,7 @@ router.put('/conceptos/:id', asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.conceptoTesoreria.findUnique({ where: { codigo } })
+    const duplicado = await prisma.conceptoTesoreria.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un concepto con ese codigo', 400)
     }
@@ -206,7 +206,7 @@ router.post('/cuentas-contables', asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser ACTIVO, PASIVO, PATRIMONIO, INGRESO o EGRESO', 400)
   }
 
-  const existente = await req.db.cuentaContable.findUnique({ where: { codigo } })
+  const existente = await req.db.cuentaContable.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe una cuenta con ese codigo', 400)
   }
@@ -255,7 +255,7 @@ router.put('/cuentas-contables/:id', asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.db.cuentaContable.findUnique({ where: { codigo } })
+    const duplicado = await req.db.cuentaContable.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe una cuenta con ese codigo', 400)
     }
@@ -428,7 +428,7 @@ router.post('/entidades', asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser PROVEEDOR, CLIENTE o PERSONAL', 400)
   }
 
-  const existente = await prisma.entidad.findUnique({ where: { codigo } })
+  const existente = await prisma.entidad.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe una entidad con ese codigo', 400)
   }
@@ -478,7 +478,7 @@ router.put('/entidades/:id', asyncHandler(async (req, res) => {
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.entidad.findUnique({ where: { codigo } })
+    const duplicado = await prisma.entidad.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe una entidad con ese codigo', 400)
     }
