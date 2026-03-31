@@ -14,8 +14,8 @@ model Tenant {
 
   // Identificación
   nombre                String
-  subdomain             String    @unique
-  slug                  String    @unique
+  subdomain             String   
+  slug                  String   
 
   // Contacto
   email                 String?
@@ -117,7 +117,7 @@ model TenantConfiguracion {
 
 model ConceptoTesoreria {
   id                   Int                  @id @default(autoincrement())
-  codigo               String               @unique
+  codigo               String              
   nombre               String
   descripcion          String?
   tipo                 String               @default("INGRESO")
@@ -145,12 +145,13 @@ model ConceptoTesoreria {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("conceptos_tesoreria")
 }
 
 model TipoSocio {
   id                  Int                @id @default(autoincrement())
-  codigo              String             @unique
+  codigo              String            
   nombre              String
   descripcion         String?
   color               String?
@@ -166,12 +167,13 @@ model TipoSocio {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("tipos_socio")
 }
 
 model CategoriaSocio {
   id                  Int      @id @default(autoincrement())
-  codigo              String   @unique
+  codigo              String  
   nombre              String
   descripcion         String?
   color               String?
@@ -183,12 +185,13 @@ model CategoriaSocio {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("categorias_socio")
 }
 
 model EstadoSocio {
   id                Int      @id @default(autoincrement())
-  codigo            String   @unique
+  codigo            String  
   nombre            String
   descripcion       String?
   color             String?
@@ -200,18 +203,19 @@ model EstadoSocio {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("estados_socio")
 }
 
 model Socio {
   id                           Int                    @id @default(autoincrement())
-  nroSocio                     String                 @unique @map("nro_socio")
+  nroSocio                     String                 @map("nro_socio")
   documento                    String?
   apellidoNombre               String                 @map("apellido_nombre")
   estado                       String                 @default("VIGENTE")
   email                        String?
   celular                      String?
-  rfidUid                      String?                @unique @map("rfid_uid")
+  rfidUid                      String?                @map("rfid_uid")
   fechaNacimiento              DateTime?              @map("fecha_nacimiento")
   categoria                    String?
   tipoSocio                    String?                @map("tipo_socio")
@@ -219,7 +223,7 @@ model Socio {
   ciudad                       String?
   createdAt                    DateTime               @default(now()) @map("created_at")
   updatedAt                    DateTime               @updatedAt @map("updated_at")
-  tokenPortal                  String?                @unique @default(uuid()) @map("token_portal")
+  tokenPortal                  String?                @default(uuid()) @map("token_portal")
   actualizadoPor               Int?                   @map("actualizado_por")
   alergias                     String?
   aliasDebito                  String?                @map("alias_debito")
@@ -355,6 +359,8 @@ model Socio {
   @@index([zona])
   @@index([titularFamiliaId], map: "idx_socios_titular_familia_id")
   @@index([tenantId])
+  @@unique([tenantId, rfidUid])
+  @@unique([tenantId, nroSocio])
   @@map("socios")
 }
 
@@ -406,7 +412,7 @@ model AutorizacionMenor {
 
 model Cobrador {
   id          Int      @id @default(autoincrement())
-  codigo      String   @unique
+  codigo      String  
   nombre      String
   telefono    String?
   email       String?
@@ -419,12 +425,13 @@ model Cobrador {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("cobradores")
 }
 
 model Actividad {
   id                  Int                  @id @default(autoincrement())
-  codigo              String               @unique
+  codigo              String              
   nombre              String
   descripcion         String?
   requiereAptaFisica  Boolean              @default(true) @map("requiere_apta_fisica")
@@ -448,13 +455,14 @@ model Actividad {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("actividades")
 }
 
 model CategoriaActividad {
   id                   Int                   @id @default(autoincrement())
   actividadId          Int                   @map("actividad_id")
-  codigo               String                @unique
+  codigo               String               
   nombre               String
   descripcion          String?
   edadMinima           Int?                  @map("edad_minima")
@@ -485,6 +493,7 @@ model CategoriaActividad {
   tenantId    Int      @map("tenant_id")
   @@index([actividadId])
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("categorias_actividad")
 }
 
@@ -656,7 +665,7 @@ model Cargo {
 
 model MedioPago {
   id                 Int             @id @default(autoincrement())
-  codigo             String          @unique
+  codigo             String         
   nombre             String
   tipo               String          @default("EFECTIVO")
   requiereDatosBanco Boolean         @default(false) @map("requiere_datos_banco")
@@ -674,12 +683,13 @@ model MedioPago {
   tenantId    Int      @map("tenant_id")
   @@index([cuentaContableId])
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("medios_pago")
 }
 
 model Pago {
   id                Int                  @id @default(autoincrement())
-  numero            String               @unique
+  numero            String              
   fecha             DateTime             @default(now())
   socioId           Int                  @map("socio_id")
   grupo_familiar_id Int?
@@ -726,6 +736,7 @@ model Pago {
   @@index([origen])
   @@index([centroCostoId])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("pagos")
 }
 
@@ -768,7 +779,7 @@ model AplicacionSaldo {
 
 model ConfiguracionDebito {
   id                  Int             @id @default(autoincrement())
-  codigo              String          @unique
+  codigo              String         
   nombre              String
   tipo                String
   plataforma          String?
@@ -793,13 +804,14 @@ model ConfiguracionDebito {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("configuracion_debito")
 }
 
 model ArchivoDebito {
   id                Int                   @id @default(autoincrement())
   configuracionId   Int                   @map("configuracion_id")
-  numero            String                @unique
+  numero            String               
   periodoAnio       Int                   @map("periodo_anio")
   periodoMes        Int                   @map("periodo_mes")
   fechaGeneracion   DateTime              @default(now()) @map("fecha_generacion")
@@ -822,6 +834,7 @@ model ArchivoDebito {
   @@index([periodoAnio, periodoMes])
   @@index([estado])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("archivos_debito")
 }
 
@@ -851,7 +864,7 @@ model DetalleDebito {
 model ImportacionCobranza {
   id                  Int               @id @default(autoincrement())
   archivoDebitoId     Int?              @map("archivo_debito_id")
-  numero              String            @unique
+  numero              String           
   tipo                String
   nombreArchivo       String            @map("nombre_archivo")
   rutaArchivo         String?           @map("ruta_archivo")
@@ -869,6 +882,7 @@ model ImportacionCobranza {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("importaciones_cobranza")
 }
 
@@ -898,7 +912,7 @@ model DetalleCobranza {
 
 model Caja {
   id                   Int                  @id @default(autoincrement())
-  codigo               String               @unique
+  codigo               String
   nombre               String
   tipo                 String
   descripcion          String?
@@ -932,6 +946,7 @@ model Caja {
   comprobantes           ComprobanteElectronico[]
 
   tenantId    Int      @map("tenant_id")
+  @@unique([tenantId, codigo])
   @@index([cuentaContableId])
   @@index([tenantId])
   @@map("cajas")
@@ -939,7 +954,7 @@ model Caja {
 
 model TransferenciaCaja {
   id              Int      @id @default(autoincrement())
-  numero          String   @unique
+  numero          String  
   cajaOrigenId    Int      @map("caja_origen_id")
   cajaDestinoId   Int      @map("caja_destino_id")
   monto           Decimal  @db.Decimal(12, 2)
@@ -958,6 +973,7 @@ model TransferenciaCaja {
   @@index([cajaDestinoId])
   @@index([fecha])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("transferencias_caja")
 }
 
@@ -982,7 +998,7 @@ model CuentaBancaria {
 
 model CuentaContable {
   id                 Int                 @id @default(autoincrement())
-  codigo             String              @unique
+  codigo             String             
   nombre             String
   tipo               String
   nivel              Int                 @default(1)
@@ -1003,12 +1019,13 @@ model CuentaContable {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("cuentas_contables")
 }
 
 model Asiento {
   id              Int                  @id @default(autoincrement())
-  numero          String               @unique
+  numero          String              
   fecha           DateTime             @default(now())
   concepto        String
   estado          String               @default("CONFIRMADO")
@@ -1029,6 +1046,7 @@ model Asiento {
   @@index([fecha])
   @@index([tipoOrigen, origenId])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("asientos")
 }
 
@@ -1055,7 +1073,7 @@ model AsientoLinea {
 
 model MovimientoCaja {
   id                      Int                  @id @default(autoincrement())
-  numero                  String               @unique
+  numero                  String              
   cajaId                  Int                  @map("caja_id")
   fecha                   DateTime             @default(now())
   fechaOperacion          DateTime?            @map("fecha_operacion")
@@ -1110,12 +1128,13 @@ model MovimientoCaja {
   @@index([conciliado])
   @@index([movimientoContableId])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("movimientos_caja")
 }
 
 model FormatoExtracto {
   id            Int                @id @default(autoincrement())
-  nombre        String             @unique
+  nombre        String            
   banco         String?
   tipoArchivo   String             @map("tipo_archivo")
   descripcion   String?
@@ -1127,13 +1146,14 @@ model FormatoExtracto {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, nombre])
   @@map("formatos_extracto")
 }
 
 model ExtractoBancario {
   id                  Int                  @id @default(autoincrement())
   cajaId              Int                  @map("caja_id")
-  numero              String               @unique
+  numero              String              
   periodoDesde        DateTime             @map("periodo_desde")
   periodoHasta        DateTime             @map("periodo_hasta")
   nombreArchivo       String?              @map("nombre_archivo")
@@ -1158,6 +1178,7 @@ model ExtractoBancario {
   @@index([formatoId])
   @@index([periodoDesde, periodoHasta])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("extractos_bancarios")
 }
 
@@ -1211,7 +1232,7 @@ model Conciliacion {
 
 model ECheq {
   id                 Int             @id @default(autoincrement())
-  numero             String          @unique
+  numero             String         
   tipo               String
   cmc7               String?
   echeqId            String?         @map("echeq_id")
@@ -1255,13 +1276,14 @@ model ECheq {
   @@index([cajaOrigenId])
   @@index([cajaDestinoId])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("echeqs")
 }
 
 model LinkPago {
   id              Int       @id @default(autoincrement())
   socioId         Int       @map("socio_id")
-  codigo          String    @unique @default(uuid())
+  codigo          String    @default(uuid())
   concepto        String
   descripcion     String?
   montoTotal      Decimal   @map("monto_total") @db.Decimal(12, 2)
@@ -1286,12 +1308,13 @@ model LinkPago {
   @@index([codigo])
   @@index([estado])
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("links_pago")
 }
 
 model Admin {
   id                      Int                  @id @default(autoincrement())
-  email                   String               @unique
+  email                   String              
   passwordHash            String               @map("password_hash")
   nombre                  String
   activo                  Boolean              @default(true)
@@ -1334,7 +1357,7 @@ model Admin {
 
 model Rol {
   id           Int           @id @default(autoincrement())
-  codigo       String        @unique
+  codigo       String       
   nombre       String
   descripcion  String?
   esSuperAdmin Boolean       @default(false) @map("es_super_admin")
@@ -1349,7 +1372,7 @@ model Rol {
 
 model Permiso {
   id          Int          @id @default(autoincrement())
-  codigo      String       @unique
+  codigo      String      
   nombre      String
   descripcion String?
   modulo      String
@@ -1421,10 +1444,10 @@ model Comercio {
   direccion             String
   rubroId               Int                  @map("rubro_id")
   telefono              String
-  email                 String               @unique
+  email                 String              
   cuit                  String
   responsable           String
-  token                 String?              @unique @default(uuid())
+  token                 String?              @default(uuid())
   estado                String               @default("PENDIENTE")
   plan                  String               @default("BASICO")
   descuentoPct          Decimal              @default(10) @map("descuento_pct") @db.Decimal(5, 2)
@@ -1542,7 +1565,7 @@ model AuditLog {
 
 model CargoPersonal {
   id          Int       @id @default(autoincrement())
-  codigo      String    @unique
+  codigo      String   
   nombre      String
   descripcion String?
   activo      Boolean   @default(true)
@@ -1552,12 +1575,13 @@ model CargoPersonal {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("cargos_personal")
 }
 
 model Entidad {
   id                   Int                  @id @default(autoincrement())
-  codigo               String               @unique
+  codigo               String              
   tipo                 String
   razonSocial          String               @map("razon_social")
   nombreFantasia       String?              @map("nombre_fantasia")
@@ -1595,12 +1619,13 @@ model Entidad {
   @@index([documento])
   @@index([cargoPersonalId])
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("entidades")
 }
 
 model OrdenCompra {
   id                   Int                  @id @default(autoincrement())
-  numero               String               @unique
+  numero               String              
   entidadId            Int                  @map("entidad_id")
   centroCostoId        Int?                 @map("centro_costo_id")
   fecha                DateTime             @default(now())
@@ -1625,6 +1650,7 @@ model OrdenCompra {
   @@index([fecha])
   @@index([centroCostoId])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("ordenes_compra")
 }
 
@@ -1649,7 +1675,7 @@ model ItemOrdenCompra {
 
 model Pedido {
   id            Int                  @id @default(autoincrement())
-  numero        String               @unique
+  numero        String              
   entidadId     Int?                 @map("entidad_id")
   socioId       Int?                 @map("socio_id")
   centroCostoId Int?                 @map("centro_costo_id")
@@ -1678,6 +1704,7 @@ model Pedido {
   @@index([fecha])
   @@index([centroCostoId])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("pedidos")
 }
 
@@ -1702,19 +1729,20 @@ model ItemPedido {
 
 model CategoriaProducto {
   id        Int        @id @default(autoincrement())
-  codigo    String     @unique
+  codigo    String    
   nombre    String
   activo    Boolean    @default(true)
   productos Producto[]
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("categorias_producto")
 }
 
 model Producto {
   id               Int                @id @default(autoincrement())
-  codigo           String             @unique
+  codigo           String            
   nombre           String
   descripcion      String?
   categoriaId      Int?               @map("categoria_id")
@@ -1738,6 +1766,7 @@ model Producto {
   @@index([conceptoCompraId])
   @@index([conceptoVentaId])
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("productos")
 }
 
@@ -1746,7 +1775,7 @@ model ProductoVariante {
   productoId       Int               @map("producto_id")
   talle            String
   color            String?
-  sku              String?           @unique
+  sku              String?          
   stockActual      Decimal           @default(0) @map("stock_actual") @db.Decimal(12, 2)
   stockMinimo      Decimal           @default(0) @map("stock_minimo") @db.Decimal(12, 2)
   precioCosto      Decimal?          @map("precio_costo") @db.Decimal(12, 2)
@@ -1764,6 +1793,7 @@ model ProductoVariante {
   @@unique([productoId, talle, color])
   @@index([productoId])
   @@index([tenantId])
+  @@unique([tenantId, sku])
   @@map("producto_variantes")
 }
 
@@ -1807,7 +1837,7 @@ model MovimientoStock {
 
 model MovimientoContable {
   id                Int                  @id @default(autoincrement())
-  numero            String               @unique
+  numero            String              
   tipo              String
   entidadId         Int?                 @map("entidad_id")
   socioId           Int?                 @map("socio_id")
@@ -1859,6 +1889,7 @@ model MovimientoContable {
   @@index([estado])
   @@index([fecha])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("movimientos_contables")
 }
 
@@ -1888,7 +1919,7 @@ model ItemMovimiento {
 
 model ConceptoLiquidacion {
   id          Int      @id @default(autoincrement())
-  codigo      String   @unique
+  codigo      String  
   nombre      String
   tipo        String
   descripcion String?
@@ -1901,12 +1932,13 @@ model ConceptoLiquidacion {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("conceptos_liquidacion")
 }
 
 model LiquidacionSueldo {
   id               Int               @id @default(autoincrement())
-  numero           String            @unique
+  numero           String           
   periodo          String
   mes              Int
   anio             Int
@@ -1926,6 +1958,7 @@ model LiquidacionSueldo {
   @@unique([mes, anio])
   @@index([estado])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("liquidaciones_sueldo")
 }
 
@@ -1956,7 +1989,7 @@ model ItemLiquidacion {
 
 model TipoEspacio {
   id          Int                @id @default(autoincrement())
-  codigo      String             @unique
+  codigo      String            
   nombre      String
   descripcion String?
   orden       Int                @default(0)
@@ -1966,12 +1999,13 @@ model TipoEspacio {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("tipos_espacio")
 }
 
 model EspacioDeportivo {
   id                     Int                     @id @default(autoincrement())
-  codigo                 String                  @unique
+  codigo                 String                 
   nombre                 String
   tipo                   String?
   capacidad              Int?
@@ -1991,6 +2025,7 @@ model EspacioDeportivo {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("espacios_deportivos")
 }
 
@@ -2194,7 +2229,7 @@ model LineaPresupuesto {
 
 model CentroCosto {
   id                   Int                  @id @default(autoincrement())
-  codigo               String               @unique
+  codigo               String              
   nombre               String
   descripcion          String?
   tipo                 String               @default("OPERATIVO")
@@ -2222,6 +2257,7 @@ model CentroCosto {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("centros_costo")
 }
 
@@ -2255,7 +2291,7 @@ model PagoInformado {
 
 model EmailTemplate {
   id          String   @id @default(cuid())
-  eventType   String   @unique
+  eventType   String  
   nombre      String
   descripcion String?
   subject     String
@@ -2274,7 +2310,7 @@ model EmailTemplate {
 
 model PdfTemplate {
   id          String   @id @default(cuid())
-  tipo        String   @unique
+  tipo        String  
   nombre      String
   descripcion String?
   htmlContent String
@@ -2415,7 +2451,7 @@ model CierreCaja {
 model PushSubscription {
   id        Int      @id @default(autoincrement())
   socioId   Int      @map("socio_id")
-  endpoint  String   @unique
+  endpoint  String  
   p256dh    String
   auth      String
   userAgent String?  @map("user_agent")
@@ -2488,7 +2524,7 @@ model Banner {
 model Noticia {
   id               Int       @id @default(autoincrement())
   titulo           String
-  slug             String    @unique
+  slug             String   
   extracto         String?
   contenido        String
   imagen           String?
@@ -2507,6 +2543,7 @@ model Noticia {
   @@index([fechaPublicacion])
   @@index([destacada])
   @@index([tenantId])
+  @@unique([tenantId, slug])
   @@map("noticias")
 }
 
@@ -2605,7 +2642,7 @@ model Mesa {
 
 model CategoriaMenu {
   id                Int                @id @default(autoincrement())
-  codigo            String             @unique
+  codigo            String            
   nombre            String
   descripcion       String?
   color             String?
@@ -2619,6 +2656,7 @@ model CategoriaMenu {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("categorias_menu")
 }
 
@@ -2711,7 +2749,7 @@ model OpcionProducto {
 
 model Comanda {
   id              Int              @id @default(autoincrement())
-  numero          String           @unique
+  numero          String          
   mesaId          Int              @map("mesa_id")
   socioId         Int?             @map("socio_id")
   centroCostoId   Int?             @map("centro_costo_id")
@@ -2744,6 +2782,7 @@ model Comanda {
   @@index([horaApertura])
   @@index([centroCostoId])
   @@index([tenantId])
+  @@unique([tenantId, numero])
   @@map("comandas")
 }
 
@@ -2873,7 +2912,7 @@ model OpcionItemTakeAway {
 
 model SectorBuffet {
   id         Int                @id @default(autoincrement())
-  codigo     String             @unique
+  codigo     String            
   nombre     String
   icono      String?
   color      String             @default("#DC2626")
@@ -2885,12 +2924,13 @@ model SectorBuffet {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("sectores_buffet")
 }
 
 model ImpresoraTermica {
   id                Int                @id @default(autoincrement())
-  nombre            String             @unique
+  nombre            String            
   tipoConexion      String             @default("IP") @map("tipo_conexion") // IP, USB, CUPS
   ip                String?            // Para tipo IP (ej: 192.168.1.100)
   puerto            Int                @default(9100) // Para tipo IP
@@ -2906,6 +2946,7 @@ model ImpresoraTermica {
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
+  @@unique([tenantId, nombre])
   @@map("impresoras_termicas")
 }
 
@@ -3115,7 +3156,7 @@ model MensajeEntrenador {
 
 model DispositivoAcceso {
   id                Int                     @id @default(autoincrement())
-  codigo            String                  @unique
+  codigo            String                 
   nombre            String
   ubicacion         String
   ipLocal           String?                 @map("ip_local")
@@ -3138,6 +3179,7 @@ model DispositivoAcceso {
   tenantId    Int      @map("tenant_id")
   @@index([activo])
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("dispositivos_acceso")
 }
 
@@ -3223,7 +3265,7 @@ model IntentoAccesoDenegado {
 
 model Evento {
   id                  Int                  @id @default(autoincrement())
-  codigo              String               @unique
+  codigo              String              
   nombre              String
   descripcion         String?              @db.Text
   tipo                String               // DEPORTIVO, SOCIAL, RECREATIVO
@@ -3264,6 +3306,7 @@ model Evento {
   @@index([conceptoTesoreriaId])
   @@index([centroCostoId])
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("eventos")
 }
 
@@ -3292,7 +3335,7 @@ model CategoriaEntrada {
 
 model Entrada {
   id                  Int                @id @default(autoincrement())
-  codigo              String             @unique @default(uuid())
+  codigo              String             @default(uuid())
   eventoId            Int                @map("evento_id")
   categoriaId         Int                @map("categoria_id")
   socioId             Int?               @map("socio_id")
@@ -3327,6 +3370,7 @@ model Entrada {
   @@index([fechaVenta])
   @@index([movimientoCajaId])
   @@index([tenantId])
+  @@unique([tenantId, codigo])
   @@map("entradas")
 }
 
@@ -3358,7 +3402,7 @@ model IngresoEntrada {
 
 model ConfiguracionFiscal {
   id               Int      @id @default(autoincrement())
-  cuit             String   @unique
+  cuit             String  
   razonSocial      String   @map("razon_social")
   condicionIva     String   @map("condicion_iva")
   domicilioFiscal  String   @map("domicilio_fiscal")
