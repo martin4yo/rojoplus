@@ -1314,7 +1314,7 @@ model LinkPago {
 
 model Admin {
   id                      Int                  @id @default(autoincrement())
-  email                   String              
+  email                   String               @unique
   passwordHash            String               @map("password_hash")
   nombre                  String
   activo                  Boolean              @default(true)
