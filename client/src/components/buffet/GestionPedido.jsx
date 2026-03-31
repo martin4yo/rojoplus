@@ -1454,6 +1454,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           )}
 
           {/* Barra de búsqueda y toggle vista - Compacta en móvil */}
+          {tabCobroActivo !== 'finalizar' && (
           <div className="px-2 py-2 md:p-4 bg-white border-b">
             <div className="flex gap-2 items-center">
               <div className="relative flex-1">
@@ -1494,8 +1495,15 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               </div>
             </div>
           </div>
+          )}
 
           {/* Menú de Categorías y Productos */}
+          {tabCobroActivo === 'finalizar' ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-3 p-8">
+              <DollarSign size={48} className="text-gray-300" />
+              <p className="text-sm text-center">El menú está deshabilitado mientras se procesa el cobro.<br />Volvé a <strong>Cuenta</strong> para agregar productos.</p>
+            </div>
+          ) : (
           <MenuProductos
             categorias={categorias}
             productos={productos}
@@ -1513,6 +1521,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
             }}
             className="pb-20 md:pb-0"
           />
+          )}
         </div>
 
         {/* Panel Derecho - Resumen con Tabs (oculto en móvil cuando está en tab productos) */}
