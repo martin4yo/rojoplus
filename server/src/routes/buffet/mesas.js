@@ -170,7 +170,7 @@ router.post('/mesas', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res)
   try {
     const { numero, nombre, capacidad, zona, esComunal } = req.body
 
-    const existente = await req.db.mesa.findUnique({ where: { numero } })
+    const existente = await req.db.mesa.findFirst({ where: { numero } })
     if (existente) {
       return res.status(400).json({ success: false, error: 'Ya existe una mesa con ese número' })
     }

@@ -2581,7 +2581,7 @@ model Mensaje {
 
 model Mesa {
   id             Int       @id @default(autoincrement())
-  numero         Int       @unique
+  numero         Int
   nombre         String?
   capacidad      Int       @default(4)
   estado         String    @default("LIBRE")
@@ -2595,6 +2595,7 @@ model Mesa {
   mozoAsignado   Admin?    @relation("MesasAsignadas", fields: [mozoAsignadoId], references: [id])
 
   tenantId    Int      @map("tenant_id")
+  @@unique([tenantId, numero])
   @@index([estado])
   @@index([activo])
   @@index([mozoAsignadoId])
