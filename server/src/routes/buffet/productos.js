@@ -25,7 +25,7 @@ router.get('/categorias', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO',
     const where = {}
     if (activo !== undefined) where.activo = activo === 'true'
 
-    const categorias = await prisma.categoriaMenu.findMany({
+    const categorias = await req.db.categoriaMenu.findMany({
       where,
       orderBy: { orden: 'asc' },
       include: {
@@ -48,7 +48,7 @@ router.post('/categorias', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req,
   try {
     const { codigo, nombre, descripcion, color, icono, orden } = req.body
 
-    const categoria = await prisma.categoriaMenu.create({
+    const categoria = await req.db.categoriaMenu.create({
       data: { codigo, nombre, descripcion, color, icono, orden: orden || 0 }
     })
 
@@ -68,7 +68,7 @@ router.put('/categorias/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (r
     const { id } = req.params
     const { codigo, nombre, descripcion, color, icono, orden, activo } = req.body
 
-    const categoria = await prisma.categoriaMenu.update({
+    const categoria = await req.db.categoriaMenu.update({
       where: { id: parseInt(id) },
       data: { codigo, nombre, descripcion, color, icono, orden, activo }
     })
@@ -93,7 +93,7 @@ router.delete('/categorias/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async
       return res.status(400).json({ success: false, error: 'No se puede eliminar una categoría con productos' })
     }
 
-    await prisma.categoriaMenu.delete({ where: { id: parseInt(id) } })
+    await req.db.categoriaMenu.delete({ where: { id: parseInt(id) } })
 
     res.json({ success: true, message: 'Categoría eliminada' })
   } catch (error) {
@@ -241,12 +241,12 @@ router.post('/productos/crear-completo', authAdmin, checkPermiso('BUFFET_CONFIG'
       return res.status(400).json({ success: false, error: 'Faltan campos obligatorios' })
     }
 
-    const existente = await prisma.producto.findUnique({ where: { codigo } })
+    const existente = await req.db.producto.findFirst({ where: { codigo } })
     if (existente) {
       return res.status(400).json({ success: false, error: 'Ya existe un producto con ese código' })
     }
 
-    const resultado = await prisma.$transaction(async (tx) => {
+    const resultado = await req.db.$transaction(async (tx) => {
       const productoStock = await tx.producto.create({
         data: {
           codigo,
@@ -293,7 +293,7 @@ router.post('/productos', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, 
   try {
     const { productoId, categoriaMenuId, nombre, descripcion, codigoBarras, precio, imagen, tiposVenta, disponible, destacado, orden } = req.body
 
-    const productoStock = await prisma.producto.findUnique({ where: { id: productoId } })
+    const productoStock = await req.db.producto.findUnique({ where: { id: productoId } })
     if (!productoStock) {
       return res.status(400).json({ success: false, error: 'Producto del stock no encontrado' })
     }
@@ -339,7 +339,7 @@ router.put('/productos/precios', authAdmin, checkPermiso('BUFFET_CONFIG'), async
       return res.status(400).json({ success: false, error: 'Debe enviar un array de productos con id y precio' })
     }
 
-    const actualizaciones = await prisma.$transaction(
+    const actualizaciones = await req.db.$transaction(
       productos.map(({ id, precio }) =>
         req.db.productoBuffet.update({
           where: { id: parseInt(id) },
