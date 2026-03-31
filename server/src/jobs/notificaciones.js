@@ -7,6 +7,10 @@ import {
   verificarMorosidad,
   verificarPartidosProximos,
 } from '../services/notificacionService.js'
+import {
+  enviarRecordatorioReserva,
+  enviarCancelacionReserva,
+} from '../services/email.js'
 
 /**
  * Sistema de Notificaciones Automáticas
@@ -162,6 +166,83 @@ const sugerirPasajesCron = cron.schedule('0 8 1 12 *', async () => {
   timezone: 'America/Argentina/Buenos_Aires',
 })
 
+async function enviarRecordatoriosReservas() {
+  const manana = new Date()
+  manana.setDate(manana.getDate() + 1)
+  manana.setHours(0, 0, 0, 0)
+  const mananaFin = new Date(manana)
+  mananaFin.setHours(23, 59, 59, 999)
+
+  const reservas = await prisma.reservaEspacio.findMany({
+    where: {
+      fecha: { gte: manana, lte: mananaFin },
+      estado: 'CONFIRMADA',
+      email: { not: null },
+    },
+    include: {
+      espacio: { select: { nombre: true } },
+    },
+  })
+
+  let enviados = 0
+  for (const reserva of reservas) {
+    await enviarRecordatorioReserva(reserva, null)
+    enviados++
+  }
+  return enviados
+}
+
+async function cerrarReservasPasadas() {
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+
+  const [completadas, noShow] = await Promise.all([
+    prisma.reservaEspacio.updateMany({
+      where: { estado: 'CONFIRMADA', fecha: { lt: hoy } },
+      data: { estado: 'COMPLETADA' },
+    }),
+    prisma.reservaEspacio.updateMany({
+      where: { estado: 'PENDIENTE_PAGO', fecha: { lt: hoy } },
+      data: { estado: 'NO_SHOW' },
+    }),
+  ])
+  return { completadas: completadas.count, noShow: noShow.count }
+}
+
+/**
+ * Enviar recordatorios de reservas 24hs antes
+ * Se ejecuta todos los días a las 8:00 AM
+ */
+const recordatoriosReservasCron = cron.schedule('0 8 * * *', async () => {
+  try {
+    console.log('\n📅 [CRON] Enviando recordatorios de reservas de mañana...')
+    const enviados = await enviarRecordatoriosReservas()
+    console.log(`✅ [CRON] Recordatorios reservas: ${enviados} enviados\n`)
+  } catch (error) {
+    console.error('❌ [CRON] Error enviando recordatorios de reservas:', error.message)
+  }
+}, {
+  scheduled: false,
+  timezone: 'America/Argentina/Buenos_Aires',
+})
+
+/**
+ * Marcar reservas pasadas como COMPLETADA o NO_SHOW
+ * Se ejecuta todos los días a las 00:30 AM
+ */
+const cerrarReservasPasadasCron = cron.schedule('30 0 * * *', async () => {
+  try {
+    console.log('\n🔒 [CRON] Cerrando reservas pasadas...')
+    const { completadas, noShow } = await cerrarReservasPasadas()
+    console.log(`✅ [CRON] Reservas cerradas: ${completadas} completadas, ${noShow} no-show\n`)
+  } catch (error) {
+    console.error('❌ [CRON] Error cerrando reservas pasadas:', error.message)
+  }
+}, {
+  scheduled: false,
+  timezone: 'America/Argentina/Buenos_Aires',
+})
+
 /**
  * Iniciar todos los cron jobs
  */
@@ -175,6 +256,8 @@ export function iniciarCronJobs() {
   console.log('  💰 Morosidad: Lunes y viernes a las 11:00 AM')
   console.log('  ⚽ Recordatorio partidos: Todos los días a las 18:00')
   console.log('  🔄 Sugerir pasajes: 1 de diciembre a las 8:00 AM')
+  console.log('  📅 Recordatorios reservas: Todos los días a las 8:00 AM')
+  console.log('  🔒 Cerrar reservas pasadas: Todos los días a las 00:30')
   console.log('  🌍 Timezone: America/Argentina/Buenos_Aires\n')
 
   procesarCola.start()
@@ -183,6 +266,8 @@ export function iniciarCronJobs() {
   verificarMorosidadCron.start()
   verificarPartidosCron.start()
   sugerirPasajesCron.start()
+  recordatoriosReservasCron.start()
+  cerrarReservasPasadasCron.start()
 
   console.log('✅ Todos los cron jobs iniciados correctamente\n')
 }
@@ -199,6 +284,8 @@ export function detenerCronJobs() {
   verificarMorosidadCron.stop()
   verificarPartidosCron.stop()
   sugerirPasajesCron.stop()
+  recordatoriosReservasCron.stop()
+  cerrarReservasPasadasCron.stop()
 
   console.log('✅ Todos los cron jobs detenidos\n')
 }
@@ -220,6 +307,10 @@ export async function ejecutarManual(tipo) {
       return await verificarMorosidad()
     case 'partidos':
       return await verificarPartidosProximos()
+    case 'recordatorios-reservas':
+      return await enviarRecordatoriosReservas()
+    case 'cerrar-reservas':
+      return await cerrarReservasPasadas()
     default:
       throw new Error(`Tipo desconocido: ${tipo}`)
   }

@@ -251,7 +251,7 @@ export default function DashboardEjecutivo() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard Ejecutivo</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Resumen ejecutivo del Club Sportivo Pilar
+            {data.nombreTenant ? `Resumen ejecutivo de ${data.nombreTenant}` : 'Resumen ejecutivo'}
             {data.periodoActual && ` - Período ${data.periodoActual.nombre}`}
           </p>
         </div>

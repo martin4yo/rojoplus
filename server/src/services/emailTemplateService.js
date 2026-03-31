@@ -1,19 +1,9 @@
-import { createTransport } from 'nodemailer'
 import Handlebars from 'handlebars'
 import juice from 'juice'
 import { generatePDF } from './pdfGenerator.js'
+import { getMailConfig } from './email.js'
 
 const handlebars = Handlebars
-
-const transporter = createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-})
 
 /**
  * Verifica si está en modo demo
@@ -83,7 +73,8 @@ export async function sendTemplateEmail(options) {
       })
     }
 
-    // 6. Manejar modo demo
+    // 6. Obtener config SMTP del tenant + modo demo
+    const mailConfig = await getMailConfig(prisma)
     const modoDemo = await getModoDemo(prisma)
     let destinatario = to
     let subjectFinal = subject
@@ -95,14 +86,15 @@ export async function sendTemplateEmail(options) {
     }
 
     // 7. Enviar email
-    const info = await transporter.sendMail({
-      from: `"Rojo Plus" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    const mailOpts = {
+      from: mailConfig.from,
       to: destinatario,
       subject: subjectFinal,
       html: bodyHtml,
-      text: template.bodyText || '', // Versión texto plano
-      attachments
-    })
+      text: template.bodyText || '',
+    }
+    if (attachments.length > 0) mailOpts.attachments = attachments
+    const info = await mailConfig.transporter.sendMail(mailOpts)
 
     console.log(`✅ Email enviado: ${eventType} → ${destinatario}`)
     console.log(`   MessageID: ${info.messageId}`)
@@ -178,9 +170,10 @@ export async function sendTestEmail(prisma, eventType, to) {
 /**
  * Verifica la conexión SMTP
  */
-export async function verificarConexionSMTP() {
+export async function verificarConexionSMTP(db = null) {
   try {
-    await transporter.verify()
+    const mailConfig = await getMailConfig(db)
+    await mailConfig.transporter.verify()
     console.log('✅ Conexión SMTP verificada')
     return true
   } catch (error) {

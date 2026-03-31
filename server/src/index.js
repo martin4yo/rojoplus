@@ -47,6 +47,7 @@ import noticiasDeportivasRoutes from './routes/noticiasDeportivas.js'
 import reglamentoRoutes from './routes/reglamento.js'
 import accesosRoutes from './routes/accesos.js'
 import eventosRoutes from './routes/eventos.js'
+import reservasRoutes from './routes/reservas.js'
 import importacionRoutes from './routes/importacion.js'
 import facturacionRoutes from './routes/facturacion.js'
 import menuRoutes from './routes/menu.js'
@@ -182,6 +183,7 @@ app.use('/api/admin/noticias-deportivas', noticiasDeportivasRoutes)
 app.use('/api/admin/reglamento', reglamentoRoutes)
 app.use('/api/accesos', accesosRoutes)
 app.use('/api/eventos', eventosRoutes)
+app.use('/api/reservas', reservasRoutes)
 app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
 app.use('/api/importacion', importacionRoutes)
 app.use('/api/admin/facturacion', facturacionRoutes)

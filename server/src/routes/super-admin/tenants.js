@@ -3,6 +3,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
+import bcrypt from 'bcryptjs'
 import prisma from '../../lib/prisma.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -324,14 +325,17 @@ router.post('/register', async (req, res) => {
     })
 
     if (!admin) {
-      // Crear nuevo admin (TODO: agregar hash de contraseña)
+      if (!adminData.password || adminData.password.length < 8) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' })
+      }
+      const hashedPassword = await bcrypt.hash(adminData.password, 12)
       admin = await prisma.admin.create({
         data: {
           nombre: adminData.nombre,
           email: adminData.email,
           nombreUsuario: adminData.nombreUsuario || adminData.email.split('@')[0],
-          password: adminData.password, // TODO: hashear con bcrypt
-          activo: true
+          password: hashedPassword,
+          activo: true,
         }
       })
     }

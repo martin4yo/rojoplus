@@ -22,7 +22,7 @@ const transporterCache = new Map()
  * Claves en tabla configuracion: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
  * SMTP_SECURE, SMTP_FROM, SMTP_FROM_NAME, EMAIL_CONTACTO, NOMBRE_CLUB
  */
-async function getMailConfig(db) {
+export async function getMailConfig(db) {
   const globalFrom = `"${process.env.SMTP_FROM_NAME || 'Clubix'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`
   const globalEmailContacto = process.env.EMAIL_CONTACTO || process.env.SMTP_USER
 
@@ -90,7 +90,7 @@ async function getModoDemo(db) {
 }
 
 // Función helper para enviar email (maneja modo demo y SMTP por tenant)
-export async function enviarEmail({ to, subject, html, db }) {
+export async function enviarEmail({ to, subject, html, db, attachments = [] }) {
   const [modoDemo, mailConfig] = await Promise.all([
     getModoDemo(db),
     getMailConfig(db),
@@ -105,12 +105,15 @@ export async function enviarEmail({ to, subject, html, db }) {
     console.log(`📧 MODO DEMO: Redirigiendo email de ${to} a ${modoDemo.email}`)
   }
 
-  await mailConfig.transporter.sendMail({
+  const mailOpts = {
     from: mailConfig.from,
     to: destinatario,
     subject: subjectFinal,
     html,
-  })
+  }
+  if (attachments.length > 0) mailOpts.attachments = attachments
+
+  await mailConfig.transporter.sendMail(mailOpts)
 }
 
 export async function enviarEmailAprobacion(comercio, db) {
@@ -625,6 +628,247 @@ export async function enviarEmailContacto({ nombre, email, telefono, asunto, men
   })
 
   console.log(`📧 Email de contacto procesado: ${nombre} <${email}>`)
+}
+
+// ─── RESERVAS DE ESPACIOS ───────────────────────────────────────────────────
+
+/**
+ * Envía confirmación de reserva al hacer el booking
+ */
+export async function enviarConfirmacionReserva(reserva, db) {
+  if (!reserva.email) return false
+
+  const fecha = new Date(reserva.fecha).toLocaleDateString('es-AR', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  })
+  const linkCancelacion = reserva.tokenCancelacion
+    ? `${frontendUrl}/reservas/cancelar/${reserva.tokenCancelacion}`
+    : null
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #DC2626; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Reserva Confirmada</h1>
+        <p style="color: white; margin: 5px 0 0 0;">Club Sportivo Pilar</p>
+      </div>
+
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hola ${reserva.nombreReserva}${reserva.apellido ? ' ' + reserva.apellido : ''}!</h2>
+
+        <p style="color: #4b5563; line-height: 1.6;">
+          Tu reserva ha sido <strong style="color: #16a34a;">confirmada</strong> exitosamente.
+        </p>
+
+        <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; width: 140px;">Código</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: bold; color: #DC2626;">${reserva.codigo}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">Espacio</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: bold; color: #1f2937;">${reserva.espacio?.nombre || ''}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">Fecha</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${fecha}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">Horario</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${reserva.horaInicio} - ${reserva.horaFin} hs</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">Total abonado</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-weight: bold; color: #1f2937;">$${Number(reserva.precioTotal).toLocaleString('es-AR')}</td>
+            </tr>
+            ${reserva.esRecurrente ? `
+            <tr>
+              <td style="padding: 8px 0; color: #6b7280;">Tipo</td>
+              <td style="padding: 8px 0; color: #7c3aed; font-weight: bold;">Reserva semanal recurrente</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+
+        ${linkCancelacion ? `
+        <div style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 15px; margin: 20px 0;">
+          <p style="color: #92400e; margin: 0 0 10px 0; font-size: 14px;">
+            ¿Necesitás cancelar? Podés hacerlo hasta las horas previas estipuladas por el club:
+          </p>
+          <a href="${linkCancelacion}" style="display: inline-block; background-color: #d97706; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 14px;">
+            Cancelar mi reserva
+          </a>
+        </div>
+        ` : ''}
+
+        <p style="color: #6b7280; font-size: 12px; margin-top: 20px; text-align: center;">
+          Guardá este email como comprobante. Código de reserva: <strong>${reserva.codigo}</strong>
+        </p>
+      </div>
+
+      <div style="background-color: #1f2937; padding: 20px; text-align: center;">
+        <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+          Club Sportivo Pilar - "El Rojo de la Avenida"
+        </p>
+      </div>
+    </div>
+  `
+
+  try {
+    await enviarEmail({
+      to: reserva.email,
+      subject: `Reserva confirmada: ${reserva.espacio?.nombre || 'Espacio'} - ${reserva.codigo}`,
+      html,
+      db,
+    })
+    console.log(`📧 Confirmación reserva ${reserva.codigo} enviada a ${reserva.email}`)
+    return true
+  } catch (error) {
+    console.error(`❌ Error enviando confirmación reserva ${reserva.codigo}:`, error.message)
+    return false
+  }
+}
+
+/**
+ * Envía notificación de cancelación de reserva
+ */
+export async function enviarCancelacionReserva(reserva, motivo, db) {
+  if (!reserva.email) return false
+
+  const fecha = new Date(reserva.fecha).toLocaleDateString('es-AR', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  })
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #6b7280; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Reserva Cancelada</h1>
+        <p style="color: #d1d5db; margin: 5px 0 0 0;">Club Sportivo Pilar</p>
+      </div>
+
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hola ${reserva.nombreReserva}${reserva.apellido ? ' ' + reserva.apellido : ''}</h2>
+
+        <p style="color: #4b5563; line-height: 1.6;">
+          Te informamos que tu reserva <strong>${reserva.codigo}</strong> ha sido cancelada.
+        </p>
+
+        <div style="background-color: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; width: 140px;">Espacio</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${reserva.espacio?.nombre || ''}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">Fecha</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${fecha}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #6b7280;">Horario</td>
+              <td style="padding: 8px 0; color: #1f2937;">${reserva.horaInicio} - ${reserva.horaFin} hs</td>
+            </tr>
+          </table>
+        </div>
+
+        ${motivo ? `
+        <div style="background-color: #fef2f2; border-left: 4px solid #DC2626; padding: 15px; margin: 20px 0;">
+          <p style="color: #991b1b; margin: 0;"><strong>Motivo:</strong> ${motivo}</p>
+        </div>
+        ` : ''}
+
+        ${reserva.reembolsado ? `
+        <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 15px; margin: 20px 0;">
+          <p style="color: #065f46; margin: 0; font-weight: bold;">
+            ✓ Se procesará el reembolso de $${Number(reserva.precioTotal).toLocaleString('es-AR')} por MercadoPago
+          </p>
+        </div>
+        ` : ''}
+
+        <p style="color: #4b5563; line-height: 1.6;">
+          Para hacer una nueva reserva podés ingresar al portal del socio o al sitio web del club.
+        </p>
+      </div>
+
+      <div style="background-color: #1f2937; padding: 20px; text-align: center;">
+        <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+          Club Sportivo Pilar - "El Rojo de la Avenida"
+        </p>
+      </div>
+    </div>
+  `
+
+  try {
+    await enviarEmail({
+      to: reserva.email,
+      subject: `Reserva cancelada: ${reserva.espacio?.nombre || 'Espacio'} - ${fecha}`,
+      html,
+      db,
+    })
+    console.log(`📧 Cancelación reserva ${reserva.codigo} enviada a ${reserva.email}`)
+    return true
+  } catch (error) {
+    console.error(`❌ Error enviando cancelación reserva ${reserva.codigo}:`, error.message)
+    return false
+  }
+}
+
+/**
+ * Envía recordatorio 24hs antes de la reserva
+ */
+export async function enviarRecordatorioReserva(reserva, db) {
+  if (!reserva.email) return false
+
+  const fecha = new Date(reserva.fecha).toLocaleDateString('es-AR', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  })
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #DC2626; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Recordatorio de Reserva</h1>
+        <p style="color: white; margin: 5px 0 0 0;">¡Mañana tenés cancha!</p>
+      </div>
+
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hola ${reserva.nombreReserva}${reserva.apellido ? ' ' + reserva.apellido : ''}!</h2>
+
+        <p style="color: #4b5563; line-height: 1.6;">
+          Te recordamos que mañana tenés una reserva en el club.
+        </p>
+
+        <div style="background-color: white; border-radius: 8px; padding: 25px; margin: 20px 0; border: 2px solid #DC2626; text-align: center;">
+          <p style="color: #6b7280; margin: 0 0 5px 0; font-size: 14px;">RESERVA</p>
+          <p style="color: #DC2626; font-size: 22px; font-weight: bold; margin: 0 0 5px 0;">${reserva.espacio?.nombre || ''}</p>
+          <p style="color: #1f2937; font-size: 18px; margin: 0 0 5px 0;">${fecha}</p>
+          <p style="color: #1f2937; font-size: 28px; font-weight: bold; margin: 0;">${reserva.horaInicio} - ${reserva.horaFin} hs</p>
+        </div>
+
+        <p style="color: #6b7280; font-size: 13px; text-align: center;">
+          Código de reserva: <strong>${reserva.codigo}</strong>
+        </p>
+      </div>
+
+      <div style="background-color: #1f2937; padding: 20px; text-align: center;">
+        <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+          Club Sportivo Pilar - "El Rojo de la Avenida"
+        </p>
+      </div>
+    </div>
+  `
+
+  try {
+    await enviarEmail({
+      to: reserva.email,
+      subject: `Recordatorio: ${reserva.espacio?.nombre || 'Reserva'} mañana a las ${reserva.horaInicio} hs`,
+      html,
+      db,
+    })
+    console.log(`📧 Recordatorio reserva ${reserva.codigo} enviado a ${reserva.email}`)
+    return true
+  } catch (error) {
+    console.error(`❌ Error enviando recordatorio reserva ${reserva.codigo}:`, error.message)
+    return false
+  }
 }
 
 // Verificar conexión SMTP al iniciar (usa config global)

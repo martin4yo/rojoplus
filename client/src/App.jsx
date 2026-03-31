@@ -200,6 +200,7 @@ import BuffetTakeAway from './pages/admin/buffet/BuffetTakeAway'
 import BuffetBarra from './pages/admin/buffet/BuffetBarra'
 import BuffetImpresoras from './pages/admin/buffet/BuffetImpresoras'
 import MenuBuffet from './pages/public/MenuBuffet'
+import ReservasPublico from './pages/public/ReservasPublico'
 
 // Control de Accesos
 import MonitorAccesos from './pages/admin/accesos/MonitorAccesos'
@@ -212,6 +213,10 @@ import EventosLista from './pages/admin/eventos/EventosLista'
 import EventoForm from './pages/admin/eventos/EventoForm'
 import EventoDetalle from './pages/admin/eventos/EventoDetalle'
 import VentaEntradas from './pages/admin/eventos/VentaEntradas'
+
+// Reservas
+import ReservasCalendario from './pages/admin/reservas/ReservasCalendario'
+import ConfigReservas from './pages/admin/reservas/ConfigReservas'
 
 // Gestión de Cobranzas
 import GestionCobranzas from './pages/admin/GestionCobranzas'
@@ -283,6 +288,10 @@ function App() {
       {/* Menú Buffet Público */}
       <Route path="/buffet/menu" element={<MenuBuffet />} />
       <Route path="/menu-buffet" element={<MenuBuffet />} />
+
+      {/* Reservas públicas */}
+      <Route path="/reservas" element={<ReservasPublico />} />
+      <Route path="/reservas/confirmacion" element={<ReservasPublico />} />
 
       {/* Rutas admin */}
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -471,6 +480,10 @@ function App() {
         <Route path="eventos/nuevo" element={<EventoForm />} />
         <Route path="eventos/:id" element={<EventoDetalle />} />
         <Route path="eventos/:id/editar" element={<EventoForm />} />
+
+        {/* Reservas */}
+        <Route path="reservas" element={<ReservasCalendario />} />
+        <Route path="reservas/config" element={<ConfigReservas />} />
 
         {/* Gestión de Cobranzas */}
         <Route path="cobranzas" element={<GestionCobranzas />} />

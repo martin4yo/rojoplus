@@ -144,6 +144,10 @@ const permisos = [
   { codigo: 'FACTURACION_EMITIR', nombre: 'Emitir Facturas', modulo: 'FACTURACION', descripcion: 'Permite emitir facturas electrónicas con CAE' },
   { codigo: 'FACTURACION_ANULAR', nombre: 'Anular Facturas', modulo: 'FACTURACION', descripcion: 'Permite anular comprobantes mediante notas de crédito' },
   { codigo: 'FACTURACION_CONFIG', nombre: 'Configurar Facturación', modulo: 'FACTURACION', descripcion: 'Configurar certificados AFIP y datos fiscales' },
+  // Reservas de Espacios
+  { codigo: 'RESERVAS_VER', nombre: 'Ver Reservas', modulo: 'RESERVAS' },
+  { codigo: 'RESERVAS_GESTIONAR', nombre: 'Gestionar Reservas', modulo: 'RESERVAS' },
+  { codigo: 'RESERVAS_CONFIG', nombre: 'Configurar Reservas', modulo: 'RESERVAS' },
 ];
 
 const conceptosTesoreria = [

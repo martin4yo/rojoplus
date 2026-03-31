@@ -120,7 +120,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
       clubNombre,
       numeroSolicitud: solicitud.id,
       actividadesSeleccionadas: actividadesTexto
-    })
+    }, req.db)
   } catch (emailError) {
     console.error('Error enviando email de confirmación:', emailError)
     // No fallar la solicitud si el email falla
@@ -150,7 +150,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
         actividadInscripcion: actividadesTexto,
         numeroSolicitud: solicitud.id,
         urlGestion: `${process.env.FRONTEND_URL}/admin/solicitudes/${solicitud.id}`
-      })
+      }, req.db)
     }
   } catch (emailError) {
     console.error('Error notificando a administradores:', emailError)

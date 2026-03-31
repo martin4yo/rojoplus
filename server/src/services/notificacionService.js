@@ -1,17 +1,8 @@
 import prisma from '../lib/prisma.js'
-import nodemailer from 'nodemailer'
 import Handlebars from 'handlebars'
 import { enviarNotificacionPush } from './webPush.js'
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-})
+import { getMailConfig } from './email.js'
+import { createTenantPrisma } from '../lib/tenantPrisma.js'
 
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
@@ -114,11 +105,12 @@ function getPushPayloadForEvent(eventType, notif) {
 /**
  * Obtener configuración de modo demo
  */
-async function getModoDemo() {
+async function getModoDemo(db) {
   try {
+    const client = db || prisma
     const [modoDemo, emailDemo] = await Promise.all([
-      prisma.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
-      prisma.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
+      client.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
+      client.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
     ])
     return {
       activo: modoDemo?.valor === 'true',
@@ -141,10 +133,11 @@ function renderTemplate(template, variables) {
 /**
  * Enviar email usando template de la BD
  */
-export async function enviarEmailConTemplate(eventType, to, variables) {
+export async function enviarEmailConTemplate(eventType, to, variables, db = null) {
   try {
+    const client = db || prisma
     // Obtener template de la BD
-    const template = await prisma.emailTemplate.findUnique({
+    const template = await client.emailTemplate.findUnique({
       where: { eventType },
     })
 
@@ -156,8 +149,12 @@ export async function enviarEmailConTemplate(eventType, to, variables) {
     const subject = renderTemplate(template.subject, variables)
     const bodyHtml = renderTemplate(template.bodyHtml, variables)
 
-    // Modo demo
-    const modoDemo = await getModoDemo()
+    // Obtener config SMTP del tenant + modo demo
+    const [mailConfig, modoDemo] = await Promise.all([
+      getMailConfig(db),
+      getModoDemo(db),
+    ])
+
     let destinatario = to
     let subjectFinal = subject
 
@@ -167,9 +164,8 @@ export async function enviarEmailConTemplate(eventType, to, variables) {
       console.log(`📧 MODO DEMO: Redirigiendo email de ${to} a ${modoDemo.email}`)
     }
 
-    // Enviar email
-    await transporter.sendMail({
-      from: `"Club Sportivo Pilar - Rojo Plus" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    await mailConfig.transporter.sendMail({
+      from: mailConfig.from,
       to: destinatario,
       subject: subjectFinal,
       html: bodyHtml,
@@ -256,10 +252,12 @@ export async function procesarNotificacionesPendientes() {
     const resultados = await Promise.allSettled(
       notificacionesPendientes.map(async (notif) => {
         try {
+          // Crear cliente scoped al tenant de la notificación
+          const tenantDb = notif.tenantId ? createTenantPrisma(notif.tenantId) : null
           // Intentar enviar email
           if (notif.tipo === 'EMAIL') {
             const metadata = notif.metadata ? JSON.parse(notif.metadata) : {}
-            await enviarEmailConTemplate(notif.eventType, notif.destinatario, metadata)
+            await enviarEmailConTemplate(notif.eventType, notif.destinatario, metadata, tenantDb)
           }
 
           // También enviar push notification si el socio tiene suscripción activa

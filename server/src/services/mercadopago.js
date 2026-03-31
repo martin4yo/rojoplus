@@ -114,7 +114,26 @@ export async function obtenerPago(paymentId) {
   }
 }
 
+/**
+ * Crear reembolso total de un pago en MercadoPago
+ * @param {string} paymentId - ID del pago original en MercadoPago
+ * @returns {Promise<Object>} Resultado del reembolso
+ */
+export async function crearReembolso(paymentId) {
+  try {
+    const { PaymentRefund } = await import('mercadopago')
+    const refund = new PaymentRefund(client)
+    const result = await refund.create({ payment_id: paymentId })
+    console.log(`✅ Reembolso MP creado para pago ${paymentId}:`, result.id)
+    return result
+  } catch (error) {
+    console.error(`❌ Error creando reembolso MP para pago ${paymentId}:`, error)
+    throw new Error('Error al procesar el reembolso en MercadoPago')
+  }
+}
+
 export default {
   crearPreferenciaPago,
   obtenerPago,
+  crearReembolso,
 }

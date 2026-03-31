@@ -7112,7 +7112,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
       fechaAlta,
       linkPortal: `${process.env.FRONTEND_URL}/mi-qr`,
       linkMiQR: `${process.env.FRONTEND_URL}/mi-qr`
-    })
+    }, req.db)
   } catch (emailError) {
     console.error('Error enviando email de bienvenida:', emailError)
   }
@@ -7180,7 +7180,7 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
       clubNombre,
       motivoRechazo,
       telefonoContacto: process.env.CLUB_TELEFONO || '+54 9 230 434 6897'
-    })
+    }, req.db)
   } catch (emailError) {
     console.error('Error enviando email de rechazo:', emailError)
   }

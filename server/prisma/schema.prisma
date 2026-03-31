@@ -342,6 +342,7 @@ model Socio {
   solicitudesAprobadas         SolicitudSocio[]
   ventas                       Venta[]
   entradas                     Entrada[]
+  reservas                     ReservaEspacio[]
   gestionesCobranza            GestionCobranza[]      @relation("GestionesCobranza")
   encuestasBaja                EncuestaBaja[]         @relation("EncuestasBaja")
   accionesRecupero             AccionRecupero[]       @relation("AccionesRecupero")
@@ -2022,6 +2023,9 @@ model EspacioDeportivo {
   partidos               Partido[]
   actividades            Actividad[]             @relation("ActividadToEspacioDeportivo")
   eventos                Evento[]
+  reservas               ReservaEspacio[]
+  configReserva          ConfigReservaEspacio[]
+  bloqueos               BloqueEspacio[]
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
@@ -3894,4 +3898,129 @@ enum EstadoEnvio {
   CLICKEADO
   REBOTADO
   ERROR
+}
+
+// ===== RESERVA DE ESPACIOS =====
+
+enum EstadoReserva {
+  PENDIENTE_PAGO
+  CONFIRMADA
+  CANCELADA
+  COMPLETADA
+  NO_SHOW
+}
+
+model ReservaEspacio {
+  id                  Int           @id @default(autoincrement())
+  codigo              String
+
+  // Qué y cuándo
+  espacioId           Int           @map("espacio_id")
+  fecha               DateTime      @db.Date
+  horaInicio          String        @map("hora_inicio")
+  horaFin             String        @map("hora_fin")
+  duracionMin         Int           @map("duracion_min")
+
+  // Quién reserva
+  socioId             Int?          @map("socio_id")
+  nombreReserva       String        @map("nombre_reserva")
+  apellido            String
+  email               String
+  telefono            String?
+  dni                 String?
+  esSocio             Boolean       @default(false) @map("es_socio")
+
+  // Precio
+  precioTotal         Decimal       @map("precio_total") @db.Decimal(12, 2)
+  descuentoAplicado   Decimal       @default(0) @map("descuento_aplicado") @db.Decimal(12, 2)
+
+  // Pago
+  metodoPago          String?       @map("metodo_pago")  // MERCADOPAGO | EFECTIVO | CORTESIA
+  linkPagoId          Int?          @map("link_pago_id")
+  movimientoCajaId    Int?          @map("movimiento_caja_id")
+  paymentIdMP         String?       @map("payment_id_mp")
+
+  // Estado
+  estado              EstadoReserva @default(PENDIENTE_PAGO)
+  motivoCancelacion   String?       @map("motivo_cancelacion")
+  canceladoPor        String?       @map("cancelado_por")  // SOCIO | ADMIN
+  fechaCancelacion    DateTime?     @map("fecha_cancelacion")
+  reembolsado         Boolean       @default(false)
+
+  // Recurrencia
+  esRecurrente        Boolean       @default(false) @map("es_recurrente")
+  grupoRecurrenciaId  String?       @map("grupo_recurrencia_id")  // UUID compartido
+
+  // Admin / extras
+  creadaPorAdmin      Boolean       @default(false) @map("creada_por_admin")
+  observaciones       String?
+  tokenCancelacion    String?       @map("token_cancelacion")  // para cancelación por email (público)
+
+  // Relaciones
+  espacio             EspacioDeportivo @relation(fields: [espacioId], references: [id])
+  socio               Socio?           @relation(fields: [socioId], references: [id])
+
+  tenantId            Int           @map("tenant_id")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  @@index([espacioId])
+  @@index([fecha])
+  @@index([socioId])
+  @@index([estado])
+  @@index([grupoRecurrenciaId])
+  @@index([tenantId])
+  @@unique([tenantId, codigo])
+  @@map("reservas_espacio")
+}
+
+model ConfigReservaEspacio {
+  id                        Int      @id @default(autoincrement())
+  espacioId                 Int?     @map("espacio_id")  // null = config global del tenant
+
+  // Slots y disponibilidad
+  duracionSlotMin           Int      @default(60) @map("duracion_slot_min")
+  cuposSimultaneos          Int      @default(1) @map("cupos_simultaneos")
+  anticipacionMinHs         Int      @default(2) @map("anticipacion_min_hs")
+  anticipacionMaxDias       Int      @default(30) @map("anticipacion_max_dias")
+
+  // Pricing
+  modoPrecio                String   @default("FIJO") @map("modo_precio")  // FIJO | DESCUENTO_PORCENTAJE
+  precioBase                Decimal? @map("precio_base") @db.Decimal(12, 2)
+  precioSocio               Decimal? @map("precio_socio") @db.Decimal(12, 2)
+  precioNoSocio             Decimal? @map("precio_no_socio") @db.Decimal(12, 2)
+  descuentoSocioPorc        Int?     @map("descuento_socio_porc")  // 0-100 para modo DESCUENTO_PORCENTAJE
+
+  // Política de cancelación
+  politicaCancelacionHs     Int      @default(24) @map("politica_cancelacion_hs")
+  permiteCancelacionOnline  Boolean  @default(true) @map("permite_cancelacion_online")
+
+  activo                    Boolean  @default(true)
+  espacio                   EspacioDeportivo? @relation(fields: [espacioId], references: [id])
+
+  tenantId                  Int      @map("tenant_id")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  @@index([espacioId])
+  @@index([tenantId])
+  @@map("config_reserva_espacio")
+}
+
+model BloqueEspacio {
+  id          Int      @id @default(autoincrement())
+  espacioId   Int      @map("espacio_id")
+  fecha       DateTime @db.Date
+  horaInicio  String   @map("hora_inicio")
+  horaFin     String   @map("hora_fin")
+  motivo      String?
+  espacio     EspacioDeportivo @relation(fields: [espacioId], references: [id])
+
+  tenantId    Int      @map("tenant_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([espacioId])
+  @@index([fecha])
+  @@index([tenantId])
+  @@map("bloqueos_espacio")
 }

@@ -23,7 +23,7 @@ router.get('/conceptos', asyncHandler(async (req, res) => {
   if (usaEnTesoreria !== undefined) where.usaEnTesoreria = usaEnTesoreria === 'true'
   if (activo !== undefined) where.activo = activo === 'true'
 
-  const conceptos = await prisma.conceptoTesoreria.findMany({
+  const conceptos = await req.db.conceptoTesoreria.findMany({
     where,
     orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
     include: {
@@ -40,7 +40,7 @@ router.get('/conceptos', asyncHandler(async (req, res) => {
 router.get('/conceptos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const concepto = await prisma.conceptoTesoreria.findUnique({
+  const concepto = await req.db.conceptoTesoreria.findUnique({
     where: { id: parseInt(id) },
     include: {
       cuentaContable: true
@@ -62,12 +62,12 @@ router.post('/conceptos', asyncHandler(async (req, res) => {
     throw new AppError('Codigo, nombre y tipo son requeridos', 400)
   }
 
-  const existente = await prisma.conceptoTesoreria.findFirst({ where: { codigo } })
+  const existente = await req.db.conceptoTesoreria.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un concepto con ese codigo', 400)
   }
 
-  const concepto = await prisma.conceptoTesoreria.create({
+  const concepto = await req.db.conceptoTesoreria.create({
     data: {
       codigo,
       nombre,
@@ -89,20 +89,20 @@ router.put('/conceptos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, descripcion, tipo, usaEnCompras, usaEnVentas, usaEnTesoreria, cuentaContableId, orden, activo } = req.body
 
-  const existente = await prisma.conceptoTesoreria.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.conceptoTesoreria.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
     throw new AppError('Concepto no encontrado', 404)
   }
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.conceptoTesoreria.findFirst({ where: { codigo } })
+    const duplicado = await req.db.conceptoTesoreria.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un concepto con ese codigo', 400)
     }
   }
 
-  const concepto = await prisma.conceptoTesoreria.update({
+  const concepto = await req.db.conceptoTesoreria.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo || existente.codigo,
@@ -354,13 +354,13 @@ router.get('/entidades', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [entidades, total] = await Promise.all([
-    prisma.entidad.findMany({
+    req.db.entidad.findMany({
       where,
       orderBy: { razonSocial: 'asc' },
       skip,
       take: parseInt(limit)
     }),
-    prisma.entidad.count({ where })
+    req.db.entidad.count({ where })
   ])
 
   res.json({
@@ -379,7 +379,7 @@ router.get('/entidades', asyncHandler(async (req, res) => {
 router.get('/entidades/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const entidad = await prisma.entidad.findUnique({
+  const entidad = await req.db.entidad.findUnique({
     where: { id: parseInt(id) },
     include: {
       ordenesCompra: {
@@ -428,12 +428,12 @@ router.post('/entidades', asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser PROVEEDOR, CLIENTE o PERSONAL', 400)
   }
 
-  const existente = await prisma.entidad.findFirst({ where: { codigo } })
+  const existente = await req.db.entidad.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe una entidad con ese codigo', 400)
   }
 
-  const entidad = await prisma.entidad.create({
+  const entidad = await req.db.entidad.create({
     data: {
       codigo,
       tipo,
@@ -471,20 +471,20 @@ router.put('/entidades/:id', asyncHandler(async (req, res) => {
     banco, cbu, alias, legajo, cargoPersonalId, sueldoBasico, fechaIngreso, observaciones, activo
   } = req.body
 
-  const existente = await prisma.entidad.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.entidad.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
     throw new AppError('Entidad no encontrada', 404)
   }
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.entidad.findFirst({ where: { codigo } })
+    const duplicado = await req.db.entidad.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe una entidad con ese codigo', 400)
     }
   }
 
-  const entidad = await prisma.entidad.update({
+  const entidad = await req.db.entidad.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo || existente.codigo,
@@ -525,7 +525,7 @@ router.get('/entidades/:id/cuenta-corriente', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { desde, hasta } = req.query
 
-  const entidad = await prisma.entidad.findUnique({
+  const entidad = await req.db.entidad.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -541,7 +541,7 @@ router.get('/entidades/:id/cuenta-corriente', asyncHandler(async (req, res) => {
   if (desde) whereMovimientos.fecha = { gte: new Date(desde) }
   if (hasta) whereMovimientos.fecha = { ...whereMovimientos.fecha, lte: new Date(hasta) }
 
-  const movimientos = await prisma.movimientoContable.findMany({
+  const movimientos = await req.db.movimientoContable.findMany({
     where: whereMovimientos,
     orderBy: { fecha: 'asc' },
     select: {
@@ -604,7 +604,7 @@ router.get('/ordenes-compra', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [ordenes, total] = await Promise.all([
-    prisma.ordenCompra.findMany({
+    req.db.ordenCompra.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -624,7 +624,7 @@ router.get('/ordenes-compra', asyncHandler(async (req, res) => {
         }
       }
     }),
-    prisma.ordenCompra.count({ where })
+    req.db.ordenCompra.count({ where })
   ])
 
   res.json({
@@ -643,7 +643,7 @@ router.get('/ordenes-compra', asyncHandler(async (req, res) => {
 router.get('/ordenes-compra/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const orden = await prisma.ordenCompra.findUnique({
+  const orden = await req.db.ordenCompra.findUnique({
     where: { id: parseInt(id) },
     include: {
       entidad: true,
@@ -684,7 +684,7 @@ router.post('/ordenes-compra', asyncHandler(async (req, res) => {
   }
 
   // Verificar que la entidad existe y es proveedor
-  const entidad = await prisma.entidad.findUnique({ where: { id: parseInt(entidadId) } })
+  const entidad = await req.db.entidad.findUnique({ where: { id: parseInt(entidadId) } })
   if (!entidad) {
     throw new AppError('Proveedor no encontrado', 404)
   }
@@ -694,7 +694,7 @@ router.post('/ordenes-compra', asyncHandler(async (req, res) => {
 
   // Generar numero de orden
   const anio = new Date().getFullYear()
-  const ultimaOrden = await prisma.ordenCompra.findFirst({
+  const ultimaOrden = await req.db.ordenCompra.findFirst({
     where: { numero: { startsWith: `OC-${anio}-` } },
     orderBy: { numero: 'desc' }
   })
@@ -722,7 +722,7 @@ router.post('/ordenes-compra', asyncHandler(async (req, res) => {
   const iva = subtotal * 0.21
   const total = subtotal + iva
 
-  const orden = await prisma.ordenCompra.create({
+  const orden = await req.db.ordenCompra.create({
     data: {
       numero,
       entidadId: parseInt(entidadId),
@@ -756,7 +756,7 @@ router.put('/ordenes-compra/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { fechaEntrega, observaciones, items } = req.body
 
-  const orden = await prisma.ordenCompra.findUnique({
+  const orden = await req.db.ordenCompra.findUnique({
     where: { id: parseInt(id) },
     include: { items: true }
   })
@@ -777,7 +777,7 @@ router.put('/ordenes-compra/:id', asyncHandler(async (req, res) => {
 
   if (items && items.length > 0) {
     // Eliminar items anteriores
-    await prisma.itemOrdenCompra.deleteMany({
+    await req.db.itemOrdenCompra.deleteMany({
       where: { ordenCompraId: parseInt(id) }
     })
 
@@ -800,14 +800,14 @@ router.put('/ordenes-compra/:id', asyncHandler(async (req, res) => {
     const total = subtotal + iva
 
     // Crear nuevos items
-    await prisma.itemOrdenCompra.createMany({ data: itemsData })
+    await req.db.itemOrdenCompra.createMany({ data: itemsData })
 
     updateData.subtotal = subtotal
     updateData.iva = iva
     updateData.total = total
   }
 
-  const ordenActualizada = await prisma.ordenCompra.update({
+  const ordenActualizada = await req.db.ordenCompra.update({
     where: { id: parseInt(id) },
     data: updateData,
     include: {
@@ -831,7 +831,7 @@ router.put('/ordenes-compra/:id/recibir', asyncHandler(async (req, res) => {
   const { itemsRecibidos } = req.body
   // itemsRecibidos: [{ itemId: 1, cantidadRecibida: 5 }, ...]
 
-  const orden = await prisma.ordenCompra.findUnique({
+  const orden = await req.db.ordenCompra.findUnique({
     where: { id: parseInt(id) },
     include: { items: true }
   })
@@ -845,7 +845,7 @@ router.put('/ordenes-compra/:id/recibir', asyncHandler(async (req, res) => {
   }
 
   // Actualizar cantidades recibidas y stock
-  await prisma.$transaction(async (tx) => {
+  await req.db.$transaction(async (tx) => {
     for (const itemRecibido of itemsRecibidos) {
       const item = orden.items.find(i => i.id === itemRecibido.itemId)
       if (!item) continue
@@ -916,7 +916,7 @@ router.put('/ordenes-compra/:id/recibir', asyncHandler(async (req, res) => {
   })
 
   // Obtener orden actualizada
-  const ordenActualizada = await prisma.ordenCompra.findUnique({
+  const ordenActualizada = await req.db.ordenCompra.findUnique({
     where: { id: parseInt(id) },
     include: {
       entidad: { select: { razonSocial: true } },
@@ -937,7 +937,7 @@ router.put('/ordenes-compra/:id/recibir', asyncHandler(async (req, res) => {
 router.put('/ordenes-compra/:id/cancelar', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const orden = await prisma.ordenCompra.findUnique({
+  const orden = await req.db.ordenCompra.findUnique({
     where: { id: parseInt(id) },
     include: { items: true }
   })
@@ -952,7 +952,7 @@ router.put('/ordenes-compra/:id/cancelar', asyncHandler(async (req, res) => {
     throw new AppError('No se puede cancelar una orden con mercaderia recibida', 400)
   }
 
-  const ordenCancelada = await prisma.ordenCompra.update({
+  const ordenCancelada = await req.db.ordenCompra.update({
     where: { id: parseInt(id) },
     data: { estado: 'CANCELADA' },
     include: {
@@ -968,7 +968,7 @@ router.put('/ordenes-compra/:id/cancelar', asyncHandler(async (req, res) => {
 router.delete('/ordenes-compra/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const orden = await prisma.ordenCompra.findUnique({
+  const orden = await req.db.ordenCompra.findUnique({
     where: { id: parseInt(id) },
     include: { items: true }
   })
@@ -987,7 +987,7 @@ router.delete('/ordenes-compra/:id', asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar una orden con mercaderia recibida', 400)
   }
 
-  await prisma.ordenCompra.delete({ where: { id: parseInt(id) } })
+  await req.db.ordenCompra.delete({ where: { id: parseInt(id) } })
 
   res.json({ success: true, message: 'Orden de compra eliminada correctamente' })
 }))
@@ -1021,7 +1021,7 @@ router.get('/pedidos', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [pedidos, total] = await Promise.all([
-    prisma.pedido.findMany({
+    req.db.pedido.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -1044,7 +1044,7 @@ router.get('/pedidos', asyncHandler(async (req, res) => {
         }
       }
     }),
-    prisma.pedido.count({ where })
+    req.db.pedido.count({ where })
   ])
 
   res.json({
@@ -1076,7 +1076,7 @@ router.get('/pedidos', asyncHandler(async (req, res) => {
 router.get('/pedidos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const pedido = await prisma.pedido.findUnique({
+  const pedido = await req.db.pedido.findUnique({
     where: { id: parseInt(id) },
     include: {
       entidad: true,
@@ -1135,7 +1135,7 @@ router.post('/pedidos', asyncHandler(async (req, res) => {
 
   // Verificar entidad si se proporciona
   if (entidadId) {
-    const entidad = await prisma.entidad.findUnique({ where: { id: parseInt(entidadId) } })
+    const entidad = await req.db.entidad.findUnique({ where: { id: parseInt(entidadId) } })
     if (!entidad) {
       throw new AppError('Cliente no encontrado', 404)
     }
@@ -1154,7 +1154,7 @@ router.post('/pedidos', asyncHandler(async (req, res) => {
 
   // Generar numero de pedido
   const anio = new Date().getFullYear()
-  const ultimoPedido = await prisma.pedido.findFirst({
+  const ultimoPedido = await req.db.pedido.findFirst({
     where: { numero: { startsWith: `PED-${anio}-` } },
     orderBy: { numero: 'desc' }
   })
@@ -1195,7 +1195,7 @@ router.post('/pedidos', asyncHandler(async (req, res) => {
 
   const total = subtotal + iva21 + iva105
 
-  const pedido = await prisma.pedido.create({
+  const pedido = await req.db.pedido.create({
     data: {
       numero,
       entidadId: entidadId ? parseInt(entidadId) : null,
@@ -1236,7 +1236,7 @@ router.put('/pedidos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { fechaEntrega, observaciones, items } = req.body
 
-  const pedido = await prisma.pedido.findUnique({
+  const pedido = await req.db.pedido.findUnique({
     where: { id: parseInt(id) },
     include: { items: true }
   })
@@ -1256,7 +1256,7 @@ router.put('/pedidos/:id', asyncHandler(async (req, res) => {
 
   if (items && items.length > 0) {
     // Eliminar items anteriores
-    await prisma.itemPedido.deleteMany({
+    await req.db.itemPedido.deleteMany({
       where: { pedidoId: parseInt(id) }
     })
 
@@ -1288,7 +1288,7 @@ router.put('/pedidos/:id', asyncHandler(async (req, res) => {
       }
     })
 
-    await prisma.itemPedido.createMany({ data: itemsData })
+    await req.db.itemPedido.createMany({ data: itemsData })
 
     updateData.subtotal = subtotal
     updateData.iva21 = iva21
@@ -1296,7 +1296,7 @@ router.put('/pedidos/:id', asyncHandler(async (req, res) => {
     updateData.total = subtotal + iva21 + iva105
   }
 
-  const pedidoActualizado = await prisma.pedido.update({
+  const pedidoActualizado = await req.db.pedido.update({
     where: { id: parseInt(id) },
     data: updateData,
     include: {
@@ -1317,7 +1317,7 @@ router.put('/pedidos/:id', asyncHandler(async (req, res) => {
 router.put('/pedidos/:id/cancelar', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const pedido = await prisma.pedido.findUnique({
+  const pedido = await req.db.pedido.findUnique({
     where: { id: parseInt(id) },
     include: { items: true }
   })
@@ -1332,7 +1332,7 @@ router.put('/pedidos/:id/cancelar', asyncHandler(async (req, res) => {
     throw new AppError('No se puede cancelar un pedido con items facturados', 400)
   }
 
-  const pedidoCancelado = await prisma.pedido.update({
+  const pedidoCancelado = await req.db.pedido.update({
     where: { id: parseInt(id) },
     data: { estado: 'CANCELADO' },
     include: {
@@ -1349,7 +1349,7 @@ router.put('/pedidos/:id/cancelar', asyncHandler(async (req, res) => {
 router.delete('/pedidos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const pedido = await prisma.pedido.findUnique({
+  const pedido = await req.db.pedido.findUnique({
     where: { id: parseInt(id) },
     include: { items: true }
   })
@@ -1367,7 +1367,7 @@ router.delete('/pedidos/:id', asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar un pedido con items facturados', 400)
   }
 
-  await prisma.pedido.delete({ where: { id: parseInt(id) } })
+  await req.db.pedido.delete({ where: { id: parseInt(id) } })
 
   res.json({ success: true, message: 'Pedido eliminado correctamente' })
 }))
@@ -1393,19 +1393,19 @@ router.get('/proximo-numero/:tipo', asyncHandler(async (req, res) => {
   let ultimoNumero = null
 
   if (tipo === 'MC') {
-    const ultimo = await prisma.movimientoContable.findFirst({
+    const ultimo = await req.db.movimientoContable.findFirst({
       where: { numero: { startsWith: `${prefijo}-${anio}-` } },
       orderBy: { numero: 'desc' }
     })
     ultimoNumero = ultimo?.numero
   } else if (tipo === 'TC') {
-    const ultimo = await prisma.transferenciaCaja.findFirst({
+    const ultimo = await req.db.transferenciaCaja.findFirst({
       where: { numero: { startsWith: `${prefijo}-${anio}-` } },
       orderBy: { numero: 'desc' }
     })
     ultimoNumero = ultimo?.numero
   } else if (tipo === 'ENT') {
-    const ultimo = await prisma.entidad.findFirst({
+    const ultimo = await req.db.entidad.findFirst({
       where: { codigo: { startsWith: `${prefijo}-` } },
       orderBy: { codigo: 'desc' }
     })

@@ -3,6 +3,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { obtenerPago } from '../services/mercadopago.js'
 import { generarAsientoAutomatico } from './asientos.js'
 import { v4 as uuidv4 } from 'uuid'
+import { enviarConfirmacionReserva } from '../services/email.js'
 
 const router = Router()
 
@@ -37,8 +38,77 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
         transaction_amount: payment.transaction_amount,
       })
 
-      // El external_reference contiene el ID del LinkPago
-      const linkPagoId = parseInt(payment.external_reference)
+      // El external_reference puede ser un número (LinkPago) o un JSON (reservas, etc.)
+      let externalRef = payment.external_reference
+      let refParsed = null
+      try { refParsed = JSON.parse(externalRef) } catch (_) { /* no es JSON */ }
+
+      // ── Reservas de espacio ──────────────────────────────────────────────
+      if (refParsed?.tipo === 'RESERVA') {
+        if (payment.status === 'approved') {
+          const reserva = await req.db.reservaEspacio.findUnique({
+            where: { id: refParsed.reservaId },
+            include: { espacio: { select: { nombre: true } } },
+          })
+
+          if (reserva && reserva.estado === 'PENDIENTE_PAGO') {
+            const whereReservas = reserva.grupoRecurrenciaId
+              ? { grupoRecurrenciaId: reserva.grupoRecurrenciaId, estado: 'PENDIENTE_PAGO' }
+              : { id: reserva.id }
+
+            await req.db.reservaEspacio.updateMany({
+              where: whereReservas,
+              data: { estado: 'CONFIRMADA', paymentIdMP: payment.id.toString() },
+            })
+
+            // Movimiento de caja si hay caja MP configurada
+            const cajaMercadoPago = await req.db.caja.findFirst({
+              where: {
+                OR: [
+                  { codigo: { contains: 'MERCADOPAGO', mode: 'insensitive' } },
+                  { codigo: { contains: 'MP', mode: 'insensitive' } },
+                  { nombre: { contains: 'MercadoPago', mode: 'insensitive' } },
+                ],
+              },
+            })
+            const conceptoReservas = await req.db.conceptoTesoreria.findFirst({
+              where: {
+                OR: [
+                  { codigo: { contains: 'RESERVA', mode: 'insensitive' } },
+                  { nombre: { contains: 'Reserva', mode: 'insensitive' } },
+                ],
+              },
+              include: { cuentaContable: true },
+            })
+            if (cajaMercadoPago && conceptoReservas?.cuentaContableId) {
+              await req.db.movimientoCaja.create({
+                data: {
+                  numero: `MOV-MP-${payment.id}`,
+                  cajaId: cajaMercadoPago.id,
+                  tipo: 'INGRESO',
+                  cuentaContableId: conceptoReservas.cuentaContableId,
+                  monto: parseFloat(payment.transaction_amount),
+                  concepto: `Reserva MP - ${reserva.espacio.nombre} - ${reserva.nombreReserva} ${reserva.apellido}`,
+                  registradoPor: 1,
+                  comprobanteNro: payment.id.toString(),
+                  comprobanteTipo: 'MERCADOPAGO',
+                  tenantId: reserva.tenantId,
+                },
+              })
+            }
+            // Enviar email de confirmación
+            if (reserva.email) {
+              enviarConfirmacionReserva(reserva, req.db).catch(() => {})
+            }
+
+            console.log('[MercadoPago] Reserva confirmada:', reserva.codigo)
+          }
+        }
+        return res.status(200).json({ success: true })
+      }
+
+      // ── Flujo original (LinkPago: cuotas y entradas) ─────────────────────
+      const linkPagoId = parseInt(externalRef)
 
       if (!linkPagoId) {
         console.error('[MercadoPago] No se encontró external_reference')
@@ -232,6 +302,76 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
           })
 
           // TODO: Enviar entradas por email
+        } else if (datosCompra.tipo === 'RESERVA') {
+          // Procesar pago de reserva de espacio
+          console.log('[MercadoPago] Procesando pago de reserva:', datosCompra)
+
+          await req.db.$transaction(async (tx) => {
+            const reserva = await tx.reservaEspacio.findUnique({
+              where: { id: datosCompra.reservaId },
+              include: { espacio: true },
+            })
+            if (!reserva) throw new Error('Reserva no encontrada')
+
+            // Si hay grupo de recurrencia, confirmar todas las pendientes del grupo
+            const whereReservas = reserva.grupoRecurrenciaId
+              ? { grupoRecurrenciaId: reserva.grupoRecurrenciaId, estado: 'PENDIENTE_PAGO' }
+              : { id: reserva.id, estado: 'PENDIENTE_PAGO' }
+
+            await tx.reservaEspacio.updateMany({
+              where: whereReservas,
+              data: {
+                estado: 'CONFIRMADA',
+                paymentIdMP: payment.id.toString(),
+              },
+            })
+
+            // Obtener caja de MercadoPago
+            const cajaMercadoPago = await tx.caja.findFirst({
+              where: {
+                tenantId: linkPago.tenantId,
+                OR: [
+                  { codigo: { contains: 'MERCADOPAGO', mode: 'insensitive' } },
+                  { codigo: { contains: 'MP', mode: 'insensitive' } },
+                  { nombre: { contains: 'MercadoPago', mode: 'insensitive' } },
+                ],
+              },
+            })
+
+            if (cajaMercadoPago) {
+              // Buscar cuenta contable para reservas
+              const conceptoReservas = await tx.conceptoTesoreria.findFirst({
+                where: {
+                  tenantId: linkPago.tenantId,
+                  OR: [
+                    { codigo: { contains: 'RESERVA', mode: 'insensitive' } },
+                    { nombre: { contains: 'Reserva', mode: 'insensitive' } },
+                  ],
+                },
+                include: { cuentaContable: true },
+              })
+
+              if (conceptoReservas?.cuentaContableId) {
+                await tx.movimientoCaja.create({
+                  data: {
+                    numero: `MOV-MP-${payment.id}`,
+                    cajaId: cajaMercadoPago.id,
+                    tipo: 'INGRESO',
+                    cuentaContableId: conceptoReservas.cuentaContableId,
+                    monto: parseFloat(payment.transaction_amount),
+                    concepto: `Reserva MP - ${reserva.espacio.nombre} - ${reserva.nombreReserva} ${reserva.apellido}`,
+                    registradoPor: 1,
+                    comprobanteNro: payment.id.toString(),
+                    comprobanteTipo: 'MERCADOPAGO',
+                    tenantId: linkPago.tenantId,
+                  },
+                })
+              }
+            }
+
+            console.log('[MercadoPago] Reserva confirmada:', reserva.codigo)
+          })
+
         } else {
           // Procesar pago de cuotas (lógica original)
           const cargosIds = Array.isArray(datosCompra) ? datosCompra : []

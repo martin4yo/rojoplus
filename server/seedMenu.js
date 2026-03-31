@@ -108,7 +108,14 @@ const menuData = [
     ]
   },
   {
-    titulo: 'Eventos', icono: 'Ticket', orden: 13,
+    titulo: 'Reservas', icono: 'CalendarDays', orden: 13,
+    children: [
+      { titulo: 'Calendario', icono: 'CalendarDays', url: '/admin/reservas', orden: 1 },
+      { titulo: 'Configuración', icono: 'Settings', url: '/admin/reservas/config', orden: 2 },
+    ]
+  },
+  {
+    titulo: 'Eventos', icono: 'Ticket', orden: 14,
     children: [
       { titulo: 'Gestión de Eventos', icono: 'Ticket', url: '/admin/eventos', orden: 1 },
       { titulo: 'Vender Entradas', icono: 'ShoppingCart', url: '/admin/eventos/vender', orden: 2 },
@@ -122,9 +129,9 @@ const menuData = [
       { titulo: 'Comercios', icono: 'Store', url: '/admin/comercios', orden: 3 },
     ]
   },
-  { titulo: 'Reportes', icono: 'BarChart3', url: '/admin/reportes', orden: 15 },
+  { titulo: 'Reportes', icono: 'BarChart3', url: '/admin/reportes', orden: 16 },
   {
-    titulo: 'Configuracion', icono: 'Settings', orden: 16,
+    titulo: 'Configuracion', icono: 'Settings', orden: 17,
     children: [
       { titulo: 'General', icono: 'Sliders', url: '/admin/configuracion', orden: 1 },
       { titulo: 'Datos Bancarios', icono: 'CreditCard', url: '/admin/configuracion/pagos', orden: 2 },
@@ -138,7 +145,7 @@ const menuData = [
     ]
   },
   {
-    titulo: 'Centros de Costo', icono: 'Building2', orden: 17,
+    titulo: 'Centros de Costo', icono: 'Building2', orden: 18,
     children: [
       { titulo: 'Dashboard Ejecutivo', icono: 'LayoutDashboard', url: '/admin/reportes/centros-costo/dashboard', orden: 1 },
       { titulo: 'Evolución Temporal', icono: 'TrendingUp', url: '/admin/reportes/centros-costo/evolucion', orden: 2 },

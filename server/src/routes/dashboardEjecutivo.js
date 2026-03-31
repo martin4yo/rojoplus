@@ -332,6 +332,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     data: {
       // Fecha de generación
       fechaGeneracion: hoy.toISOString(),
+      nombreTenant: req.tenant?.nombre || null,
       periodoActual: periodoActual ? {
         id: periodoActual.id,
         nombre: periodoActual.nombre,

@@ -1,5 +1,5 @@
 # Estado del Proyecto RojoPlus / Clubix
-**Última actualización:** 16 de marzo 2026
+**Última actualización:** 31 de marzo 2026
 
 ---
 

@@ -4,7 +4,7 @@ import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { v4 as uuidv4 } from 'uuid'
 import PDFDocument from 'pdfkit'
-import nodemailer from 'nodemailer'
+import { enviarEmail } from '../services/email.js'
 import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -2124,41 +2124,29 @@ router.post('/enviar-entradas', authAdmin, checkPermiso('EVENTOS_VENDER'), async
     // Generar PDF con PDFKit
     const pdfBuffer = await generarPDFEntradas(entradas, nombreComprador)
 
-    // Configurar transporter de email
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    })
-
     // Enviar email con PDF adjunto
     const evento = entradas[0].evento
-    const mailOptions = {
-      from: `"${process.env.SMTP_FROM_NAME || 'Club Sportivo Pilar'}" <${process.env.SMTP_USER}>`,
+    await enviarEmail({
       to: email,
-      subject: `🎫 Tus entradas para ${evento.nombre}`,
+      subject: `Tus entradas para ${evento.nombre}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #DC2626;">¡Gracias por tu compra!</h2>
+          <h2 style="color: #DC2626;">Gracias por tu compra!</h2>
           <p>Hola <strong>${nombreComprador}</strong>,</p>
-          <p>Adjunto encontrarás ${entradas.length} entrada${entradas.length > 1 ? 's' : ''} para:</p>
+          <p>Adjunto encontraras ${entradas.length} entrada${entradas.length > 1 ? 's' : ''} para:</p>
           <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin: 0 0 10px 0; color: #111827;">${evento.nombre}</h3>
-            <p style="margin: 5px 0;"><strong>📅 Fecha:</strong> ${new Date(evento.fecha).toLocaleDateString('es-AR')}</p>
-            <p style="margin: 5px 0;"><strong>🕐 Hora:</strong> ${evento.hora}</p>
-            <p style="margin: 5px 0;"><strong>📍 Ubicación:</strong> ${evento.ubicacion || 'Ver entrada'}</p>
+            <p style="margin: 5px 0;"><strong>Fecha:</strong> ${new Date(evento.fecha).toLocaleDateString('es-AR')}</p>
+            <p style="margin: 5px 0;"><strong>Hora:</strong> ${evento.hora}</p>
+            <p style="margin: 5px 0;"><strong>Ubicacion:</strong> ${evento.ubicacion || 'Ver entrada'}</p>
           </div>
-          <p>Por favor, presenta el código QR de cada entrada al ingresar al evento.</p>
+          <p>Por favor, presenta el codigo QR de cada entrada al ingresar al evento.</p>
           <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">
-            <strong>Club Sportivo Pilar</strong><br>
-            Este es un correo automático, por favor no responder.
+            Este es un correo automatico, por favor no responder.
           </p>
         </div>
       `,
+      db: req.db,
       attachments: [
         {
           filename: `entradas-${evento.codigo}.pdf`,
@@ -2166,9 +2154,7 @@ router.post('/enviar-entradas', authAdmin, checkPermiso('EVENTOS_VENDER'), async
           contentType: 'application/pdf'
         }
       ]
-    }
-
-    await transporter.sendMail(mailOptions)
+    })
 
     res.json({
       success: true,
