@@ -336,8 +336,7 @@ export default function CashFlowPanel({ stats }) {
           {/* Gráfico principal: Evolución Cash Flow */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Evolución del Cash Flow</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={cashFlowMensual} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="mes" tick={{ fontSize: 12 }} stroke="#9CA3AF" />
@@ -347,8 +346,7 @@ export default function CashFlowPanel({ stats }) {
                   <Bar dataKey="ingresos" name="Ingresos" fill="#10B981" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="egresos" name="Egresos" fill="#EF4444" radius={[4, 4, 0, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
+            </ResponsiveContainer>
           </div>
 
           {/* Composición Ingresos y Egresos */}
@@ -358,8 +356,8 @@ export default function CashFlowPanel({ stats }) {
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Composición de Ingresos</h3>
               {ingresosComposicion.length > 0 ? (
                 <div className="flex items-center gap-6">
-                  <div className="w-40 h-40">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="w-40 h-40 flex-shrink-0">
+                    <ResponsiveContainer width={160} height={160}>
                       <PieChart>
                         <Pie
                           data={ingresosComposicion}
@@ -400,8 +398,8 @@ export default function CashFlowPanel({ stats }) {
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Composición de Egresos</h3>
               {egresosComposicion.length > 0 ? (
                 <div className="flex items-center gap-6">
-                  <div className="w-40 h-40">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="w-40 h-40 flex-shrink-0">
+                    <ResponsiveContainer width={160} height={160}>
                       <PieChart>
                         <Pie
                           data={egresosComposicion}
@@ -679,8 +677,7 @@ export default function CashFlowPanel({ stats }) {
           {/* Gráfico de línea Cash Flow Neto */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Cash Flow Neto - Tendencia</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={256}>
                 <AreaChart data={cashFlowMensual} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorNeto" x1="0" y1="0" x2="0" y2="1">
@@ -694,8 +691,7 @@ export default function CashFlowPanel({ stats }) {
                   <Tooltip content={<CustomTooltip />} />
                   <Area type="monotone" dataKey="neto" name="Cash Flow Neto" stroke="#3B82F6" fillOpacity={1} fill="url(#colorNeto)" strokeWidth={2} />
                 </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -738,8 +734,7 @@ export default function CashFlowPanel({ stats }) {
           {/* Gráfico histórico de cobranza */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Histórico de Cobranza</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={cobranzaHistorica} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="periodo" tick={{ fontSize: 12 }} stroke="#9CA3AF" />
@@ -749,8 +744,7 @@ export default function CashFlowPanel({ stats }) {
                   <Bar dataKey="cobrado" name="Cobrado" fill="#10B981" radius={[4, 4, 0, 0]} stackId="a" />
                   <Bar dataKey="pendiente" name="Pendiente" fill="#FBBF24" radius={[4, 4, 0, 0]} stackId="a" />
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
+            </ResponsiveContainer>
           </div>
 
           {/* Porcentaje de cobranza por periodo */}

@@ -42,7 +42,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
     setSlots([])
     setSlotElegido(null)
     try {
-      const data = await api.get(`/reservas/disponibilidad?espacioId=${espacioId}&fecha=${fecha}`)
+      const data = await api.getFull(`/reservas/disponibilidad?espacioId=${espacioId}&fecha=${fecha}`)
       setSlots(data.slots || [])
       setConfig(data.config || null)
     } catch {

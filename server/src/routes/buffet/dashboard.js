@@ -331,7 +331,6 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     })
     const topProductos = Object.values(productosVendidos)
       .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, 10)
 
     // Ventas por hora (siempre)
     const ventasPorHora = {}

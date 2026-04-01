@@ -3983,6 +3983,7 @@ model ConfigReservaEspacio {
   cuposSimultaneos          Int      @default(1) @map("cupos_simultaneos")
   anticipacionMinHs         Int      @default(2) @map("anticipacion_min_hs")
   anticipacionMaxDias       Int      @default(30) @map("anticipacion_max_dias")
+  horariosConfig            String   @default("[{\"dias\":[1,2,3,4,5],\"horaInicio\":\"08:00\",\"horaFin\":\"22:00\"},{\"dias\":[6,0],\"horaInicio\":\"09:00\",\"horaFin\":\"22:00\"}]") @map("horarios_config")
 
   // Pricing
   modoPrecio                String   @default("FIJO") @map("modo_precio")  // FIJO | DESCUENTO_PORCENTAJE

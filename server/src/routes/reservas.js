@@ -75,17 +75,18 @@ async function calcularSlots(db, tenantId, espacioId, fecha) {
   const cupos = config.cuposSimultaneos
 
   // Día de la semana (0=domingo … 6=sábado)
-  const diaSemana = new Date(fecha).getDay()
+  const diaSemana = new Date(fecha + 'T12:00:00').getDay()
 
-  const horario = await db.horarioDisponibilidad.findFirst({
-    where: { espacioDeportivoId: espacioId, diaSemana, activo: true },
-  })
-  if (!horario) return []
+  // Buscar la franja horaria para este día
+  let franjas = []
+  try { franjas = JSON.parse(config.horariosConfig || '[]') } catch { franjas = [] }
+  const franja = franjas.find(f => f.dias?.includes(diaSemana))
+  if (!franja) return []
 
-  // Generar todos los slots del día
+  // Generar todos los slots del día usando la franja correspondiente
   const slots = []
-  let [hh, mm] = horario.horaInicio.split(':').map(Number)
-  const [hhFin, mmFin] = horario.horaFin.split(':').map(Number)
+  let [hh, mm] = (franja.horaInicio || '08:00').split(':').map(Number)
+  const [hhFin, mmFin] = (franja.horaFin || '22:00').split(':').map(Number)
   const minutosInicio = hh * 60 + mm
   const minutosFin = hhFin * 60 + mmFin
 
@@ -242,6 +243,9 @@ router.get('/disponibilidad', asyncHandler(async (req, res) => {
     config: config ? {
       duracionSlotMin: config.duracionSlotMin,
       cuposSimultaneos: config.cuposSimultaneos,
+      horaInicio: config.horaInicio,
+      horaFin: config.horaFin,
+      diasHabilitados: config.diasHabilitados,
       modoPrecio: config.modoPrecio,
       precioSocio: config.precioSocio,
       precioNoSocio: config.precioNoSocio,
@@ -263,24 +267,33 @@ router.get('/espacios', asyncHandler(async (req, res) => {
   const db = req.db
   const tenantId = req.tenantId
 
-  const espacios = await db.espacioDeportivo.findMany({
-    where: { tenantId, activo: true },
-    include: {
-      tipoEspacio: { select: { nombre: true } },
-      configReserva: { where: { tenantId, activo: true }, orderBy: { espacioId: 'desc' }, take: 1 },
-    },
-    orderBy: { nombre: 'asc' },
-  })
+  const [espacios, configGlobal] = await Promise.all([
+    db.espacioDeportivo.findMany({
+      where: { tenantId, activo: true },
+      include: {
+        tipoEspacio: { select: { nombre: true } },
+        configReserva: { where: { tenantId, activo: true }, take: 1 },
+      },
+      orderBy: { nombre: 'asc' },
+    }),
+    db.configReservaEspacio.findFirst({
+      where: { tenantId, espacioId: null, activo: true },
+    }),
+  ])
 
-  res.json(espacios.map((e) => ({
-    id: e.id,
-    nombre: e.nombre,
-    tipo: e.tipoEspacio?.nombre || e.tipo,
-    descripcion: e.descripcion,
-    cubierto: e.cubierto,
-    iluminacion: e.iluminacion,
-    config: e.configReserva[0] || null,
-  })))
+  const resultado = espacios
+    .map((e) => ({
+      id: e.id,
+      nombre: e.nombre,
+      tipo: e.tipoEspacio?.nombre || e.tipo,
+      descripcion: e.descripcion,
+      cubierto: e.cubierto,
+      iluminacion: e.iluminacion,
+      config: e.configReserva[0] || configGlobal || null,
+    }))
+    .filter((e) => e.config !== null) // solo espacios con config activa
+
+  res.json(resultado)
 }))
 
 // ─── Crear reserva ───────────────────────────────────────────────────────────
@@ -842,6 +855,183 @@ router.get('/admin/calendario', authAdmin, asyncHandler(async (req, res) => {
   res.json({ reservas, bloqueos })
 }))
 
+// ─── Config por espacio (admin) ──────────────────────────────────────────────
+
+/**
+ * GET /api/admin/reservas/config
+ * Lista configs (incluye global y por espacio).
+ */
+router.get('/admin/config', authAdmin, asyncHandler(async (req, res) => {
+  const db = req.db
+  const configs = await db.configReservaEspacio.findMany({
+    where: { tenantId: req.tenantId },
+    include: { espacio: { select: { nombre: true } } },
+    orderBy: [{ espacioId: 'asc' }],
+  })
+  res.json(configs)
+}))
+
+/**
+ * POST /api/admin/reservas/config
+ * Crear config (global o por espacio).
+ */
+router.post('/admin/config', authAdmin, asyncHandler(async (req, res) => {
+  const db = req.db
+  const {
+    espacioId, modoPrecio, precioBase, precioSocio, precioNoSocio,
+    descuentoSocioPorc, duracionSlotMin, cuposSimultaneos,
+    anticipacionMinHs, anticipacionMaxDias, politicaCancelacionHs,
+    permiteCancelacionOnline, activo, horariosConfig,
+  } = req.body
+  const config = await db.configReservaEspacio.create({
+    data: {
+      tenantId: req.tenantId,
+      modoPrecio, precioBase, precioSocio, precioNoSocio,
+      descuentoSocioPorc, duracionSlotMin, cuposSimultaneos,
+      anticipacionMinHs, anticipacionMaxDias, politicaCancelacionHs,
+      permiteCancelacionOnline, activo,
+      horariosConfig: typeof horariosConfig === 'string' ? horariosConfig : JSON.stringify(horariosConfig || []),
+      ...(espacioId ? { espacio: { connect: { id: parseInt(espacioId) } } } : {}),
+    },
+  })
+  res.status(201).json(config)
+}))
+
+/**
+ * PUT /api/admin/reservas/config/:id
+ * Actualizar config.
+ */
+router.put('/admin/config/:id', authAdmin, asyncHandler(async (req, res) => {
+  const db = req.db
+  const {
+    espacioId, modoPrecio, precioBase, precioSocio, precioNoSocio,
+    descuentoSocioPorc, duracionSlotMin, cuposSimultaneos,
+    anticipacionMinHs, anticipacionMaxDias, politicaCancelacionHs,
+    permiteCancelacionOnline, activo, horariosConfig,
+  } = req.body
+  const config = await db.configReservaEspacio.update({
+    where: { id: parseInt(req.params.id) },
+    data: {
+      modoPrecio, precioBase, precioSocio, precioNoSocio,
+      descuentoSocioPorc, duracionSlotMin, cuposSimultaneos,
+      anticipacionMinHs, anticipacionMaxDias, politicaCancelacionHs,
+      permiteCancelacionOnline, activo,
+      horariosConfig: typeof horariosConfig === 'string' ? horariosConfig : JSON.stringify(horariosConfig || []),
+      espacio: espacioId
+        ? { connect: { id: parseInt(espacioId) } }
+        : { disconnect: true },
+    },
+  })
+  res.json(config)
+}))
+
+// ─── Bloqueos (admin) ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/reservas/bloqueos
+ */
+router.get('/admin/bloqueos', authAdmin, asyncHandler(async (req, res) => {
+  const db = req.db
+  const { espacioId, fechaDesde, fechaHasta } = req.query
+  const where = { tenantId: req.tenantId }
+  if (espacioId) where.espacioId = parseInt(espacioId)
+  if (fechaDesde) where.fecha = { ...(where.fecha || {}), gte: new Date(fechaDesde) }
+  if (fechaHasta) where.fecha = { ...(where.fecha || {}), lte: new Date(fechaHasta) }
+
+  const bloqueos = await db.bloqueEspacio.findMany({
+    where,
+    include: { espacio: { select: { nombre: true } } },
+    orderBy: [{ fecha: 'asc' }, { horaInicio: 'asc' }],
+  })
+  res.json(bloqueos)
+}))
+
+/**
+ * POST /api/admin/reservas/bloqueos
+ */
+router.post('/admin/bloqueos', authAdmin, asyncHandler(async (req, res) => {
+  const db = req.db
+  const { espacioId, fecha, horaInicio, horaFin, motivo } = req.body
+  if (!espacioId || !fecha || !horaInicio || !horaFin) throw new AppError('Faltan campos', 400)
+
+  const bloqueo = await db.bloqueEspacio.create({
+    data: {
+      espacioId: parseInt(espacioId),
+      fecha: new Date(fecha),
+      horaInicio,
+      horaFin,
+      motivo,
+      tenantId: req.tenantId,
+    },
+  })
+  res.status(201).json(bloqueo)
+}))
+
+/**
+ * DELETE /api/admin/reservas/bloqueos/:id
+ */
+router.delete('/admin/bloqueos/:id', authAdmin, asyncHandler(async (req, res) => {
+  const db = req.db
+  await db.bloqueEspacio.delete({ where: { id: parseInt(req.params.id) } })
+  res.json({ mensaje: 'Bloqueo eliminado' })
+}))
+
+// ─── Estadísticas (admin) ────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/reservas/estadisticas
+ */
+router.get('/admin/estadisticas', authAdmin, asyncHandler(async (req, res) => {
+  const db = req.db
+  const tenantId = req.tenantId
+  const { fechaDesde, fechaHasta } = req.query
+
+  const where = { tenantId }
+  if (fechaDesde || fechaHasta) {
+    where.fecha = {}
+    if (fechaDesde) where.fecha.gte = new Date(fechaDesde)
+    if (fechaHasta) where.fecha.lte = new Date(fechaHasta)
+  }
+
+  const [total, porEstado, porEspacio, ingresos] = await Promise.all([
+    db.reservaEspacio.count({ where }),
+    db.reservaEspacio.groupBy({
+      by: ['estado'],
+      where,
+      _count: { id: true },
+    }),
+    db.reservaEspacio.groupBy({
+      by: ['espacioId'],
+      where: { ...where, estado: { in: ['CONFIRMADA', 'COMPLETADA'] } },
+      _count: { id: true },
+      _sum: { precioTotal: true },
+    }),
+    db.reservaEspacio.aggregate({
+      where: { ...where, estado: { in: ['CONFIRMADA', 'COMPLETADA'] } },
+      _sum: { precioTotal: true },
+    }),
+  ])
+
+  const espaciosIds = porEspacio.map((p) => p.espacioId)
+  const espacios = await db.espacioDeportivo.findMany({
+    where: { id: { in: espaciosIds } },
+    select: { id: true, nombre: true },
+  })
+  const espaciosMap = Object.fromEntries(espacios.map((e) => [e.id, e.nombre]))
+
+  res.json({
+    total,
+    porEstado: Object.fromEntries(porEstado.map((e) => [e.estado, e._count.id])),
+    porEspacio: porEspacio.map((e) => ({
+      espacioId: e.espacioId,
+      nombre: espaciosMap[e.espacioId] || `Espacio ${e.espacioId}`,
+      cantidad: e._count.id,
+      ingresos: e._sum.precioTotal || 0,
+    })),
+    ingresosTotal: ingresos._sum.precioTotal || 0,
+  })
+}))
+
 /**
  * GET /api/admin/reservas/:id
  * Detalle de una reserva.
@@ -1040,155 +1230,6 @@ router.patch('/admin/:id/no-show', authAdmin, asyncHandler(async (req, res) => {
     data: { estado: 'NO_SHOW' },
   })
   res.json(updated)
-}))
-
-// ─── Config por espacio (admin) ──────────────────────────────────────────────
-
-/**
- * GET /api/admin/reservas/config
- * Lista configs (incluye global y por espacio).
- */
-router.get('/admin/config', authAdmin, asyncHandler(async (req, res) => {
-  const db = req.db
-  const configs = await db.configReservaEspacio.findMany({
-    where: { tenantId: req.tenantId },
-    include: { espacio: { select: { nombre: true } } },
-    orderBy: [{ espacioId: 'asc' }],
-  })
-  res.json(configs)
-}))
-
-/**
- * POST /api/admin/reservas/config
- * Crear config (global o por espacio).
- */
-router.post('/admin/config', authAdmin, asyncHandler(async (req, res) => {
-  const db = req.db
-  const config = await db.configReservaEspacio.create({
-    data: { ...req.body, tenantId: req.tenantId },
-  })
-  res.status(201).json(config)
-}))
-
-/**
- * PUT /api/admin/reservas/config/:id
- * Actualizar config.
- */
-router.put('/admin/config/:id', authAdmin, asyncHandler(async (req, res) => {
-  const db = req.db
-  const config = await db.configReservaEspacio.update({
-    where: { id: parseInt(req.params.id) },
-    data: req.body,
-  })
-  res.json(config)
-}))
-
-// ─── Bloqueos (admin) ────────────────────────────────────────────────────────
-
-/**
- * GET /api/admin/reservas/bloqueos
- */
-router.get('/admin/bloqueos', authAdmin, asyncHandler(async (req, res) => {
-  const db = req.db
-  const { espacioId, fechaDesde, fechaHasta } = req.query
-  const where = { tenantId: req.tenantId }
-  if (espacioId) where.espacioId = parseInt(espacioId)
-  if (fechaDesde) where.fecha = { ...(where.fecha || {}), gte: new Date(fechaDesde) }
-  if (fechaHasta) where.fecha = { ...(where.fecha || {}), lte: new Date(fechaHasta) }
-
-  const bloqueos = await db.bloqueEspacio.findMany({
-    where,
-    include: { espacio: { select: { nombre: true } } },
-    orderBy: [{ fecha: 'asc' }, { horaInicio: 'asc' }],
-  })
-  res.json(bloqueos)
-}))
-
-/**
- * POST /api/admin/reservas/bloqueos
- */
-router.post('/admin/bloqueos', authAdmin, asyncHandler(async (req, res) => {
-  const db = req.db
-  const { espacioId, fecha, horaInicio, horaFin, motivo } = req.body
-  if (!espacioId || !fecha || !horaInicio || !horaFin) throw new AppError('Faltan campos', 400)
-
-  const bloqueo = await db.bloqueEspacio.create({
-    data: {
-      espacioId: parseInt(espacioId),
-      fecha: new Date(fecha),
-      horaInicio,
-      horaFin,
-      motivo,
-      tenantId: req.tenantId,
-    },
-  })
-  res.status(201).json(bloqueo)
-}))
-
-/**
- * DELETE /api/admin/reservas/bloqueos/:id
- */
-router.delete('/admin/bloqueos/:id', authAdmin, asyncHandler(async (req, res) => {
-  const db = req.db
-  await db.bloqueEspacio.delete({ where: { id: parseInt(req.params.id) } })
-  res.json({ mensaje: 'Bloqueo eliminado' })
-}))
-
-// ─── Estadísticas (admin) ────────────────────────────────────────────────────
-
-/**
- * GET /api/admin/reservas/estadisticas
- */
-router.get('/admin/estadisticas', authAdmin, asyncHandler(async (req, res) => {
-  const db = req.db
-  const tenantId = req.tenantId
-  const { fechaDesde, fechaHasta } = req.query
-
-  const where = { tenantId }
-  if (fechaDesde || fechaHasta) {
-    where.fecha = {}
-    if (fechaDesde) where.fecha.gte = new Date(fechaDesde)
-    if (fechaHasta) where.fecha.lte = new Date(fechaHasta)
-  }
-
-  const [total, porEstado, porEspacio, ingresos] = await Promise.all([
-    db.reservaEspacio.count({ where }),
-    db.reservaEspacio.groupBy({
-      by: ['estado'],
-      where,
-      _count: { id: true },
-    }),
-    db.reservaEspacio.groupBy({
-      by: ['espacioId'],
-      where: { ...where, estado: { in: ['CONFIRMADA', 'COMPLETADA'] } },
-      _count: { id: true },
-      _sum: { precioTotal: true },
-    }),
-    db.reservaEspacio.aggregate({
-      where: { ...where, estado: { in: ['CONFIRMADA', 'COMPLETADA'] } },
-      _sum: { precioTotal: true },
-    }),
-  ])
-
-  // Enriquecer porEspacio con nombres
-  const espaciosIds = porEspacio.map((p) => p.espacioId)
-  const espacios = await db.espacioDeportivo.findMany({
-    where: { id: { in: espaciosIds } },
-    select: { id: true, nombre: true },
-  })
-  const espaciosMap = Object.fromEntries(espacios.map((e) => [e.id, e.nombre]))
-
-  res.json({
-    total,
-    porEstado: Object.fromEntries(porEstado.map((e) => [e.estado, e._count.id])),
-    porEspacio: porEspacio.map((e) => ({
-      espacioId: e.espacioId,
-      nombre: espaciosMap[e.espacioId] || `Espacio ${e.espacioId}`,
-      cantidad: e._count.id,
-      ingresos: e._sum.precioTotal || 0,
-    })),
-    ingresosTotal: ingresos._sum.precioTotal || 0,
-  })
 }))
 
 export default router

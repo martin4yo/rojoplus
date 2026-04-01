@@ -73,8 +73,8 @@ export default function ReservasCalendario() {
 
   async function cargarEspacios() {
     try {
-      const data = await api.get('/reservas/espacios')
-      setEspacios(data || [])
+      const data = await api.getFull('/reservas/espacios')
+      setEspacios(Array.isArray(data) ? data : data?.data || [])
     } catch {
       toast.error('Error al cargar espacios')
     }
@@ -85,7 +85,7 @@ export default function ReservasCalendario() {
     try {
       const params = new URLSearchParams({ fechaDesde, fechaHasta })
       if (espacioFiltro) params.append('espacioId', espacioFiltro)
-      const data = await api.get(`/reservas/admin/calendario?${params}`)
+      const data = await api.getFull(`/reservas/admin/calendario?${params}`)
       setReservas(data.reservas || [])
       setBloqueos(data.bloqueos || [])
     } catch {

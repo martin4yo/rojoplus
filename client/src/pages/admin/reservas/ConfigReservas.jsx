@@ -14,6 +14,20 @@ const CAMPOS_CONFIG = [
   { key: 'politicaCancelacionHs', label: 'Cancelación gratuita hasta', tipo: 'number', sufijo: 'hs antes', min: 0, max: 168 },
 ]
 
+const DIAS_SEMANA = [
+  { value: 1, label: 'Lun' },
+  { value: 2, label: 'Mar' },
+  { value: 3, label: 'Mié' },
+  { value: 4, label: 'Jue' },
+  { value: 5, label: 'Vie' },
+  { value: 6, label: 'Sáb' },
+  { value: 0, label: 'Dom' },
+]
+
+const DEFAULT_FRANJAS = [
+  { dias: [1, 2, 3, 4, 5], horaInicio: '08:00', horaFin: '22:00' },
+]
+
 const DEFAULT_FORM = {
   espacioId: null,
   modoPrecio: 'FIJO',
@@ -28,6 +42,7 @@ const DEFAULT_FORM = {
   politicaCancelacionHs: 24,
   permiteCancelacionOnline: true,
   activo: true,
+  horariosConfig: DEFAULT_FRANJAS,
 }
 
 export default function ConfigReservas() {
@@ -38,6 +53,7 @@ export default function ConfigReservas() {
   const [editando, setEditando] = useState(null) // id de config | 'nuevo'
   const [form, setForm] = useState(DEFAULT_FORM)
   const [guardando, setGuardando] = useState(false)
+  const [tabActivo, setTabActivo] = useState('alcance')
 
   useEffect(() => {
     cargarDatos()
@@ -47,11 +63,11 @@ export default function ConfigReservas() {
     setLoading(true)
     try {
       const [cfgs, esps] = await Promise.all([
-        api.get('/reservas/admin/config'),
-        api.get('/reservas/espacios'),
+        api.getFull('/reservas/admin/config'),
+        api.getFull('/reservas/espacios'),
       ])
-      setConfigs(cfgs || [])
-      setEspacios(esps || [])
+      setConfigs(Array.isArray(cfgs) ? cfgs : cfgs?.data || [])
+      setEspacios(Array.isArray(esps) ? esps : esps?.data || [])
     } catch {
       toast.error('Error al cargar configuraciones')
     } finally {
@@ -61,10 +77,12 @@ export default function ConfigReservas() {
 
   function abrirNuevo() {
     setForm({ ...DEFAULT_FORM })
+    setTabActivo('alcance')
     setEditando('nuevo')
   }
 
   function abrirEditar(cfg) {
+    setTabActivo('alcance')
     setForm({
       ...DEFAULT_FORM,
       ...cfg,
@@ -73,6 +91,9 @@ export default function ConfigReservas() {
       precioSocio: cfg.precioSocio ?? '',
       precioNoSocio: cfg.precioNoSocio ?? '',
       descuentoSocioPorc: cfg.descuentoSocioPorc ?? 0,
+      horariosConfig: (() => {
+        try { return JSON.parse(cfg.horariosConfig || '[]') } catch { return DEFAULT_FRANJAS }
+      })(),
     })
     setEditando(cfg.id)
   }
@@ -97,6 +118,7 @@ export default function ConfigReservas() {
         anticipacionMinHs: parseInt(form.anticipacionMinHs),
         anticipacionMaxDias: parseInt(form.anticipacionMaxDias),
         politicaCancelacionHs: parseInt(form.politicaCancelacionHs),
+        horariosConfig: JSON.stringify(form.horariosConfig || []),
       }
 
       if (editando === 'nuevo') {
@@ -162,194 +184,310 @@ export default function ConfigReservas() {
       {/* Modal formulario */}
       {editando && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
 
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-0">
               <h2 className="text-lg font-bold text-gray-900">
                 {editando === 'nuevo' ? 'Nueva Configuración' : 'Editar Configuración'}
               </h2>
             </div>
 
-            <div className="p-6 space-y-5">
+            {/* Tabs */}
+            <div className="flex gap-0 px-6 pt-4 border-b border-gray-200">
+              {[
+                { id: 'alcance', label: 'Alcance y Slots' },
+                { id: 'precios', label: 'Precios' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setTabActivo(tab.id)}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition -mb-px ${
+                    tabActivo === tab.id
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-              {/* Alcance */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Alcance</label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setForm(f => ({ ...f, espacioId: null }))}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 text-sm font-medium transition ${!form.espacioId ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                  >
-                    <Globe size={14} /> Global (todos los espacios)
-                  </button>
-                  <button
-                    onClick={() => setForm(f => ({ ...f, espacioId: espacios[0]?.id || null }))}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 text-sm font-medium transition ${form.espacioId ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                  >
-                    <MapPin size={14} /> Espacio específico
-                  </button>
-                </div>
-                {form.espacioId && (
-                  <select
-                    value={form.espacioId || ''}
-                    onChange={e => setForm(f => ({ ...f, espacioId: e.target.value }))}
-                    className="mt-2 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">Seleccionar espacio...</option>
-                    {espacios.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                  </select>
-                )}
-              </div>
+            {/* Body scrollable */}
+            <div className="overflow-y-auto h-[560px] p-6 space-y-5">
 
-              {/* Slots y cupos */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">Disponibilidad</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {CAMPOS_CONFIG.map(({ key, label, tipo, sufijo, min, max }) => (
-                    <div key={key}>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-                      <div className="flex items-center gap-1">
+              {/* TAB: Alcance y Slots */}
+              {tabActivo === 'alcance' && (
+                <>
+                  {/* Alcance */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Alcance</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setForm(f => ({ ...f, espacioId: null }))}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 text-sm font-medium transition ${form.espacioId === null ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                      >
+                        <Globe size={14} /> Global (todos los espacios)
+                      </button>
+                      <button
+                        onClick={() => setForm(f => ({ ...f, espacioId: f.espacioId || '' }))}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 text-sm font-medium transition ${form.espacioId !== null ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                      >
+                        <MapPin size={14} /> Espacio específico
+                      </button>
+                    </div>
+                    {form.espacioId !== null && (
+                      <select
+                        value={form.espacioId || ''}
+                        onChange={e => setForm(f => ({ ...f, espacioId: e.target.value || null }))}
+                        className="mt-2 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="">— Seleccionar espacio —</option>
+                        {espacios.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                      </select>
+                    )}
+                    {form.espacioId !== null && espacios.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                        <AlertCircle size={12} /> No hay espacios creados todavía.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Slots y cupos */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">Disponibilidad</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {CAMPOS_CONFIG.map(({ key, label, tipo, sufijo, min, max }) => (
+                        <div key={key}>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type={tipo}
+                              min={min}
+                              max={max}
+                              value={form[key]}
+                              onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                            {sufijo && <span className="text-xs text-gray-500 whitespace-nowrap">{sufijo}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Horarios por franja */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-semibold text-gray-700">Horarios de atención</label>
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({
+                          ...f,
+                          horariosConfig: [...f.horariosConfig, { dias: [], horaInicio: '08:00', horaFin: '22:00' }],
+                        }))}
+                        className="flex items-center gap-1 text-xs text-primary hover:underline font-medium"
+                      >
+                        <Plus size={12} /> Agregar franja
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {form.horariosConfig.map((franja, idx) => (
+                        <div key={idx} className="border border-gray-200 rounded-xl p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1 flex-wrap flex-1">
+                              {DIAS_SEMANA.map(dia => {
+                                const activo = franja.dias.includes(dia.value)
+                                return (
+                                  <button
+                                    key={dia.value}
+                                    type="button"
+                                    onClick={() => setForm(f => ({
+                                      ...f,
+                                      horariosConfig: f.horariosConfig.map((fr, i) => i !== idx ? fr : {
+                                        ...fr,
+                                        dias: activo ? fr.dias.filter(d => d !== dia.value) : [...fr.dias, dia.value],
+                                      }),
+                                    }))}
+                                    className={`px-2 py-1 rounded text-xs font-medium border transition ${activo ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}
+                                  >
+                                    {dia.label}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {form.horariosConfig.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setForm(f => ({ ...f, horariosConfig: f.horariosConfig.filter((_, i) => i !== idx) }))}
+                                className="text-red-400 hover:text-red-600 transition"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={franja.horaInicio}
+                              onChange={e => setForm(f => ({
+                                ...f,
+                                horariosConfig: f.horariosConfig.map((fr, i) => i !== idx ? fr : { ...fr, horaInicio: e.target.value }),
+                              }))}
+                              className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                            <span className="text-xs text-gray-400">a</span>
+                            <input
+                              type="time"
+                              value={franja.horaFin}
+                              onChange={e => setForm(f => ({
+                                ...f,
+                                horariosConfig: f.horariosConfig.map((fr, i) => i !== idx ? fr : { ...fr, horaFin: e.target.value }),
+                              }))}
+                              className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cancelación online */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Cancelación online</div>
+                      <div className="text-xs text-gray-500">El reservante puede cancelar sin llamar</div>
+                    </div>
+                    <button
+                      onClick={() => setForm(f => ({ ...f, permiteCancelacionOnline: !f.permiteCancelacionOnline }))}
+                      className={`w-10 h-6 rounded-full transition ${form.permiteCancelacionOnline ? 'bg-green-500' : 'bg-gray-300'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-1 ${form.permiteCancelacionOnline ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
+                  {/* Activo */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Configuración activa</div>
+                      <div className="text-xs text-gray-500">Si está inactiva no se aplica al espacio</div>
+                    </div>
+                    <button
+                      onClick={() => setForm(f => ({ ...f, activo: !f.activo }))}
+                      className={`w-10 h-6 rounded-full transition ${form.activo ? 'bg-green-500' : 'bg-gray-300'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-1 ${form.activo ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* TAB: Precios */}
+              {tabActivo === 'precios' && (
+                <>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setForm(f => ({ ...f, modoPrecio: 'FIJO' }))}
+                      className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-medium transition ${form.modoPrecio === 'FIJO' ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    >
+                      Precios fijos
+                    </button>
+                    <button
+                      onClick={() => setForm(f => ({ ...f, modoPrecio: 'DESCUENTO_PORCENTAJE' }))}
+                      className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-medium transition ${form.modoPrecio === 'DESCUENTO_PORCENTAJE' ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    >
+                      % Descuento socio
+                    </button>
+                  </div>
+
+                  {form.modoPrecio === 'FIJO' ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio público ($)</label>
                         <input
-                          type={tipo}
-                          min={min}
-                          max={max}
-                          value={form[key]}
-                          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          type="number" min={0} step="0.01"
+                          value={form.precioNoSocio}
+                          onChange={e => setForm(f => ({ ...f, precioNoSocio: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="0.00"
                         />
-                        {sufijo && <span className="text-xs text-gray-500 whitespace-nowrap">{sufijo}</span>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio socio ($)</label>
+                        <input
+                          type="number" min={0} step="0.01"
+                          value={form.precioSocio}
+                          onChange={e => setForm(f => ({ ...f, precioSocio: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="0.00"
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Pricing */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">Precios</label>
-                <div className="flex gap-2 mb-3">
-                  <button
-                    onClick={() => setForm(f => ({ ...f, modoPrecio: 'FIJO' }))}
-                    className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition ${form.modoPrecio === 'FIJO' ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                  >
-                    Precios fijos
-                  </button>
-                  <button
-                    onClick={() => setForm(f => ({ ...f, modoPrecio: 'DESCUENTO_PORCENTAJE' }))}
-                    className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition ${form.modoPrecio === 'DESCUENTO_PORCENTAJE' ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                  >
-                    % Descuento socio
-                  </button>
-                </div>
-
-                {form.modoPrecio === 'FIJO' ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Precio público ($)</label>
-                      <input
-                        type="number" min={0} step="0.01"
-                        value={form.precioNoSocio}
-                        onChange={e => setForm(f => ({ ...f, precioNoSocio: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="0.00"
-                      />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio base ($)</label>
+                        <input
+                          type="number" min={0} step="0.01"
+                          value={form.precioBase}
+                          onChange={e => setForm(f => ({ ...f, precioBase: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Descuento socio (%)</label>
+                        <input
+                          type="number" min={0} max={100}
+                          value={form.descuentoSocioPorc}
+                          onChange={e => setForm(f => ({ ...f, descuentoSocioPorc: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Precio socio ($)</label>
-                      <input
-                        type="number" min={0} step="0.01"
-                        value={form.precioSocio}
-                        onChange={e => setForm(f => ({ ...f, precioSocio: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Precio base ($)</label>
-                      <input
-                        type="number" min={0} step="0.01"
-                        value={form.precioBase}
-                        onChange={e => setForm(f => ({ ...f, precioBase: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Descuento socio (%)</label>
-                      <input
-                        type="number" min={0} max={100}
-                        value={form.descuentoSocioPorc}
-                        onChange={e => setForm(f => ({ ...f, descuentoSocioPorc: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Preview de precios */}
-                {((form.modoPrecio === 'FIJO' && form.precioNoSocio) || (form.modoPrecio === 'DESCUENTO_PORCENTAJE' && form.precioBase)) && (
-                  <div className="mt-3 bg-gray-50 rounded-lg p-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Público:</span>
-                      <span className="font-medium">{formatCurrency(form.modoPrecio === 'FIJO' ? form.precioNoSocio : form.precioBase)}</span>
+                  {/* Preview de precios */}
+                  {((form.modoPrecio === 'FIJO' && form.precioNoSocio) || (form.modoPrecio === 'DESCUENTO_PORCENTAJE' && form.precioBase)) && (
+                    <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Vista previa</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Público</span>
+                        <span className="font-semibold text-gray-800">{formatCurrency(form.modoPrecio === 'FIJO' ? form.precioNoSocio : form.precioBase)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Socio</span>
+                        <span className="font-semibold text-green-700">
+                          {form.modoPrecio === 'FIJO'
+                            ? formatCurrency(form.precioSocio || form.precioNoSocio)
+                            : formatCurrency(parseFloat(form.precioBase || 0) * (1 - (form.descuentoSocioPorc || 0) / 100))
+                          }
+                        </span>
+                      </div>
+                      {form.modoPrecio === 'FIJO' && form.precioSocio && form.precioNoSocio && (
+                        <div className="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-2 mt-1">
+                          <span>Ahorro socio</span>
+                          <span>{(((form.precioNoSocio - form.precioSocio) / form.precioNoSocio) * 100).toFixed(0)}%</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Socio:</span>
-                      <span className="font-medium text-green-700">
-                        {form.modoPrecio === 'FIJO'
-                          ? formatCurrency(form.precioSocio || form.precioNoSocio)
-                          : formatCurrency(parseFloat(form.precioBase || 0) * (1 - (form.descuentoSocioPorc || 0) / 100))
-                        }
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </>
+              )}
+            </div>
 
-              {/* Cancelación online */}
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Cancelación online</div>
-                  <div className="text-xs text-gray-500">El reservante puede cancelar sin llamar</div>
-                </div>
-                <button
-                  onClick={() => setForm(f => ({ ...f, permiteCancelacionOnline: !f.permiteCancelacionOnline }))}
-                  className={`w-10 h-6 rounded-full transition ${form.permiteCancelacionOnline ? 'bg-green-500' : 'bg-gray-300'}`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-1 ${form.permiteCancelacionOnline ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-              </div>
-
-              {/* Activo */}
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Configuración activa</div>
-                  <div className="text-xs text-gray-500">Si está inactiva no se aplica al espacio</div>
-                </div>
-                <button
-                  onClick={() => setForm(f => ({ ...f, activo: !f.activo }))}
-                  className={`w-10 h-6 rounded-full transition ${form.activo ? 'bg-green-500' : 'bg-gray-300'}`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-1 ${form.activo ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-              </div>
-
-              {/* Footer */}
-              <div className="flex justify-between pt-2 border-t border-gray-100">
-                <button onClick={cerrar} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition text-sm">
-                  Cancelar
-                </button>
-                <button
-                  onClick={guardar}
-                  disabled={guardando}
-                  className="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium disabled:opacity-50"
-                >
-                  <Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}
-                </button>
-              </div>
+            {/* Footer siempre visible */}
+            <div className="flex justify-between px-6 py-4 border-t border-gray-100 bg-white rounded-b-2xl">
+              <button onClick={cerrar} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition text-sm">
+                Cancelar
+              </button>
+              <button
+                onClick={guardar}
+                disabled={guardando}
+                className="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium disabled:opacity-50"
+              >
+                <Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}
+              </button>
             </div>
           </div>
         </div>

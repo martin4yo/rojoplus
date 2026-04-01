@@ -63,6 +63,7 @@ export default function BuffetDashboard() {
   const [fechaHasta, setFechaHasta] = useState('')
   const [loading, setLoading] = useState(true)
   const [kpis, setKpis] = useState(null)
+  const [limiteProductos, setLimiteProductos] = useState(5)
 
   // Obtener fechas según el rango seleccionado
   const obtenerFechas = useCallback(() => {
@@ -343,9 +344,26 @@ export default function BuffetDashboard() {
             {/* Top Productos */}
             {kpis.topProductos && kpis.topProductos.length > 0 && (
               <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="font-semibold text-gray-800 mb-4">Productos más vendidos</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-800">Productos más vendidos</h3>
+                  <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+                    {[{ label: 'Top 5', value: 5 }, { label: 'Top 10', value: 10 }, { label: 'Todos', value: null }].map(opt => (
+                      <button
+                        key={opt.label}
+                        onClick={() => setLimiteProductos(opt.value)}
+                        className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                          limiteProductos === opt.value
+                            ? 'bg-white shadow text-orange-600'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="space-y-3">
-                  {kpis.topProductos.slice(0, 5).map((prod, idx) => (
+                  {(limiteProductos ? kpis.topProductos.slice(0, limiteProductos) : kpis.topProductos).map((prod, idx) => (
                     <div key={idx} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -365,6 +383,11 @@ export default function BuffetDashboard() {
                     </div>
                   ))}
                 </div>
+                {limiteProductos && kpis.topProductos.length > limiteProductos && (
+                  <p className="text-xs text-gray-400 text-center mt-3">
+                    Mostrando {limiteProductos} de {kpis.topProductos.length} productos
+                  </p>
+                )}
               </div>
             )}
 

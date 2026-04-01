@@ -123,6 +123,10 @@ app.use('/api/buffet/*', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()
 })
+app.use('/api/reservas/*', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+})
 
 // Rutas públicas con tenant opcional
 app.use('/api/public/*', extractTenantOptional, (req, res, next) => {

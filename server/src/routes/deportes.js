@@ -429,7 +429,9 @@ router.delete('/espacios-deportivos/:espacioId/horarios/:horarioId', asyncHandle
 }))
 
 // POST /api/admin/espacios-deportivos/:id/horarios/bulk - Guardar horarios masivamente
-router.post('/espacios-deportivos/:id/horarios/bulk', asyncHandler(async (req, res) => {
+router.post('/espacios-deportivos/:id/horarios/bulk', authAdmin, asyncHandler(async (req, res) => {
+  const db = req.db
+  const tenantId = req.tenantId
   const { id } = req.params
   const { horarios } = req.body // Array de { diaSemana, horaInicio, horaFin, activo }
 
@@ -437,33 +439,34 @@ router.post('/espacios-deportivos/:id/horarios/bulk', asyncHandler(async (req, r
     throw new AppError('Se esperaba un array de horarios', 400)
   }
 
-  // Verificar que el espacio existe
-  const espacio = await prisma.espacioDeportivo.findUnique({ where: { id: parseInt(id) } })
+  // Verificar que el espacio existe y pertenece al tenant
+  const espacio = await db.espacioDeportivo.findFirst({ where: { id: parseInt(id), tenantId } })
   if (!espacio) {
     throw new AppError('Espacio no encontrado', 404)
   }
 
-  // Eliminar horarios existentes
-  await prisma.horarioDisponibilidad.deleteMany({
-    where: { espacioDeportivoId: parseInt(id) }
+  // Eliminar horarios existentes del espacio
+  await db.horarioDisponibilidad.deleteMany({
+    where: { espacioDeportivoId: parseInt(id), tenantId }
   })
 
   // Crear nuevos horarios
   if (horarios.length > 0) {
-    await prisma.horarioDisponibilidad.createMany({
+    await db.horarioDisponibilidad.createMany({
       data: horarios.map(h => ({
         espacioDeportivoId: parseInt(id),
         diaSemana: parseInt(h.diaSemana),
         horaInicio: h.horaInicio,
         horaFin: h.horaFin,
-        activo: h.activo !== false
+        activo: h.activo !== false,
+        tenantId,
       }))
     })
   }
 
   // Obtener horarios actualizados
-  const updated = await prisma.horarioDisponibilidad.findMany({
-    where: { espacioDeportivoId: parseInt(id) },
+  const updated = await db.horarioDisponibilidad.findMany({
+    where: { espacioDeportivoId: parseInt(id), tenantId },
     orderBy: { diaSemana: 'asc' }
   })
 
