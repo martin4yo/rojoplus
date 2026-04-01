@@ -262,6 +262,36 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
       }
     })
 
+    // Cajas del buffet para filtrar egresos
+    const cajasBuffet = await req.db.caja.findMany({
+      where: { paraBuffet: true, activo: true },
+      select: { id: true }
+    })
+    const cajaBuffetIds = cajasBuffet.map(c => c.id)
+
+    // Egresos del período en cajas de buffet
+    const egresosRaw = await req.db.movimientoCaja.findMany({
+      where: {
+        cajaId: { in: cajaBuffetIds },
+        tipo: 'EGRESO',
+        fecha: { gte: fechaDesde, lte: fechaHasta },
+        anulado: false
+      },
+      select: { monto: true, concepto: true, fecha: true }
+    })
+
+    const totalEgresos = egresosRaw.reduce((sum, e) => sum + Number(e.monto), 0)
+
+    // Agrupar egresos por concepto
+    const egresosMap = {}
+    egresosRaw.forEach(e => {
+      const key = e.concepto || 'Sin concepto'
+      if (!egresosMap[key]) egresosMap[key] = { concepto: key, total: 0, cantidad: 0 }
+      egresosMap[key].total += Number(e.monto)
+      egresosMap[key].cantidad++
+    })
+    const egresosPorConcepto = Object.values(egresosMap).sort((a, b) => b.total - a.total)
+
     // Ventas de Kiosco (movimientos de caja)
     const ventasKiosco = await req.db.movimientoCaja.aggregate({
       where: {
@@ -385,6 +415,11 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
         pagoTarjeta,
         pagoDigital,
         pagoCtaCte,
+
+        // Egresos
+        totalEgresos,
+        egresosPorConcepto,
+        saldo: ventasTotal - totalEgresos,
 
         // Rankings
         topProductos,

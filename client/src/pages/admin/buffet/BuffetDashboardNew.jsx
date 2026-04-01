@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart,
   ChefHat, Coffee, Truck, RefreshCw, ArrowRight,
-  CreditCard, Banknote, QrCode, BarChart3
+  CreditCard, Banknote, QrCode, BarChart3, ArrowUpCircle, ArrowDownCircle, Scale
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import toast from 'react-hot-toast'
@@ -195,6 +195,38 @@ export default function BuffetDashboard() {
         </div>
       ) : kpis ? (
         <>
+          {/* Ingresos / Egresos / Saldo */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-green-700 text-sm font-medium">Ingresos</span>
+                <ArrowUpCircle className="text-green-500" size={20} />
+              </div>
+              <div className="text-2xl font-bold text-green-800">{formatMoney(kpis.ventasTotal)}</div>
+              <div className="text-xs text-green-600 mt-1">{kpis.cantidadVentas || 0} operaciones</div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-red-700 text-sm font-medium">Egresos</span>
+                <ArrowDownCircle className="text-red-500" size={20} />
+              </div>
+              <div className="text-2xl font-bold text-red-800">{formatMoney(kpis.totalEgresos || 0)}</div>
+              <div className="text-xs text-red-600 mt-1">{kpis.egresosPorConcepto?.length || 0} registros</div>
+            </div>
+            <div className={`border rounded-xl p-4 ${(kpis.saldo || 0) >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-sm font-medium ${(kpis.saldo || 0) >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>Saldo</span>
+                <Scale className={(kpis.saldo || 0) >= 0 ? 'text-blue-500' : 'text-orange-500'} size={20} />
+              </div>
+              <div className={`text-2xl font-bold ${(kpis.saldo || 0) >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+                {formatMoney(kpis.saldo || 0)}
+              </div>
+              <div className={`text-xs mt-1 ${(kpis.saldo || 0) >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                {(kpis.saldo || 0) >= 0 ? 'Resultado positivo' : 'Resultado negativo'}
+              </div>
+            </div>
+          </div>
+
           {/* KPIs Principales */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Ventas Totales */}
@@ -417,6 +449,38 @@ export default function BuffetDashboard() {
               </div>
             )}
           </div>
+
+          {/* Detalle de Egresos */}
+          {kpis.egresosPorConcepto && kpis.egresosPorConcepto.length > 0 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <ArrowDownCircle size={16} className="text-red-500" /> Detalle de Egresos
+              </h3>
+              <div className="space-y-2">
+                {kpis.egresosPorConcepto.map((e, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-gray-700 truncate block">{e.concepto}</span>
+                      <span className="text-xs text-gray-400">{e.cantidad} registro{e.cantidad !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-32 bg-gray-100 rounded-full h-1.5">
+                        <div
+                          className="bg-red-400 h-1.5 rounded-full"
+                          style={{ width: `${Math.min(100, (e.total / (kpis.totalEgresos || 1)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold text-red-700 w-24 text-right">{formatMoney(e.total)}</span>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center pt-2 mt-1 border-t border-gray-200">
+                  <span className="text-sm font-semibold text-gray-700">Total egresos</span>
+                  <span className="text-base font-bold text-red-700">{formatMoney(kpis.totalEgresos || 0)}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="text-center py-12 text-gray-500">
