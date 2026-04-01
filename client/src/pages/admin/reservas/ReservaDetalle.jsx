@@ -147,7 +147,7 @@ export default function ReservaDetalle({ reservaId, onClose }) {
             {/* Espacio y horario */}
             <div className="bg-gray-50 rounded-xl p-4 space-y-2">
               <div className="flex items-center gap-2 text-sm">
-                <MapPin size={15} className="text-red-500 shrink-0" />
+                <MapPin size={15} className="text-primary shrink-0" />
                 <span className="font-semibold text-gray-800">{reserva.espacio?.nombre}</span>
                 {reserva.espacio?.tipo && <span className="text-gray-500">· {reserva.espacio.tipo}</span>}
               </div>
@@ -251,7 +251,7 @@ export default function ReservaDetalle({ reservaId, onClose }) {
                 <button
                   onClick={cancelar}
                   disabled={accionando}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium disabled:opacity-50"
                 >
                   <XCircle size={15} /> Cancelar
                 </button>

@@ -42,6 +42,7 @@ Stack: React + Vite + Tailwind | Node.js + Express + Prisma | PostgreSQL + Socke
 - [x] **Chat IA** — Asistente conversacional con contexto del club
 - [x] **Notificaciones Push** — Web push, suscripciones, cron jobs automáticos
 - [x] **Importación Excel** — Socios, kiosco, actividades
+- [x] **Reserva de Espacios** — Canchas/salones/instalaciones, disponibilidad por slots, precios socio/no-socio, MercadoPago, reembolso automático, reservas recurrentes, portal socio, sitio público, calendario admin, config por espacio, emails automáticos, cron jobs
 
 ### Bugs corregidos en sesión actual (16/03/2026)
 - [x] `req.req.db` → `req.db` (564 instancias en 28 archivos de rutas)
@@ -87,13 +88,24 @@ Stack: React + Vite + Tailwind | Node.js + Express + Prisma | PostgreSQL + Socke
 - [ ] Tests de carga
 - [ ] Tests de seguridad
 
-### 4. Multi-Tenant FASE 7 — Testing & Deployment
+### 4. Multi-Tenant FASE 7 — Deploy & Infraestructura
 **Referencia:** `MULTITENANT_ROADMAP.md` FASE 7
 **Estado:** 0% — la arquitectura está pero no hay infraestructura productiva
 
+#### Qué implica cada tarea:
+- **Docker + Docker Compose** — Empaquetar en contenedores (app Node + PostgreSQL + Redis). Permite deploy en cualquier servidor sin instalar dependencias manualmente. Archivo `docker-compose.yml` con los 3 servicios.
+- **CI/CD (GitHub Actions)** — Pipeline automático: push a `main` → tests → build imagen Docker → deploy al servidor. Sin esto cada deploy es manual y riesgoso.
+- **Migraciones automáticas por tenant** — Reemplazar `prisma db push` manual por migraciones versionadas (`prisma migrate deploy`) que se corren sin downtime ni pérdida de datos.
+- **Logging (Winston/Morgan)** — Los `console.log` no son suficientes en producción. Winston: logs en archivos con rotación, niveles (error/warn/info), envío a servicios externos (Datadog, Papertrail).
+- **Error tracking (Sentry)** — Captura errores en producción en tiempo real: stack trace completo, contexto del usuario que lo disparó, alertas por email/Slack. Sin esto los errores son invisibles.
+- **Redis** — Cache de sesiones/permisos (hoy se consulta la DB en cada request) + rate-limiting distribuido entre múltiples instancias.
+- **Prometheus/Grafana** — Métricas en tiempo real: requests/segundo, latencia P95/P99, uso CPU/RAM, errores por endpoint. Grafana los muestra en dashboards.
+- **Swagger** — Documentación automática de la API REST. Útil para integración con terceros y debugging.
+
+#### Checklist:
 - [ ] Dockerfile + Docker Compose (App + DB + Redis)
 - [ ] CI/CD Pipeline (GitHub Actions)
-- [ ] Migraciones automáticas por tenant
+- [ ] Migraciones automáticas (`prisma migrate deploy`)
 - [ ] Logging centralizado (Winston/Morgan)
 - [ ] Error tracking (Sentry)
 - [ ] Métricas (Prometheus/Grafana)
@@ -102,11 +114,11 @@ Stack: React + Vite + Tailwind | Node.js + Express + Prisma | PostgreSQL + Socke
 - [ ] README actualizado con guía de deploy
 
 ### 5. Seguridad — Producción Ready
-**Estado:** Parcialmente implementado. Items críticos faltantes:
+**Estado:** Parcialmente implementado.
 
-- [ ] Hash de contraseñas con bcrypt en registro público de tenant (`/register` — hay TODO en código)
+- [x] Hash de contraseñas con bcrypt en `/register` (`bcrypt.hash(password, 12)`) — **RESUELTO 31/03/2026**
 - [ ] Email verification para nuevos admins/tenants
-- [ ] Rate limiting en endpoints públicos (registro, login)
+- [ ] Rate limiting en endpoints públicos (registro, login) — `express-rate-limit`
 - [ ] 2FA para super-admin
 - [ ] Audit log de cambios sensibles
 - [ ] HTTPS obligatorio en producción
@@ -217,8 +229,7 @@ Frontend:        http://localhost:5173
 
 ## 🚀 Próximos pasos recomendados (por prioridad)
 
-1. **Testing manual del flujo completo** — login superadmin, login admin con subdomain, creación tenant
-2. **Hash bcrypt en `/register`** — crítico para producción (hay TODO en el código)
-3. **Rate limiting** — express-rate-limit en login y register
-4. **Payway** — si el club lo requiere pronto (35.10–35.14)
-5. **Deploy** — Docker + CI/CD para llevar a producción (FASE 7 multi-tenant)
+1. **Rate limiting** — `express-rate-limit` en login y register (rápido, crítico)
+2. **Payway** — si el club lo requiere pronto (35.10–35.14)
+3. **Deploy** — Docker + CI/CD para llevar a producción (FASE 7 multi-tenant)
+4. **Email verification** — para nuevos tenants registrados

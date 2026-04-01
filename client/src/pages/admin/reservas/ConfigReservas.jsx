@@ -131,7 +131,7 @@ export default function ConfigReservas() {
         </div>
         <button
           onClick={abrirNuevo}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium"
         >
           <Plus size={16} /> Nueva config
         </button>
@@ -142,7 +142,7 @@ export default function ConfigReservas() {
         <div className="bg-white rounded-xl border border-gray-200 py-12 text-center">
           <Settings size={32} className="mx-auto mb-3 text-gray-300" />
           <p className="text-gray-500 text-sm">No hay configuraciones. Creá una para habilitar reservas.</p>
-          <button onClick={abrirNuevo} className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition">
+          <button onClick={abrirNuevo} className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark transition">
             Crear primera config
           </button>
         </div>
@@ -178,13 +178,13 @@ export default function ConfigReservas() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setForm(f => ({ ...f, espacioId: null }))}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 text-sm font-medium transition ${!form.espacioId ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 text-sm font-medium transition ${!form.espacioId ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                   >
                     <Globe size={14} /> Global (todos los espacios)
                   </button>
                   <button
                     onClick={() => setForm(f => ({ ...f, espacioId: espacios[0]?.id || null }))}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 text-sm font-medium transition ${form.espacioId ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 text-sm font-medium transition ${form.espacioId ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                   >
                     <MapPin size={14} /> Espacio específico
                   </button>
@@ -193,7 +193,7 @@ export default function ConfigReservas() {
                   <select
                     value={form.espacioId || ''}
                     onChange={e => setForm(f => ({ ...f, espacioId: e.target.value }))}
-                    className="mt-2 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="mt-2 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">Seleccionar espacio...</option>
                     {espacios.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
@@ -215,7 +215,7 @@ export default function ConfigReservas() {
                           max={max}
                           value={form[key]}
                           onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                         {sufijo && <span className="text-xs text-gray-500 whitespace-nowrap">{sufijo}</span>}
                       </div>
@@ -230,13 +230,13 @@ export default function ConfigReservas() {
                 <div className="flex gap-2 mb-3">
                   <button
                     onClick={() => setForm(f => ({ ...f, modoPrecio: 'FIJO' }))}
-                    className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition ${form.modoPrecio === 'FIJO' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition ${form.modoPrecio === 'FIJO' ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                   >
                     Precios fijos
                   </button>
                   <button
                     onClick={() => setForm(f => ({ ...f, modoPrecio: 'DESCUENTO_PORCENTAJE' }))}
-                    className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition ${form.modoPrecio === 'DESCUENTO_PORCENTAJE' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition ${form.modoPrecio === 'DESCUENTO_PORCENTAJE' ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                   >
                     % Descuento socio
                   </button>
@@ -250,7 +250,7 @@ export default function ConfigReservas() {
                         type="number" min={0} step="0.01"
                         value={form.precioNoSocio}
                         onChange={e => setForm(f => ({ ...f, precioNoSocio: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="0.00"
                       />
                     </div>
@@ -260,7 +260,7 @@ export default function ConfigReservas() {
                         type="number" min={0} step="0.01"
                         value={form.precioSocio}
                         onChange={e => setForm(f => ({ ...f, precioSocio: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="0.00"
                       />
                     </div>
@@ -273,7 +273,7 @@ export default function ConfigReservas() {
                         type="number" min={0} step="0.01"
                         value={form.precioBase}
                         onChange={e => setForm(f => ({ ...f, precioBase: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="0.00"
                       />
                     </div>
@@ -283,7 +283,7 @@ export default function ConfigReservas() {
                         type="number" min={0} max={100}
                         value={form.descuentoSocioPorc}
                         onChange={e => setForm(f => ({ ...f, descuentoSocioPorc: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
                   </div>
@@ -345,7 +345,7 @@ export default function ConfigReservas() {
                 <button
                   onClick={guardar}
                   disabled={guardando}
-                  className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium disabled:opacity-50"
+                  className="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium disabled:opacity-50"
                 >
                   <Save size={14} /> {guardando ? 'Guardando...' : 'Guardar'}
                 </button>
@@ -373,12 +373,12 @@ function ConfigCard({ config, espacioNombre, onEditar }) {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            {esGlobal ? <Globe size={15} className="text-gray-400" /> : <MapPin size={15} className="text-red-500" />}
+            {esGlobal ? <Globe size={15} className="text-gray-400" /> : <MapPin size={15} className="text-primary" />}
             <span className="font-semibold text-gray-800">{esGlobal ? 'Config global' : espacioNombre}</span>
           </div>
           {!config.activo && <span className="text-xs text-gray-400 mt-0.5 block">Inactiva</span>}
         </div>
-        <button onClick={onEditar} className="text-xs text-red-600 hover:underline font-medium">Editar</button>
+        <button onClick={onEditar} className="text-xs text-primary hover:underline font-medium">Editar</button>
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-sm">

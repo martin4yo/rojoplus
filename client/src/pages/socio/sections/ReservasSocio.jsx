@@ -6,7 +6,6 @@ import {
   XCircleIcon,
   CheckCircleIcon,
   ArrowLeftIcon,
-  RepeatIcon,
 } from '@heroicons/react/24/outline'
 import { Repeat, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -138,17 +137,17 @@ export default function ReservasSocio({ socio, tokenPortal }) {
       <div className="flex gap-2">
         <button
           onClick={() => setVista('espacios')}
-          className={`flex-1 py-3 rounded-xl text-sm font-semibold transition ${vista === 'espacios' || vista === 'disponibilidad' ? 'bg-red-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
+          className={`flex-1 py-3 rounded-xl text-sm font-semibold transition ${vista === 'espacios' || vista === 'disponibilidad' ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
         >
           Reservar
         </button>
         <button
           onClick={() => { setVista('misReservas'); cargarMisReservas() }}
-          className={`flex-1 py-3 rounded-xl text-sm font-semibold transition relative ${vista === 'misReservas' ? 'bg-red-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
+          className={`flex-1 py-3 rounded-xl text-sm font-semibold transition relative ${vista === 'misReservas' ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
         >
           Mis Reservas
           {misReservas.length > 0 && vista !== 'misReservas' && (
-            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
               {misReservas.length}
             </span>
           )}
@@ -169,7 +168,7 @@ export default function ReservasSocio({ socio, tokenPortal }) {
               <button
                 key={espacio.id}
                 onClick={() => seleccionarEspacio(espacio)}
-                className="w-full bg-white rounded-2xl p-5 text-left shadow-sm border border-gray-100 hover:border-red-200 hover:shadow-md transition"
+                className="w-full bg-white rounded-2xl p-5 text-left shadow-sm border border-gray-100 hover:border-primary-200 hover:shadow-md transition"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -199,7 +198,7 @@ export default function ReservasSocio({ socio, tokenPortal }) {
                   )}
                 </div>
                 <div className="mt-3 flex justify-end">
-                  <span className="text-xs text-red-600 font-semibold">Ver disponibilidad →</span>
+                  <span className="text-xs text-primary font-semibold">Ver disponibilidad →</span>
                 </div>
               </button>
             ))
@@ -213,7 +212,7 @@ export default function ReservasSocio({ socio, tokenPortal }) {
           {/* Breadcrumb */}
           <button
             onClick={() => setVista('espacios')}
-            className="flex items-center gap-1.5 text-sm text-red-600 font-medium"
+            className="flex items-center gap-1.5 text-sm text-primary font-medium"
           >
             <ChevronLeft size={16} /> Volver a espacios
           </button>
@@ -265,7 +264,7 @@ export default function ReservasSocio({ socio, tokenPortal }) {
                   <button
                     key={i}
                     onClick={() => setFechaSel(str)}
-                    className={`flex flex-col items-center min-w-[44px] py-2 px-1 rounded-xl text-xs transition shrink-0 ${activo ? 'bg-red-600 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+                    className={`flex flex-col items-center min-w-[44px] py-2 px-1 rounded-xl text-xs transition shrink-0 ${activo ? 'bg-primary text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
                   >
                     <span className="font-medium">{DIAS_CORTO[d.getDay()]}</span>
                     <span className={`text-base font-bold mt-0.5 ${activo ? 'text-white' : 'text-gray-800'}`}>{d.getDate()}</span>
@@ -301,7 +300,7 @@ export default function ReservasSocio({ socio, tokenPortal }) {
                       className={`p-3 rounded-xl border-2 text-center transition ${
                         !disponible
                           ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                          : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 active:scale-95'
+                          : 'border-primary-200 bg-primary-50 text-primary-dark hover:bg-primary-100 active:scale-95'
                       }`}
                     >
                       <div className="text-sm font-bold">{slot.horaInicio}</div>
@@ -331,7 +330,7 @@ export default function ReservasSocio({ socio, tokenPortal }) {
               <p className="text-sm font-medium">No tenés reservas futuras</p>
               <button
                 onClick={() => setVista('espacios')}
-                className="mt-4 px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold"
+                className="mt-4 px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-semibold"
               >
                 Hacer una reserva
               </button>
@@ -521,7 +520,7 @@ function ModalReserva({ slot, espacio, fecha, config, socio, tokenPortal, precio
           {/* Resumen */}
           <div>
             <h2 className="text-xl font-bold text-gray-900">Confirmar reserva</h2>
-            <div className="mt-3 bg-red-50 rounded-2xl p-4 space-y-1.5">
+            <div className="mt-3 bg-primary-50 rounded-2xl p-4 space-y-1.5">
               <div className="font-bold text-gray-800 text-base">{espacio.nombre}</div>
               <div className="text-sm text-gray-600">
                 📅 {DIAS_CORTO[fechaObj.getDay()]} {fechaObj.getDate()} {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][fechaObj.getMonth()]}
@@ -594,7 +593,7 @@ function ModalReserva({ slot, espacio, fecha, config, socio, tokenPortal, precio
               onChange={e => setObservaciones(e.target.value)}
               rows={2}
               placeholder="¿Algo que debamos saber?"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -614,7 +613,7 @@ function ModalReserva({ slot, espacio, fecha, config, socio, tokenPortal, precio
             <button
               onClick={confirmar}
               disabled={confirmando}
-              className="w-full py-4 bg-red-600 text-white rounded-2xl text-base font-bold disabled:opacity-50 active:scale-98 transition"
+              className="w-full py-4 bg-primary text-white rounded-2xl text-base font-bold disabled:opacity-50 active:scale-98 transition"
             >
               {confirmando ? 'Procesando...' : metodoPago === 'MERCADOPAGO' ? 'Pagar con MercadoPago' : 'Confirmar reserva'}
             </button>

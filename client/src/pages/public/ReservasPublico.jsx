@@ -163,7 +163,7 @@ export default function ReservasPublico() {
           {/* Pasos */}
           <div className="ml-auto flex items-center gap-1.5">
             {['espacios', 'disponibilidad', 'datos'].map((p, i) => (
-              <div key={p} className={`w-2 h-2 rounded-full transition ${paso === p ? 'bg-red-600 w-5' : i < ['espacios', 'disponibilidad', 'datos'].indexOf(paso) ? 'bg-green-500' : 'bg-gray-200'}`} />
+              <div key={p} className={`w-2 h-2 rounded-full transition ${paso === p ? 'bg-primary w-5' : i < ['espacios', 'disponibilidad', 'datos'].indexOf(paso) ? 'bg-green-500' : 'bg-gray-200'}`} />
             ))}
           </div>
         </div>
@@ -183,9 +183,9 @@ export default function ReservasPublico() {
                   <button
                     key={espacio.id}
                     onClick={() => { setEspacioSel(espacio); setPaso('disponibilidad') }}
-                    className="bg-white rounded-2xl p-5 text-left shadow-sm border border-gray-100 hover:border-red-200 hover:shadow-md transition group"
+                    className="bg-white rounded-2xl p-5 text-left shadow-sm border border-gray-100 hover:border-primary-200 hover:shadow-md transition group"
                   >
-                    <div className="font-bold text-gray-900 text-base group-hover:text-red-600 transition">{espacio.nombre}</div>
+                    <div className="font-bold text-gray-900 text-base group-hover:text-primary transition">{espacio.nombre}</div>
                     <div className="text-sm text-gray-500 mt-0.5">{espacio.tipo}</div>
                     {espacio.descripcion && (
                       <p className="text-xs text-gray-400 mt-2 line-clamp-2">{espacio.descripcion}</p>
@@ -262,7 +262,7 @@ export default function ReservasPublico() {
                     <button
                       key={i}
                       onClick={() => setFechaSel(str)}
-                      className={`flex flex-col items-center min-w-[46px] py-2 px-1 rounded-xl text-xs transition shrink-0 ${activo ? 'bg-red-600 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+                      className={`flex flex-col items-center min-w-[46px] py-2 px-1 rounded-xl text-xs transition shrink-0 ${activo ? 'bg-primary text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
                     >
                       <span>{DIAS[d.getDay()]}</span>
                       <span className={`text-lg font-bold mt-0.5 ${activo ? '' : 'text-gray-800'}`}>{d.getDate()}</span>
@@ -302,7 +302,7 @@ export default function ReservasPublico() {
                         className={`p-3 rounded-xl border-2 text-center transition ${
                           !disponible
                             ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                            : 'border-red-200 bg-white text-red-700 hover:bg-red-50 hover:border-red-400 hover:shadow-sm active:scale-95'
+                            : 'border-primary-200 bg-white text-primary-dark hover:bg-primary-50 hover:border-primary hover:shadow-sm active:scale-95'
                         }`}
                       >
                         <div className="font-bold text-sm">{slot.horaInicio}</div>
@@ -325,10 +325,10 @@ export default function ReservasPublico() {
         {paso === 'datos' && slotSel && espacioSel && (
           <>
             {/* Resumen */}
-            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-1.5">
+            <div className="bg-primary-50 border border-primary-100 rounded-2xl p-4 space-y-1.5">
               <div className="font-bold text-gray-900">{espacioSel.nombre}</div>
               <div className="text-sm text-gray-600">📅 {DIAS[fechaObj.getDay()]} {fechaObj.getDate()} de {MESES[fechaObj.getMonth()]} · 🕐 {slotSel.horaInicio}–{slotSel.horaFin}</div>
-              <div className="text-base font-bold text-red-700">{formatCurrency(precioPublico())} / turno</div>
+              <div className="text-base font-bold text-primary-dark">{formatCurrency(precioPublico())} / turno</div>
             </div>
 
             {/* Formulario */}
@@ -340,7 +340,7 @@ export default function ReservasPublico() {
                   <input
                     value={form.nombre}
                     onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -348,7 +348,7 @@ export default function ReservasPublico() {
                   <input
                     value={form.apellido}
                     onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div className="col-span-2">
@@ -357,7 +357,7 @@ export default function ReservasPublico() {
                     type="email"
                     value={form.email}
                     onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -365,7 +365,7 @@ export default function ReservasPublico() {
                   <input
                     value={form.telefono}
                     onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -373,7 +373,7 @@ export default function ReservasPublico() {
                   <input
                     value={form.dni}
                     onChange={e => setForm(f => ({ ...f, dni: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -388,7 +388,7 @@ export default function ReservasPublico() {
                 </div>
                 <button
                   onClick={() => setForm(f => ({ ...f, esRecurrente: !f.esRecurrente }))}
-                  className={`w-12 h-6 rounded-full transition-colors ${form.esRecurrente ? 'bg-red-600' : 'bg-gray-200'}`}
+                  className={`w-12 h-6 rounded-full transition-colors ${form.esRecurrente ? 'bg-primary' : 'bg-gray-200'}`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full shadow mx-0.5 transition-transform ${form.esRecurrente ? 'translate-x-6' : 'translate-x-0'}`} />
                 </button>
@@ -436,7 +436,7 @@ export default function ReservasPublico() {
                 onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))}
                 rows={2}
                 placeholder="¿Algo que debamos saber?"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
 
@@ -454,12 +454,12 @@ export default function ReservasPublico() {
               <button
                 onClick={confirmarReserva}
                 disabled={enviando || !form.nombre || !form.apellido || !form.email}
-                className="w-full py-4 bg-red-600 text-white rounded-2xl font-bold text-base disabled:opacity-40 hover:bg-red-700 transition active:scale-98"
+                className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-base disabled:opacity-40 hover:bg-primary-dark transition active:scale-98"
               >
                 {enviando ? 'Procesando...' : form.metodoPago === 'MERCADOPAGO' ? '💳 Pagar con MercadoPago' : '✓ Confirmar reserva'}
               </button>
               <p className="text-xs text-gray-400 text-center mt-3">
-                Sos socio del club? <a href="#" className="text-red-600 font-medium">Accedé al portal</a> para precio especial.
+                Sos socio del club? <a href="#" className="text-primary font-medium">Accedé al portal</a> para precio especial.
               </p>
             </div>
           </>
@@ -512,7 +512,7 @@ function PaginaResultado({ exito, pendiente, codigo, onNuevaReserva }) {
 
         <button
           onClick={onNuevaReserva}
-          className="w-full py-3 bg-red-600 text-white rounded-2xl font-semibold hover:bg-red-700 transition"
+          className="w-full py-3 bg-primary text-white rounded-2xl font-semibold hover:bg-primary-dark transition"
         >
           {exito ? 'Hacer otra reserva' : 'Intentar de nuevo'}
         </button>

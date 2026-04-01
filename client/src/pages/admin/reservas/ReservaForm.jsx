@@ -130,7 +130,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
             <h2 className="text-lg font-bold text-gray-900">Nueva Reserva (Admin)</h2>
             <div className="flex items-center gap-2 mt-1">
               {[1, 2, 3].map(n => (
-                <div key={n} className={`w-6 h-6 rounded-full text-xs flex items-center justify-center font-medium ${paso >= n ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                <div key={n} className={`w-6 h-6 rounded-full text-xs flex items-center justify-center font-medium ${paso >= n ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}>
                   {n}
                 </div>
               ))}
@@ -154,7 +154,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                 <select
                   value={espacioId}
                   onChange={e => setEspacioId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="">Seleccionar espacio...</option>
                   {espacios.map(e => (
@@ -171,7 +171,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                   value={fecha}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={e => setFecha(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
@@ -216,8 +216,8 @@ export default function ReservaForm({ espacios = [], onClose }) {
                           !libre
                             ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
                             : elegido
-                            ? 'border-red-500 bg-red-50 text-red-700'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-red-300 hover:bg-red-50'
+                            ? 'border-primary bg-primary-50 text-primary-dark'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-primary hover:bg-primary-50'
                         }`}
                       >
                         <div>{slot.horaInicio}</div>
@@ -256,7 +256,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setEsSocio(false); setSocioEncontrado(null) }}
-                    className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition ${!esSocio ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition ${!esSocio ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                   >
                     Externo / Público
                   </button>
@@ -279,7 +279,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                       onChange={e => setBusquedaSocio(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && buscarSocio()}
                       placeholder="Nombre, apellido o nro socio..."
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <button
                       onClick={buscarSocio}
@@ -304,7 +304,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                   <input
                     value={form.nombre}
                     onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -312,7 +312,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                   <input
                     value={form.apellido}
                     onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div className="col-span-2">
@@ -321,7 +321,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                     type="email"
                     value={form.email}
                     onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -329,7 +329,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                   <input
                     value={form.telefono}
                     onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -337,7 +337,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                   <input
                     value={form.dni}
                     onChange={e => setForm(f => ({ ...f, dni: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -350,7 +350,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                     <button
                       key={mp}
                       onClick={() => setForm(f => ({ ...f, metodoPago: mp }))}
-                      className={`flex-1 py-2 rounded-lg border-2 text-xs font-medium transition ${form.metodoPago === mp ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                      className={`flex-1 py-2 rounded-lg border-2 text-xs font-medium transition ${form.metodoPago === mp ? 'border-primary bg-primary-50 text-primary-dark' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                     >
                       {mp === 'EFECTIVO' ? 'Efectivo' : mp === 'CORTESIA' ? 'Cortesía' : 'MercadoPago'}
                     </button>
@@ -395,7 +395,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
                   value={form.observaciones}
                   onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))}
                   rows={2}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -432,7 +432,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
               <button
                 onClick={() => setPaso(p => p + 1)}
                 disabled={(paso === 1 && !puedeAvanzarPaso1) || (paso === 2 && !puedeAvanzarPaso2)}
-                className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium disabled:opacity-40"
+                className="px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium disabled:opacity-40"
               >
                 Siguiente
               </button>
@@ -440,7 +440,7 @@ export default function ReservaForm({ espacios = [], onClose }) {
               <button
                 onClick={guardar}
                 disabled={!puedeGuardar || guardando}
-                className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium disabled:opacity-40"
+                className="px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium disabled:opacity-40"
               >
                 {guardando ? 'Guardando...' : 'Crear Reserva'}
               </button>

@@ -150,20 +150,20 @@ export default function ReservasCalendario() {
           <div className="flex rounded-lg border border-gray-200 overflow-hidden">
             <button
               onClick={() => setVista('semana')}
-              className={`px-3 py-2 text-sm flex items-center gap-1 transition ${vista === 'semana' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-2 text-sm flex items-center gap-1 transition ${vista === 'semana' ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               <Calendar size={14} /> Semana
             </button>
             <button
               onClick={() => setVista('lista')}
-              className={`px-3 py-2 text-sm flex items-center gap-1 transition ${vista === 'lista' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-2 text-sm flex items-center gap-1 transition ${vista === 'lista' ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               <List size={14} /> Lista
             </button>
           </div>
           <button
             onClick={() => setMostrarFormNuevo(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition text-sm font-medium"
           >
             <Plus size={16} /> Nueva Reserva
           </button>
@@ -190,7 +190,7 @@ export default function ReservasCalendario() {
         <select
           value={espacioFiltro}
           onChange={e => setEspacioFiltro(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="">Todos los espacios</option>
           {espacios.map(e => (
@@ -260,9 +260,9 @@ function VistaSemana({ diasSemana, hoy, reservasDeDia, bloqueosDeDia, onVerReser
         {diasSemana.map((dia, i) => {
           const esHoy = isoDate(dia) === hoy
           return (
-            <div key={i} className={`p-3 text-center border-r border-gray-100 last:border-r-0 ${esHoy ? 'bg-red-50' : ''}`}>
+            <div key={i} className={`p-3 text-center border-r border-gray-100 last:border-r-0 ${esHoy ? 'bg-primary-50' : ''}`}>
               <div className="text-xs text-gray-500 uppercase font-medium">{DIAS[dia.getDay()]}</div>
-              <div className={`text-lg font-bold mt-0.5 ${esHoy ? 'text-red-600' : 'text-gray-800'}`}>
+              <div className={`text-lg font-bold mt-0.5 ${esHoy ? 'text-primary' : 'text-gray-800'}`}>
                 {dia.getDate()}
               </div>
               <div className="text-xs text-gray-400">{MESES[dia.getMonth()].slice(0,3)}</div>
@@ -280,7 +280,7 @@ function VistaSemana({ diasSemana, hoy, reservasDeDia, bloqueosDeDia, onVerReser
           return (
             <div
               key={i}
-              className={`p-2 border-r border-gray-100 last:border-r-0 space-y-1 min-h-32 ${esHoy ? 'bg-red-50/40' : ''}`}
+              className={`p-2 border-r border-gray-100 last:border-r-0 space-y-1 min-h-32 ${esHoy ? 'bg-primary-50/40' : ''}`}
             >
               {blq.map((b, j) => (
                 <div key={j} className="bg-gray-200 border border-gray-300 rounded p-1.5 text-xs text-gray-600">
@@ -323,9 +323,9 @@ function VistaLista({ diasSemana, hoy, reservasDeDia, bloqueosDeDia, onVerReserv
           const blq = bloqueosDeDia(item.dia)
           if (rsv.length === 0 && blq.length === 0) return null
           return (
-            <div key={i} className={`px-4 py-2 text-xs font-semibold uppercase tracking-wide ${item.esHoy ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-500'}`}>
+            <div key={i} className={`px-4 py-2 text-xs font-semibold uppercase tracking-wide ${item.esHoy ? 'bg-primary-50 text-primary-dark' : 'bg-gray-50 text-gray-500'}`}>
               {DIAS[item.dia.getDay()]} {item.dia.getDate()} {MESES[item.dia.getMonth()]}
-              {item.esHoy && <span className="ml-2 bg-red-600 text-white px-1.5 py-0.5 rounded-full text-xs">Hoy</span>}
+              {item.esHoy && <span className="ml-2 bg-primary text-white px-1.5 py-0.5 rounded-full text-xs">Hoy</span>}
             </div>
           )
         }
