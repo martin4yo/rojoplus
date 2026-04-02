@@ -264,7 +264,7 @@ async function generarNumeroMovimiento(db) {
 
 // GET /api/admin/movimientos-caja - Listar movimientos
 router.get('/movimientos-caja', asyncHandler(async (req, res) => {
-  const { cajaId, tipo, desde, hasta, medioPago, page = 1, limit = 50 } = req.query
+  const { cajaId, tipo, desde, hasta, medioPago, medioPagoId, page = 1, limit = 50 } = req.query
 
   // Obtener cajas permitidas según rol del usuario
   const admin = await prisma.admin.findUnique({
@@ -300,7 +300,9 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
     if (hasta) where.fecha.lte = new Date(hasta + 'T23:59:59.999Z')
   }
 
-  if (medioPago) {
+  if (medioPagoId !== undefined) {
+    where.medioPagoId = medioPagoId === 'null' ? null : parseInt(medioPagoId)
+  } else if (medioPago) {
     where.medioPago = medioPago === 'SIN_ESPECIFICAR' ? null : medioPago
   }
 
@@ -400,12 +402,12 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/movimientos-caja - Crear movimiento manual
 router.post('/movimientos-caja', asyncHandler(async (req, res) => {
-  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion, centroCostoId, medioPago, fecha } = req.body
+  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion, centroCostoId, medioPago, medioPagoId: medioPagoIdBody, fecha } = req.body
 
   if (!cajaId || !tipo || !monto || !cuentaContableId) {
     throw new AppError('Caja, tipo, monto y cuenta contable son requeridos', 400)
   }
-  if (!medioPago) {
+  if (!medioPago && !medioPagoIdBody) {
     throw new AppError('El medio de pago es requerido', 400)
   }
   if (!centroCostoId) {
@@ -465,18 +467,29 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     }
   }
 
+  // Resolver medio de pago: acepta ID directo o código string (backward compat)
+  const _mpInclude = { include: { conceptoTesoreria: true } }
+  let medioPagoRecord = null
+  if (medioPagoIdBody) {
+    medioPagoRecord = await req.db.medioPago.findUnique({ where: { id: parseInt(medioPagoIdBody) }, ..._mpInclude })
+  } else if (medioPago) {
+    medioPagoRecord = await req.db.medioPago.findFirst({ where: { codigo: medioPago }, ..._mpInclude })
+  }
+  if (!medioPagoRecord) {
+    throw new AppError(`Medio de pago '${medioPago || medioPagoIdBody}' no encontrado. Verificá la configuración de medios de pago.`, 400)
+  }
+
   // Verificar saldo suficiente para egresos — filtrado por medio de pago
   const montoNum = parseFloat(monto)
   if (tipo === 'EGRESO') {
-    const whereBase = { cajaId: parseInt(cajaId), anulado: false, medioPago }
+    const whereBase = { cajaId: parseInt(cajaId), anulado: false, medioPagoId: medioPagoRecord.id }
     const [ingresosAgg, egresosAgg] = await Promise.all([
       req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'INGRESO' }, _sum: { monto: true } }),
       req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
     ])
     const saldoMedio = (Number(ingresosAgg._sum.monto) || 0) - (Number(egresosAgg._sum.monto) || 0)
     if (saldoMedio < montoNum) {
-      const LABELS = { EFECTIVO: 'Efectivo', MERCADOPAGO: 'MercadoPago', QR: 'QR / MercadoPago', TRANSFERENCIA: 'Transferencia', CHEQUE: 'Cheque', TARJETA: 'Tarjeta', TARJETA_CREDITO: 'Tarjeta Crédito', TARJETA_DEBITO: 'Tarjeta Débito', CUENTA_CORRIENTE: 'Cuenta Corriente', OTRO: 'Otro' }
-      throw new AppError(`Saldo insuficiente en ${caja.nombre} para ${LABELS[medioPago] || medioPago}. Disponible: $${saldoMedio.toLocaleString('es-AR')}`, 400)
+      throw new AppError(`Saldo insuficiente en ${caja.nombre} para ${medioPagoRecord.nombre}. Disponible: $${saldoMedio.toLocaleString('es-AR')}`, 400)
     }
   }
 
@@ -494,7 +507,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
       centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       concepto: concepto || cuentaContable.nombre,
       descripcion: descripcion || null,
-      medioPago: medioPago || null,
+      medioPagoId: medioPagoRecord.id,
       registradoPor: req.admin.id
     },
     include: {
@@ -514,6 +527,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     await generarAsientoMovimientoCaja(req.db, {
       movimiento: resultado,
       caja,
+      medioPago: medioPagoRecord,
       registradoPor: req.admin.id,
     })
   } catch (err) {
@@ -1055,19 +1069,32 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
     }
   })
 
-  // Agrupado por medio de pago
+  // Agrupado por medio de pago (usa medioPagoId FK)
   const movsPorMedioPago = await req.db.movimientoCaja.groupBy({
-    by: ['medioPago', 'tipo'],
+    by: ['medioPagoId', 'tipo'],
     where: whereMovimientos,
     _sum: { monto: true },
     _count: true
   })
 
+  // Enriquecer con nombre del medio de pago
+  const medioPagoIds = [...new Set(movsPorMedioPago.map(r => r.medioPagoId).filter(Boolean))]
+  const mediosPagoList = medioPagoIds.length
+    ? await req.db.medioPago.findMany({ where: { id: { in: medioPagoIds } }, select: { id: true, nombre: true, tipo: true } })
+    : []
+  const mediosPagoById = Object.fromEntries(mediosPagoList.map(m => [m.id, m]))
+
   const medioPagoMap = {}
   for (const row of movsPorMedioPago) {
-    const key = row.medioPago || 'SIN_ESPECIFICAR'
+    const key = row.medioPagoId ?? 'SIN_ESPECIFICAR'
     if (!medioPagoMap[key]) {
-      medioPagoMap[key] = { medioPago: row.medioPago, ingresos: 0, egresos: 0, cantIngresos: 0, cantEgresos: 0 }
+      const mp = row.medioPagoId ? mediosPagoById[row.medioPagoId] : null
+      medioPagoMap[key] = {
+        medioPagoId: row.medioPagoId,
+        medioPago: mp?.nombre ?? null,
+        medioPagoTipo: mp?.tipo ?? null,
+        ingresos: 0, egresos: 0, cantIngresos: 0, cantEgresos: 0
+      }
     }
     if (row.tipo === 'INGRESO') {
       medioPagoMap[key].ingresos = Number(row._sum.monto || 0)
@@ -1079,7 +1106,7 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
   }
   const porMedioPago = Object.values(medioPagoMap)
     .map(m => ({ ...m, neto: m.ingresos - m.egresos }))
-    .sort((a, b) => (a.medioPago || 'ZZZ').localeCompare(b.medioPago || 'ZZZ'))
+    .sort((a, b) => (a.medioPago ?? 'ZZZ').localeCompare(b.medioPago ?? 'ZZZ'))
 
   // Saldo real calculado desde todos los movimientos activos (sin filtro de periodo)
   const [totalesHistoricos] = await Promise.all([

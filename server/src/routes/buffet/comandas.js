@@ -16,7 +16,8 @@ import {
 } from '../../services/socketService.js'
 import {
   generarAsientoFacturaVenta,
-  generarAsientoReciboCobro
+  generarAsientoReciboCobro,
+  resolverCuentaCashId
 } from '../../services/asientosContables.js'
 import {
   generarNumeroComanda,
@@ -24,6 +25,7 @@ import {
   recalcularTotalesComanda
 } from './helpers.js'
 import { enviarImpresion } from './impresoras.js'
+import { descontarStockVentaBuffet } from '../../services/buffetStockService.js'
 
 const router = express.Router()
 
@@ -481,7 +483,8 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
             create: item.opcionesSeleccionadas.map(opSel => ({
               opcionId: opSel.opcionId,
               cantidad: opSel.cantidad || 1,
-              precioAdicional: opSel.precioAdicional || 0
+              precioAdicional: opSel.precioAdicional || 0,
+              tenantId: req.tenantId
             }))
           } : undefined
         },
@@ -1118,7 +1121,10 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       }
 
       for (const pago of pagosParciales) {
-        const medioPago = await req.db.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
+        const medioPago = await req.db.medioPago.findUnique({
+          where: { id: parseInt(pago.medioPagoId) },
+          include: { conceptoTesoreria: true }
+        })
         if (!medioPago) {
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
@@ -1139,7 +1145,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
             centroCostoId: caja.centroCostoId,
             monto: parseFloat(pago.monto),
-            medioPago: medioPago.codigo,
+            medioPagoId: medioPago.id,
             concepto: `Venta Buffet - Comanda ${comanda.numero} - ${medioPago.nombre}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
             comandaId: parseInt(id),
@@ -1148,10 +1154,11 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         })
 
         // Generar asiento contable automático
-        // Líneas del asiento: una para el DEBE (caja) y una o más para el HABER (ventas por cuenta)
+        // DEBE: cuenta del concepto del medio de pago (ej: Caja Efectivo, Banco, etc.)
+        const cuentaDebeBuffetMulti = resolverCuentaCashId(medioPago, caja)
         const lineasAsiento = [
           {
-            cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+            cuentaContableId: cuentaDebeBuffetMulti,
             debe: parseFloat(pago.monto),
             haber: 0,
             centroCostoId: caja.centroCostoId || null,
@@ -1190,12 +1197,15 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         movimientos.push(movimiento)
       }
     } else {
-      const medioPago = await req.db.medioPago.findUnique({ where: { id: medioPagoId } })
+      const medioPago = await req.db.medioPago.findUnique({
+        where: { id: parseInt(medioPagoId) },
+        include: { conceptoTesoreria: true }
+      })
       if (!medioPago) {
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
 
-      const caja = await req.db.caja.findUnique({ where: { id: cajaId } })
+      const caja = await req.db.caja.findUnique({ where: { id: parseInt(cajaId) } })
       if (!caja) {
         return res.status(400).json({ success: false, error: 'Caja no encontrada' })
       }
@@ -1206,12 +1216,12 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       const movimiento = await req.db.movimientoCaja.create({
         data: {
           numero: nuevoNumero,
-          cajaId,
+          cajaId: parseInt(cajaId),
           tipo: 'INGRESO',
           cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
           centroCostoId: caja.centroCostoId,
           monto: totalFinal,
-          medioPago: medioPago.codigo,
+          medioPagoId: medioPago.id,
           concepto: `Venta Buffet - Comanda ${comanda.numero}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
           comandaId: parseInt(id),
@@ -1220,9 +1230,11 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       })
 
       // Generar asiento contable automático
+      // DEBE: cuenta del concepto del medio de pago (ej: Caja Efectivo, Banco, etc.)
+      const cuentaDebeBuffet = resolverCuentaCashId(medioPago, caja)
       const lineasAsiento = [
         {
-          cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+          cuentaContableId: cuentaDebeBuffet,
           debe: totalFinal,
           haber: 0,
           centroCostoId: caja.centroCostoId || null,
@@ -1274,6 +1286,14 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         esVentaInterna: esVentaInterna || false
       }
     })
+
+    // Descontar stock para productos que tienen variantes
+    await descontarStockVentaBuffet(
+      req.db,
+      comanda.items.filter(i => i.estado !== 'ANULADO'),
+      req.admin.id,
+      `Venta Buffet - Comanda ${comanda.numero}`
+    )
 
     // Variables para facturación
     let comprobanteFiscal = null

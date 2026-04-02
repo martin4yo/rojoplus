@@ -60,7 +60,6 @@ export default function ConfiguracionForm() {
     activo: true,
     // tipos-socio
     cuotaMensual: '',
-    conceptoTesoreriaId: '',
     // categorias-socio
     porcentajeDescuento: 0,
     // estados-socio
@@ -81,10 +80,11 @@ export default function ConfiguracionForm() {
     paraBuffet: true,
     paraKiosco: true,
     paraTakeaway: true,
+    conceptoTesoreriaId: '',
   })
 
   useEffect(() => {
-    if (tabla === 'tipos-socio') {
+    if (tabla === 'tipos-socio' || tabla === 'medios-pago') {
       cargarConceptosTesoreria()
     }
     if (tabla === 'conceptos-tesoreria') {
@@ -125,7 +125,6 @@ export default function ConfiguracionForm() {
         orden: data.orden || 0,
         activo: data.activo !== false,
         cuotaMensual: data.cuotaMensual || '',
-        conceptoTesoreriaId: data.conceptoTesoreriaId || '',
         porcentajeDescuento: data.porcentajeDescuento || 0,
         permiteDescuentos: data.permiteDescuentos !== false,
         // conceptos-tesoreria
@@ -142,6 +141,7 @@ export default function ConfiguracionForm() {
         paraBuffet: data.paraBuffet !== false,
         paraKiosco: data.paraKiosco !== false,
         paraTakeaway: data.paraTakeaway !== false,
+        conceptoTesoreriaId: data.conceptoTesoreriaId ? String(data.conceptoTesoreriaId) : '',
       })
     } catch (err) {
       setError('Error al cargar datos')
@@ -208,6 +208,7 @@ export default function ConfiguracionForm() {
         datos.paraBuffet = form.paraBuffet
         datos.paraKiosco = form.paraKiosco
         datos.paraTakeaway = form.paraTakeaway
+        datos.conceptoTesoreriaId = form.conceptoTesoreriaId ? parseInt(form.conceptoTesoreriaId) : null
         delete datos.color
         delete datos.descripcion
       }
@@ -220,7 +221,7 @@ export default function ConfiguracionForm() {
 
       navigate(`/admin/configuracion/${tabla}`)
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al guardar')
+      setError(err.response?.data?.message || err.message || 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -252,8 +253,284 @@ export default function ConfiguracionForm() {
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
 
       {/* Formulario */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-xl">
+      <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 ${tabla === 'conceptos-tesoreria' || tabla === 'medios-pago' ? 'max-w-3xl' : 'max-w-xl'}`}>
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Layout especial para conceptos-tesoreria y medios-pago */}
+          {tabla === 'medios-pago' ? (
+            <>
+              {/* Fila 1: Código | Nombre */}
+              <div className="grid grid-cols-6 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Código</label>
+                  <input
+                    type="text"
+                    value={form.codigo}
+                    onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })}
+                    className="input-field w-full"
+                    required
+                  />
+                </div>
+                <div className="col-span-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                  <input
+                    type="text"
+                    value={form.nombre}
+                    onChange={e => setForm({ ...form, nombre: e.target.value })}
+                    className="input-field w-full"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Fila 2: Tipo (select full width) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                <select
+                  value={form.tipoMedioPago}
+                  onChange={e => setForm({ ...form, tipoMedioPago: e.target.value })}
+                  className="input-field w-full"
+                >
+                  {TIPOS_MEDIO_PAGO.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fila 2: Concepto Tesorería | Comisión | Orden */}
+              <div className="grid grid-cols-6 gap-4">
+                <div className="col-span-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Concepto Tesorería <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={form.conceptoTesoreriaId}
+                    onChange={e => setForm({ ...form, conceptoTesoreriaId: e.target.value })}
+                    className="input-field w-full"
+                    required
+                  >
+                    <option value="">Seleccionar concepto...</option>
+                    {conceptosTesoreria.filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS').map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Comisión %</label>
+                  <input
+                    type="number"
+                    value={form.comisionPct}
+                    onChange={e => setForm({ ...form, comisionPct: e.target.value })}
+                    className="input-field w-full"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Orden</label>
+                  <input
+                    type="number"
+                    value={form.orden}
+                    onChange={e => setForm({ ...form, orden: e.target.value })}
+                    className="input-field w-full"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              {/* Fila 3: Opciones + Botones */}
+              <div className="flex items-center gap-5 pt-2 border-t flex-wrap">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.requiereDatosBanco}
+                    onChange={e => setForm({ ...form, requiereDatosBanco: e.target.checked })}
+                    className="rounded border-gray-300 text-primary"
+                  />
+                  <span className="text-sm text-gray-700">Req. datos banco</span>
+                </label>
+                <div className="h-4 border-l border-gray-300" />
+                <span className="text-sm font-medium text-gray-600">Disponible en:</span>
+                {[
+                  { key: 'paraCaja',     label: 'Caja' },
+                  { key: 'paraBuffet',   label: 'Buffet' },
+                  { key: 'paraKiosco',   label: 'Kiosco' },
+                  { key: 'paraTakeaway', label: 'Pedidos' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form[key]}
+                      onChange={e => setForm({ ...form, [key]: e.target.checked })}
+                      className="rounded border-gray-300 text-primary"
+                    />
+                    <span className="text-sm text-gray-700">{label}</span>
+                  </label>
+                ))}
+                {isEditing && (
+                  <>
+                    <div className="h-4 border-l border-gray-300" />
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.activo}
+                        onChange={e => setForm({ ...form, activo: e.target.checked })}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm text-gray-700">Activo</span>
+                    </label>
+                  </>
+                )}
+                <div className="flex gap-3 ml-auto">
+                  <Button type="submit" loading={saving} className="flex items-center gap-2">
+                    <Save className="w-4 h-4" />
+                    Guardar
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => navigate(`/admin/configuracion/${tabla}`)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : tabla === 'conceptos-tesoreria' ? (
+            <>
+              {/* Fila 1: Tipo | Código | Nombre | Orden */}
+              <div className="grid grid-cols-12 gap-3">
+                <div className="col-span-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                  <div className="flex gap-1">
+                    {['INGRESO', 'EGRESO', 'AMBOS'].map(tipo => (
+                      <button
+                        key={tipo}
+                        type="button"
+                        onClick={() => setForm({ ...form, tipo, cuentaContableId: '' })}
+                        className={`flex-1 py-2 px-1 rounded-lg border-2 text-xs font-medium transition ${
+                          form.tipo === tipo
+                            ? tipo === 'INGRESO' ? 'border-green-500 bg-green-50 text-green-700'
+                            : tipo === 'EGRESO'  ? 'border-red-500 bg-red-50 text-red-700'
+                            : 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        {tipo === 'INGRESO' ? 'Ingreso' : tipo === 'EGRESO' ? 'Egreso' : 'Ambos'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Código</label>
+                  <input
+                    type="text"
+                    value={form.codigo}
+                    onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })}
+                    className="input-field w-full"
+                    required
+                  />
+                </div>
+                <div className="col-span-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                  <input
+                    type="text"
+                    value={form.nombre}
+                    onChange={e => setForm({ ...form, nombre: e.target.value })}
+                    className="input-field w-full"
+                    required
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Orden</label>
+                  <input
+                    type="number"
+                    value={form.orden}
+                    onChange={e => setForm({ ...form, orden: e.target.value })}
+                    className="input-field w-full"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              {/* Fila 2: Cuenta Contable | Descripción */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cuenta Contable <span className="text-gray-400 text-xs">(opcional)</span>
+                  </label>
+                  <select
+                    value={form.cuentaContableId}
+                    onChange={e => setForm({ ...form, cuentaContableId: e.target.value })}
+                    className="input-field w-full"
+                  >
+                    <option value="">Sin asignar</option>
+                    {cuentasContables
+                      .filter(c => {
+                        if (form.tipo === 'INGRESO') return c.tipo === 'INGRESO' || c.codigo.startsWith('4')
+                        if (form.tipo === 'EGRESO') return c.tipo === 'EGRESO' || c.codigo.startsWith('5')
+                        return true
+                      })
+                      .map(c => (
+                        <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <input
+                    type="text"
+                    value={form.descripcion}
+                    onChange={e => setForm({ ...form, descripcion: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="Descripción opcional"
+                  />
+                </div>
+              </div>
+
+              {/* Fila 3: Usar en + Activo + Botones */}
+              <div className="flex items-center gap-6 pt-1 border-t flex-wrap">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium text-gray-700">Usar en:</span>
+                  {[
+                    { key: 'usaEnTesoreria', label: 'Tesorería' },
+                    { key: 'usaEnCompras',   label: 'Compras' },
+                    { key: 'usaEnVentas',    label: 'Ventas' },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form[key]}
+                        onChange={e => setForm({ ...form, [key]: e.target.checked })}
+                        className="rounded border-gray-300 text-primary"
+                      />
+                      <span className="text-sm text-gray-700">{label}</span>
+                    </label>
+                  ))}
+                </div>
+                {isEditing && (
+                  <label className="flex items-center gap-1.5 cursor-pointer ml-2">
+                    <input
+                      type="checkbox"
+                      checked={form.activo}
+                      onChange={e => setForm({ ...form, activo: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Activo</span>
+                  </label>
+                )}
+                <div className="flex gap-3 ml-auto">
+                  <Button type="submit" loading={saving} className="flex items-center gap-2">
+                    <Save className="w-4 h-4" />
+                    Guardar
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => navigate(`/admin/configuracion/${tabla}`)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+          {/* Layout estándar para otras tablas */}
           <div className="grid grid-cols-2 gap-4">
             {tabla !== 'descuentos-disponibles' && tabla !== 'rubros' && (
               <div>
@@ -367,98 +644,6 @@ export default function ConfiguracionForm() {
             </div>
           )}
 
-          {/* Campos específicos para conceptos-tesoreria */}
-          {tabla === 'conceptos-tesoreria' && (
-            <>
-              {/* Tipo de concepto */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
-                <div className="flex gap-2">
-                  {['INGRESO', 'EGRESO', 'AMBOS'].map(tipo => (
-                    <button
-                      key={tipo}
-                      type="button"
-                      onClick={() => setForm({ ...form, tipo, cuentaContableId: '' })}
-                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition ${
-                        form.tipo === tipo
-                          ? tipo === 'INGRESO'
-                            ? 'border-green-500 bg-green-50 text-green-700'
-                            : tipo === 'EGRESO'
-                            ? 'border-red-500 bg-red-50 text-red-700'
-                            : 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                      }`}
-                    >
-                      {tipo === 'INGRESO' ? 'Ingreso' : tipo === 'EGRESO' ? 'Egreso' : 'Ambos'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Usar en */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Usar en</label>
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.usaEnTesoreria}
-                      onChange={e => setForm({ ...form, usaEnTesoreria: e.target.checked })}
-                      className="rounded border-gray-300 text-primary"
-                    />
-                    <span className="text-sm text-gray-700">Tesorería</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.usaEnCompras}
-                      onChange={e => setForm({ ...form, usaEnCompras: e.target.checked })}
-                      className="rounded border-gray-300 text-primary"
-                    />
-                    <span className="text-sm text-gray-700">Compras</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.usaEnVentas}
-                      onChange={e => setForm({ ...form, usaEnVentas: e.target.checked })}
-                      className="rounded border-gray-300 text-primary"
-                    />
-                    <span className="text-sm text-gray-700">Ventas</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Cuenta Contable */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cuenta Contable (opcional)
-                </label>
-                <select
-                  value={form.cuentaContableId}
-                  onChange={e => setForm({ ...form, cuentaContableId: e.target.value })}
-                  className="input-field w-full"
-                >
-                  <option value="">Sin asignar</option>
-                  {cuentasContables
-                    .filter(c => {
-                      if (form.tipo === 'INGRESO') return c.tipo === 'INGRESO' || c.codigo.startsWith('4')
-                      if (form.tipo === 'EGRESO') return c.tipo === 'EGRESO' || c.codigo.startsWith('5')
-                      return true
-                    })
-                    .map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.codigo} - {c.nombre}
-                      </option>
-                    ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Vincula a una cuenta del plan de cuentas para reportes contables
-                </p>
-              </div>
-            </>
-          )}
-
           {/* Campos específicos para descuentos-disponibles */}
           {tabla === 'descuentos-disponibles' && (
             <div>
@@ -480,95 +665,6 @@ export default function ConfiguracionForm() {
             </div>
           )}
 
-          {/* Campos específicos para medios-pago */}
-          {tabla === 'medios-pago' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                <select
-                  value={form.tipoMedioPago}
-                  onChange={e => setForm({ ...form, tipoMedioPago: e.target.value })}
-                  className="input-field w-full"
-                >
-                  {TIPOS_MEDIO_PAGO.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Comisión (%)</label>
-                <input
-                  type="number"
-                  value={form.comisionPct}
-                  onChange={e => setForm({ ...form, comisionPct: e.target.value })}
-                  className="input-field w-full"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  placeholder="Ej: 3.5"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Porcentaje de comisión que cobra el procesador de pagos
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <input
-                  type="checkbox"
-                  id="requiereDatosBanco"
-                  checked={form.requiereDatosBanco}
-                  onChange={e => setForm({ ...form, requiereDatosBanco: e.target.checked })}
-                  className="rounded border-gray-300"
-                />
-                <label htmlFor="requiereDatosBanco" className="text-sm text-blue-800">
-                  Requiere datos bancarios (CBU, banco, etc.)
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Disponible en</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
-                    <input
-                      type="checkbox"
-                      checked={form.paraCaja}
-                      onChange={e => setForm({ ...form, paraCaja: e.target.checked })}
-                      className="rounded border-gray-300 text-primary"
-                    />
-                    <span className="text-sm text-gray-700">Caja General</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
-                    <input
-                      type="checkbox"
-                      checked={form.paraBuffet}
-                      onChange={e => setForm({ ...form, paraBuffet: e.target.checked })}
-                      className="rounded border-gray-300 text-primary"
-                    />
-                    <span className="text-sm text-gray-700">Buffet</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
-                    <input
-                      type="checkbox"
-                      checked={form.paraKiosco}
-                      onChange={e => setForm({ ...form, paraKiosco: e.target.checked })}
-                      className="rounded border-gray-300 text-primary"
-                    />
-                    <span className="text-sm text-gray-700">Kiosco</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
-                    <input
-                      type="checkbox"
-                      checked={form.paraTakeaway}
-                      onChange={e => setForm({ ...form, paraTakeaway: e.target.checked })}
-                      className="rounded border-gray-300 text-primary"
-                    />
-                    <span className="text-sm text-gray-700">Pedidos</span>
-                  </label>
-                </div>
-              </div>
-            </>
-          )}
 
           {/* Color del badge (no para conceptos-tesoreria, descuentos-disponibles, rubros ni medios-pago) */}
           {tabla !== 'conceptos-tesoreria' && tabla !== 'descuentos-disponibles' && tabla !== 'rubros' && tabla !== 'medios-pago' && (
@@ -617,6 +713,7 @@ export default function ConfiguracionForm() {
               Cancelar
             </Button>
           </div>
+          </> )}
         </form>
       </div>
     </div>

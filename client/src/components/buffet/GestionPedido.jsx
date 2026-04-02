@@ -479,7 +479,8 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           return
         }
         requestData = {
-          pagos: pagosParciales.pagos,
+          pagosParciales: pagosParciales.pagos,
+          cajaId: parseInt(cobroData.cajaId),
           propina: 0,
           aplicarDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable
         }

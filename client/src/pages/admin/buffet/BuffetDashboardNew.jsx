@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart,
   ChefHat, Coffee, Truck, RefreshCw, ArrowRight,
-  CreditCard, Banknote, QrCode, BarChart3, ArrowUpCircle, ArrowDownCircle, Scale
+  CreditCard, Banknote, QrCode, BarChart3, ArrowUpCircle, ArrowDownCircle, Scale,
+  ChevronDown, ChevronRight, Wallet, Printer
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import toast from 'react-hot-toast'
@@ -64,6 +65,8 @@ export default function BuffetDashboard() {
   const [loading, setLoading] = useState(true)
   const [kpis, setKpis] = useState(null)
   const [limiteProductos, setLimiteProductos] = useState(5)
+  const [mediosPagoExpanded, setMediosPagoExpanded] = useState(false)
+  const [imprimiendo, setImprimiendo] = useState(false)
 
   // Obtener fechas según el rango seleccionado
   const obtenerFechas = useCallback(() => {
@@ -88,6 +91,11 @@ export default function BuffetDashboard() {
         setLoading(false)
         return
       }
+      if (desde > hasta) {
+        toast.error('La fecha "desde" no puede ser posterior a "hasta"')
+        setLoading(false)
+        return
+      }
 
       const params = new URLSearchParams({
         desde: desde.toISOString(),
@@ -108,6 +116,32 @@ export default function BuffetDashboard() {
   useEffect(() => {
     cargarDatos()
   }, [cargarDatos])
+
+  // Imprimir reporte de cierre
+  const imprimirReporte = async () => {
+    const { desde, hasta } = obtenerFechas()
+    if (!desde || !hasta) {
+      toast.error('Seleccione un período válido')
+      return
+    }
+    setImprimiendo(true)
+    try {
+      const reporte = await api.post('/admin/buffet/reporte-cierre', {
+        desde: desde.toISOString(),
+        hasta: hasta.toISOString()
+      })
+      const { ticketBase64 } = reporte || {}
+      await api.post('/admin/buffet/imprimir-ticket-directo', {
+        ticketBase64,
+        tipoTicket: 'CUENTA'
+      })
+      toast.success('Reporte enviado a impresora')
+    } catch (err) {
+      toast.error(err.message || 'Error al imprimir reporte')
+    } finally {
+      setImprimiendo(false)
+    }
+  }
 
   // Formatear moneda
   const formatMoney = (value) => {
@@ -149,6 +183,15 @@ export default function BuffetDashboard() {
             {rango.label}
           </button>
         ))}
+        <button
+          onClick={imprimirReporte}
+          disabled={imprimiendo || loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-800 disabled:opacity-50"
+          title="Imprimir reporte de cierre"
+        >
+          <Printer size={16} className={imprimiendo ? 'animate-pulse' : ''} />
+          <span className="hidden sm:inline">Imprimir</span>
+        </button>
         <button
           onClick={() => cargarDatos()}
           className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
@@ -195,36 +238,101 @@ export default function BuffetDashboard() {
         </div>
       ) : kpis ? (
         <>
-          {/* Ingresos / Egresos / Saldo */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-green-700 text-sm font-medium">Ingresos</span>
-                <ArrowUpCircle className="text-green-500" size={20} />
+          {/* Saldo Anterior / Ingresos / Egresos / Saldo Actual */}
+          {(() => {
+            // Usar movimientoCaja como fuente única (igual que saldoAnterior)
+            const totalIngresosCaja = (kpis.porMedioPago || []).reduce((s, m) => s + m.ingresos, 0)
+            const totalEgresosCaja = (kpis.porMedioPago || []).reduce((s, m) => s + m.egresos, 0)
+            const saldoReal = (kpis.saldoAnterior || 0) + totalIngresosCaja - totalEgresosCaja
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-600 text-sm font-medium">Saldo Anterior</span>
+                    <Wallet className="text-gray-400" size={20} />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-700">{formatMoney(kpis.saldoAnterior || 0)}</div>
+                  <div className="text-xs text-gray-500 mt-1">Antes del período</div>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-green-700 text-sm font-medium">Ingresos</span>
+                    <ArrowUpCircle className="text-green-500" size={20} />
+                  </div>
+                  <div className="text-2xl font-bold text-green-800">{formatMoney(totalIngresosCaja)}</div>
+                  <div className="text-xs text-green-600 mt-1">{kpis.cantidadVentas || 0} operaciones</div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-red-700 text-sm font-medium">Egresos</span>
+                    <ArrowDownCircle className="text-red-500" size={20} />
+                  </div>
+                  <div className="text-2xl font-bold text-red-800">{formatMoney(totalEgresosCaja)}</div>
+                  <div className="text-xs text-red-600 mt-1">{kpis.egresosPorConcepto?.length || 0} registros</div>
+                </div>
+                <div className={`border rounded-xl p-4 ${saldoReal >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-sm font-medium ${saldoReal >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>Saldo Real</span>
+                    <Scale className={saldoReal >= 0 ? 'text-blue-500' : 'text-orange-500'} size={20} />
+                  </div>
+                  <div className={`text-2xl font-bold ${saldoReal >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+                    {formatMoney(saldoReal)}
+                  </div>
+                  <div className={`text-xs mt-1 ${saldoReal >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                    Ant. + Ing. − Egr.
+                  </div>
+                </div>
               </div>
-              <div className="text-2xl font-bold text-green-800">{formatMoney(kpis.ventasTotal)}</div>
-              <div className="text-xs text-green-600 mt-1">{kpis.cantidadVentas || 0} operaciones</div>
-            </div>
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-red-700 text-sm font-medium">Egresos</span>
-                <ArrowDownCircle className="text-red-500" size={20} />
+            )
+          })()}
+
+          {/* Acordeón: Detalle por Medio de Pago */}
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <button
+              onClick={() => setMediosPagoExpanded(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+            >
+              <span className="font-medium text-gray-700 flex items-center gap-2 text-sm">
+                <CreditCard size={16} className="text-gray-400" />
+                Detalle por Medio de Pago
+              </span>
+              {mediosPagoExpanded
+                ? <ChevronDown size={16} className="text-gray-400" />
+                : <ChevronRight size={16} className="text-gray-400" />
+              }
+            </button>
+            {mediosPagoExpanded && (
+              <div className="border-t border-gray-100 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                    <tr>
+                      <th className="text-left px-4 py-2">Medio de Pago</th>
+                      <th className="text-right px-4 py-2">Saldo Anterior</th>
+                      <th className="text-right px-4 py-2 text-green-600">Ingresos</th>
+                      <th className="text-right px-4 py-2 text-red-600">Egresos</th>
+                      <th className="text-right px-4 py-2">Saldo Actual</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {(kpis.porMedioPago || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-4 text-center text-gray-400 text-xs">Sin movimientos</td>
+                      </tr>
+                    ) : (kpis.porMedioPago || []).map((mp, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-700">{mp.medioPago || 'Sin especificar'}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-500">{formatMoney(mp.saldoAnterior)}</td>
+                        <td className="px-4 py-2.5 text-right text-green-600 font-medium">+{formatMoney(mp.ingresos)}</td>
+                        <td className="px-4 py-2.5 text-right text-red-600 font-medium">-{formatMoney(mp.egresos)}</td>
+                        <td className={`px-4 py-2.5 text-right font-bold ${mp.saldo >= 0 ? 'text-gray-800' : 'text-red-700'}`}>
+                          {formatMoney(mp.saldo)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="text-2xl font-bold text-red-800">{formatMoney(kpis.totalEgresos || 0)}</div>
-              <div className="text-xs text-red-600 mt-1">{kpis.egresosPorConcepto?.length || 0} registros</div>
-            </div>
-            <div className={`border rounded-xl p-4 ${(kpis.saldo || 0) >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className={`text-sm font-medium ${(kpis.saldo || 0) >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>Saldo</span>
-                <Scale className={(kpis.saldo || 0) >= 0 ? 'text-blue-500' : 'text-orange-500'} size={20} />
-              </div>
-              <div className={`text-2xl font-bold ${(kpis.saldo || 0) >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
-                {formatMoney(kpis.saldo || 0)}
-              </div>
-              <div className={`text-xs mt-1 ${(kpis.saldo || 0) >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                {(kpis.saldo || 0) >= 0 ? 'Resultado positivo' : 'Resultado negativo'}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* KPIs Principales */}
@@ -374,8 +482,7 @@ export default function BuffetDashboard() {
           {/* Productos más vendidos y Ventas por hora */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* Top Productos */}
-            {kpis.topProductos && kpis.topProductos.length > 0 && (
-              <div className="bg-white rounded-xl shadow p-4">
+            <div className="bg-white rounded-xl shadow p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-800">Productos más vendidos</h3>
                   <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
@@ -394,8 +501,11 @@ export default function BuffetDashboard() {
                     ))}
                   </div>
                 </div>
+                {(!kpis.topProductos || kpis.topProductos.length === 0) && (
+                  <p className="text-sm text-gray-400 text-center py-4">Sin ventas en el período</p>
+                )}
                 <div className="space-y-3">
-                  {(limiteProductos ? kpis.topProductos.slice(0, limiteProductos) : kpis.topProductos).map((prod, idx) => (
+                  {(limiteProductos ? (kpis.topProductos || []).slice(0, limiteProductos) : (kpis.topProductos || [])).map((prod, idx) => (
                     <div key={idx} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -415,18 +525,17 @@ export default function BuffetDashboard() {
                     </div>
                   ))}
                 </div>
-                {limiteProductos && kpis.topProductos.length > limiteProductos && (
+                {limiteProductos && (kpis.topProductos?.length || 0) > limiteProductos && (
                   <p className="text-xs text-gray-400 text-center mt-3">
                     Mostrando {limiteProductos} de {kpis.topProductos.length} productos
                   </p>
                 )}
-              </div>
-            )}
+            </div>
 
             {/* Ventas por hora */}
-            {kpis.ventasPorHora && Object.values(kpis.ventasPorHora).some(v => v.total > 0) && (
-              <div className="bg-white rounded-xl shadow p-4">
-                <h3 className="font-semibold text-gray-800 mb-4">Ventas por hora</h3>
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="font-semibold text-gray-800 mb-4">Ventas por hora</h3>
+              {kpis.ventasPorHora && Object.values(kpis.ventasPorHora).some(v => v.total > 0) ? (
                 <div className="space-y-2">
                   {Object.entries(kpis.ventasPorHora)
                     .filter(([_, v]) => v.total > 0)
@@ -437,17 +546,17 @@ export default function BuffetDashboard() {
                         <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
                           <div
                             className="bg-orange-500 h-full rounded-full"
-                            style={{
-                              width: `${Math.min(100, (data.total / (kpis.maxVentaHora || 1)) * 100)}%`
-                            }}
+                            style={{ width: `${Math.min(100, (data.total / (kpis.maxVentaHora || 1)) * 100)}%` }}
                           />
                         </div>
                         <span className="w-20 text-right text-sm font-medium">{formatMoney(data.total)}</span>
                       </div>
                     ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-4">Sin ventas en el período</p>
+              )}
+            </div>
           </div>
 
           {/* Detalle de Egresos */}

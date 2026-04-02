@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Edit2, Trash2, Tag, Users, Activity, Wallet, Briefcase
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
-import { tienePermiso, PERMISOS } from '../../services/permisos'
+import { tienePermiso, onPermisosLoaded, PERMISOS } from '../../services/permisos'
 import { useConfirm } from '../../hooks/useConfirm'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
@@ -48,6 +48,9 @@ export default function ConfiguracionLista() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [items, setItems] = useState([])
+  const [, forceUpdate] = useState(0)
+
+  useEffect(() => onPermisosLoaded(() => forceUpdate(v => v + 1)), [])
 
   const titulo = TITULOS[tabla] || 'Configuración'
   const iconConfig = ICONOS[tabla] || { icon: Tag, bgColor: 'bg-gray-100', color: 'text-gray-600' }

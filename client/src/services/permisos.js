@@ -19,6 +19,12 @@ let cajasPermitidas = []
 let esSuperAdmin = false
 let usuarioActual = null
 let rolActual = null
+let _subscribers = []
+
+export function onPermisosLoaded(fn) {
+  _subscribers.push(fn)
+  return () => { _subscribers = _subscribers.filter(s => s !== fn) }
+}
 
 /**
  * Cargar permisos del usuario actual desde el servidor
@@ -56,6 +62,7 @@ export async function cargarPermisos() {
       usuarioActual = data.data.usuario
       rolActual = data.data.rol
       console.log('[Permisos] Cargados:', { permisos: permisosUsuario.length, esSuperAdmin })
+      _subscribers.forEach(fn => fn())
       return true
     }
 

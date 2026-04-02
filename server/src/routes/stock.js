@@ -236,7 +236,7 @@ router.post('/productos', asyncHandler(async (req, res) => {
     throw new AppError('Codigo y nombre son requeridos', 400)
   }
 
-  const existente = await prisma.producto.findFirst({ where: { codigo } })
+  const existente = await prisma.producto.findFirst({ where: { codigo, tenantId: req.tenantId } })
   if (existente) {
     throw new AppError('Ya existe un producto con ese codigo', 400)
   }
@@ -252,13 +252,15 @@ router.post('/productos', asyncHandler(async (req, res) => {
       precioVenta: precioVenta ? parseFloat(precioVenta) : null,
       conceptoCompraId: conceptoCompraId ? parseInt(conceptoCompraId) : null,
       conceptoVentaId: conceptoVentaId ? parseInt(conceptoVentaId) : null,
+      tenantId: req.tenantId,
       variantes: variantes?.length ? {
         create: variantes.map(v => ({
           talle: v.talle,
           color: v.color || null,
           sku: v.sku || null,
           stockActual: v.stockActual ? parseFloat(v.stockActual) : 0,
-          stockMinimo: v.stockMinimo ? parseFloat(v.stockMinimo) : 0
+          stockMinimo: v.stockMinimo ? parseFloat(v.stockMinimo) : 0,
+          tenantId: req.tenantId
         }))
       } : undefined
     },
@@ -380,6 +382,7 @@ router.post('/productos/:id/variantes', asyncHandler(async (req, res) => {
   const variante = await prisma.productoVariante.create({
     data: {
       productoId: parseInt(id),
+      tenantId: req.tenantId,
       talle,
       color: color || null,
       sku: sku || null,
@@ -682,7 +685,8 @@ router.post('/movimientos-stock/ajuste', asyncHandler(async (req, res) => {
         stockAnterior: stockActual,
         stockPosterior: nuevoStock,
         concepto: concepto || `Ajuste manual - ${tipo}`,
-        registradoPor: req.admin.id
+        registradoPor: req.admin.id,
+        tenantId: req.tenantId
       },
       include: {
         productoVariante: {

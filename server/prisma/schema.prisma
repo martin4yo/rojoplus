@@ -142,6 +142,7 @@ model ConceptoTesoreria {
   productosVenta       Producto[]           @relation("ProductoConceptoVenta")
   tiposSocioMora       TipoSocio[]          @relation("TipoSocioConceptoMora")
   tiposSocio           TipoSocio[]          @relation("TipoSocioConcepto")
+  mediosPago           MedioPago[]
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
@@ -665,24 +666,28 @@ model Cargo {
 }
 
 model MedioPago {
-  id                 Int             @id @default(autoincrement())
-  codigo             String         
-  nombre             String
-  tipo               String          @default("EFECTIVO")
-  requiereDatosBanco Boolean         @default(false) @map("requiere_datos_banco")
-  comisionPct        Decimal         @default(0) @map("comision_pct") @db.Decimal(5, 2)
-  activo             Boolean         @default(true)
-  orden              Int             @default(0)
-  paraBuffet         Boolean         @default(true) @map("para_buffet")
-  paraCaja           Boolean         @default(true) @map("para_caja")
-  paraKiosco         Boolean         @default(true) @map("para_kiosco")
-  paraTakeaway       Boolean         @default(true) @map("para_takeaway")
-  cuentaContableId   Int?            @map("cuenta_contable_id")
-  pagos              Pago[]
-  cuentaContable     CuentaContable? @relation(fields: [cuentaContableId], references: [id])
+  id                  Int             @id @default(autoincrement())
+  codigo              String
+  nombre              String
+  tipo                String          @default("EFECTIVO")
+  requiereDatosBanco  Boolean         @default(false) @map("requiere_datos_banco")
+  comisionPct         Decimal         @default(0) @map("comision_pct") @db.Decimal(5, 2)
+  activo              Boolean         @default(true)
+  orden               Int             @default(0)
+  paraBuffet          Boolean         @default(true) @map("para_buffet")
+  paraCaja            Boolean         @default(true) @map("para_caja")
+  paraKiosco          Boolean         @default(true) @map("para_kiosco")
+  paraTakeaway        Boolean         @default(true) @map("para_takeaway")
+  cuentaContableId    Int?            @map("cuenta_contable_id")
+  conceptoTesoreriaId Int?            @map("concepto_tesoreria_id")
+  pagos               Pago[]
+  movimientosCaja     MovimientoCaja[]
+  cuentaContable      CuentaContable?    @relation(fields: [cuentaContableId], references: [id])
+  conceptoTesoreria   ConceptoTesoreria? @relation(fields: [conceptoTesoreriaId], references: [id])
 
   tenantId    Int      @map("tenant_id")
   @@index([cuentaContableId])
+  @@index([conceptoTesoreriaId])
   @@index([tenantId])
   @@unique([tenantId, codigo])
   @@map("medios_pago")
@@ -1104,7 +1109,7 @@ model MovimientoCaja {
   observacionConciliacion String?              @map("observacion_conciliacion")
   comandaId               Int?                 @map("comanda_id")
   pedidoTakeAwayId        Int?                 @map("pedido_takeaway_id")
-  medioPago               String?              @map("medio_pago")
+  medioPagoId             Int?                 @map("medio_pago_id")
   adjuntos                AdjuntoComprobante[]
   echeq                   ECheq?
   caja                    Caja                 @relation(fields: [cajaId], references: [id])
@@ -1112,6 +1117,7 @@ model MovimientoCaja {
   comanda                 Comanda?             @relation(fields: [comandaId], references: [id])
   conciliacion            Conciliacion?        @relation(fields: [conciliacionId], references: [id])
   cuentaContable          CuentaContable       @relation(fields: [cuentaContableId], references: [id])
+  medioPagoRel            MedioPago?           @relation(fields: [medioPagoId], references: [id])
   movimientoContable      MovimientoContable?  @relation(fields: [movimientoContableId], references: [id])
   pago                    Pago?                @relation(fields: [pagoId], references: [id])
   pedidoTakeAway          PedidoTakeAway?      @relation(fields: [pedidoTakeAwayId], references: [id])
@@ -1128,6 +1134,7 @@ model MovimientoCaja {
   @@index([centroCostoId])
   @@index([conciliado])
   @@index([movimientoContableId])
+  @@index([medioPagoId])
   @@index([tenantId])
   @@unique([tenantId, numero])
   @@map("movimientos_caja")

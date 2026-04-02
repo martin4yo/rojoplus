@@ -9,10 +9,12 @@ import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 import { generarAsientoAutomatico } from '../asientos.js'
 import {
   generarAsientoFacturaVenta,
-  generarAsientoReciboCobro
+  generarAsientoReciboCobro,
+  resolverCuentaCashId
 } from '../../services/asientosContables.js'
 import { generarNumeroMC } from './helpers.js'
 import { enviarImpresion } from './impresoras.js'
+import { descontarStockVentaBuffet } from '../../services/buffetStockService.js'
 
 /**
  * Genera ESC/POS de comanda para kiosco y la envía a las impresoras destino.
@@ -163,8 +165,9 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         cantidad,
         precioUnitario: precioUnitarioTotal,
         subtotal,
-        opcionesInfo, // Para el ticket
-        categoriaMenuId: producto.categoriaMenuId // Para ruteo de comanda
+        opcionesInfo,
+        categoriaMenuId: producto.categoriaMenuId,
+        productoBuffet: producto  // Para descuento de stock
       })
     }
 
@@ -195,7 +198,10 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       }
 
       for (const pago of pagosParciales) {
-        const medioPago = await req.db.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
+        const medioPago = await req.db.medioPago.findUnique({
+          where: { id: parseInt(pago.medioPagoId) },
+          include: { conceptoTesoreria: true }
+        })
         if (!medioPago) {
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
@@ -216,6 +222,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             cuentaContableId: cuentaContable?.id || 1,
             centroCostoId: caja.centroCostoId,
             monto: parseFloat(pago.monto),
+            medioPagoId: medioPago.id,
             concepto: `Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
             registradoPor: req.admin.id
@@ -223,6 +230,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         })
 
         // Generar asiento contable automático
+        const cuentaDebeKiMulti = resolverCuentaCashId(medioPago, caja)
         await generarAsientoAutomatico(req.db, {
           fecha: new Date(),
           concepto: `Venta Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}`,
@@ -231,7 +239,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           registradoPor: req.admin.id,
           lineas: [
             {
-              cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+              cuentaContableId: cuentaDebeKiMulti,
               debe: parseFloat(pago.monto),
               haber: 0,
               descripcion: `Ingreso por venta kiosco`
@@ -248,12 +256,15 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         movimientos.push(movimiento)
       }
     } else {
-      const medioPago = await req.db.medioPago.findUnique({ where: { id: medioPagoId } })
+      const medioPago = await req.db.medioPago.findUnique({
+        where: { id: parseInt(medioPagoId) },
+        include: { conceptoTesoreria: true }
+      })
       if (!medioPago) {
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
 
-      const caja = await req.db.caja.findUnique({ where: { id: cajaId } })
+      const caja = await req.db.caja.findUnique({ where: { id: parseInt(cajaId) } })
       if (!caja) {
         return res.status(400).json({ success: false, error: 'Caja no encontrada' })
       }
@@ -264,18 +275,20 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       const movimiento = await req.db.movimientoCaja.create({
         data: {
           numero: nuevoNumero,
-          cajaId,
+          cajaId: parseInt(cajaId),
           tipo: 'INGRESO',
           cuentaContableId: cuentaContable?.id || 1,
           centroCostoId: caja.centroCostoId,
           monto: totalFinal,
-          concepto: `Kiosco - ${detalleItems.join(', ')}${propinaMonto > 0 ? ` + Propina` : ''}`,
+          medioPagoId: medioPago.id,
+          concepto: `Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
           registradoPor: req.admin.id
         }
       })
 
       // Generar asiento contable automático
+      const cuentaDebeKi = resolverCuentaCashId(medioPago, caja)
       await generarAsientoAutomatico(req.db, {
         fecha: new Date(),
         concepto: `Venta Kiosco - ${detalleItems.join(', ')}`,
@@ -284,7 +297,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         registradoPor: req.admin.id,
         lineas: [
           {
-            cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+            cuentaContableId: cuentaDebeKi,
             debe: totalFinal,
             haber: 0,
             descripcion: `Ingreso por venta kiosco`
@@ -560,6 +573,14 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
     } catch (cmdErr) {
       console.error('[Kiosco] Error al imprimir comanda:', cmdErr)
     }
+
+    // Descontar stock para productos que tienen variantes
+    await descontarStockVentaBuffet(
+      req.db,
+      productosVenta,
+      req.admin.id,
+      `Venta Kiosco`
+    )
 
     res.json({
       success: true,

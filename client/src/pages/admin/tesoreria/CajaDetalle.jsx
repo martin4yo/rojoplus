@@ -41,9 +41,9 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
   const [loading, setLoading] = useState(false)
   const [busqueda, setBusqueda] = useState('')
 
-  const key = getMedioPagoKey(grupo.medioPago)
-  const config = MEDIO_PAGO_CONFIG[key] || MEDIO_PAGO_CONFIG.OTRO
+  const config = MEDIO_PAGO_CONFIG[grupo.medioPagoTipo] || MEDIO_PAGO_CONFIG.OTRO
   const Icon = config.icon
+  const displayLabel = grupo.medioPago || 'Sin especificar'
 
   async function toggleExpand() {
     if (!expanded && movimientos.length === 0) {
@@ -57,7 +57,7 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
     try {
       const params = new URLSearchParams({
         cajaId,
-        medioPago: key,
+        medioPagoId: grupo.medioPagoId ?? 'null',
         limit: 200
       })
       if (periodo.desde) params.set('desde', periodo.desde)
@@ -88,7 +88,7 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
         <div className={`p-2 rounded-lg ${config.bg}`}>
           <Icon className={`w-4 h-4 ${config.color}`} />
         </div>
-        <span className={`font-medium text-gray-800 flex-1`}>{config.label}</span>
+        <span className={`font-medium text-gray-800 flex-1`}>{displayLabel}</span>
 
         <div className="flex items-center gap-6 text-sm">
           {grupo.cantIngresos > 0 && (
@@ -418,7 +418,7 @@ export default function CajaDetalle() {
           <div className="space-y-2">
             {resumen.porMedioPago.map(grupo => (
               <MedioPagoRow
-                key={getMedioPagoKey(grupo.medioPago)}
+                key={grupo.medioPagoId ?? 'sin-especificar'}
                 grupo={grupo}
                 cajaId={id}
                 periodo={periodo}

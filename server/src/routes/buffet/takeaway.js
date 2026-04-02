@@ -10,7 +10,8 @@ import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 import { generarAsientoAutomatico } from '../asientos.js'
 import {
   generarAsientoFacturaVenta,
-  generarAsientoReciboCobro
+  generarAsientoReciboCobro,
+  resolverCuentaCashId
 } from '../../services/asientosContables.js'
 import {
   generarNumeroPedido,
@@ -18,6 +19,7 @@ import {
   recalcularTotalesPedido
 } from './helpers.js'
 import { enviarImpresion } from './impresoras.js'
+import { descontarStockVentaBuffet } from '../../services/buffetStockService.js'
 
 const router = express.Router()
 
@@ -435,14 +437,14 @@ router.post('/takeaway/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
         }
       })
 
-      // Crear opciones seleccionadas por separado para que el tenant extension inyecte tenantId
       if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
         await req.db.opcionItemTakeAway.createMany({
           data: item.opcionesSeleccionadas.map(opSel => ({
             itemTakeAwayId: itemCreado.id,
             opcionId: opSel.opcionId,
             cantidad: opSel.cantidad || 1,
-            precioAdicional: opSel.precioAdicional || 0
+            precioAdicional: opSel.precioAdicional || 0,
+            tenantId: req.tenantId
           }))
         })
       }
@@ -911,7 +913,10 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       }
 
       for (const pago of pagosParciales) {
-        const medioPago = await req.db.medioPago.findUnique({ where: { id: parseInt(pago.medioPagoId) } })
+        const medioPago = await req.db.medioPago.findUnique({
+          where: { id: parseInt(pago.medioPagoId) },
+          include: { conceptoTesoreria: true }
+        })
         if (!medioPago) {
           return res.status(400).json({ success: false, error: `Medio de pago ${pago.medioPagoId} no encontrado` })
         }
@@ -932,7 +937,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
             centroCostoId: caja.centroCostoId,
             monto: parseFloat(pago.monto),
-            medioPago: medioPago.codigo,
+            medioPagoId: medioPago.id,
             concepto: `Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
             pedidoTakeAwayId: parseInt(id),
@@ -941,9 +946,10 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         })
 
         // Generar asiento contable automático
+        const cuentaDébeTAMulti = resolverCuentaCashId(medioPago, caja)
         const lineasAsiento = [
           {
-            cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+            cuentaContableId: cuentaDébeTAMulti,
             debe: parseFloat(pago.monto),
             haber: 0,
             centroCostoId: caja.centroCostoId || null,
@@ -982,12 +988,15 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         movimientos.push(movimiento)
       }
     } else {
-      const medioPago = await req.db.medioPago.findUnique({ where: { id: medioPagoId } })
+      const medioPago = await req.db.medioPago.findUnique({
+        where: { id: parseInt(medioPagoId) },
+        include: { conceptoTesoreria: true }
+      })
       if (!medioPago) {
         return res.status(400).json({ success: false, error: 'Medio de pago no encontrado' })
       }
 
-      const caja = await req.db.caja.findUnique({ where: { id: cajaId } })
+      const caja = await req.db.caja.findUnique({ where: { id: parseInt(cajaId) } })
       if (!caja) {
         return res.status(400).json({ success: false, error: 'Caja no encontrada' })
       }
@@ -998,13 +1007,13 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       const movimiento = await req.db.movimientoCaja.create({
         data: {
           numero: nuevoNumero,
-          cajaId,
+          cajaId: parseInt(cajaId),
           tipo: 'INGRESO',
           cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
           centroCostoId: caja.centroCostoId,
           monto: totalFinal,
-          medioPago: medioPago.codigo,
-          concepto: `Take Away - Pedido ${pedido.numero}${propinaMonto > 0 ? ` + Propina` : ''}`,
+          medioPagoId: medioPago.id,
+          concepto: `Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
           pedidoTakeAwayId: parseInt(id),
           registradoPor: req.admin.id
@@ -1012,9 +1021,10 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       })
 
       // Generar asiento contable automático
+      const cuentaDebeTA = resolverCuentaCashId(medioPago, caja)
       const lineasAsiento = [
         {
-          cuentaContableId: caja.cuentaContableId, // DEBE: Caja (aumenta activo)
+          cuentaContableId: cuentaDebeTA,
           debe: totalFinal,
           haber: 0,
           centroCostoId: caja.centroCostoId || null,
@@ -1358,6 +1368,14 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         // No fallar el cobro si falla la eliminación
       }
     }
+
+    // Descontar stock para productos que tienen variantes
+    await descontarStockVentaBuffet(
+      req.db,
+      pedido.items.filter(i => i.estado !== 'ANULADO'),
+      req.admin.id,
+      `Venta TakeAway - Pedido ${pedido.numero}`
+    )
 
     res.json({
       success: true,

@@ -73,9 +73,8 @@ export function usePagination(initialPage = 1, initialLimit = 10) {
    */
   const nextPage = useCallback(() => {
     setPage(currentPage => {
-      if (pagination && currentPage >= pagination.totalPages) {
-        return currentPage
-      }
+      const total = pagination?.totalPages || pagination?.pages || 0
+      if (pagination && currentPage >= total) return currentPage
       return currentPage + 1
     })
   }, [pagination])
@@ -96,8 +95,9 @@ export function usePagination(initialPage = 1, initialLimit = 10) {
       return
     }
 
-    if (pagination && pageNum > pagination.totalPages) {
-      setPage(pagination.totalPages)
+    const maxPage = pagination?.totalPages || pagination?.pages || 0
+    if (pagination && pageNum > maxPage) {
+      setPage(maxPage)
     } else {
       setPage(pageNum)
     }
@@ -126,7 +126,7 @@ export function usePagination(initialPage = 1, initialLimit = 10) {
   /**
    * Verificar si hay página siguiente
    */
-  const hasNext = pagination ? page < pagination.totalPages : false
+  const hasNext = pagination ? page < (pagination.totalPages || pagination.pages || 0) : false
 
   /**
    * Verificar si hay página anterior
@@ -136,7 +136,7 @@ export function usePagination(initialPage = 1, initialLimit = 10) {
   /**
    * Total de páginas
    */
-  const totalPages = pagination?.totalPages || 0
+  const totalPages = pagination?.totalPages || pagination?.pages || 0
 
   /**
    * Total de items

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Plus, AlertTriangle } from 'lucide-react'
 import SelectorMedioPago from './SelectorMedioPago'
 
@@ -15,15 +15,21 @@ export default function PagoMultiple({
   const totalPagado = pagosParciales.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0)
   const totalPendiente = total - totalPagado
 
-  // Notificar cambios al padre
+  // Ref para evitar que onPagosChange (nueva referencia cada render del padre) cause loop
+  const onPagosChangeRef = useRef(onPagosChange)
+  useEffect(() => { onPagosChangeRef.current = onPagosChange })
+
+  // Notificar cambios al padre — solo depende de datos propios, no de la función prop
   useEffect(() => {
-    onPagosChange?.({
+    const pagado = pagosParciales.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0)
+    const pendiente = total - pagado
+    onPagosChangeRef.current?.({
       pagos: pagosParciales,
-      totalPagado,
-      totalPendiente,
-      esCompleto: totalPendiente <= 0
+      totalPagado: pagado,
+      totalPendiente: pendiente,
+      esCompleto: pendiente <= 0
     })
-  }, [pagosParciales, totalPagado, totalPendiente, onPagosChange])
+  }, [pagosParciales, total])
 
   const handleAgregarPago = () => {
     if (!nuevoPago.medioPagoId || !nuevoPago.monto || parseFloat(nuevoPago.monto) <= 0) {
@@ -68,15 +74,16 @@ export default function PagoMultiple({
     return medio?.nombre || 'Desconocido'
   }
 
-  // Auto-seleccionar efectivo si está disponible
+  // Auto-seleccionar efectivo cuando los medios de pago se cargan por primera vez
+  // Depende solo de mediosPago.length para no dispararse en cada render del padre
   useEffect(() => {
-    if (!nuevoPago.medioPagoId && mediosPago.length > 0) {
+    if (mediosPago.length > 0) {
       const efectivo = mediosPago.find(m => m.codigo === 'EFECTIVO')
       if (efectivo) {
-        setNuevoPago(prev => ({ ...prev, medioPagoId: efectivo.id }))
+        setNuevoPago(prev => prev.medioPagoId ? prev : { ...prev, medioPagoId: efectivo.id })
       }
     }
-  }, [mediosPago, nuevoPago.medioPagoId])
+  }, [mediosPago.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={`border-t pt-4 ${className}`}>

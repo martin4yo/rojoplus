@@ -39,6 +39,21 @@ const CUENTAS = {
 }
 
 /**
+ * Resuelve la cuentaContableId del lado "cash" de un asiento de cobro/pago.
+ * Prioridad:
+ *   1. conceptoTesoreria del medioPago (si tiene cuentaContableId)
+ *   2. cuentaContableId de la caja
+ *   3. null (los callers deben manejar el fallback por tipo de caja)
+ *
+ * Requiere que medioPago se haya fetched con `include: { conceptoTesoreria: true }`.
+ */
+export function resolverCuentaCashId(medioPago, caja) {
+  return medioPago?.conceptoTesoreria?.cuentaContableId
+    || caja?.cuentaContableId
+    || null
+}
+
+/**
  * Genera el próximo número de asiento
  */
 async function generarNumeroAsiento(prisma) {
@@ -102,10 +117,12 @@ async function crearAsiento(prisma, datos) {
     throw new Error('El asiento debe tener al menos 2 líneas con monto')
   }
 
-  // Obtener IDs de cuentas
+  // Obtener IDs de cuentas — acepta cuentaContableId directo o cuentaCodigo string
   const lineasConIds = await Promise.all(
     lineasConMonto.map(async (linea, index) => ({
-      cuentaContableId: await getCuentaId(prisma, linea.cuentaCodigo),
+      cuentaContableId: linea.cuentaContableId != null
+        ? linea.cuentaContableId
+        : await getCuentaId(prisma, linea.cuentaCodigo),
       descripcion: linea.descripcion || null,
       debe: linea.debe || 0,
       haber: linea.haber || 0,
@@ -149,15 +166,15 @@ async function crearAsiento(prisma, datos) {
  *   - Si es cuota SOCIAL: usar centro de costo Administración (ADM)
  */
 async function generarAsientoPagoCuota(prisma, datos) {
-  const { pago, caja, cargos, registradoPor } = datos
+  const { pago, caja, cargos, registradoPor, medioPago } = datos
 
   try {
-    // Obtener código de cuenta de la caja (si tiene) o usar CAJA_EFECTIVO por defecto
-    let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
-    if (caja.cuentaContable?.codigo) {
-      cuentaCajaCodigo = caja.cuentaContable.codigo
-    } else if (caja.tipo === 'BANCO') {
-      cuentaCajaCodigo = CUENTAS.BANCO_CC
+    // Cuenta del lado cash: medioPago.conceptoTesoreria > caja > fallback por tipo
+    const cuentaCajaId = resolverCuentaCashId(medioPago, caja)
+    let cuentaCajaCodigo = null
+    if (!cuentaCajaId) {
+      cuentaCajaCodigo = caja.cuentaContable?.codigo
+        || (caja.tipo === 'BANCO' ? CUENTAS.BANCO_CC : CUENTAS.CAJA_EFECTIVO)
     }
 
     // Determinar centro de costo según los cargos pagados
@@ -203,10 +220,10 @@ async function generarAsientoPagoCuota(prisma, datos) {
     const montoBase = montoTotal - montoRecargo
 
     // Líneas del asiento
-    const lineas = [
-      // DEBE: Caja con el total
-      { cuentaCodigo: cuentaCajaCodigo, debe: montoTotal, haber: 0 },
-    ]
+    const lineaCash = cuentaCajaId
+      ? { cuentaContableId: cuentaCajaId, debe: montoTotal, haber: 0 }
+      : { cuentaCodigo: cuentaCajaCodigo, debe: montoTotal, haber: 0 }
+    const lineas = [ lineaCash ]
 
     // HABER: Ingresos por cuotas (monto base)
     if (montoBase > 0) {
@@ -248,17 +265,13 @@ async function generarAsientoPagoCuota(prisma, datos) {
  *   H: Caja           $monto
  */
 async function generarAsientoMovimientoCaja(prisma, datos) {
-  const { movimiento, caja, registradoPor } = datos
+  const { movimiento, caja, registradoPor, medioPago } = datos
 
-  // Cuenta de la caja (lado cash del asiento)
-  let cuentaCajaCodigo = null
-  if (caja.cuentaContable?.codigo) {
-    cuentaCajaCodigo = caja.cuentaContable.codigo
-  } else if (caja.tipo === 'BANCO') {
-    cuentaCajaCodigo = CUENTAS.BANCO_CC
-  } else {
-    cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
-  }
+  // Cuenta del lado cash: medioPago.conceptoTesoreria > caja > fallback por tipo
+  const cuentaCajaId = resolverCuentaCashId(medioPago, caja)
+  const lineaCashBase = cuentaCajaId
+    ? { cuentaContableId: cuentaCajaId }
+    : { cuentaCodigo: caja.cuentaContable?.codigo || (caja.tipo === 'BANCO' ? CUENTAS.BANCO_CC : CUENTAS.CAJA_EFECTIVO) }
 
   // Cuenta del concepto (contracuenta: gasto/ingreso) — viene del include del movimiento
   const cuentaConceptoCodigo = movimiento.cuentaContable?.codigo
@@ -266,18 +279,16 @@ async function generarAsientoMovimientoCaja(prisma, datos) {
     throw new Error('La cuenta contable del movimiento es requerida para generar el asiento')
   }
 
-
-
   const monto = Number(movimiento.monto)
   const obs = movimiento.descripcion || null
   const lineas = movimiento.tipo === 'INGRESO'
     ? [
-        { cuentaCodigo: cuentaCajaCodigo,      debe: monto, haber: 0,     descripcion: obs },
-        { cuentaCodigo: cuentaConceptoCodigo,   debe: 0,     haber: monto, descripcion: obs },
+        { ...lineaCashBase,                                         debe: monto, haber: 0,     descripcion: obs },
+        { cuentaCodigo: cuentaConceptoCodigo,                       debe: 0,     haber: monto, descripcion: obs },
       ]
     : [
-        { cuentaCodigo: cuentaConceptoCodigo,   debe: monto, haber: 0,     descripcion: obs },
-        { cuentaCodigo: cuentaCajaCodigo,       debe: 0,     haber: monto, descripcion: obs },
+        { cuentaCodigo: cuentaConceptoCodigo,                       debe: monto, haber: 0,     descripcion: obs },
+        { ...lineaCashBase,                                         debe: 0,     haber: monto, descripcion: obs },
       ]
 
   const asiento = await crearAsiento(prisma, {
@@ -545,16 +556,14 @@ async function generarAsientoOrdenPago(prisma, datos) {
  *   H: Clientes     $monto
  */
 async function generarAsientoReciboCobro(prisma, datos) {
-  const { recibo, caja, registradoPor } = datos
+  const { recibo, caja, registradoPor, medioPago } = datos
 
   try {
-    // Cuenta de la caja
-    let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
-    if (caja.cuentaContable?.codigo) {
-      cuentaCajaCodigo = caja.cuentaContable.codigo
-    } else if (caja.tipo === 'BANCO') {
-      cuentaCajaCodigo = CUENTAS.BANCO_CC
-    }
+    // Cuenta del lado cash: medioPago.conceptoTesoreria > caja > fallback
+    const cuentaCajaId = resolverCuentaCashId(medioPago, caja)
+    const lineaCash = cuentaCajaId
+      ? { cuentaContableId: cuentaCajaId, debe: Number(recibo.montoTotal), haber: 0, descripcion: `Recibo ${recibo.numero}` }
+      : { cuentaCodigo: caja?.cuentaContable?.codigo || (caja?.tipo === 'BANCO' ? CUENTAS.BANCO_CC : CUENTAS.CAJA_EFECTIVO), debe: Number(recibo.montoTotal), haber: 0, descripcion: `Recibo ${recibo.numero}` }
 
     const monto = Number(recibo.montoTotal)
     const nombreCliente = recibo.entidad?.razonSocial
@@ -567,9 +576,9 @@ async function generarAsientoReciboCobro(prisma, datos) {
       tipoOrigen: 'RECIBO_COBRO',
       origenId: recibo.id,
       registradoPor,
-      centroCostoId: recibo.centroCostoId || null, // Usar centro de costo del recibo
+      centroCostoId: recibo.centroCostoId || null,
       lineas: [
-        { cuentaCodigo: cuentaCajaCodigo, debe: monto, haber: 0, descripcion: `Recibo ${recibo.numero}` },
+        lineaCash,
         { cuentaCodigo: CUENTAS.CLIENTES, debe: 0, haber: monto, descripcion: 'Cobro deuda' },
       ],
     })

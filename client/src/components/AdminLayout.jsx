@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
@@ -27,6 +27,8 @@ export default function AdminLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState([])
+  const [flyout, setFlyout] = useState(null) // { label, items, top }
+  const flyoutTimer = useRef(null)
   const [pagosPendientesCount, setPagosPendientesCount] = useState(0)
   const [permisosLoaded, setPermisosLoaded] = useState(false)
   const [menuItems, setMenuItems] = useState([])
@@ -97,6 +99,7 @@ export default function AdminLayout() {
   // Cerrar menú al cambiar de ruta
   useEffect(() => {
     setMenuOpen(false)
+    setFlyout(null)
   }, [location.pathname])
 
   // Expandir automáticamente el menú que contiene la ruta actual
@@ -239,30 +242,45 @@ export default function AdminLayout() {
         ${menuOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-        <div className={`flex-shrink-0 p-4 border-b border-gray-200 bg-white flex items-center ${sidebarCollapsed ? 'md:justify-center' : 'justify-between'}`}>
-          <Link to="/admin" className={`flex items-center gap-3 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
-            <TenantLogo className="h-14" />
-            <div>
-              <span className="font-bold text-primary text-lg whitespace-nowrap">{tenant?.nombre || 'Admin'}</span>
-              <p className="text-xs text-gray-500">Admin</p>
+        <div className="flex-shrink-0 border-b border-gray-200 bg-white">
+          {/* Expanded: logo + name + toggle button */}
+          <div className={`flex items-center justify-between px-4 py-3 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
+            <Link to="/admin" className="flex items-center gap-3 min-w-0">
+              <TenantLogo className="h-14 flex-shrink-0" />
+              <div className="min-w-0">
+                <span className="font-bold text-primary text-lg whitespace-nowrap">{tenant?.nombre || 'Admin'}</span>
+                <p className="text-xs text-gray-500">Admin</p>
+              </div>
+            </Link>
+            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+              <button
+                onClick={() => setSidebarCollapsed(true)}
+                className="hidden md:flex p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+                title="Colapsar menú"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="md:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          </Link>
-          <Link to="/admin" className={`hidden ${sidebarCollapsed ? 'md:block' : 'md:hidden'}`}>
-            <TenantLogo className="h-10" />
-          </Link>
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className={`hidden md:flex p-2 text-gray-500 hover:bg-gray-100 rounded-lg ${sidebarCollapsed ? 'absolute top-4 right-2' : ''}`}
-            title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setMenuOpen(false)}
-            className="md:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          </div>
+          {/* Collapsed: small logo + expand button stacked */}
+          <div className={`hidden flex-col items-center gap-1 py-3 ${sidebarCollapsed ? 'md:flex' : ''}`}>
+            <Link to="/admin">
+              <TenantLogo className="h-10" />
+            </Link>
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+              title="Expandir menú"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 pb-20">
@@ -280,9 +298,19 @@ export default function AdminLayout() {
                 const hasActiveChild = isSubmenuActive(item.submenu)
 
                 return (
-                  <div key={item.label} className="mb-1 relative group">
+                  <div key={item.label} className="mb-1">
                     <button
-                      onClick={() => !sidebarCollapsed && toggleSubmenu(item.label)}
+                      onClick={() => { if (!sidebarCollapsed) toggleSubmenu(item.label) }}
+                      onMouseEnter={(e) => {
+                        if (!sidebarCollapsed) return
+                        clearTimeout(flyoutTimer.current)
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        setFlyout({ label: item.label, items: item.submenu, top: rect.top })
+                      }}
+                      onMouseLeave={() => {
+                        if (!sidebarCollapsed) return
+                        flyoutTimer.current = setTimeout(() => setFlyout(null), 120)
+                      }}
                       className={`w-full flex items-center ${sidebarCollapsed ? 'md:justify-center' : 'justify-between'} px-4 py-3 rounded-lg transition-colors ${
                         hasActiveChild
                           ? 'bg-primary text-white'
@@ -295,11 +323,7 @@ export default function AdminLayout() {
                         <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
                       </div>
                       {!sidebarCollapsed && (
-                        isExpanded ? (
-                          <ChevronDown className="w-4 h-4" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )
+                        isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
                       )}
                     </button>
                     {/* Submenu expandido normal */}
@@ -312,31 +336,6 @@ export default function AdminLayout() {
                               key={subItem.path}
                               to={subItem.path}
                               className={`flex items-center gap-3 px-4 py-2 rounded-lg mb-1 text-sm transition-colors ${
-                                isActive(subItem.path)
-                                  ? 'bg-primary text-white'
-                                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                              }`}
-                            >
-                              <SubIcon className="w-4 h-4" />
-                              <span>{subItem.label}</span>
-                            </Link>
-                          )
-                        })}
-                      </div>
-                    )}
-                    {/* Tooltip/Popup submenu cuando está colapsado */}
-                    {sidebarCollapsed && (
-                      <div className="hidden md:group-hover:block absolute left-full top-0 ml-2 bg-gray-800 rounded-lg shadow-lg py-2 min-w-[200px] z-50">
-                        <div className="px-4 py-2 text-sm font-medium text-gray-300 border-b border-gray-700">
-                          {item.label}
-                        </div>
-                        {item.submenu.map((subItem) => {
-                          const SubIcon = getIcon(subItem.iconName)
-                          return (
-                            <Link
-                              key={subItem.path}
-                              to={subItem.path}
-                              className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
                                 isActive(subItem.path)
                                   ? 'bg-primary text-white'
                                   : 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -422,6 +421,38 @@ export default function AdminLayout() {
           </a>
         </div>
 
+        {/* Flyout de segundo nivel cuando sidebar está colapsado */}
+        {sidebarCollapsed && flyout && (
+          <div
+            className="fixed left-20 z-[70] bg-gray-800 rounded-lg shadow-xl py-2 min-w-[220px]"
+            style={{ top: flyout.top }}
+            onMouseEnter={() => clearTimeout(flyoutTimer.current)}
+            onMouseLeave={() => setFlyout(null)}
+          >
+            <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-700 mb-1">
+              {flyout.label}
+            </div>
+            {flyout.items.map((subItem) => {
+              const SubIcon = getIcon(subItem.iconName)
+              return (
+                <Link
+                  key={subItem.path}
+                  to={subItem.path}
+                  onClick={() => setFlyout(null)}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                    isActive(subItem.path)
+                      ? 'bg-primary text-white'
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  <SubIcon className="w-4 h-4 flex-shrink-0" />
+                  <span>{subItem.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+
         {/* Info del usuario en sidebar móvil */}
         <div className="md:hidden absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700 bg-gray-900">
           <div className="flex items-center justify-between">
@@ -447,22 +478,24 @@ export default function AdminLayout() {
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Top bar */}
         <header className="flex-shrink-0 bg-white shadow-sm h-16 flex items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="md:hidden min-w-0">
+              <Link to="/admin" className="flex items-center gap-2 min-w-0">
+                <TenantLogo className="h-8 flex-shrink-0" />
+                <span className="font-bold text-primary truncate">{tenant?.nombre || 'Admin'}</span>
+              </Link>
+            </div>
+            <div className="hidden md:block">
+              <span className="text-2xl font-bold text-gray-400 italic">{tenant?.slogan || ''}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => setMenuOpen(true)}
               className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="md:hidden">
-              <Link to="/admin" className="flex items-center gap-2">
-                <TenantLogo className="h-8" />
-                <span className="font-bold text-primary whitespace-nowrap">{tenant?.nombre || 'Admin'}</span>
-              </Link>
-            </div>
-            <div className="hidden md:block">
-              <span className="text-2xl font-bold text-gray-400 italic">{tenant?.slogan || ''}</span>
-            </div>
           </div>
           <div className="hidden md:flex items-center gap-4">
             <Link

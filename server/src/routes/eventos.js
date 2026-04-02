@@ -9,6 +9,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { generarAsientoAutomatico } from './asientos.js'
+import { resolverCuentaCashId } from '../services/asientosContables.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -853,9 +854,8 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
       // 1. Crear MovimientoCaja
       const numeroMovimiento = `MOV-${Date.now()}`
 
-      // Obtener nombre del medio de pago
       const medioPago = medioPagoId
-        ? await prisma.medioPago.findUnique({ where: { id: parseInt(medioPagoId) } })
+        ? await prisma.medioPago.findUnique({ where: { id: parseInt(medioPagoId) }, include: { conceptoTesoreria: true } })
         : null
 
       const movimientoCaja = await tx.movimientoCaja.create({
@@ -891,8 +891,8 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
         registradoPor: req.admin.id,
         lineas: [
           {
-            // DEBE: Cuenta de caja (donde entra el dinero)
-            cuentaContableId: caja.cuentaContableId,
+            // DEBE: Cuenta del medio de pago o de la caja (fallback)
+            cuentaContableId: resolverCuentaCashId(medioPago, caja),
             descripcion: `${caja.nombre}${medioPago ? ` - ${medioPago.nombre}` : ''}`,
             debe: total,
             haber: 0,
@@ -1114,7 +1114,7 @@ router.post('/venta-kiosco', authAdmin, checkPermiso('BUFFET_COBRAR'), async (re
       }
 
       const medioPago = medioPagoId
-        ? await tx.medioPago.findUnique({ where: { id: parseInt(medioPagoId) } })
+        ? await tx.medioPago.findUnique({ where: { id: parseInt(medioPagoId) }, include: { conceptoTesoreria: true } })
         : null
 
       const asiento = await generarAsientoAutomatico(tx, {
@@ -1125,8 +1125,8 @@ router.post('/venta-kiosco', authAdmin, checkPermiso('BUFFET_COBRAR'), async (re
         registradoPor: req.admin.id,
         lineas: [
           {
-            // DEBE: Cuenta de caja (donde entra el dinero)
-            cuentaContableId: caja.cuentaContableId,
+            // DEBE: Cuenta del medio de pago o de la caja (fallback)
+            cuentaContableId: resolverCuentaCashId(medioPago, caja),
             descripcion: `${caja.nombre}${medioPago ? ` - ${medioPago.nombre}` : ''}`,
             debe: totalGeneral,
             haber: 0

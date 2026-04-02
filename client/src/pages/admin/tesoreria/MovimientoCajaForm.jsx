@@ -15,6 +15,7 @@ export default function MovimientoCajaForm() {
   const [cajas, setCajas] = useState([])
   const [cuentasContables, setCuentasContables] = useState([])
   const [conceptos, setConceptos] = useState([])
+  const [mediosPago, setMediosPago] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -30,7 +31,7 @@ export default function MovimientoCajaForm() {
     centroCostoId: null,
     concepto: '',
     descripcion: '',
-    medioPago: ''
+    medioPagoId: ''
   })
 
   useEffect(() => {
@@ -51,15 +52,17 @@ export default function MovimientoCajaForm() {
   async function cargarDatos() {
     try {
       setLoading(true)
-      const [cajasRes, cuentasRes, conceptosRes] = await Promise.all([
+      const [cajasRes, cuentasRes, conceptosRes, mediosRes] = await Promise.all([
         api.getFull('/admin/cajas?activo=true'),
         api.getFull('/admin/cuentas-contables?flat=true'),
-        api.getFull('/admin/conceptos-tesoreria')
+        api.getFull('/admin/conceptos-tesoreria'),
+        api.getFull('/admin/medios-pago')
       ])
       const cajasData = cajasRes.data || []
       setCajas(cajasData)
       setCuentasContables((cuentasRes.data || []).filter(c => c.esImputable))
       setConceptos(conceptosRes.data || [])
+      setMediosPago((mediosRes.data || []).filter(m => m.paraCaja && m.activo))
 
       // Si hay cajaId en la URL, poblar solo el centro de costo de la caja (la cuenta contable la da el concepto)
       if (cajaIdParam) {
@@ -159,7 +162,7 @@ export default function MovimientoCajaForm() {
       return
     }
 
-    if (!form.medioPago) {
+    if (!form.medioPagoId) {
       setError('El medio de pago es obligatorio')
       return
     }
@@ -191,7 +194,7 @@ export default function MovimientoCajaForm() {
         centroCostoId: form.centroCostoId || null,
         concepto: form.concepto || null,
         descripcion: form.descripcion || null,
-        medioPago: form.medioPago || null
+        medioPagoId: parseInt(form.medioPagoId)
       })
 
       if (cajaIdParam) {
@@ -327,19 +330,16 @@ export default function MovimientoCajaForm() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago *</label>
               <select
-                name="medioPago"
-                value={form.medioPago}
+                name="medioPagoId"
+                value={form.medioPagoId}
                 onChange={handleChange}
                 className="input-field w-full"
                 required
               >
                 <option value="">Seleccionar...</option>
-                <option value="EFECTIVO">Efectivo</option>
-                <option value="MERCADOPAGO">MercadoPago</option>
-                <option value="TRANSFERENCIA">Transferencia</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="TARJETA">Tarjeta</option>
-                <option value="OTRO">Otro</option>
+                {mediosPago.map(mp => (
+                  <option key={mp.id} value={mp.id}>{mp.nombre}</option>
+                ))}
               </select>
             </div>
 

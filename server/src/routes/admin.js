@@ -4761,6 +4761,7 @@ router.get('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
   const medios = await req.prisma.medioPago.findMany({
     where,
     orderBy: { orden: 'asc' },
+    include: { conceptoTesoreria: { select: { id: true, nombre: true, cuentaContableId: true } } }
   })
   res.json({ success: true, data: medios })
 }))
@@ -4769,6 +4770,7 @@ router.get('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
 router.get('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
   const medio = await req.prisma.medioPago.findUnique({
     where: { id: parseInt(req.params.id) },
+    include: { conceptoTesoreria: { select: { id: true, nombre: true, cuentaContableId: true } } }
   })
   if (!medio) throw new AppError('Medio de pago no encontrado', 404, 'NOT_FOUND')
   res.json({ success: true, data: medio })
@@ -4776,10 +4778,13 @@ router.get('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/medios-pago - Crear medio de pago
 router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway } = req.body
+  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway, conceptoTesoreriaId } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  }
+  if (!conceptoTesoreriaId) {
+    throw new AppError('El concepto de tesorería es requerido', 400, 'VALIDATION_ERROR')
   }
 
   // Verificar código único
@@ -4801,7 +4806,9 @@ router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
       paraBuffet: paraBuffet !== false,
       paraKiosco: paraKiosco !== false,
       paraTakeaway: paraTakeaway !== false,
+      conceptoTesoreriaId: parseInt(conceptoTesoreriaId),
     },
+    include: { conceptoTesoreria: { select: { id: true, nombre: true, cuentaContableId: true } } }
   })
 
   res.status(201).json({ success: true, data: medio })
@@ -4810,10 +4817,14 @@ router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/medios-pago/:id - Actualizar medio de pago
 router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway } = req.body
+  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway, conceptoTesoreriaId } = req.body
 
   const existente = await req.prisma.medioPago.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Medio de pago no encontrado', 404, 'NOT_FOUND')
+
+  if (conceptoTesoreriaId === null || conceptoTesoreriaId === '' || conceptoTesoreriaId === undefined) {
+    throw new AppError('El concepto de tesorería es requerido', 400, 'VALIDATION_ERROR')
+  }
 
   // Verificar código único (si cambió)
   if (codigo && codigo !== existente.codigo) {
@@ -4837,7 +4848,9 @@ router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
       ...(paraBuffet !== undefined && { paraBuffet }),
       ...(paraKiosco !== undefined && { paraKiosco }),
       ...(paraTakeaway !== undefined && { paraTakeaway }),
+      ...(conceptoTesoreriaId !== undefined && { conceptoTesoreriaId: parseInt(conceptoTesoreriaId) }),
     },
+    include: { conceptoTesoreria: { select: { id: true, nombre: true, cuentaContableId: true } } }
   })
 
   res.json({ success: true, data: medio })

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react'
 import { Button } from './Button'
 
@@ -74,9 +75,9 @@ export function Modal({
 
   // Modo con children (formularios personalizados)
   if (children) {
-    return (
+    return createPortal(
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
         onClick={handleCancel}
         onKeyDown={handleKeyDown}
         tabIndex={0}
@@ -122,14 +123,15 @@ export function Modal({
             </div>
           )}
         </div>
-      </div>
+      </div>,
+      document.body
     )
   }
 
   // Modo alert/confirm/prompt original
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
       onClick={handleCancel}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -200,7 +202,8 @@ export function Modal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

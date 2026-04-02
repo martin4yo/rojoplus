@@ -165,8 +165,8 @@ export default function ProductoForm() {
     if (isEditing) {
       // Guardar en servidor
       try {
-        const res = await api.post(`/admin/productos/${id}/variantes`, nuevaVariante)
-        setVariantes([...variantes, res.data])
+        const variante = await api.post(`/admin/productos/${id}/variantes`, nuevaVariante)
+        setVariantes([...variantes, variante])
         setNuevaVariante({ talle: '', color: '', stockActual: 0, stockMinimo: 0 })
         setSuccess('Variante agregada')
       } catch (err) {

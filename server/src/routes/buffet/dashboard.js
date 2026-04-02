@@ -265,7 +265,7 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     // Cajas del buffet para filtrar egresos
     const cajasBuffet = await req.db.caja.findMany({
       where: { paraBuffet: true, activo: true },
-      select: { id: true }
+      select: { id: true, saldoInicial: true }
     })
     const cajaBuffetIds = cajasBuffet.map(c => c.id)
 
@@ -381,6 +381,80 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
       if (ventasPorHora[hora].total > maxVentaHora) maxVentaHora = ventasPorHora[hora].total
     })
 
+    // Saldo anterior al período (cajas buffet)
+    const saldoInicialCajas = cajasBuffet.reduce((sum, c) => sum + Number(c.saldoInicial || 0), 0)
+    const [movAntIngresos, movAntEgresos] = await Promise.all([
+      req.db.movimientoCaja.aggregate({
+        where: { cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { lt: fechaDesde }, anulado: false },
+        _sum: { monto: true }
+      }),
+      req.db.movimientoCaja.aggregate({
+        where: { cajaId: { in: cajaBuffetIds }, tipo: 'EGRESO', fecha: { lt: fechaDesde }, anulado: false },
+        _sum: { monto: true }
+      })
+    ])
+    const saldoAnterior = saldoInicialCajas
+      + Number(movAntIngresos._sum.monto || 0)
+      - Number(movAntEgresos._sum.monto || 0)
+
+    // Por medio de pago: período actual + saldo anterior
+    const [movPeriodoPorMedio, movAntPorMedio] = await Promise.all([
+      req.db.movimientoCaja.groupBy({
+        by: ['medioPagoId', 'tipo'],
+        where: { cajaId: { in: cajaBuffetIds }, fecha: { gte: fechaDesde, lte: fechaHasta }, anulado: false },
+        _sum: { monto: true }
+      }),
+      req.db.movimientoCaja.groupBy({
+        by: ['medioPagoId', 'tipo'],
+        where: { cajaId: { in: cajaBuffetIds }, fecha: { lt: fechaDesde }, anulado: false },
+        _sum: { monto: true }
+      })
+    ])
+
+    const allMedioPagoIds = [...new Set([
+      ...movPeriodoPorMedio.map(r => r.medioPagoId),
+      ...movAntPorMedio.map(r => r.medioPagoId)
+    ].filter(Boolean))]
+    const mediosPagoListDash = allMedioPagoIds.length
+      ? await req.db.medioPago.findMany({ where: { id: { in: allMedioPagoIds } }, select: { id: true, nombre: true, tipo: true } })
+      : []
+    const mediosPagoByIdDash = Object.fromEntries(mediosPagoListDash.map(m => [m.id, m]))
+
+    const medioPagoMapDash = {}
+    const getOrCreate = (medioPagoId) => {
+      const key = medioPagoId ?? 'null'
+      if (!medioPagoMapDash[key]) {
+        const mp = medioPagoId ? mediosPagoByIdDash[medioPagoId] : null
+        medioPagoMapDash[key] = {
+          medioPagoId,
+          medioPago: mp?.nombre ?? null,
+          medioPagoTipo: mp?.tipo ?? null,
+          antIngresos: 0, antEgresos: 0,
+          ingresos: 0, egresos: 0
+        }
+      }
+      return medioPagoMapDash[key]
+    }
+    movAntPorMedio.forEach(r => {
+      const e = getOrCreate(r.medioPagoId)
+      if (r.tipo === 'INGRESO') e.antIngresos += Number(r._sum.monto || 0)
+      else e.antEgresos += Number(r._sum.monto || 0)
+    })
+    movPeriodoPorMedio.forEach(r => {
+      const e = getOrCreate(r.medioPagoId)
+      if (r.tipo === 'INGRESO') e.ingresos += Number(r._sum.monto || 0)
+      else e.egresos += Number(r._sum.monto || 0)
+    })
+    const porMedioPagoDash = Object.values(medioPagoMapDash).map(m => ({
+      medioPagoId: m.medioPagoId,
+      medioPago: m.medioPago,
+      medioPagoTipo: m.medioPagoTipo,
+      saldoAnterior: m.antIngresos - m.antEgresos,
+      ingresos: m.ingresos,
+      egresos: m.egresos,
+      saldo: (m.antIngresos - m.antEgresos) + m.ingresos - m.egresos
+    })).sort((a, b) => (a.medioPago ?? 'ZZZ').localeCompare(b.medioPago ?? 'ZZZ'))
+
     // Ventas por día
     const ventasPorDiaMap = {}
     const addDia = (fecha, total) => {
@@ -420,6 +494,10 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
         totalEgresos,
         egresosPorConcepto,
         saldo: ventasTotal - totalEgresos,
+
+        // Saldo
+        saldoAnterior,
+        porMedioPago: porMedioPagoDash,
 
         // Rankings
         topProductos,
@@ -535,6 +613,220 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
   } catch (error) {
     console.error('Error obteniendo ventas del período:', error)
     res.status(500).json({ success: false, error: 'Error al obtener ventas' })
+  }
+})
+
+/**
+ * POST /reporte-cierre
+ * Genera reporte de cierre ESC/POS para impresora térmica 80mm
+ * Retorna base64 listo para enviar a /imprimir-ticket-directo
+ */
+router.post('/reporte-cierre', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) => {
+  try {
+    const { desde, hasta } = req.body
+
+    if (!desde || !hasta) {
+      return res.status(400).json({ success: false, error: 'Fechas requeridas' })
+    }
+
+    const fechaDesde = new Date(desde)
+    const fechaHasta = new Date(hasta)
+
+    // Configuración del club
+    const clubConfigRows = await req.db.configuracion.findMany({
+      where: { clave: { in: ['CLUB_NOMBRE', 'CLUB_DIRECCION'] } }
+    })
+    const configMap = Object.fromEntries(clubConfigRows.map(c => [c.clave, c.valor]))
+    const clubNombre = configMap.CLUB_NOMBRE || 'Club Sportivo Pilar'
+    const clubDireccion = configMap.CLUB_DIRECCION || ''
+
+    // Cajas del buffet
+    const cajasBuffet = await req.db.caja.findMany({
+      where: { paraBuffet: true, activo: true },
+      select: { id: true, saldoInicial: true }
+    })
+    const cajaBuffetIds = cajasBuffet.map(c => c.id)
+    const saldoInicialCajas = cajasBuffet.reduce((sum, c) => sum + Number(c.saldoInicial || 0), 0)
+
+    // Saldo anterior
+    const [movAntIngresos, movAntEgresos] = await Promise.all([
+      req.db.movimientoCaja.aggregate({
+        where: { cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { lt: fechaDesde }, anulado: false },
+        _sum: { monto: true }
+      }),
+      req.db.movimientoCaja.aggregate({
+        where: { cajaId: { in: cajaBuffetIds }, tipo: 'EGRESO', fecha: { lt: fechaDesde }, anulado: false },
+        _sum: { monto: true }
+      })
+    ])
+    const saldoAnterior = saldoInicialCajas
+      + Number(movAntIngresos._sum.monto || 0)
+      - Number(movAntEgresos._sum.monto || 0)
+
+    // Movimientos del período por medio de pago
+    const movPeriodoPorMedio = await req.db.movimientoCaja.groupBy({
+      by: ['medioPagoId', 'tipo'],
+      where: { cajaId: { in: cajaBuffetIds }, fecha: { gte: fechaDesde, lte: fechaHasta }, anulado: false },
+      _sum: { monto: true }
+    })
+
+    const allMedioPagoIds = [...new Set(movPeriodoPorMedio.map(r => r.medioPagoId).filter(Boolean))]
+    const mediosPagoList = allMedioPagoIds.length
+      ? await req.db.medioPago.findMany({ where: { id: { in: allMedioPagoIds } }, select: { id: true, nombre: true } })
+      : []
+    const mediosPagoById = Object.fromEntries(mediosPagoList.map(m => [m.id, m]))
+
+    const medioMap = {}
+    movPeriodoPorMedio.forEach(r => {
+      const key = r.medioPagoId ?? 'null'
+      if (!medioMap[key]) {
+        const mp = r.medioPagoId ? mediosPagoById[r.medioPagoId] : null
+        medioMap[key] = { nombre: mp?.nombre ?? 'Sin especificar', ingresos: 0, egresos: 0 }
+      }
+      if (r.tipo === 'INGRESO') medioMap[key].ingresos += Number(r._sum.monto || 0)
+      else medioMap[key].egresos += Number(r._sum.monto || 0)
+    })
+    const mediosPago = Object.values(medioMap).sort((a, b) => a.nombre.localeCompare(b.nombre))
+
+    const totalIngresos = mediosPago.reduce((s, m) => s + m.ingresos, 0)
+    const totalEgresos = mediosPago.reduce((s, m) => s + m.egresos, 0)
+    const saldoFinal = saldoAnterior + totalIngresos - totalEgresos
+
+    // Ventas por categoría (comandas + takeaway)
+    const comandas = await req.db.comanda.findMany({
+      where: { estado: 'CERRADA', horaCierre: { gte: fechaDesde, lte: fechaHasta } },
+      include: {
+        items: {
+          where: { estado: { not: 'ANULADO' } },
+          include: { productoBuffet: { select: { nombre: true, categoriaMenu: { select: { nombre: true } } } } }
+        }
+      }
+    })
+
+    const takeaway = await prisma.pedidoTakeAway.findMany({
+      where: { estado: { in: ['PAGADO', 'ENTREGADO'] }, horaPagado: { gte: fechaDesde, lte: fechaHasta } },
+      include: {
+        items: {
+          include: { productoBuffet: { select: { nombre: true, categoriaMenu: { select: { nombre: true } } } } }
+        }
+      }
+    })
+
+    const catMap = {}
+    const addItem = (item) => {
+      const cat = item.productoBuffet?.categoriaMenu?.nombre || 'Sin categoría'
+      if (!catMap[cat]) catMap[cat] = { nombre: cat, cantidad: 0, total: 0 }
+      catMap[cat].cantidad += item.cantidad
+      catMap[cat].total += Number(item.subtotal || 0)
+    }
+    comandas.forEach(c => c.items.forEach(addItem))
+    takeaway.forEach(t => t.items.forEach(addItem))
+
+    const categorias = Object.values(catMap).sort((a, b) => b.total - a.total)
+    const totalUnidades = categorias.reduce((s, c) => s + c.cantidad, 0)
+    const totalImporte = categorias.reduce((s, c) => s + c.total, 0)
+
+    // ====== GENERAR ESC/POS ======
+    const ESC = '\x1B'
+    const GS = '\x1D'
+    const INIT = ESC + '@'
+    const ALIGN_LEFT = ESC + 'a\x00'
+    const ALIGN_CENTER = ESC + 'a\x01'
+    const BOLD_ON = ESC + 'E\x01'
+    const BOLD_OFF = ESC + 'E\x00'
+    const DOUBLE_HEIGHT = GS + '!\x01'
+    const NORMAL_SIZE = GS + '!\x00'
+    const CUT = GS + 'V\x00'
+    const FEED = (n) => ESC + 'd' + String.fromCharCode(n)
+
+    const W = 48
+    const sep = (c = '-') => c.repeat(W)
+    const fmtPrice = (n) => `$${Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const fmtLV = (label, value) => {
+      const sp = W - label.length - value.length
+      return label + ' '.repeat(Math.max(1, sp)) + value
+    }
+    const fmtCols3 = (left, center, right) => {
+      // 3-column: left (24), center (8), right (16)
+      const l = left.substring(0, 22).padEnd(22)
+      const c = center.substring(0, 6).padStart(6)
+      const r = right.substring(0, 12).padStart(12)
+      return l + ' ' + c + ' ' + r
+    }
+
+    const fechaDesdeStr = fechaDesde.toLocaleDateString('es-AR')
+    const fechaHastaStr = fechaHasta.toLocaleDateString('es-AR')
+    const periodoStr = fechaDesdeStr === fechaHastaStr ? fechaDesdeStr : `${fechaDesdeStr} - ${fechaHastaStr}`
+
+    let out = ''
+    out += INIT
+    out += ALIGN_CENTER
+    out += BOLD_ON + DOUBLE_HEIGHT
+    out += clubNombre + '\n'
+    out += NORMAL_SIZE + BOLD_OFF
+    if (clubDireccion) out += clubDireccion + '\n'
+    out += sep('=') + '\n'
+    out += BOLD_ON + 'REPORTE DE CIERRE\n' + BOLD_OFF
+    out += `Período: ${periodoStr}\n`
+    out += sep('=') + '\n'
+
+    // ---- RESUMEN DE CAJA ----
+    out += ALIGN_LEFT
+    out += BOLD_ON + 'RESUMEN DE CAJA\n' + BOLD_OFF
+    out += sep() + '\n'
+    out += fmtLV('Saldo anterior', fmtPrice(saldoAnterior)) + '\n'
+    out += '\n'
+
+    // Ingresos por medio de pago
+    out += BOLD_ON + 'Ingresos:\n' + BOLD_OFF
+    mediosPago.forEach(m => {
+      if (m.ingresos > 0) {
+        out += fmtLV(`  ${m.nombre}`, fmtPrice(m.ingresos)) + '\n'
+      }
+    })
+    out += BOLD_ON + fmtLV('  TOTAL INGRESOS', fmtPrice(totalIngresos)) + BOLD_OFF + '\n'
+    out += '\n'
+
+    // Egresos por medio de pago
+    out += BOLD_ON + 'Egresos:\n' + BOLD_OFF
+    mediosPago.forEach(m => {
+      if (m.egresos > 0) {
+        out += fmtLV(`  ${m.nombre}`, fmtPrice(m.egresos)) + '\n'
+      }
+    })
+    if (totalEgresos === 0) out += '  (sin egresos)\n'
+    out += BOLD_ON + fmtLV('  TOTAL EGRESOS', fmtPrice(totalEgresos)) + BOLD_OFF + '\n'
+    out += '\n'
+
+    out += sep('=') + '\n'
+    out += BOLD_ON + fmtLV('SALDO FINAL', fmtPrice(saldoFinal)) + BOLD_OFF + '\n'
+    out += sep('=') + '\n'
+
+    // ---- VENTAS POR CATEGORÍA ----
+    out += '\n'
+    out += ALIGN_CENTER + BOLD_ON + 'VENTAS POR CATEGORIA\n' + BOLD_OFF
+    out += ALIGN_LEFT
+    out += sep() + '\n'
+    // Header
+    out += fmtCols3('Categoría', 'Unid.', 'Importe') + '\n'
+    out += sep() + '\n'
+    categorias.forEach(c => {
+      out += fmtCols3(c.nombre, String(c.cantidad), fmtPrice(c.total)) + '\n'
+    })
+    if (categorias.length === 0) out += '  (sin ventas en el período)\n'
+    out += sep() + '\n'
+    out += BOLD_ON + fmtCols3('TOTAL', String(totalUnidades), fmtPrice(totalImporte)) + BOLD_OFF + '\n'
+    out += sep('=') + '\n'
+
+    out += FEED(4)
+    out += CUT
+
+    const ticketBase64 = Buffer.from(out, 'binary').toString('base64')
+
+    res.json({ success: true, data: { ticketBase64 } })
+  } catch (error) {
+    console.error('Error generando reporte de cierre:', error)
+    res.status(500).json({ success: false, error: 'Error al generar reporte' })
   }
 })
 

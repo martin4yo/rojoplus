@@ -58,15 +58,15 @@ export default function Pagination({
   maxButtons = 5
 }) {
   // Si no hay paginación o solo una página, no mostrar
-  if (!pagination || pagination.totalPages <= 1) {
+  const totalPages = pagination?.totalPages || pagination?.pages || 1
+  if (!pagination || totalPages <= 1) {
     return null
   }
 
   const currentPage = currentPageProp || pagination.page || 1
-  const totalPages = pagination.totalPages || 1
   const total = pagination.total || 0
-  const from = pagination.from || 0
-  const to = pagination.to || 0
+  const from = pagination.from || ((currentPage - 1) * (pagination.limit || 10) + 1)
+  const to = pagination.to || Math.min(currentPage * (pagination.limit || 10), total)
 
   // Calcular rango de páginas a mostrar
   const pageNumbers = getPageNumbers(currentPage, totalPages, maxButtons)
