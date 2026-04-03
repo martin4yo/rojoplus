@@ -1077,7 +1077,7 @@ router.get('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const medios = await req.prisma.medioPago.findMany({
+  const medios = await req.db.medioPago.findMany({
     where,
     orderBy: { orden: 'asc' },
   })
@@ -1086,7 +1086,7 @@ router.get('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/medios-pago/:id - Obtener medio de pago por ID
 router.get('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
-  const medio = await req.prisma.medioPago.findUnique({
+  const medio = await req.db.medioPago.findUnique({
     where: { id: parseInt(req.params.id) },
     include: { conceptoTesoreria: { select: { id: true, nombre: true } } }
   })
@@ -1102,13 +1102,13 @@ router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  // Verificar código único
-  const existente = await req.prisma.medioPago.findFirst({ where: { codigo } })
+  // Verificar código único dentro del tenant
+  const existente = await req.db.medioPago.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
   }
 
-  const medio = await req.prisma.medioPago.create({
+  const medio = await req.db.medioPago.create({
     data: {
       codigo,
       nombre,
@@ -1134,18 +1134,18 @@ router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway, conceptoTesoreriaId } = req.body
 
-  const existente = await req.prisma.medioPago.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.medioPago.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Medio de pago no encontrado', 404, 'NOT_FOUND')
 
-  // Verificar código único (si cambió)
+  // Verificar código único dentro del tenant (si cambió)
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.medioPago.findFirst({ where: { codigo } })
+    const duplicado = await req.db.medioPago.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
     }
   }
 
-  const medio = await req.prisma.medioPago.update({
+  const medio = await req.db.medioPago.update({
     where: { id: parseInt(id) },
     data: {
       ...(codigo !== undefined && { codigo }),
@@ -1184,7 +1184,7 @@ router.delete('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
     )
   }
 
-  await req.prisma.medioPago.delete({ where: { id: parseInt(id) } })
+  await req.db.medioPago.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, message: 'Medio de pago eliminado' })
 }))
 

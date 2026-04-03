@@ -41,6 +41,39 @@ export function createTenantPrisma(tenantId) {
         },
 
         async findUnique({ model, args, query }) {
+          if (!GLOBAL_MODELS.has(model)) {
+            // findUnique no admite filtros extra en where (requiere constraint único),
+            // por eso se redirige a findFirst que sí acepta tenantId arbitrario.
+            const modelName = model.charAt(0).toLowerCase() + model.slice(1);
+            return prisma[modelName].findFirst({
+              ...args,
+              where: { ...args.where, tenantId },
+            });
+          }
+          return query(args);
+        },
+
+        async findUniqueOrThrow({ model, args, query }) {
+          if (!GLOBAL_MODELS.has(model)) {
+            const modelName = model.charAt(0).toLowerCase() + model.slice(1);
+            const result = await prisma[modelName].findFirst({
+              ...args,
+              where: { ...args.where, tenantId },
+            });
+            if (!result) {
+              const err = new Error(`No ${model} record found`);
+              err.code = 'P2025';
+              throw err;
+            }
+            return result;
+          }
+          return query(args);
+        },
+
+        async groupBy({ model, args, query }) {
+          if (!GLOBAL_MODELS.has(model)) {
+            args.where = { ...args.where, tenantId };
+          }
           return query(args);
         },
 

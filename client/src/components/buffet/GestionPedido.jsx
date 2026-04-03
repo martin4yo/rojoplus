@@ -9,10 +9,8 @@ import { useConfirm } from '../../hooks/useConfirm'
 import StatusBadge from '../StatusBadge'
 import { formatCurrency } from '../../utils/formatters'
 import Modal from '../Modal'
-import CalculadoraVuelto from './CalculadoraVuelto'
-import SelectorMedioPago from './SelectorMedioPago'
+import PagoUnificado from './PagoUnificado'
 import SplitCuenta from './SplitCuenta'
-import PagoMultiple from './PagoMultiple'
 import ClienteSelector from './ClienteSelector'
 import MenuProductos from './MenuProductos'
 import ModalOpcionesProducto from './ModalOpcionesProducto'
@@ -71,12 +69,11 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
   const [editarComandaData, setEditarComandaData] = useState({ buscarSocio: '', socioId: null, socioNombre: '', nombreGrupo: '' })
 
   // Estados para cobro
-  const [datosVuelto, setDatosVuelto] = useState({ montoPagado: 0, vuelto: 0, esSuficiente: false })
+  const [datosPago, setDatosPago] = useState({ pagos: [], totalPagado: 0, pendiente: 0, esCompleto: false })
   const [modalSplit, setModalSplit] = useState(false)
-  const [pagosParciales, setPagosParciales] = useState({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
-  const [usarPagosMultiples, setUsarPagosMultiples] = useState(false)
   const [tabCobroActivo, setTabCobroActivo] = useState('cuenta') // 'cuenta' o 'finalizar'
   const [cobrando, setCobrando] = useState(false) // Evitar doble click en cobrar
+  const cobroConcretadoRef = useRef(false) // true una vez que el backend confirmó el cobro
   const puedeCobrar = tienePermiso(PERMISOS.BUFFET_COBRAR)
   const puedeGestionarMesas = tienePermiso(PERMISOS.BUFFET_MESAS)
 
@@ -295,7 +292,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
           ...prev,
           medioPagoId: efectivo?.id || mediosPagoDisponibles[0]?.id || ''
         }))
-        setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
       }
     }
   }, [cobroData.cajaId, mediosPagoDisponibles])
@@ -460,35 +456,42 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
     const totalFinal = Number(comandaActiva.subtotal || comandaActiva.total) -
       (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)
 
-    // Validación de vuelto si es efectivo
-    const medioPago = mediosPagoDisponibles.find(m => m.id === parseInt(cobroData.medioPagoId))
-    if (medioPago?.codigo === 'EFECTIVO' && !usarPagosMultiples) {
-      if (!datosVuelto.esSuficiente) {
-        toast.error('El monto pagado es insuficiente')
+    // Validación de pagos
+    if (datosPago.pagos.length === 0) {
+      toast.error('Ingresá al menos un medio de pago')
+      return
+    }
+    if (!datosPago.esCompleto) {
+      toast.error('El monto ingresado no cubre el total a cobrar')
+      return
+    }
+    // Efectivo solo: el monto debe ser >= total
+    if (datosPago.pagos.length === 1) {
+      const mp = mediosPagoDisponibles.find(m => m.id === datosPago.pagos[0].medioPagoId)
+      if (mp?.codigo === 'EFECTIVO' && datosPago.pagos[0].monto < totalFinal) {
+        toast.error('El monto en efectivo es insuficiente')
         return
       }
     }
 
     setCobrando(true)
+    cobroConcretadoRef.current = false
     try {
       let requestData
 
-      if (usarPagosMultiples) {
-        if (!pagosParciales.esCompleto) {
-          toast.error('El total de pagos no cubre el monto total')
-          return
-        }
+      if (datosPago.pagos.length > 1) {
         requestData = {
-          pagosParciales: pagosParciales.pagos,
+          pagosParciales: datosPago.pagos.map(p => ({ medioPagoId: p.medioPagoId, monto: p.monto })),
           cajaId: parseInt(cobroData.cajaId),
           propina: 0,
           aplicarDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable
         }
       } else {
+        const pago = datosPago.pagos[0]
         requestData = {
           cajaId: parseInt(cobroData.cajaId),
-          medioPagoId: parseInt(cobroData.medioPagoId),
-          montoPagado: medioPago?.codigo === 'EFECTIVO' ? datosVuelto.montoPagado : totalFinal,
+          medioPagoId: pago.medioPagoId,
+          montoPagado: pago.monto,
           propina: 0,
           aplicarDescuento: cobroData.aplicarDescuento && descuentoInfo?.aplicable
         }
@@ -512,6 +515,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
         : `/admin/buffet/takeaway/${id}/cobrar`
 
       const data = await api.post(endpoint, requestData)
+      cobroConcretadoRef.current = true // backend confirmó — no re-habilitar botón aunque falle el post-proceso
 
       toast.success(tipo === 'mesa' ? 'Comanda cobrada' : 'Pedido cobrado')
 
@@ -558,9 +562,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       }
 
       // Reset estados
-      setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
-      setUsarPagosMultiples(false)
-      setPagosParciales({ pagos: [], totalPagado: 0, totalPendiente: 0, esCompleto: false })
+      setDatosPago({ pagos: [], totalPagado: 0, pendiente: 0, esCompleto: false })
       setTabCobroActivo('cuenta')
       setClienteSeleccionado(null)
       setEmitirFactura(false)
@@ -574,7 +576,10 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
       console.error('Error al cobrar:', err)
       toast.error(err.message || 'Error al procesar el cobro')
     } finally {
-      setCobrando(false)
+      // Solo re-habilitar si el backend NO llegó a confirmar el cobro
+      if (!cobroConcretadoRef.current) {
+        setCobrando(false)
+      }
     }
   }
 
@@ -1881,30 +1886,6 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   )}
                 </div>
 
-                {/* Selector de modo de pago */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setUsarPagosMultiples(false)}
-                    className={`flex-1 py-2 rounded-lg font-medium text-sm transition ${
-                      !usarPagosMultiples
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Pago Simple
-                  </button>
-                  <button
-                    onClick={() => setUsarPagosMultiples(true)}
-                    className={`flex-1 py-2 rounded-lg font-medium text-sm transition ${
-                      usarPagosMultiples
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Pagos Múltiples
-                  </button>
-                </div>
-
                 {/* Selector de Caja */}
                 {cajas.length > 1 && (
                   <div>
@@ -1915,9 +1896,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     >
                       {cajas.map(caja => (
-                        <option key={caja.id} value={caja.id}>
-                          {caja.nombre}
-                        </option>
+                        <option key={caja.id} value={caja.id}>{caja.nombre}</option>
                       ))}
                     </select>
                   </div>
@@ -1936,44 +1915,13 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
                   </div>
                 )}
 
-                {/* Pago Simple */}
-                {!usarPagosMultiples && (
-                  <div className="space-y-3">
-                    {/* Selector Medio de Pago */}
-                    <SelectorMedioPago
-                      mediosPago={mediosPagoDisponibles}
-                      selectedId={cobroData.medioPagoId}
-                      onChange={(id) => {
-                        // Solo resetear vuelto si cambia el medio de pago
-                        if (id !== cobroData.medioPagoId) {
-                          setCobroData({ ...cobroData, medioPagoId: id })
-                          setDatosVuelto({ montoPagado: 0, vuelto: 0, esSuficiente: false })
-                        }
-                      }}
-                      compact={true}
-                    />
-
-                    {/* Calculadora de vuelto (solo efectivo) */}
-                    {mediosPagoDisponibles.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO' && (
-                      <CalculadoraVuelto
-                        total={Number(comandaActiva.subtotal || comandaActiva.total) -
-                          (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)}
-                        onVueltoCalculado={(datos) => setDatosVuelto(datos)}
-                        medioPagoSeleccionado={mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Pagos Múltiples */}
-                {usarPagosMultiples && (
-                  <PagoMultiple
-                    total={Number(comandaActiva.subtotal || comandaActiva.total) -
-                      (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)}
-                    mediosPago={mediosPagoDisponibles}
-                    onPagosChange={(datos) => setPagosParciales(datos)}
-                  />
-                )}
+                {/* Medios de pago unificado */}
+                <PagoUnificado
+                  total={Number(comandaActiva.subtotal || comandaActiva.total) -
+                    (cobroData.aplicarDescuento && descuentoInfo?.aplicable ? Number(descuentoInfo.monto) : 0)}
+                  mediosPago={mediosPagoDisponibles}
+                  onChange={setDatosPago}
+                />
 
                 {/* Facturación Electrónica */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
@@ -2111,14 +2059,7 @@ export default function GestionPedido({ tipo = 'mesa', id, onVolver, onActualiza
               <div className="border-t p-3 bg-white flex-shrink-0">
                 <button
                   onClick={cobrar}
-                  disabled={
-                    cobrando ||
-                    cajas.length === 0 ||
-                    (mediosPago.find(m => m.id === parseInt(cobroData.medioPagoId))?.codigo === 'EFECTIVO' &&
-                      !usarPagosMultiples &&
-                      !datosVuelto.esSuficiente) ||
-                    (usarPagosMultiples && !pagosParciales.esCompleto)
-                  }
+                  disabled={cobrando || cajas.length === 0 || !datosPago.esCompleto}
                   className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-green-600 text-white font-bold text-lg rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {cobrando ? (

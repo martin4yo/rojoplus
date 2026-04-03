@@ -92,7 +92,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   const sociosSinActividad = Math.max(0, sociosActivos - cantSociosConActividad)
 
   // Periodo actual (más reciente con estado GENERADO)
-  const periodoActual = await req.prisma.periodo.findFirst({
+  const periodoActual = await req.db.periodo.findFirst({
     where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
   })
@@ -147,7 +147,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   const saldoTotalCajas = cajas.reduce((sum, c) => sum + Number(c.saldoActual), 0)
 
   // Comercios pendientes de aprobación
-  const comerciosPendientes = await req.prisma.comercio.count({ where: { estado: 'PENDIENTE' } })
+  const comerciosPendientes = await req.db.comercio.count({ where: { estado: 'PENDIENTE' } })
 
   // Saldo Clientes (facturas de venta pendientes de cobro)
   // Nota: Estos datos dependen de tablas que pueden no existir aún
@@ -156,9 +156,9 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   let sueldosPorPagar = 0
 
   try {
-    if (req.prisma.movimientoContable) {
+    if (req.db.movimientoContable) {
       const [saldoClientesResult, saldoProveedoresResult] = await Promise.all([
-        req.prisma.movimientoContable.aggregate({
+        req.db.movimientoContable.aggregate({
           where: {
             tipo: 'FACTURA_VENTA',
             estado: { not: 'ANULADO' },
@@ -166,7 +166,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
           },
           _sum: { saldoPendiente: true },
         }),
-        req.prisma.movimientoContable.aggregate({
+        req.db.movimientoContable.aggregate({
           where: {
             tipo: 'FACTURA_COMPRA',
             estado: { not: 'ANULADO' },
@@ -184,8 +184,8 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
 
   // Sueldos por pagar (liquidaciones pendientes)
   try {
-    if (req.prisma.liquidacionSueldo) {
-      const sueldosPorPagarResult = await req.prisma.liquidacionSueldo.aggregate({
+    if (req.db.liquidacionSueldo) {
+      const sueldosPorPagarResult = await req.db.liquidacionSueldo.aggregate({
         where: { estado: 'PENDIENTE' },
         _sum: { totalNeto: true },
       })
@@ -253,10 +253,10 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   let echequesRecibidos = []
   let echequesEmitidos = []
   try {
-    if (req.prisma.eCheq) {
+    if (req.db.eCheq) {
       [echequesRecibidos, echequesEmitidos] = await Promise.all([
         // eCheqs RECIBIDOS pendientes de acreditación
-        req.prisma.eCheq.findMany({
+        req.db.eCheq.findMany({
           where: {
             tipo: 'RECIBIDO',
             estado: { in: ['CARTERA', 'DEPOSITADO'] },
@@ -272,7 +272,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
           orderBy: { fechaVencimiento: 'asc' },
         }),
         // eCheqs EMITIDOS pendientes de débito
-        req.prisma.eCheq.findMany({
+        req.db.eCheq.findMany({
           where: {
             tipo: 'EMITIDO',
             estado: 'PENDIENTE',
@@ -363,7 +363,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Cobranza de cuotas de los últimos 6 periodos
-  const periodosHistoricos = await req.prisma.periodo.findMany({
+  const periodosHistoricos = await req.db.periodo.findMany({
     where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
     take: 6,
@@ -499,14 +499,14 @@ router.get('/comercios', authAdmin, asyncHandler(async (req, res) => {
   const where = estado ? { estado } : {}
 
   const [comercios, total] = await Promise.all([
-    req.prisma.comercio.findMany({
+    req.db.comercio.findMany({
       where,
       include: { rubro: true },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: parseInt(limit),
     }),
-    req.prisma.comercio.count({ where }),
+    req.db.comercio.count({ where }),
   ])
 
   res.json({
@@ -535,7 +535,7 @@ router.get('/comercios', authAdmin, asyncHandler(async (req, res) => {
 router.get('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const comercio = await req.prisma.comercio.findUnique({
+  const comercio = await req.db.comercio.findUnique({
     where: { id: parseInt(id) },
     include: { rubro: true },
   })
@@ -545,7 +545,7 @@ router.get('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Stats
-  const stats = await req.prisma.venta.aggregate({
+  const stats = await req.db.venta.aggregate({
     where: { comercioId: comercio.id },
     _count: true,
     _sum: { importeFinal: true },
@@ -567,7 +567,7 @@ router.get('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
 router.post('/comercios/:id/aprobar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const comercio = await req.prisma.comercio.update({
+  const comercio = await req.db.comercio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'ACTIVO',
@@ -599,7 +599,7 @@ router.post('/comercios/:id/rechazar', authAdmin, asyncHandler(async (req, res) 
   const { id } = req.params
   const { motivo } = req.body
 
-  const comercio = await req.prisma.comercio.update({
+  const comercio = await req.db.comercio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'RECHAZADO',
@@ -629,7 +629,7 @@ router.patch('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { descuentoPct, acumulacionActiva, acumComprasReq, acumPeriodoDias, acumDescuentoExtra } = req.body
 
-  const comercio = await req.prisma.comercio.update({
+  const comercio = await req.db.comercio.update({
     where: { id: parseInt(id) },
     data: {
       descuentoPct,
@@ -653,7 +653,7 @@ router.patch('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
 router.post('/comercios/:id/desactivar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  await req.prisma.comercio.update({
+  await req.db.comercio.update({
     where: { id: parseInt(id) },
     data: { estado: 'INACTIVO' },
   })
@@ -668,7 +668,7 @@ router.post('/comercios/:id/desactivar', authAdmin, asyncHandler(async (req, res
 router.post('/comercios/:id/reenviar-link', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const comercio = await req.prisma.comercio.findUnique({
+  const comercio = await req.db.comercio.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -1818,18 +1818,18 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   // Crear tipos de socio que no existan
   for (const tipo of tiposUnicos) {
     const codigo = tipo.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
-    const existente = await req.prisma.tipoSocio.findFirst({
+    const existente = await req.db.tipoSocio.findFirst({
       where: { OR: [{ codigo }, { nombre: tipo }] }
     })
     if (!existente) {
-      await req.prisma.tipoSocio.create({
+      await req.db.tipoSocio.create({
         data: { codigo, nombre: tipo, color: 'blue' }
       })
     }
   }
 
   // Obtener mapeo de tipos de socio (nombre -> id)
-  const tiposSocio = await req.prisma.tipoSocio.findMany()
+  const tiposSocio = await req.db.tipoSocio.findMany()
   const mapeoTipoSocio = {}
   for (const tipo of tiposSocio) {
     mapeoTipoSocio[tipo.nombre] = tipo.id
@@ -1839,18 +1839,18 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   // Crear categorías de socio que no existan
   for (const cat of categoriasUnicas) {
     const codigo = cat.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
-    const existente = await req.prisma.categoriaSocio.findFirst({
+    const existente = await req.db.categoriaSocio.findFirst({
       where: { OR: [{ codigo }, { nombre: cat }] }
     })
     if (!existente) {
-      await req.prisma.categoriaSocio.create({
+      await req.db.categoriaSocio.create({
         data: { codigo, nombre: cat, color: 'blue' }
       })
     }
   }
 
   // Obtener mapeo de categorías de socio (nombre -> id)
-  const categoriasSocio = await req.prisma.categoriaSocio.findMany()
+  const categoriasSocio = await req.db.categoriaSocio.findMany()
   const mapeoCategoriaSocio = {}
   for (const cat of categoriasSocio) {
     mapeoCategoriaSocio[cat.nombre] = cat.id
@@ -1860,14 +1860,14 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   // Crear estados de socio que no existan
   for (const estado of estadosUnicos) {
     const codigo = estado.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
-    const existente = await req.prisma.estadoSocio.findFirst({
+    const existente = await req.db.estadoSocio.findFirst({
       where: { OR: [{ codigo }, { nombre: estado }] }
     })
     if (!existente) {
       // Determinar si permite descuentos basado en el nombre
       const permiteDescuentos = estado.toLowerCase().includes('activ') ||
         estado.toLowerCase().includes('vigent')
-      await req.prisma.estadoSocio.create({
+      await req.db.estadoSocio.create({
         data: {
           codigo,
           nombre: estado,
@@ -1879,7 +1879,7 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   }
 
   // Obtener mapeo de estados de socio (nombre -> id)
-  const estadosSocio = await req.prisma.estadoSocio.findMany()
+  const estadosSocio = await req.db.estadoSocio.findMany()
   const mapeoEstadoSocio = {}
   for (const est of estadosSocio) {
     mapeoEstadoSocio[est.nombre] = est.id
@@ -2011,11 +2011,11 @@ router.get('/reportes/ventas', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Debug: ver cuántas ventas hay en total
-  const totalVentas = await req.prisma.venta.count()
+  const totalVentas = await req.db.venta.count()
   console.log('Total ventas en BD:', totalVentas, 'Filtro:', where)
 
   const [resumen, porComercio] = await Promise.all([
-    req.prisma.venta.aggregate({
+    req.db.venta.aggregate({
       where,
       _count: true,
       _sum: {
@@ -2024,7 +2024,7 @@ router.get('/reportes/ventas', authAdmin, asyncHandler(async (req, res) => {
         descuentoMonto: true,
       },
     }),
-    req.prisma.venta.groupBy({
+    req.db.venta.groupBy({
       by: ['comercioId'],
       where,
       _count: true,
@@ -2038,7 +2038,7 @@ router.get('/reportes/ventas', authAdmin, asyncHandler(async (req, res) => {
 
   // Obtener nombres de comercios
   const comercioIds = porComercio.map(p => p.comercioId)
-  const comercios = await req.prisma.comercio.findMany({
+  const comercios = await req.db.comercio.findMany({
     where: { id: { in: comercioIds } },
     select: { id: true, nombre: true },
   })
@@ -2084,7 +2084,7 @@ router.get('/reportes/ventas/export', authAdmin, asyncHandler(async (req, res) =
   }
 
   // Obtener ventas con detalle
-  const ventas = await req.prisma.venta.findMany({
+  const ventas = await req.db.venta.findMany({
     where,
     include: {
       comercio: { select: { nombre: true, cuit: true } },
@@ -2260,7 +2260,7 @@ router.put('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const categoriasCount = await req.prisma.categoriaActividad.count({
+  const categoriasCount = await req.db.categoriaActividad.count({
     where: { actividadId: parseInt(id) },
   })
 
@@ -2281,7 +2281,7 @@ router.get('/categorias-actividad', authAdmin, asyncHandler(async (req, res) => 
   if (actividadId) where.actividadId = parseInt(actividadId)
   if (activo !== undefined) where.activo = activo === 'true'
 
-  const categorias = await req.prisma.categoriaActividad.findMany({
+  const categorias = await req.db.categoriaActividad.findMany({
     where,
     include: {
       actividad: { select: { id: true, codigo: true, nombre: true, cuotaMensual: true } },
@@ -2304,7 +2304,7 @@ router.get('/categorias-actividad', authAdmin, asyncHandler(async (req, res) => 
 
 // GET /api/admin/categorias-actividad/:id - Detalle de categoría
 router.get('/categorias-actividad/:id', authAdmin, asyncHandler(async (req, res) => {
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(req.params.id) },
     include: {
       actividad: { select: { id: true, codigo: true, nombre: true, cuotaMensual: true } },
@@ -2341,13 +2341,13 @@ router.post('/categorias-actividad', authAdmin, asyncHandler(async (req, res) =>
     throw new AppError('Actividad, código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.categoriaActividad.findFirst({ where: { codigo } })
+  const existente = await req.db.categoriaActividad.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
 
   const actividad = await req.db.actividad.findUnique({ where: { id: parseInt(actividadId) } })
   if (!actividad) throw new AppError('Actividad no encontrada', 404, 'NOT_FOUND')
 
-  const categoria = await req.prisma.categoriaActividad.create({
+  const categoria = await req.db.categoriaActividad.create({
     data: {
       actividadId: parseInt(actividadId),
       codigo,
@@ -2386,15 +2386,15 @@ router.put('/categorias-actividad/:id', authAdmin, asyncHandler(async (req, res)
     cupoMaximo, orden, activo
   } = req.body
 
-  const existente = await req.prisma.categoriaActividad.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.categoriaActividad.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Categoría no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.categoriaActividad.findFirst({ where: { codigo } })
+    const duplicado = await req.db.categoriaActividad.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
   }
 
-  const categoria = await req.prisma.categoriaActividad.update({
+  const categoria = await req.db.categoriaActividad.update({
     where: { id: parseInt(id) },
     data: {
       actividadId: actividadId ? parseInt(actividadId) : existente.actividadId,
@@ -2438,7 +2438,7 @@ router.delete('/categorias-actividad/:id', authAdmin, asyncHandler(async (req, r
     throw new AppError(`No se puede eliminar, tiene ${inscripcionesCount} inscripción(es)`, 400, 'HAS_RELATIONS')
   }
 
-  await req.prisma.categoriaActividad.delete({ where: { id: parseInt(id) } })
+  await req.db.categoriaActividad.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Categoría eliminada' } })
 }))
 
@@ -2640,7 +2640,7 @@ router.post('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Crear en transaccion: Entidad PERSONAL + Entrenador
-  const entrenador = await req.prisma.$transaction(async (tx) => {
+  const entrenador = await req.db.$transaction(async (tx) => {
     // 1. Crear Entidad tipo PERSONAL
     const codigoEntidad = await generarCodigoEntidadPersonal(tx)
     const razonSocial = apellido ? `${apellido}, ${nombre}` : nombre
@@ -2716,7 +2716,7 @@ router.put('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
   if (!existente) throw new AppError('Entrenador no encontrado', 404, 'NOT_FOUND')
 
   // Actualizar en transaccion
-  const entrenador = await req.prisma.$transaction(async (tx) => {
+  const entrenador = await req.db.$transaction(async (tx) => {
     // 1. Actualizar o crear Entidad PERSONAL
     const nombreFinal = nombre ?? existente.nombre
     const apellidoFinal = apellido !== undefined ? apellido : existente.apellido
@@ -2890,7 +2890,7 @@ router.post('/entrenadores/:id/categorias', authAdmin, asyncHandler(async (req, 
   const entrenador = await req.db.entrenador.findUnique({ where: { id: parseInt(id) } })
   if (!entrenador) throw new AppError('Entrenador no encontrado', 404, 'NOT_FOUND')
 
-  const categoria = await req.prisma.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
+  const categoria = await req.db.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
   if (!categoria) throw new AppError('Categoría no encontrada', 404, 'NOT_FOUND')
 
   // Verificar si ya existe la asignación
@@ -2960,7 +2960,7 @@ router.delete('/entrenadores/:id/categorias/:catId', authAdmin, asyncHandler(asy
 
 // GET /api/admin/cobradores - Listado de cobradores
 router.get('/cobradores', authAdmin, asyncHandler(async (req, res) => {
-  const cobradores = await req.prisma.cobrador.findMany({
+  const cobradores = await req.db.cobrador.findMany({
     where: { activo: true },
     orderBy: { nombre: 'asc' },
   })
@@ -2985,7 +2985,7 @@ router.get('/tipos-socio', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const tipos = await req.prisma.tipoSocio.findMany({
+  const tipos = await req.db.tipoSocio.findMany({
     where,
     include: {
       conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
@@ -2998,7 +2998,7 @@ router.get('/tipos-socio', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/tipos-socio/:id
 router.get('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
-  const tipo = await req.prisma.tipoSocio.findUnique({
+  const tipo = await req.db.tipoSocio.findUnique({
     where: { id: parseInt(req.params.id) },
     include: {
       conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
@@ -3016,10 +3016,10 @@ router.post('/tipos-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.tipoSocio.findFirst({ where: { codigo } })
+  const existente = await req.db.tipoSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un tipo con ese código', 400, 'DUPLICATE')
 
-  const tipo = await req.prisma.tipoSocio.create({
+  const tipo = await req.db.tipoSocio.create({
     data: {
       codigo,
       nombre,
@@ -3042,15 +3042,15 @@ router.put('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, descripcion, cuotaMensual, conceptoTesoreriaId, color, orden, activo } = req.body
 
-  const existente = await req.prisma.tipoSocio.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.tipoSocio.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Tipo de socio no encontrado', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.tipoSocio.findFirst({ where: { codigo } })
+    const duplicado = await req.db.tipoSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe un tipo con ese código', 400, 'DUPLICATE')
   }
 
-  const tipo = await req.prisma.tipoSocio.update({
+  const tipo = await req.db.tipoSocio.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo ?? existente.codigo,
@@ -3083,7 +3083,7 @@ router.delete('/tipos-socio/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError(`No se puede eliminar, hay ${sociosConTipo} socio(s) con este tipo`, 400, 'HAS_RELATIONS')
   }
 
-  await req.prisma.tipoSocio.delete({ where: { id: parseInt(id) } })
+  await req.db.tipoSocio.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Tipo de socio eliminado' } })
 }))
 
@@ -3094,7 +3094,7 @@ router.get('/categorias-socio', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const categorias = await req.prisma.categoriaSocio.findMany({
+  const categorias = await req.db.categoriaSocio.findMany({
     where,
     orderBy: { orden: 'asc' },
   })
@@ -3110,7 +3110,7 @@ router.get('/categorias-socio', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/categorias-socio/:id
 router.get('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => {
-  const categoria = await req.prisma.categoriaSocio.findUnique({
+  const categoria = await req.db.categoriaSocio.findUnique({
     where: { id: parseInt(req.params.id) },
   })
   if (!categoria) throw new AppError('Categoría de socio no encontrada', 404, 'NOT_FOUND')
@@ -3128,10 +3128,10 @@ router.post('/categorias-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.categoriaSocio.findFirst({ where: { codigo } })
+  const existente = await req.db.categoriaSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
 
-  const categoria = await req.prisma.categoriaSocio.create({
+  const categoria = await req.db.categoriaSocio.create({
     data: {
       codigo,
       nombre,
@@ -3150,15 +3150,15 @@ router.put('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) => 
   const { id } = req.params
   const { codigo, nombre, descripcion, porcentajeDescuento, color, orden, activo } = req.body
 
-  const existente = await req.prisma.categoriaSocio.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.categoriaSocio.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Categoría de socio no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.categoriaSocio.findFirst({ where: { codigo } })
+    const duplicado = await req.db.categoriaSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
   }
 
-  const categoria = await req.prisma.categoriaSocio.update({
+  const categoria = await req.db.categoriaSocio.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo ?? existente.codigo,
@@ -3186,7 +3186,7 @@ router.delete('/categorias-socio/:id', authAdmin, asyncHandler(async (req, res) 
     throw new AppError(`No se puede eliminar, hay ${sociosConCategoria} socio(s) con esta categoría`, 400, 'HAS_RELATIONS')
   }
 
-  await req.prisma.categoriaSocio.delete({ where: { id: parseInt(id) } })
+  await req.db.categoriaSocio.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Categoría de socio eliminada' } })
 }))
 
@@ -3197,7 +3197,7 @@ router.get('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const estados = await req.prisma.estadoSocio.findMany({
+  const estados = await req.db.estadoSocio.findMany({
     where,
     orderBy: { orden: 'asc' },
   })
@@ -3207,7 +3207,7 @@ router.get('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/estados-socio/:id
 router.get('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
-  const estado = await req.prisma.estadoSocio.findUnique({
+  const estado = await req.db.estadoSocio.findUnique({
     where: { id: parseInt(req.params.id) },
   })
   if (!estado) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
@@ -3222,10 +3222,10 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.estadoSocio.findFirst({ where: { codigo } })
+  const existente = await req.db.estadoSocio.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
 
-  const estado = await req.prisma.estadoSocio.create({
+  const estado = await req.db.estadoSocio.create({
     data: {
       codigo,
       nombre,
@@ -3244,15 +3244,15 @@ router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, descripcion, color, permiteDescuentos, orden, activo } = req.body
 
-  const existente = await req.prisma.estadoSocio.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.estadoSocio.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.estadoSocio.findFirst({ where: { codigo } })
+    const duplicado = await req.db.estadoSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
   }
 
-  const estado = await req.prisma.estadoSocio.update({
+  const estado = await req.db.estadoSocio.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo ?? existente.codigo,
@@ -3280,7 +3280,7 @@ router.delete('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => 
     throw new AppError(`No se puede eliminar, hay ${sociosConEstado} socio(s) con este estado`, 400, 'HAS_RELATIONS')
   }
 
-  await req.prisma.estadoSocio.delete({ where: { id: parseInt(id) } })
+  await req.db.estadoSocio.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Estado de socio eliminado' } })
 }))
 
@@ -3291,7 +3291,7 @@ router.get('/descuentos-disponibles', authAdmin, asyncHandler(async (req, res) =
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const descuentos = await req.prisma.descuentoDisponible.findMany({
+  const descuentos = await req.db.descuentoDisponible.findMany({
     where,
     orderBy: { orden: 'asc' },
   })
@@ -3301,7 +3301,7 @@ router.get('/descuentos-disponibles', authAdmin, asyncHandler(async (req, res) =
 
 // GET /api/admin/descuentos-disponibles/:id
 router.get('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req, res) => {
-  const descuento = await req.prisma.descuentoDisponible.findUnique({
+  const descuento = await req.db.descuentoDisponible.findUnique({
     where: { id: parseInt(req.params.id) },
   })
   if (!descuento) throw new AppError('Descuento no encontrado', 404, 'NOT_FOUND')
@@ -3320,7 +3320,7 @@ router.post('/descuentos-disponibles', authAdmin, asyncHandler(async (req, res) 
     throw new AppError('El porcentaje debe estar entre 0 y 100', 400, 'VALIDATION_ERROR')
   }
 
-  const descuento = await req.prisma.descuentoDisponible.create({
+  const descuento = await req.db.descuentoDisponible.create({
     data: {
       nombre,
       porcentaje: parseFloat(porcentaje),
@@ -3337,14 +3337,14 @@ router.put('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req, re
   const { id } = req.params
   const { nombre, porcentaje, descripcion, orden, activo } = req.body
 
-  const existente = await req.prisma.descuentoDisponible.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.descuentoDisponible.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Descuento no encontrado', 404, 'NOT_FOUND')
 
   if (porcentaje !== undefined && (porcentaje < 0 || porcentaje > 100)) {
     throw new AppError('El porcentaje debe estar entre 0 y 100', 400, 'VALIDATION_ERROR')
   }
 
-  const descuento = await req.prisma.descuentoDisponible.update({
+  const descuento = await req.db.descuentoDisponible.update({
     where: { id: parseInt(id) },
     data: {
       nombre: nombre ?? existente.nombre,
@@ -3363,7 +3363,7 @@ router.delete('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req,
   const { id } = req.params
 
   // Verificar si hay comercios usando este descuento
-  const comerciosConDescuento = await req.prisma.comercio.count({
+  const comerciosConDescuento = await req.db.comercio.count({
     where: { descuentoDisponibleId: parseInt(id) },
   })
 
@@ -3371,7 +3371,7 @@ router.delete('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req,
     throw new AppError(`No se puede eliminar, hay ${comerciosConDescuento} comercio(s) con este descuento`, 400, 'HAS_RELATIONS')
   }
 
-  await req.prisma.descuentoDisponible.delete({ where: { id: parseInt(id) } })
+  await req.db.descuentoDisponible.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Descuento eliminado' } })
 }))
 
@@ -3382,7 +3382,7 @@ router.get('/rubros', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const rubros = await req.prisma.rubro.findMany({
+  const rubros = await req.db.rubro.findMany({
     where,
     orderBy: { orden: 'asc' },
   })
@@ -3392,7 +3392,7 @@ router.get('/rubros', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/rubros/:id
 router.get('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
-  const rubro = await req.prisma.rubro.findUnique({
+  const rubro = await req.db.rubro.findUnique({
     where: { id: parseInt(req.params.id) },
   })
   if (!rubro) throw new AppError('Rubro no encontrado', 404, 'NOT_FOUND')
@@ -3407,7 +3407,7 @@ router.post('/rubros', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('El nombre es requerido', 400, 'VALIDATION_ERROR')
   }
 
-  const rubro = await req.prisma.rubro.create({
+  const rubro = await req.db.rubro.create({
     data: {
       nombre,
       orden: orden || 0,
@@ -3422,10 +3422,10 @@ router.put('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { nombre, orden, activo } = req.body
 
-  const existente = await req.prisma.rubro.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.rubro.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Rubro no encontrado', 404, 'NOT_FOUND')
 
-  const rubro = await req.prisma.rubro.update({
+  const rubro = await req.db.rubro.update({
     where: { id: parseInt(id) },
     data: {
       nombre: nombre ?? existente.nombre,
@@ -3442,7 +3442,7 @@ router.delete('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
   // Verificar si hay comercios usando este rubro
-  const comerciosConRubro = await req.prisma.comercio.count({
+  const comerciosConRubro = await req.db.comercio.count({
     where: { rubroId: parseInt(id) },
   })
 
@@ -3450,7 +3450,7 @@ router.delete('/rubros/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError(`No se puede eliminar, hay ${comerciosConRubro} comercio(s) con este rubro`, 400, 'HAS_RELATIONS')
   }
 
-  await req.prisma.rubro.delete({ where: { id: parseInt(id) } })
+  await req.db.rubro.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Rubro eliminado' } })
 }))
 
@@ -3463,7 +3463,7 @@ router.get('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => {
   if (activo !== undefined) where.activo = activo === 'true'
   if (tipo) where.tipo = tipo
 
-  const conceptos = await req.prisma.conceptoTesoreria.findMany({
+  const conceptos = await req.db.conceptoTesoreria.findMany({
     where,
     include: {
       cuentaContable: { select: { id: true, codigo: true, nombre: true } },
@@ -3476,7 +3476,7 @@ router.get('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/conceptos-tesoreria/:id
 router.get('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) => {
-  const concepto = await req.prisma.conceptoTesoreria.findUnique({
+  const concepto = await req.db.conceptoTesoreria.findUnique({
     where: { id: parseInt(req.params.id) },
     include: {
       cuentaContable: { select: { id: true, codigo: true, nombre: true } },
@@ -3494,10 +3494,10 @@ router.post('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => 
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.conceptoTesoreria.findFirst({ where: { codigo } })
+  const existente = await req.db.conceptoTesoreria.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe un concepto con ese código', 400, 'DUPLICATE')
 
-  const concepto = await req.prisma.conceptoTesoreria.create({
+  const concepto = await req.db.conceptoTesoreria.create({
     data: {
       codigo,
       nombre,
@@ -3522,7 +3522,7 @@ router.put('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, res) 
   const { id } = req.params
   const { codigo, nombre, descripcion, tipo, usaEnCompras, usaEnVentas, usaEnTesoreria, cuentaContableId, orden, activo } = req.body
 
-  const concepto = await req.prisma.conceptoTesoreria.update({
+  const concepto = await req.db.conceptoTesoreria.update({
     where: { id: parseInt(id) },
     data: {
       codigo,
@@ -3550,16 +3550,16 @@ router.delete('/conceptos-tesoreria/:id', authAdmin, asyncHandler(async (req, re
 
   // Verificar si hay tipos de socio o actividades usando este concepto
   const [tiposSocio, actividades, categorias] = await Promise.all([
-    req.prisma.tipoSocio.count({ where: { conceptoId: parseInt(id) } }),
+    req.db.tipoSocio.count({ where: { conceptoId: parseInt(id) } }),
     req.db.actividad.count({ where: { conceptoId: parseInt(id) } }),
-    req.prisma.categoriaActividad.count({ where: { conceptoId: parseInt(id) } }),
+    req.db.categoriaActividad.count({ where: { conceptoId: parseInt(id) } }),
   ])
 
   if (tiposSocio > 0 || actividades > 0 || categorias > 0) {
     throw new AppError('No se puede eliminar, el concepto está en uso', 400, 'IN_USE')
   }
 
-  await req.prisma.conceptoTesoreria.delete({ where: { id: parseInt(id) } })
+  await req.db.conceptoTesoreria.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Concepto eliminado' } })
 }))
 
@@ -3574,7 +3574,7 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
   const where = {}
   if (anio) where.anio = parseInt(anio)
 
-  const periodos = await req.prisma.periodo.findMany({
+  const periodos = await req.db.periodo.findMany({
     where,
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
     include: {
@@ -3631,7 +3631,7 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
 router.get('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const periodo = await req.prisma.periodo.findUnique({
+  const periodo = await req.db.periodo.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -3661,7 +3661,7 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
   const mesInt = parseInt(mes)
 
   // Verificar si ya existe un periodo con el mismo año/mes
-  const periodoExistente = await req.prisma.periodo.findFirst({
+  const periodoExistente = await req.db.periodo.findFirst({
     where: { anio: anioInt, mes: mesInt }
   })
 
@@ -3714,7 +3714,7 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
     fechaVenc = new Date(anioVenc, mesVenc - 1, diaVencimiento)
   }
 
-  const periodo = await req.prisma.periodo.create({
+  const periodo = await req.db.periodo.create({
     data: {
       anio: anioInt,
       mes: mesInt,
@@ -3731,7 +3731,7 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const periodo = await req.prisma.periodo.findUnique({
+  const periodo = await req.db.periodo.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -3757,7 +3757,7 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Eliminar el periodo
-  await req.prisma.periodo.delete({
+  await req.db.periodo.delete({
     where: { id: periodo.id },
   })
 
@@ -3768,7 +3768,7 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
 router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const periodo = await req.prisma.periodo.findUnique({
+  const periodo = await req.db.periodo.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -3933,7 +3933,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   })
 
   if (totalCuotasPeriodo > 0) {
-    await req.prisma.periodo.update({
+    await req.db.periodo.update({
       where: { id: periodo.id },
       data: {
         estado: 'GENERADO',
@@ -4187,7 +4187,7 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
 
   // Calcular recargo para cada cuota
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
-    const recargoCalc = await calcularRecargoCargo(req.prisma, cuota)
+    const recargoCalc = await calcularRecargoCargo(req.db, cuota)
     return {
       ...cuota,
       recargoCalculado: recargoCalc.recargo,
@@ -4540,7 +4540,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
 
   // Calcular recargo para cada cuota
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
-    const recargoCalc = await calcularRecargoCargo(req.prisma, cuota)
+    const recargoCalc = await calcularRecargoCargo(req.db, cuota)
     return {
       ...cuota,
       recargoCalculado: recargoCalc.recargo,
@@ -4572,7 +4572,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Todo dentro de una transacción
-  const pagoCompleto = await req.prisma.$transaction(async (tx) => {
+  const pagoCompleto = await req.db.$transaction(async (tx) => {
     // Generar número de recibo (dentro de transacción para evitar duplicados)
     const ultimoPago = await tx.pago.findFirst({
       orderBy: { id: 'desc' },
@@ -4732,7 +4732,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Generar asiento contable automático (fuera de transacción, no debe fallar el pago)
-  generarAsientoPagoCuota(req.prisma, {
+  generarAsientoPagoCuota(req.db, {
     pago: pagoCompleto,
     caja,
     cargos: pagoCompleto.cargos || [],
@@ -4758,7 +4758,7 @@ router.get('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
   const where = activo !== undefined ? { activo: activo === 'true' } : {}
 
-  const medios = await req.prisma.medioPago.findMany({
+  const medios = await req.db.medioPago.findMany({
     where,
     orderBy: { orden: 'asc' },
     include: { conceptoTesoreria: { select: { id: true, nombre: true, cuentaContableId: true } } }
@@ -4768,7 +4768,7 @@ router.get('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/medios-pago/:id - Obtener medio de pago por ID
 router.get('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
-  const medio = await req.prisma.medioPago.findUnique({
+  const medio = await req.db.medioPago.findUnique({
     where: { id: parseInt(req.params.id) },
     include: { conceptoTesoreria: { select: { id: true, nombre: true, cuentaContableId: true } } }
   })
@@ -4787,13 +4787,13 @@ router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('El concepto de tesorería es requerido', 400, 'VALIDATION_ERROR')
   }
 
-  // Verificar código único
-  const existente = await req.prisma.medioPago.findFirst({ where: { codigo } })
+  // Verificar código único dentro del tenant
+  const existente = await req.db.medioPago.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
   }
 
-  const medio = await req.prisma.medioPago.create({
+  const medio = await req.db.medioPago.create({
     data: {
       codigo,
       nombre,
@@ -4819,22 +4819,22 @@ router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway, conceptoTesoreriaId } = req.body
 
-  const existente = await req.prisma.medioPago.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.medioPago.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Medio de pago no encontrado', 404, 'NOT_FOUND')
 
   if (conceptoTesoreriaId === null || conceptoTesoreriaId === '' || conceptoTesoreriaId === undefined) {
     throw new AppError('El concepto de tesorería es requerido', 400, 'VALIDATION_ERROR')
   }
 
-  // Verificar código único (si cambió)
+  // Verificar código único dentro del tenant (si cambió)
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.medioPago.findFirst({ where: { codigo } })
+    const duplicado = await req.db.medioPago.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un medio de pago con ese código', 400, 'DUPLICATE_CODE')
     }
   }
 
-  const medio = await req.prisma.medioPago.update({
+  const medio = await req.db.medioPago.update({
     where: { id: parseInt(id) },
     data: {
       ...(codigo !== undefined && { codigo }),
@@ -4873,7 +4873,7 @@ router.delete('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
     )
   }
 
-  await req.prisma.medioPago.delete({ where: { id: parseInt(id) } })
+  await req.db.medioPago.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, message: 'Medio de pago eliminado' })
 }))
 
@@ -4934,7 +4934,7 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
   })
   let totalRecargoPendiente = 0
   for (const cuota of cuotasPendientesConRecargo) {
-    const recargo = await calcularRecargoCargo(req.prisma, cuota)
+    const recargo = await calcularRecargoCargo(req.db, cuota)
     totalRecargoPendiente += recargo.recargo
   }
 
@@ -5147,7 +5147,7 @@ router.get('/reportes/cobranza/morosos', authAdmin, asyncHandler(async (req, res
 
   // Si se filtra por actividad, buscar todas las categorías de esa actividad
   if (actividadId && !categoriaActividadId) {
-    const categoriasActividad = await req.prisma.categoriaActividad.findMany({
+    const categoriasActividad = await req.db.categoriaActividad.findMany({
       where: { actividadId: parseInt(actividadId) },
       select: { id: true },
     })
@@ -5185,7 +5185,7 @@ router.get('/reportes/cobranza/morosos', authAdmin, asyncHandler(async (req, res
   const hoy = new Date()
   const cuotasConRecargo = []
   for (const cuota of cuotasPendientes) {
-    const recargo = await calcularRecargoCargo(req.prisma, cuota)
+    const recargo = await calcularRecargoCargo(req.db, cuota)
     cuotasConRecargo.push({
       ...cuota,
       recargo: recargo.recargo,
@@ -5242,7 +5242,7 @@ router.get('/reportes/cobranza/evolucion', authAdmin, asyncHandler(async (req, r
   const fechaDesde = desde ? new Date(desde) : new Date(fechaHasta.getFullYear(), fechaHasta.getMonth() - 5, 1)
 
   // Obtener todos los periodos en el rango
-  const periodos = await req.prisma.periodo.findMany({
+  const periodos = await req.db.periodo.findMany({
     where: {
       estado: 'GENERADO',
       OR: [
@@ -5276,7 +5276,7 @@ router.get('/reportes/cobranza/evolucion', authAdmin, asyncHandler(async (req, r
     filtroAdicional.categoriaActividadId = parseInt(categoriaActividadId)
   } else if (actividadId) {
     // Si hay actividadId pero no categoriaActividadId, buscar todas las categorías de esa actividad
-    const categoriasAct = await req.prisma.categoriaActividad.findMany({
+    const categoriasAct = await req.db.categoriaActividad.findMany({
       where: { actividadId: parseInt(actividadId) },
       select: { id: true },
     })
@@ -5554,7 +5554,7 @@ router.get('/cargos/:id/recargo', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Cargo no encontrado', 404, 'NOT_FOUND')
   }
 
-  const resultado = await calcularRecargoCargo(req.prisma, cargo)
+  const resultado = await calcularRecargoCargo(req.db, cargo)
   res.json({ success: true, data: resultado })
 }))
 
@@ -5783,7 +5783,7 @@ router.post('/planes-pago', authAdmin, asyncHandler(async (req, res) => {
 
   // Calcular recargo para cada cuota
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
-    const recargoCalc = await calcularRecargoCargo(req.prisma, cuota)
+    const recargoCalc = await calcularRecargoCargo(req.db, cuota)
     return {
       ...cuota,
       recargoCalculado: recargoCalc.recargo,
@@ -5815,7 +5815,7 @@ router.post('/planes-pago', authAdmin, asyncHandler(async (req, res) => {
   const descripcionPlan = `Financiación: ${cuotasDesc}`
 
   // Todo dentro de una transacción
-  const resultado = await req.prisma.$transaction(async (tx) => {
+  const resultado = await req.db.$transaction(async (tx) => {
     // 1. Marcar cuotas originales como FINANCIADA
     await tx.cargo.updateMany({
       where: { id: { in: cuotaIds.map(id => parseInt(id)) } },
@@ -5930,7 +5930,7 @@ router.post('/planes-pago/preview', authAdmin, asyncHandler(async (req, res) => 
 
   // Calcular recargos
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
-    const recargoCalc = await calcularRecargoCargo(req.prisma, cuota)
+    const recargoCalc = await calcularRecargoCargo(req.db, cuota)
     return {
       id: cuota.id,
       descripcion: cuota.periodo?.nombre || cuota.descripcion || `Cargo #${cuota.id}`,
@@ -6226,7 +6226,7 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
   ])
 
   // Obtener movimientos contables
-  const movimientosContables = await req.prisma.movimientoContable.findMany({
+  const movimientosContables = await req.db.movimientoContable.findMany({
     where: whereMovContable,
     include: {
       concepto: true,
@@ -6355,7 +6355,7 @@ router.get('/centros-costo-reporte-comparativo', authAdmin, asyncHandler(async (
       ])
 
       // Movimientos contables
-      const movContables = await req.prisma.movimientoContable.findMany({
+      const movContables = await req.db.movimientoContable.findMany({
         where: { ...whereMovContable, centroCostoId: centro.id },
         select: { tipo: true, montoTotal: true },
       })
@@ -6774,7 +6774,7 @@ router.get('/solicitudes', asyncHandler(async (req, res) => {
   const take = parseInt(limite)
 
   const [solicitudes, total] = await Promise.all([
-    req.prisma.solicitudSocio.findMany({
+    req.db.solicitudSocio.findMany({
       where,
       include: {
         respondidoPorAdmin: {
@@ -6788,7 +6788,7 @@ router.get('/solicitudes', asyncHandler(async (req, res) => {
       skip,
       take
     }),
-    req.prisma.solicitudSocio.count({ where })
+    req.db.solicitudSocio.count({ where })
   ])
 
   res.json({
@@ -6810,7 +6810,7 @@ router.get('/solicitudes', asyncHandler(async (req, res) => {
 router.get('/solicitudes/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const solicitud = await req.prisma.solicitudSocio.findUnique({
+  const solicitud = await req.db.solicitudSocio.findUnique({
     where: { id: parseInt(id) },
     include: {
       respondidoPorAdmin: {
@@ -6840,7 +6840,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   const { id } = req.params
   const { tipoSocioId, categoriaSocioId, observacionesInternas } = req.body
 
-  const solicitud = await req.prisma.solicitudSocio.findUnique({
+  const solicitud = await req.db.solicitudSocio.findUnique({
     where: { id: parseInt(id) },
     include: {
       familiares: true
@@ -6983,7 +6983,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     proximoNumero++
 
     // Actualizar el registro de FamiliarSolicitud con el socio creado
-    await req.prisma.familiarSolicitud.update({
+    await req.db.familiarSolicitud.update({
       where: { id: familiar.id },
       data: { socioCreado: socioFamiliar.id }
     })
@@ -7003,7 +7003,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   const anioActual = hoy.getFullYear()
 
   // Buscar el periodo actual
-  const periodoActual = await req.prisma.periodo.findFirst({
+  const periodoActual = await req.db.periodo.findFirst({
     where: {
       mes: mesActual,
       anio: anioActual
@@ -7013,7 +7013,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   const cuotasGeneradas = []
 
   if (periodoActual) {
-    const tipoSocio = await req.prisma.tipoSocio.findUnique({
+    const tipoSocio = await req.db.tipoSocio.findUnique({
       where: { id: parseInt(tipoSocioId) }
     })
 
@@ -7085,7 +7085,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   if (cuotasGeneradas.length > 0) {
     const montoTotal = cuotasGeneradas.reduce((sum, cargo) => sum + parseFloat(cargo.montoTotal), 0)
 
-    linkPago = await req.prisma.linkPago.create({
+    linkPago = await req.db.linkPago.create({
       data: {
         socio: { connect: { id: nuevoSocio.id } },
         concepto: 'Primera cuota - Alta de socio',
@@ -7100,7 +7100,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   }
 
   // PASO 6: Actualizar la solicitud
-  const solicitudActualizada = await req.prisma.solicitudSocio.update({
+  const solicitudActualizada = await req.db.solicitudSocio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'APROBADA',
@@ -7159,7 +7159,7 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
     throw new AppError('Debe especificar el motivo del rechazo', 400)
   }
 
-  const solicitud = await req.prisma.solicitudSocio.findUnique({
+  const solicitud = await req.db.solicitudSocio.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -7172,7 +7172,7 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
   }
 
   // Actualizar la solicitud
-  const solicitudActualizada = await req.prisma.solicitudSocio.update({
+  const solicitudActualizada = await req.db.solicitudSocio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'RECHAZADA',
@@ -7211,10 +7211,10 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
  */
 router.get('/solicitudes-stats', asyncHandler(async (req, res) => {
   const [pendientes, aprobadas, rechazadas, totalMes] = await Promise.all([
-    req.prisma.solicitudSocio.count({ where: { estado: 'PENDIENTE' } }),
-    req.prisma.solicitudSocio.count({ where: { estado: 'APROBADA' } }),
-    req.prisma.solicitudSocio.count({ where: { estado: 'RECHAZADA' } }),
-    req.prisma.solicitudSocio.count({
+    req.db.solicitudSocio.count({ where: { estado: 'PENDIENTE' } }),
+    req.db.solicitudSocio.count({ where: { estado: 'APROBADA' } }),
+    req.db.solicitudSocio.count({ where: { estado: 'RECHAZADA' } }),
+    req.db.solicitudSocio.count({
       where: {
         fechaSolicitud: {
           gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -7374,7 +7374,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar que la categoría existe y está activa
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(categoriaActividadId) },
     include: {
       actividad: true
@@ -7565,7 +7565,7 @@ router.get('/categorias-actividad/:id/plantel', authAdmin, asyncHandler(async (r
   const { id } = req.params
   const { incluirInactivos = false } = req.query
 
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(id) },
     include: {
       actividad: true
@@ -7659,7 +7659,7 @@ router.get('/categorias-actividad/:id/plantel', authAdmin, asyncHandler(async (r
 router.get('/categorias-actividad/:id/plantel/excel', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(id) },
     include: {
       actividad: true
