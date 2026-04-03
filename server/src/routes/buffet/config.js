@@ -80,7 +80,7 @@ router.get('/config/medios-pago/:puntoVenta', authAdmin, checkPermiso('BUFFET_VE
         break
     }
 
-    const mediosPago = await prisma.medioPago.findMany({
+    const mediosPago = await req.db.medioPago.findMany({
       where,
       orderBy: { orden: 'asc' },
       select: { id: true, codigo: true, nombre: true, tipo: true, comisionPct: true }
