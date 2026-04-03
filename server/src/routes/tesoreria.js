@@ -806,17 +806,23 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
     }
   }
 
+  // Resolver medioPago código → ID
+  const medioPagoRecord = await req.db.medioPago.findFirst({ where: { codigo: medioPago, activo: true } })
+  if (!medioPagoRecord) {
+    throw new AppError(`Medio de pago '${medioPago}' no encontrado`, 400)
+  }
+  const medioPagoId = medioPagoRecord.id
+
   // Verificar saldo suficiente por medio de pago
   {
-    const whereBase = { cajaId: parseInt(cajaOrigenId), anulado: false, medioPago }
+    const whereBase = { cajaId: parseInt(cajaOrigenId), anulado: false, medioPagoId }
     const [ingAgg, egrAgg] = await Promise.all([
       req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'INGRESO' }, _sum: { monto: true } }),
       req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
     ])
     const saldoMedio = (Number(ingAgg._sum.monto) || 0) - (Number(egrAgg._sum.monto) || 0)
     if (saldoMedio < montoNum) {
-      const LABELS = { EFECTIVO: 'Efectivo', MERCADOPAGO: 'MercadoPago', QR: 'QR / MercadoPago', TRANSFERENCIA: 'Transferencia', CHEQUE: 'Cheque', TARJETA: 'Tarjeta', TARJETA_CREDITO: 'Tarjeta Crédito', TARJETA_DEBITO: 'Tarjeta Débito', CUENTA_CORRIENTE: 'Cuenta Corriente', OTRO: 'Otro' }
-      throw new AppError(`Saldo insuficiente en ${cajaOrigen.nombre} para ${LABELS[medioPago] || medioPago}. Disponible: $${saldoMedio.toLocaleString('es-AR')}`, 400)
+      throw new AppError(`Saldo insuficiente en ${cajaOrigen.nombre} para ${medioPagoRecord.nombre}. Disponible: $${saldoMedio.toLocaleString('es-AR')}`, 400)
     }
   }
 
@@ -872,7 +878,7 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
       fecha: new Date(),
       tipo: 'EGRESO',
       monto: montoNum,
-      medioPago,
+      medioPagoId,
       cuentaContableId: cuentaOrigenId,
       centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       concepto: `Transferencia a ${cajaDestino.nombre}`,
@@ -889,7 +895,7 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
       fecha: new Date(),
       tipo: 'INGRESO',
       monto: montoNum,
-      medioPago,
+      medioPagoId,
       cuentaContableId: cuentaDestinoId,
       centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       concepto: `Transferencia desde ${cajaOrigen.nombre}`,
@@ -1108,32 +1114,52 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
     .map(m => ({ ...m, neto: m.ingresos - m.egresos }))
     .sort((a, b) => (a.medioPago ?? 'ZZZ').localeCompare(b.medioPago ?? 'ZZZ'))
 
+  // Saldo anterior al período (todo hasta el día antes del desde)
+  let saldoAnterior = Number(caja.saldoInicial)
+  if (desde) {
+    const fechaAntes = new Date(desde)
+    const [ingAnt, egrAnt] = await Promise.all([
+      req.db.movimientoCaja.aggregate({
+        where: { cajaId: parseInt(id), anulado: false, tipo: 'INGRESO', fecha: { lt: fechaAntes } },
+        _sum: { monto: true }
+      }),
+      req.db.movimientoCaja.aggregate({
+        where: { cajaId: parseInt(id), anulado: false, tipo: 'EGRESO', fecha: { lt: fechaAntes } },
+        _sum: { monto: true }
+      })
+    ])
+    saldoAnterior += Number(ingAnt._sum.monto || 0) - Number(egrAnt._sum.monto || 0)
+  }
+
   // Saldo real calculado desde todos los movimientos activos (sin filtro de periodo)
-  const [totalesHistoricos] = await Promise.all([
-    req.db.movimientoCaja.groupBy({
-      by: ['tipo'],
-      where: { cajaId: parseInt(id), anulado: false },
-      _sum: { monto: true }
-    })
-  ])
+  const totalesHistoricos = await req.db.movimientoCaja.groupBy({
+    by: ['tipo'],
+    where: { cajaId: parseInt(id), anulado: false },
+    _sum: { monto: true }
+  })
   const ingresosHist = totalesHistoricos.find(r => r.tipo === 'INGRESO')?._sum?.monto || 0
   const egresosHist  = totalesHistoricos.find(r => r.tipo === 'EGRESO')?._sum?.monto  || 0
   const saldoCalculado = Number(caja.saldoInicial) + Number(ingresosHist) - Number(egresosHist)
+
+  const totalIngresos = Number(ingresos._sum.monto || 0)
+  const totalEgresos  = Number(egresos._sum.monto || 0)
 
   res.json({
     success: true,
     data: {
       caja: { ...caja, saldoActual: saldoCalculado },
       periodo: { desde, hasta },
+      saldoAnterior,
       ingresos: {
-        total: Number(ingresos._sum.monto || 0),
+        total: totalIngresos,
         cantidad: ingresos._count
       },
       egresos: {
-        total: Number(egresos._sum.monto || 0),
+        total: totalEgresos,
         cantidad: egresos._count
       },
-      saldoMovimientos: Number(ingresos._sum.monto || 0) - Number(egresos._sum.monto || 0),
+      saldoMovimientos: totalIngresos - totalEgresos,
+      saldoFinal: saldoAnterior + totalIngresos - totalEgresos,
       porMedioPago,
       ultimosMovimientos: ultimosMovimientos.map(m => ({
         ...m,

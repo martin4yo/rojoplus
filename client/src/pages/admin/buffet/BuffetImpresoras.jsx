@@ -150,8 +150,7 @@ export default function BuffetImpresoras() {
 
   async function cargarConfigTickets() {
     try {
-      const res = await api.get('/admin/buffet/config-impresoras')
-      const data = res.data?.data || res.data || {}
+      const data = await api.get('/admin/buffet/config-impresoras') || {}
       setConfigTickets(data.config || { tickets: null, kiosco: null, takeaway: null })
     } catch (err) {
       console.error('Error cargando config tickets:', err)
@@ -161,9 +160,7 @@ export default function BuffetImpresoras() {
   async function guardarConfigTickets() {
     setGuardandoConfig(true)
     try {
-      console.log('Guardando config:', configTickets) // Debug
-      const res = await api.put('/admin/buffet/config-impresoras', configTickets)
-      console.log('Respuesta del servidor:', res.data) // Debug
+      await api.put('/admin/buffet/config-impresoras', configTickets)
       toast.success('Configuración de impresoras guardada')
       // Recargar la configuración para asegurar que se actualizó
       await cargarConfigTickets()

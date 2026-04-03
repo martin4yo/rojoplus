@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Edit, Wallet, Building, CreditCard, TrendingUp, TrendingDown,
   ArrowRightLeft, Calendar, ChevronDown, ChevronRight, Search, Banknote,
-  Smartphone, FileText, CheckSquare, X
+  Smartphone, FileText, X, Scale
 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
@@ -368,7 +368,22 @@ export default function CajaDetalle() {
 
       {/* Resumen del periodo */}
       {resumen && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {/* Saldo anterior */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gray-100">
+                <Wallet className="w-5 h-5 text-gray-500" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Saldo anterior</p>
+                <p className={`text-xl font-bold ${resumen.saldoAnterior >= 0 ? 'text-gray-700' : 'text-orange-600'}`}>
+                  ${(resumen.saldoAnterior ?? 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+          {/* Ingresos */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-100">
@@ -380,6 +395,7 @@ export default function CajaDetalle() {
               </div>
             </div>
           </div>
+          {/* Egresos */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-red-100">
@@ -391,15 +407,16 @@ export default function CajaDetalle() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          {/* Saldo final del período */}
+          <div className={`rounded-lg shadow-sm border p-4 ${resumen.saldoFinal >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${resumen.saldoMovimientos >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
-                <Wallet className={`w-5 h-5 ${resumen.saldoMovimientos >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+              <div className={`p-2 rounded-lg ${resumen.saldoFinal >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
+                <Scale className={`w-5 h-5 ${resumen.saldoFinal >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Neto del periodo</p>
-                <p className={`text-xl font-bold ${resumen.saldoMovimientos >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                  {resumen.saldoMovimientos >= 0 ? '+' : ''}${resumen.saldoMovimientos.toLocaleString()}
+                <p className={`text-sm ${resumen.saldoFinal >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>Saldo al cierre</p>
+                <p className={`text-xl font-bold ${resumen.saldoFinal >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
+                  ${(resumen.saldoFinal ?? resumen.saldoMovimientos).toLocaleString()}
                 </p>
               </div>
             </div>

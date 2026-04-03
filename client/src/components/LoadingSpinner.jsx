@@ -10,22 +10,17 @@ export default function LoadingSpinner({ size = 'md', fullPage = false }) {
   const logoSize = { sm: 'h-8', md: 'h-12', lg: 'h-16' }[size] || 'h-12'
 
   const inner = (
-    <TenantLogo
-      className={`${logoSize} w-auto animate-pulse`}
-      fallbackSrc="/images/LogoClubixSolo.png"
-    />
+    <div className="flex flex-col items-center gap-2">
+      <TenantLogo
+        className={`${logoSize} w-auto animate-pulse`}
+        fallbackSrc="/images/LogoClubixSolo.png"
+      />
+      <span className="text-sm text-gray-400">Cargando...</span>
+    </div>
   )
 
-  if (fullPage) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white/70 z-50">
-        {inner}
-      </div>
-    )
-  }
-
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
+    <div className="fixed inset-0 flex items-center justify-center z-[9999]">
       {inner}
     </div>
   )

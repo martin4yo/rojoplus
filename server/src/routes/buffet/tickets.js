@@ -818,7 +818,7 @@ router.put('/config-impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async
       }
     }
 
-    res.json({ success: true, message: 'Configuración guardada' })
+    res.json({ success: true, data: { message: 'Configuración guardada' } })
   } catch (error) {
     console.error('Error guardando config impresoras:', error)
     res.status(500).json({ success: false, error: 'Error al guardar configuración' })

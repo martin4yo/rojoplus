@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart,
   ChefHat, Coffee, Truck, RefreshCw, ArrowRight,
   CreditCard, Banknote, QrCode, BarChart3, ArrowUpCircle, ArrowDownCircle, Scale,
-  ChevronDown, ChevronRight, Wallet, Printer
+  ChevronDown, ChevronRight, Wallet, Printer, Download
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -15,6 +16,7 @@ import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
 import ChatWidget from '../../../components/chat/ChatWidget'
+import LoadingSpinner from '../../../components/LoadingSpinner'
 
 // Rangos de fecha predefinidos
 const RANGOS_FECHA = [
@@ -68,6 +70,9 @@ export default function BuffetDashboard() {
   const [loading, setLoading] = useState(true)
   const [kpis, setKpis] = useState(null)
   const [limiteProductos, setLimiteProductos] = useState(5)
+  const [criterioProductos, setCriterioProductos] = useState('cantidad') // 'cantidad' | 'total'
+  const [agruparCategoria, setAgruparCategoria] = useState(false)
+  const [categoriasColapsadas, setCategoriasColapsadas] = useState({})
   const [mediosPagoExpanded, setMediosPagoExpanded] = useState(false)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [tendencia, setTendencia] = useState([])
@@ -246,9 +251,7 @@ export default function BuffetDashboard() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-        </div>
+        <LoadingSpinner />
       ) : kpis ? (
         <>
           {/* Saldo Anterior / Ingresos / Egresos / Saldo Actual */}
@@ -495,55 +498,195 @@ export default function BuffetDashboard() {
           {/* Productos más vendidos y Ventas por hora */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* Top Productos */}
-            <div className="bg-white rounded-xl shadow p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-gray-800">Productos más vendidos</h3>
-                  <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
-                    {[{ label: 'Top 5', value: 5 }, { label: 'Top 10', value: 10 }, { label: 'Todos', value: null }].map(opt => (
-                      <button
-                        key={opt.label}
-                        onClick={() => setLimiteProductos(opt.value)}
-                        className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                          limiteProductos === opt.value
-                            ? 'bg-white shadow text-orange-600'
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+            {(() => {
+              const sorted = [...(kpis.topProductos || [])].sort((a, b) =>
+                criterioProductos === 'total' ? b.total - a.total : b.cantidad - a.cantidad
+              )
+              // Agrupado por categoría
+              const grupos = agruparCategoria
+                ? sorted.reduce((acc, p) => {
+                    const cat = p.categoria || 'Sin categoría'
+                    if (!acc[cat]) acc[cat] = []
+                    acc[cat].push(p)
+                    return acc
+                  }, {})
+                : null
+              const lista = !agruparCategoria
+                ? (limiteProductos ? sorted.slice(0, limiteProductos) : sorted)
+                : null
+
+              const toggleCategoria = (cat) => setCategoriasColapsadas(prev => ({ ...prev, [cat]: !prev[cat] }))
+
+              const renderFila = (prod, idx) => (
+                <div key={idx} className="flex items-center justify-between py-1 gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
+                      idx === 0 ? 'bg-yellow-100 text-yellow-700' :
+                      idx === 1 ? 'bg-gray-100 text-gray-700' :
+                      idx === 2 ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-50 text-gray-500'
+                    }`}>{idx + 1}</span>
+                    <span className="text-gray-700 text-sm truncate">{prod.nombre}</span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0 whitespace-nowrap">
+                    <span className="text-xs text-gray-400 w-8 text-right">{prod.cantidad} un</span>
+                    <span className="font-semibold text-sm text-gray-800 w-20 text-right">{formatMoney(prod.total)}</span>
                   </div>
                 </div>
-                {(!kpis.topProductos || kpis.topProductos.length === 0) && (
-                  <p className="text-sm text-gray-400 text-center py-4">Sin ventas en el período</p>
-                )}
-                <div className="space-y-3">
-                  {(limiteProductos ? (kpis.topProductos || []).slice(0, limiteProductos) : (kpis.topProductos || [])).map((prod, idx) => (
-                    <div key={idx} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          idx === 0 ? 'bg-yellow-100 text-yellow-700' :
-                          idx === 1 ? 'bg-gray-100 text-gray-700' :
-                          idx === 2 ? 'bg-orange-100 text-orange-700' :
-                          'bg-gray-50 text-gray-500'
-                        }`}>
-                          {idx + 1}
-                        </span>
-                        <span className="text-gray-700">{prod.nombre}</span>
+              )
+
+              const exportarExcel = () => {
+                const rangoLabel = rangoSeleccionado === 'custom'
+                  ? `${fechaDesde}_${fechaHasta}`
+                  : RANGOS_FECHA.find(r => r.id === rangoSeleccionado)?.label || rangoSeleccionado
+                const filas = sorted.map(p => ({
+                  Categoría: p.categoria || 'Sin categoría',
+                  Producto: p.nombre,
+                  'Un. Vendidas': p.cantidad,
+                  'Total Ventas ($)': p.total,
+                  'Stock Ingresado': p.ingresoStock || 0,
+                }))
+                const ws = XLSX.utils.json_to_sheet(filas)
+                ws['!cols'] = [{ wch: 20 }, { wch: 35 }, { wch: 14 }, { wch: 16 }, { wch: 16 }]
+                const wb = XLSX.utils.book_new()
+                XLSX.utils.book_append_sheet(wb, ws, 'Productos')
+                XLSX.writeFile(wb, `productos-vendidos-${rangoLabel}.xlsx`)
+              }
+
+              return (
+                <div className="bg-white rounded-xl shadow p-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 className="font-semibold text-gray-800 text-sm">
+                      {criterioProductos === 'total' ? 'Productos más rentables' : 'Productos más vendidos'}
+                    </h3>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Criterio */}
+                      <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+                        {[{ label: 'Cant.', value: 'cantidad' }, { label: '$', value: 'total' }].map(opt => (
+                          <button key={opt.value} onClick={() => setCriterioProductos(opt.value)}
+                            className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                              criterioProductos === opt.value ? 'bg-white shadow text-orange-600' : 'text-gray-500 hover:text-gray-700'
+                            }`}>{opt.label}</button>
+                        ))}
                       </div>
-                      <div className="text-right">
-                        <div className="font-semibold">{prod.cantidad}</div>
-                        <div className="text-xs text-gray-500">{formatMoney(prod.total)}</div>
+                      {/* Límite (solo sin agrupación) */}
+                      {!agruparCategoria && (
+                        <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+                          {[{ label: 'Top 5', value: 5 }, { label: 'Top 10', value: 10 }, { label: 'Todos', value: null }].map(opt => (
+                            <button key={opt.label} onClick={() => setLimiteProductos(opt.value)}
+                              className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                                limiteProductos === opt.value ? 'bg-white shadow text-orange-600' : 'text-gray-500 hover:text-gray-700'
+                              }`}>{opt.label}</button>
+                          ))}
+                        </div>
+                      )}
+                      {/* Toggle categoría */}
+                      <button
+                        onClick={() => {
+                          const next = !agruparCategoria
+                          setAgruparCategoria(next)
+                          if (next) {
+                            // Inicializar todas colapsadas
+                            const todas = sorted.reduce((acc, p) => {
+                              const cat = p.categoria || 'Sin categoría'
+                              acc[cat] = true
+                              return acc
+                            }, {})
+                            setCategoriasColapsadas(todas)
+                          } else {
+                            setCategoriasColapsadas({})
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                          agruparCategoria
+                            ? 'bg-orange-600 text-white border-orange-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        Por categoría
+                      </button>
+                      {/* Exportar Excel */}
+                      {sorted.length > 0 && (
+                        <button
+                          onClick={exportarExcel}
+                          title="Exportar a Excel"
+                          className="p-1.5 rounded-lg border border-gray-300 text-gray-500 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Cabecera columnas */}
+                  {sorted.length > 0 && (
+                    <div className="flex items-center justify-between text-xs text-gray-400 pb-1 border-b border-gray-100 mb-1">
+                      <span>Producto</span>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="w-8 text-right">Un</span>
+                        <span className="w-20 text-right">Total</span>
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {sorted.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-4">Sin ventas en el período</p>
+                  )}
+
+                  {/* Sin agrupación */}
+                  {!agruparCategoria && (
+                    <>
+                      <div className="divide-y divide-gray-50">{lista.map(renderFila)}</div>
+                      {limiteProductos && sorted.length > limiteProductos && (
+                        <p className="text-xs text-gray-400 text-center mt-3">
+                          Mostrando {limiteProductos} de {sorted.length} productos
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  {/* Agrupado por categoría */}
+                  {agruparCategoria && grupos && (
+                    <div className="space-y-1">
+                      {Object.entries(grupos)
+                        .sort((a, b) => {
+                          const totalA = a[1].reduce((s, p) => s + (criterioProductos === 'total' ? p.total : p.cantidad), 0)
+                          const totalB = b[1].reduce((s, p) => s + (criterioProductos === 'total' ? p.total : p.cantidad), 0)
+                          return totalB - totalA
+                        })
+                        .map(([cat, prods]) => {
+                          const colapsada = !!categoriasColapsadas[cat]
+                          const subtotalCant = prods.reduce((s, p) => s + p.cantidad, 0)
+                          const subtotalMonto = prods.reduce((s, p) => s + p.total, 0)
+                          return (
+                            <div key={cat}>
+                              <button
+                                onClick={() => toggleCategoria(cat)}
+                                className="w-full flex items-center justify-between py-1.5 px-1 rounded hover:bg-orange-50 transition-colors group"
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  {colapsada
+                                    ? <ChevronRight className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                                    : <ChevronDown className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />}
+                                  <span className="text-xs font-semibold text-orange-600 uppercase tracking-wide truncate">{cat}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0 whitespace-nowrap ml-2">
+                                  <span className="w-8 text-right">{subtotalCant} un</span>
+                                  <span className="w-20 text-right font-semibold">{formatMoney(subtotalMonto)}</span>
+                                </div>
+                              </button>
+                              {!colapsada && (
+                                <div className="pl-5 divide-y divide-gray-50">{prods.map(renderFila)}</div>
+                              )}
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )}
                 </div>
-                {limiteProductos && (kpis.topProductos?.length || 0) > limiteProductos && (
-                  <p className="text-xs text-gray-400 text-center mt-3">
-                    Mostrando {limiteProductos} de {kpis.topProductos.length} productos
-                  </p>
-                )}
-            </div>
+              )
+            })()}
 
             {/* Ventas por hora */}
             <div className="bg-white rounded-xl shadow p-4">

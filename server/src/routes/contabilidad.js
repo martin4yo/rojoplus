@@ -181,7 +181,7 @@ router.get('/cuentas-contables/:id', asyncHandler(async (req, res) => {
         orderBy: { codigo: 'asc' },
         select: { id: true, codigo: true, nombre: true, tipo: true, esImputable: true, activo: true }
       },
-      conceptos: {
+      conceptosTesoreria: {
         select: { id: true, codigo: true, nombre: true, tipo: true }
       }
     }

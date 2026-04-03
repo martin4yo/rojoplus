@@ -225,16 +225,25 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     const fechaDesdeAnterior = new Date(fechaDesde - duracion)
     const fechaHastaAnterior = new Date(fechaDesde)
 
+    // Las columnas fecha/horaCierre/horaPagado son `timestamp without time zone`
+    // guardadas en hora local Argentina (UTC-3). Prisma envía UTC epoch como string literal,
+    // así que ajustamos -3h para que la comparación sea correcta.
+    const AR_OFFSET_MS = 3 * 60 * 60 * 1000
+    const fd = new Date(fechaDesde.getTime() - AR_OFFSET_MS)
+    const fh = new Date(fechaHasta.getTime() - AR_OFFSET_MS)
+    const fdAnt = new Date(fechaDesdeAnterior.getTime() - AR_OFFSET_MS)
+    const fhAnt = new Date(fechaHastaAnterior.getTime() - AR_OFFSET_MS)
+
     // Comandas cerradas en el período
     const comandas = await req.db.comanda.findMany({
       where: {
         estado: 'CERRADA',
-        horaCierre: { gte: fechaDesde, lte: fechaHasta }
+        horaCierre: { gte: fd, lte: fh }
       },
       include: {
         items: {
           where: { estado: { not: 'ANULADO' } },
-          include: { productoBuffet: { select: { id: true, nombre: true } } }
+          include: { productoBuffet: { select: { id: true, nombre: true, categoriaMenu: { select: { nombre: true } } } } }
         }
       }
     })
@@ -243,7 +252,7 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     const comandasAnterior = await req.db.comanda.aggregate({
       where: {
         estado: 'CERRADA',
-        horaCierre: { gte: fechaDesdeAnterior, lt: fechaHastaAnterior }
+        horaCierre: { gte: fdAnt, lt: fhAnt }
       },
       _sum: { total: true },
       _count: true
@@ -253,11 +262,11 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     const takeaway = await prisma.pedidoTakeAway.findMany({
       where: {
         estado: { in: ['PAGADO', 'ENTREGADO'] },
-        horaPagado: { gte: fechaDesde, lte: fechaHasta }
+        horaPagado: { gte: fd, lte: fh }
       },
       include: {
         items: {
-          include: { productoBuffet: { select: { id: true, nombre: true } } }
+          include: { productoBuffet: { select: { id: true, nombre: true, categoriaMenu: { select: { nombre: true } } } } }
         }
       }
     })
@@ -274,7 +283,7 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
       where: {
         cajaId: { in: cajaBuffetIds },
         tipo: 'EGRESO',
-        fecha: { gte: fechaDesde, lte: fechaHasta },
+        fecha: { gte: fd, lte: fh },
         anulado: false
       },
       select: { monto: true, concepto: true, fecha: true }
@@ -296,7 +305,7 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     const ventasKiosco = await req.db.movimientoCaja.aggregate({
       where: {
         concepto: { startsWith: 'Kiosco' },
-        fecha: { gte: fechaDesde, lte: fechaHasta },
+        fecha: { gte: fd, lte: fh },
         anulado: false
       },
       _sum: { monto: true },
@@ -337,30 +346,45 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     // Asumir kiosco como efectivo por defecto
     pagoEfectivo += totalKiosco
 
-    // Top productos
+    // Top productos (con categoría para agrupación)
     const productosVendidos = {}
-    comandas.forEach(c => {
-      c.items.forEach(item => {
-        const nombre = item.productoBuffet?.nombre || item.nombre || 'Producto'
-        if (!productosVendidos[nombre]) {
-          productosVendidos[nombre] = { nombre, cantidad: 0, total: 0 }
+    const addProd = (pb, cantidad, subtotal) => {
+      const nombre = pb?.nombre || 'Producto'
+      const categoria = pb?.categoriaMenu?.nombre || 'Sin categoría'
+      if (!productosVendidos[nombre]) {
+        productosVendidos[nombre] = { nombre, categoria, cantidad: 0, total: 0 }
+      }
+      productosVendidos[nombre].cantidad += cantidad
+      productosVendidos[nombre].total += Number(subtotal)
+    }
+    comandas.forEach(c => c.items.forEach(item => addProd(item.productoBuffet, item.cantidad, item.subtotal)))
+    takeaway.forEach(t => t.items.forEach(item => addProd(item.productoBuffet, item.cantidad, item.subtotal)))
+
+    // Stock ingresos del período por productoBuffet
+    const stockIngresosRaw = await req.db.movimientoStock.findMany({
+      where: { tipo: 'INGRESO', fecha: { gte: fd, lte: fh } },
+      select: {
+        cantidad: true,
+        productoVariante: {
+          select: {
+            producto: {
+              select: { productoBuffet: { select: { nombre: true } } }
+            }
+          }
         }
-        productosVendidos[nombre].cantidad += item.cantidad
-        productosVendidos[nombre].total += Number(item.subtotal)
-      })
+      }
     })
-    takeaway.forEach(t => {
-      t.items.forEach(item => {
-        const nombre = item.productoBuffet?.nombre || 'Producto'
-        if (!productosVendidos[nombre]) {
-          productosVendidos[nombre] = { nombre, cantidad: 0, total: 0 }
-        }
-        productosVendidos[nombre].cantidad += item.cantidad
-        productosVendidos[nombre].total += Number(item.subtotal)
-      })
+    const stockIngresosPorProducto = {}
+    stockIngresosRaw.forEach(m => {
+      const nombre = m.productoVariante?.producto?.productoBuffet?.nombre
+      if (!nombre) return
+      if (!stockIngresosPorProducto[nombre]) stockIngresosPorProducto[nombre] = 0
+      stockIngresosPorProducto[nombre] += Number(m.cantidad)
     })
+
     const topProductos = Object.values(productosVendidos)
       .sort((a, b) => b.cantidad - a.cantidad)
+      .map(p => ({ ...p, ingresoStock: stockIngresosPorProducto[p.nombre] || 0 }))
 
     // Ventas por hora (siempre)
     const ventasPorHora = {}
@@ -385,11 +409,11 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     const saldoInicialCajas = cajasBuffet.reduce((sum, c) => sum + Number(c.saldoInicial || 0), 0)
     const [movAntIngresos, movAntEgresos] = await Promise.all([
       req.db.movimientoCaja.aggregate({
-        where: { cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { lt: fechaDesde }, anulado: false },
+        where: { cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { lt: fd }, anulado: false },
         _sum: { monto: true }
       }),
       req.db.movimientoCaja.aggregate({
-        where: { cajaId: { in: cajaBuffetIds }, tipo: 'EGRESO', fecha: { lt: fechaDesde }, anulado: false },
+        where: { cajaId: { in: cajaBuffetIds }, tipo: 'EGRESO', fecha: { lt: fd }, anulado: false },
         _sum: { monto: true }
       })
     ])
@@ -401,12 +425,12 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     const [movPeriodoPorMedio, movAntPorMedio] = await Promise.all([
       req.db.movimientoCaja.groupBy({
         by: ['medioPagoId', 'tipo'],
-        where: { cajaId: { in: cajaBuffetIds }, fecha: { gte: fechaDesde, lte: fechaHasta }, anulado: false },
+        where: { cajaId: { in: cajaBuffetIds }, fecha: { gte: fd, lte: fh }, anulado: false },
         _sum: { monto: true }
       }),
       req.db.movimientoCaja.groupBy({
         by: ['medioPagoId', 'tipo'],
-        where: { cajaId: { in: cajaBuffetIds }, fecha: { lt: fechaDesde }, anulado: false },
+        where: { cajaId: { in: cajaBuffetIds }, fecha: { lt: fd }, anulado: false },
         _sum: { monto: true }
       })
     ])
@@ -530,12 +554,15 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
 
     const fechaDesde = new Date(desde)
     const fechaHasta = new Date(hasta)
+    const AR = 3 * 60 * 60 * 1000
+    const fd = new Date(fechaDesde.getTime() - AR)
+    const fh = new Date(fechaHasta.getTime() - AR)
 
     // Comandas cerradas en el período
     const comandas = await req.db.comanda.findMany({
       where: {
         estado: 'CERRADA',
-        horaCierre: { gte: fechaDesde, lte: fechaHasta }
+        horaCierre: { gte: fd, lte: fh }
       },
       orderBy: { horaCierre: 'desc' },
       take: parseInt(limit),
@@ -550,7 +577,7 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
     const takeaway = await prisma.pedidoTakeAway.findMany({
       where: {
         estado: { in: ['PAGADO', 'ENTREGADO'] },
-        horaPagado: { gte: fechaDesde, lte: fechaHasta }
+        horaPagado: { gte: fd, lte: fh }
       },
       orderBy: { horaPagado: 'desc' },
       take: parseInt(limit)

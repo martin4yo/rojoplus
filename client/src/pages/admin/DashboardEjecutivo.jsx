@@ -210,10 +210,7 @@ export default function DashboardEjecutivo() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3">
-          <LoadingSpinner />
-          <p className="text-gray-600">Cargando dashboard...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     )
   }
