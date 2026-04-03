@@ -6,7 +6,10 @@ import {
   CreditCard, Banknote, QrCode, BarChart3, ArrowUpCircle, ArrowDownCircle, Scale,
   ChevronDown, ChevronRight, Wallet, Printer
 } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  ComposedChart, Line, Legend
+} from 'recharts'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -67,6 +70,8 @@ export default function BuffetDashboard() {
   const [limiteProductos, setLimiteProductos] = useState(5)
   const [mediosPagoExpanded, setMediosPagoExpanded] = useState(false)
   const [imprimiendo, setImprimiendo] = useState(false)
+  const [tendencia, setTendencia] = useState([])
+  const [mesesTendencia, setMesesTendencia] = useState(12)
 
   // Obtener fechas según el rango seleccionado
   const obtenerFechas = useCallback(() => {
@@ -116,6 +121,14 @@ export default function BuffetDashboard() {
   useEffect(() => {
     cargarDatos()
   }, [cargarDatos])
+
+  // Cargar tendencia mensual (independiente del rango de fechas)
+  useEffect(() => {
+    if (!puedeVerDashboard) return
+    api.get(`/admin/buffet/tendencia-mensual?meses=${mesesTendencia}`)
+      .then(res => setTendencia(res?.data || res || []))
+      .catch(() => {})
+  }, [mesesTendencia, puedeVerDashboard])
 
   // Imprimir reporte de cierre
   const imprimirReporte = async () => {
@@ -594,6 +607,61 @@ export default function BuffetDashboard() {
       ) : (
         <div className="text-center py-12 text-gray-500">
           No hay datos para el período seleccionado
+        </div>
+      )}
+
+      {/* Tendencia mensual - siempre visible independiente del filtro */}
+      {tendencia.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+              <TrendingUp size={18} className="text-orange-500" />
+              Tendencia mensual
+            </h3>
+            <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+              {[{ label: '6M', value: 6 }, { label: '12M', value: 12 }, { label: '24M', value: 24 }].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setMesesTendencia(opt.value)}
+                  className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                    mesesTendencia === opt.value
+                      ? 'bg-white shadow text-orange-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <ComposedChart data={tendencia} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                tickFormatter={v => `$${Math.abs(v / 1000).toFixed(0)}k`}
+                width={52}
+              />
+              <Tooltip
+                formatter={(value, name) => [
+                  `$${Number(value).toLocaleString('es-AR')}`,
+                  name === 'ingresos' ? 'Ingresos' : name === 'egresos' ? 'Egresos' : 'Resultado'
+                ]}
+              />
+              <Legend formatter={name => name === 'ingresos' ? 'Ingresos' : name === 'egresos' ? 'Egresos' : 'Resultado'} />
+              <Bar dataKey="ingresos" fill="#22c55e" radius={[3, 3, 0, 0]} opacity={0.8} />
+              <Bar dataKey="egresos" fill="#ef4444" radius={[3, 3, 0, 0]} opacity={0.8} />
+              <Line
+                type="monotone"
+                dataKey="resultado"
+                stroke="#ea580c"
+                strokeWidth={2.5}
+                dot={{ r: 3, fill: '#ea580c' }}
+                activeDot={{ r: 5 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       )}
 

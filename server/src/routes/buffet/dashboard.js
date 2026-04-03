@@ -830,4 +830,60 @@ router.post('/reporte-cierre', authAdmin, checkPermiso('BUFFET_VER'), async (req
   }
 })
 
+/**
+ * GET /tendencia-mensual
+ * Retorna los últimos N meses de movimientos de caja del buffet
+ * agrupados por mes: ingresos, egresos, resultado neto
+ */
+router.get('/tendencia-mensual', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) => {
+  try {
+    const meses = Math.min(parseInt(req.query.meses) || 12, 24)
+
+    // Inicio del primer mes a analizar
+    const ahora = new Date()
+    const inicioRango = new Date(ahora.getFullYear(), ahora.getMonth() - (meses - 1), 1)
+
+    // Traer todos los movimientos de caja del buffet en el período
+    const movimientos = await req.db.movimientoCaja.findMany({
+      where: {
+        fecha: { gte: inicioRango },
+        anulado: false,
+        OR: [
+          { comandaId: { not: null } },
+          { pedidoTakeAwayId: { not: null } },
+          { concepto: { startsWith: 'Kiosco' } },
+          { tipo: 'EGRESO' }
+        ]
+      },
+      select: { fecha: true, monto: true, tipo: true }
+    })
+
+    // Agrupar por año-mes
+    const porMes = {}
+    for (let i = 0; i < meses; i++) {
+      const d = new Date(ahora.getFullYear(), ahora.getMonth() - (meses - 1 - i), 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      porMes[key] = { mes: key, label: d.toLocaleString('es-AR', { month: 'short', year: '2-digit' }), ingresos: 0, egresos: 0 }
+    }
+
+    for (const mov of movimientos) {
+      const d = new Date(mov.fecha)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!porMes[key]) continue
+      if (mov.tipo === 'INGRESO') porMes[key].ingresos += Number(mov.monto)
+      else porMes[key].egresos += Number(mov.monto)
+    }
+
+    const data = Object.values(porMes).map(m => ({
+      ...m,
+      resultado: m.ingresos - m.egresos
+    }))
+
+    res.json({ success: true, data })
+  } catch (error) {
+    console.error('Error obteniendo tendencia mensual:', error)
+    res.status(500).json({ success: false, error: 'Error al obtener tendencia mensual' })
+  }
+})
+
 export default router
