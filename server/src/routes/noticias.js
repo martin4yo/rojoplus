@@ -466,4 +466,90 @@ function generarSlug(texto) {
     .substring(0, 100) // Limitar longitud
 }
 
+/**
+ * GET /api/public/stats
+ * Estadísticas públicas del tenant: años de historia, socios activos, actividades
+ */
+router.get('/public/stats', async (req, res) => {
+  try {
+    const tenantId = req.tenantId
+    if (!tenantId || !req.db) {
+      return res.json({ aniosHistoria: null, socios: null, actividades: null })
+    }
+
+    // Fecha de fundación desde TenantConfiguracion
+    const configFecha = await prisma.tenantConfiguracion.findUnique({
+      where: { tenantId_clave: { tenantId, clave: 'FECHA_FUNDACION' } }
+    })
+
+    let aniosHistoria = null
+    if (configFecha?.valor) {
+      const fundacion = new Date(configFecha.valor)
+      const ahora = new Date()
+      const years = ahora.getFullYear() - fundacion.getFullYear()
+      // Redondear hacia abajo a la decena más cercana, mínimo 1
+      aniosHistoria = Math.max(1, Math.floor(years / 10) * 10)
+    }
+
+    // Cantidad de socios activos (estado VIGENTE o ACTIVO)
+    const cantidadSocios = await req.db.socio.count({
+      where: { estado: { in: ['VIGENTE', 'ACTIVO'] } }
+    })
+
+    // Cantidad de actividades activas
+    const cantidadActividades = await req.db.actividad.count({
+      where: { activo: true }
+    })
+
+    // Formatear con "+" y redondeo hacia abajo
+    const formatSocios = (n) => {
+      if (n === 0) return null
+      if (n >= 1000) return `${Math.floor(n / 100) * 100}+`
+      if (n >= 100) return `${Math.floor(n / 10) * 10}+`
+      return `${Math.floor(n / 5) * 5}+`
+    }
+
+    const formatActividades = (n) => {
+      if (n === 0) return null
+      return `${Math.floor(n / 5) * 5 || n}+`
+    }
+
+    res.json({
+      aniosHistoria: aniosHistoria ? `${aniosHistoria}+` : null,
+      socios: formatSocios(cantidadSocios),
+      actividades: formatActividades(cantidadActividades)
+    })
+  } catch (error) {
+    console.error('Error obteniendo stats públicas:', error)
+    res.status(500).json({ error: 'Error al cargar estadísticas' })
+  }
+})
+
+/**
+ * GET /api/public/instalaciones
+ * Lista espacios deportivos activos del tenant (para el sitio público)
+ */
+router.get('/public/instalaciones', async (req, res) => {
+  try {
+    const espacios = await req.db.espacioDeportivo.findMany({
+      where: { activo: true },
+      select: {
+        id: true,
+        nombre: true,
+        tipo: true,
+        descripcion: true,
+        capacidad: true,
+        cubierto: true,
+        iluminacion: true,
+        tipoEspacio: { select: { nombre: true } }
+      },
+      orderBy: { nombre: 'asc' }
+    })
+    res.json({ data: espacios })
+  } catch (error) {
+    console.error('Error listando instalaciones:', error)
+    res.status(500).json({ error: 'Error al cargar instalaciones' })
+  }
+})
+
 export default router

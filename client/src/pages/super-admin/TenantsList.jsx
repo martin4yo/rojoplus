@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Eye, Trash2, CheckCircle, XCircle, AlertCircle, Plus, Building2, Users, Activity, TrendingUp } from 'lucide-react'
+import { Eye, Trash2, CheckCircle, XCircle, AlertCircle, Plus, Building2, Users, Activity, TrendingUp, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
@@ -78,6 +78,14 @@ export default function TenantsList() {
     } catch (error) {
       toast.error('Error suspendiendo tenant: ' + error.message)
     }
+  }
+
+  function abrirSitio(subdomain) {
+    const hostname = window.location.hostname
+    const url = hostname.includes('localhost')
+      ? `http://${subdomain}.localhost:5173`
+      : `https://${subdomain}.clubix.com.ar`
+    window.open(url, '_blank')
   }
 
   async function eliminar(id, subdomain) {
@@ -234,6 +242,16 @@ export default function TenantsList() {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+
+                      {tenant.activo && (
+                        <button
+                          onClick={() => abrirSitio(tenant.subdomain)}
+                          className="p-2 hover:bg-green-50 rounded text-green-600"
+                          title="Abrir sitio del club"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
+                      )}
 
                       {tenant.estado === 'PENDING_APPROVAL' && (
                         <>

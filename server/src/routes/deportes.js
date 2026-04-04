@@ -157,7 +157,7 @@ router.get('/espacios-deportivos', asyncHandler(async (req, res) => {
   if (activo !== undefined) where.activo = activo === 'true'
   if (tipoEspacioId) where.tipoEspacioId = parseInt(tipoEspacioId)
 
-  const espacios = await prisma.espacioDeportivo.findMany({
+  const espacios = await req.db.espacioDeportivo.findMany({
     where,
     orderBy: { nombre: 'asc' },
     include: {
@@ -175,7 +175,7 @@ router.get('/espacios-deportivos', asyncHandler(async (req, res) => {
 router.get('/espacios-deportivos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const espacio = await prisma.espacioDeportivo.findUnique({
+  const espacio = await req.db.espacioDeportivo.findUnique({
     where: { id: parseInt(id) },
     include: {
       tipoEspacio: true,
@@ -204,18 +204,18 @@ router.post('/espacios-deportivos', asyncHandler(async (req, res) => {
   }
 
   // Verificar codigo unico
-  const existente = await prisma.espacioDeportivo.findFirst({ where: { codigo } })
+  const existente = await req.db.espacioDeportivo.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe un espacio con ese codigo', 400)
   }
 
   // Verificar que el tipo existe
-  const tipoExiste = await prisma.tipoEspacio.findUnique({ where: { id: parseInt(tipoEspacioId) } })
+  const tipoExiste = await req.db.tipoEspacio.findUnique({ where: { id: parseInt(tipoEspacioId) } })
   if (!tipoExiste) {
     throw new AppError('Tipo de espacio no encontrado', 400)
   }
 
-  const espacio = await prisma.espacioDeportivo.create({
+  const espacio = await req.db.espacioDeportivo.create({
     data: {
       codigo,
       nombre,
@@ -244,14 +244,14 @@ router.put('/espacios-deportivos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, tipoEspacioId, capacidad, cubierto, iluminacion, descripcion, activo, actividadIds } = req.body
 
-  const existente = await prisma.espacioDeportivo.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.espacioDeportivo.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
     throw new AppError('Espacio no encontrado', 404)
   }
 
   // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.espacioDeportivo.findFirst({ where: { codigo } })
+    const duplicado = await req.db.espacioDeportivo.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un espacio con ese codigo', 400)
     }
@@ -259,13 +259,13 @@ router.put('/espacios-deportivos/:id', asyncHandler(async (req, res) => {
 
   // Verificar que el tipo existe si se cambio
   if (tipoEspacioId && tipoEspacioId !== existente.tipoEspacioId) {
-    const tipoExiste = await prisma.tipoEspacio.findUnique({ where: { id: parseInt(tipoEspacioId) } })
+    const tipoExiste = await req.db.tipoEspacio.findUnique({ where: { id: parseInt(tipoEspacioId) } })
     if (!tipoExiste) {
       throw new AppError('Tipo de espacio no encontrado', 400)
     }
   }
 
-  const espacio = await prisma.espacioDeportivo.update({
+  const espacio = await req.db.espacioDeportivo.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo || existente.codigo,
@@ -295,7 +295,7 @@ router.put('/espacios-deportivos/:id', asyncHandler(async (req, res) => {
 router.delete('/espacios-deportivos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const espacio = await prisma.espacioDeportivo.findUnique({
+  const espacio = await req.db.espacioDeportivo.findUnique({
     where: { id: parseInt(id) },
     include: {
       _count: {
@@ -313,7 +313,7 @@ router.delete('/espacios-deportivos/:id', asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar un espacio con entrenamientos o partidos asociados', 400)
   }
 
-  await prisma.espacioDeportivo.delete({ where: { id: parseInt(id) } })
+  await req.db.espacioDeportivo.delete({ where: { id: parseInt(id) } })
 
   res.json({ success: true, message: 'Espacio eliminado correctamente' })
 }))
@@ -328,7 +328,7 @@ const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viern
 router.get('/espacios-deportivos/:id/horarios', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const horarios = await prisma.horarioDisponibilidad.findMany({
+  const horarios = await req.db.horarioDisponibilidad.findMany({
     where: { espacioDeportivoId: parseInt(id) },
     orderBy: { diaSemana: 'asc' }
   })
@@ -350,13 +350,13 @@ router.post('/espacios-deportivos/:id/horarios', asyncHandler(async (req, res) =
   }
 
   // Verificar que el espacio existe
-  const espacio = await prisma.espacioDeportivo.findUnique({ where: { id: parseInt(id) } })
+  const espacio = await req.db.espacioDeportivo.findUnique({ where: { id: parseInt(id) } })
   if (!espacio) {
     throw new AppError('Espacio no encontrado', 404)
   }
 
   // Verificar que no exista horario para ese dia
-  const existente = await prisma.horarioDisponibilidad.findUnique({
+  const existente = await req.db.horarioDisponibilidad.findUnique({
     where: {
       espacioDeportivoId_diaSemana: {
         espacioDeportivoId: parseInt(id),
@@ -368,7 +368,7 @@ router.post('/espacios-deportivos/:id/horarios', asyncHandler(async (req, res) =
     throw new AppError(`Ya existe un horario para ${DIAS_SEMANA[diaSemana]}`, 400)
   }
 
-  const horario = await prisma.horarioDisponibilidad.create({
+  const horario = await req.db.horarioDisponibilidad.create({
     data: {
       espacioDeportivoId: parseInt(id),
       diaSemana: parseInt(diaSemana),
@@ -385,7 +385,7 @@ router.put('/espacios-deportivos/:espacioId/horarios/:horarioId', asyncHandler(a
   const { espacioId, horarioId } = req.params
   const { horaInicio, horaFin, activo } = req.body
 
-  const horario = await prisma.horarioDisponibilidad.findFirst({
+  const horario = await req.db.horarioDisponibilidad.findFirst({
     where: {
       id: parseInt(horarioId),
       espacioDeportivoId: parseInt(espacioId)
@@ -396,7 +396,7 @@ router.put('/espacios-deportivos/:espacioId/horarios/:horarioId', asyncHandler(a
     throw new AppError('Horario no encontrado', 404)
   }
 
-  const updated = await prisma.horarioDisponibilidad.update({
+  const updated = await req.db.horarioDisponibilidad.update({
     where: { id: parseInt(horarioId) },
     data: {
       horaInicio: horaInicio || horario.horaInicio,
@@ -412,7 +412,7 @@ router.put('/espacios-deportivos/:espacioId/horarios/:horarioId', asyncHandler(a
 router.delete('/espacios-deportivos/:espacioId/horarios/:horarioId', asyncHandler(async (req, res) => {
   const { espacioId, horarioId } = req.params
 
-  const horario = await prisma.horarioDisponibilidad.findFirst({
+  const horario = await req.db.horarioDisponibilidad.findFirst({
     where: {
       id: parseInt(horarioId),
       espacioDeportivoId: parseInt(espacioId)
@@ -423,7 +423,7 @@ router.delete('/espacios-deportivos/:espacioId/horarios/:horarioId', asyncHandle
     throw new AppError('Horario no encontrado', 404)
   }
 
-  await prisma.horarioDisponibilidad.delete({ where: { id: parseInt(horarioId) } })
+  await req.db.horarioDisponibilidad.delete({ where: { id: parseInt(horarioId) } })
 
   res.json({ success: true, message: 'Horario eliminado correctamente' })
 }))

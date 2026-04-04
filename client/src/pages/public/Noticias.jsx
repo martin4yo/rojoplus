@@ -1,77 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, ChevronRight, Search } from 'lucide-react'
+import { Calendar, ChevronRight, Search, Newspaper } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import { useTenant } from '../../contexts/TenantContext'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
-
-// Noticias de ejemplo (fallback si no hay datos en la BD)
-const noticiasEjemplo = [
-  {
-    id: 1,
-    titulo: 'Sportivo Pilar clasificó a Playoffs Interconferencias',
-    extracto: 'En un partido de altísima tensión, el equipo de La Caldera superó a Gimnasia de Ituzaingó 73-71 y avanzó en la Liga Federal 2025.',
-    imagen: '/images/club/68f64b9d.jpeg',
-    fechaPublicacion: '2026-01-28',
-    categoria: 'DEPORTES',
-  },
-  {
-    id: 2,
-    titulo: 'Categoría 2012: ¡Tricampeones!',
-    extracto: 'La categoría 2012 cerró el grupo con victoria 3-0 y se consagró tricampeona (2023/24/25) de la Liga Argentina. Un orgullo para el club.',
-    imagen: '/images/club/pngwing.com.png',
-    fechaPublicacion: '2026-01-20',
-    categoria: 'DEPORTES',
-  },
-  {
-    id: 3,
-    titulo: 'Mendoza Cup 2024: Campeones internacionales',
-    extracto: 'Nuestra categoría 2012 conquistó el torneo internacional Mendoza Cup 2024, sumando otro título a su impresionante palmarés.',
-    imagen: '/images/club/gf6127dd755feb3d69457e16a134e721500df191447b9681a6e921d8f92a648aef97dcca6db09cdf4f391cdbe339b3441_1280.jpg',
-    fechaPublicacion: '2025-12-15',
-    categoria: 'DEPORTES',
-  },
-  {
-    id: 4,
-    titulo: 'Femenino campeón: Sportivo venció a Derqui',
-    extracto: 'El básquet femenino de Sportivo Pilar se consagró campeón tras vencer a Presidente Derqui en una gran final.',
-    imagen: '/images/club/4177dee1f84c3c767bad32efd0d41d885df4931c46126ea3b2acc298fe99ee3cd61de290a4edd84e73bdfc6bf9686d1e2148d8ac79f0ced8fbeeee_1280.jpg',
-    fechaPublicacion: '2025-11-28',
-    categoria: 'DEPORTES',
-  },
-  {
-    id: 5,
-    titulo: 'Formativas arrasan en Torneo de Verano',
-    extracto: 'Las categorías 2014 y 2017 se coronaron campeonas divisionales. La 2012 lideró su zona con 111 puntos rumbo a la Copa de Campeones.',
-    imagen: '/images/club/4874ca4a8ac815adf95e7c540ced359e6a736d059848c1f1656a0757d8ad9508c98157fed290419d407ae3cd546c441677e987dd9b4936f73fd145_1280.jpg',
-    fechaPublicacion: '2025-11-10',
-    categoria: 'DEPORTES',
-  },
-  {
-    id: 6,
-    titulo: 'Sportivo Pilar cumplió 93 años de historia',
-    extracto: 'El 4 de junio celebramos un nuevo aniversario de La Caldera. Más de 90 años formando deportistas y construyendo comunidad en Pilar.',
-    imagen: '/images/club/8ad73f3c.jpeg',
-    fechaPublicacion: '2025-06-04',
-    categoria: 'INSTITUCIONAL',
-  },
-  {
-    id: 7,
-    titulo: 'Liga Federal 2026: Sportivo confirmado',
-    extracto: 'El club continuará participando en la Liga Federal de Básquet 2026, dentro de la Conferencia Metropolitana junto a otros 23 clubes.',
-    imagen: '/images/club/0fd3416c.jpeg',
-    fechaPublicacion: '2026-02-01',
-    categoria: 'INSTITUCIONAL',
-  },
-  {
-    id: 8,
-    titulo: 'Inscripciones abiertas temporada 2026',
-    extracto: 'Ya podés inscribirte en todas las actividades deportivas del club. Básquet, fútbol, gimnasia y más. ¡Sumate a La Caldera!',
-    imagen: '/images/club/IMG_2915.JPG',
-    fechaPublicacion: '2026-02-05',
-    categoria: 'INSTITUCIONAL',
-  },
-]
 
 const CATEGORIAS = [
   { value: '', label: 'Todas' },
@@ -82,32 +15,18 @@ const CATEGORIAS = [
 ]
 
 export default function Noticias() {
+  const { tenant } = useTenant()
   const [noticias, setNoticias] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => {
-    fetchNoticias()
+    api.getFull('/public/noticias')
+      .then(data => setNoticias(data?.noticias || []))
+      .catch(() => setNoticias([]))
+      .finally(() => setLoading(false))
   }, [])
-
-  const fetchNoticias = async () => {
-    try {
-      const data = await api.getFull('/public/noticias')
-      // Si hay noticias en la BD, usarlas; si no, usar las de ejemplo
-      if (data?.noticias && data.noticias.length > 0) {
-        setNoticias(data.noticias)
-      } else {
-        setNoticias(noticiasEjemplo)
-      }
-    } catch (err) {
-      console.error('Error cargando noticias:', err)
-      // Usar noticias de ejemplo como fallback
-      setNoticias(noticiasEjemplo)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const noticiasFiltradas = noticias.filter(n => {
     const matchCategoria = !filtroCategoria || n.categoria === filtroCategoria
@@ -187,8 +106,11 @@ export default function Noticias() {
               <LoadingSpinner />
             </div>
           ) : noticiasFiltradas.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No se encontraron noticias</p>
+            <div className="text-center py-16 text-gray-500">
+              <Newspaper className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p className="text-lg">
+                {busqueda || filtroCategoria ? 'No se encontraron noticias con esos filtros.' : 'Aún no hay noticias publicadas.'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -248,20 +170,27 @@ export default function Noticias() {
       {/* Banner Footer */}
       <BannerPublicitario tipo="FOOTER" ubicacion="NOTICIAS" />
 
-      {/* Info - Redes sociales */}
-      <section className="py-8 bg-primary-50 border-t border-primary-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-primary-dark text-sm">
-            <strong>Seguinos en redes:</strong> Para más novedades del club, seguinos en{' '}
-            <a href="https://www.instagram.com/sportivopilaroficial" target="_blank" rel="noopener noreferrer" className="underline font-medium">
-              Instagram
-            </a>{' '}y{' '}
-            <a href="https://www.facebook.com/sportivopilaroficial" target="_blank" rel="noopener noreferrer" className="underline font-medium">
-              Facebook
-            </a>.
-          </p>
-        </div>
-      </section>
+      {/* Redes sociales del tenant */}
+      {(tenant?.redesSociales?.instagram || tenant?.redesSociales?.facebook) && (
+        <section className="py-8 bg-primary-50 border-t border-primary-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-primary-dark text-sm">
+              <strong>Seguinos en redes:</strong> Para más novedades del club, seguinos en{' '}
+              {tenant.redesSociales.instagram && (
+                <a href={tenant.redesSociales.instagram} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                  Instagram
+                </a>
+              )}
+              {tenant.redesSociales.instagram && tenant.redesSociales.facebook && ' y '}
+              {tenant.redesSociales.facebook && (
+                <a href={tenant.redesSociales.facebook} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                  Facebook
+                </a>
+              )}.
+            </p>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

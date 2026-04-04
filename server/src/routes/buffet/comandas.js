@@ -126,7 +126,7 @@ function generarComandaESCPOS(comanda, items, sectorNombre = 'COCINA') {
 /**
  * Imprime comanda en los destinos correspondientes según categoría
  */
-async function imprimirComandaPorDestinos(comanda, items) {
+async function imprimirComandaPorDestinos(db, comanda, items) {
   try {
     console.log(`[Print] Iniciando impresión. Items: ${items.length}`)
 
@@ -137,7 +137,7 @@ async function imprimirComandaPorDestinos(comanda, items) {
       const producto = item.productoBuffet
       if (!producto?.categoriaMenuId) continue
 
-      const destino = await req.db.destinoImpresion.findFirst({
+      const destino = await db.destinoImpresion.findFirst({
         where: { categoriaMenuId: producto.categoriaMenuId },
         include: {
           impresora: {
@@ -512,7 +512,7 @@ router.post('/comandas/:id/items', authAdmin, checkPermiso('BUFFET_MESAS'), asyn
           include: { mesa: true, socio: true }
         })
         // Ejecutar impresión de forma asíncrona (no bloquea la respuesta)
-        imprimirComandaPorDestinos(comandaConMesa, itemsCreados)
+        imprimirComandaPorDestinos(req.db, comandaConMesa, itemsCreados)
       }
     }
 

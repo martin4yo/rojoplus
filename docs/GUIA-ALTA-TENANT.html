@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guía Alta de Tenant — Clubix / RojoPlus</title>
+  <style>
+    :root {
+      --rojo: #dc2626;
+      --rojo-dark: #991b1b;
+      --gris: #1e293b;
+      --gris-light: #334155;
+      --bg: #f8fafc;
+      --border: #e2e8f0;
+      --ok: #16a34a;
+      --warn: #d97706;
+      --error: #dc2626;
+      --info: #2563eb;
+      --code-bg: #0f172a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1e293b;
+      background: var(--bg);
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, var(--rojo-dark), var(--rojo));
+      color: white;
+      padding: 48px 64px;
+    }
+    header h1 { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.5px; }
+    header p  { margin-top: 8px; font-size: 1.05rem; opacity: 0.85; }
+    header .meta { margin-top: 16px; font-size: 0.82rem; opacity: 0.65; }
+
+    /* ── Layout ── */
+    .layout { display: flex; gap: 0; min-height: calc(100vh - 160px); }
+
+    /* ── Sidebar ── */
+    nav.sidebar {
+      width: 280px;
+      flex-shrink: 0;
+      background: var(--gris);
+      color: #94a3b8;
+      padding: 32px 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    nav.sidebar h3 {
+      padding: 0 24px 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+    nav.sidebar a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 24px;
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 0.88rem;
+      transition: background 0.15s;
+    }
+    nav.sidebar a:hover, nav.sidebar a.active {
+      background: rgba(255,255,255,0.07);
+      color: white;
+    }
+    nav.sidebar .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #334155;
+      color: #94a3b8;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ── Main content ── */
+    main {
+      flex: 1;
+      padding: 48px 56px;
+      max-width: 900px;
+    }
+
+    /* ── Sections ── */
+    section { margin-bottom: 64px; }
+    section:target { scroll-margin-top: 20px; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+    .step-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--rojo);
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-badge.green  { background: var(--ok); }
+    .step-badge.blue   { background: var(--info); }
+    .step-badge.yellow { background: var(--warn); }
+    .step-badge.gray   { background: #64748b; }
+
+    section h2 { font-size: 1.5rem; font-weight: 700; color: var(--gris); }
+    section h3 { font-size: 1.1rem; font-weight: 600; color: var(--gris); margin: 28px 0 12px; }
+    section h4 { font-size: 0.95rem; font-weight: 600; color: #475569; margin: 20px 0 8px; }
+    section p  { margin-bottom: 12px; color: #374151; }
+
+    /* ── Callout boxes ── */
+    .callout {
+      display: flex;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin: 16px 0;
+      font-size: 0.9rem;
+    }
+    .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .callout.info    { background: #eff6ff; border-left: 3px solid var(--info); }
+    .callout.warn    { background: #fffbeb; border-left: 3px solid var(--warn); }
+    .callout.ok      { background: #f0fdf4; border-left: 3px solid var(--ok); }
+    .callout.danger  { background: #fef2f2; border-left: 3px solid var(--error); }
+
+    /* ── Code blocks ── */
+    pre {
+      background: var(--code-bg);
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 20px 24px;
+      overflow-x: auto;
+      font-size: 0.84rem;
+      line-height: 1.65;
+      margin: 14px 0;
+    }
+    code { font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; }
+    p code, li code, td code {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      color: #dc2626;
+    }
+    pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+
+    /* SQL syntax highlight helpers */
+    .kw  { color: #7dd3fc; }
+    .str { color: #86efac; }
+    .cmt { color: #64748b; font-style: italic; }
+    .num { color: #fbbf24; }
+    .fn  { color: #c084fc; }
+
+    /* ── Tables ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 0.88rem;
+    }
+    th {
+      background: #f1f5f9;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: #374151;
+      border-bottom: 2px solid var(--border);
+    }
+    td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* ── Status badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-ok     { background: #dcfce7; color: #15803d; }
+    .badge-warn   { background: #fef9c3; color: #a16207; }
+    .badge-error  { background: #fee2e2; color: #b91c1c; }
+    .badge-info   { background: #dbeafe; color: #1d4ed8; }
+    .badge-gray   { background: #f1f5f9; color: #475569; }
+
+    /* ── Ordered steps within a section ── */
+    ol.steps { padding-left: 0; list-style: none; counter-reset: step; }
+    ol.steps > li {
+      counter-increment: step;
+      display: flex;
+      gap: 14px;
+      margin-bottom: 14px;
+      align-items: flex-start;
+    }
+    ol.steps > li::before {
+      content: counter(step);
+      min-width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #334155;
+      color: white;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+    ol.steps > li div { flex: 1; }
+
+    ul.check { list-style: none; padding-left: 0; }
+    ul.check li { padding: 5px 0; padding-left: 24px; position: relative; }
+    ul.check li::before { content: '✓'; position: absolute; left: 0; color: var(--ok); font-weight: 700; }
+    ul.check.cross li::before { content: '✗'; color: var(--error); }
+
+    /* ── Divider ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+    /* ── TOC overview cards ── */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+    .overview-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.15s;
+    }
+    .overview-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .overview-card .card-num {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--rojo);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .overview-card h4 { font-size: 0.9rem; font-weight: 600; margin: 0 0 4px; }
+    .overview-card p  { font-size: 0.8rem; color: #64748b; margin: 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .layout { flex-direction: column; }
+      nav.sidebar { width: 100%; height: auto; position: static; }
+      main { padding: 32px 24px; }
+      header { padding: 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Guía de Alta y Configuración de Tenant</h1>
+  <p>Clubix / RojoPlus — Sistema Multi-Tenant para Clubes Deportivos</p>
+  <div class="meta">Arquitectura: una sola base de datos PostgreSQL, datos aislados por <code style="color:#fca5a5">tenantId</code> &nbsp;|&nbsp; Actualizado: Abril 2026</div>
+</header>
+
+<div class="layout">
+
+  <!-- ─── Sidebar ─── -->
+  <nav class="sidebar">
+    <h3>Pasos</h3>
+    <a href="#overview"><span class="step-num">0</span> Resumen de arquitectura</a>
+    <a href="#paso1"><span class="step-num">1</span> Crear el tenant</a>
+    <a href="#paso2"><span class="step-num">2</span> Crear / vincular admin</a>
+    <a href="#paso3"><span class="step-num">3</span> Aprobar el tenant</a>
+    <a href="#paso4"><span class="step-num">4</span> DNS y Nginx</a>
+    <a href="#paso5"><span class="step-num">5</span> Tipos y estados de socio</a>
+    <a href="#paso6"><span class="step-num">6</span> Conceptos de tesorería</a>
+    <a href="#paso7"><span class="step-num">7</span> Medios de pago</a>
+    <a href="#paso8"><span class="step-num">8</span> Actividades deportivas</a>
+    <a href="#paso9"><span class="step-num">9</span> Buffet (opcional)</a>
+    <a href="#paso10"><span class="step-num">10</span> Configuración global</a>
+    <a href="#paso11"><span class="step-num">11</span> Verificación final</a>
+    <a href="#sql-rapido"><span class="step-num">★</span> SQL rápido de arranque</a>
+  </nav>
+
+  <!-- ─── Main ─── -->
+  <main>
+
+    <!-- ─ Resumen ─ -->
+    <section id="overview">
+      <div class="section-header">
+        <div class="step-badge gray">0</div>
+        <h2>Arquitectura multi-tenant</h2>
+      </div>
+
+      <p>RojoPlus usa <strong>una única base de datos PostgreSQL</strong> compartida por todos los clubes.
+      Cada registro de negocio lleva una columna <code>tenant_id</code> que lo ata al club dueño.
+      El middleware <code>extractTenant</code> identifica al club por el subdominio del host y rechaza
+      cualquier petición de un tenant inactivo o suspendido.</p>
+
+      <div class="overview-grid">
+        <a class="overview-card" href="#paso1">
+          <div class="card-num">01</div>
+          <h4>Alta del tenant</h4>
+          <p>Registro del club en la tabla <code>tenants</code></p>
+        </a>
+        <a class="overview-card" href="#paso2">
+          <div class="card-num">02</div>
+          <h4>Admin del club</h4>
+          <p>Usuario administrador y vinculación a tenant</p>
+        </a>
+        <a class="overview-card" href="#paso3">
+          <div class="card-num">03</div>
+          <h4>Aprobación</h4>
+          <p>Cambio de estado a ACTIVE + activo=true</p>
+        </a>
+        <a class="overview-card" href="#paso4">
+          <div class="card-num">04</div>
+          <h4>DNS / Nginx</h4>
+          <p>Wildcard *.clubix.com.ar ya configurado</p>
+        </a>
+        <a class="overview-card" href="#paso5">
+          <div class="card-num">05</div>
+          <h4>Tipos de socio</h4>
+          <p>Categorías, estados, tipos de membresía</p>
+        </a>
+        <a class="overview-card" href="#paso6">
+          <div class="card-num">06</div>
+          <h4>Tesorería</h4>
+          <p>Conceptos de ingreso/egreso y plan de cuentas</p>
+        </a>
+        <a class="overview-card" href="#paso7">
+          <div class="card-num">07</div>
+          <h4>Medios de pago</h4>
+          <p>Efectivo, transferencia, MercadoPago, etc.</p>
+        </a>
+        <a class="overview-card" href="#paso8">
+          <div class="card-num">08</div>
+          <h4>Actividades</h4>
+          <p>Deportes, categorías y cuotas por categoría</p>
+        </a>
+        <a class="overview-card" href="#paso9">
+          <div class="card-num">09</div>
+          <h4>Buffet</h4>
+          <p>Sectores, impresoras, zonas y productos</p>
+        </a>
+        <a class="overview-card" href="#paso10">
+          <div class="card-num">10</div>
+          <h4>Config global</h4>
+          <p>Claves en tabla <code>configuracion</code></p>
+        </a>
+      </div>
+
+      <h3>Modelos globales (sin <code>tenantId</code>)</h3>
+      <p>Estos modelos son compartidos por todos los tenants. No se filtran por club:</p>
+      <table>
+        <thead><tr><th>Modelo</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>Tenant</code></td><td>El registro del club en sí</td></tr>
+          <tr><td><code>TenantUsuario</code></td><td>Vínculo admin↔tenant con rol</td></tr>
+          <tr><td><code>TenantConfiguracion</code></td><td>Config específica por tenant (diferente de <code>Configuracion</code>)</td></tr>
+          <tr><td><code>Admin</code></td><td>Usuarios administradores (pueden gestionar varios clubs)</td></tr>
+          <tr><td><code>Rol</code>, <code>Permiso</code>, <code>PermisoRol</code></td><td>Sistema de permisos compartido</td></tr>
+          <tr><td><code>MenuItem</code>, <code>MenuItemRol</code></td><td>Menú de navegación compartido</td></tr>
+          <tr><td><code>Rubro</code></td><td>Rubros comerciales compartidos</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ️</span>
+        <div>El resto de los 135+ modelos (socios, cuotas, actividades, buffet, etc.) tienen <code>tenant_id</code>
+        y el Prisma client los filtra automáticamente via <code>$extends</code> en <code>tenantPrisma.js</code>.</div>
+      </div>
+    </section>
+
+    <!-- ─ Paso 1 ─ -->
+    <section id="paso1">
+      <div class="section-header">
+        <div class="step-badge">1</div>
+        <h2>Crear el tenant</h2>
+      </div>
+
+      <p>Hay dos formas de crear un tenant. La recomendada en producción es desde el <strong>Panel Super-Admin</strong>.</p>
+
+      <h3>Opción A — Panel Super-Admin (recomendada)</h3>
+      <ol class="steps">
+        <li><div>Acceder al panel en <code>localhost:5173/super-admin</code> (dev) o <code>clubix.com.ar/super-admin</code> (prod).</div></li>
+        <li><div>Ir a <strong>Tenants → Nuevo Tenant</strong>.</div></li>
+        <li><div>Completar el formulario con los datos del club. El campo <strong>Subdominio</strong> es crítico: solo letras minúsculas, números y guiones (<code>^[a-z0-9-]+$</code>). Ejemplos: <code>sportivopilar</code>, <code>club-atletico-rio</code>.</div></li>
+        <li><div>Guardar. El tenant queda en estado <code>PENDING_APPROVAL</code> con <code>activo = false</code>.</div></li>
+      </ol>
+
+      <h3>Opción B — SQL directo</h3>
+      <pre><code><span class="kw">INSERT INTO</span> tenants (
+  nombre, subdomain, slug,
+  email, telefono,
+  ciudad, provincia,
+  plan, estado, activo,
+  timezone, moneda,
+  colores, redes_sociales,
+  created_at, updated_at
+) <span class="kw">VALUES</span> (
+  <span class="str">'Club Ejemplo'</span>, <span class="str">'clubejemplo'</span>, <span class="str">'clubejemplo'</span>,
+  <span class="str">'admin@clubejemplo.com'</span>, <span class="str">'011-1234-5678'</span>,
+  <span class="str">'Buenos Aires'</span>, <span class="str">'Buenos Aires'</span>,
+  <span class="str">'TRIAL'</span>, <span class="str">'PENDING_APPROVAL'</span>, <span class="num">false</span>,
+  <span class="str">'America/Argentina/Buenos_Aires'</span>, <span class="str">'ARS'</span>,
+  <span class="str">'{}'</span>, <span class="str">'{}'</span>,
+  <span class="fn">NOW()</span>, <span class="fn">NOW()</span>
+)
+<span class="kw">RETURNING</span> id, subdomain; <span class="cmt">-- Guardar el id para los pasos siguientes</span></code></pre>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div><strong>Nota sobre el slug:</strong> debe ser idéntico al subdomain. El código lo genera automáticamente como <code>subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '-')</code>. Si insertás por SQL, asegurate de que coincidan.</div>
+      </div>
+
+      <h3>Campos del tenant</h3>
+      <table>
+        <thead><tr><th>Campo</th><th>Tipo</th><th>Obligatorio</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>nombre</code></td><td>String</td><td><span class="badge badge-error">Sí</span></td><td>Nombre visible del club</td></tr>
+          <tr><td><code>subdomain</code></td><td>String único</td><td><span class="badge badge-error">Sí</span></td><td>Subdominio ej: <code>sportivopilar</code></td></tr>
+          <tr><td><code>slug</code></td><td>String único</td><td><span class="badge badge-error">Sí</span></td><td>Igual al subdomain (auto-generado)</td></tr>
+          <tr><td><code>email</code></td><td>String</td><td><span class="badge badge-gray">No</span></td><td>Email de contacto del club</td></tr>
+          <tr><td><code>plan</code></td><td>String</td><td><span class="badge badge-gray">No</span></td><td>TRIAL, BASIC, PRO (default: TRIAL)</td></tr>
+          <tr><td><code>maxSocios</code></td><td>Int</td><td><span class="badge badge-gray">No</span></td><td>Límite de socios (null = ilimitado)</td></tr>
+          <tr><td><code>maxAdmins</code></td><td>Int</td><td><span class="badge badge-gray">No</span></td><td>Límite de admins</td></tr>
+          <tr><td><code>timezone</code></td><td>String</td><td><span class="badge badge-gray">No</span></td><td>Default: <code>America/Argentina/Buenos_Aires</code></td></tr>
+          <tr><td><code>colores</code></td><td>JSON</td><td><span class="badge badge-gray">No</span></td><td>Branding: <code>{"primary":"#dc2626","secondary":"#1e293b"}</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─ Paso 2 ─ -->
+    <section id="paso2">
+      <div class="section-header">
+        <div class="step-badge">2</div>
+        <h2>Crear y vincular el administrador</h2>
+      </div>
+
+      <p>El admin del club es una fila en la tabla global <code>admins</code> vinculada al tenant via <code>tenant_usuarios</code>.</p>
+
+      <h3>Opción A — Registro público (crea admin + vínculo automáticamente)</h3>
+      <pre><code><span class="cmt">-- Endpoint: POST /api/super-admin/tenants/register</span>
+<span class="cmt">-- Body JSON:</span>
+{
+  "nombre": "Club Ejemplo",
+  "subdomain": "clubejemplo",
+  "email": "admin@clubejemplo.com",
+  "adminData": {
+    "nombre": "Juan Administrador",
+    "email": "juan@clubejemplo.com",
+    "password": "ClaveSegura123!",
+    "nombreUsuario": "juan.admin"
+  }
+}</code></pre>
+
+      <h3>Opción B — SQL manual (si el tenant ya fue creado)</h3>
+      <pre><code><span class="cmt">-- 1. Crear el admin (password debe ser hash bcrypt)</span>
+<span class="kw">INSERT INTO</span> admins (nombre, email, password, nombre_usuario, activo, created_at, updated_at)
+<span class="kw">VALUES</span> (
+  <span class="str">'Juan Administrador'</span>,
+  <span class="str">'juan@clubejemplo.com'</span>,
+  <span class="str">'$2b$10$...'</span>, <span class="cmt">-- hash bcrypt de la contraseña</span>
+  <span class="str">'juan.admin'</span>,
+  <span class="num">true</span>,
+  <span class="fn">NOW()</span>, <span class="fn">NOW()</span>
+)
+<span class="kw">RETURNING</span> id;
+
+<span class="cmt">-- 2. Vincular admin al tenant</span>
+<span class="kw">INSERT INTO</span> tenant_usuarios (tenant_id, admin_id, rol, permisos, activo, fecha_ingreso, created_at, updated_at)
+<span class="kw">VALUES</span> (
+  <span class="num">&lt;TENANT_ID&gt;</span>,    <span class="cmt">-- id del tenant creado en el paso 1</span>
+  <span class="num">&lt;ADMIN_ID&gt;</span>,     <span class="cmt">-- id del admin recién creado</span>
+  <span class="str">'ADMIN'</span>,
+  <span class="str">'[]'</span>,
+  <span class="num">true</span>,
+  <span class="fn">NOW()</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>
+);</code></pre>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div>El campo <code>password</code> debe ser un hash <strong>bcrypt</strong> ($2b$10$...). Nunca insertar contraseñas en texto plano.
+        Para generarlo desde Node.js: <code>await bcrypt.hash('contraseña', 10)</code></div>
+      </div>
+
+      <h3>Roles disponibles en TenantUsuario</h3>
+      <table>
+        <thead><tr><th>Rol</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>ADMIN</code></td><td>Acceso completo al tenant</td></tr>
+          <tr><td><code>TESORERO</code></td><td>Solo módulos financieros</td></tr>
+          <tr><td><code>SECRETARIO</code></td><td>Socios e inscripciones</td></tr>
+          <tr><td><code>CONSULTA</code></td><td>Solo lectura</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ️</span>
+        <div>Un mismo <code>Admin</code> puede estar vinculado a <strong>múltiples tenants</strong> con distintos roles. La tabla <code>tenant_usuarios</code> tiene un unique en <code>(tenantId, adminId)</code>.</div>
+      </div>
+    </section>
+
+    <!-- ─ Paso 3 ─ -->
+    <section id="paso3">
+      <div class="section-header">
+        <div class="step-badge green">3</div>
+        <h2>Aprobar el tenant</h2>
+      </div>
+
+      <p>El tenant en estado <code>PENDING_APPROVAL</code> no es accesible. <code>extractTenant</code> rechaza cualquier petición con <em>Club no encontrado o inactivo</em> hasta que se apruebe.</p>
+
+      <h3>Desde el panel</h3>
+      <p>Super-Admin → Tenants → (seleccionar el club) → botón <strong>Aprobar</strong>.</p>
+
+      <h3>Via API</h3>
+      <pre><code><span class="fn">POST</span> /api/super-admin/tenants/<span class="num">{id}</span>/approve
+Authorization: Bearer <span class="str">&lt;TOKEN_SUPERADMIN&gt;</span></code></pre>
+
+      <h3>SQL directo</h3>
+      <pre><code><span class="kw">UPDATE</span> tenants
+<span class="kw">SET</span>
+  estado = <span class="str">'ACTIVE'</span>,
+  activo = <span class="num">true</span>,
+  fecha_aprobacion = <span class="fn">NOW()</span>,
+  updated_at = <span class="fn">NOW()</span>
+<span class="kw">WHERE</span> id = <span class="num">&lt;TENANT_ID&gt;</span>;</code></pre>
+
+      <div class="callout ok">
+        <span class="callout-icon">✅</span>
+        <div>Luego de este paso el subdominio <code>clubejemplo.clubix.com.ar</code> ya responde. El admin puede iniciar sesión desde la URL del club.</div>
+      </div>
+    </section>
+
+    <!-- ─ Paso 4 ─ -->
+    <section id="paso4">
+      <div class="section-header">
+        <div class="step-badge blue">4</div>
+        <h2>DNS y configuración Nginx</h2>
+      </div>
+
+      <div class="callout ok">
+        <span class="callout-icon">✅</span>
+        <div><strong>En producción (clubix.com.ar) esto ya está resuelto.</strong> El certificado wildcard SSL y el bloque <code>server_name *.clubix.com.ar</code> en Nginx cubren automáticamente cualquier nuevo subdominio. No se requiere ningún cambio de infraestructura para cada nuevo tenant.</div>
+      </div>
+
+      <h3>Cómo funciona el routing</h3>
+      <table>
+        <thead><tr><th>Request</th><th>Nginx block</th><th>Destino</th></tr></thead>
+        <tbody>
+          <tr><td><code>clubix.com.ar</code></td><td>Sitio institucional</td><td><code>/var/www/clubix/web</code></td></tr>
+          <tr><td><code>clubejemplo.clubix.com.ar</code></td><td>Wildcard <code>*.clubix.com.ar</code></td><td>App React en <code>/var/www/clubix/client/dist</code></td></tr>
+          <tr><td><code>clubejemplo.clubix.com.ar/api/*</code></td><td>Proxy pass</td><td>Backend Node.js puerto <code>5400</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Cómo el backend identifica el tenant</h3>
+      <p>Nginx pasa el header <code>Host: clubejemplo.clubix.com.ar</code> al backend via <code>proxy_set_header Host $host</code>. El middleware <code>extractTenant</code> extrae el subdomain (<code>clubejemplo</code>) y busca el tenant en la DB.</p>
+
+      <h3>En desarrollo local</h3>
+      <pre><code><span class="cmt"># Para probar un tenant localmente editar C:\Windows\System32\drivers\etc\hosts:</span>
+127.0.0.1  clubejemplo.localhost
+
+<span class="cmt"># O usar el header X-Tenant-Slug en las peticiones API:</span>
+curl -H <span class="str">"X-Tenant-Slug: clubejemplo"</span> http://localhost:3000/api/admin/socios</code></pre>
+
+      <p>Si no hay subdomain en desarrollo, el sistema usa el valor de <code>DEFAULT_TENANT_SUBDOMAIN</code> en el <code>.env</code> del servidor.</p>
+    </section>
+
+    <!-- ─ Paso 5 ─ -->
+    <section id="paso5">
+      <div class="section-header">
+        <div class="step-badge">5</div>
+        <h2>Tipos de socio, categorías y estados</h2>
+      </div>
+
+      <p>Estos son los primeros datos de negocio que necesita el club para poder registrar socios.</p>
+
+      <h3>5.1 — Tipos de Socio (<code>tipos_socio</code>)</h3>
+      <p>Define las <strong>clases de membresía</strong> del club (ej: Activo, Cadete, Vitalicio).</p>
+      <p><strong>Desde el panel:</strong> Configuración → Tipos de Socio → Nuevo</p>
+
+      <pre><code><span class="kw">INSERT INTO</span> tipos_socio (codigo, nombre, descripcion, orden, activo, tenant_id, created_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'ACTIVO'</span>,    <span class="str">'Socio Activo'</span>,    <span class="str">'Socio mayor de edad'</span>,       <span class="num">1</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'CADETE'</span>,    <span class="str">'Socio Cadete'</span>,    <span class="str">'Menor de 18 años'</span>,           <span class="num">2</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'VITALICIO'</span>, <span class="str">'Socio Vitalicio'</span>, <span class="str">'Sin cargo mensual'</span>,           <span class="num">3</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'ADHERENTE'</span>, <span class="str">'Socio Adherente'</span>, <span class="str">'Sin acceso a instalaciones'</span>, <span class="num">4</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>);
+<span class="cmt">-- Luego vincular concepto_tesoreria_id y concepto_mora_id (ver paso 6)</span></code></pre>
+
+      <h3>5.2 — Categorías de Socio (<code>categorias_socio</code>)</h3>
+      <p>Agrupaciones opcionales con <strong>descuentos</strong> (ej: Jubilado 50%, Personal del club 100%).</p>
+
+      <pre><code><span class="kw">INSERT INTO</span> categorias_socio (codigo, nombre, porcentaje_descuento, orden, activo, tenant_id, created_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'REGULAR'</span>,   <span class="str">'Regular'</span>,            <span class="num">0.00</span>,  <span class="num">1</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'JUBILADO'</span>,  <span class="str">'Jubilado'</span>,           <span class="num">50.00</span>, <span class="num">2</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'PERSONAL'</span>,  <span class="str">'Personal del Club'</span>, <span class="num">100.00</span>,<span class="num">3</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>);</code></pre>
+
+      <h3>5.3 — Estados de Socio (<code>estados_socio</code>)</h3>
+      <p>Estado de la relación del socio con el club. El campo <code>permite_descuentos</code> controla si el sistema aplica descuentos de categoría.</p>
+
+      <pre><code><span class="kw">INSERT INTO</span> estados_socio (codigo, nombre, color, permite_descuentos, orden, activo, tenant_id, created_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'VIGENTE'</span>,    <span class="str">'Vigente'</span>,    <span class="str">'#16a34a'</span>, <span class="num">true</span>,  <span class="num">1</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'SUSPENDIDO'</span>, <span class="str">'Suspendido'</span>, <span class="str">'#d97706'</span>, <span class="num">false</span>, <span class="num">2</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'BAJA'</span>,       <span class="str">'Baja'</span>,       <span class="str">'#dc2626'</span>, <span class="num">false</span>, <span class="num">3</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'MOROSO'</span>,     <span class="str">'Moroso'</span>,     <span class="str">'#9333ea'</span>, <span class="num">false</span>, <span class="num">4</span>, <span class="num">true</span>, <span class="num">&lt;TENANT_ID&gt;</span>, <span class="fn">NOW()</span>);</code></pre>
+    </section>
+
+    <!-- ─ Paso 6 ─ -->
+    <section id="paso6">
+      <div class="section-header">
+        <div class="step-badge">6</div>
+        <h2>Conceptos de tesorería y plan de cuentas</h2>
+      </div>
+
+      <p>Los <strong>conceptos de tesorería</strong> clasifican los movimientos de caja. Sin ellos, no se puede cobrar ni registrar egresos. Cada concepto puede vincularse a una cuenta contable y un centro de costo para que los asientos contables se generen correctamente.</p>
+
+      <h3>6.1 — Crear conceptos básicos</h3>
+      <p><strong>Desde el panel:</strong> Finanzas → Conceptos de Tesorería → Nuevo</p>
+
+      <pre><code><span class="kw">INSERT INTO</span> conceptos_tesoreria (
+  codigo, nombre, tipo,
+  usa_en_tesoreria, usa_en_ventas, usa_en_compras,
+  activo, orden, tenant_id, created_at, updated_at
+)
+<span class="kw">VALUES</span>
+  <span class="cmt">-- INGRESOS</span>
+  (<span class="str">'COB-CUO'</span>, <span class="str">'Cobranza de Cuotas'</span>,      <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">1</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'COB-ACT'</span>, <span class="str">'Cobranza Actividades'</span>,     <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">2</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'ING-MORA'</span>,<span class="str">'Ingresos por Mora'</span>,         <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">3</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'ING-BUF'</span>, <span class="str">'Ingresos Buffet'</span>,           <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">true</span>,  <span class="num">false</span>, <span class="num">true</span>, <span class="num">4</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'OTR-ING'</span>, <span class="str">'Otros Ingresos'</span>,            <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">5</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  <span class="cmt">-- EGRESOS</span>
+  (<span class="str">'SUE'</span>,     <span class="str">'Sueldos y Jornales'</span>,        <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">6</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'SERV'</span>,    <span class="str">'Servicios'</span>,                 <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">true</span>,  <span class="num">true</span>, <span class="num">7</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'MAN'</span>,     <span class="str">'Mantenimiento'</span>,             <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">true</span>,  <span class="num">true</span>, <span class="num">8</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'COM'</span>,     <span class="str">'Compras'</span>,                   <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">true</span>,  <span class="num">true</span>, <span class="num">9</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'OTR-EGR'</span>,<span class="str">'Otros Egresos'</span>,             <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">10</span>,<span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>);
+<span class="cmt">-- Reemplazar &lt;T&gt; por el tenant_id real</span></code></pre>
+
+      <h3>6.2 — Vincular a tipos de socio (una vez creados los conceptos)</h3>
+      <pre><code><span class="kw">UPDATE</span> tipos_socio
+<span class="kw">SET</span>
+  concepto_tesoreria_id = (<span class="kw">SELECT</span> id <span class="kw">FROM</span> conceptos_tesoreria <span class="kw">WHERE</span> codigo=<span class="str">'COB-CUO'</span> <span class="kw">AND</span> tenant_id=<span class="num">&lt;T&gt;</span>),
+  concepto_mora_id      = (<span class="kw">SELECT</span> id <span class="kw">FROM</span> conceptos_tesoreria <span class="kw">WHERE</span> codigo=<span class="str">'ING-MORA'</span> <span class="kw">AND</span> tenant_id=<span class="num">&lt;T&gt;</span>)
+<span class="kw">WHERE</span> tenant_id = <span class="num">&lt;T&gt;</span>;</code></pre>
+
+      <h3>6.3 — Configurar concepto por defecto</h3>
+      <pre><code><span class="kw">INSERT INTO</span> configuracion (clave, valor, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'CONCEPTO_COBRANZA_CUOTAS'</span>,
+   (<span class="kw">SELECT</span> id::text <span class="kw">FROM</span> conceptos_tesoreria <span class="kw">WHERE</span> codigo=<span class="str">'COB-CUO'</span> <span class="kw">AND</span> tenant_id=<span class="num">&lt;T&gt;</span>),
+   <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'CONCEPTO_MORA'</span>,
+   (<span class="kw">SELECT</span> id::text <span class="kw">FROM</span> conceptos_tesoreria <span class="kw">WHERE</span> codigo=<span class="str">'ING-MORA'</span> <span class="kw">AND</span> tenant_id=<span class="num">&lt;T&gt;</span>),
+   <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> (clave, tenant_id) <span class="kw">DO UPDATE SET</span> valor = EXCLUDED.valor;</code></pre>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div>Sin <code>CONCEPTO_COBRANZA_CUOTAS</code> configurado, el sistema no puede generar cargos de cuotas. Es un prerequisito para cualquier flujo de cobranza.</div>
+      </div>
+    </section>
+
+    <!-- ─ Paso 7 ─ -->
+    <section id="paso7">
+      <div class="section-header">
+        <div class="step-badge">7</div>
+        <h2>Medios de pago</h2>
+      </div>
+
+      <p>Los medios de pago disponibles para el club. El sistema tiene los siguientes definidos globalmente, pero cada tenant puede tener los suyos propios en la tabla <code>medios_pago</code>.</p>
+
+      <pre><code><span class="kw">INSERT INTO</span> medios_pago (codigo, nombre, descripcion, activo, orden, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'EFECTIVO'</span>,      <span class="str">'Efectivo'</span>,            <span class="str">'Pago en efectivo'</span>,        <span class="num">true</span>, <span class="num">1</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'TRANSFERENCIA'</span>, <span class="str">'Transferencia'</span>,       <span class="str">'Transferencia bancaria'</span>,  <span class="num">true</span>, <span class="num">2</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'DEBITO'</span>,        <span class="str">'Tarjeta Débito'</span>,      <span class="str">'Tarjeta de débito'</span>,       <span class="num">true</span>, <span class="num">3</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'CREDITO'</span>,       <span class="str">'Tarjeta Crédito'</span>,     <span class="str">'Tarjeta de crédito'</span>,      <span class="num">true</span>, <span class="num">4</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'MERCADOPAGO'</span>,   <span class="str">'MercadoPago'</span>,         <span class="str">'Link de pago MP'</span>,         <span class="num">true</span>, <span class="num">5</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'COBRADOR'</span>,      <span class="str">'Por Cobrador'</span>,        <span class="str">'Cobro domiciliario'</span>,      <span class="num">false</span>,<span class="num">6</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'DEBITO_AUTO'</span>,   <span class="str">'Débito Automático'</span>,   <span class="str">'CBU / adhesión Prisma'</span>,   <span class="num">false</span>,<span class="num">7</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>);</code></pre>
+    </section>
+
+    <!-- ─ Paso 8 ─ -->
+    <section id="paso8">
+      <div class="section-header">
+        <div class="step-badge">8</div>
+        <h2>Actividades deportivas</h2>
+      </div>
+
+      <p>Sin actividades no hay categorías, y sin categorías no se pueden generar inscripciones ni cobrar cuotas deportivas.</p>
+
+      <h3>8.1 — Crear Centros de Costo (si no existen)</h3>
+      <p><strong>Desde el panel:</strong> Contabilidad → Centros de Costo → Nuevo</p>
+      <pre><code><span class="kw">INSERT INTO</span> centros_costo (codigo, nombre, activo, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'ADM'</span>, <span class="str">'Administración'</span>, <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'FUT'</span>, <span class="str">'Fútbol'</span>,         <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'BAS'</span>, <span class="str">'Básquet'</span>,        <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'VOL'</span>, <span class="str">'Vóley'</span>,          <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'NAT'</span>, <span class="str">'Natación'</span>,       <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'HOC'</span>, <span class="str">'Hockey'</span>,         <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'TEN'</span>, <span class="str">'Tenis'</span>,          <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'PAD'</span>, <span class="str">'Paddle'</span>,         <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'GIM'</span>, <span class="str">'Gimnasia'</span>,       <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'BUFFET'</span>,<span class="str">'Buffet'</span>,       <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>);</code></pre>
+
+      <h3>8.2 — Crear Actividades</h3>
+      <p><strong>Desde el panel:</strong> Deportes → Actividades → Nueva Actividad</p>
+      <pre><code><span class="kw">INSERT INTO</span> actividades (
+  codigo, nombre, activo, orden,
+  concepto_tesoreria_id, concepto_mora_id, centro_costo_id,
+  tenant_id, created_at, updated_at
+)
+<span class="kw">SELECT</span>
+  a.codigo, a.nombre, <span class="num">true</span>, a.orden,
+  ct_cob.id, ct_mora.id, cc.id,
+  <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>
+<span class="kw">FROM</span> (<span class="kw">VALUES</span>
+  (<span class="str">'FUT'</span>, <span class="str">'Fútbol'</span>,   <span class="num">1</span>, <span class="str">'FUT'</span>),
+  (<span class="str">'BAS'</span>, <span class="str">'Básquet'</span>, <span class="num">2</span>, <span class="str">'BAS'</span>),
+  (<span class="str">'VOL'</span>, <span class="str">'Vóley'</span>,   <span class="num">3</span>, <span class="str">'VOL'</span>),
+  (<span class="str">'NAT'</span>, <span class="str">'Natación'</span>,<span class="num">4</span>, <span class="str">'NAT'</span>),
+  (<span class="str">'HOC'</span>, <span class="str">'Hockey'</span>,  <span class="num">5</span>, <span class="str">'HOC'</span>),
+  (<span class="str">'TEN'</span>, <span class="str">'Tenis'</span>,   <span class="num">6</span>, <span class="str">'TEN'</span>),
+  (<span class="str">'PAD'</span>, <span class="str">'Paddle'</span>,  <span class="num">7</span>, <span class="str">'PAD'</span>),
+  (<span class="str">'GIM'</span>, <span class="str">'Gimnasia'</span>,<span class="num">8</span>, <span class="str">'GIM'</span>)
+) <span class="kw">AS</span> a(codigo, nombre, orden, cc_codigo)
+<span class="kw">JOIN</span> conceptos_tesoreria ct_cob  <span class="kw">ON</span> ct_cob.codigo=<span class="str">'COB-ACT'</span> <span class="kw">AND</span> ct_cob.tenant_id=<span class="num">&lt;T&gt;</span>
+<span class="kw">JOIN</span> conceptos_tesoreria ct_mora <span class="kw">ON</span> ct_mora.codigo=<span class="str">'ING-MORA'</span> <span class="kw">AND</span> ct_mora.tenant_id=<span class="num">&lt;T&gt;</span>
+<span class="kw">JOIN</span> centros_costo cc            <span class="kw">ON</span> cc.codigo=a.cc_codigo <span class="kw">AND</span> cc.tenant_id=<span class="num">&lt;T&gt;</span>;</code></pre>
+
+      <h3>8.3 — Crear Categorías por Actividad</h3>
+      <p>Cada actividad necesita al menos una categoría con su cuota mensual.</p>
+      <p><strong>Desde el panel:</strong> Deportes → (seleccionar actividad) → Categorías → Nueva</p>
+
+      <pre><code><span class="cmt">-- Ejemplo para Fútbol con 3 categorías</span>
+<span class="kw">INSERT INTO</span> categorias_actividad (
+  codigo, nombre, cuota_mensual,
+  actividad_id, tenant_id, created_at, updated_at
+)
+<span class="kw">SELECT</span>
+  c.codigo, c.nombre, c.cuota,
+  a.id, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>
+<span class="kw">FROM</span> (<span class="kw">VALUES</span>
+  (<span class="str">'INF'</span>, <span class="str">'Infantil'</span>,  <span class="num">5000.00</span>),
+  (<span class="str">'JUV'</span>, <span class="str">'Juvenil'</span>,   <span class="num">7000.00</span>),
+  (<span class="str">'ADU'</span>, <span class="str">'Adultos'</span>,   <span class="num">9000.00</span>)
+) <span class="kw">AS</span> c(codigo, nombre, cuota)
+<span class="kw">CROSS JOIN</span> actividades a
+<span class="kw">WHERE</span> a.codigo=<span class="str">'FUT'</span> <span class="kw">AND</span> a.tenant_id=<span class="num">&lt;T&gt;</span>;</code></pre>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ️</span>
+        <div>Si el club viene migrado de otro sistema, verificar qué <code>categoria_actividad_id</code> referencian las inscripciones existentes antes de crear categorías con IDs nuevos.</div>
+      </div>
+    </section>
+
+    <!-- ─ Paso 9 ─ -->
+    <section id="paso9">
+      <div class="section-header">
+        <div class="step-badge blue">9</div>
+        <h2>Buffet (módulo opcional)</h2>
+      </div>
+
+      <p>Si el club usa el módulo de buffet, hay que configurar sectores, zonas, impresoras y productos. Si no lo usa, saltar este paso.</p>
+
+      <h3>9.1 — Sectores de Buffet</h3>
+      <pre><code><span class="kw">INSERT INTO</span> sectores_buffet (codigo, nombre, tipo, activo, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'COC'</span>,  <span class="str">'Cocina'</span>,      <span class="str">'COCINA'</span>, <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'BAR'</span>,  <span class="str">'Barra'</span>,       <span class="str">'BARRA'</span>,  <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'CAJA'</span>, <span class="str">'Caja'</span>,        <span class="str">'CAJA'</span>,   <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>);</code></pre>
+
+      <h3>9.2 — Zonas / Salones</h3>
+      <pre><code><span class="kw">INSERT INTO</span> zonas_buffet (nombre, activo, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'Salón Principal'</span>, <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'Terraza'</span>,          <span class="num">true</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>);</code></pre>
+
+      <h3>9.3 — Mesas</h3>
+      <p>Desde el panel: Buffet → Mesas → Nueva Mesa (o configurar la distribución gráfica).</p>
+
+      <h3>9.4 — Impresoras térmicas</h3>
+      <p><strong>Desde el panel:</strong> Buffet → Impresoras → Nueva Impresora</p>
+      <p>Campos necesarios: nombre, IP, puerto (default 9100), tipo de impresora.</p>
+      <p>Luego configurar qué impresora se usa para cada punto de venta:</p>
+
+      <table>
+        <thead><tr><th>Clave de configuración</th><th>Uso</th></tr></thead>
+        <tbody>
+          <tr><td><code>BUFFET_IMPRESORA_TICKETS</code></td><td>Tickets de mesas/cobros</td></tr>
+          <tr><td><code>BUFFET_IMPRESORA_KIOSCO</code></td><td>Tickets del kiosco</td></tr>
+          <tr><td><code>BUFFET_IMPRESORA_TAKEAWAY</code></td><td>Tickets de take away</td></tr>
+        </tbody>
+      </table>
+
+      <pre><code><span class="cmt">-- Ejemplo: asignar impresora id=1 a todos los tickets</span>
+<span class="kw">INSERT INTO</span> configuracion (clave, valor, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'BUFFET_IMPRESORA_TICKETS'</span>,  <span class="str">'1'</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'BUFFET_IMPRESORA_KIOSCO'</span>,   <span class="str">'1'</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'BUFFET_IMPRESORA_TAKEAWAY'</span>, <span class="str">'1'</span>, <span class="num">&lt;T&gt;</span>, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> (clave, tenant_id) <span class="kw">DO UPDATE SET</span> valor = EXCLUDED.valor;</code></pre>
+
+      <h3>9.5 — Categorías y productos</h3>
+      <p><strong>Desde el panel:</strong> Buffet → Categorías → Nueva, luego Buffet → Productos → Nuevo.</p>
+      <p>Cada producto debe tener configurado <code>tiposVenta</code> para aparecer en el punto de venta correcto:</p>
+      <table>
+        <thead><tr><th>tiposVenta</th><th>Aparece en</th></tr></thead>
+        <tbody>
+          <tr><td><code>["BUFFET"]</code></td><td>Mesas, TakeAway y Menú Público</td></tr>
+          <tr><td><code>["KIOSCO"]</code></td><td>Kiosco</td></tr>
+          <tr><td><code>["BUFFET","KIOSCO"]</code></td><td>Ambos</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─ Paso 10 ─ -->
+    <section id="paso10">
+      <div class="section-header">
+        <div class="step-badge yellow">10</div>
+        <h2>Configuración global del tenant</h2>
+      </div>
+
+      <p>La tabla <code>configuracion</code> almacena claves de configuración por tenant (distinta de <code>tenant_configuracion</code> que es del super-admin). Estas se gestionan desde <strong>Panel Admin → Configuración</strong>.</p>
+
+      <h3>Claves de cobranza (obligatorias)</h3>
+      <table>
+        <thead><tr><th>Clave</th><th>Descripción</th><th>Valor</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>CONCEPTO_COBRANZA_CUOTAS</code></td>
+            <td>ID del concepto de tesorería para cuotas sociales</td>
+            <td><span class="badge badge-error">Obligatorio</span></td>
+          </tr>
+          <tr>
+            <td><code>CONCEPTO_MORA</code></td>
+            <td>ID del concepto para recargos por mora</td>
+            <td><span class="badge badge-error">Obligatorio</span></td>
+          </tr>
+          <tr>
+            <td><code>CAJA_DEFECTO</code></td>
+            <td>ID de la caja predeterminada para cobros</td>
+            <td><span class="badge badge-warn">Recomendado</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Claves de buffet (si se usa el módulo)</h3>
+      <table>
+        <thead><tr><th>Clave</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>BUFFET_IMPRESORA_TICKETS</code></td><td>ID de impresora para tickets de mesas</td></tr>
+          <tr><td><code>BUFFET_IMPRESORA_KIOSCO</code></td><td>ID de impresora para kiosco</td></tr>
+          <tr><td><code>BUFFET_IMPRESORA_TAKEAWAY</code></td><td>ID de impresora para take away</td></tr>
+          <tr><td><code>BUFFET_DESCUENTO_SOCIO</code></td><td>% de descuento para socios en buffet (ej: <code>10</code>)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Claves de facturación electrónica (si se usa)</h3>
+      <table>
+        <thead><tr><th>Clave</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>AFIP_CUIT</code></td><td>CUIT del club para facturación electrónica</td></tr>
+          <tr><td><code>AFIP_PUNTO_VENTA</code></td><td>Número de punto de venta habilitado en AFIP</td></tr>
+          <tr><td><code>AFIP_CERT</code></td><td>Certificado digital (.pem)</td></tr>
+          <tr><td><code>AFIP_KEY</code></td><td>Clave privada del certificado</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Otras claves</h3>
+      <table>
+        <thead><tr><th>Clave</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>MODO_DEMO</code></td><td><code>true</code> / <code>false</code> — en modo demo no se envían emails reales</td></tr>
+          <tr><td><code>EMAIL_DEMO</code></td><td>Email destino de todas las notificaciones en modo demo</td></tr>
+          <tr><td><code>MP_ACCESS_TOKEN</code></td><td>Access token de MercadoPago del club</td></tr>
+          <tr><td><code>MP_PUBLIC_KEY</code></td><td>Public key de MercadoPago</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─ Paso 11 ─ -->
+    <section id="paso11">
+      <div class="section-header">
+        <div class="step-badge green">11</div>
+        <h2>Verificación final</h2>
+      </div>
+
+      <h3>Checklist antes de habilitar al club</h3>
+      <ul class="check">
+        <li>Tenant creado con <code>activo = true</code> y estado <code>ACTIVE</code></li>
+        <li>Admin vinculado en <code>tenant_usuarios</code></li>
+        <li>Login desde <code>subdominio.clubix.com.ar</code> funciona</li>
+        <li>Tipos de socio cargados (al menos 1)</li>
+        <li>Estados de socio cargados (VIGENTE es el mínimo)</li>
+        <li>Conceptos de tesorería cargados (COB-CUO e ING-MORA como mínimo)</li>
+        <li>Clave <code>CONCEPTO_COBRANZA_CUOTAS</code> configurada</li>
+        <li>Medios de pago cargados (Efectivo es el mínimo)</li>
+        <li>Al menos una actividad con una categoría (si el club tiene deporte)</li>
+        <li>Caja principal creada (Tesorería → Cajas)</li>
+      </ul>
+
+      <h3>Test de smoke end-to-end</h3>
+      <ol class="steps">
+        <li><div>Crear un socio desde Panel Admin → Socios → Nuevo Socio</div></li>
+        <li><div>Registrar un cargo manual de cuota social</div></li>
+        <li><div>Cobrar el cargo → verificar que se genera el movimiento de caja</div></li>
+        <li><div>Verificar que el socio puede acceder al portal (<code>subdominio.clubix.com.ar/s/{token}</code>)</div></li>
+        <li><div>Si el club tiene buffet: crear un producto, abrir una mesa, agregar ítem y cobrar</div></li>
+      </ol>
+
+      <h3>Query de verificación rápida</h3>
+      <pre><code><span class="cmt">-- Estado del tenant</span>
+<span class="kw">SELECT</span>
+  t.id, t.nombre, t.subdomain, t.estado, t.activo,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> tipos_socio     <span class="kw">WHERE</span> tenant_id=t.id) tipos_socio,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> estados_socio   <span class="kw">WHERE</span> tenant_id=t.id) estados_socio,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> conceptos_tesoreria <span class="kw">WHERE</span> tenant_id=t.id) conceptos_tes,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> medios_pago     <span class="kw">WHERE</span> tenant_id=t.id) medios_pago,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> actividades     <span class="kw">WHERE</span> tenant_id=t.id) actividades,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> tenant_usuarios <span class="kw">WHERE</span> tenant_id=t.id) admins
+<span class="kw">FROM</span> tenants t
+<span class="kw">WHERE</span> t.subdomain = <span class="str">'clubejemplo'</span>;</code></pre>
+    </section>
+
+    <!-- ─ SQL Rápido ─ -->
+    <section id="sql-rapido">
+      <div class="section-header">
+        <div class="step-badge gray">★</div>
+        <h2>Script SQL de arranque completo</h2>
+      </div>
+
+      <p>Script para insertar todos los datos mínimos de un tenant nuevo en una sola pasada. Reemplazar <code>&lt;T&gt;</code> por el <code>tenant_id</code> real luego de crearlo.</p>
+
+      <div class="callout danger">
+        <span class="callout-icon">🚨</span>
+        <div>Ejecutar este script <strong>después</strong> de crear el tenant en la tabla <code>tenants</code> y <strong>antes</strong> de habilitarlo. Verificar que no existan registros previos para el mismo <code>tenant_id</code>.</div>
+      </div>
+
+      <pre><code><span class="cmt">-- ============================================================
+-- SCRIPT DE INICIALIZACIÓN DE TENANT
+-- Reemplazar &lt;T&gt; por el tenant_id real en TODOS los lugares
+-- ============================================================</span>
+
+<span class="kw">DO</span> $$
+<span class="kw">DECLARE</span>
+  v_tenant_id  INT := <span class="num">&lt;T&gt;</span>;
+  v_cob_cuo_id INT;
+  v_ing_mora_id INT;
+  v_cob_act_id INT;
+<span class="kw">BEGIN</span>
+
+<span class="cmt">-- 1. TIPOS DE SOCIO</span>
+<span class="kw">INSERT INTO</span> tipos_socio (codigo, nombre, orden, activo, tenant_id, created_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'ACTIVO'</span>, <span class="str">'Socio Activo'</span>, <span class="num">1</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>),
+  (<span class="str">'CADETE'</span>, <span class="str">'Socio Cadete'</span>, <span class="num">2</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>),
+  (<span class="str">'VITALICIO'</span>, <span class="str">'Socio Vitalicio'</span>, <span class="num">3</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> (tenant_id, codigo) <span class="kw">DO NOTHING</span>;
+
+<span class="cmt">-- 2. CATEGORÍAS DE SOCIO</span>
+<span class="kw">INSERT INTO</span> categorias_socio (codigo, nombre, porcentaje_descuento, orden, activo, tenant_id, created_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'REGULAR'</span>,  <span class="str">'Regular'</span>,   <span class="num">0.00</span>,  <span class="num">1</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>),
+  (<span class="str">'JUBILADO'</span>, <span class="str">'Jubilado'</span>,  <span class="num">50.00</span>, <span class="num">2</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> (tenant_id, codigo) <span class="kw">DO NOTHING</span>;
+
+<span class="cmt">-- 3. ESTADOS DE SOCIO</span>
+<span class="kw">INSERT INTO</span> estados_socio (codigo, nombre, color, permite_descuentos, orden, activo, tenant_id, created_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'VIGENTE'</span>,    <span class="str">'Vigente'</span>,    <span class="str">'#16a34a'</span>, <span class="num">true</span>,  <span class="num">1</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>),
+  (<span class="str">'SUSPENDIDO'</span>, <span class="str">'Suspendido'</span>, <span class="str">'#d97706'</span>, <span class="num">false</span>, <span class="num">2</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>),
+  (<span class="str">'BAJA'</span>,       <span class="str">'Baja'</span>,       <span class="str">'#dc2626'</span>, <span class="num">false</span>, <span class="num">3</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>),
+  (<span class="str">'MOROSO'</span>,     <span class="str">'Moroso'</span>,     <span class="str">'#9333ea'</span>, <span class="num">false</span>, <span class="num">4</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> (tenant_id, codigo) <span class="kw">DO NOTHING</span>;
+
+<span class="cmt">-- 4. CONCEPTOS DE TESORERÍA</span>
+<span class="kw">INSERT INTO</span> conceptos_tesoreria (codigo, nombre, tipo, usa_en_tesoreria, usa_en_ventas, usa_en_compras, activo, orden, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'COB-CUO'</span>, <span class="str">'Cobranza de Cuotas'</span>,  <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">1</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'COB-ACT'</span>, <span class="str">'Cobranza Actividades'</span>, <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">2</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'ING-MORA'</span>,<span class="str">'Ingresos por Mora'</span>,    <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">3</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'ING-BUF'</span>, <span class="str">'Ingresos Buffet'</span>,      <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">true</span>,  <span class="num">false</span>, <span class="num">true</span>, <span class="num">4</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'OTR-ING'</span>, <span class="str">'Otros Ingresos'</span>,       <span class="str">'INGRESO'</span>, <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">5</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'SUE'</span>,     <span class="str">'Sueldos'</span>,              <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">6</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'SERV'</span>,    <span class="str">'Servicios'</span>,            <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">true</span>,  <span class="num">true</span>, <span class="num">7</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'MAN'</span>,     <span class="str">'Mantenimiento'</span>,        <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">true</span>,  <span class="num">true</span>, <span class="num">8</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'OTR-EGR'</span>,<span class="str">'Otros Egresos'</span>,        <span class="str">'EGRESO'</span>,  <span class="num">true</span>, <span class="num">false</span>, <span class="num">false</span>, <span class="num">true</span>, <span class="num">9</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> (tenant_id, codigo) <span class="kw">DO NOTHING</span>;
+
+<span class="cmt">-- Obtener IDs de conceptos recién creados</span>
+<span class="kw">SELECT</span> id <span class="kw">INTO</span> v_cob_cuo_id  <span class="kw">FROM</span> conceptos_tesoreria <span class="kw">WHERE</span> codigo=<span class="str">'COB-CUO'</span>  <span class="kw">AND</span> tenant_id=v_tenant_id;
+<span class="kw">SELECT</span> id <span class="kw">INTO</span> v_ing_mora_id <span class="kw">FROM</span> conceptos_tesoreria <span class="kw">WHERE</span> codigo=<span class="str">'ING-MORA'</span> <span class="kw">AND</span> tenant_id=v_tenant_id;
+<span class="kw">SELECT</span> id <span class="kw">INTO</span> v_cob_act_id  <span class="kw">FROM</span> conceptos_tesoreria <span class="kw">WHERE</span> codigo=<span class="str">'COB-ACT'</span>  <span class="kw">AND</span> tenant_id=v_tenant_id;
+
+<span class="cmt">-- 5. VINCULAR CONCEPTOS A TIPOS DE SOCIO</span>
+<span class="kw">UPDATE</span> tipos_socio
+<span class="kw">SET</span> concepto_tesoreria_id = v_cob_cuo_id,
+    concepto_mora_id      = v_ing_mora_id
+<span class="kw">WHERE</span> tenant_id = v_tenant_id;
+
+<span class="cmt">-- 6. MEDIOS DE PAGO</span>
+<span class="kw">INSERT INTO</span> medios_pago (codigo, nombre, activo, orden, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'EFECTIVO'</span>,      <span class="str">'Efectivo'</span>,          <span class="num">true</span>,  <span class="num">1</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'TRANSFERENCIA'</span>, <span class="str">'Transferencia'</span>,     <span class="num">true</span>,  <span class="num">2</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'DEBITO'</span>,        <span class="str">'Tarjeta Débito'</span>,    <span class="num">true</span>,  <span class="num">3</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'CREDITO'</span>,       <span class="str">'Tarjeta Crédito'</span>,   <span class="num">true</span>,  <span class="num">4</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'MERCADOPAGO'</span>,   <span class="str">'MercadoPago'</span>,       <span class="num">true</span>,  <span class="num">5</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'DEBITO_AUTO'</span>,   <span class="str">'Débito Automático'</span>, <span class="num">false</span>, <span class="num">6</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> DO NOTHING;
+
+<span class="cmt">-- 7. CONFIGURACIÓN BASE</span>
+<span class="kw">INSERT INTO</span> configuracion (clave, valor, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'CONCEPTO_COBRANZA_CUOTAS'</span>, v_cob_cuo_id::text,  v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'CONCEPTO_MORA'</span>,            v_ing_mora_id::text, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> (clave, tenant_id) <span class="kw">DO UPDATE SET</span> valor = EXCLUDED.valor;
+
+<span class="cmt">-- 8. CENTROS DE COSTO</span>
+<span class="kw">INSERT INTO</span> centros_costo (codigo, nombre, activo, tenant_id, created_at, updated_at)
+<span class="kw">VALUES</span>
+  (<span class="str">'ADM'</span>,    <span class="str">'Administración'</span>, <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'FUT'</span>,    <span class="str">'Fútbol'</span>,         <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'BAS'</span>,    <span class="str">'Básquet'</span>,        <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'VOL'</span>,    <span class="str">'Vóley'</span>,          <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'GIM'</span>,    <span class="str">'Gimnasia'</span>,       <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>),
+  (<span class="str">'BUFFET'</span>, <span class="str">'Buffet'</span>,         <span class="num">true</span>, v_tenant_id, <span class="fn">NOW()</span>, <span class="fn">NOW()</span>)
+<span class="kw">ON CONFLICT</span> DO NOTHING;
+
+  <span class="fn">RAISE NOTICE</span> <span class="str">'✅ Tenant % inicializado correctamente'</span>, v_tenant_id;
+<span class="kw">END</span> $$;
+
+<span class="cmt">-- Verificación final</span>
+<span class="kw">SELECT</span>
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> tipos_socio         <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Tipos Socio"</span>,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> estados_socio        <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Estados Socio"</span>,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> conceptos_tesoreria  <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Conceptos Tes."</span>,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> medios_pago          <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Medios Pago"</span>,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> centros_costo        <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Centros Costo"</span>,
+  (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> configuracion        <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Config Keys"</span>;</code></pre>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // Highlight active nav link on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks  = document.querySelectorAll('nav.sidebar a');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

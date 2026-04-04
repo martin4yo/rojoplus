@@ -140,8 +140,22 @@ app.use('/api/public/*', extractTenantOptional, (req, res, next) => {
 app.use('/api/super-admin/*', requireSuperAdmin)
 
 // Endpoint de tenant actual (necesario para frontend)
-app.get('/api/tenant/current', extractTenant, (req, res) => {
-  res.json(req.tenant)
+app.get('/api/tenant/current', extractTenant, async (req, res) => {
+  try {
+    const config = await prisma.tenantConfiguracion.findUnique({
+      where: { tenantId_clave: { tenantId: req.tenantId, clave: 'HERO_IMAGES' } }
+    })
+    let heroImages = []
+    if (config?.valor) {
+      try { heroImages = JSON.parse(config.valor) } catch {}
+    }
+    if (!heroImages.length && req.tenant.heroImageUrl) {
+      heroImages = [req.tenant.heroImageUrl]
+    }
+    res.json({ ...req.tenant, heroImages })
+  } catch {
+    res.json(req.tenant)
+  }
 })
 
 // ===== FIN MULTI-TENANT SETUP =====

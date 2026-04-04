@@ -1,7 +1,8 @@
 /**
  * Script de importación de grupos familiares desde GruposFamiliares.xlsx (Brio)
  *
- * Ejecutar con: node scripts/importar-grupos-familiares.js
+ * Ejecutar con: node scripts/importar-grupos-familiares.js <tenantId>
+ * Ejemplo:      node scripts/importar-grupos-familiares.js 1
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -15,7 +16,25 @@ const __dirname = path.dirname(__filename)
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🚀 Iniciando importación de grupos familiares desde Brio...\n')
+  // Leer slug desde argumento de línea de comandos
+  const slug = process.argv[2]
+  if (!slug) {
+    console.error('❌ Falta el slug. Uso: node scripts/importar-grupos-familiares.js <slug>')
+    console.error('   Ejemplo: node scripts/importar-grupos-familiares.js sportivopilar')
+    process.exit(1)
+  }
+
+  // Verificar que el tenant existe
+  const tenant = await prisma.tenant.findUnique({ where: { slug } })
+  if (!tenant) {
+    console.error(`❌ Tenant con slug "${slug}" no encontrado`)
+    process.exit(1)
+  }
+
+  const tenantId = tenant.id
+
+  console.log(`🚀 Iniciando importación de grupos familiares desde Brio...\n`)
+  console.log(`   Tenant: [${tenantId}] ${tenant.nombre}\n`)
 
   // 1. Leer el archivo Excel
   const filePath = path.join(__dirname, '..', '..', 'brio', 'GruposFamiliares.xlsx')
@@ -30,9 +49,10 @@ async function main() {
 
   console.log(`📊 Total de registros a procesar: ${data.length}\n`)
 
-  // 2. Cargar todos los socios para mapear nroSocio -> id
+  // 2. Cargar todos los socios del tenant para mapear nroSocio -> id
   console.log('👥 Cargando socios...')
   const socios = await prisma.socio.findMany({
+    where: { tenantId },
     select: { id: true, nroSocio: true, apellidoNombre: true }
   })
   const socioMap = new Map()
@@ -95,7 +115,7 @@ async function main() {
         // Si el socio es el mismo que el titular, asegurar que titularFamiliaId sea null
         if (miembro.nroSocio === nroTitular) {
           await prisma.socio.update({
-            where: { id: socio.id },
+            where: { id: socio.id, tenantId },
             data: {
               titularFamiliaId: null,
               parentescoTitular: null,
@@ -105,7 +125,7 @@ async function main() {
         } else {
           // Es un miembro de familia, asignar al titular
           await prisma.socio.update({
-            where: { id: socio.id },
+            where: { id: socio.id, tenantId },
             data: {
               titularFamiliaId: titular.id,
               parentescoTitular: miembro.parentesco || null,
@@ -159,15 +179,17 @@ async function main() {
   }
 
   // 6. Estadísticas de la BD
-  const totalSocios = await prisma.socio.count()
+  const totalSocios = await prisma.socio.count({ where: { tenantId } })
   const sociosTitulares = await prisma.socio.count({
     where: {
+      tenantId,
       titularFamiliaId: null,
       tipoSocio: { contains: 'Titular' }
     }
   })
   const sociosMiembros = await prisma.socio.count({
     where: {
+      tenantId,
       titularFamiliaId: { not: null }
     }
   })

@@ -25,7 +25,7 @@ router.get('/', asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'Tenant no encontrado' })
   }
 
-  res.json(tenant)
+  res.json({ data: tenant })
 }))
 
 /**
@@ -122,6 +122,74 @@ router.put('/favicon', asyncHandler(async (req, res) => {
     success: true,
     faviconUrl: tenant.faviconUrl
   })
+}))
+
+/**
+ * GET /api/admin/branding/hero-images
+ * Obtener lista de imágenes del carousel hero
+ */
+router.get('/hero-images', asyncHandler(async (req, res) => {
+  const { tenantId } = req
+  const config = await req.db.tenantConfiguracion.findUnique({
+    where: { tenantId_clave: { tenantId, clave: 'HERO_IMAGES' } }
+  })
+  let images = []
+  if (config?.valor) {
+    try { images = JSON.parse(config.valor) } catch {}
+  }
+  res.json({ data: images })
+}))
+
+/**
+ * PUT /api/admin/branding/hero-images
+ * Guardar lista de imágenes del carousel hero
+ * Body: { images: ['url1', 'url2', ...] }
+ */
+router.put('/hero-images', asyncHandler(async (req, res) => {
+  const { tenantId } = req
+  const { images } = req.body
+  if (!Array.isArray(images)) {
+    return res.status(400).json({ error: 'images debe ser un array' })
+  }
+  const valor = JSON.stringify(images.filter(Boolean))
+  await req.db.tenantConfiguracion.upsert({
+    where: { tenantId_clave: { tenantId, clave: 'HERO_IMAGES' } },
+    create: { tenantId, clave: 'HERO_IMAGES', valor, tipo: 'JSON', descripcion: 'Imágenes del carousel hero' },
+    update: { valor }
+  })
+  res.json({ success: true, images })
+}))
+
+/**
+ * GET /api/admin/branding/fecha-fundacion
+ * Obtener la fecha de fundación del tenant
+ */
+router.get('/fecha-fundacion', asyncHandler(async (req, res) => {
+  const { tenantId } = req
+  const config = await req.db.tenantConfiguracion.findUnique({
+    where: { tenantId_clave: { tenantId, clave: 'FECHA_FUNDACION' } }
+  })
+  res.json({ data: config?.valor || null })
+}))
+
+/**
+ * PUT /api/admin/branding/fecha-fundacion
+ * Guardar la fecha de fundación del tenant
+ * Body: { fecha: 'YYYY-MM-DD' }
+ */
+router.put('/fecha-fundacion', asyncHandler(async (req, res) => {
+  const { tenantId } = req
+  const { fecha } = req.body
+  if (!fecha || isNaN(new Date(fecha).getTime())) {
+    return res.status(400).json({ error: 'fecha inválida' })
+  }
+  const valor = new Date(fecha).toISOString().split('T')[0]
+  await req.db.tenantConfiguracion.upsert({
+    where: { tenantId_clave: { tenantId, clave: 'FECHA_FUNDACION' } },
+    create: { tenantId, clave: 'FECHA_FUNDACION', valor, tipo: 'STRING', descripcion: 'Fecha de fundación del club' },
+    update: { valor }
+  })
+  res.json({ success: true, fecha: valor })
 }))
 
 /**

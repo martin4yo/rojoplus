@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Palette, Upload, RotateCcw, Save } from 'lucide-react'
+import { Palette, Upload, RotateCcw, Save, Plus, Trash2, Images, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import { useTenant } from '../../contexts/TenantContext'
@@ -13,6 +13,10 @@ export default function Branding() {
   const [logoUrl, setLogoUrl] = useState('')
   const [faviconUrl, setFaviconUrl] = useState('')
   const [changed, setChanged] = useState(false)
+  const [heroImages, setHeroImages] = useState([])
+  const [heroChanged, setHeroChanged] = useState(false)
+  const [fechaFundacion, setFechaFundacion] = useState('')
+  const [fechaChanged, setFechaChanged] = useState(false)
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -25,15 +29,19 @@ export default function Branding() {
     try {
       setLoading(true)
 
-      // Cargar branding actual
-      const res = await api.get('/api/admin/branding')
-      setColores(res.data.colores || {})
-      setLogoUrl(res.data.logoUrl || '')
-      setFaviconUrl(res.data.faviconUrl || '')
+      const [res, defaultRes, heroRes, fechaRes] = await Promise.all([
+        api.get('/admin/branding'),
+        api.getFull('/admin/branding/default-colors'),
+        api.get('/admin/branding/hero-images'),
+        api.get('/admin/branding/fecha-fundacion'),
+      ])
 
-      // Cargar colores por defecto
-      const defaultRes = await api.get('/api/admin/branding/default-colors')
-      setDefaultColors(defaultRes.data)
+      setColores(res?.colores || {})
+      setLogoUrl(res?.logoUrl || '')
+      setFaviconUrl(res?.faviconUrl || '')
+      setDefaultColors(defaultRes || {})
+      setHeroImages(Array.isArray(heroRes) ? heroRes : [])
+      setFechaFundacion(fechaRes || '')
     } catch (error) {
       toast.error('Error cargando branding: ' + error.message)
     } finally {
@@ -62,7 +70,7 @@ export default function Branding() {
   async function guardarColores() {
     try {
       setLoading(true)
-      await api.put('/api/admin/branding/colores', { colores })
+      await api.put('/admin/branding/colores', { colores })
       toast.success('Colores guardados')
       setChanged(false)
     } catch (error) {
@@ -75,7 +83,7 @@ export default function Branding() {
   async function guardarLogo() {
     try {
       setLoading(true)
-      await api.put('/api/admin/branding/logo', { logoUrl })
+      await api.put('/admin/branding/logo', { logoUrl })
       toast.success('Logo guardado')
       setChanged(false)
     } catch (error) {
@@ -88,11 +96,52 @@ export default function Branding() {
   async function guardarFavicon() {
     try {
       setLoading(true)
-      await api.put('/api/admin/branding/favicon', { faviconUrl })
+      await api.put('/admin/branding/favicon', { faviconUrl })
       toast.success('Favicon guardado')
       setChanged(false)
     } catch (error) {
       toast.error('Error guardando favicon: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function guardarHeroImages() {
+    try {
+      setLoading(true)
+      await api.put('/admin/branding/hero-images', { images: heroImages })
+      toast.success('Imágenes del hero guardadas')
+      setHeroChanged(false)
+    } catch (error) {
+      toast.error('Error guardando imágenes: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function agregarHeroImage() {
+    setHeroImages(prev => [...prev, ''])
+    setHeroChanged(true)
+  }
+
+  function updateHeroImage(idx, val) {
+    setHeroImages(prev => prev.map((img, i) => i === idx ? val : img))
+    setHeroChanged(true)
+  }
+
+  function removeHeroImage(idx) {
+    setHeroImages(prev => prev.filter((_, i) => i !== idx))
+    setHeroChanged(true)
+  }
+
+  async function guardarFechaFundacion() {
+    try {
+      setLoading(true)
+      await api.put('/admin/branding/fecha-fundacion', { fecha: fechaFundacion })
+      toast.success('Fecha de fundación guardada')
+      setFechaChanged(false)
+    } catch (error) {
+      toast.error('Error guardando fecha: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -126,6 +175,84 @@ export default function Branding() {
         <div>
           <h1 className="text-3xl font-bold">Personalización Visual</h1>
           <p className="text-gray-600">Configura los colores y logos de tu club</p>
+        </div>
+      </div>
+
+      {/* Sección Hero Carousel */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
+          <Images className="w-5 h-5" /> Imágenes del Hero (Carousel)
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Agregá las URLs de las imágenes que rotarán en el banner principal del sitio público. Se avanza automáticamente cada 5 segundos.
+        </p>
+
+        <div className="space-y-3 mb-4">
+          {heroImages.map((url, idx) => (
+            <div key={idx} className="flex gap-2 items-center">
+              <span className="text-xs text-gray-400 w-5 text-right flex-shrink-0">{idx + 1}</span>
+              <input
+                type="url"
+                value={url}
+                onChange={e => updateHeroImage(idx, e.target.value)}
+                placeholder="https://example.com/imagen.jpg"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
+              />
+              {url && (
+                <img src={url} alt="" className="w-12 h-8 object-cover rounded border border-gray-200 flex-shrink-0" onError={e => e.target.style.display='none'} />
+              )}
+              <button
+                onClick={() => removeHeroImage(idx)}
+                className="p-1.5 text-red-500 hover:bg-red-50 rounded flex-shrink-0"
+                title="Eliminar"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={agregarHeroImage}
+            className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+          >
+            <Plus className="w-4 h-4" /> Agregar imagen
+          </button>
+          <button
+            onClick={guardarHeroImages}
+            disabled={loading || !heroChanged}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:bg-gray-400 flex items-center gap-2 text-sm"
+          >
+            <Save className="w-4 h-4" />
+            Guardar carousel
+          </button>
+        </div>
+      </div>
+
+      {/* Sección Fecha de Fundación */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
+          <Calendar className="w-5 h-5" /> Fecha de Fundación
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Se usa para calcular los años de historia que se muestran en el hero del sitio público.
+        </p>
+        <div className="flex items-center gap-4">
+          <input
+            type="date"
+            value={fechaFundacion}
+            onChange={e => { setFechaFundacion(e.target.value); setFechaChanged(true) }}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary text-sm"
+          />
+          <button
+            onClick={guardarFechaFundacion}
+            disabled={loading || !fechaChanged}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:bg-gray-400 flex items-center gap-2 text-sm"
+          >
+            <Save className="w-4 h-4" />
+            Guardar
+          </button>
         </div>
       </div>
 
