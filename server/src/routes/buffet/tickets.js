@@ -433,7 +433,7 @@ router.get('/preview-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRAR',
  */
 router.get('/menu-publico', async (req, res) => {
   try {
-    const categorias = await prisma.categoriaMenu.findMany({
+    const categorias = await req.db.categoriaMenu.findMany({
       where: { activo: true },
       orderBy: { orden: 'asc' },
       select: {
@@ -478,7 +478,7 @@ router.get('/menu-publico', async (req, res) => {
  */
 router.get('/menu-publico/pdf', async (req, res) => {
   try {
-    const categorias = await prisma.categoriaMenu.findMany({
+    const categorias = await req.db.categoriaMenu.findMany({
       where: { activo: true },
       orderBy: { orden: 'asc' },
       select: {

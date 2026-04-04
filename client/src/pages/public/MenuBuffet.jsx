@@ -52,9 +52,22 @@ export default function MenuBuffet() {
     cargarMenu()
   }, [])
 
+  function getTenantHeaders() {
+    const hostname = window.location.hostname
+    let slug = null
+    if (hostname.includes('localhost')) {
+      const m = hostname.match(/^([^.]+)\.localhost/)
+      if (m) slug = m[1]
+    } else {
+      const parts = hostname.split('.')
+      if (parts.length > 2 && parts[0] !== 'www') slug = parts[0]
+    }
+    return slug ? { 'X-Tenant-Slug': slug } : {}
+  }
+
   async function cargarMenu() {
     try {
-      const res = await fetch('/api/buffet/menu-publico')
+      const res = await fetch('/api/buffet/menu-publico', { headers: getTenantHeaders() })
       const data = await res.json()
       if (data.success) {
         setCategorias(data.data || [])
@@ -73,14 +86,22 @@ export default function MenuBuffet() {
   const getIcono = (codigo) => iconosPorCategoria[codigo] || UtensilsCrossed
   const getImagen = (codigo) => imagenesPorCategoria[codigo] || null
 
-  const descargarPDF = () => {
-    const url = '/api/buffet/menu-publico/pdf'
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `menu-buffet-${new Date().toISOString().split('T')[0]}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  async function descargarPDF() {
+    try {
+      const res = await fetch('/api/buffet/menu-publico/pdf', { headers: getTenantHeaders() })
+      if (!res.ok) throw new Error('Error al generar PDF')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `menu-buffet-${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error descargando PDF:', err)
+    }
   }
 
   if (loading) {
