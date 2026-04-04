@@ -31,10 +31,15 @@ export default function BuffetProductos() {
     return localStorage.getItem('buffetProductosVista') || 'shop'
   })
 
+  const [conceptosCompra, setConceptosCompra] = useState([])
+  const [conceptosVenta, setConceptosVenta] = useState([])
+
   const [formData, setFormData] = useState({
     // Campos para producto nuevo (stock)
     codigo: '',
     categoriaStockId: '',
+    conceptoCompraId: '',
+    conceptoVentaId: '',
     // Campos comunes
     nombre: '',
     descripcion: '',
@@ -53,11 +58,23 @@ export default function BuffetProductos() {
 
   useEffect(() => {
     cargarDatos()
+    cargarConceptos()
   }, [])
 
   useEffect(() => {
     localStorage.setItem('buffetProductosVista', vista)
   }, [vista])
+
+  async function cargarConceptos() {
+    try {
+      const data = await api.get('/admin/conceptos-tesoreria?activo=true')
+      const conceptos = data || []
+      setConceptosCompra(conceptos.filter(c => c.tipo === 'EGRESO' || c.tipo === 'AMBOS'))
+      setConceptosVenta(conceptos.filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS'))
+    } catch (err) {
+      console.error('Error cargando conceptos:', err)
+    }
+  }
 
   async function cargarDatos() {
     try {
@@ -102,6 +119,8 @@ export default function BuffetProductos() {
       setFormData({
         codigo: '',
         categoriaStockId: '',
+        conceptoCompraId: '',
+        conceptoVentaId: '',
         nombre: '',
         descripcion: '',
         codigoBarras: '',
@@ -151,6 +170,14 @@ export default function BuffetProductos() {
       return
     }
 
+    // Validar conceptos contables al crear producto nuevo
+    if (!editando && modoCreacion === 'nuevo') {
+      if (!formData.conceptoCompraId || !formData.conceptoVentaId) {
+        toast.error('Los conceptos de compra y venta son obligatorios')
+        return
+      }
+    }
+
     try {
       if (editando) {
         // Actualizar producto existente
@@ -174,6 +201,8 @@ export default function BuffetProductos() {
             // Datos del producto stock
             codigo: formData.codigo,
             categoriaStockId: formData.categoriaStockId ? parseInt(formData.categoriaStockId) : null,
+            conceptoCompraId: parseInt(formData.conceptoCompraId),
+            conceptoVentaId: parseInt(formData.conceptoVentaId),
             // Datos comunes
             nombre: formData.nombre,
             descripcion: formData.descripcion,
@@ -783,6 +812,40 @@ export default function BuffetProductos() {
                         <option value="">Sin categoría</option>
                         {categoriasStock.map(cat => (
                           <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Conceptos contables - solo al crear producto nuevo */}
+                {!editando && modoCreacion === 'nuevo' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Compra <span className="text-red-500">*</span></label>
+                      <select
+                        value={formData.conceptoCompraId}
+                        onChange={e => setFormData({ ...formData, conceptoCompraId: e.target.value })}
+                        className={`w-full border rounded-lg px-3 py-1.5 text-sm ${!formData.conceptoCompraId ? 'border-red-300' : 'border-gray-300'}`}
+                        required
+                      >
+                        <option value="">Seleccionar...</option>
+                        {conceptosCompra.map(c => (
+                          <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Venta <span className="text-red-500">*</span></label>
+                      <select
+                        value={formData.conceptoVentaId}
+                        onChange={e => setFormData({ ...formData, conceptoVentaId: e.target.value })}
+                        className={`w-full border rounded-lg px-3 py-1.5 text-sm ${!formData.conceptoVentaId ? 'border-red-300' : 'border-gray-300'}`}
+                        required
+                      >
+                        <option value="">Seleccionar...</option>
+                        {conceptosVenta.map(c => (
+                          <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
                         ))}
                       </select>
                     </div>

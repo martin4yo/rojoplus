@@ -55,6 +55,7 @@ import chatRoutes from './routes/chat.js'
 import superAdminRoutes from './routes/super-admin/index.js'
 import brandingRoutes from './routes/admin/branding.js'
 import authRoutes from './routes/admin/auth.js'
+import whatsappRoutes from './routes/whatsapp/webhook.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -209,6 +210,14 @@ app.use('/api/admin/menu', menuRoutes)
 app.use('/api/admin/branding', brandingRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/super-admin', superAdminRoutes)
+
+// WhatsApp webhook (sin autenticación — Evolution API llama directamente)
+// Las rutas admin de WhatsApp usan extractTenant
+app.post('/api/whatsapp/webhook', whatsappRoutes)
+app.use('/api/admin/whatsapp', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+}, whatsappRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

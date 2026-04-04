@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BellIcon, EnvelopeIcon, DevicePhoneMobileIcon, TrophyIcon, CalendarIcon, XCircleIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { BellIcon, EnvelopeIcon, DevicePhoneMobileIcon, TrophyIcon, XCircleIcon, CheckCircleIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline'
 import api from '../../../services/api'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../../components/LoadingSpinner'
@@ -52,6 +52,17 @@ export default function NotificacionesSocio({ tokenPortal }) {
     guardarPreferencias(nuevasPreferencias)
   }
 
+  function toggleCanal(campo) {
+    const nuevasPreferencias = {
+      ...preferencias,
+      canales: {
+        ...preferencias.canales,
+        [campo]: !preferencias.canales?.[campo]
+      }
+    }
+    guardarPreferencias(nuevasPreferencias)
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -80,6 +91,35 @@ export default function NotificacionesSocio({ tokenPortal }) {
             <h2 className="text-xl font-bold text-gray-900">Preferencias de Notificaciones</h2>
             <p className="text-gray-600 text-sm">Configura qué notificaciones quieres recibir</p>
           </div>
+        </div>
+      </div>
+
+      {/* Canales de notificación */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="p-4 bg-gray-50 border-b">
+          <div className="flex items-center gap-2">
+            <BellIcon className="h-5 w-5 text-gray-600" />
+            <h3 className="font-semibold text-gray-800">Canales de notificación</h3>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Elegí cómo querés recibir tus notificaciones</p>
+        </div>
+        <div className="divide-y">
+          <NotificacionItem
+            titulo="Email"
+            descripcion="Recibir notificaciones por correo electrónico"
+            activo={preferencias.canales?.email !== false}
+            onChange={() => toggleCanal('email')}
+            disabled={saving}
+            icon={<EnvelopeIcon className="h-5 w-5 text-blue-500" />}
+          />
+          <NotificacionItem
+            titulo="WhatsApp"
+            descripcion="Recibir notificaciones por WhatsApp"
+            activo={preferencias.canales?.whatsapp !== false}
+            onChange={() => toggleCanal('whatsapp')}
+            disabled={saving}
+            icon={<ChatBubbleLeftEllipsisIcon className="h-5 w-5 text-green-500" />}
+          />
         </div>
       </div>
 
@@ -185,9 +225,9 @@ export default function NotificacionesSocio({ tokenPortal }) {
             <EnvelopeIcon className="h-5 w-5 text-blue-600" />
           </div>
           <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">Las notificaciones se envían por email</p>
+            <p className="font-medium mb-1">Canales disponibles: email y WhatsApp</p>
             <p className="text-blue-600">
-              Asegurate de tener tu email actualizado en tu perfil para recibir las notificaciones correctamente.
+              Asegurate de tener tu email y celular actualizados en tu perfil para recibir las notificaciones correctamente.
             </p>
           </div>
         </div>

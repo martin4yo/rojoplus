@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Users, Settings, FileText } from 'lucide-react'
+import { ArrowLeft, Edit, Users, Settings, FileText, Bot, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -10,10 +10,13 @@ export default function TenantDetail() {
   const navigate = useNavigate()
   const [tenant, setTenant] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('info') // info, admins, config
+  const [tab, setTab] = useState('info')
+  const [features, setFeatures] = useState({ whatsapp: false, waAgent: false })
+  const [guardandoFeature, setGuardandoFeature] = useState(null) // key del feature que se está guardando
 
   useEffect(() => {
     cargarTenant()
+    cargarFeatures()
   }, [id])
 
   async function cargarTenant() {
@@ -25,6 +28,38 @@ export default function TenantDetail() {
       navigate('/admin/tenants')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function cargarFeatures() {
+    try {
+      const [wa, agent] = await Promise.all([
+        api.getFull(`/super-admin/tenants/${id}/configuracion/PLAN_FEATURE_WHATSAPP`).catch(() => ({ valor: null })),
+        api.getFull(`/super-admin/tenants/${id}/configuracion/PLAN_FEATURE_WA_AGENT`).catch(() => ({ valor: null })),
+      ])
+      setFeatures({ whatsapp: wa.valor === 'true', waAgent: agent.valor === 'true' })
+    } catch {
+      // silencioso
+    }
+  }
+
+  async function toggleFeature(key, clave, label) {
+    const nuevoValor = !features[key]
+    setGuardandoFeature(key)
+    try {
+      await api.postFull(`/super-admin/tenants/${id}/configuracion`, {
+        clave,
+        valor: nuevoValor ? 'true' : 'false',
+        tipo: 'BOOLEAN',
+        modulo: 'PLAN',
+        descripcion: label
+      })
+      setFeatures(f => ({ ...f, [key]: nuevoValor }))
+      toast.success(`${label}: ${nuevoValor ? 'habilitado' : 'deshabilitado'}`)
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    } finally {
+      setGuardandoFeature(null)
     }
   }
 
@@ -95,6 +130,7 @@ export default function TenantDetail() {
           {[
             { id: 'info', label: 'Información', icon: FileText },
             { id: 'admins', label: 'Administradores', icon: Users },
+            { id: 'funcionalidades', label: 'Funcionalidades', icon: Bot },
             { id: 'config', label: 'Configuración', icon: Settings }
           ].map(t => (
             <button
@@ -233,17 +269,73 @@ export default function TenantDetail() {
             </div>
           )}
 
+          {/* Tab: Funcionalidades */}
+          {tab === 'funcionalidades' && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500 mb-4">Activá las funcionalidades disponibles según el plan contratado por el club.</p>
+
+              {/* WhatsApp Notificaciones */}
+              <div className="border rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <MessageCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Notificaciones por WhatsApp</p>
+                    <p className="text-sm text-gray-500">Permite enviar avisos de cuotas, pagos y novedades vía WhatsApp</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={guardandoFeature === 'whatsapp'}
+                  onClick={() => toggleFeature('whatsapp', 'PLAN_FEATURE_WHATSAPP', 'Notificaciones WhatsApp')}
+                  className={`relative w-12 h-6 rounded-full transition-colors disabled:opacity-50 ${features.whatsapp ? 'bg-green-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${features.whatsapp ? 'translate-x-6' : ''}`} />
+                </button>
+              </div>
+
+              {/* Agente IA */}
+              <div className={`border rounded-lg p-4 flex items-center justify-between ${!features.whatsapp ? 'opacity-50' : ''}`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Bot className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Agente de IA (WhatsApp)</p>
+                    <p className="text-sm text-gray-500">Asistente virtual con Claude AI que responde consultas de socios</p>
+                    {!features.whatsapp && (
+                      <p className="text-xs text-amber-600 mt-0.5">Requiere tener WhatsApp habilitado</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={guardandoFeature === 'waAgent' || !features.whatsapp}
+                  onClick={() => toggleFeature('waAgent', 'PLAN_FEATURE_WA_AGENT', 'Agente IA WhatsApp')}
+                  className={`relative w-12 h-6 rounded-full transition-colors disabled:opacity-50 ${features.waAgent && features.whatsapp ? 'bg-purple-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${features.waAgent && features.whatsapp ? 'translate-x-6' : ''}`} />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Tab: Configuración */}
           {tab === 'config' && (
             <div>
               {tenant.configuraciones && tenant.configuraciones.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {tenant.configuraciones.map(config => (
-                    <div key={config.id} className="border rounded-lg p-4">
-                      <p className="font-medium">{config.clave}</p>
-                      <p className="text-sm text-gray-600 mt-1">Valor: {config.valor}</p>
+                    <div key={config.id} className="border rounded-lg p-3 bg-gray-50">
+                      <p className="font-medium text-sm">{config.clave}</p>
+                      <p className="text-sm text-gray-600 mt-0.5">
+                        {config.clave.toLowerCase().includes('pass') || config.clave.toLowerCase().includes('key')
+                          ? '••••••••'
+                          : config.valor}
+                      </p>
                       {config.descripcion && (
-                        <p className="text-xs text-gray-500 mt-2">{config.descripcion}</p>
+                        <p className="text-xs text-gray-400 mt-1">{config.descripcion}</p>
                       )}
                     </div>
                   ))}

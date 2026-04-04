@@ -694,6 +694,20 @@ export default function SocioDetalle() {
                   <dd className="text-gray-800">{socio.emailSecundario || '-'}</dd>
                 </div>
               </dl>
+              {/* Canales de notificación */}
+              <div className="mt-4 pt-3 border-t">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Notificaciones</p>
+                <div className="flex gap-3">
+                  <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${socio.notifEmail !== false ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                    Email {socio.notifEmail !== false ? 'activo' : 'desactivado'}
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${socio.notifWhatsapp !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                    WhatsApp {socio.notifWhatsapp !== false ? 'activo' : 'desactivado'}
+                  </span>
+                </div>
+              </div>
             </div>
             <div>
               <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">

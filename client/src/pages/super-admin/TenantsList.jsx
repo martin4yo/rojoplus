@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Eye, Trash2, CheckCircle, XCircle, AlertCircle, Plus, Building2, Users, Activity, TrendingUp, ExternalLink } from 'lucide-react'
+import { Eye, Trash2, CheckCircle, XCircle, AlertCircle, Plus, Building2, Users, Activity, TrendingUp, ExternalLink, Wand2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
@@ -77,6 +77,31 @@ export default function TenantsList() {
       cargarTenants()
     } catch (error) {
       toast.error('Error suspendiendo tenant: ' + error.message)
+    }
+  }
+
+  async function initDatos(tenant) {
+    const confirmado = await confirm(
+      'Inicializar datos básicos',
+      `¿Crear datos básicos para "${tenant.nombre}"? Solo se crearán datos en tablas vacías. Las tablas que ya tengan datos no se modifican.`,
+      { confirmText: 'Inicializar', variant: 'warning' }
+    )
+    if (!confirmado) return
+
+    try {
+      const res = await api.postFull(`/super-admin/tenants/${tenant.id}/init-datos`)
+      const r = res.resultado || {}
+      const creados = Object.entries(r)
+        .filter(([, v]) => v.created)
+        .map(([k, v]) => `${k}: ${v.created}`)
+        .join(', ')
+      const omitidos = Object.entries(r)
+        .filter(([, v]) => v.skipped)
+        .map(([k, v]) => `${k} (${v.existentes} existentes)`)
+        .join(', ')
+      toast.success(`Datos inicializados.\nCreados: ${creados || 'ninguno'}\nOmitidos: ${omitidos || 'ninguno'}`, { duration: 6000 })
+    } catch (error) {
+      toast.error('Error: ' + error.message)
     }
   }
 
@@ -208,6 +233,7 @@ export default function TenantsList() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
+                <th className="px-4 py-3 w-14"></th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nombre</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Subdomain</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
@@ -220,6 +246,20 @@ export default function TenantsList() {
             <tbody className="divide-y">
               {filtered.map(tenant => (
                 <tr key={tenant.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    {tenant.logoUrl ? (
+                      <img
+                        src={tenant.logoUrl}
+                        alt={tenant.nombre}
+                        className="w-10 h-10 object-contain rounded"
+                        onError={e => e.target.style.display = 'none'}
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                        {tenant.nombre?.charAt(0)}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-gray-900">{tenant.nombre}</div>
                     <div className="text-sm text-gray-500">{tenant.descripcion?.substring(0, 50)}</div>
@@ -241,6 +281,14 @@ export default function TenantsList() {
                         title="Ver"
                       >
                         <Eye className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => initDatos(tenant)}
+                        className="p-2 hover:bg-purple-50 rounded text-purple-600"
+                        title="Inicializar datos básicos (plan de cuentas, tipos de socio, conceptos, etc.)"
+                      >
+                        <Wand2 className="w-4 h-4" />
                       </button>
 
                       {tenant.activo && (

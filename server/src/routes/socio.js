@@ -2,6 +2,7 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
+import { enviarLinkPortal } from '../services/whatsappService.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
 import { generatePDF } from '../services/pdfGenerator.js'
 
@@ -110,6 +111,8 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
       email: true,
       documento: true,
       estado: true,
+      celular: true,
+      notifWhatsapp: true,
     },
   })
 
@@ -145,6 +148,22 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
 
   // Enviar email con Magic Link
   await enviarMagicLinkSocio(socio, token, req.db)
+
+  // Enviar por WhatsApp si el socio tiene el canal habilitado y el tenant lo permite
+  if (socio.notifWhatsapp && socio.celular) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_MAGIC_LINK' } })
+      .then(flag => {
+        if (flag?.valor !== 'false') {
+          enviarLinkPortal({
+            db: req.db,
+            socio,
+            link: `${frontendUrl}/s/${token}`,
+          }).catch(err => console.error('Error enviando magic link por WA:', err.message))
+        }
+      })
+      .catch(err => console.error('Error leyendo flag WA magic link:', err.message))
+  }
 
   res.json({
     success: true,
@@ -2161,7 +2180,10 @@ router.get('/:token/preferencias-notificaciones', asyncHandler(async (req, res) 
       notificarConvocatoria: true,
       notificarRecordatorioPartido: true,
       notificarCancelacionEntreno: true,
-      notificarNuevoEntrenamiento: true
+      notificarNuevoEntrenamiento: true,
+      // Canales
+      notifEmail: true,
+      notifWhatsapp: true,
     }
   })
 
@@ -2172,6 +2194,10 @@ router.get('/:token/preferencias-notificaciones', asyncHandler(async (req, res) 
   res.json({
     success: true,
     data: {
+      canales: {
+        email: socio.notifEmail,
+        whatsapp: socio.notifWhatsapp,
+      },
       cuotasYGeneral: {
         cuotaProximaVencer: socio.notificarCuotaProxVenc,
         cuotaVencida: socio.notificarCuotaVencida,
@@ -2193,7 +2219,7 @@ router.get('/:token/preferencias-notificaciones', asyncHandler(async (req, res) 
 // PUT /api/socio/:token/preferencias-notificaciones
 router.put('/:token/preferencias-notificaciones', asyncHandler(async (req, res) => {
   const { token } = req.params
-  const { cuotasYGeneral, deportivas } = req.body
+  const { canales, cuotasYGeneral, deportivas } = req.body
 
   const socio = await req.db.socio.findUnique({
     where: { tokenPortal: token },
@@ -2206,6 +2232,12 @@ router.put('/:token/preferencias-notificaciones', asyncHandler(async (req, res) 
 
   // Construir objeto de actualización
   const updateData = {}
+
+  // Canales
+  if (canales) {
+    if (typeof canales.email === 'boolean') updateData.notifEmail = canales.email
+    if (typeof canales.whatsapp === 'boolean') updateData.notifWhatsapp = canales.whatsapp
+  }
 
   // Cuotas y General
   if (cuotasYGeneral) {

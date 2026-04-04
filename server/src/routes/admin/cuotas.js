@@ -3,6 +3,7 @@ import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
 import { enviarReciboPago } from '../../services/email.js'
 import { generarAsientoPagoCuota } from '../../services/asientosContables.js'
+import { notificarPago as notificarPagoWA } from '../../services/whatsappService.js'
 
 const router = Router()
 
@@ -1031,6 +1032,8 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
             apellidoNombre: true,
             documento: true,
             email: true,
+            celular: true,
+            notifWhatsapp: true,
           },
         },
         medioPago: { select: { id: true, nombre: true } },
@@ -1064,6 +1067,19 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   enviarReciboPago(pagoCompleto, req.db).catch(err => {
     console.error('Error enviando recibo por email:', err)
   })
+
+  // Notificar pago por WhatsApp si el socio tiene el canal habilitado y el tenant lo permite
+  if (pagoCompleto.socio?.notifWhatsapp && pagoCompleto.socio?.celular) {
+    req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_PAGO' } })
+      .then(flag => {
+        if (flag?.valor !== 'false') {
+          notificarPagoWA({ db: req.db, socio: pagoCompleto.socio, pago: pagoCompleto }).catch(err => {
+            console.error('Error enviando notif WA de pago:', err.message)
+          })
+        }
+      })
+      .catch(err => console.error('Error leyendo flag WA pago:', err.message))
+  }
 
   res.status(201).json({ success: true, data: pagoCompleto })
 }))

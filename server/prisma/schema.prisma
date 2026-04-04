@@ -307,6 +307,8 @@ model Socio {
   notificarConvocatoria        Boolean                @default(true) @map("notificar_convocatoria")
   notificarNuevoEntrenamiento  Boolean                @default(true) @map("notificar_nuevo_entrenamiento")
   notificarRecordatorioPartido Boolean                @default(true) @map("notificar_recordatorio_partido")
+  notifEmail                   Boolean                @default(false) @map("notif_email")
+  notifWhatsapp                Boolean                @default(false) @map("notif_whatsapp")
   aceptacionesReglamento       AceptacionReglamento[]
   asistencias                  Asistencia[]
   autorizaciones               AutorizacionMenor[]
@@ -4031,4 +4033,18 @@ model BloqueEspacio {
   @@index([fecha])
   @@index([tenantId])
   @@map("bloqueos_espacio")
+}
+
+model AiUsageLog {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  provider     String   // anthropic | openai
+  model        String
+  inputTokens  Int      @default(0) @map("input_tokens")
+  outputTokens Int      @default(0) @map("output_tokens")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("ai_usage_logs")
 }

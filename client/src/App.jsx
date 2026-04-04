@@ -237,6 +237,7 @@ import SuperAdminDashboard from './pages/super-admin/Dashboard'
 import TenantsList from './pages/super-admin/TenantsList'
 import TenantForm from './pages/super-admin/TenantForm'
 import TenantDetail from './pages/super-admin/TenantDetail'
+import TenantUsage from './pages/super-admin/TenantUsage'
 
 function App() {
   return (
@@ -500,6 +501,7 @@ function App() {
         <Route path="tenants/nuevo" element={<TenantForm />} />
         <Route path="tenants/:id" element={<TenantDetail />} />
         <Route path="tenants/:id/editar" element={<TenantForm />} />
+        <Route path="uso" element={<TenantUsage />} />
       </Route>
             </Routes>
             </NotificacionBuffetProvider>

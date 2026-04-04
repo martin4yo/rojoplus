@@ -213,6 +213,81 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/admin/socios/grupos-familiares - Listar grupos familiares con sus miembros
+router.get('/socios/grupos-familiares', authAdmin, asyncHandler(async (req, res) => {
+  const { q, estado, categoria, tipoSocio, zona, page = 1, limit = 20 } = req.query
+
+  const where = { titularFamiliaId: null, miembrosFamilia: { some: {} } }
+
+  if (q) {
+    where.OR = [
+      { nroSocio: { contains: q, mode: 'insensitive' } },
+      { apellidoNombre: { contains: q, mode: 'insensitive' } },
+      { documento: { contains: q, mode: 'insensitive' } },
+    ]
+  }
+
+  if (estado) where.estado = { contains: estado, mode: 'insensitive' }
+  if (categoria) where.categoria = { contains: categoria, mode: 'insensitive' }
+  if (tipoSocio) where.tipoSocio = { contains: tipoSocio, mode: 'insensitive' }
+  if (zona) where.zona = zona
+
+  const [titulares, total] = await Promise.all([
+    req.db.socio.findMany({
+      where,
+      orderBy: { apellidoNombre: 'asc' },
+      skip: Math.max(0, (parseInt(page) - 1) * parseInt(limit)),
+      take: parseInt(limit),
+      select: {
+        id: true,
+        nroSocio: true,
+        apellidoNombre: true,
+        documento: true,
+        estado: true,
+        categoria: true,
+        tipoSocio: true,
+        fotoUrl: true,
+        email: true,
+        celular: true,
+        miembrosFamilia: {
+          select: {
+            id: true,
+            nroSocio: true,
+            apellidoNombre: true,
+            parentescoTitular: true,
+            estado: true,
+            categoria: true,
+            tipoSocio: true,
+            esMenor: true,
+            fechaNacimiento: true,
+            fotoUrl: true,
+          },
+          orderBy: { apellidoNombre: 'asc' }
+        }
+      }
+    }),
+    req.db.socio.count({ where })
+  ])
+
+  const currentPage = parseInt(page)
+  const itemsPerPage = parseInt(limit)
+
+  res.json({
+    success: true,
+    data: {
+      grupos: titulares,
+      pagination: {
+        page: currentPage,
+        limit: itemsPerPage,
+        total,
+        pages: Math.ceil(total / itemsPerPage),
+        from: total > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0,
+        to: Math.min(currentPage * itemsPerPage, total),
+      }
+    }
+  })
+}))
+
 // GET /api/admin/socios/:id - Detalle completo del socio
 router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
@@ -481,7 +556,8 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Campos booleanos
   const camposBooleanos = [
-    'esMenor', 'aptaFisicaVigente', 'enviaDebito', 'debitoVerificado'
+    'esMenor', 'aptaFisicaVigente', 'enviaDebito', 'debitoVerificado',
+    'notifEmail', 'notifWhatsapp'
   ]
 
   camposBooleanos.forEach(campo => {

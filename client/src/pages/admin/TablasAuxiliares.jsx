@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Bot, Cpu, Key } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -55,12 +55,83 @@ export default function TablasAuxiliares() {
   })
   const [guardandoFiscal, setGuardandoFiscal] = useState(false)
 
+  // Configuración SMTP
+  const [configSmtp, setConfigSmtp] = useState({
+    host: '',
+    port: '587',
+    user: '',
+    pass: '',
+    secure: 'false',
+    from: '',
+    fromName: '',
+    emailContacto: '',
+  })
+  const [guardandoSmtp, setGuardandoSmtp] = useState(false)
+  const [testeandoSmtp, setTesteandoSmtp] = useState(false)
+  const [resultadoTestSmtp, setResultadoTestSmtp] = useState(null) // null | 'ok' | 'error'
+  const [mostrarPassSmtp, setMostrarPassSmtp] = useState(false)
+
+  // Configuración WhatsApp
+  const [configWa, setConfigWa] = useState({
+    enabled: 'false', apiUrl: '', instance: '', apiKey: '',
+    delayMs: '3000', horaInicio: '8', horaFin: '21',
+  })
+  const [guardandoWa, setGuardandoWa] = useState(false)
+  const [statusWa, setStatusWa] = useState(null)
+  const [verificandoWa, setVerificandoWa] = useState(false)
+  const [mostrarApiKey, setMostrarApiKey] = useState(false)
+  const [resultadoWebhook, setResultadoWebhook] = useState(null) // null | 'ok' | 'error'
+
+  // Configuración Agente IA WhatsApp
+  const [configWaAgent, setConfigWaAgent] = useState({
+    enabled: 'false', horarioInicio: '7', horarioFin: '23', msgFueraHorario: '', whitelist: '',
+  })
+  const [guardandoWaAgent, setGuardandoWaAgent] = useState(false)
+
+  // Eventos de notificación WhatsApp
+  const [notifEventos, setNotifEventos] = useState({
+    WHATSAPP_NOTIF_PAGO: 'true',
+    WHATSAPP_NOTIF_VENCIMIENTO: 'true',
+    WHATSAPP_NOTIF_MORA: 'true',
+    WHATSAPP_NOTIF_MAGIC_LINK: 'true',
+  })
+  const [guardandoNotifEventos] = useState(false) // mantenido por compatibilidad
+
+  // Feature flags del plan (activados por super-admin)
+  const [planFeatures, setPlanFeatures] = useState({ whatsapp: false, waAgent: false })
+
+  // Textos de notificaciones WhatsApp
+  const [notifTextos, setNotifTextos] = useState({
+    NOTIF_WA_PAGO: '',
+    NOTIF_WA_VENCIMIENTO: '',
+    NOTIF_WA_MORA: '',
+    NOTIF_WA_PORTAL: '',
+  })
+  const [guardandoNotifWA, setGuardandoNotifWA] = useState(false)
+
+  // Configuración de proveedor de IA
+  const [configAI, setConfigAI] = useState({ provider: 'anthropic', tier: 'rapido', apiKey: '', modelOverride: '' })
+  const [guardandoAI, setGuardandoAI] = useState(false)
+  const [mostrarApiKeyAI, setMostrarApiKeyAI] = useState(false)
+
+  // Prueba de envío WhatsApp
+  const [testWa, setTestWa] = useState({ telefono: '', texto: 'Hola! Esto es un mensaje de prueba desde el panel.' })
+  const [enviandoTestWa, setEnviandoTestWa] = useState(false)
+  const [resultadoTestWa, setResultadoTestWa] = useState(null)
+
   useEffect(() => {
     cargarDatos()
     cargarModoDemo()
     cargarConfiguracion()
     cargarRecargo()
     cargarConfigFiscal()
+    cargarConfigSmtp()
+    cargarConfigWa()
+    cargarConfigWaAgent()
+    cargarConfigAI()
+    cargarNotifTextos()
+    cargarNotifEventos()
+    cargarPlanFeatures()
   }, [])
 
   async function cargarDatos() {
@@ -275,6 +346,254 @@ export default function TablasAuxiliares() {
     }
   }
 
+  async function cargarConfigSmtp() {
+    try {
+      const claves = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_SECURE', 'SMTP_FROM', 'SMTP_FROM_NAME', 'EMAIL_CONTACTO']
+      const results = await Promise.all(
+        claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null))
+      )
+      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
+      setConfigSmtp({
+        host: cfg.SMTP_HOST,
+        port: cfg.SMTP_PORT || '587',
+        user: cfg.SMTP_USER,
+        pass: cfg.SMTP_PASS,
+        secure: cfg.SMTP_SECURE || 'false',
+        from: cfg.SMTP_FROM,
+        fromName: cfg.SMTP_FROM_NAME,
+        emailContacto: cfg.EMAIL_CONTACTO,
+      })
+    } catch (err) {
+      console.error('Error cargando configuración SMTP:', err)
+    }
+  }
+
+  async function testearSmtp() {
+    setTesteandoSmtp(true)
+    setResultadoTestSmtp(null)
+    try {
+      await api.post('/admin/sistema/smtp/test')
+      setResultadoTestSmtp('ok')
+    } catch (err) {
+      setResultadoTestSmtp('error')
+    } finally {
+      setTesteandoSmtp(false)
+    }
+  }
+
+  async function guardarConfigSmtp() {
+    setGuardandoSmtp(true)
+    setError(null)
+    try {
+      const campos = [
+        { clave: 'SMTP_HOST', valor: configSmtp.host, descripcion: 'Servidor SMTP' },
+        { clave: 'SMTP_PORT', valor: configSmtp.port, descripcion: 'Puerto SMTP' },
+        { clave: 'SMTP_USER', valor: configSmtp.user, descripcion: 'Usuario SMTP' },
+        { clave: 'SMTP_PASS', valor: configSmtp.pass, descripcion: 'Contraseña SMTP' },
+        { clave: 'SMTP_SECURE', valor: configSmtp.secure, descripcion: 'Usar TLS (puerto 465)' },
+        { clave: 'SMTP_FROM', valor: configSmtp.from, descripcion: 'Email remitente' },
+        { clave: 'SMTP_FROM_NAME', valor: configSmtp.fromName, descripcion: 'Nombre remitente' },
+        { clave: 'EMAIL_CONTACTO', valor: configSmtp.emailContacto, descripcion: 'Email de contacto' },
+      ]
+      await Promise.all(
+        campos.map(({ clave, valor, descripcion }) =>
+          api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'STRING', modulo: 'EMAIL', descripcion })
+        )
+      )
+      setSuccess('Configuración de email actualizada')
+    } catch (err) {
+      setError(err.message || 'Error al guardar configuración de email')
+    } finally {
+      setGuardandoSmtp(false)
+    }
+  }
+
+  async function enviarTestWa() {
+    setEnviandoTestWa(true)
+    setResultadoTestWa(null)
+    try {
+      const data = await api.postFull('/admin/whatsapp/test', { telefono: testWa.telefono, texto: testWa.texto })
+      setResultadoTestWa(data.enviado ? 'ok' : 'error')
+    } catch (err) {
+      setResultadoTestWa('error')
+    } finally {
+      setEnviandoTestWa(false)
+    }
+  }
+
+  async function cargarPlanFeatures() {
+    try {
+      const [wa, agent] = await Promise.all([
+        api.get('/admin/sistema/configuracion/PLAN_FEATURE_WHATSAPP').catch(() => null),
+        api.get('/admin/sistema/configuracion/PLAN_FEATURE_WA_AGENT').catch(() => null),
+      ])
+      setPlanFeatures({ whatsapp: wa?.valor === 'true', waAgent: agent?.valor === 'true' })
+    } catch (err) { console.error('Error cargando plan features:', err) }
+  }
+
+  async function cargarConfigWa() {
+    try {
+      const claves = ['WHATSAPP_ENABLED', 'WHATSAPP_API_URL', 'WHATSAPP_INSTANCE', 'WHATSAPP_API_KEY', 'WHATSAPP_DELAY_MS', 'WHATSAPP_HORA_INICIO', 'WHATSAPP_HORA_FIN']
+      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
+      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
+      setConfigWa({
+        enabled: cfg.WHATSAPP_ENABLED || 'false',
+        apiUrl: cfg.WHATSAPP_API_URL || '',
+        instance: cfg.WHATSAPP_INSTANCE || '',
+        apiKey: cfg.WHATSAPP_API_KEY || '',
+        delayMs: cfg.WHATSAPP_DELAY_MS || '3000',
+        horaInicio: cfg.WHATSAPP_HORA_INICIO || '8',
+        horaFin: cfg.WHATSAPP_HORA_FIN || '21',
+      })
+    } catch (err) { console.error('Error cargando config WA:', err) }
+  }
+
+  async function guardarConfigWa() {
+    setGuardandoWa(true)
+    setError(null)
+    setResultadoWebhook(null)
+    try {
+      const campos = [
+        { clave: 'WHATSAPP_ENABLED', valor: configWa.enabled, descripcion: 'WhatsApp habilitado' },
+        { clave: 'WHATSAPP_API_URL', valor: configWa.apiUrl, descripcion: 'URL de la API de WhatsApp' },
+        { clave: 'WHATSAPP_INSTANCE', valor: configWa.instance, descripcion: 'Nombre de la instancia' },
+        { clave: 'WHATSAPP_API_KEY', valor: configWa.apiKey, descripcion: 'API Key de Evolution API' },
+        { clave: 'WHATSAPP_DELAY_MS', valor: configWa.delayMs, descripcion: 'Delay entre mensajes (ms)' },
+        { clave: 'WHATSAPP_HORA_INICIO', valor: configWa.horaInicio, descripcion: 'Hora inicio envío' },
+        { clave: 'WHATSAPP_HORA_FIN', valor: configWa.horaFin, descripcion: 'Hora fin envío' },
+      ]
+      await Promise.all(campos.map(({ clave, valor, descripcion }) =>
+        api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'STRING', modulo: 'WHATSAPP', descripcion })
+      ))
+      setSuccess('Configuración de WhatsApp actualizada')
+
+      // Registrar webhook automáticamente si está habilitado y los campos están completos
+      if (configWa.enabled === 'true' && configWa.apiUrl && configWa.instance && configWa.apiKey) {
+        api.postFull('/admin/whatsapp/configurar-webhook', {})
+          .then(r => setResultadoWebhook({ ok: true, url: r.webhookUrl }))
+          .catch(e => setResultadoWebhook({ ok: false, error: e.message }))
+      }
+    } catch (err) {
+      setError(err.message || 'Error al guardar configuración de WhatsApp')
+    } finally { setGuardandoWa(false) }
+  }
+
+  async function verificarEstadoWa() {
+    setVerificandoWa(true)
+    setStatusWa(null)
+    try {
+      const data = await api.getFull('/admin/whatsapp/status')
+      setStatusWa(data)
+    } catch (err) {
+      setStatusWa({ conectado: false, motivo: err.message })
+    } finally { setVerificandoWa(false) }
+  }
+
+  async function cargarConfigWaAgent() {
+    try {
+      const claves = ['WA_AGENT_ENABLED', 'WA_AGENT_HORARIO_INICIO', 'WA_AGENT_HORARIO_FIN', 'WA_AGENT_MSG_FUERA_HORARIO', 'WA_AGENT_WHITELIST']
+      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
+      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
+      setConfigWaAgent({
+        enabled: cfg.WA_AGENT_ENABLED || 'false',
+        horarioInicio: cfg.WA_AGENT_HORARIO_INICIO || '7',
+        horarioFin: cfg.WA_AGENT_HORARIO_FIN || '23',
+        msgFueraHorario: cfg.WA_AGENT_MSG_FUERA_HORARIO || '',
+        whitelist: cfg.WA_AGENT_WHITELIST || '',
+      })
+    } catch (err) { console.error('Error cargando config WA Agent:', err) }
+  }
+
+  async function guardarConfigWaAgent() {
+    setGuardandoWaAgent(true)
+    setError(null)
+    try {
+      const campos = [
+        { clave: 'WA_AGENT_ENABLED', valor: configWaAgent.enabled, descripcion: 'Agente IA habilitado' },
+        { clave: 'WA_AGENT_HORARIO_INICIO', valor: configWaAgent.horarioInicio, descripcion: 'Hora inicio agente' },
+        { clave: 'WA_AGENT_HORARIO_FIN', valor: configWaAgent.horarioFin, descripcion: 'Hora fin agente' },
+        { clave: 'WA_AGENT_MSG_FUERA_HORARIO', valor: configWaAgent.msgFueraHorario, descripcion: 'Mensaje fuera de horario' },
+        { clave: 'WA_AGENT_WHITELIST', valor: configWaAgent.whitelist, descripcion: 'Lista blanca de números (vacío = todos)' },
+      ]
+      await Promise.all(campos.map(({ clave, valor, descripcion }) =>
+        api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'STRING', modulo: 'WHATSAPP', descripcion })
+      ))
+      setSuccess('Configuración del agente actualizada')
+    } catch (err) {
+      setError(err.message || 'Error al guardar configuración del agente')
+    } finally { setGuardandoWaAgent(false) }
+  }
+
+  async function cargarNotifTextos() {
+    try {
+      const claves = ['NOTIF_WA_PAGO', 'NOTIF_WA_VENCIMIENTO', 'NOTIF_WA_MORA', 'NOTIF_WA_PORTAL']
+      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
+      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
+      setNotifTextos(cfg)
+    } catch (err) { console.error('Error cargando textos de notificación:', err) }
+  }
+
+  async function guardarNotifWA() {
+    setGuardandoNotifWA(true)
+    setError(null)
+    try {
+      await Promise.all([
+        ...Object.entries(notifEventos).map(([clave, valor]) =>
+          api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'BOOLEAN', modulo: 'WHATSAPP', descripcion: `Notificación WA: ${clave}` })
+        ),
+        ...Object.entries(notifTextos).map(([clave, valor]) =>
+          api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'STRING', modulo: 'WHATSAPP', descripcion: `Template WA: ${clave}` })
+        ),
+      ])
+      setSuccess('Notificaciones de WhatsApp actualizadas')
+    } catch (err) {
+      setError(err.message || 'Error al guardar notificaciones')
+    } finally { setGuardandoNotifWA(false) }
+  }
+
+  async function cargarConfigAI() {
+    try {
+      const claves = ['AI_PROVIDER', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_MODEL_OVERRIDE']
+      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
+      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
+      setConfigAI({
+        provider: cfg.AI_PROVIDER || 'anthropic',
+        tier: cfg.AI_MODEL_TIER || 'rapido',
+        apiKey: cfg.AI_API_KEY || '',
+        modelOverride: cfg.AI_MODEL_OVERRIDE || '',
+      })
+    } catch (err) { console.error('Error cargando config IA:', err) }
+  }
+
+  async function guardarConfigAI() {
+    setGuardandoAI(true)
+    setError(null)
+    try {
+      const campos = [
+        { clave: 'AI_PROVIDER', valor: configAI.provider, descripcion: 'Proveedor de IA' },
+        { clave: 'AI_MODEL_TIER', valor: configAI.tier, descripcion: 'Tier de modelo IA' },
+        { clave: 'AI_API_KEY', valor: configAI.apiKey, descripcion: 'API key del proveedor de IA' },
+        { clave: 'AI_MODEL_OVERRIDE', valor: configAI.modelOverride, descripcion: 'Modelo exacto (override del tier)' },
+      ]
+      await Promise.all(campos.map(({ clave, valor, descripcion }) =>
+        api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'STRING', modulo: 'IA', descripcion })
+      ))
+      setSuccess('Configuración de IA actualizada')
+    } catch (err) {
+      setError(err.message || 'Error al guardar configuración de IA')
+    } finally { setGuardandoAI(false) }
+  }
+
+  async function cargarNotifEventos() {
+    try {
+      const claves = ['WHATSAPP_NOTIF_PAGO', 'WHATSAPP_NOTIF_VENCIMIENTO', 'WHATSAPP_NOTIF_MORA', 'WHATSAPP_NOTIF_MAGIC_LINK']
+      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
+      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor ?? 'true']))
+      setNotifEventos(cfg)
+    } catch (err) { console.error('Error cargando eventos notificacion:', err) }
+  }
+
+
   if (loading) {
     return (
       <LoadingSpinner />
@@ -344,6 +663,19 @@ export default function TablasAuxiliares() {
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Usuarios y Roles
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('notificaciones')}
+            className={`pb-3 px-1 border-b-2 font-medium text-sm transition ${
+              activeTab === 'notificaciones'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              Notificaciones
             </div>
           </button>
         </nav>
@@ -1182,6 +1514,476 @@ export default function TablasAuxiliares() {
               Ver listado →
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Tab: Notificaciones */}
+      {activeTab === 'notificaciones' && (
+        <div className="flex flex-wrap gap-6">
+
+          {/* Configuración SMTP / Email */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[750px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-blue-100">
+                <Server className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Configuración de Email (SMTP)</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Servidor de correo para el envío de notificaciones del club. Si no se configura, se usa el servidor global.
+                </p>
+                <div className="mt-4 space-y-3">
+                  <div className="grid grid-cols-6 gap-3">
+                    <div className="col-span-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Servidor (host)</label>
+                      <input type="text" value={configSmtp.host} onChange={e => setConfigSmtp({ ...configSmtp, host: e.target.value })} placeholder="smtp.gmail.com" className="input-field w-full" />
+                    </div>
+                    <div className="col-span-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Puerto</label>
+                      <input type="number" value={configSmtp.port} onChange={e => setConfigSmtp({ ...configSmtp, port: e.target.value })} placeholder="587" className="input-field w-full" />
+                    </div>
+                    <div className="col-span-2 flex flex-col justify-end pb-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={configSmtp.secure === 'true'} onChange={e => setConfigSmtp({ ...configSmtp, secure: e.target.checked ? 'true' : 'false', port: e.target.checked ? '465' : '587' })} className="rounded border-gray-300 text-primary" />
+                        <span className="text-sm text-gray-700">TLS (puerto 465)</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                      <input type="email" value={configSmtp.user} onChange={e => setConfigSmtp({ ...configSmtp, user: e.target.value })} placeholder="club@gmail.com" className="input-field w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                      <div className="relative">
+                        <input type={mostrarPassSmtp ? 'text' : 'password'} value={configSmtp.pass} onChange={e => setConfigSmtp({ ...configSmtp, pass: e.target.value })} placeholder="App password" className="input-field w-full pr-10" />
+                        <button type="button" onClick={() => setMostrarPassSmtp(!mostrarPassSmtp)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          {mostrarPassSmtp ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre remitente</label>
+                      <input type="text" value={configSmtp.fromName} onChange={e => setConfigSmtp({ ...configSmtp, fromName: e.target.value })} placeholder="Club Sportivo Pilar" className="input-field w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email remitente (from)</label>
+                      <input type="email" value={configSmtp.from} onChange={e => setConfigSmtp({ ...configSmtp, from: e.target.value })} placeholder="noreply@club.com.ar" className="input-field w-full" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email de contacto</label>
+                    <input type="email" value={configSmtp.emailContacto} onChange={e => setConfigSmtp({ ...configSmtp, emailContacto: e.target.value })} placeholder="contacto@club.com.ar" className="input-field w-full" />
+                    <p className="text-xs text-gray-500 mt-1">Destinatario de los formularios de contacto del sitio</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {resultadoTestSmtp === 'ok' && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Conexión exitosa</span>}
+                {resultadoTestSmtp === 'error' && <span className="text-sm text-red-600 font-medium flex items-center gap-1"><XCircle className="w-4 h-4" /> Error de conexión</span>}
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={testearSmtp} disabled={testeandoSmtp || !configSmtp.host || !configSmtp.user} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">
+                  {testeandoSmtp ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : <Mail className="w-4 h-4" />}
+                  Testear
+                </button>
+                {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                  <button onClick={guardarConfigSmtp} disabled={guardandoSmtp} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
+                    {guardandoSmtp ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                    Guardar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Conexión WhatsApp — solo si el plan lo habilita */}
+          {!planFeatures.whatsapp && (
+            <div className="w-full py-6 px-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-center text-gray-500">
+              <MessageCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+              <p className="font-medium text-sm">WhatsApp no habilitado en este plan</p>
+              <p className="text-xs mt-1">Contactá al soporte para activar las notificaciones por WhatsApp.</p>
+            </div>
+          )}
+          {planFeatures.whatsapp && <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[750px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-green-100">
+                <MessageCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Conexión WhatsApp (Evolution API)</h3>
+                    <p className="text-sm text-gray-500 mt-1">Configura la instancia de WhatsApp para envío de mensajes</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigWa({ ...configWa, enabled: configWa.enabled === 'true' ? 'false' : 'true' })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${configWa.enabled === 'true' ? 'bg-green-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configWa.enabled === 'true' ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">URL de la API</label>
+                    <input type="url" value={configWa.apiUrl} onChange={e => setConfigWa({ ...configWa, apiUrl: e.target.value })} placeholder="https://evolution.tu-dominio.com" className="input-field w-full" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Instancia</label>
+                      <input type="text" value={configWa.instance} onChange={e => setConfigWa({ ...configWa, instance: e.target.value })} placeholder="club-pilar" className="input-field w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                      <div className="relative">
+                        <input type={mostrarApiKey ? 'text' : 'password'} value={configWa.apiKey} onChange={e => setConfigWa({ ...configWa, apiKey: e.target.value })} placeholder="••••••••••" className="input-field w-full pr-10" />
+                        <button type="button" onClick={() => setMostrarApiKey(!mostrarApiKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          {mostrarApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Delay entre mensajes</label>
+                      <div className="flex items-center gap-2">
+                        <input type="number" value={configWa.delayMs} onChange={e => setConfigWa({ ...configWa, delayMs: e.target.value })} className="input-field w-full" />
+                        <span className="text-xs text-gray-500 whitespace-nowrap">ms</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Hora inicio</label>
+                      <input type="number" value={configWa.horaInicio} onChange={e => setConfigWa({ ...configWa, horaInicio: e.target.value })} min="0" max="23" className="input-field w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Hora fin</label>
+                      <input type="number" value={configWa.horaFin} onChange={e => setConfigWa({ ...configWa, horaFin: e.target.value })} min="0" max="23" className="input-field w-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Prueba de envío */}
+            <div className="mt-4 pt-4 border-t space-y-2">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Enviar mensaje de prueba</p>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  value={testWa.telefono}
+                  onChange={e => { setTestWa(t => ({ ...t, telefono: e.target.value })); setResultadoTestWa(null) }}
+                  placeholder="549XXXXXXXXXX"
+                  className="input-field w-44"
+                />
+                <input
+                  type="text"
+                  value={testWa.texto}
+                  onChange={e => setTestWa(t => ({ ...t, texto: e.target.value }))}
+                  placeholder="Mensaje..."
+                  className="input-field flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={enviarTestWa}
+                  disabled={enviandoTestWa || !testWa.telefono || !testWa.texto}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 transition whitespace-nowrap"
+                >
+                  {enviandoTestWa ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                  Enviar
+                </button>
+              </div>
+              {resultadoTestWa === 'ok' && <p className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Mensaje enviado</p>}
+              {resultadoTestWa === 'error' && <p className="text-xs text-red-600 font-medium flex items-center gap-1"><XCircle className="w-3.5 h-3.5" /> Error al enviar — verificá la configuración</p>}
+            </div>
+
+            <div className="mt-4 pt-4 border-t flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                {statusWa?.conectado === true && (
+                  <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                    <Wifi className="w-4 h-4" /> Conectado
+                  </span>
+                )}
+                {statusWa?.conectado === false && (
+                  <span className="flex items-center gap-1.5 text-sm text-red-600 font-medium">
+                    <WifiOff className="w-4 h-4" /> Desconectado {statusWa.motivo ? `— ${statusWa.motivo}` : `(${statusWa.estado})`}
+                  </span>
+                )}
+                {resultadoWebhook?.ok && (
+                  <span className="flex items-center gap-1.5 text-xs text-green-600">
+                    <CheckCircle className="w-3.5 h-3.5" /> Webhook registrado: <code className="ml-1 bg-green-50 px-1 rounded">{resultadoWebhook.url}</code>
+                  </span>
+                )}
+                {resultadoWebhook?.ok === false && (
+                  <span className="flex items-center gap-1.5 text-xs text-amber-600">
+                    <XCircle className="w-3.5 h-3.5" /> Error al registrar webhook: {resultadoWebhook.error}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={verificarEstadoWa} disabled={verificandoWa} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">
+                  {verificandoWa ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : <Wifi className="w-4 h-4" />}
+                  Verificar estado
+                </button>
+                {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                  <button onClick={guardarConfigWa} disabled={guardandoWa} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
+                    {guardandoWa ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                    Guardar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>}
+
+          {/* Agente IA WhatsApp — solo si el plan lo habilita */}
+          {planFeatures.whatsapp && planFeatures.waAgent && <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[750px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-purple-100">
+                <Bot className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Agente de IA (WhatsApp)</h3>
+                    <p className="text-sm text-gray-500 mt-1">Asistente virtual que responde consultas de socios por WhatsApp</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigWaAgent({ ...configWaAgent, enabled: configWaAgent.enabled === 'true' ? 'false' : 'true' })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${configWaAgent.enabled === 'true' ? 'bg-purple-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configWaAgent.enabled === 'true' ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Hora inicio atención</label>
+                      <input type="number" value={configWaAgent.horarioInicio} onChange={e => setConfigWaAgent({ ...configWaAgent, horarioInicio: e.target.value })} min="0" max="23" className="input-field w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Hora fin atención</label>
+                      <input type="number" value={configWaAgent.horarioFin} onChange={e => setConfigWaAgent({ ...configWaAgent, horarioFin: e.target.value })} min="0" max="23" className="input-field w-full" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje fuera de horario</label>
+                    <textarea
+                      value={configWaAgent.msgFueraHorario}
+                      onChange={e => setConfigWaAgent({ ...configWaAgent, msgFueraHorario: e.target.value })}
+                      placeholder="Hola! Nuestro asistente atiende de 7 a 23hs. Te respondemos pronto."
+                      className="input-field w-full resize-none"
+                      rows={3}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Se envía automáticamente cuando el socio escribe fuera del horario</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Lista blanca de números <span className="text-gray-400 font-normal">(solo para pruebas)</span></label>
+                    <input
+                      type="text"
+                      value={configWaAgent.whitelist}
+                      onChange={e => setConfigWaAgent({ ...configWaAgent, whitelist: e.target.value })}
+                      placeholder="5491112345678, 5491187654321"
+                      className="input-field w-full"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Números separados por coma. <strong>Si está vacío, el agente responde a todos.</strong> Útil para probar sin responder a todos los contactos.
+                    </p>
+                  </div>
+                  {configWaAgent.enabled === 'true' && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs text-amber-700">
+                        <span className="font-medium">Requiere:</span> WhatsApp conectado y API key de IA configurada (ver tarjeta Proveedor de IA).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t flex justify-end">
+              {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                <button onClick={guardarConfigWaAgent} disabled={guardandoWaAgent} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
+                  {guardandoWaAgent ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                  Guardar
+                </button>
+              )}
+            </div>
+          </div>}
+
+          {/* Proveedor de IA — solo si el agente está habilitado en el plan */}
+          {planFeatures.whatsapp && planFeatures.waAgent && <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[750px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-indigo-100">
+                <Cpu className="w-6 h-6 text-indigo-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Proveedor de IA</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Configurá qué modelo de IA usa el agente de WhatsApp. Si tenés tu propia API key, el costo se factura a tu cuenta.
+                </p>
+                <div className="mt-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor</label>
+                      <select
+                        value={configAI.provider}
+                        onChange={e => setConfigAI({ ...configAI, provider: e.target.value })}
+                        className="input-field w-full"
+                      >
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="openai">OpenAI (GPT)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de modelo</label>
+                      <select
+                        value={configAI.tier}
+                        onChange={e => setConfigAI({ ...configAI, tier: e.target.value })}
+                        className="input-field w-full"
+                      >
+                        <option value="rapido">Rápido — Haiku / GPT-4o mini (~$0.001/msg)</option>
+                        <option value="estandar">Estándar — Sonnet / GPT-4o (~$0.012/msg)</option>
+                        <option value="premium">Premium — Opus / GPT-4o (~$0.06/msg)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">API Key propia</label>
+                    <div className="relative">
+                      <input
+                        type={mostrarApiKeyAI ? 'text' : 'password'}
+                        value={configAI.apiKey}
+                        onChange={e => setConfigAI({ ...configAI, apiKey: e.target.value })}
+                        placeholder="sk-ant-... o sk-..."
+                        className="input-field w-full pr-10"
+                      />
+                      <button type="button" onClick={() => setMostrarApiKeyAI(!mostrarApiKeyAI)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {mostrarApiKeyAI ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Si no se configura, se usa la key global del servidor (compartida)</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Modelo exacto (opcional)</label>
+                    <input
+                      type="text"
+                      value={configAI.modelOverride}
+                      onChange={e => setConfigAI({ ...configAI, modelOverride: e.target.value })}
+                      placeholder="Dejar vacío para usar el nivel seleccionado"
+                      className="input-field w-full"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Ej: <span className="font-mono">claude-haiku-4-5-20251001</span> — si el modelo cambia, actualizá el nivel y dejá este campo vacío</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t flex justify-end">
+              {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                <button onClick={guardarConfigAI} disabled={guardandoAI} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
+                  {guardandoAI ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                  Guardar
+                </button>
+              )}
+            </div>
+          </div>}
+
+          {/* Notificaciones automáticas WhatsApp */}
+          {planFeatures.whatsapp && <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[750px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-emerald-100">
+                <Smartphone className="w-6 h-6 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Notificaciones Automáticas (WhatsApp)</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Activá cada evento y personalizá el texto. Dejá el texto vacío para usar el mensaje por defecto.
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Variables: <span className="font-mono bg-gray-100 px-1 rounded">{'{{nombre}}'}</span> <span className="font-mono bg-gray-100 px-1 rounded">{'{{monto}}'}</span> <span className="font-mono bg-gray-100 px-1 rounded">{'{{vencimiento}}'}</span> <span className="font-mono bg-gray-100 px-1 rounded">{'{{total}}'}</span> <span className="font-mono bg-gray-100 px-1 rounded">{'{{link}}'}</span>
+                </p>
+                <div className="mt-4 space-y-4">
+                  {[
+                    {
+                      eventoKey: 'WHATSAPP_NOTIF_PAGO',
+                      textoKey: 'NOTIF_WA_PAGO',
+                      label: 'Confirmación de pago',
+                      desc: 'Al registrar un pago del socio',
+                      placeholder: '*{{nombre}}*, registramos tu pago de *{{monto}}*. Gracias!',
+                      vars: '{{nombre}}, {{monto}}',
+                    },
+                    {
+                      eventoKey: 'WHATSAPP_NOTIF_VENCIMIENTO',
+                      textoKey: 'NOTIF_WA_VENCIMIENTO',
+                      label: 'Aviso de vencimiento',
+                      desc: 'Días antes del vencimiento de cuota',
+                      placeholder: '*{{nombre}}*, tu cuota de *{{monto}}* vence el *{{vencimiento}}*. Podés pagar desde el portal del club.',
+                      vars: '{{nombre}}, {{monto}}, {{vencimiento}}',
+                    },
+                    {
+                      eventoKey: 'WHATSAPP_NOTIF_MORA',
+                      textoKey: 'NOTIF_WA_MORA',
+                      label: 'Aviso de mora',
+                      desc: 'Al tener cuotas vencidas',
+                      placeholder: '*{{nombre}}*, tenés cuotas vencidas por un total de *{{total}}*. Por favor regularizá tu situación.',
+                      vars: '{{nombre}}, {{total}}',
+                    },
+                    {
+                      eventoKey: 'WHATSAPP_NOTIF_MAGIC_LINK',
+                      textoKey: 'NOTIF_WA_PORTAL',
+                      label: 'Link del portal',
+                      desc: 'Al generar acceso al portal del socio',
+                      placeholder: '*{{nombre}}*, acá está tu acceso al portal del club:\n{{link}}\n\nEste link es personal y expira en 7 días.',
+                      vars: '{{nombre}}, {{link}}',
+                    },
+                  ].map(({ eventoKey, textoKey, label, desc, placeholder, vars }) => {
+                    const activo = notifEventos[eventoKey] === 'true'
+                    return (
+                      <div key={eventoKey} className={`border rounded-lg p-3 transition-colors ${activo ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-200 bg-gray-50/50'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-800">{label}</p>
+                            <p className="text-xs text-gray-500">{desc}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setNotifEventos({ ...notifEventos, [eventoKey]: activo ? 'false' : 'true' })}
+                            className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors ${activo ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                          >
+                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${activo ? 'translate-x-6' : ''}`} />
+                          </button>
+                        </div>
+                        {activo && (
+                          <div className="mt-2">
+                            <textarea
+                              value={notifTextos[textoKey] || ''}
+                              onChange={e => setNotifTextos({ ...notifTextos, [textoKey]: e.target.value })}
+                              placeholder={placeholder}
+                              className="input-field w-full resize-none text-sm mt-1"
+                              rows={3}
+                            />
+                            <p className="text-xs text-gray-400 mt-0.5">Variables: <span className="font-mono">{vars}</span></p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t flex justify-end">
+              {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                <button onClick={guardarNotifWA} disabled={guardandoNotifWA} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
+                  {guardandoNotifWA ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                  Guardar
+                </button>
+              )}
+            </div>
+          </div>}
+
         </div>
       )}
     </div>

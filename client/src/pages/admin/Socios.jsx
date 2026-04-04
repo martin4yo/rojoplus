@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Upload, QrCode, ExternalLink, RefreshCw, X, Copy, Check,
-  Plus, Eye, Edit, Users, CreditCard, Search, Filter, ChevronDown, DollarSign
+  Plus, Eye, Edit, Users, CreditCard, Search, Filter, ChevronDown, DollarSign,
+  UserCheck, ChevronRight
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
@@ -44,11 +45,12 @@ function AvatarSocio({ foto, nombre }) {
 export default function AdminSocios() {
   const navigate = useNavigate()
   const { confirm, ConfirmDialog } = useConfirm()
+  const [vista, setVista] = useState('socios') // 'socios' | 'grupos'
   const [socios, setSocios] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [busqueda, setBusqueda] = useState('')
-  const [terminoBusqueda, setTerminoBusqueda] = useState('') // Término activo de búsqueda
+  const [terminoBusqueda, setTerminoBusqueda] = useState('')
   const [estado, setEstado] = useState('VIGENTE')
   const [categoria, setCategoria] = useState('')
   const [tipoSocio, setTipoSocio] = useState('')
@@ -57,6 +59,20 @@ export default function AdminSocios() {
   const { page, pagination, setPagination, goToPage } = usePagination()
   const [filtros, setFiltros] = useState({ estados: [], categorias: [], tiposSocio: [], zonas: [] })
   const [showFilters, setShowFilters] = useState(false)
+
+  // Estado para grupos familiares
+  const [grupos, setGrupos] = useState([])
+  const [loadingGrupos, setLoadingGrupos] = useState(false)
+  const [busquedaGrupos, setBusquedaGrupos] = useState('')
+  const [terminoBusquedaGrupos, setTerminoBusquedaGrupos] = useState('')
+  const [pageGrupos, setPageGrupos] = useState(1)
+  const [paginationGrupos, setPaginationGrupos] = useState(null)
+  const [expandidos, setExpandidos] = useState(new Set())
+  const [showFiltersGrupos, setShowFiltersGrupos] = useState(false)
+  const [estadoGrupos, setEstadoGrupos] = useState('')
+  const [categoriaGrupos, setCategoriaGrupos] = useState('')
+  const [tipoSocioGrupos, setTipoSocioGrupos] = useState('')
+  const [zonaGrupos, setZonaGrupos] = useState('')
 
   // Modal QR
   const [qrModal, setQrModal] = useState(null)
@@ -98,9 +114,56 @@ export default function AdminSocios() {
     }
   }
 
+  // Debounce para búsqueda de grupos
+  useEffect(() => {
+    const timer = setTimeout(() => setTerminoBusquedaGrupos(busquedaGrupos), 500)
+    return () => clearTimeout(timer)
+  }, [busquedaGrupos])
+
+  useEffect(() => {
+    if (vista === 'grupos') cargarGrupos()
+  }, [vista, pageGrupos, terminoBusquedaGrupos, estadoGrupos, categoriaGrupos, tipoSocioGrupos, zonaGrupos])
+
+  async function cargarGrupos() {
+    setLoadingGrupos(true)
+    try {
+      const params = new URLSearchParams({ page: pageGrupos.toString() })
+      if (terminoBusquedaGrupos) params.append('q', terminoBusquedaGrupos)
+      if (estadoGrupos) params.append('estado', estadoGrupos)
+      if (categoriaGrupos) params.append('categoria', categoriaGrupos)
+      if (tipoSocioGrupos) params.append('tipoSocio', tipoSocioGrupos)
+      if (zonaGrupos) params.append('zona', zonaGrupos)
+      const response = await api.getFull(`/admin/socios/grupos-familiares?${params}`)
+      setGrupos(response.data.grupos || [])
+      setPaginationGrupos(response.data.pagination)
+    } catch (err) {
+      console.error('Error cargando grupos:', err)
+    } finally {
+      setLoadingGrupos(false)
+    }
+  }
+
+  function limpiarFiltrosGrupos() {
+    setBusquedaGrupos('')
+    setTerminoBusquedaGrupos('')
+    setEstadoGrupos('')
+    setCategoriaGrupos('')
+    setTipoSocioGrupos('')
+    setZonaGrupos('')
+    setPageGrupos(1)
+  }
+
+  function toggleExpandido(id) {
+    setExpandidos(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   function handleBuscar(e) {
     e.preventDefault()
-    setTerminoBusqueda(busqueda) // Activar la búsqueda
+    setTerminoBusqueda(busqueda)
     goToPage(1)
   }
 
@@ -310,14 +373,36 @@ export default function AdminSocios() {
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Socios</h1>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {tienePermiso(PERMISOS.SOCIOS_CREAR) && (
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Toggle de vistas */}
+          <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+            <button
+              onClick={() => setVista('socios')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                vista === 'socios' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Socios
+            </button>
+            <button
+              onClick={() => setVista('grupos')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                vista === 'grupos' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" />
+              Grupos Familiares
+            </button>
+          </div>
+
+          {vista === 'socios' && tienePermiso(PERMISOS.SOCIOS_CREAR) && (
             <Button onClick={() => navigate('/admin/socios/nuevo')} className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
               Nuevo Socio
             </Button>
           )}
-          {tienePermiso(PERMISOS.SOCIOS_CREAR) && (
+          {vista === 'socios' && tienePermiso(PERMISOS.SOCIOS_CREAR) && (
             <Link to="/admin/socios/cargar" className="btn-secondary flex items-center gap-2">
               <Upload className="w-4 h-4" />
               Cargar Excel
@@ -325,6 +410,176 @@ export default function AdminSocios() {
           )}
         </div>
       </div>
+
+      {/* ── VISTA GRUPOS FAMILIARES ── */}
+      {vista === 'grupos' && (
+        <div>
+          {/* Búsqueda + filtros */}
+          <div className="mb-4 flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={busquedaGrupos}
+                onChange={e => { setBusquedaGrupos(e.target.value); setPageGrupos(1) }}
+                placeholder="Buscar titular por nombre, nro. socio o DNI..."
+                className="input-field pl-10 pr-10 w-full"
+              />
+              {busquedaGrupos && (
+                <button type="button" onClick={() => setBusquedaGrupos('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFiltersGrupos(!showFiltersGrupos)}
+              className={`px-4 py-2 rounded-lg border flex items-center gap-2 transition relative ${
+                showFiltersGrupos ? 'bg-primary text-white border-primary' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Filtros
+              {(estadoGrupos || categoriaGrupos || tipoSocioGrupos || zonaGrupos) && !showFiltersGrupos && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+              )}
+              <ChevronDown className={`w-4 h-4 transition ${showFiltersGrupos ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {showFiltersGrupos && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <select value={estadoGrupos} onChange={e => { setEstadoGrupos(e.target.value); setPageGrupos(1) }} className="input-field">
+                  <option value="">Todos los estados</option>
+                  {filtros.estados.map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
+                <select value={categoriaGrupos} onChange={e => { setCategoriaGrupos(e.target.value); setPageGrupos(1) }} className="input-field">
+                  <option value="">Todas las categorías</option>
+                  {filtros.categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={tipoSocioGrupos} onChange={e => { setTipoSocioGrupos(e.target.value); setPageGrupos(1) }} className="input-field">
+                  <option value="">Todos los tipos</option>
+                  {filtros.tiposSocio.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select value={zonaGrupos} onChange={e => { setZonaGrupos(e.target.value); setPageGrupos(1) }} className="input-field">
+                  <option value="">Todas las zonas</option>
+                  {filtros.zonas.map(z => <option key={z} value={z}>{z}</option>)}
+                </select>
+              </div>
+              {(estadoGrupos || categoriaGrupos || tipoSocioGrupos || zonaGrupos || terminoBusquedaGrupos) && (
+                <div className="mt-3 flex justify-between items-center">
+                  <span className="text-sm text-gray-500">{paginationGrupos?.total || 0} grupos encontrados</span>
+                  <button type="button" onClick={limpiarFiltrosGrupos} className="text-sm text-primary hover:underline">
+                    Limpiar filtros
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!showFiltersGrupos && paginationGrupos && (
+            <div className="mb-4 text-sm text-gray-500">
+              {paginationGrupos.total} grupos familiares
+            </div>
+          )}
+
+          {loadingGrupos ? (
+            <LoadingSpinner />
+          ) : grupos.length === 0 ? (
+            <div className="text-center text-gray-500 py-12 bg-white rounded-lg border border-gray-200">
+              No hay grupos familiares registrados.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {grupos.map(titular => (
+                <div key={titular.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                  {/* Titular */}
+                  <button
+                    className="w-full flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition text-left"
+                    onClick={() => toggleExpandido(titular.id)}
+                  >
+                    <AvatarSocio foto={titular.fotoUrl} nombre={titular.apellidoNombre} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-900">{titular.apellidoNombre}</span>
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Titular</span>
+                        <StatusBadge status={titular.estado} type="socio" />
+                      </div>
+                      <div className="text-sm text-gray-500 mt-0.5">
+                        #{titular.nroSocio}
+                        {titular.documento && ` · DNI ${titular.documento}`}
+                        {titular.categoria && ` · ${titular.categoria}`}
+                        <span className="ml-2 text-purple-600 font-medium">
+                          {titular.miembrosFamilia.length} {titular.miembrosFamilia.length === 1 ? 'integrante' : 'integrantes'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={e => { e.stopPropagation(); navigate(`/admin/socios/${titular.id}`) }}
+                        className="p-1.5 rounded hover:bg-gray-200 text-gray-400 hover:text-primary transition"
+                        title="Ver detalle"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${expandidos.has(titular.id) ? 'rotate-90' : ''}`} />
+                    </div>
+                  </button>
+
+                  {/* Miembros expandidos */}
+                  {expandidos.has(titular.id) && (
+                    <div className="border-t border-gray-100 divide-y divide-gray-50">
+                      {titular.miembrosFamilia.map(miembro => (
+                        <div
+                          key={miembro.id}
+                          className="flex items-center gap-4 px-4 py-2.5 pl-14 bg-gray-50 hover:bg-gray-100 transition cursor-pointer"
+                          onClick={() => navigate(`/admin/socios/${miembro.id}`)}
+                        >
+                          <AvatarSocio foto={miembro.fotoUrl} nombre={miembro.apellidoNombre} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-gray-800 text-sm">{miembro.apellidoNombre}</span>
+                              {miembro.parentescoTitular && (
+                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                                  {miembro.parentescoTitular}
+                                </span>
+                              )}
+                              {miembro.esMenor && (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Menor</span>
+                              )}
+                              <StatusBadge status={miembro.estado} type="socio" />
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              #{miembro.nroSocio}
+                              {miembro.categoria && ` · ${miembro.categoria}`}
+                            </div>
+                          </div>
+                          <Eye className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Paginación grupos */}
+          {paginationGrupos && paginationGrupos.pages > 1 && (
+            <Pagination
+              pagination={paginationGrupos}
+              page={pageGrupos}
+              onPageChange={setPageGrupos}
+              className="mt-6"
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── VISTA SOCIOS ── */}
+      {vista === 'socios' && <>
 
       {/* Busqueda */}
       <form onSubmit={handleBuscar} className="mb-4">
@@ -481,6 +736,8 @@ export default function AdminSocios() {
           />
         </>
       )}
+
+      </> /* fin vista socios */}
 
       {/* Modal QR */}
       {qrModal && (

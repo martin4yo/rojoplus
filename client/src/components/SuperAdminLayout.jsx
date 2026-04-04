@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, LogOut, Menu, X, Settings, Building2 } from 'lucide-react'
+import { LayoutDashboard, LogOut, Menu, X, Settings, Building2, BarChart2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import api from '../services/api'
 
@@ -29,6 +29,7 @@ export default function SuperAdminLayout() {
   const menuItems = [
     { path: '/super-admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/super-admin/tenants', label: 'Gestión de Tenants', icon: Building2 },
+    { path: '/super-admin/uso', label: 'Dashboard de Uso', icon: BarChart2 },
   ]
 
   function isActive(path) {

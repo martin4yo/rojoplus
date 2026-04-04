@@ -225,6 +225,8 @@ router.post('/productos/crear-completo', authAdmin, checkPermiso('BUFFET_CONFIG'
     const {
       codigo,
       categoriaStockId,
+      conceptoCompraId,
+      conceptoVentaId,
       nombre,
       descripcion,
       codigoBarras,
@@ -241,6 +243,10 @@ router.post('/productos/crear-completo', authAdmin, checkPermiso('BUFFET_CONFIG'
       return res.status(400).json({ success: false, error: 'Faltan campos obligatorios' })
     }
 
+    if (!conceptoCompraId || !conceptoVentaId) {
+      return res.status(400).json({ success: false, error: 'Los conceptos de compra y venta son obligatorios' })
+    }
+
     const existente = await req.db.producto.findFirst({ where: { codigo } })
     if (existente) {
       return res.status(400).json({ success: false, error: 'Ya existe un producto con ese código' })
@@ -253,6 +259,8 @@ router.post('/productos/crear-completo', authAdmin, checkPermiso('BUFFET_CONFIG'
           nombre,
           descripcion,
           categoriaId: categoriaStockId || null,
+          conceptoCompraId: conceptoCompraId ? parseInt(conceptoCompraId) : null,
+          conceptoVentaId: conceptoVentaId ? parseInt(conceptoVentaId) : null,
           precioVenta: precio,
           activo: true
         }

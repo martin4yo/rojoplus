@@ -309,6 +309,7 @@
     <a href="#paso10"><span class="step-num">10</span> Configuración global</a>
     <a href="#paso11"><span class="step-num">11</span> Verificación final</a>
     <a href="#sql-rapido"><span class="step-num">★</span> SQL rápido de arranque</a>
+    <a href="#print-agent"><span class="step-num">🖨</span> Agente de impresión</a>
   </nav>
 
   <!-- ─── Main ─── -->
@@ -1074,6 +1075,177 @@ curl -H <span class="str">"X-Tenant-Slug: clubejemplo"</span> http://localhost:3
   (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> medios_pago          <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Medios Pago"</span>,
   (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> centros_costo        <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Centros Costo"</span>,
   (<span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> configuracion        <span class="kw">WHERE</span> tenant_id=<span class="num">&lt;T&gt;</span>) <span class="str">"Config Keys"</span>;</code></pre>
+    </section>
+
+    <!-- ─ Print Agent ─ -->
+    <section id="print-agent">
+      <div class="section-header">
+        <div class="step-badge blue">🖨</div>
+        <h2>Agente de Impresión (Print Agent)</h2>
+      </div>
+
+      <p>El print-agent es un proceso Node.js que corre en cada puesto de impresión (barra, cocina, caja) y recibe los trabajos de impresión desde el servidor via WebSocket. Soporta impresoras USB, CUPS y red (IP/TCP).</p>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ️</span>
+        <div>Las variables de entorno clave son: <code>ROJOPLUS_SERVER_URL</code>, <code>ROJOPLUS_PRINT_TOKEN</code>, <code>ROJOPLUS_PUESTO_ID</code> y <code>ROJOPLUS_PUESTO_NOMBRE</code>.</div>
+      </div>
+
+      <h3>Instalación en Linux (Ubuntu/Debian)</h3>
+
+      <h4>Opción A — Script automático (recomendado)</h4>
+      <p>Copiá la carpeta <code>print-agent/</code> al puesto y ejecutá:</p>
+      <pre><code>cd print-agent
+sudo ./install.sh</code></pre>
+      <p>El script instala Node.js si no está, copia los archivos a <code>/opt/rojoplus-print-agent</code>, solicita los datos de configuración interactivamente y registra el servicio en systemd.</p>
+
+      <h4>Opción B — Instalación manual</h4>
+      <pre><code># 1. Crear directorio e instalar
+sudo mkdir -p /opt/rojoplus-print-agent
+sudo cp index.js package.json /opt/rojoplus-print-agent/
+cd /opt/rojoplus-print-agent
+sudo npm install --production
+
+# 2. Crear el servicio systemd
+sudo nano /etc/systemd/system/rojoplus-print-agent.service</code></pre>
+
+      <p>Contenido del archivo <code>.service</code>:</p>
+      <pre><code>[Unit]
+Description=RojoPlus Print Agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rojoplus-print-agent
+ExecStart=/usr/bin/node /opt/rojoplus-print-agent/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rojoplus-print-agent
+
+Environment=NODE_ENV=production
+Environment=ROJOPLUS_SERVER_URL=https://miclub.clubix.com.ar
+Environment=ROJOPLUS_PRINT_TOKEN=rojoplus-print-agent
+Environment=ROJOPLUS_PUESTO_ID=barra-01
+Environment=ROJOPLUS_PUESTO_NOMBRE=Barra
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+
+      <pre><code># 3. Habilitar y arrancar
+sudo systemctl daemon-reload
+sudo systemctl enable rojoplus-print-agent
+sudo systemctl start rojoplus-print-agent
+
+# 4. Verificar
+sudo systemctl status rojoplus-print-agent</code></pre>
+
+      <h4>Permisos USB en Linux</h4>
+      <pre><code># Crear regla udev para acceso a USB sin root
+sudo nano /etc/udev/rules.d/99-usb-printer.rules</code></pre>
+      <pre><code>SUBSYSTEM=="usb", ATTR{idVendor}=="*", MODE="0666"
+KERNEL=="lp[0-9]*", MODE="0666"</code></pre>
+      <pre><code>sudo udevadm control --reload-rules
+sudo udevadm trigger</code></pre>
+
+      <hr>
+
+      <h3>Instalación en Windows</h3>
+
+      <ol class="steps">
+        <li><div>
+          <strong>Instalar Node.js</strong><br>
+          Descargar e instalar Node.js 20 LTS desde <code>nodejs.org</code>. Verificar con <code>node --version</code> en CMD.
+        </div></li>
+        <li><div>
+          <strong>Copiar archivos</strong><br>
+          Copiar la carpeta <code>print-agent\</code> a <code>C:\rojoplus-print-agent\</code> e instalar dependencias:
+          <pre><code>cd C:\rojoplus-print-agent
+npm install --production</code></pre>
+        </div></li>
+        <li><div>
+          <strong>Crear archivo de configuración</strong><br>
+          Crear el archivo <code>C:\rojoplus-print-agent\.env</code> (o usar variables de entorno del sistema):
+          <pre><code>ROJOPLUS_SERVER_URL=https://miclub.clubix.com.ar
+ROJOPLUS_PRINT_TOKEN=rojoplus-print-agent
+ROJOPLUS_PUESTO_ID=caja-01
+ROJOPLUS_PUESTO_NOMBRE=Caja</code></pre>
+        </div></li>
+        <li><div>
+          <strong>Instalar como servicio Windows con NSSM</strong><br>
+          Descargar <a href="https://nssm.cc" target="_blank">NSSM</a> y ejecutar como Administrador:
+          <pre><code>nssm install RojoPlusPrintAgent
+# En el cuadro de diálogo:
+#   Path:    C:\Program Files\nodejs\node.exe
+#   Startup: C:\rojoplus-print-agent
+#   Arguments: index.js
+
+nssm start RojoPlusPrintAgent</code></pre>
+        </div></li>
+        <li><div>
+          <strong>Alternativa sin NSSM — ejecutar manualmente</strong>
+          <pre><code>cd C:\rojoplus-print-agent
+node index.js</code></pre>
+          Para que arranque solo con Windows, crear un acceso directo en la carpeta <code>shell:startup</code>.
+        </div></li>
+      </ol>
+
+      <hr>
+
+      <h3>Comandos de operación diaria</h3>
+
+      <table>
+        <thead><tr><th>Acción</th><th>Linux</th><th>Windows (NSSM)</th></tr></thead>
+        <tbody>
+          <tr><td>Ver estado</td><td><code>systemctl status rojoplus-print-agent</code></td><td><code>nssm status RojoPlusPrintAgent</code></td></tr>
+          <tr><td>Ver logs en vivo</td><td><code>journalctl -u rojoplus-print-agent -f</code></td><td><code>nssm logs RojoPlusPrintAgent</code></td></tr>
+          <tr><td>Reiniciar</td><td><code>systemctl restart rojoplus-print-agent</code></td><td><code>nssm restart RojoPlusPrintAgent</code></td></tr>
+          <tr><td>Detener</td><td><code>systemctl stop rojoplus-print-agent</code></td><td><code>nssm stop RojoPlusPrintAgent</code></td></tr>
+        </tbody>
+      </table>
+
+      <hr>
+
+      <h3>Cambiar la URL del servidor</h3>
+      <p>Si la URL del servidor cambia (dominio nuevo, migración, etc.):</p>
+
+      <h4>Linux</h4>
+      <pre><code># Editar el servicio
+sudo nano /etc/systemd/system/rojoplus-print-agent.service
+# Cambiar la línea:
+# Environment=ROJOPLUS_SERVER_URL=https://nueva-url.com
+
+# Aplicar cambios
+sudo systemctl daemon-reload
+sudo systemctl restart rojoplus-print-agent
+
+# Verificar reconexión
+journalctl -u rojoplus-print-agent -f</code></pre>
+
+      <h4>Windows</h4>
+      <pre><code># Opción A: editar variables de entorno del sistema y reiniciar el servicio
+nssm stop RojoPlusPrintAgent
+# (editar .env o variables de entorno del sistema)
+nssm start RojoPlusPrintAgent
+
+# Opción B: reconfigurar con NSSM
+nssm edit RojoPlusPrintAgent</code></pre>
+
+      <div class="callout ok">
+        <span class="callout-icon">✅</span>
+        <div>Al reconectar correctamente verás en los logs: <code>[PrintAgent] Conectado via Socket: &lt;puesto-id&gt;</code></div>
+      </div>
+
+      <h3>Verificar que el puesto está conectado</h3>
+      <p>Desde el admin del sistema: <strong>Buffet → Impresoras → Puestos conectados</strong>. El puesto debe aparecer con estado verde.</p>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div>Si el trabajo se encola (<em>"Trabajo enviado a puesto:xxx"</em>) pero no imprime, el puesto no está conectado al WebSocket. Verificar URL, token y que el servicio esté corriendo.</div>
+      </div>
+
     </section>
 
   </main>

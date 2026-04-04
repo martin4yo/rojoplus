@@ -106,6 +106,11 @@ export default function ProductoForm() {
       return
     }
 
+    if (!form.conceptoCompraId || !form.conceptoVentaId) {
+      setError('Los conceptos de compra y venta son obligatorios')
+      return
+    }
+
     setSaving(true)
     try {
       const datos = {
@@ -440,14 +445,15 @@ export default function ProductoForm() {
                 <h3 className="font-medium text-gray-700 mb-3">Conceptos Contables</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Compra</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Compra <span className="text-red-500">*</span></label>
                     <select
                       value={form.conceptoCompraId}
                       onChange={e => setForm({ ...form, conceptoCompraId: e.target.value })}
-                      className="input-field w-full"
+                      className={`input-field w-full ${editMode && !form.conceptoCompraId ? 'border-red-300' : ''}`}
                       disabled={!editMode}
+                      required
                     >
-                      <option value="">Sin concepto</option>
+                      <option value="">Seleccionar concepto...</option>
                       {conceptosCompra.map(c => (
                         <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
                       ))}
@@ -455,14 +461,15 @@ export default function ProductoForm() {
                     <p className="text-xs text-gray-500 mt-1">Para facturas de compra</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Venta</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Venta <span className="text-red-500">*</span></label>
                     <select
                       value={form.conceptoVentaId}
                       onChange={e => setForm({ ...form, conceptoVentaId: e.target.value })}
-                      className="input-field w-full"
+                      className={`input-field w-full ${editMode && !form.conceptoVentaId ? 'border-red-300' : ''}`}
                       disabled={!editMode}
+                      required
                     >
-                      <option value="">Sin concepto</option>
+                      <option value="">Seleccionar concepto...</option>
                       {conceptosVenta.map(c => (
                         <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
                       ))}

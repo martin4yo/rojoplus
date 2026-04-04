@@ -65,6 +65,8 @@ export default function SocioForm() {
     telefonoFijo: '',
     celular: '',
     celularSecundario: '',
+    notifEmail: false,
+    notifWhatsapp: false,
     // Domicilio
     domicilio: '',
     calle: '',
@@ -720,6 +722,32 @@ export default function SocioForm() {
                     onChange={handleChange}
                     className="input-field w-full"
                   />
+                </div>
+                {/* Canales de notificación */}
+                <div className="col-span-12">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Canales de notificación</label>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="notifEmail"
+                        checked={form.notifEmail !== false}
+                        onChange={e => setForm(f => ({ ...f, notifEmail: e.target.checked }))}
+                        className="rounded border-gray-300 text-primary"
+                      />
+                      <span className="text-sm text-gray-700">Recibir notificaciones por Email</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="notifWhatsapp"
+                        checked={form.notifWhatsapp !== false}
+                        onChange={e => setForm(f => ({ ...f, notifWhatsapp: e.target.checked }))}
+                        className="rounded border-gray-300 text-primary"
+                      />
+                      <span className="text-sm text-gray-700">Recibir notificaciones por WhatsApp</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 

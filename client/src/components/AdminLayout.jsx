@@ -390,19 +390,34 @@ export default function AdminLayout() {
             })
           )}
           {admin?.esSuperAdmin && (
-            <a
-              href="/admin/tenants"
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${sidebarCollapsed ? 'md:justify-center' : ''} text-yellow-400 hover:bg-gray-700 hover:text-yellow-300 relative group`}
-              title={sidebarCollapsed ? 'Gestión de Tenants' : ''}
-            >
-              <Shield className="w-5 h-5 flex-shrink-0" />
-              <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>Gestión de Tenants</span>
-              {sidebarCollapsed && (
-                <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
-                  <span className="text-sm text-white">Gestión de Tenants</span>
-                </div>
-              )}
-            </a>
+            <>
+              <a
+                href="/admin/tenants"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${sidebarCollapsed ? 'md:justify-center' : ''} text-yellow-400 hover:bg-gray-700 hover:text-yellow-300 relative group`}
+                title={sidebarCollapsed ? 'Gestión de Tenants' : ''}
+              >
+                <Shield className="w-5 h-5 flex-shrink-0" />
+                <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>Gestión de Tenants</span>
+                {sidebarCollapsed && (
+                  <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
+                    <span className="text-sm text-white">Gestión de Tenants</span>
+                  </div>
+                )}
+              </a>
+              <a
+                href="/admin/uso"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${sidebarCollapsed ? 'md:justify-center' : ''} text-yellow-400 hover:bg-gray-700 hover:text-yellow-300 relative group`}
+                title={sidebarCollapsed ? 'Dashboard de Uso' : ''}
+              >
+                <BarChart3 className="w-5 h-5 flex-shrink-0" />
+                <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>Dashboard de Uso</span>
+                {sidebarCollapsed && (
+                  <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
+                    <span className="text-sm text-white">Dashboard de Uso</span>
+                  </div>
+                )}
+              </a>
+            </>
           )}
         </nav>
 

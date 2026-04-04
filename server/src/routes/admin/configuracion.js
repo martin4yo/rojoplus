@@ -1263,4 +1263,12 @@ router.get('/configuracion/fiscal', authAdmin, asyncHandler(async (req, res) => 
   res.json({ success: true, data: null })
 }))
 
+// POST /api/admin/sistema/smtp/test - Testear conexión SMTP del tenant
+router.post('/sistema/smtp/test', authAdmin, asyncHandler(async (req, res) => {
+  const { getMailConfig } = await import('../../services/email.js')
+  const { transporter, from } = await getMailConfig(req.db)
+  await transporter.verify()
+  res.json({ success: true, message: 'Conexión SMTP exitosa', from })
+}))
+
 export default router

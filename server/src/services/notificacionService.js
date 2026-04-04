@@ -3,6 +3,7 @@ import Handlebars from 'handlebars'
 import { enviarNotificacionPush } from './webPush.js'
 import { getMailConfig } from './email.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
+import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora } from './whatsappService.js'
 
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
@@ -256,6 +257,14 @@ export async function procesarNotificacionesPendientes() {
           const tenantDb = notif.tenantId ? createTenantPrisma(notif.tenantId) : null
           // Intentar enviar email
           if (notif.tipo === 'EMAIL') {
+            // Respetar preferencia de canal del socio
+            if (notif.socio?.notifEmail === false) {
+              await prisma.notificacionLog.update({
+                where: { id: notif.id },
+                data: { enviado: true, fechaEnvio: new Date(), intentos: notif.intentos + 1, error: 'Canal email deshabilitado por el socio' },
+              })
+              return { success: true, id: notif.id, omitido: true }
+            }
             const metadata = notif.metadata ? JSON.parse(notif.metadata) : {}
             await enviarEmailConTemplate(notif.eventType, notif.destinatario, metadata, tenantDb)
           }
@@ -327,8 +336,7 @@ export async function notificarCuotaProximaVencer(cargo) {
       },
     })
 
-    if (!socio || !socio.email || !socio.notificarCuotaProxVenc) {
-      console.log(`⏭️  Socio ${cargo.socioId} sin email o notificaciones desactivadas`)
+    if (!socio || !socio.notificarCuotaProxVenc) {
       return
     }
 
@@ -345,19 +353,38 @@ export async function notificarCuotaProximaVencer(cargo) {
       linkPortal: `${frontendUrl}/s/${socio.tokenPortal}`,
     }
 
-    await programarNotificacion({
-      tipo: 'EMAIL',
-      eventType: 'CUOTA_PROX_VENCER',
-      destinatario: socio.email,
-      socioId: socio.id,
-      cargoId: cargo.id,
-      asunto: `Recordatorio: Tu cuota vence en ${diasRestantes} días`,
-      cuerpo: null, // Se usará el template
-      fechaProgramado: new Date(), // Enviar ahora
-      metadata,
-    })
+    // Email
+    if (socio.email && socio.notifEmail !== false) {
+      await programarNotificacion({
+        tipo: 'EMAIL',
+        eventType: 'CUOTA_PROX_VENCER',
+        destinatario: socio.email,
+        socioId: socio.id,
+        cargoId: cargo.id,
+        asunto: `Recordatorio: Tu cuota vence en ${diasRestantes} días`,
+        cuerpo: null,
+        fechaProgramado: new Date(),
+        metadata,
+      })
+    }
 
-    console.log(`📧 Programado: Cuota próxima a vencer para ${socio.apellidoNombre}`)
+    // WhatsApp
+    if (socio.notifWhatsapp && socio.celular) {
+      const db = createTenantPrisma(socio.tenantId)
+      db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_VENCIMIENTO' } })
+        .then(flag => {
+          if (flag?.valor !== 'false') {
+            notifWaVencimiento({
+              db,
+              socio,
+              cuota: { vencimiento: cargo.fechaVencimiento, importe: cargo.montoTotal },
+            }).catch(err => console.error('Error WA cuota próx. vencer:', err.message))
+          }
+        })
+        .catch(err => console.error('Error leyendo flag WA vencimiento:', err.message))
+    }
+
+    console.log(`Notificado: Cuota próxima a vencer para ${socio.apellidoNombre}`)
   } catch (error) {
     console.error('Error notificando cuota próxima a vencer:', error.message)
   }
@@ -372,7 +399,7 @@ export async function notificarCuotaVencida(cargo) {
       where: { id: cargo.socioId },
     })
 
-    if (!socio || !socio.email || !socio.notificarCuotaVencida) {
+    if (!socio || !socio.notificarCuotaVencida) {
       return
     }
 
@@ -385,19 +412,38 @@ export async function notificarCuotaVencida(cargo) {
       linkPortal: `${frontendUrl}/s/${socio.tokenPortal}`,
     }
 
-    await programarNotificacion({
-      tipo: 'EMAIL',
-      eventType: 'CUOTA_VENCIDA',
-      destinatario: socio.email,
-      socioId: socio.id,
-      cargoId: cargo.id,
-      asunto: 'Tu cuota ha vencido',
-      cuerpo: null,
-      fechaProgramado: new Date(),
-      metadata,
-    })
+    // Email
+    if (socio.email && socio.notifEmail !== false) {
+      await programarNotificacion({
+        tipo: 'EMAIL',
+        eventType: 'CUOTA_VENCIDA',
+        destinatario: socio.email,
+        socioId: socio.id,
+        cargoId: cargo.id,
+        asunto: 'Tu cuota ha vencido',
+        cuerpo: null,
+        fechaProgramado: new Date(),
+        metadata,
+      })
+    }
 
-    console.log(`📧 Programado: Cuota vencida para ${socio.apellidoNombre}`)
+    // WhatsApp
+    if (socio.notifWhatsapp && socio.celular) {
+      const db = createTenantPrisma(socio.tenantId)
+      db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_VENCIMIENTO' } })
+        .then(flag => {
+          if (flag?.valor !== 'false') {
+            notifWaVencimiento({
+              db,
+              socio,
+              cuota: { vencimiento: cargo.fechaVencimiento, importe: cargo.montoTotal },
+            }).catch(err => console.error('Error WA cuota vencida:', err.message))
+          }
+        })
+        .catch(err => console.error('Error leyendo flag WA vencimiento:', err.message))
+    }
+
+    console.log(`Notificado: Cuota vencida para ${socio.apellidoNombre}`)
   } catch (error) {
     console.error('Error notificando cuota vencida:', error.message)
   }
@@ -412,7 +458,7 @@ export async function notificarMorosidad(socioId) {
       where: { id: socioId },
     })
 
-    if (!socio || !socio.email || !socio.notificarMorosidad) {
+    if (!socio || !socio.notificarMorosidad) {
       return
     }
 
@@ -421,13 +467,9 @@ export async function notificarMorosidad(socioId) {
       where: {
         socioId: socio.id,
         estado: 'PENDIENTE',
-        fechaVencimiento: {
-          lt: new Date(),
-        },
+        fechaVencimiento: { lt: new Date() },
       },
-      orderBy: {
-        fechaVencimiento: 'asc',
-      },
+      orderBy: { fechaVencimiento: 'asc' },
     })
 
     if (cuotasVencidas.length === 0) {
@@ -449,19 +491,38 @@ export async function notificarMorosidad(socioId) {
       })),
     }
 
-    await programarNotificacion({
-      tipo: 'EMAIL',
-      eventType: 'MOROSIDAD',
-      destinatario: socio.email,
-      socioId: socio.id,
-      cargoId: null,
-      asunto: `Recordatorio de pago - ${cuotasVencidas.length} cuotas pendientes`,
-      cuerpo: null,
-      fechaProgramado: new Date(),
-      metadata,
-    })
+    // Email
+    if (socio.email && socio.notifEmail !== false) {
+      await programarNotificacion({
+        tipo: 'EMAIL',
+        eventType: 'MOROSIDAD',
+        destinatario: socio.email,
+        socioId: socio.id,
+        cargoId: null,
+        asunto: `Recordatorio de pago - ${cuotasVencidas.length} cuotas pendientes`,
+        cuerpo: null,
+        fechaProgramado: new Date(),
+        metadata,
+      })
+    }
 
-    console.log(`📧 Programado: Morosidad para ${socio.apellidoNombre} (${cuotasVencidas.length} cuotas)`)
+    // WhatsApp
+    if (socio.notifWhatsapp && socio.celular) {
+      const db = createTenantPrisma(socio.tenantId)
+      db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_MORA' } })
+        .then(flag => {
+          if (flag?.valor !== 'false') {
+            notifWaMora({
+              db,
+              socio,
+              deuda: { total: totalAdeudado },
+            }).catch(err => console.error('Error WA morosidad:', err.message))
+          }
+        })
+        .catch(err => console.error('Error leyendo flag WA mora:', err.message))
+    }
+
+    console.log(`Notificado: Morosidad para ${socio.apellidoNombre} (${cuotasVencidas.length} cuotas)`)
   } catch (error) {
     console.error('Error notificando morosidad:', error.message)
   }
