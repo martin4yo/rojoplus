@@ -213,7 +213,7 @@ app.use('/api/super-admin', superAdminRoutes)
 
 // WhatsApp webhook (sin autenticación — Evolution API llama directamente)
 // Las rutas admin de WhatsApp usan extractTenant
-app.post('/api/whatsapp/webhook', whatsappRoutes)
+app.use('/api/whatsapp', whatsappRoutes)
 app.use('/api/admin/whatsapp', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()
