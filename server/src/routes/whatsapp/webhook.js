@@ -99,8 +99,8 @@ router.post('/webhook', async (req, res) => {
     const db = createTenantPrisma(tenantId)
 
     // Verificar que el agente esté habilitado para este tenant
-    const agentConfig = await db.configuracion.findUnique({
-      where: { tenantId_clave: { tenantId, clave: 'WA_AGENT_ENABLED' } }
+    const agentConfig = await db.configuracion.findFirst({
+      where: { tenantId, clave: 'WA_AGENT_ENABLED' }
     })
     if (agentConfig?.valor !== 'true') {
       console.log(`[WA webhook] Agente deshabilitado para tenant ${tenantId}`)
@@ -108,8 +108,8 @@ router.post('/webhook', async (req, res) => {
     }
 
     // Lista blanca: si está configurada, solo responder a esos números
-    const whitelistConfig = await db.configuracion.findUnique({
-      where: { tenantId_clave: { tenantId, clave: 'WA_AGENT_WHITELIST' } }
+    const whitelistConfig = await db.configuracion.findFirst({
+      where: { tenantId, clave: 'WA_AGENT_WHITELIST' }
     })
     if (whitelistConfig?.valor?.trim()) {
       const whitelist = whitelistConfig.valor.split(',').map(n => n.trim().replace(/\D/g, '')).filter(Boolean)
@@ -122,11 +122,11 @@ router.post('/webhook', async (req, res) => {
     }
 
     // Verificar horario de atención del agente
-    const horaInicioConfig = await db.configuracion.findUnique({
-      where: { tenantId_clave: { tenantId, clave: 'WA_AGENT_HORARIO_INICIO' } }
+    const horaInicioConfig = await db.configuracion.findFirst({
+      where: { tenantId, clave: 'WA_AGENT_HORARIO_INICIO' }
     })
-    const horaFinConfig = await db.configuracion.findUnique({
-      where: { tenantId_clave: { tenantId, clave: 'WA_AGENT_HORARIO_FIN' } }
+    const horaFinConfig = await db.configuracion.findFirst({
+      where: { tenantId, clave: 'WA_AGENT_HORARIO_FIN' }
     })
 
     const horaInicio = parseInt(horaInicioConfig?.valor || '7')
@@ -135,8 +135,8 @@ router.post('/webhook', async (req, res) => {
 
     if (horaActual < horaInicio || horaActual >= horaFin) {
       console.log(`[WA webhook] Fuera de horario (${horaActual}h, rango ${horaInicio}-${horaFin})`)
-      const msgFueraHorario = await db.configuracion.findUnique({
-        where: { tenantId_clave: { tenantId, clave: 'WA_AGENT_MSG_FUERA_HORARIO' } }
+      const msgFueraHorario = await db.configuracion.findFirst({
+        where: { tenantId, clave: 'WA_AGENT_MSG_FUERA_HORARIO' }
       })
       if (msgFueraHorario?.valor) {
         await enviarWhatsApp({ db, telefono: telefonoRaw, texto: msgFueraHorario.valor, ignorarHorario: true })

@@ -1727,7 +1727,7 @@ export default function TablasAuxiliares() {
               <div className="flex gap-3">
                 <button type="button" onClick={verificarEstadoWa} disabled={verificandoWa} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">
                   {verificandoWa ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : <Wifi className="w-4 h-4" />}
-                  Verificar estado
+                  Testear
                 </button>
                 {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
                   <button onClick={guardarConfigWa} disabled={guardandoWa} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
