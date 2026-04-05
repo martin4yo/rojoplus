@@ -1216,7 +1216,7 @@ router.post('/socio/:token/eventos/:eventoId/comprar', asyncHandler(async (req, 
   }
 
   // Validar token y obtener socio
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token }
   })
 
@@ -1346,7 +1346,7 @@ router.get('/socio/:token/eventos', asyncHandler(async (req, res) => {
   const { token } = req.params
 
   // Validar token y obtener socio
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token }
   })
 

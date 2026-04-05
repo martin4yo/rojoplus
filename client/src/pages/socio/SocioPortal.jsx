@@ -11,6 +11,7 @@ export default function SocioPortal() {
   const qrRef = useRef(null)
 
   const [socio, setSocio] = useState(null)
+  const [branding, setBranding] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -22,6 +23,7 @@ export default function SocioPortal() {
       try {
         const data = await api.get(`/socio/${tokenPortal}`)
         setSocio(data)
+        if (data?.branding) setBranding(data.branding)
       } catch (err) {
         setError('No se pudo cargar la informacion del socio')
       } finally {
@@ -77,19 +79,21 @@ export default function SocioPortal() {
     )
   }
 
+  const colorPrimario = branding?.colores?.primario || '#dc2626'
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-md mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
-            <img src="/images/logo.png" alt="Logo" className="h-14" />
+            <img src={branding?.logoUrl || '/images/logo.png'} alt="Logo" className="h-14" />
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="text-primary font-bold text-lg whitespace-nowrap">Rojo Plus</span>
-                <span className="text-xs text-gray-400 italic whitespace-nowrap">Tu pasion tiene recompensas</span>
+                <span className="font-bold text-lg whitespace-nowrap" style={{ color: colorPrimario }}>{branding?.nombre || 'Portal'}</span>
+                {branding?.slogan && <span className="text-xs text-gray-400 italic whitespace-nowrap">{branding.slogan}</span>}
               </div>
-              <span className="text-gray-600 text-sm block">Portal del Socio</span>
+              <span className="text-gray-600 text-sm block">Beneficios del Socio</span>
             </div>
           </div>
         </div>
@@ -140,7 +144,7 @@ export default function SocioPortal() {
                 level="H"
                 includeMargin={true}
                 imageSettings={{
-                  src: '/images/logo.png',
+                  src: branding?.logoUrl || '/images/logo.png',
                   x: undefined,
                   y: undefined,
                   height: 40,

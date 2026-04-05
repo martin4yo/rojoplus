@@ -307,11 +307,20 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
   const estadoUpper = socio.estado?.toUpperCase() || ''
   const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
 
+  const branding = req.tenant ? {
+    nombre: req.tenant.nombre,
+    slogan: req.tenant.slogan,
+    logoUrl: req.tenant.logoUrl,
+    faviconUrl: req.tenant.faviconUrl,
+    colores: req.tenant.colores,
+  } : null
+
   res.json({
     success: true,
     data: {
       ...socio,
       esActivo,
+      branding,
       grupoFamiliar: socio.titularFamiliaId ? {
         titular: socio.titularFamilia,
         integrantes: socio.titularFamilia?.miembrosFamilia || [],

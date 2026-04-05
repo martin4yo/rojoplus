@@ -52,6 +52,7 @@ export default function PortalSocioNuevo() {
   const { showModal, ModalComponent } = useModal()
   const [activeTab, setActiveTab] = useState('inicio')
   const [socio, setSocio] = useState(null)
+  const [branding, setBranding] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
@@ -112,6 +113,7 @@ export default function PortalSocioNuevo() {
       // api.get ya retorna data.data, así que response es directamente el objeto socio
       const socioData = await api.get(`/socio/${tokenPortal}`)
       setSocio(socioData)
+      if (socioData?.branding) setBranding(socioData.branding)
 
       // Cargar datos adicionales en paralelo
       const [cuotas] = await Promise.all([
@@ -227,17 +229,20 @@ export default function PortalSocioNuevo() {
     )
   }
 
+  const colorPrimario = branding?.colores?.primario || '#dc2626'
+  const headerStyle = { background: `linear-gradient(to right, ${colorPrimario}, ${colorPrimario}dd)` }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 pb-20">
       {/* Header */}
-      <header className="bg-gradient-to-r from-red-600 to-red-700 shadow-lg sticky top-0 z-40">
+      <header className="shadow-lg sticky top-0 z-40" style={headerStyle}>
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <img src="/images/logo.png" alt="Logo" className="h-12 w-auto" />
+              <img src={branding?.logoUrl || '/images/logo.png'} alt="Logo" className="h-12 w-auto" />
               <div>
-                <h1 className="text-white font-bold text-lg">Rojo Plus</h1>
-                <p className="text-red-100 text-xs">Portal del Socio</p>
+                <h1 className="text-white font-bold text-lg">{branding?.nombre || 'Portal'}</h1>
+                <p className="text-white/70 text-xs">Portal del Socio</p>
               </div>
             </div>
             <div className="text-right">
