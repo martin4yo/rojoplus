@@ -20,7 +20,7 @@
 | **AxiomaDocs** | Gestión documental y vencimientos | React 18 + Vite + TS | Express + Prisma | MySQL | ❌ |
 | **Parse** | Extracción de documentos fiscales con IA | Next.js + React | Express + Prisma | PostgreSQL | ✅ |
 | **Tally** | Rendiciones y conciliación de tarjetas | Next.js 15 + React 19 | Express + Prisma | PostgreSQL | ✅ |
-| **Checkpoint** | Control de presencia y GPS | Next.js 15 + React 19 | Next.js API Routes | PostgreSQL | ✅ |
+| **Checkpoint** | Gestión de RRHH (legajos, evaluaciones, presencia, GPS) | Next.js 15 + React 19 | Next.js API Routes | PostgreSQL | ✅ |
 | **Elore** | Gestión de proyectos y tareas | Next.js 15 + React 19 | Next.js API Routes | PostgreSQL | ✅ |
 | **Hub** | Portal de proveedores omnicanal | Next.js 15 + React 19 + TS | Express + Prisma | PostgreSQL | ✅ |
 
@@ -303,14 +303,20 @@ Core puede leer estos manifests y almacenarlos en su `Application` registry, dan
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│  CHECKPOINT                                                         │
+│  CHECKPOINT — RRHH completo                                         │
 │  Ofrece:                                                            │
 │    → CheckInWidget         Registrar presencia con GPS y foto       │
 │    → BiometricAuthWidget   Autenticación biométrica                 │
 │    → EmployeeStatusWidget  Estado de presencia en tiempo real       │
+│    → LegajoWidget          Ficha del empleado con documentos        │
+│    → EvaluacionWidget      Evaluación de desempeño                  │
+│    → EmployeeSearchWidget  Buscar empleado para operaciones de RRHH │
+│    → ReciboSueldoWidget    Recibo de sueldo firmado digitalmente     │
+│    → LiquidacionWidget     Liquidación de haberes                   │
 │  Consume de:                                                        │
-│    ← Mini: generar recibos de sueldo / facturar horas               │
-│    ← Elore: crear tareas de RRHH                                    │
+│    ← Mini: asientos contables de la liquidación / AFIP (F931, etc) │
+│    ← AxiomaDocs: documentos habilitantes del empleado               │
+│    ← Elore: plan de capacitación / tareas de incorporación          │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -363,8 +369,12 @@ Core puede leer estos manifests y almacenarlos en su `Application` registry, dan
 | Mini ERP | Parse | parse-invoice service | Cargar facturas de compra escaneadas |
 | MediFlow | Parse | parse-receipt service | Parsear órdenes y recetas |
 | Tally | Parse | parse-invoice service | Extraer datos de resúmenes de tarjeta |
-| Clubix | Checkpoint | CheckInWidget | Control de acceso de socios |
-| MediFlow | Checkpoint | CheckInWidget | Registro de llegada de pacientes |
+| Clubix | Checkpoint | CheckInWidget | Control de acceso y presencia de empleados del club |
+| MediFlow | Checkpoint | CheckInWidget + LegajoWidget | Presencia del personal médico y legajos habilitantes |
+| MediFlow | Checkpoint | LiquidacionWidget + ReciboSueldoWidget | Liquidar haberes del personal médico |
+| Clubix | Checkpoint | LiquidacionWidget + ReciboSueldoWidget | Liquidar haberes del personal del club |
+| Hub | Checkpoint | LegajoWidget | Ver legajo del proveedor/contacto |
+| AxiomaDocs | Checkpoint | EmployeeSearchWidget | Asignar documentos a empleado desde Checkpoint |
 | Todas | Elore | TaskCreatorWidget | Crear ticket de soporte o tarea interna |
 | MediFlow | AxiomaDocs | DocStatusWidget | Ver habilitaciones del médico |
 | Hub | Mini ERP | FacturacionWidget | Facturar / generar órdenes de compra al proveedor |
@@ -656,12 +666,13 @@ Estos principios guían toda decisión de integración:
 
  ┌────────────┐    ┌──────────────┐    ┌─────────────────┐
  │ CHECKPOINT │    │  AXIOMADOCS  │    │      HUB        │
- │ (presencia)│    │ (documentos) │    │  (proveedores)  │
+ │   (RRHH)   │    │ (documentos) │    │  (proveedores)  │
  └─────┬──────┘    └──────┬───────┘    └────────┬────────┘
        ↓                  ↓                     ↓
-   Clubix              MediFlow              Mini ERP
+   Mini ERP            MediFlow              Mini ERP
    MediFlow            Elore                 Parse
-                                             Elore
+   Clubix              Checkpoint            Elore
+   AxiomaDocs
 ```
 
 ---
