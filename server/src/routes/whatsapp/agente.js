@@ -68,7 +68,17 @@ const TOOLS = [
   },
   {
     name: 'enviar_link_portal',
-    description: 'Genera y envía al socio el link para acceder a su portal personal donde puede ver su cuenta y hacer pagos.',
+    description: 'Genera y envía al socio el link de acceso a su portal personal (ver cuotas, pagos, datos). No confundir con el QR de beneficios en comercios.',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'enviar_qr_comercios',
+    description: 'Envía al socio el link/QR para presentar en comercios adheridos y obtener descuentos o beneficios. Es distinto al portal personal.',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'enviar_link_web',
+    description: 'Envía al socio el link al sitio web público del club.',
     input_schema: { type: 'object', properties: {}, required: [] }
   },
   {
@@ -170,7 +180,7 @@ async function ejecutarTool(name, input, { db, socio, tenantId, telefono }) {
         const baseUrl = tenant?.slug
           ? `https://${tenant.slug}.${appDomain}`
           : (process.env.FRONTEND_URL || `https://${appDomain}`)
-        const link = `${baseUrl}/s/${token}`
+        const link = `${baseUrl}/portal-socio/${token}`
 
         // Enviar el link por WhatsApp directamente
         await enviarWhatsApp({
@@ -183,6 +193,48 @@ async function ejecutarTool(name, input, { db, socio, tenantId, telefono }) {
         return { enviado: true, expira: expira.toLocaleDateString('es-AR') }
       } catch (err) {
         return { error: 'No se pudo generar el link: ' + err.message }
+      }
+    }
+
+    case 'enviar_qr_comercios': {
+      if (!socio) return { error: 'No estás registrado como socio del club.' }
+      try {
+        const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
+        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } }).catch(() => null)
+        const baseUrl = tenant?.slug
+          ? `https://${tenant.slug}.${appDomain}`
+          : (process.env.FRONTEND_URL || `https://${appDomain}`)
+        const link = `${baseUrl}/s/${socio.tokenPortal}`
+
+        await enviarWhatsApp({
+          db,
+          telefono,
+          texto: `🎟 Tu QR para usar beneficios en comercios adheridos:\n${link}\n\n_Mostrá este link o el QR en el comercio para acceder a tu descuento._`,
+          ignorarHorario: true,
+        })
+        return { enviado: true }
+      } catch (err) {
+        return { error: 'No se pudo generar el QR: ' + err.message }
+      }
+    }
+
+    case 'enviar_link_web': {
+      try {
+        const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
+        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true, nombre: true } }).catch(() => null)
+        const url = tenant?.slug
+          ? `https://${tenant.slug}.${appDomain}`
+          : (process.env.FRONTEND_URL || `https://${appDomain}`)
+
+        await enviarWhatsApp({
+          db,
+          telefono,
+          texto: `🌐 Sitio web del club:\n${url}`,
+          ignorarHorario: true,
+        })
+        return { enviado: true, url }
+      } catch (err) {
+        return { error: 'No se pudo obtener el link: ' + err.message }
       }
     }
 
@@ -279,7 +331,7 @@ Hoy es ${hoy}.
 ${infoSocio}
 
 Instrucciones:
-- Respondés en español rioplatense (vos, che, dale, etc.), de forma amigable y concisa.
+- Respondés en español rioplatense (vos, dale, etc.), de forma amigable y concisa. No usás "che".
 - Máximo 3 párrafos cortos. Sin markdown complejo (WhatsApp solo soporta *negrita*, _cursiva_).
 - Nunca inventás información. Siempre usás las tools para consultar datos reales.
 - Si no podés resolver algo, usás la tool derivar_humano.
@@ -291,7 +343,8 @@ Temas permitidos (ÚNICAMENTE estos):
 - Deudas, cuotas y pagos del socio
 - Actividades e inscripciones
 - Acceso al portal del socio
-- Información general del club (horarios, dirección, contacto)
+- QR para beneficios en comercios adheridos
+- Información general del club (horarios, dirección, contacto) y link al sitio web
 - Reserva de espacios
 - Derivación a administración
 
