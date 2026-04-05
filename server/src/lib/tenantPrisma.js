@@ -1,6 +1,33 @@
 import prisma from './prisma.js';
 
 /**
+ * Expande selectores de claves compuestas de Prisma a campos individuales.
+ * Ejemplo: { tenantId_clave: { tenantId: 4, clave: 'X' } } → { tenantId: 4, clave: 'X' }
+ * Necesario porque findUnique acepta compound keys pero findFirst no.
+ */
+function expandCompoundSelectors(where) {
+  if (!where) return where
+  const result = {}
+  for (const [key, value] of Object.entries(where)) {
+    const isCompound =
+      key.includes('_') &&
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      !(value instanceof Date) &&
+      !('gte' in value || 'lte' in value || 'gt' in value || 'lt' in value ||
+        'in' in value || 'notIn' in value || 'not' in value ||
+        'contains' in value || 'startsWith' in value || 'endsWith' in value)
+    if (isCompound) {
+      Object.assign(result, value)
+    } else {
+      result[key] = value
+    }
+  }
+  return result
+}
+
+/**
  * Modelos del sistema multi-tenant que NO deben ser filtrados por tenantId.
  * Son modelos globales compartidos entre todos los tenants.
  */
@@ -44,10 +71,11 @@ export function createTenantPrisma(tenantId) {
           if (!GLOBAL_MODELS.has(model)) {
             // findUnique no admite filtros extra en where (requiere constraint único),
             // por eso se redirige a findFirst que sí acepta tenantId arbitrario.
+            // Los selectores compuestos (e.g. tenantId_clave) se expanden a campos individuales.
             const modelName = model.charAt(0).toLowerCase() + model.slice(1);
             return prisma[modelName].findFirst({
               ...args,
-              where: { ...args.where, tenantId },
+              where: { ...expandCompoundSelectors(args.where), tenantId },
             });
           }
           return query(args);
@@ -58,7 +86,7 @@ export function createTenantPrisma(tenantId) {
             const modelName = model.charAt(0).toLowerCase() + model.slice(1);
             const result = await prisma[modelName].findFirst({
               ...args,
-              where: { ...args.where, tenantId },
+              where: { ...expandCompoundSelectors(args.where), tenantId },
             });
             if (!result) {
               const err = new Error(`No ${model} record found`);
