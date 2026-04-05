@@ -91,7 +91,7 @@ const TOOLS = [
 
 // ─── Handlers de tools ────────────────────────────────────────────────────────
 
-async function ejecutarTool(name, input, { db, socio, tenantId }) {
+async function ejecutarTool(name, input, { db, socio, tenantId, telefono }) {
   switch (name) {
 
     case 'consultar_deuda': {
@@ -175,7 +175,7 @@ async function ejecutarTool(name, input, { db, socio, tenantId }) {
         // Enviar el link por WhatsApp directamente
         await enviarWhatsApp({
           db,
-          telefono: context.telefono,
+          telefono,
           texto: `🔗 Acá está tu link de acceso al portal:\n${link}\n\n_Válido hasta el ${expira.toLocaleDateString('es-AR')}. No lo compartas._`,
           ignorarHorario: true,
         })
