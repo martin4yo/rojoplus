@@ -509,17 +509,20 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
       saldo: (m.antIngresos - m.antEgresos) + m.ingresos - m.egresos
     })).sort((a, b) => (a.medioPago ?? 'ZZZ').localeCompare(b.medioPago ?? 'ZZZ'))
 
-    // Ventas por día
+    // Ventas por día (ingresos + egresos)
     const ventasPorDiaMap = {}
-    const addDia = (fecha, total) => {
+    const getOrCreateDia = (fecha) => {
       const d = new Date(fecha)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      if (!ventasPorDiaMap[key]) ventasPorDiaMap[key] = { fecha: key, label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, total: 0 }
-      ventasPorDiaMap[key].total += total
+      if (!ventasPorDiaMap[key]) ventasPorDiaMap[key] = { fecha: key, label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, ingresos: 0, egresos: 0 }
+      return ventasPorDiaMap[key]
     }
-    comandas.forEach(c => addDia(c.horaCierre, Number(c.total)))
-    takeaway.forEach(t => addDia(t.horaPagado, Number(t.total)))
-    const ventasPorDia = Object.values(ventasPorDiaMap).sort((a, b) => a.fecha.localeCompare(b.fecha))
+    comandas.forEach(c => { getOrCreateDia(c.horaCierre).ingresos += Number(c.total) })
+    takeaway.forEach(t => { getOrCreateDia(t.horaPagado).ingresos += Number(t.total) })
+    egresosRaw.forEach(e => { getOrCreateDia(e.fecha).egresos += Number(e.monto) })
+    const ventasPorDia = Object.values(ventasPorDiaMap)
+      .map(d => ({ ...d, resultado: d.ingresos - d.egresos }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
 
     res.json({
       success: true,

@@ -546,18 +546,24 @@ export default function BuffetDashboard() {
             )}
           </div>
 
-          {/* Evolución de ventas por día */}
+          {/* Evolución de ingresos y egresos por día */}
           {kpis.ventasPorDia && kpis.ventasPorDia.length > 1 && (
             <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-4">Evolución de ventas por día</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={kpis.ventasPorDia} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+              <h3 className="font-semibold text-gray-800 mb-4">Ingresos y egresos por día</h3>
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={kpis.ventasPorDia} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip formatter={v => formatMoney(v)} labelFormatter={l => `Día ${l}`} />
-                  <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} name="Ventas" />
-                </BarChart>
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={52} />
+                  <Tooltip
+                    formatter={(value, name) => [formatMoney(value), name === 'ingresos' ? 'Ingresos' : name === 'egresos' ? 'Egresos' : 'Resultado']}
+                    labelFormatter={l => `Día ${l}`}
+                  />
+                  <Legend formatter={name => name === 'ingresos' ? 'Ingresos' : name === 'egresos' ? 'Egresos' : 'Resultado'} />
+                  <Bar dataKey="ingresos" fill="#22c55e" radius={[3, 3, 0, 0]} opacity={0.8} name="ingresos" />
+                  <Bar dataKey="egresos" fill="#ef4444" radius={[3, 3, 0, 0]} opacity={0.8} name="egresos" />
+                  <Line type="monotone" dataKey="resultado" stroke="#ea580c" strokeWidth={2.5} dot={{ r: 3, fill: '#ea580c' }} activeDot={{ r: 5 }} name="resultado" />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           )}
