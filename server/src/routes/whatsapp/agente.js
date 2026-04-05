@@ -194,6 +194,7 @@ async function ejecutarTool(name, input, { db, socio, tenantId }) {
 
 function registrarUsoIA(db, tenantId, provider, model, inputTokens, outputTokens) {
   if (!db || !tenantId || (!inputTokens && !outputTokens)) return
+  if (!db.aiUsageLog) return
   db.aiUsageLog.create({
     data: { tenantId, provider, model, inputTokens, outputTokens }
   }).catch(err => console.error('[WhatsApp Agente] Error registrando uso IA:', err.message))
