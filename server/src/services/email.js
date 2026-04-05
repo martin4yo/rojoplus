@@ -2,10 +2,13 @@ import nodemailer from 'nodemailer'
 import prisma from '../lib/prisma.js'
 
 // Transporter global (fallback desde variables de entorno)
+const _globalSmtpPort = parseInt(process.env.SMTP_PORT) || 587
 const globalTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false,
+  port: _globalSmtpPort,
+  secure: process.env.SMTP_SECURE !== undefined && process.env.SMTP_SECURE !== ''
+    ? process.env.SMTP_SECURE === 'true'
+    : _globalSmtpPort === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -50,12 +53,17 @@ export async function getMailConfig(db) {
       }
     }
 
-    const cacheKey = `${cfg.SMTP_HOST}:${cfg.SMTP_PORT || 587}:${cfg.SMTP_USER}`
+    const smtpPort = parseInt(cfg.SMTP_PORT) || 587
+    // Si SMTP_SECURE no está explícito, inferir por puerto (465 = SSL directo)
+    const smtpSecure = cfg.SMTP_SECURE !== undefined && cfg.SMTP_SECURE !== ''
+      ? cfg.SMTP_SECURE === 'true'
+      : smtpPort === 465
+    const cacheKey = `${cfg.SMTP_HOST}:${smtpPort}:${smtpSecure}:${cfg.SMTP_USER}`
     if (!transporterCache.has(cacheKey)) {
       transporterCache.set(cacheKey, nodemailer.createTransport({
         host: cfg.SMTP_HOST,
-        port: parseInt(cfg.SMTP_PORT) || 587,
-        secure: cfg.SMTP_SECURE === 'true',
+        port: smtpPort,
+        secure: smtpSecure,
         auth: { user: cfg.SMTP_USER, pass: cfg.SMTP_PASS },
       }))
     }
