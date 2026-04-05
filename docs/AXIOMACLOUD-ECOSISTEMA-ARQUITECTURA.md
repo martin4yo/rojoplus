@@ -22,6 +22,7 @@
 | **Tally** | Rendiciones y conciliación de tarjetas | Next.js 15 + React 19 | Express + Prisma | PostgreSQL | ✅ |
 | **Checkpoint** | Control de presencia y GPS | Next.js 15 + React 19 | Next.js API Routes | PostgreSQL | ✅ |
 | **Elore** | Gestión de proyectos y tareas | Next.js 15 + React 19 | Next.js API Routes | PostgreSQL | ✅ |
+| **Hub** | Portal de proveedores omnicanal | Next.js 15 + React 19 + TS | Express + Prisma | PostgreSQL | ✅ |
 
 ### Build tools por app
 
@@ -29,7 +30,7 @@
 |-------|------|----------------------------|
 | React 18 + Vite | Core, Mini ERP, Clubix, AxiomaDocs | Vite Library Mode nativo |
 | React 19 + Vite | MediFlow | Vite Library Mode nativo |
-| React 19 + Next.js | Parse, Tally, Checkpoint, Elore | Vite Library Mode adicional (build separado) |
+| React 19 + Next.js | Parse, Tally, Checkpoint, Elore, Hub | Vite Library Mode adicional (build separado) |
 
 ---
 
@@ -324,6 +325,20 @@ Core puede leer estos manifests y almacenarlos en su `Application` registry, dan
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
+│  HUB                                                                │
+│  Ofrece:                                                            │
+│    → SupplierPortalWidget   Portal de proveedores embebido          │
+│    → DocumentViewerWidget   Visor de documentos (PDF/imágenes)      │
+│    → CommunicationsWidget   Omnicanal: WhatsApp, email, chat        │
+│    → SupplierSearchWidget   Buscar/seleccionar proveedor            │
+│  Consume de:                                                        │
+│    ← Parse: clasificación y OCR de documentos de proveedores        │
+│    ← Mini: facturas de compra, órdenes de compra, pagos             │
+│    ← Elore: tareas de aprobación de documentos/facturas             │
+│    ← Core: SSO, gestión de usuarios del portal                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
 │  AXIOMADOCS                                                         │
 │  Ofrece:                                                            │
 │    → DocStatusWidget       Estado de documentos de una persona      │
@@ -352,6 +367,11 @@ Core puede leer estos manifests y almacenarlos en su `Application` registry, dan
 | MediFlow | Checkpoint | CheckInWidget | Registro de llegada de pacientes |
 | Todas | Elore | TaskCreatorWidget | Crear ticket de soporte o tarea interna |
 | MediFlow | AxiomaDocs | DocStatusWidget | Ver habilitaciones del médico |
+| Hub | Mini ERP | FacturacionWidget | Facturar / generar órdenes de compra al proveedor |
+| Hub | Parse | DocumentUploadWidget | Clasificar y extraer datos de facturas recibidas |
+| Hub | Elore | TaskCreatorWidget | Crear tarea de aprobación al recibir documento |
+| Mini ERP | Hub | SupplierSearchWidget | Seleccionar proveedor del portal al registrar compra |
+| Cualquiera | Hub | CommunicationsWidget | Enviar notificación omnicanal (WhatsApp, email, chat) |
 | Todas | Core | SSO / Session | Login único, gestión de sesión |
 
 ---
@@ -578,10 +598,13 @@ Una sección nueva en el admin de Core: **"Integraciones del Ecosistema"**
 - [ ] MediFlow consume facturación de Mini
 - [ ] MediFlow consume documentos de AxiomaDocs
 
-### Fase 5 — Tally + AxiomaDocs
+### Fase 5 — Tally + AxiomaDocs + Hub
 - [ ] Tally consume Parse para extracción de resúmenes
 - [ ] AxiomaDocs expone `DocStatusWidget`
 - [ ] Tally genera asientos via Mini
+- [ ] Hub expone `SupplierSearchWidget` y `CommunicationsWidget`
+- [ ] Hub consume Mini para facturación de proveedores
+- [ ] Hub consume Elore para tareas de aprobación
 
 ### Fase 6 — Registry centralizado en Core
 - [ ] Core lee y almacena manifests de todas las apps
@@ -631,13 +654,14 @@ Estos principios guían toda decisión de integración:
  Clubix MediFlow Tally Clubix  Mini ERP  Clubix   Mini ERP
                        MediFlow  Tally   MediFlow  Elore
 
- ┌────────────┐    ┌──────────────┐
- │ CHECKPOINT │    │  AXIOMADOCS  │
- │ (presencia)│    │ (documentos) │
- └─────┬──────┘    └──────┬───────┘
-       ↓                  ↓
-   Clubix              MediFlow
-   MediFlow            Elore
+ ┌────────────┐    ┌──────────────┐    ┌─────────────────┐
+ │ CHECKPOINT │    │  AXIOMADOCS  │    │      HUB        │
+ │ (presencia)│    │ (documentos) │    │  (proveedores)  │
+ └─────┬──────┘    └──────┬───────┘    └────────┬────────┘
+       ↓                  ↓                     ↓
+   Clubix              MediFlow              Mini ERP
+   MediFlow            Elore                 Parse
+                                             Elore
 ```
 
 ---

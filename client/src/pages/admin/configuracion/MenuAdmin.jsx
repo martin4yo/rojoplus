@@ -233,26 +233,43 @@ export default function MenuAdmin() {
   }
 
   async function handleToggleRol(itemId, rolId, currentlyHasRole) {
-    // Calcular nuevos roles
     const item = findItemById(menuItems, itemId)
     if (!item) return
 
-    let newRolesIds = [...(item.rolesIds || [])]
-    if (currentlyHasRole) {
-      newRolesIds = newRolesIds.filter(r => r !== rolId)
-    } else {
-      newRolesIds.push(rolId)
-    }
+    const newValue = !currentlyHasRole
 
-    // Actualizar estado local inmediatamente (optimistic update)
-    setMenuItems(prev => updateItemRoles(prev, itemId, newRolesIds))
+    // Recopilar item + hijos (si es nivel 1)
+    const itemsToUpdate = [item, ...(item.children || [])]
 
-    // Guardar en el servidor en segundo plano
+    const updates = itemsToUpdate.map(i => {
+      let newRolesIds = [...(i.rolesIds || [])]
+      if (newValue) {
+        if (!newRolesIds.includes(rolId)) newRolesIds.push(rolId)
+      } else {
+        newRolesIds = newRolesIds.filter(r => r !== rolId)
+      }
+      return { id: i.id, oldRolesIds: i.rolesIds || [], newRolesIds }
+    })
+
+    // Optimistic update de todos
+    setMenuItems(prev => {
+      let updated = prev
+      for (const u of updates) updated = updateItemRoles(updated, u.id, u.newRolesIds)
+      return updated
+    })
+
+    // Guardar todos en paralelo
     try {
-      await api.patch(`/admin/menu/${itemId}/roles`, { rolesIds: newRolesIds })
+      await Promise.all(
+        updates.map(u => api.patch(`/admin/menu/${u.id}/roles`, { rolesIds: u.newRolesIds }))
+      )
     } catch (err) {
-      // Si falla, revertir el cambio
-      setMenuItems(prev => updateItemRoles(prev, itemId, item.rolesIds || []))
+      // Revertir
+      setMenuItems(prev => {
+        let reverted = prev
+        for (const u of updates) reverted = updateItemRoles(reverted, u.id, u.oldRolesIds)
+        return reverted
+      })
       setError('Error al actualizar permisos: ' + (err.message || 'Error desconocido'))
     }
   }
@@ -428,10 +445,16 @@ export default function MenuAdmin() {
     const hasChildren = item.children && item.children.length > 0
     const hasRole = selectedRolId && (item.rolesIds || []).includes(selectedRolId)
 
+    // Para ítems padre: detectar estado parcial (algunos hijos con rol, otros sin)
+    const childrenWithRole = hasChildren && selectedRolId
+      ? item.children.filter(c => (c.rolesIds || []).includes(selectedRolId)).length
+      : 0
+    const isPartial = hasChildren && childrenWithRole > 0 && childrenWithRole < item.children.length
+
     return (
       <div key={item.id}>
         <div
-          className={`flex items-center gap-3 p-3 border-b ${!item.activo ? 'opacity-50' : ''}`}
+          className={`flex items-center gap-3 p-3 border-b ${!item.activo ? 'opacity-50' : ''} ${level === 0 && hasChildren ? 'bg-gray-50' : ''}`}
           style={{ paddingLeft: `${level * 24 + 12}px` }}
         >
           {/* Expand/collapse */}
@@ -444,19 +467,27 @@ export default function MenuAdmin() {
 
           {/* Icono y título */}
           <IconComponent name={item.icono} className="w-5 h-5 text-gray-500" />
-          <span className="flex-1 font-medium">{item.titulo}</span>
+          <span className="flex-1 font-medium">
+            {item.titulo}
+            {hasChildren && selectedRolId && (
+              <span className="ml-2 text-xs text-gray-400 font-normal">
+                {childrenWithRole}/{item.children.length}
+              </span>
+            )}
+          </span>
 
           {/* Switch de permiso */}
           {selectedRolId && !item.soloSuperAdmin && (
             <button
               onClick={() => handleToggleRol(item.id, selectedRolId, hasRole)}
+              title={hasChildren ? 'Activar/desactivar también aplica a todos los subitems' : ''}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                hasRole ? 'bg-green-500' : 'bg-gray-300'
+                hasRole ? 'bg-green-500' : isPartial ? 'bg-yellow-400' : 'bg-gray-300'
               }`}
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  hasRole ? 'translate-x-6' : 'translate-x-1'
+                  hasRole ? 'translate-x-6' : isPartial ? 'translate-x-3' : 'translate-x-1'
                 }`}
               />
             </button>
