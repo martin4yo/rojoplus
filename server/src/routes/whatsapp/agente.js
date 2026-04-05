@@ -12,6 +12,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { enviarWhatsApp } from '../../services/whatsappService.js'
 import { resolverModelo } from '../../config/aiModels.js'
+import prisma from '../../lib/prisma.js'
 
 const MAX_MENSAJES_HISTORIAL = 20
 const MAX_TOOL_ITERATIONS = 5
@@ -163,9 +164,23 @@ async function ejecutarTool(name, input, { db, socio, tenantId }) {
           data: { tokenPortal: token, tokenPortalExpira: expira }
         })
 
-        const baseUrl = process.env.FRONTEND_URL || 'https://app.clubix.com.ar'
+        // Construir URL con el subdominio del tenant
+        const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
+        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } }).catch(() => null)
+        const baseUrl = tenant?.slug
+          ? `https://${tenant.slug}.${appDomain}`
+          : (process.env.FRONTEND_URL || `https://${appDomain}`)
         const link = `${baseUrl}/s/${token}`
-        return { link, enviado: true, expira: expira.toLocaleDateString('es-AR') }
+
+        // Enviar el link por WhatsApp directamente
+        await enviarWhatsApp({
+          db,
+          telefono: context.telefono,
+          texto: `🔗 Acá está tu link de acceso al portal:\n${link}\n\n_Válido hasta el ${expira.toLocaleDateString('es-AR')}. No lo compartas._`,
+          ignorarHorario: true,
+        })
+
+        return { enviado: true, expira: expira.toLocaleDateString('es-AR') }
       } catch (err) {
         return { error: 'No se pudo generar el link: ' + err.message }
       }
