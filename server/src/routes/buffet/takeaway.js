@@ -867,12 +867,40 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       return res.status(400).json({ success: false, error: 'No se puede cobrar un pedido cancelado' })
     }
 
+    // Verificar que no existan movimientos previos para este pedido (evita duplicados por reintento)
+    const movExistente = await req.db.movimientoCaja.findFirst({
+      where: {
+        anulado: false,
+        tipo: 'INGRESO',
+        OR: [
+          { pedidoTakeAwayId: parseInt(id) },
+          { concepto: { startsWith: `Take Away - Pedido ${pedido.numero}` } }
+        ]
+      },
+      select: { id: true }
+    })
+    if (movExistente) {
+      // Hay cobro registrado pero el pedido no está en estado correcto — sincronizar
+      if (!['PAGADO', 'ENTREGADO'].includes(pedido.estado)) {
+        await req.db.pedidoTakeAway.update({
+          where: { id: parseInt(id) },
+          data: { estado: 'PAGADO', horaPagado: new Date() }
+        })
+      }
+      return res.status(400).json({
+        success: false,
+        error: `El pedido ${pedido.numero} ya tiene cobros registrados. Recargá la pantalla.`
+      })
+    }
+
     const propinaMonto = propina && propina > 0 ? parseFloat(propina) : 0
     const totalFinal = Number(pedido.total) + propinaMonto
 
     // Agrupar items por cuenta contable del concepto de venta del producto para asientos
+    // Excluir items anulados (no generan ingreso)
     const itemsPorCuenta = {}
     for (const item of pedido.items) {
+      if (item.estado === 'ANULADO') continue
       const cuentaId = item.productoBuffet?.producto?.conceptoVenta?.cuentaContableId
                     || item.productoBuffet?.cuentaContableId
       if (!itemsPorCuenta[cuentaId]) {

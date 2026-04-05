@@ -260,18 +260,13 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
         select: { comandaId: true }
       }) : Promise.resolve([]),
       cajaBuffetIds.length ? req.db.movimientoCaja.findMany({
-        where: {
-          cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { gte: fd, lte: fh }, anulado: false,
-          OR: [{ pedidoTakeAwayId: { not: null } }, { concepto: { startsWith: 'Take Away' } }]
-        },
-        select: { pedidoTakeAwayId: true, monto: true }
+        where: { cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { gte: fd, lte: fh }, anulado: false, pedidoTakeAwayId: { not: null } },
+        select: { pedidoTakeAwayId: true }
       }) : Promise.resolve([])
     ])
 
     const comandaIds = [...new Set(movComandas.map(m => m.comandaId))]
-    const takeawayIds = [...new Set(movTakeaway.filter(m => m.pedidoTakeAwayId != null).map(m => m.pedidoTakeAwayId))]
-    // Total de takeaway calculado desde movimientos (fuente de verdad cuando pedidoTakeAwayId es null por bug de Prisma)
-    const totalTakeawayFromMovs = movTakeaway.reduce((sum, m) => sum + Number(m.monto || 0), 0)
+    const takeawayIds = [...new Set(movTakeaway.map(m => m.pedidoTakeAwayId))]
 
     // Comandas del período (por IDs de caja, no por horaCierre)
     const comandas = comandaIds.length ? await req.db.comanda.findMany({
@@ -338,13 +333,20 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
       _count: true
     })
 
-    // Calcular totales
+    // Calcular totales desde movimientos de caja (misma fuente que "Ingresos" de porMedioPago)
+    // Solo se cuentan movimientos vinculados a una venta real (comandaId, pedidoTakeAwayId, Kiosco)
+    const ventasTotalMovs = cajaBuffetIds.length ? await req.db.movimientoCaja.aggregate({
+      where: {
+        cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { gte: fd, lte: fh }, anulado: false,
+        OR: [{ comandaId: { not: null } }, { pedidoTakeAwayId: { not: null } }, { concepto: { startsWith: 'Kiosco' } }]
+      },
+      _sum: { monto: true }
+    }) : { _sum: { monto: 0 } }
+
     const totalComandas = comandas.reduce((sum, c) => sum + Number(c.total), 0)
-    // Usar sum de movimientos como fallback cuando pedidoTakeAwayId es null (bug Prisma sin regenerar)
-    const totalTakeawayFromPedidos = takeaway.reduce((sum, t) => sum + Number(t.total), 0)
-    const totalTakeaway = totalTakeawayFromPedidos > 0 ? totalTakeawayFromPedidos : totalTakeawayFromMovs
+    const totalTakeaway = takeaway.reduce((sum, t) => sum + Number(t.total), 0)
     const totalKiosco = Number(ventasKiosco._sum.monto || 0)
-    const ventasTotal = totalComandas + totalTakeaway + totalKiosco
+    const ventasTotal = Number(ventasTotalMovs._sum.monto || 0)
     const cantidadVentas = comandas.length + takeaway.length + (ventasKiosco._count || 0)
 
     // Totales por medio de pago
