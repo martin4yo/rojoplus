@@ -576,7 +576,7 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
  */
 router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_KIOSCO'), async (req, res) => {
   try {
-    const { desde, hasta, limit = 50 } = req.query
+    const { desde, hasta, limit = 50, page = 1 } = req.query
 
     if (!desde || !hasta) {
       return res.status(400).json({ success: false, error: 'Fechas requeridas' })
@@ -587,61 +587,28 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
     const AR = 3 * 60 * 60 * 1000
     const fd = new Date(fechaDesde.getTime() - AR)
     const fh = new Date(fechaHasta.getTime() - AR)
+    const pageSize = parseInt(limit)
+    const pageNum = Math.max(1, parseInt(page))
 
-    // Comandas cerradas en el período
-    const comandas = await req.db.comanda.findMany({
-      where: {
-        estado: 'CERRADA',
-        horaCierre: { gte: fd, lte: fh }
-      },
-      orderBy: { horaCierre: 'desc' },
-      take: parseInt(limit),
-      include: {
-        mesa: { select: { numero: true } },
-        socio: { select: { nroSocio: true, apellidoNombre: true } },
-        cerrador: { select: { nombre: true, apellido: true } }
-      }
-    })
+    // Comandas cerradas en el período (todas para paginar correctamente)
+    const [comandas, takeaway] = await Promise.all([
+      req.db.comanda.findMany({
+        where: { estado: 'CERRADA', horaCierre: { gte: fd, lte: fh } },
+        orderBy: { horaCierre: 'desc' },
+        include: {
+          mesa: { select: { numero: true } },
+          socio: { select: { nroSocio: true, apellidoNombre: true } },
+          cerrador: { select: { nombre: true, apellido: true } }
+        }
+      }),
+      req.db.pedidoTakeAway.findMany({
+        where: { estado: { in: ['PAGADO', 'ENTREGADO'] }, horaPagado: { gte: fd, lte: fh } },
+        orderBy: { horaPagado: 'desc' }
+      })
+    ])
 
-    // Pedidos TakeAway en el período
-    const takeaway = await req.db.pedidoTakeAway.findMany({
-      where: {
-        estado: { in: ['PAGADO', 'ENTREGADO'] },
-        horaPagado: { gte: fd, lte: fh }
-      },
-      orderBy: { horaPagado: 'desc' },
-      take: parseInt(limit)
-    })
-
-    // Obtener comprobantes
-    const comandaIds = comandas.map(c => c.id)
-    const takeawayIds = takeaway.map(t => t.id)
-
-    const comprobantes = await req.db.comprobanteElectronico.findMany({
-      where: {
-        OR: [
-          { comandaId: { in: comandaIds } },
-          { pedidoTakeawayId: { in: takeawayIds } }
-        ]
-      },
-      select: {
-        tipo: true,
-        puntoVenta: true,
-        numero: true,
-        cae: true,
-        comandaId: true,
-        pedidoTakeawayId: true
-      }
-    })
-
-    const comprobantesMap = {}
-    comprobantes.forEach(c => {
-      if (c.comandaId) comprobantesMap[`comanda-${c.comandaId}`] = c
-      if (c.pedidoTakeawayId) comprobantesMap[`takeaway-${c.pedidoTakeawayId}`] = c
-    })
-
-    // Formatear respuesta
-    const ventas = [
+    // Obtener comprobantes solo para los registros de la página
+    const todasVentas = [
       ...comandas.map(c => ({
         id: c.id,
         tipo: 'COMANDA',
@@ -652,7 +619,7 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
         socio: c.socio ? `${c.socio.nroSocio} - ${c.socio.apellidoNombre}` : null,
         esVentaInterna: c.esVentaInterna,
         cobradoPor: c.cerrador ? `${c.cerrador.nombre} ${c.cerrador.apellido || ''}`.trim() : null,
-        comprobante: comprobantesMap[`comanda-${c.id}`] || null
+        comprobante: null
       })),
       ...takeaway.map(t => ({
         id: t.id,
@@ -662,11 +629,35 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
         total: Number(t.total),
         cliente: t.nombreCliente,
         esVentaInterna: t.esVentaInterna,
-        comprobante: comprobantesMap[`takeaway-${t.id}`] || null
+        comprobante: null
       }))
-    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, parseInt(limit))
+    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
 
-    res.json({ success: true, data: ventas })
+    const total = todasVentas.length
+    const totalPages = Math.ceil(total / pageSize)
+    const skip = (pageNum - 1) * pageSize
+    const ventasPagina = todasVentas.slice(skip, skip + pageSize)
+
+    // Obtener comprobantes solo para registros de esta página
+    const comandaIds = ventasPagina.filter(v => v.tipo === 'COMANDA').map(v => v.id)
+    const takeawayIds = ventasPagina.filter(v => v.tipo === 'TAKEAWAY').map(v => v.id)
+    if (comandaIds.length || takeawayIds.length) {
+      const comprobantes = await req.db.comprobanteElectronico.findMany({
+        where: {
+          OR: [
+            ...(comandaIds.length ? [{ comandaId: { in: comandaIds } }] : []),
+            ...(takeawayIds.length ? [{ pedidoTakeawayId: { in: takeawayIds } }] : [])
+          ]
+        },
+        select: { tipo: true, puntoVenta: true, numero: true, cae: true, comandaId: true, pedidoTakeawayId: true }
+      })
+      comprobantes.forEach(c => {
+        const v = ventasPagina.find(v => (v.tipo === 'COMANDA' && v.id === c.comandaId) || (v.tipo === 'TAKEAWAY' && v.id === c.pedidoTakeawayId))
+        if (v) v.comprobante = c
+      })
+    }
+
+    res.json({ success: true, data: ventasPagina, total, page: pageNum, pages: totalPages })
   } catch (error) {
     console.error('Error obteniendo ventas del período:', error)
     res.status(500).json({ success: false, error: 'Error al obtener ventas' })

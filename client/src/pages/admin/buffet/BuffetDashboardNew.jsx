@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart,
   ChefHat, Coffee, Truck, RefreshCw, ArrowRight,
   CreditCard, Banknote, QrCode, BarChart3, ArrowUpCircle, ArrowDownCircle, Scale,
-  ChevronDown, ChevronRight, Wallet, Printer, Download
+  ChevronDown, ChevronRight, Wallet, Printer, Download, Eye, X, ChevronLeft
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -78,8 +78,14 @@ export default function BuffetDashboard() {
   const [tendencia, setTendencia] = useState([])
   const [mesesTendencia, setMesesTendencia] = useState(12)
   const [ventas, setVentas] = useState([])
+  const [ventasTotal, setVentasTotal] = useState(0)
+  const [ventasPagina, setVentasPagina] = useState(1)
+  const [ventasTotalPages, setVentasTotalPages] = useState(1)
   const [loadingVentas, setLoadingVentas] = useState(false)
   const [ventasExpanded, setVentasExpanded] = useState(false)
+  const [ventaDetalle, setVentaDetalle] = useState(null) // { tipo, id, numero }
+  const [loadingDetalle, setLoadingDetalle] = useState(false)
+  const [detalleItems, setDetalleItems] = useState(null)
 
   // Obtener fechas según el rango seleccionado
   const obtenerFechas = useCallback(() => {
@@ -131,15 +137,18 @@ export default function BuffetDashboard() {
   }, [cargarDatos])
 
   // Cargar listado de ventas del período
-  const cargarVentas = useCallback(async () => {
+  const cargarVentas = useCallback(async (pagina = 1) => {
     if (!puedeVerDashboard) return
     const { desde, hasta } = obtenerFechas()
     if (!desde || !hasta) return
     setLoadingVentas(true)
     try {
-      const params = new URLSearchParams({ desde: desde.toISOString(), hasta: hasta.toISOString(), limit: 100 })
-      const res = await api.get(`/admin/buffet/ventas-periodo?${params}`)
-      setVentas(res?.data || res || [])
+      const params = new URLSearchParams({ desde: desde.toISOString(), hasta: hasta.toISOString(), limit: 50, page: pagina })
+      const res = await api.getFull(`/admin/buffet/ventas-periodo?${params}`)
+      setVentas(res?.data || [])
+      setVentasTotal(res?.total || 0)
+      setVentasPagina(res?.page || 1)
+      setVentasTotalPages(res?.pages || 1)
     } catch {
       setVentas([])
     } finally {
@@ -148,8 +157,27 @@ export default function BuffetDashboard() {
   }, [obtenerFechas, puedeVerDashboard])
 
   useEffect(() => {
-    cargarVentas()
+    cargarVentas(1)
   }, [cargarVentas])
+
+  // Cargar detalle de una venta
+  const verDetalle = async (venta) => {
+    setVentaDetalle(venta)
+    setDetalleItems(null)
+    setLoadingDetalle(true)
+    try {
+      const endpoint = venta.tipo === 'COMANDA'
+        ? `/admin/buffet/comandas/${venta.id}`
+        : `/admin/buffet/takeaway/${venta.id}`
+      const data = await api.get(endpoint)
+      const items = data?.items || []
+      setDetalleItems(items)
+    } catch {
+      setDetalleItems([])
+    } finally {
+      setLoadingDetalle(false)
+    }
+  }
 
   // Cargar tendencia mensual (independiente del rango de fechas)
   useEffect(() => {
@@ -384,9 +412,9 @@ export default function BuffetDashboard() {
               <span className="font-medium text-gray-700 flex items-center gap-2 text-sm">
                 <ShoppingCart size={16} className="text-gray-400" />
                 Ventas del período
-                {ventas.length > 0 && (
+                {ventasTotal > 0 && (
                   <span className="text-xs bg-orange-100 text-orange-700 rounded-full px-2 py-0.5 font-medium">
-                    {ventas.length}
+                    {ventasTotal}
                   </span>
                 )}
               </span>
@@ -401,7 +429,11 @@ export default function BuffetDashboard() {
                   <div className="py-6 text-center text-sm text-gray-400">Cargando...</div>
                 ) : ventas.length === 0 ? (
                   <div className="py-6 text-center text-sm text-gray-400">Sin ventas en el período</div>
-                ) : (
+                ) : (() => {
+                    const hayComprobantes = ventas.some(v => v.comprobante)
+                    const colSpanFoot = hayComprobantes ? 5 : 4
+                    return (
+                  <>
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                       <tr>
@@ -409,8 +441,9 @@ export default function BuffetDashboard() {
                         <th className="text-left px-4 py-2">Hora</th>
                         <th className="text-left px-4 py-2">Tipo</th>
                         <th className="text-left px-4 py-2">Detalle</th>
-                        <th className="text-left px-4 py-2">Comprobante</th>
+                        {hayComprobantes && <th className="text-left px-4 py-2">Comprobante</th>}
                         <th className="text-right px-4 py-2">Total</th>
+                        <th className="px-4 py-2"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -432,31 +465,102 @@ export default function BuffetDashboard() {
                           <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[200px] truncate">
                             {v.socio || v.cliente || (v.cobradoPor ? `Cobró: ${v.cobradoPor}` : '-')}
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-gray-400">
-                            {v.comprobante
-                              ? <span className="text-green-600 font-medium">{v.comprobante.tipo} {v.comprobante.puntoVenta?.padStart(4,'0') || ''}-{String(v.comprobante.numero || '').padStart(8,'0')}</span>
-                              : <span className="text-gray-300">—</span>
-                            }
-                          </td>
+                          {hayComprobantes && (
+                            <td className="px-4 py-2.5 text-xs text-gray-400">
+                              {v.comprobante
+                                ? <span className="text-green-600 font-medium">{v.comprobante.tipo} {v.comprobante.puntoVenta?.toString().padStart(4,'0') || ''}-{String(v.comprobante.numero || '').padStart(8,'0')}</span>
+                                : <span className="text-gray-300">—</span>
+                              }
+                            </td>
+                          )}
                           <td className="px-4 py-2.5 text-right font-semibold text-gray-800">
                             {formatMoney(v.total)}
+                          </td>
+                          <td className="px-2 py-2.5">
+                            <button
+                              onClick={() => verDetalle(v)}
+                              className="p-1 rounded hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors"
+                              title="Ver detalle"
+                            >
+                              <Eye size={14} />
+                            </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="border-t border-gray-200 bg-gray-50">
                       <tr>
-                        <td colSpan={5} className="px-4 py-2.5 text-sm font-semibold text-gray-700">Total</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-gray-900">
-                          {formatMoney(ventas.reduce((s, v) => s + (v.total || 0), 0))}
+                        <td colSpan={colSpanFoot} className="px-4 py-2.5 text-sm font-semibold text-gray-700">
+                          Total del período ({ventasTotal} ventas)
                         </td>
+                        <td className="px-4 py-2.5 text-right font-bold text-gray-900">
+                          {formatMoney(kpis?.ventasTotal || 0)}
+                        </td>
+                        <td />
                       </tr>
                     </tfoot>
                   </table>
-                )}
+                  {ventasTotalPages > 1 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
+                      <span className="text-xs text-gray-500">
+                        Página {ventasPagina} de {ventasTotalPages} · {ventasTotal} ventas
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => cargarVentas(ventasPagina - 1)}
+                          disabled={ventasPagina <= 1 || loadingVentas}
+                          className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        {Array.from({ length: Math.min(5, ventasTotalPages) }, (_, i) => {
+                          const p = ventasPagina <= 3 ? i + 1
+                            : ventasPagina >= ventasTotalPages - 2 ? ventasTotalPages - 4 + i
+                            : ventasPagina - 2 + i
+                          if (p < 1 || p > ventasTotalPages) return null
+                          return (
+                            <button
+                              key={p}
+                              onClick={() => cargarVentas(p)}
+                              disabled={loadingVentas}
+                              className={`w-7 h-7 text-xs rounded ${p === ventasPagina ? 'bg-orange-500 text-white' : 'hover:bg-gray-200 text-gray-600'}`}
+                            >
+                              {p}
+                            </button>
+                          )
+                        })}
+                        <button
+                          onClick={() => cargarVentas(ventasPagina + 1)}
+                          disabled={ventasPagina >= ventasTotalPages || loadingVentas}
+                          className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  </>
+                    )
+                  })()}
               </div>
             )}
           </div>
+
+          {/* Evolución de ventas por día */}
+          {kpis.ventasPorDia && kpis.ventasPorDia.length > 1 && (
+            <div className="bg-white rounded-xl shadow p-4">
+              <h3 className="font-semibold text-gray-800 mb-4">Evolución de ventas por día</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={kpis.ventasPorDia} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip formatter={v => formatMoney(v)} labelFormatter={l => `Día ${l}`} />
+                  <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} name="Ventas" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           {/* Productos más vendidos y Ventas por hora */}
           <div className="grid md:grid-cols-2 gap-6">
@@ -783,6 +887,50 @@ export default function BuffetDashboard() {
 
       {/* Xavi - Chat Widget para Camareros */}
       <ChatWidget role="camarero" position="bottom-right" />
+
+      {/* Modal detalle de venta */}
+      {ventaDetalle && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setVentaDetalle(null)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div>
+                <span className="font-semibold text-gray-800">{ventaDetalle.numero}</span>
+                <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-medium ${
+                  ventaDetalle.tipo === 'COMANDA' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700'
+                }`}>
+                  {ventaDetalle.tipo === 'COMANDA' ? `Mesa ${ventaDetalle.mesa || '?'}` : 'TakeAway'}
+                </span>
+              </div>
+              <button onClick={() => setVentaDetalle(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4">
+              {loadingDetalle ? (
+                <div className="py-8 text-center text-sm text-gray-400">Cargando...</div>
+              ) : detalleItems === null ? null : detalleItems.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400">Sin detalle disponible</div>
+              ) : (
+                <div className="space-y-2">
+                  {detalleItems.map((item, i) => (
+                    <div key={i} className="flex items-start justify-between gap-2 py-1.5 border-b border-gray-50 last:border-0">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-gray-700">{item.cantidad}x {item.productoBuffet?.nombre || item.producto?.nombre || item.nombre || '—'}</span>
+                        {item.observaciones && <p className="text-xs text-gray-400 mt-0.5">{item.observaciones}</p>}
+                      </div>
+                      <span className="text-sm font-medium text-gray-800 whitespace-nowrap">{formatMoney(Number(item.subtotal || 0))}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-gray-100 flex justify-between items-center">
+              <span className="text-sm text-gray-500">{ventaDetalle.fecha ? new Date(ventaDetalle.fecha).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : ''}</span>
+              <span className="font-bold text-gray-800">{formatMoney(ventaDetalle.total)}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
