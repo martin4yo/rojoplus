@@ -124,7 +124,7 @@ export default function EspacioForm() {
       } else {
         const res = await api.post('/admin/espacios-deportivos', datos)
         setSuccess('Espacio creado correctamente')
-        navigate(`/admin/deportes/espacios/${res.data.id}`)
+        navigate(`/admin/deportes/espacios/${res.id}`)
       }
     } catch (err) {
       setError(err.message || 'Error al guardar')

@@ -461,7 +461,7 @@ router.get('/socio/:token', asyncHandler(async (req, res) => {
   const tenantId = req.tenantId
 
   const socio = await db.socio.findFirst({
-    where: { magicLinkToken: req.params.token, tenantId },
+    where: { tokenPortal: req.params.token, tenantId },
     select: { id: true },
   })
   if (!socio) throw new AppError('Token inválido', 401)
@@ -489,7 +489,7 @@ router.post('/socio/:token', asyncHandler(async (req, res) => {
   const tenantId = req.tenantId
 
   const socio = await db.socio.findFirst({
-    where: { magicLinkToken: req.params.token, tenantId },
+    where: { tokenPortal: req.params.token, tenantId },
   })
   if (!socio) throw new AppError('Token inválido', 401)
 
@@ -621,7 +621,7 @@ router.delete('/socio/:token/:codigo', asyncHandler(async (req, res) => {
   const tenantId = req.tenantId
 
   const socio = await db.socio.findFirst({
-    where: { magicLinkToken: req.params.token, tenantId },
+    where: { tokenPortal: req.params.token, tenantId },
     select: { id: true },
   })
   if (!socio) throw new AppError('Token inválido', 401)

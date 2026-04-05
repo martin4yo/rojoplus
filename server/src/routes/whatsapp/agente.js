@@ -283,9 +283,21 @@ function getHistorial(tenantId, telefono) {
 }
 
 function guardarHistorial(tenantId, telefono, mensajes) {
-  // Solo pares user/assistant con contenido de texto
+  // Normalizar a pares user/assistant con contenido de texto plano
   const simples = mensajes
-    .filter(m => typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .map(m => {
+      if (typeof m.content === 'string') return m
+      // Anthropic: content es array de blocks → extraer el texto
+      if (m.role === 'assistant' && Array.isArray(m.content)) {
+        const textBlock = m.content.find(b => b.type === 'text')
+        return textBlock ? { role: 'assistant', content: textBlock.text } : null
+      }
+      // User con array (tool_results) → descartar, no es texto del usuario
+      if (m.role === 'user' && Array.isArray(m.content)) return null
+      return null
+    })
+    .filter(Boolean)
     .slice(-MAX_MENSAJES_HISTORIAL)
   historiales.set(`${tenantId}:${telefono}`, simples)
 }

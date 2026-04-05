@@ -212,6 +212,10 @@ app.use('/api/importacion', importacionRoutes)
 app.use('/api/admin/facturacion', facturacionRoutes)
 app.use('/api/admin/menu', menuRoutes)
 app.use('/api/admin/branding', brandingRoutes)
+app.use('/api/chat/*', extractTenantOptional, (req, res, next) => {
+  if (req.tenantId) req.db = createTenantPrisma(req.tenantId)
+  next()
+})
 app.use('/api/chat', chatRoutes)
 app.use('/api/super-admin', superAdminRoutes)
 

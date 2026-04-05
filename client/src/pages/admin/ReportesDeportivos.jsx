@@ -159,7 +159,7 @@ export default function ReportesDeportivos() {
       try {
         const [actRes, catRes] = await Promise.all([
           api.get('/admin/actividades'),
-          api.get('/admin/categorias'),
+          api.get('/admin/categorias-actividad'),
         ])
         setActividades(actRes.data || [])
         setCategorias(catRes.data || [])

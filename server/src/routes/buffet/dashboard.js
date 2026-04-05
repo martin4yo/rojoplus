@@ -4,7 +4,6 @@
  * - Últimas ventas
  */
 import express from 'express'
-import prisma from '../../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 
 const router = express.Router()
@@ -37,11 +36,11 @@ router.get('/dashboard', authAdmin, checkPermiso('BUFFET_VER'), async (req, res)
     })
 
     // Take away del día
-    const takeAwayPendientes = await prisma.pedidoTakeAway.count({
+    const takeAwayPendientes = await req.db.pedidoTakeAway.count({
       where: { estado: { in: ['RECIBIDO', 'EN_PREPARACION', 'LISTO'] } }
     })
 
-    const takeAwayEntregados = await prisma.pedidoTakeAway.count({
+    const takeAwayEntregados = await req.db.pedidoTakeAway.count({
       where: {
         estado: 'ENTREGADO',
         horaEntregado: { gte: hoy, lt: manana }
@@ -138,7 +137,7 @@ router.get('/ultimas-ventas', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
     })
 
     // Pedidos takeaway pagados en el período
-    const takeaway = await prisma.pedidoTakeAway.findMany({
+    const takeaway = await req.db.pedidoTakeAway.findMany({
       where: {
         estado: { in: ['PAGADO', 'ENTREGADO'] },
         horaPagado: { gte: fechaDesde, lte: fechaHasta }
@@ -156,7 +155,7 @@ router.get('/ultimas-ventas', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
     const comandaIds = comandas.map(c => c.id)
     const takeawayIds = takeaway.map(t => t.id)
 
-    const comprobantes = await prisma.comprobanteElectronico.findMany({
+    const comprobantes = await req.db.comprobanteElectronico.findMany({
       where: {
         OR: [
           { comandaId: { in: comandaIds } },
@@ -246,21 +245,46 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
     const fdAnt = new Date(fechaDesdeAnterior.getTime() - AR_OFFSET_MS)
     const fhAnt = new Date(fechaHastaAnterior.getTime() - AR_OFFSET_MS)
 
-    // Comandas cerradas en el período
-    const comandas = await req.db.comanda.findMany({
-      where: {
-        estado: 'CERRADA',
-        horaCierre: { gte: fd, lte: fh }
-      },
+    // Cajas del buffet (fuente de verdad para todos los totales)
+    const cajasBuffet = await req.db.caja.findMany({
+      where: { paraBuffet: true, activo: true },
+      select: { id: true, saldoInicial: true }
+    })
+    const cajaBuffetIds = cajasBuffet.map(c => c.id)
+
+    // Obtener IDs de comandas y takeaway que tienen movimiento de caja en el período
+    // Esto garantiza consistencia: Ventas Totales = Ingresos (misma fuente)
+    const [movComandas, movTakeaway] = await Promise.all([
+      cajaBuffetIds.length ? req.db.movimientoCaja.findMany({
+        where: { cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { gte: fd, lte: fh }, anulado: false, comandaId: { not: null } },
+        select: { comandaId: true }
+      }) : Promise.resolve([]),
+      cajaBuffetIds.length ? req.db.movimientoCaja.findMany({
+        where: {
+          cajaId: { in: cajaBuffetIds }, tipo: 'INGRESO', fecha: { gte: fd, lte: fh }, anulado: false,
+          OR: [{ pedidoTakeAwayId: { not: null } }, { concepto: { startsWith: 'Take Away' } }]
+        },
+        select: { pedidoTakeAwayId: true, monto: true }
+      }) : Promise.resolve([])
+    ])
+
+    const comandaIds = [...new Set(movComandas.map(m => m.comandaId))]
+    const takeawayIds = [...new Set(movTakeaway.filter(m => m.pedidoTakeAwayId != null).map(m => m.pedidoTakeAwayId))]
+    // Total de takeaway calculado desde movimientos (fuente de verdad cuando pedidoTakeAwayId es null por bug de Prisma)
+    const totalTakeawayFromMovs = movTakeaway.reduce((sum, m) => sum + Number(m.monto || 0), 0)
+
+    // Comandas del período (por IDs de caja, no por horaCierre)
+    const comandas = comandaIds.length ? await req.db.comanda.findMany({
+      where: { id: { in: comandaIds } },
       include: {
         items: {
           where: { estado: { not: 'ANULADO' } },
           include: { productoBuffet: { select: { id: true, nombre: true, categoriaMenu: { select: { nombre: true } } } } }
         }
       }
-    })
+    }) : []
 
-    // Comandas período anterior
+    // Comandas período anterior (mantiene comparación por horaCierre como referencia)
     const comandasAnterior = await req.db.comanda.aggregate({
       where: {
         estado: 'CERRADA',
@@ -270,25 +294,15 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
       _count: true
     })
 
-    // Pedidos TakeAway en el período
-    const takeaway = await prisma.pedidoTakeAway.findMany({
-      where: {
-        estado: { in: ['PAGADO', 'ENTREGADO'] },
-        horaPagado: { gte: fd, lte: fh }
-      },
+    // Pedidos TakeAway del período (por IDs de caja)
+    const takeaway = takeawayIds.length ? await req.db.pedidoTakeAway.findMany({
+      where: { id: { in: takeawayIds } },
       include: {
         items: {
           include: { productoBuffet: { select: { id: true, nombre: true, categoriaMenu: { select: { nombre: true } } } } }
         }
       }
-    })
-
-    // Cajas del buffet para filtrar egresos
-    const cajasBuffet = await req.db.caja.findMany({
-      where: { paraBuffet: true, activo: true },
-      select: { id: true, saldoInicial: true }
-    })
-    const cajaBuffetIds = cajasBuffet.map(c => c.id)
+    }) : []
 
     // Egresos del período en cajas de buffet
     const egresosRaw = await req.db.movimientoCaja.findMany({
@@ -326,7 +340,9 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
 
     // Calcular totales
     const totalComandas = comandas.reduce((sum, c) => sum + Number(c.total), 0)
-    const totalTakeaway = takeaway.reduce((sum, t) => sum + Number(t.total), 0)
+    // Usar sum de movimientos como fallback cuando pedidoTakeAwayId es null (bug Prisma sin regenerar)
+    const totalTakeawayFromPedidos = takeaway.reduce((sum, t) => sum + Number(t.total), 0)
+    const totalTakeaway = totalTakeawayFromPedidos > 0 ? totalTakeawayFromPedidos : totalTakeawayFromMovs
     const totalKiosco = Number(ventasKiosco._sum.monto || 0)
     const ventasTotal = totalComandas + totalTakeaway + totalKiosco
     const cantidadVentas = comandas.length + takeaway.length + (ventasKiosco._count || 0)
@@ -586,7 +602,7 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
     })
 
     // Pedidos TakeAway en el período
-    const takeaway = await prisma.pedidoTakeAway.findMany({
+    const takeaway = await req.db.pedidoTakeAway.findMany({
       where: {
         estado: { in: ['PAGADO', 'ENTREGADO'] },
         horaPagado: { gte: fd, lte: fh }
@@ -599,7 +615,7 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
     const comandaIds = comandas.map(c => c.id)
     const takeawayIds = takeaway.map(t => t.id)
 
-    const comprobantes = await prisma.comprobanteElectronico.findMany({
+    const comprobantes = await req.db.comprobanteElectronico.findMany({
       where: {
         OR: [
           { comandaId: { in: comandaIds } },
@@ -742,7 +758,7 @@ router.post('/reporte-cierre', authAdmin, checkPermiso('BUFFET_VER'), async (req
       }
     })
 
-    const takeaway = await prisma.pedidoTakeAway.findMany({
+    const takeaway = await req.db.pedidoTakeAway.findMany({
       where: { estado: { in: ['PAGADO', 'ENTREGADO'] }, horaPagado: { gte: fechaDesde, lte: fechaHasta } },
       include: {
         items: {

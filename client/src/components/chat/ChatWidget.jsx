@@ -32,6 +32,7 @@ export default function ChatWidget({
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isAvailable, setIsAvailable] = useState(null) // null = cargando
+  const [agentName, setAgentName] = useState('Xavi')
   const [dragPos, setDragPos] = useState(null) // { x, y } desde esquina inferior derecha, null = posición default
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -61,9 +62,10 @@ export default function ChatWidget({
   const checkHealth = async () => {
     const health = await chatService.checkHealth()
     setIsAvailable(health.available)
+    if (health.agentName) setAgentName(health.agentName)
 
     if (!health.available) {
-      console.warn('⚠️  Xavi no disponible')
+      console.warn('⚠️  Asistente no disponible')
     }
   }
 
@@ -149,7 +151,7 @@ export default function ChatWidget({
   const getWelcomeMessage = () => {
     switch (role) {
       case 'socio':
-        return `👋 ¡Hola! Soy **Xavi**, tu asistente del Club Sportivo Pilar.
+        return `👋 ¡Hola! Soy **${agentName}**, tu asistente del club.
 
 Puedo ayudarte con:
 • 💳 Consultar tu deuda y generar links de pago
@@ -165,7 +167,7 @@ Puedo ayudarte con:
 • "Ver menú del buffet"`
 
       case 'camarero':
-        return `👋 ¡Hola! Soy **Xavi**, tu asistente para el buffet.
+        return `👋 ¡Hola! Soy **${agentName}**, tu asistente para el buffet.
 
 Puedo ayudarte con:
 • 🍽️ Ver estado de mesas
@@ -181,7 +183,7 @@ Puedo ayudarte con:
 • "Ver cuenta de mesa 7"`
 
       case 'admin':
-        return `👋 ¡Hola! Soy **Xavi**, tu asistente administrativo.
+        return `👋 ¡Hola! Soy **${agentName}**, tu asistente administrativo.
 
 Puedo ayudarte con:
 • 📊 Consultas y reportes
@@ -193,7 +195,7 @@ Puedo ayudarte con:
 • "Ventas del buffet hoy"`
 
       default:
-        return '👋 ¡Hola! Soy Xavi, ¿en qué puedo ayudarte?'
+        return `👋 ¡Hola! Soy ${agentName}, ¿en qué puedo ayudarte?`
     }
   }
 
@@ -288,7 +290,7 @@ Puedo ayudarte con:
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <div>
-                <h3 className="font-semibold">Xavi</h3>
+                <h3 className="font-semibold">{agentName}</h3>
                 <p className="text-xs opacity-90">
                   {isAvailable ? 'Conectado' : 'No disponible'}
                 </p>

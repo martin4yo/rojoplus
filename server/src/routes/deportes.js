@@ -16,18 +16,13 @@ router.use(authAdmin)
 // GET /api/admin/tipos-espacio - Listar tipos de espacio
 router.get('/tipos-espacio', asyncHandler(async (req, res) => {
   const { activo } = req.query
-
-  const where = {}
+  const where = { tenantId: req.tenantId }
   if (activo !== undefined) where.activo = activo === 'true'
 
-  const tipos = await prisma.tipoEspacio.findMany({
+  const tipos = await req.db.tipoEspacio.findMany({
     where,
     orderBy: { orden: 'asc' },
-    include: {
-      _count: {
-        select: { espacios: true }
-      }
-    }
+    include: { _count: { select: { espacios: true } } }
   })
 
   res.json({ success: true, data: tipos })
@@ -35,52 +30,30 @@ router.get('/tipos-espacio', asyncHandler(async (req, res) => {
 
 // GET /api/admin/tipos-espacio/:id - Detalle de tipo
 router.get('/tipos-espacio/:id', asyncHandler(async (req, res) => {
-  const { id } = req.params
-
-  const tipo = await prisma.tipoEspacio.findUnique({
-    where: { id: parseInt(id) },
-    include: {
-      _count: {
-        select: { espacios: true }
-      }
-    }
+  const tipo = await req.db.tipoEspacio.findFirst({
+    where: { id: parseInt(req.params.id), tenantId: req.tenantId },
+    include: { _count: { select: { espacios: true } } }
   })
-
-  if (!tipo) {
-    throw new AppError('Tipo de espacio no encontrado', 404)
-  }
-
+  if (!tipo) throw new AppError('Tipo de espacio no encontrado', 404)
   res.json({ success: true, data: tipo })
 }))
 
 // POST /api/admin/tipos-espacio - Crear tipo
 router.post('/tipos-espacio', asyncHandler(async (req, res) => {
   const { codigo, nombre, descripcion, orden } = req.body
+  if (!codigo || !nombre) throw new AppError('Codigo y nombre son requeridos', 400)
 
-  if (!codigo || !nombre) {
-    throw new AppError('Codigo y nombre son requeridos', 400)
-  }
+  const existente = await req.db.tipoEspacio.findFirst({ where: { codigo, tenantId: req.tenantId } })
+  if (existente) throw new AppError('Ya existe un tipo con ese codigo', 400)
 
-  // Verificar codigo unico
-  const existente = await prisma.tipoEspacio.findFirst({ where: { codigo } })
-  if (existente) {
-    throw new AppError('Ya existe un tipo con ese codigo', 400)
-  }
-
-  // Si no se especifica orden, poner al final
   let ordenFinal = orden
   if (ordenFinal === undefined) {
-    const ultimo = await prisma.tipoEspacio.findFirst({ orderBy: { orden: 'desc' } })
+    const ultimo = await req.db.tipoEspacio.findFirst({ where: { tenantId: req.tenantId }, orderBy: { orden: 'desc' } })
     ordenFinal = (ultimo?.orden || 0) + 1
   }
 
-  const tipo = await prisma.tipoEspacio.create({
-    data: {
-      codigo: codigo.toUpperCase(),
-      nombre,
-      descripcion: descripcion || null,
-      orden: ordenFinal
-    }
+  const tipo = await req.db.tipoEspacio.create({
+    data: { codigo: codigo.toUpperCase(), nombre, descripcion: descripcion || null, orden: ordenFinal, tenantId: req.tenantId }
   })
 
   res.status(201).json({ success: true, data: tipo })
@@ -91,20 +64,15 @@ router.put('/tipos-espacio/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, descripcion, orden, activo } = req.body
 
-  const existente = await prisma.tipoEspacio.findUnique({ where: { id: parseInt(id) } })
-  if (!existente) {
-    throw new AppError('Tipo de espacio no encontrado', 404)
-  }
+  const existente = await req.db.tipoEspacio.findFirst({ where: { id: parseInt(id), tenantId: req.tenantId } })
+  if (!existente) throw new AppError('Tipo de espacio no encontrado', 404)
 
-  // Verificar codigo unico si cambio
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.tipoEspacio.findFirst({ where: { codigo } })
-    if (duplicado) {
-      throw new AppError('Ya existe un tipo con ese codigo', 400)
-    }
+    const duplicado = await req.db.tipoEspacio.findFirst({ where: { codigo, tenantId: req.tenantId } })
+    if (duplicado) throw new AppError('Ya existe un tipo con ese codigo', 400)
   }
 
-  const tipo = await prisma.tipoEspacio.update({
+  const tipo = await req.db.tipoEspacio.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo ? codigo.toUpperCase() : existente.codigo,
@@ -120,28 +88,14 @@ router.put('/tipos-espacio/:id', asyncHandler(async (req, res) => {
 
 // DELETE /api/admin/tipos-espacio/:id - Eliminar tipo
 router.delete('/tipos-espacio/:id', asyncHandler(async (req, res) => {
-  const { id } = req.params
-
-  const tipo = await prisma.tipoEspacio.findUnique({
-    where: { id: parseInt(id) },
-    include: {
-      _count: {
-        select: { espacios: true }
-      }
-    }
+  const tipo = await req.db.tipoEspacio.findFirst({
+    where: { id: parseInt(req.params.id), tenantId: req.tenantId },
+    include: { _count: { select: { espacios: true } } }
   })
+  if (!tipo) throw new AppError('Tipo de espacio no encontrado', 404)
+  if (tipo._count.espacios > 0) throw new AppError('No se puede eliminar un tipo con espacios asociados', 400)
 
-  if (!tipo) {
-    throw new AppError('Tipo de espacio no encontrado', 404)
-  }
-
-  // Verificar que no tenga espacios asociados
-  if (tipo._count.espacios > 0) {
-    throw new AppError('No se puede eliminar un tipo con espacios asociados', 400)
-  }
-
-  await prisma.tipoEspacio.delete({ where: { id: parseInt(id) } })
-
+  await req.db.tipoEspacio.delete({ where: { id: parseInt(req.params.id) } })
   res.json({ success: true, message: 'Tipo de espacio eliminado correctamente' })
 }))
 
@@ -203,20 +157,21 @@ router.post('/espacios-deportivos', asyncHandler(async (req, res) => {
     throw new AppError('Codigo, nombre y tipo son requeridos', 400)
   }
 
-  // Verificar codigo unico
-  const existente = await req.db.espacioDeportivo.findFirst({ where: { codigo } })
+  // Verificar codigo unico dentro del tenant
+  const existente = await req.db.espacioDeportivo.findFirst({ where: { codigo, tenantId: req.tenantId } })
   if (existente) {
     throw new AppError('Ya existe un espacio con ese codigo', 400)
   }
 
-  // Verificar que el tipo existe
-  const tipoExiste = await req.db.tipoEspacio.findUnique({ where: { id: parseInt(tipoEspacioId) } })
+  // Verificar que el tipo existe y pertenece al tenant
+  const tipoExiste = await req.db.tipoEspacio.findFirst({ where: { id: parseInt(tipoEspacioId), tenantId: req.tenantId } })
   if (!tipoExiste) {
     throw new AppError('Tipo de espacio no encontrado', 400)
   }
 
   const espacio = await req.db.espacioDeportivo.create({
     data: {
+      tenantId: req.tenantId,
       codigo,
       nombre,
       tipoEspacioId: parseInt(tipoEspacioId),
@@ -483,11 +438,11 @@ const DIAS_SEMANA_NOMBRES = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves'
 router.get('/horarios-recurrentes', asyncHandler(async (req, res) => {
   const { categoriaActividadId, activo } = req.query
 
-  const where = {}
+  const where = { tenantId: req.tenantId }
   if (categoriaActividadId) where.categoriaActividadId = parseInt(categoriaActividadId)
   if (activo !== undefined) where.activo = activo === 'true'
 
-  const horarios = await prisma.horarioRecurrente.findMany({
+  const horarios = await req.db.horarioRecurrente.findMany({
     where,
     orderBy: [{ categoriaActividadId: 'asc' }, { diaSemana: 'asc' }, { horaInicio: 'asc' }],
     include: {
@@ -504,8 +459,8 @@ router.get('/horarios-recurrentes', asyncHandler(async (req, res) => {
 router.get('/horarios-recurrentes/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const horario = await prisma.horarioRecurrente.findUnique({
-    where: { id: parseInt(id) },
+  const horario = await req.db.horarioRecurrente.findFirst({
+    where: { id: parseInt(id), tenantId: req.tenantId },
     include: {
       categoriaActividad: {
         include: { actividad: true }
@@ -529,15 +484,16 @@ router.post('/horarios-recurrentes', asyncHandler(async (req, res) => {
   }
 
   // Verificar que la categoria existe
-  const categoria = await prisma.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
+  const categoria = await req.db.categoriaActividad.findFirst({ where: { id: parseInt(categoriaActividadId), tenantId: req.tenantId } })
   if (!categoria) {
     throw new AppError('Categoria de actividad no encontrada', 404)
   }
 
   // Verificar conflicto de horario en el mismo espacio (si se especifica)
   if (espacioId) {
-    const conflicto = await prisma.horarioRecurrente.findFirst({
+    const conflicto = await req.db.horarioRecurrente.findFirst({
       where: {
+        tenantId: req.tenantId,
         espacioId: parseInt(espacioId),
         diaSemana: parseInt(diaSemana),
         activo: true,
@@ -553,8 +509,9 @@ router.post('/horarios-recurrentes', asyncHandler(async (req, res) => {
     }
   }
 
-  const horario = await prisma.horarioRecurrente.create({
+  const horario = await req.db.horarioRecurrente.create({
     data: {
+      tenantId: req.tenantId,
       categoriaActividadId: parseInt(categoriaActividadId),
       espacioId: espacioId ? parseInt(espacioId) : null,
       diaSemana: parseInt(diaSemana),
@@ -576,12 +533,12 @@ router.put('/horarios-recurrentes/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { espacioId, diaSemana, horaInicio, horaFin, activo } = req.body
 
-  const existente = await prisma.horarioRecurrente.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.horarioRecurrente.findFirst({ where: { id: parseInt(id), tenantId: req.tenantId } })
   if (!existente) {
     throw new AppError('Horario recurrente no encontrado', 404)
   }
 
-  const horario = await prisma.horarioRecurrente.update({
+  const horario = await req.db.horarioRecurrente.update({
     where: { id: parseInt(id) },
     data: {
       espacioId: espacioId !== undefined ? (espacioId ? parseInt(espacioId) : null) : existente.espacioId,
@@ -604,12 +561,12 @@ router.put('/horarios-recurrentes/:id', asyncHandler(async (req, res) => {
 router.delete('/horarios-recurrentes/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const horario = await prisma.horarioRecurrente.findUnique({ where: { id: parseInt(id) } })
+  const horario = await req.db.horarioRecurrente.findFirst({ where: { id: parseInt(id), tenantId: req.tenantId } })
   if (!horario) {
     throw new AppError('Horario recurrente no encontrado', 404)
   }
 
-  await prisma.horarioRecurrente.delete({ where: { id: parseInt(id) } })
+  await req.db.horarioRecurrente.delete({ where: { id: parseInt(id) } })
 
   res.json({ success: true, message: 'Horario recurrente eliminado correctamente' })
 }))
@@ -622,7 +579,7 @@ router.delete('/horarios-recurrentes/:id', asyncHandler(async (req, res) => {
 router.get('/entrenamientos', asyncHandler(async (req, res) => {
   const { categoriaActividadId, espacioId, fechaDesde, fechaHasta, estado, actividadId } = req.query
 
-  const where = {}
+  const where = { tenantId: req.tenantId }
   if (categoriaActividadId) where.categoriaActividadId = parseInt(categoriaActividadId)
   if (espacioId) where.espacioId = parseInt(espacioId)
   if (estado) where.estado = estado
@@ -639,7 +596,7 @@ router.get('/entrenamientos', asyncHandler(async (req, res) => {
     where.categoriaActividad = { actividadId: parseInt(actividadId) }
   }
 
-  const entrenamientos = await prisma.entrenamiento.findMany({
+  const entrenamientos = await req.db.entrenamiento.findMany({
     where,
     orderBy: [{ fecha: 'asc' }, { horaInicio: 'asc' }],
     include: {
@@ -660,8 +617,8 @@ router.get('/entrenamientos', asyncHandler(async (req, res) => {
 router.get('/entrenamientos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const entrenamiento = await prisma.entrenamiento.findUnique({
-    where: { id: parseInt(id) },
+  const entrenamiento = await req.db.entrenamiento.findFirst({
+    where: { id: parseInt(id), tenantId: req.tenantId },
     include: {
       categoriaActividad: {
         include: { actividad: true }
@@ -693,15 +650,16 @@ router.post('/entrenamientos', asyncHandler(async (req, res) => {
   }
 
   // Verificar que la categoria existe
-  const categoria = await prisma.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
+  const categoria = await req.db.categoriaActividad.findFirst({ where: { id: parseInt(categoriaActividadId), tenantId: req.tenantId } })
   if (!categoria) {
     throw new AppError('Categoria de actividad no encontrada', 404)
   }
 
   // Verificar conflicto de horario en el espacio (si se especifica)
   if (espacioId) {
-    const conflicto = await prisma.entrenamiento.findFirst({
+    const conflicto = await req.db.entrenamiento.findFirst({
       where: {
+        tenantId: req.tenantId,
         espacioId: parseInt(espacioId),
         fecha: new Date(fecha),
         estado: { not: 'CANCELADO' },
@@ -718,8 +676,9 @@ router.post('/entrenamientos', asyncHandler(async (req, res) => {
     }
   }
 
-  const entrenamiento = await prisma.entrenamiento.create({
+  const entrenamiento = await req.db.entrenamiento.create({
     data: {
+      tenantId: req.tenantId,
       categoriaActividadId: parseInt(categoriaActividadId),
       espacioId: espacioId ? parseInt(espacioId) : null,
       fecha: new Date(fecha),
@@ -745,12 +704,12 @@ router.put('/entrenamientos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { espacioId, fecha, horaInicio, horaFin, tipo, observaciones, estado } = req.body
 
-  const existente = await prisma.entrenamiento.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.entrenamiento.findFirst({ where: { id: parseInt(id), tenantId: req.tenantId } })
   if (!existente) {
     throw new AppError('Entrenamiento no encontrado', 404)
   }
 
-  const entrenamiento = await prisma.entrenamiento.update({
+  const entrenamiento = await req.db.entrenamiento.update({
     where: { id: parseInt(id) },
     data: {
       espacioId: espacioId !== undefined ? (espacioId ? parseInt(espacioId) : null) : existente.espacioId,
@@ -777,7 +736,7 @@ router.post('/entrenamientos/:id/cancelar', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { motivo } = req.body
 
-  const entrenamiento = await prisma.entrenamiento.findUnique({ where: { id: parseInt(id) } })
+  const entrenamiento = await req.db.entrenamiento.findFirst({ where: { id: parseInt(id), tenantId: req.tenantId } })
   if (!entrenamiento) {
     throw new AppError('Entrenamiento no encontrado', 404)
   }
@@ -786,7 +745,7 @@ router.post('/entrenamientos/:id/cancelar', asyncHandler(async (req, res) => {
     throw new AppError('El entrenamiento ya esta cancelado', 400)
   }
 
-  const updated = await prisma.entrenamiento.update({
+  const updated = await req.db.entrenamiento.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'CANCELADO',
@@ -807,8 +766,8 @@ router.post('/entrenamientos/:id/cancelar', asyncHandler(async (req, res) => {
 router.post('/entrenamientos/:id/notificar', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const entrenamiento = await prisma.entrenamiento.findUnique({
-    where: { id: parseInt(id) },
+  const entrenamiento = await req.db.entrenamiento.findFirst({
+    where: { id: parseInt(id), tenantId: req.tenantId },
     include: {
       categoriaActividad: {
         include: { actividad: true }
@@ -839,8 +798,8 @@ router.post('/entrenamientos/:id/notificar', asyncHandler(async (req, res) => {
 router.delete('/entrenamientos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const entrenamiento = await prisma.entrenamiento.findUnique({
-    where: { id: parseInt(id) },
+  const entrenamiento = await req.db.entrenamiento.findFirst({
+    where: { id: parseInt(id), tenantId: req.tenantId },
     include: { _count: { select: { asistencias: true } } }
   })
 
@@ -852,7 +811,7 @@ router.delete('/entrenamientos/:id', asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar un entrenamiento con asistencias registradas. Cancele el entrenamiento en su lugar.', 400)
   }
 
-  await prisma.entrenamiento.delete({ where: { id: parseInt(id) } })
+  await req.db.entrenamiento.delete({ where: { id: parseInt(id) } })
 
   res.json({ success: true, message: 'Entrenamiento eliminado correctamente' })
 }))
@@ -879,10 +838,10 @@ router.post('/entrenamientos/generar', asyncHandler(async (req, res) => {
   }
 
   // Obtener horarios recurrentes activos
-  const whereHorarios = { activo: true }
+  const whereHorarios = { tenantId: req.tenantId, activo: true }
   if (categoriaActividadId) whereHorarios.categoriaActividadId = parseInt(categoriaActividadId)
 
-  const horariosRecurrentes = await prisma.horarioRecurrente.findMany({
+  const horariosRecurrentes = await req.db.horarioRecurrente.findMany({
     where: whereHorarios,
     include: { categoriaActividad: true }
   })
@@ -905,8 +864,9 @@ router.post('/entrenamientos/generar', asyncHandler(async (req, res) => {
       const fechaEntrenamiento = new Date(d)
 
       // Verificar si ya existe un entrenamiento para esa categoría, fecha y horario
-      const existente = await prisma.entrenamiento.findFirst({
+      const existente = await req.db.entrenamiento.findFirst({
         where: {
+          tenantId: req.tenantId,
           categoriaActividadId: horario.categoriaActividadId,
           fecha: fechaEntrenamiento,
           horaInicio: horario.horaInicio
@@ -919,8 +879,9 @@ router.post('/entrenamientos/generar', asyncHandler(async (req, res) => {
 
       // Verificar conflicto de espacio si hay espacio asignado
       if (horario.espacioId) {
-        const conflicto = await prisma.entrenamiento.findFirst({
+        const conflicto = await req.db.entrenamiento.findFirst({
           where: {
+            tenantId: req.tenantId,
             espacioId: horario.espacioId,
             fecha: fechaEntrenamiento,
             estado: { not: 'CANCELADO' },
@@ -937,8 +898,9 @@ router.post('/entrenamientos/generar', asyncHandler(async (req, res) => {
       }
 
       try {
-        const nuevo = await prisma.entrenamiento.create({
+        const nuevo = await req.db.entrenamiento.create({
           data: {
+            tenantId: req.tenantId,
             categoriaActividadId: horario.categoriaActividadId,
             espacioId: horario.espacioId,
             fecha: fechaEntrenamiento,
@@ -973,8 +935,8 @@ router.post('/entrenamientos/generar', asyncHandler(async (req, res) => {
 router.get('/entrenamientos/:id/socios', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const entrenamiento = await prisma.entrenamiento.findUnique({
-    where: { id: parseInt(id) },
+  const entrenamiento = await req.db.entrenamiento.findFirst({
+    where: { id: parseInt(id), tenantId: req.tenantId },
     include: { categoriaActividad: true }
   })
 
@@ -1033,8 +995,8 @@ router.post('/entrenamientos/:id/asistencia', asyncHandler(async (req, res) => {
     throw new AppError('El campo asistencias debe ser un array', 400)
   }
 
-  const entrenamiento = await prisma.entrenamiento.findUnique({
-    where: { id: parseInt(id) }
+  const entrenamiento = await req.db.entrenamiento.findFirst({
+    where: { id: parseInt(id), tenantId: req.tenantId }
   })
 
   if (!entrenamiento) {
@@ -1090,7 +1052,7 @@ router.post('/entrenamientos/:id/asistencia', asyncHandler(async (req, res) => {
 
   // Actualizar estado del entrenamiento a FINALIZADO si tiene asistencias
   if (resultados.length > 0 && entrenamiento.estado === 'PROGRAMADO') {
-    await prisma.entrenamiento.update({
+    await req.db.entrenamiento.update({
       where: { id: parseInt(id) },
       data: { estado: 'FINALIZADO' }
     })
@@ -1204,7 +1166,7 @@ router.post('/partidos', asyncHandler(async (req, res) => {
   }
 
   // Verificar que la categoría existe
-  const categoria = await prisma.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
+  const categoria = await req.db.categoriaActividad.findFirst({ where: { id: parseInt(categoriaActividadId), tenantId: req.tenantId } })
   if (!categoria) {
     throw new AppError('Categoría de actividad no encontrada', 404)
   }
@@ -1629,7 +1591,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
     if ((tipo === 'push' || tipo === 'todos') && socio.notificarPush) {
       try {
         // Buscar suscripción push del socio
-        const suscripcion = await prisma.pushSubscription.findFirst({
+        const suscripcion = await req.db.pushSubscription.findFirst({
           where: { socioId: socio.id }
         })
 
@@ -1734,7 +1696,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
 router.get('/partidos/:id/estadisticas', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const estadisticas = await prisma.estadisticaPartido.findMany({
+  const estadisticas = await req.db.estadisticaPartido.findMany({
     where: { partidoId: parseInt(id) },
     include: {
       socio: {
@@ -1769,7 +1731,7 @@ router.post('/partidos/:id/estadisticas', asyncHandler(async (req, res) => {
     if (!socioId) continue
 
     try {
-      const registro = await prisma.estadisticaPartido.upsert({
+      const registro = await req.db.estadisticaPartido.upsert({
         where: {
           partidoId_socioId: {
             partidoId: parseInt(id),
@@ -1830,7 +1792,7 @@ router.get('/estadisticas/jugador/:socioId', asyncHandler(async (req, res) => {
     }
   }
 
-  const estadisticas = await prisma.estadisticaPartido.findMany({
+  const estadisticas = await req.db.estadisticaPartido.findMany({
     where,
     include: {
       partido: {
@@ -1886,7 +1848,7 @@ router.get('/estadisticas/ranking', asyncHandler(async (req, res) => {
     wherePartido.categoriaActividadId = parseInt(categoriaActividadId)
   }
 
-  const estadisticas = await prisma.estadisticaPartido.groupBy({
+  const estadisticas = await req.db.estadisticaPartido.groupBy({
     by: ['socioId'],
     where: {
       partido: wherePartido

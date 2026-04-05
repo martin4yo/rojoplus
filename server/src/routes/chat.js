@@ -220,14 +220,22 @@ router.post(
  * GET /api/chat/health
  * Verifica si el servicio de AI está disponible
  */
-router.get('/health', (req, res) => {
+router.get('/health', asyncHandler(async (req, res) => {
   const assistant = getAIAssistant()
+  let agentName = 'Xavi'
+  if (req.db && req.tenantId) {
+    const cfg = await req.db.configuracion.findFirst({
+      where: { clave: 'WA_AGENT_NOMBRE' }
+    }).catch(() => null)
+    if (cfg?.valor) agentName = cfg.valor
+  }
   return res.json({
     available: assistant !== null,
-    service: 'Xavi - Chat Assistant',
+    agentName,
+    service: `${agentName} - Chat Assistant`,
     model: assistant ? 'claude-sonnet-4-20250514' : null
   })
-})
+}))
 
 // ==============================================================================
 // UPLOAD DE DOCUMENTOS (para socios)
