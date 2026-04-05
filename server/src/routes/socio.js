@@ -85,6 +85,85 @@ router.post('/enviar-qr', asyncHandler(async (req, res) => {
   })
 }))
 
+// POST /api/socio/enviar-link-whatsapp - Enviar link de acceso al portal por WhatsApp
+router.post('/enviar-link-whatsapp', asyncHandler(async (req, res) => {
+  const { busqueda } = req.body
+
+  if (!busqueda?.trim()) {
+    throw new AppError('Ingresa tu número de socio o DNI', 400, 'VALIDATION_ERROR')
+  }
+
+  const socio = await req.db.socio.findFirst({
+    where: {
+      OR: [
+        { nroSocio: busqueda.trim() },
+        { documento: busqueda.trim() },
+      ],
+    },
+    select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      celular: true,
+      tokenPortal: true,
+      estado: true,
+    },
+  })
+
+  if (!socio) {
+    throw new AppError('No se encontró un socio con ese número o DNI', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  const estadoUpper = socio.estado?.toUpperCase() || ''
+  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
+  if (!esActivo) {
+    throw new AppError('Tu membresía no está activa. Regulariza tu situación en el club.', 403, 'SOCIO_INACTIVO')
+  }
+
+  if (!socio.celular) {
+    throw new AppError('No tenés celular registrado. Contacta al club para actualizarlo.', 400, 'NO_CELULAR')
+  }
+
+  if (!socio.tokenPortal) {
+    throw new AppError('Error al obtener tu acceso. Contacta al club.', 500, 'NO_TOKEN')
+  }
+
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+  // Construir URL con tenant slug para multi-tenant
+  const tenantSlug = req.tenant?.subdomain
+  let baseUrl = frontendUrl
+  if (tenantSlug && process.env.NODE_ENV === 'production') {
+    const urlObj = new URL(frontendUrl)
+    baseUrl = `${urlObj.protocol}//${tenantSlug}.${urlObj.host}`
+  }
+  const portalUrl = `${baseUrl}/portal-socio/${socio.tokenPortal}`
+
+  const { enviarWhatsApp } = await import('../services/whatsappService.js')
+  const resultado = await enviarWhatsApp({
+    db: req.db,
+    telefono: socio.celular,
+    texto: `Hola ${socio.apellidoNombre.split(',')[0].trim()}! Aquí está tu link de acceso al portal del socio:\n\n${portalUrl}\n\nGuardalo para acceder a tus datos, pagos y beneficios.`,
+    ignorarHorario: true,
+  })
+
+  if (!resultado.enviado) {
+    throw new AppError(
+      resultado.motivo || 'No se pudo enviar por WhatsApp. Intentá por email.',
+      503,
+      'WA_NOT_AVAILABLE'
+    )
+  }
+
+  // Ocultar parte del celular para la respuesta
+  const celularOculto = socio.celular.replace(/(\d{3})\d+(\d{3})/, '$1****$2')
+
+  res.json({
+    success: true,
+    message: 'Link enviado por WhatsApp correctamente',
+    data: { celularEnviado: celularOculto },
+  })
+}))
+
 // ==============================================================================
 // AUTENTICACIÓN - MAGIC LINK
 // ==============================================================================

@@ -143,17 +143,21 @@ app.use('/api/super-admin/*', requireSuperAdmin)
 // Endpoint de tenant actual (necesario para frontend)
 app.get('/api/tenant/current', extractTenant, async (req, res) => {
   try {
-    const config = await prisma.tenantConfiguracion.findUnique({
-      where: { tenantId_clave: { tenantId: req.tenantId, clave: 'HERO_IMAGES' } }
-    })
+    const db = createTenantPrisma(req.tenantId)
+    const [heroConfig, waConfig] = await Promise.all([
+      prisma.tenantConfiguracion.findUnique({
+        where: { tenantId_clave: { tenantId: req.tenantId, clave: 'HERO_IMAGES' } }
+      }),
+      db.configuracion.findFirst({ where: { clave: 'WA_AGENT_ENABLED' } }),
+    ])
     let heroImages = []
-    if (config?.valor) {
-      try { heroImages = JSON.parse(config.valor) } catch {}
+    if (heroConfig?.valor) {
+      try { heroImages = JSON.parse(heroConfig.valor) } catch {}
     }
     if (!heroImages.length && req.tenant.heroImageUrl) {
       heroImages = [req.tenant.heroImageUrl]
     }
-    res.json({ ...req.tenant, heroImages })
+    res.json({ ...req.tenant, heroImages, waEnabled: waConfig?.valor === 'true' })
   } catch {
     res.json(req.tenant)
   }
