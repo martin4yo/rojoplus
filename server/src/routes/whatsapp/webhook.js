@@ -150,7 +150,7 @@ router.post('/webhook', async (req, res) => {
       where: { celular: { in: variantes } },
       include: {
         tipoSocioRel: { select: { nombre: true } },
-        categoriaRel: { select: { nombre: true } },
+        categoriaSocioRel: { select: { nombre: true } },
       }
     })
     console.log(`[WA webhook] Socio: ${socio ? socio.apellidoNombre : 'no registrado'}`)
