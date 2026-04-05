@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { resolverModelo } from '../config/aiModels.js'
 
 /**
  * AI Assistant Service - Xavi
@@ -50,16 +51,23 @@ const ROLES = {
 
 class AIAssistantService {
   constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    // La API key se resuelve por request (puede venir del tenant o del .env)
+    this.defaultApiKey = process.env.ANTHROPIC_API_KEY || null
+    this.defaultModel = resolverModelo('anthropic', 'rapido', null)
+    console.log('✅ AI Assistant Service inicializado')
+  }
 
-    if (!apiKey) {
-      console.warn('⚠️  ANTHROPIC_API_KEY no configurada')
-      throw new Error('ANTHROPIC_API_KEY no está configurada en .env')
+  _getClient(context) {
+    const apiKey = context?.aiApiKey || this.defaultApiKey
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY no configurada')
+    return new Anthropic({ apiKey })
+  }
+
+  _getModel(context) {
+    if (context?.aiModelTier) {
+      return resolverModelo(context.aiProvider || 'anthropic', context.aiModelTier, null)
     }
-
-    this.anthropic = new Anthropic({ apiKey })
-    this.model = 'claude-sonnet-4-20250514'
-    console.log('✅ Xavi Service inicializado')
+    return this.defaultModel
   }
 
   /**
@@ -81,9 +89,11 @@ class AIAssistantService {
       console.log(`   Mensaje: "${message}"`)
 
       const systemPrompt = this.buildSystemPrompt(context)
+      const client = this._getClient(context)
+      const model = this._getModel(context)
 
-      const response = await this.anthropic.messages.create({
-        model: this.model,
+      const response = await client.messages.create({
+        model,
         max_tokens: 2048,
         system: systemPrompt,
         messages: [{
@@ -123,14 +133,15 @@ class AIAssistantService {
    * Construye el prompt del sistema según el rol
    */
   buildSystemPrompt(context) {
-    const basePrompt = `Eres Xavi, el asistente inteligente de Club Sportivo Pilar.
+    const botName = context?.botName || 'Xavi'
+    const basePrompt = `Eres ${botName}, el asistente inteligente del club.
 
 SOBRE TI:
-- Tu nombre es Xavi (pronunciado "Rojito")
+- Tu nombre es ${botName}
 - Eres profesional pero cercano y amigable
 - Usás lenguaje informal argentino (vos, che, etc.)
 - Podés usar emojis moderadamente
-- Cuando te pregunten quién sos, presentate como Xavi, el asistente del Club
+- Cuando te pregunten quién sos, presentate como ${botName}, el asistente del club
 
 CONTEXTO DEL USUARIO:
 - Nombre: ${context.userName}

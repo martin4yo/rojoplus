@@ -145,6 +145,17 @@ router.post(
 
     console.log(`Usuario: ${context.userName} (${context.role})`)
 
+    // Leer config IA del tenant (nombre del bot, modelo, api key)
+    const configClaves = ['WA_AGENT_NOMBRE', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_PROVIDER']
+    const configRows = await req.db.configuracion.findMany({
+      where: { clave: { in: configClaves } }
+    }).catch(() => [])
+    const cfg = Object.fromEntries(configRows.map(c => [c.clave, c.valor]))
+    context.botName = cfg.WA_AGENT_NOMBRE || null
+    context.aiModelTier = cfg.AI_MODEL_TIER || null
+    context.aiApiKey = cfg.AI_API_KEY || null
+    context.aiProvider = cfg.AI_PROVIDER || 'anthropic'
+
     // Paso 1: Procesar comando con IA
     const aiResponse = await assistant.processCommand(message, context)
 

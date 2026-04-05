@@ -95,19 +95,19 @@ async function ejecutarTool(name, input, { db, socio, tenantId }) {
 
     case 'consultar_deuda': {
       if (!socio) return { error: 'No estás registrado como socio del club.' }
-      const cuotas = await db.cuota.findMany({
-        where: { socioId: socio.id, estado: { in: ['IMPAGA', 'VENCIDA', 'PENDIENTE'] } },
-        orderBy: { vencimiento: 'asc' },
+      const cargos = await db.cargo.findMany({
+        where: { socioId: socio.id, estado: { in: ['PENDIENTE', 'VENCIDA'] } },
+        orderBy: { fechaVencimiento: 'asc' },
         take: 10
       })
-      const total = cuotas.reduce((acc, c) => acc + Number(c.importe), 0)
+      const total = cargos.reduce((acc, c) => acc + Number(c.montoTotal), 0)
       return {
-        cuotasImpagas: cuotas.length,
+        cuotasImpagas: cargos.length,
         totalDeuda: total,
-        cuotas: cuotas.map(c => ({
-          periodo: c.periodo,
-          importe: Number(c.importe),
-          vencimiento: new Date(c.vencimiento).toLocaleDateString('es-AR'),
+        cuotas: cargos.map(c => ({
+          descripcion: c.descripcion,
+          importe: Number(c.montoTotal),
+          vencimiento: c.fechaVencimiento ? new Date(c.fechaVencimiento).toLocaleDateString('es-AR') : 'Sin vencimiento',
           estado: c.estado
         }))
       }
@@ -116,17 +116,17 @@ async function ejecutarTool(name, input, { db, socio, tenantId }) {
     case 'consultar_ultimos_movimientos': {
       if (!socio) return { error: 'No estás registrado como socio del club.' }
       const limite = input.limite || 5
-      const movimientos = await db.movimientoCuenta.findMany({
+      const pagos = await db.pago.findMany({
         where: { socioId: socio.id },
         orderBy: { fecha: 'desc' },
         take: limite
       }).catch(() => [])
       return {
-        movimientos: movimientos.map(m => ({
-          fecha: new Date(m.fecha).toLocaleDateString('es-AR'),
-          concepto: m.concepto,
-          importe: Number(m.importe),
-          tipo: m.tipo
+        movimientos: pagos.map(p => ({
+          fecha: new Date(p.fecha).toLocaleDateString('es-AR'),
+          concepto: p.concepto || 'Pago',
+          importe: Number(p.montoTotal || 0),
+          tipo: 'PAGO'
         }))
       }
     }
@@ -154,19 +154,13 @@ async function ejecutarTool(name, input, { db, socio, tenantId }) {
     case 'enviar_link_portal': {
       if (!socio) return { error: 'No estás registrado como socio del club.' }
       try {
-        const { v4: uuidv4 } = await import('uuid')
-        const token = uuidv4()
+        const crypto = await import('crypto')
+        const token = crypto.randomBytes(32).toString('hex')
         const expira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
-        await db.portalAcceso.upsert({
-          where: { socioId: socio.id },
-          update: { token, expira, usosRestantes: 5 },
-          create: { socioId: socio.id, token, expira, usosRestantes: 5 }
-        }).catch(async () => {
-          await db.socio.update({
-            where: { id: socio.id },
-            data: { portalToken: token, portalTokenExpira: expira }
-          })
+        await db.socio.update({
+          where: { id: socio.id },
+          data: { tokenPortal: token, tokenPortalExpira: expira }
         })
 
         const baseUrl = process.env.FRONTEND_URL || 'https://app.clubix.com.ar'
@@ -230,21 +224,40 @@ setInterval(() => {
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
-async function construirSystemPrompt(db, socio) {
+async function construirSystemPrompt(db, socio, esPrimerMensaje) {
   const hoy = new Date().toLocaleDateString('es-AR', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   })
 
-  const nombreConfig = await db.configuracion.findFirst({
-    where: { clave: { in: ['NOMBRE_CLUB', 'nombre'] } }
-  }).catch(() => null)
-  const nombreClub = nombreConfig?.valor || 'el club'
+  const configs = await db.configuracion.findMany({
+    where: {
+      clave: { in: ['NOMBRE_CLUB', 'nombre', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT', 'WA_AGENT_SYSTEM_PROMPT_EXTRA'] }
+    }
+  }).catch(() => [])
+  const cfg = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
+
+  // Si el tenant definió un prompt completo, usarlo directamente (solo append fecha e info socio)
+  if (cfg.WA_AGENT_SYSTEM_PROMPT) {
+    const extra = cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA ? `\n\n${cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA}` : ''
+    return `${cfg.WA_AGENT_SYSTEM_PROMPT}\n\nHoy es ${hoy}.\n${extra}`
+  }
+
+  const nombreClub = cfg.NOMBRE_CLUB || cfg.nombre || 'el club'
+  const nombreBot = cfg.WA_AGENT_NOMBRE || 'Asistente'
 
   const infoSocio = socio
     ? `Estás hablando con *${socio.apellidoNombre}*, socio Nº ${socio.nroSocio}${socio.tipoSocioRel ? `, tipo ${socio.tipoSocioRel.nombre}` : ''}.`
     : `El número no está registrado como socio. Podés dar información general del club pero no datos personales.`
 
-  return `Sos el asistente virtual de *${nombreClub}*, respondés consultas por WhatsApp.
+  const instruccionSaludo = esPrimerMensaje
+    ? `- Es el PRIMER mensaje de esta conversación. Saludá al socio por su nombre (si está registrado) o de forma genérica, presentate como ${nombreBot} y luego respondé su consulta en el mismo mensaje.`
+    : `- La conversación ya está en curso. No te presentes de nuevo ni repitas saludos.`
+
+  const promptExtra = cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA
+    ? `\nInstrucciones adicionales del club:\n${cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA}`
+    : ''
+
+  return `Sos *${nombreBot}*, el asistente virtual de *${nombreClub}*, respondés consultas por WhatsApp.
 Hoy es ${hoy}.
 
 ${infoSocio}
@@ -255,7 +268,23 @@ Instrucciones:
 - Nunca inventás información. Siempre usás las tools para consultar datos reales.
 - Si no podés resolver algo, usás la tool derivar_humano.
 - Si el socio pide hablar con una persona, usás derivar_humano.
-- No discutís precios ni políticas internas — solo informás lo que está en el sistema.`
+- No discutís precios ni políticas internas — solo informás lo que está en el sistema.
+${instruccionSaludo}
+
+Temas permitidos (ÚNICAMENTE estos):
+- Deudas, cuotas y pagos del socio
+- Actividades e inscripciones
+- Acceso al portal del socio
+- Información general del club (horarios, dirección, contacto)
+- Reserva de espacios
+- Derivación a administración
+
+Si el socio pregunta qué podés hacer o en qué podés ayudar, respondé:
+"Puedo ayudarte con:\n• Ver tus cuotas y deudas\n• Consultar tus actividades\n• Enviarte el link de tu portal personal\n• Información del club (horarios, dirección)\n• Conectarte con administración\n\n¿En qué te ayudo?"
+
+Si el mensaje NO tiene relación con la gestión del club (clima, noticias, recetas, chistes, preguntas generales, etc.), respondé EXACTAMENTE esto sin usar ninguna tool:
+"Solo puedo ayudarte con consultas sobre el club. Para eso estoy acá 😊"
+No des explicaciones adicionales ni te disculpes.${promptExtra}`
 }
 
 // ─── Provider: Anthropic ──────────────────────────────────────────────────────
@@ -414,7 +443,8 @@ export async function procesarMensajeAgente({ db, tenantId, telefono, nombreCont
     }
 
     const historial = getHistorial(tenantId, telefono)
-    const systemPrompt = await construirSystemPrompt(db, socio)
+    const esPrimerMensaje = historial.length === 0
+    const systemPrompt = await construirSystemPrompt(db, socio, esPrimerMensaje)
     const context = { db, socio, tenantId, telefono }
 
     let respuestaFinal
