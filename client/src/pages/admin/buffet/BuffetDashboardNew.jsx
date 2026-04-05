@@ -77,6 +77,9 @@ export default function BuffetDashboard() {
   const [imprimiendo, setImprimiendo] = useState(false)
   const [tendencia, setTendencia] = useState([])
   const [mesesTendencia, setMesesTendencia] = useState(12)
+  const [ventas, setVentas] = useState([])
+  const [loadingVentas, setLoadingVentas] = useState(false)
+  const [ventasExpanded, setVentasExpanded] = useState(false)
 
   // Obtener fechas según el rango seleccionado
   const obtenerFechas = useCallback(() => {
@@ -126,6 +129,27 @@ export default function BuffetDashboard() {
   useEffect(() => {
     cargarDatos()
   }, [cargarDatos])
+
+  // Cargar listado de ventas del período
+  const cargarVentas = useCallback(async () => {
+    if (!puedeVerDashboard) return
+    const { desde, hasta } = obtenerFechas()
+    if (!desde || !hasta) return
+    setLoadingVentas(true)
+    try {
+      const params = new URLSearchParams({ desde: desde.toISOString(), hasta: hasta.toISOString(), limit: 100 })
+      const res = await api.get(`/admin/buffet/ventas-periodo?${params}`)
+      setVentas(res?.data || res || [])
+    } catch {
+      setVentas([])
+    } finally {
+      setLoadingVentas(false)
+    }
+  }, [obtenerFechas, puedeVerDashboard])
+
+  useEffect(() => {
+    cargarVentas()
+  }, [cargarVentas])
 
   // Cargar tendencia mensual (independiente del rango de fechas)
   useEffect(() => {
@@ -208,7 +232,7 @@ export default function BuffetDashboard() {
           title="Imprimir reporte de cierre"
         >
           <Printer size={16} className={imprimiendo ? 'animate-pulse' : ''} />
-          <span className="hidden sm:inline">Imprimir</span>
+          <span className="hidden sm:inline">Reporte</span>
         </button>
         <button
           onClick={() => cargarDatos()}
@@ -351,149 +375,88 @@ export default function BuffetDashboard() {
             )}
           </div>
 
-          {/* KPIs Principales */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Ventas Totales */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">Ventas Totales</span>
-                <DollarSign className="text-green-500" size={20} />
+          {/* Listado de Ventas del Período */}
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <button
+              onClick={() => setVentasExpanded(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+            >
+              <span className="font-medium text-gray-700 flex items-center gap-2 text-sm">
+                <ShoppingCart size={16} className="text-gray-400" />
+                Ventas del período
+                {ventas.length > 0 && (
+                  <span className="text-xs bg-orange-100 text-orange-700 rounded-full px-2 py-0.5 font-medium">
+                    {ventas.length}
+                  </span>
+                )}
+              </span>
+              {ventasExpanded
+                ? <ChevronDown size={16} className="text-gray-400" />
+                : <ChevronRight size={16} className="text-gray-400" />
+              }
+            </button>
+            {ventasExpanded && (
+              <div className="border-t border-gray-100 overflow-x-auto">
+                {loadingVentas ? (
+                  <div className="py-6 text-center text-sm text-gray-400">Cargando...</div>
+                ) : ventas.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-gray-400">Sin ventas en el período</div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                      <tr>
+                        <th className="text-left px-4 py-2">#</th>
+                        <th className="text-left px-4 py-2">Hora</th>
+                        <th className="text-left px-4 py-2">Tipo</th>
+                        <th className="text-left px-4 py-2">Detalle</th>
+                        <th className="text-left px-4 py-2">Comprobante</th>
+                        <th className="text-right px-4 py-2">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {ventas.map((v, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 text-gray-500 font-mono text-xs">{v.numero || '-'}</td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                            {v.fecha ? new Date(v.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              v.tipo === 'COMANDA' ? 'bg-orange-100 text-orange-700'
+                              : v.tipo === 'TAKEAWAY' ? 'bg-purple-100 text-purple-700'
+                              : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {v.tipo === 'COMANDA' ? `Mesa ${v.mesa || '?'}` : v.tipo === 'TAKEAWAY' ? 'TakeAway' : 'Kiosco'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-gray-600 text-xs max-w-[200px] truncate">
+                            {v.socio || v.cliente || (v.cobradoPor ? `Cobró: ${v.cobradoPor}` : '-')}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-gray-400">
+                            {v.comprobante
+                              ? <span className="text-green-600 font-medium">{v.comprobante.tipo} {v.comprobante.puntoVenta?.padStart(4,'0') || ''}-{String(v.comprobante.numero || '').padStart(8,'0')}</span>
+                              : <span className="text-gray-300">—</span>
+                            }
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-gray-800">
+                            {formatMoney(v.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="border-t border-gray-200 bg-gray-50">
+                      <tr>
+                        <td colSpan={5} className="px-4 py-2.5 text-sm font-semibold text-gray-700">Total</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-gray-900">
+                          {formatMoney(ventas.reduce((s, v) => s + (v.total || 0), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )}
               </div>
-              <div className="text-2xl font-bold text-gray-800">{formatMoney(kpis.ventasTotal)}</div>
-              {kpis.ventasTotalAnterior > 0 && (
-                <div className={`text-xs flex items-center gap-1 mt-1 ${
-                  kpis.ventasTotal >= kpis.ventasTotalAnterior ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {kpis.ventasTotal >= kpis.ventasTotalAnterior ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                  {formatCambio(kpis.ventasTotal, kpis.ventasTotalAnterior)}% vs período anterior
-                </div>
-              )}
-            </div>
-
-            {/* Cantidad de Ventas */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">Operaciones</span>
-                <ShoppingCart className="text-blue-500" size={20} />
-              </div>
-              <div className="text-2xl font-bold text-gray-800">{kpis.cantidadVentas || 0}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                Ticket Promedio: {formatMoney(kpis.ticketPromedio)}
-              </div>
-            </div>
-
-            {/* Mesas Atendidas */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">Mesas</span>
-                <ChefHat className="text-orange-500" size={20} />
-              </div>
-              <div className="text-2xl font-bold text-gray-800">{kpis.mesasAtendidas || 0}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                Promedio: {formatMoney(kpis.promedioMesa)}
-              </div>
-            </div>
-
-            {/* Pedidos Delivery/TakeAway */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">Pedidos</span>
-                <Truck className="text-purple-500" size={20} />
-              </div>
-              <div className="text-2xl font-bold text-gray-800">{kpis.pedidosTakeaway || 0}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                Total: {formatMoney(kpis.totalTakeaway)}
-              </div>
-            </div>
+            )}
           </div>
-
-          {/* Segunda fila de KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Ventas Kiosco */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">Kiosco</span>
-                <Coffee className="text-amber-500" size={20} />
-              </div>
-              <div className="text-xl font-bold text-gray-800">{formatMoney(kpis.ventasKiosco)}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                {kpis.cantidadKiosco || 0} operaciones
-              </div>
-            </div>
-
-            {/* Efectivo */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">Efectivo</span>
-                <Banknote className="text-green-600" size={20} />
-              </div>
-              <div className="text-xl font-bold text-gray-800">{formatMoney(kpis.pagoEfectivo)}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                {kpis.cantidadVentas > 0 ? ((kpis.pagoEfectivo / kpis.ventasTotal) * 100).toFixed(0) : 0}% del total
-              </div>
-            </div>
-
-            {/* Tarjeta */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">Tarjeta</span>
-                <CreditCard className="text-blue-600" size={20} />
-              </div>
-              <div className="text-xl font-bold text-gray-800">{formatMoney(kpis.pagoTarjeta)}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                {kpis.cantidadVentas > 0 ? ((kpis.pagoTarjeta / kpis.ventasTotal) * 100).toFixed(0) : 0}% del total
-              </div>
-            </div>
-
-            {/* QR/Transferencia */}
-            <div className="bg-white rounded-xl shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-sm">QR/Transferencia</span>
-                <QrCode className="text-indigo-600" size={20} />
-              </div>
-              <div className="text-xl font-bold text-gray-800">{formatMoney(kpis.pagoDigital)}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                {kpis.cantidadVentas > 0 ? ((kpis.pagoDigital / kpis.ventasTotal) * 100).toFixed(0) : 0}% del total
-              </div>
-            </div>
-          </div>
-
-          {/* Evolución de ventas por día */}
-          {kpis.ventasPorDia && kpis.ventasPorDia.length >= 1 && ['mes', 'mesAnterior', 'personalizado'].includes(rangoSeleccionado) && (
-            <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                Evolución de ventas por día
-                <span className="text-xs font-normal text-gray-400">Clic en una barra para filtrar ese día</span>
-              </h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart
-                  data={kpis.ventasPorDia}
-                  margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
-                  onClick={(chartData) => {
-                    if (!chartData?.activePayload?.[0]) return
-                    const fecha = chartData.activePayload[0].payload.fecha
-                    setFechaDesde(fecha)
-                    setFechaHasta(fecha)
-                    setRangoSeleccionado('personalizado')
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={v => `$${(v / 1000).toFixed(0)}k`}
-                    width={48}
-                  />
-                  <Tooltip
-                    formatter={(value) => [`$${Number(value).toLocaleString('es-AR')}`, 'Ventas']}
-                    labelFormatter={label => `Día ${label}`}
-                  />
-                  <Bar dataKey="total" fill="#ea580c" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
 
           {/* Productos más vendidos y Ventas por hora */}
           <div className="grid md:grid-cols-2 gap-6">

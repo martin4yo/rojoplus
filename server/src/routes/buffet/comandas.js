@@ -1078,8 +1078,10 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
     const totalFinal = Number(comanda.subtotal) - descuentoMonto + propinaMonto
 
     // Agrupar items por cuenta contable del concepto de venta del producto para asientos
+    // Excluir items anulados (subtotal 0, no generan ingreso)
     const itemsPorCuenta = {}
     for (const item of comanda.items) {
+      if (item.estado === 'ANULADO') continue
       const cuentaId = item.productoBuffet?.producto?.conceptoVenta?.cuentaContableId
                     || item.productoBuffet?.cuentaContableId
       if (!itemsPorCuenta[cuentaId]) {

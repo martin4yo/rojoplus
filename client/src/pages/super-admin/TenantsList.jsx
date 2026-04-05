@@ -3,6 +3,7 @@ import { Eye, Trash2, CheckCircle, XCircle, AlertCircle, Plus, Building2, Users,
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
+import PageHeader from '../../components/PageHeader'
 import { useConfirm } from '../../hooks/useConfirm.jsx'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
@@ -160,12 +161,7 @@ export default function TenantsList() {
   return (
     <>
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Gestión de Tenants</h1>
-          <p className="text-gray-600">Administra todos los clubs del sistema</p>
-        </div>
+      <PageHeader icon={Building2} title="Gestión de Tenants" subtitle="Administra todos los clubs del sistema">
         <button
           onClick={() => navigate('/admin/tenants/nuevo')}
           className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark flex items-center gap-2"
@@ -173,7 +169,7 @@ export default function TenantsList() {
           <Plus className="w-4 h-4" />
           Nuevo Tenant
         </button>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
       {stats && (

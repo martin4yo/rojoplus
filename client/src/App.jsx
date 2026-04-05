@@ -186,7 +186,7 @@ import MiPerfil from './pages/admin/MiPerfil'
 
 // Buffet
 import BuffetDashboard from './pages/admin/buffet/BuffetDashboardNew'
-import BuffetEstadoMesas from './pages/admin/buffet/BuffetDashboard'
+import BuffetEstadoMesas from './pages/admin/buffet/BuffetEstadoMesas'
 import BuffetMesas from './pages/admin/buffet/BuffetMesas'
 import BuffetCategorias from './pages/admin/buffet/BuffetCategorias'
 import BuffetProductos from './pages/admin/buffet/BuffetProductos'

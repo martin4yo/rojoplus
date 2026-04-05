@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Users, Settings, FileText, Bot, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Edit, Users, Settings, FileText, Bot, MessageCircle, Cpu, Key, Eye, EyeOff, Save, BarChart2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -13,10 +13,19 @@ export default function TenantDetail() {
   const [tab, setTab] = useState('info')
   const [features, setFeatures] = useState({ whatsapp: false, waAgent: false })
   const [guardandoFeature, setGuardandoFeature] = useState(null) // key del feature que se está guardando
+  const [configIA, setConfigIA] = useState({
+    enabled: 'false', chatEnabled: 'true',
+    horarioInicio: '7', horarioFin: '23', msgFueraHorario: '', whitelist: '',
+    nombre: '', promptExtra: '', prompt: '',
+    provider: 'anthropic', tier: 'rapido', apiKey: '', modelOverride: '',
+  })
+  const [guardandoIA, setGuardandoIA] = useState(false)
+  const [mostrarApiKey, setMostrarApiKey] = useState(false)
 
   useEffect(() => {
     cargarTenant()
     cargarFeatures()
+    cargarConfigIA()
   }, [id])
 
   async function cargarTenant() {
@@ -60,6 +69,67 @@ export default function TenantDetail() {
       toast.error('Error: ' + err.message)
     } finally {
       setGuardandoFeature(null)
+    }
+  }
+
+  async function cargarConfigIA() {
+    try {
+      const claves = [
+        'WA_AGENT_ENABLED', 'CHAT_AGENT_ENABLED',
+        'WA_AGENT_HORARIO_INICIO', 'WA_AGENT_HORARIO_FIN', 'WA_AGENT_MSG_FUERA_HORARIO',
+        'WA_AGENT_WHITELIST', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA', 'WA_AGENT_SYSTEM_PROMPT',
+        'AI_PROVIDER', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_MODEL_OVERRIDE'
+      ]
+      const results = await Promise.all(
+        claves.map(c => api.getFull(`/super-admin/tenants/${id}/configuracion/${c}`).catch(() => ({ valor: null })))
+      )
+      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
+      setConfigIA({
+        enabled: cfg.WA_AGENT_ENABLED || 'false',
+        chatEnabled: cfg.CHAT_AGENT_ENABLED !== '' ? cfg.CHAT_AGENT_ENABLED : 'true',
+        horarioInicio: cfg.WA_AGENT_HORARIO_INICIO || '7',
+        horarioFin: cfg.WA_AGENT_HORARIO_FIN || '23',
+        msgFueraHorario: cfg.WA_AGENT_MSG_FUERA_HORARIO || '',
+        whitelist: cfg.WA_AGENT_WHITELIST || '',
+        nombre: cfg.WA_AGENT_NOMBRE || '',
+        promptExtra: cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA || '',
+        prompt: cfg.WA_AGENT_SYSTEM_PROMPT || '',
+        provider: cfg.AI_PROVIDER || 'anthropic',
+        tier: cfg.AI_MODEL_TIER || 'rapido',
+        apiKey: cfg.AI_API_KEY || '',
+        modelOverride: cfg.AI_MODEL_OVERRIDE || '',
+      })
+    } catch (err) {
+      console.error('Error cargando config IA:', err)
+    }
+  }
+
+  async function guardarConfigIA() {
+    setGuardandoIA(true)
+    try {
+      const campos = [
+        { clave: 'WA_AGENT_ENABLED', valor: configIA.enabled, descripcion: 'Agente IA WhatsApp habilitado', modulo: 'IA' },
+        { clave: 'CHAT_AGENT_ENABLED', valor: configIA.chatEnabled, descripcion: 'Asistente de chat interno habilitado', modulo: 'IA' },
+        { clave: 'WA_AGENT_HORARIO_INICIO', valor: configIA.horarioInicio, descripcion: 'Hora inicio agente', modulo: 'IA' },
+        { clave: 'WA_AGENT_HORARIO_FIN', valor: configIA.horarioFin, descripcion: 'Hora fin agente', modulo: 'IA' },
+        { clave: 'WA_AGENT_MSG_FUERA_HORARIO', valor: configIA.msgFueraHorario, descripcion: 'Mensaje fuera de horario', modulo: 'IA' },
+        { clave: 'WA_AGENT_WHITELIST', valor: configIA.whitelist, descripcion: 'Lista blanca de números', modulo: 'IA' },
+        { clave: 'WA_AGENT_NOMBRE', valor: configIA.nombre, descripcion: 'Nombre del asistente virtual', modulo: 'IA' },
+        { clave: 'WA_AGENT_SYSTEM_PROMPT_EXTRA', valor: configIA.promptExtra, descripcion: 'Instrucciones adicionales para el agente', modulo: 'IA' },
+        { clave: 'WA_AGENT_SYSTEM_PROMPT', valor: configIA.prompt, descripcion: 'Prompt completo personalizado', modulo: 'IA' },
+        { clave: 'AI_PROVIDER', valor: configIA.provider, descripcion: 'Proveedor de IA', modulo: 'IA' },
+        { clave: 'AI_MODEL_TIER', valor: configIA.tier, descripcion: 'Tier de modelo IA', modulo: 'IA' },
+        { clave: 'AI_API_KEY', valor: configIA.apiKey, descripcion: 'API key del proveedor de IA', modulo: 'IA' },
+        { clave: 'AI_MODEL_OVERRIDE', valor: configIA.modelOverride, descripcion: 'Modelo exacto (override del tier)', modulo: 'IA' },
+      ]
+      await Promise.all(campos.map(({ clave, valor, descripcion, modulo }) =>
+        api.postFull(`/super-admin/tenants/${id}/configuracion`, { clave, valor, tipo: 'STRING', modulo, descripcion })
+      ))
+      toast.success('Configuración de IA guardada')
+    } catch (err) {
+      toast.error('Error al guardar: ' + err.message)
+    } finally {
+      setGuardandoIA(false)
     }
   }
 
@@ -131,6 +201,7 @@ export default function TenantDetail() {
             { id: 'info', label: 'Información', icon: FileText },
             { id: 'admins', label: 'Administradores', icon: Users },
             { id: 'funcionalidades', label: 'Funcionalidades', icon: Bot },
+            { id: 'agente', label: 'Agente IA', icon: Cpu },
             { id: 'config', label: 'Configuración', icon: Settings }
           ].map(t => (
             <button
@@ -316,6 +387,146 @@ export default function TenantDetail() {
                   className={`relative w-12 h-6 rounded-full transition-colors disabled:opacity-50 ${features.waAgent && features.whatsapp ? 'bg-purple-500' : 'bg-gray-300'}`}
                 >
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${features.waAgent && features.whatsapp ? 'translate-x-6' : ''}`} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Tab: Agente IA */}
+          {tab === 'agente' && (
+            <div className="space-y-6">
+              <p className="text-sm text-gray-500">Configuración del asistente virtual de IA para WhatsApp y chat interno.</p>
+
+              {/* Chat interno */}
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg"><Bot className="w-5 h-5 text-blue-600" /></div>
+                    <div>
+                      <p className="font-medium">Asistente de chat (Portal del Socio)</p>
+                      <p className="text-sm text-gray-500">Widget de chat IA dentro del portal web del socio</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigIA({ ...configIA, chatEnabled: configIA.chatEnabled === 'true' ? 'false' : 'true' })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${configIA.chatEnabled === 'true' ? 'bg-blue-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configIA.chatEnabled === 'true' ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Agente WA */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg"><Bot className="w-5 h-5 text-purple-600" /></div>
+                    <div>
+                      <p className="font-medium">Agente de IA (WhatsApp)</p>
+                      <p className="text-sm text-gray-500">Asistente virtual que responde consultas de socios por WhatsApp</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigIA({ ...configIA, enabled: configIA.enabled === 'true' ? 'false' : 'true' })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${configIA.enabled === 'true' ? 'bg-purple-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configIA.enabled === 'true' ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hora inicio atención</label>
+                    <input type="number" value={configIA.horarioInicio} onChange={e => setConfigIA({ ...configIA, horarioInicio: e.target.value })} min="0" max="23" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hora fin atención</label>
+                    <input type="number" value={configIA.horarioFin} onChange={e => setConfigIA({ ...configIA, horarioFin: e.target.value })} min="0" max="23" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del asistente</label>
+                  <input type="text" value={configIA.nombre} onChange={e => setConfigIA({ ...configIA, nombre: e.target.value })} placeholder="Asistente" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  <p className="text-xs text-gray-500 mt-1">Cómo se presenta el bot al saludar.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje fuera de horario</label>
+                  <textarea value={configIA.msgFueraHorario} onChange={e => setConfigIA({ ...configIA, msgFueraHorario: e.target.value })} placeholder="Hola! Nuestro asistente atiende de 7 a 23hs. Te respondemos pronto." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none" rows={3} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Lista blanca de números <span className="text-gray-400 font-normal">(solo para pruebas)</span></label>
+                  <input type="text" value={configIA.whitelist} onChange={e => setConfigIA({ ...configIA, whitelist: e.target.value })} placeholder="5491112345678, 5491187654321" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  <p className="text-xs text-gray-500 mt-1">Separados por coma. Vacío = responde a todos.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Instrucciones adicionales</label>
+                  <textarea value={configIA.promptExtra} onChange={e => setConfigIA({ ...configIA, promptExtra: e.target.value })} placeholder="Ej: No informes precios. Derivá inscripciones nuevas a administración." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none" rows={3} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Prompt completo personalizado <span className="text-gray-400 font-normal">(reemplaza el comportamiento base)</span></label>
+                  <textarea value={configIA.prompt} onChange={e => setConfigIA({ ...configIA, prompt: e.target.value })} placeholder="Dejá vacío para usar el comportamiento estándar." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none font-mono text-xs" rows={6} />
+                  <p className="text-xs text-amber-600 mt-1">⚠ Si completás este campo, las instrucciones adicionales se ignoran.</p>
+                </div>
+              </div>
+
+              {/* Proveedor de IA */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-indigo-100 rounded-lg"><Cpu className="w-5 h-5 text-indigo-600" /></div>
+                  <div>
+                    <p className="font-medium">Proveedor de IA</p>
+                    <p className="text-sm text-gray-500">Modelo y API key. Si no se configura API key, usa la global del servidor.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor</label>
+                    <select value={configIA.provider} onChange={e => setConfigIA({ ...configIA, provider: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                      <option value="anthropic">Anthropic (Claude)</option>
+                      <option value="openai">OpenAI (GPT)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de modelo</label>
+                    <select value={configIA.tier} onChange={e => setConfigIA({ ...configIA, tier: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                      <option value="rapido">Rápido — Haiku / GPT-4o mini (~$0.001/msg)</option>
+                      <option value="estandar">Estándar — Sonnet / GPT-4o (~$0.012/msg)</option>
+                      <option value="premium">Premium — Opus / GPT-4o (~$0.06/msg)</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">API Key propia</label>
+                  <div className="relative">
+                    <input
+                      type={mostrarApiKey ? 'text' : 'password'}
+                      value={configIA.apiKey}
+                      onChange={e => setConfigIA({ ...configIA, apiKey: e.target.value })}
+                      placeholder="sk-ant-... o sk-..."
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm"
+                    />
+                    <button type="button" onClick={() => setMostrarApiKey(!mostrarApiKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {mostrarApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Modelo exacto (opcional)</label>
+                  <input type="text" value={configIA.modelOverride} onChange={e => setConfigIA({ ...configIA, modelOverride: e.target.value })} placeholder="Dejar vacío para usar el nivel seleccionado" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  <p className="text-xs text-gray-500 mt-1">Ej: <span className="font-mono">claude-haiku-4-5-20251001</span></p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={guardarConfigIA}
+                  disabled={guardandoIA}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
+                >
+                  {guardandoIA ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                  Guardar configuración de IA
                 </button>
               </div>
             </div>

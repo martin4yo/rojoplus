@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Users, Bot, TrendingUp, DollarSign, MessageSquare, Activity, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { Users, Bot, TrendingUp, DollarSign, MessageSquare, Activity, ChevronDown, ChevronRight, RefreshCw, BarChart2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import PageHeader from '../../components/PageHeader'
 
 const ESTADO_BADGE = {
   ACTIVE:           { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Activo'     },
@@ -64,24 +65,17 @@ export default function TenantUsage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard de Uso</h1>
-          <p className="text-gray-600">Métricas por tenant y consumo de IA</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <input type="date" value={desde} onChange={e => setDesde(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-          <span className="text-gray-500">→</span>
-          <input type="date" value={hasta} onChange={e => setHasta(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-          <button onClick={cargar}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark text-sm">
-            <RefreshCw className="w-4 h-4" /> Actualizar
-          </button>
-        </div>
-      </div>
+      <PageHeader icon={BarChart2} title="Dashboard de Uso" subtitle="Métricas por tenant y consumo de IA">
+        <input type="date" value={desde} onChange={e => setDesde(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+        <span className="text-gray-500">→</span>
+        <input type="date" value={hasta} onChange={e => setHasta(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+        <button onClick={cargar}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark text-sm">
+          <RefreshCw className="w-4 h-4" /> Actualizar
+        </button>
+      </PageHeader>
 
       {/* Tarjetas de totales */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -107,7 +101,8 @@ export default function TenantUsage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-4 py-3 w-8"></th>
+              <th className="px-4 py-3 w-10"></th>
+              <th className="px-4 py-3 w-10"></th>
               <th className="px-4 py-3 text-left font-semibold text-gray-700">Tenant</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-700">Plan / Estado</th>
               <th className="px-4 py-3 text-right font-semibold text-gray-700">Socios</th>
@@ -132,6 +127,12 @@ export default function TenantUsage() {
                     {t.ai.breakdown.length > 0
                       ? (abierto ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)
                       : null}
+                  </td>
+                  <td className="px-2 py-3">
+                    {t.logoUrl
+                      ? <img src={t.logoUrl} alt={t.nombre} className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+                      : <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">{t.nombre.charAt(0).toUpperCase()}</div>
+                    }
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">{t.nombre}</div>
@@ -166,7 +167,7 @@ export default function TenantUsage() {
                 // Fila de desglose por modelo
                 abierto && t.ai.breakdown.length > 0 && (
                   <tr key={`${t.id}-detail`} className="bg-purple-50">
-                    <td colSpan={9} className="px-8 py-3">
+                    <td colSpan={10} className="px-8 py-3">
                       <div className="text-xs font-semibold text-purple-700 mb-2">Desglose por modelo</div>
                       <table className="w-full text-xs">
                         <thead>

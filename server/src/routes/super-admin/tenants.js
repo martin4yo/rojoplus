@@ -102,7 +102,7 @@ router.get('/uso', async (req, res) => {
 
     const tenants = await prisma.tenant.findMany({
       orderBy: { nombre: 'asc' },
-      select: { id: true, nombre: true, subdomain: true, plan: true, estado: true, activo: true }
+      select: { id: true, nombre: true, subdomain: true, plan: true, estado: true, activo: true, logoUrl: true }
     })
 
     const datos = await Promise.all(tenants.map(async (tenant) => {

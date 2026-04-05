@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Bot, Cpu, Key, BarChart2 } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Key } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -82,13 +82,6 @@ export default function TablasAuxiliares() {
   const [mostrarApiKey, setMostrarApiKey] = useState(false)
   const [resultadoWebhook, setResultadoWebhook] = useState(null) // null | 'ok' | 'error'
 
-  // Configuración Agente IA WhatsApp
-  const [configWaAgent, setConfigWaAgent] = useState({
-    enabled: 'false', horarioInicio: '7', horarioFin: '23', msgFueraHorario: '', whitelist: '',
-    nombre: '', promptExtra: '', prompt: '', chatEnabled: 'true',
-  })
-  const [guardandoWaAgent, setGuardandoWaAgent] = useState(false)
-
   // Eventos de notificación WhatsApp
   const [notifEventos, setNotifEventos] = useState({
     WHATSAPP_NOTIF_PAGO: 'true',
@@ -110,11 +103,6 @@ export default function TablasAuxiliares() {
   })
   const [guardandoNotifWA, setGuardandoNotifWA] = useState(false)
 
-  // Configuración de proveedor de IA
-  const [configAI, setConfigAI] = useState({ provider: 'anthropic', tier: 'rapido', apiKey: '', modelOverride: '' })
-  const [guardandoAI, setGuardandoAI] = useState(false)
-  const [mostrarApiKeyAI, setMostrarApiKeyAI] = useState(false)
-
   // Prueba de envío WhatsApp
   const [testWa, setTestWa] = useState({ telefono: '', texto: 'Hola! Esto es un mensaje de prueba desde el panel.' })
   const [enviandoTestWa, setEnviandoTestWa] = useState(false)
@@ -128,8 +116,6 @@ export default function TablasAuxiliares() {
     cargarConfigFiscal()
     cargarConfigSmtp()
     cargarConfigWa()
-    cargarConfigWaAgent()
-    cargarConfigAI()
     cargarNotifTextos()
     cargarNotifEventos()
     cargarPlanFeatures()
@@ -490,49 +476,6 @@ export default function TablasAuxiliares() {
     } finally { setVerificandoWa(false) }
   }
 
-  async function cargarConfigWaAgent() {
-    try {
-      const claves = ['WA_AGENT_ENABLED', 'WA_AGENT_HORARIO_INICIO', 'WA_AGENT_HORARIO_FIN', 'WA_AGENT_MSG_FUERA_HORARIO', 'WA_AGENT_WHITELIST', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA', 'WA_AGENT_SYSTEM_PROMPT', 'CHAT_AGENT_ENABLED']
-      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
-      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
-      setConfigWaAgent({
-        enabled: cfg.WA_AGENT_ENABLED || 'false',
-        horarioInicio: cfg.WA_AGENT_HORARIO_INICIO || '7',
-        horarioFin: cfg.WA_AGENT_HORARIO_FIN || '23',
-        msgFueraHorario: cfg.WA_AGENT_MSG_FUERA_HORARIO || '',
-        whitelist: cfg.WA_AGENT_WHITELIST || '',
-        nombre: cfg.WA_AGENT_NOMBRE || '',
-        promptExtra: cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA || '',
-        prompt: cfg.WA_AGENT_SYSTEM_PROMPT || '',
-        chatEnabled: cfg.CHAT_AGENT_ENABLED !== '' ? cfg.CHAT_AGENT_ENABLED : 'true',
-      })
-    } catch (err) { console.error('Error cargando config WA Agent:', err) }
-  }
-
-  async function guardarConfigWaAgent() {
-    setGuardandoWaAgent(true)
-    setError(null)
-    try {
-      const campos = [
-        { clave: 'WA_AGENT_ENABLED', valor: configWaAgent.enabled, descripcion: 'Agente IA WhatsApp habilitado' },
-        { clave: 'CHAT_AGENT_ENABLED', valor: configWaAgent.chatEnabled, descripcion: 'Asistente de chat interno habilitado' },
-        { clave: 'WA_AGENT_HORARIO_INICIO', valor: configWaAgent.horarioInicio, descripcion: 'Hora inicio agente' },
-        { clave: 'WA_AGENT_HORARIO_FIN', valor: configWaAgent.horarioFin, descripcion: 'Hora fin agente' },
-        { clave: 'WA_AGENT_MSG_FUERA_HORARIO', valor: configWaAgent.msgFueraHorario, descripcion: 'Mensaje fuera de horario' },
-        { clave: 'WA_AGENT_WHITELIST', valor: configWaAgent.whitelist, descripcion: 'Lista blanca de números (vacío = todos)' },
-        { clave: 'WA_AGENT_NOMBRE', valor: configWaAgent.nombre, descripcion: 'Nombre del asistente virtual' },
-        { clave: 'WA_AGENT_SYSTEM_PROMPT_EXTRA', valor: configWaAgent.promptExtra, descripcion: 'Instrucciones adicionales para el agente' },
-        { clave: 'WA_AGENT_SYSTEM_PROMPT', valor: configWaAgent.prompt, descripcion: 'Prompt completo personalizado (reemplaza el base)' },
-      ]
-      await Promise.all(campos.map(({ clave, valor, descripcion }) =>
-        api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'STRING', modulo: 'WHATSAPP', descripcion })
-      ))
-      setSuccess('Configuración del agente actualizada')
-    } catch (err) {
-      setError(err.message || 'Error al guardar configuración del agente')
-    } finally { setGuardandoWaAgent(false) }
-  }
-
   async function cargarNotifTextos() {
     try {
       const claves = ['NOTIF_WA_PAGO', 'NOTIF_WA_VENCIMIENTO', 'NOTIF_WA_MORA', 'NOTIF_WA_PORTAL']
@@ -558,39 +501,6 @@ export default function TablasAuxiliares() {
     } catch (err) {
       setError(err.message || 'Error al guardar notificaciones')
     } finally { setGuardandoNotifWA(false) }
-  }
-
-  async function cargarConfigAI() {
-    try {
-      const claves = ['AI_PROVIDER', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_MODEL_OVERRIDE']
-      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
-      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
-      setConfigAI({
-        provider: cfg.AI_PROVIDER || 'anthropic',
-        tier: cfg.AI_MODEL_TIER || 'rapido',
-        apiKey: cfg.AI_API_KEY || '',
-        modelOverride: cfg.AI_MODEL_OVERRIDE || '',
-      })
-    } catch (err) { console.error('Error cargando config IA:', err) }
-  }
-
-  async function guardarConfigAI() {
-    setGuardandoAI(true)
-    setError(null)
-    try {
-      const campos = [
-        { clave: 'AI_PROVIDER', valor: configAI.provider, descripcion: 'Proveedor de IA' },
-        { clave: 'AI_MODEL_TIER', valor: configAI.tier, descripcion: 'Tier de modelo IA' },
-        { clave: 'AI_API_KEY', valor: configAI.apiKey, descripcion: 'API key del proveedor de IA' },
-        { clave: 'AI_MODEL_OVERRIDE', valor: configAI.modelOverride, descripcion: 'Modelo exacto (override del tier)' },
-      ]
-      await Promise.all(campos.map(({ clave, valor, descripcion }) =>
-        api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'STRING', modulo: 'IA', descripcion })
-      ))
-      setSuccess('Configuración de IA actualizada')
-    } catch (err) {
-      setError(err.message || 'Error al guardar configuración de IA')
-    } finally { setGuardandoAI(false) }
   }
 
   async function cargarNotifEventos() {
@@ -687,21 +597,6 @@ export default function TablasAuxiliares() {
               Notificaciones
             </div>
           </button>
-          {planFeatures.waAgent && (
-            <button
-              onClick={() => setActiveTab('agente')}
-              className={`pb-3 px-1 border-b-2 font-medium text-sm transition ${
-                activeTab === 'agente'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4" />
-                Agente IA
-              </div>
-            </button>
-          )}
         </nav>
       </div>
 
@@ -1860,230 +1755,6 @@ export default function TablasAuxiliares() {
         </div>
       )}
 
-      {/* Tab: Agente IA */}
-      {activeTab === 'agente' && (
-        <div className="space-y-6 max-w-3xl">
-
-          {/* Chat interno (Portal del Socio) */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-blue-100">
-                <Bot className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-800">Asistente de chat (Portal del Socio)</h3>
-                    <p className="text-sm text-gray-500 mt-1">Widget de chat con IA disponible dentro del portal web del socio</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setConfigWaAgent({ ...configWaAgent, chatEnabled: configWaAgent.chatEnabled === 'true' ? 'false' : 'true' })}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${configWaAgent.chatEnabled === 'true' ? 'bg-blue-500' : 'bg-gray-300'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configWaAgent.chatEnabled === 'true' ? 'translate-x-6' : ''}`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t flex justify-end">
-              {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
-                <button onClick={guardarConfigWaAgent} disabled={guardandoWaAgent} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
-                  {guardandoWaAgent ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
-                  Guardar
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Agente IA WhatsApp */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-purple-100">
-                <Bot className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-800">Agente de IA (WhatsApp)</h3>
-                    <p className="text-sm text-gray-500 mt-1">Asistente virtual que responde consultas de socios por WhatsApp</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setConfigWaAgent({ ...configWaAgent, enabled: configWaAgent.enabled === 'true' ? 'false' : 'true' })}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${configWaAgent.enabled === 'true' ? 'bg-purple-500' : 'bg-gray-300'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configWaAgent.enabled === 'true' ? 'translate-x-6' : ''}`} />
-                  </button>
-                </div>
-                <div className="mt-4 space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Hora inicio atención</label>
-                      <input type="number" value={configWaAgent.horarioInicio} onChange={e => setConfigWaAgent({ ...configWaAgent, horarioInicio: e.target.value })} min="0" max="23" className="input-field w-full" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Hora fin atención</label>
-                      <input type="number" value={configWaAgent.horarioFin} onChange={e => setConfigWaAgent({ ...configWaAgent, horarioFin: e.target.value })} min="0" max="23" className="input-field w-full" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del asistente</label>
-                    <input
-                      type="text"
-                      value={configWaAgent.nombre}
-                      onChange={e => setConfigWaAgent({ ...configWaAgent, nombre: e.target.value })}
-                      placeholder="Asistente"
-                      className="input-field w-full"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Cómo se presenta el bot al saludar en WhatsApp y en el chat interno.</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje fuera de horario</label>
-                    <textarea
-                      value={configWaAgent.msgFueraHorario}
-                      onChange={e => setConfigWaAgent({ ...configWaAgent, msgFueraHorario: e.target.value })}
-                      placeholder="Hola! Nuestro asistente atiende de 7 a 23hs. Te respondemos pronto."
-                      className="input-field w-full resize-none"
-                      rows={3}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Se envía automáticamente cuando el socio escribe fuera del horario</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Lista blanca de números <span className="text-gray-400 font-normal">(solo para pruebas)</span></label>
-                    <input
-                      type="text"
-                      value={configWaAgent.whitelist}
-                      onChange={e => setConfigWaAgent({ ...configWaAgent, whitelist: e.target.value })}
-                      placeholder="5491112345678, 5491187654321"
-                      className="input-field w-full"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Números separados por coma. <strong>Si está vacío, el agente responde a todos.</strong> Útil para probar sin afectar a todos los socios.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Instrucciones adicionales <span className="text-gray-400 font-normal">(se agregan al prompt base)</span></label>
-                    <textarea
-                      value={configWaAgent.promptExtra}
-                      onChange={e => setConfigWaAgent({ ...configWaAgent, promptExtra: e.target.value })}
-                      placeholder="Ej: No informes precios. Si preguntan por inscripciones nuevas, derivá siempre a administración."
-                      className="input-field w-full resize-none"
-                      rows={3}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Reglas o contexto extra que el agente debe tener en cuenta.</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Prompt completo personalizado <span className="text-gray-400 font-normal">(reemplaza todo el comportamiento base)</span>
-                    </label>
-                    <textarea
-                      value={configWaAgent.prompt}
-                      onChange={e => setConfigWaAgent({ ...configWaAgent, prompt: e.target.value })}
-                      placeholder="Dejá vacío para usar el comportamiento estándar. Solo completá esto si necesitás control total sobre el prompt."
-                      className="input-field w-full resize-none font-mono text-xs"
-                      rows={6}
-                    />
-                    <p className="text-xs text-amber-600 mt-1">⚠ Si completás este campo, las instrucciones adicionales se ignoran.</p>
-                  </div>
-                  {configWaAgent.enabled === 'true' && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <p className="text-xs text-amber-700">
-                        <span className="font-medium">Requiere:</span> WhatsApp conectado y API key de IA configurada abajo.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t flex items-center justify-between">
-              <button
-                onClick={() => navigate('/admin/ia-metricas')}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-purple-700 hover:bg-purple-50 rounded-lg transition"
-              >
-                <BarChart2 className="w-4 h-4" />
-                Ver métricas de uso
-              </button>
-              {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
-                <button onClick={guardarConfigWaAgent} disabled={guardandoWaAgent} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
-                  {guardandoWaAgent ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
-                  Guardar
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Proveedor de IA */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-indigo-100">
-                <Cpu className="w-6 h-6 text-indigo-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-800">Proveedor de IA</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Configurá qué modelo de IA usa el agente. Si tenés tu propia API key, el costo se factura a tu cuenta.
-                </p>
-                <div className="mt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor</label>
-                      <select value={configAI.provider} onChange={e => setConfigAI({ ...configAI, provider: e.target.value })} className="input-field w-full">
-                        <option value="anthropic">Anthropic (Claude)</option>
-                        <option value="openai">OpenAI (GPT)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de modelo</label>
-                      <select value={configAI.tier} onChange={e => setConfigAI({ ...configAI, tier: e.target.value })} className="input-field w-full">
-                        <option value="rapido">Rápido — Haiku / GPT-4o mini (~$0.001/msg)</option>
-                        <option value="estandar">Estándar — Sonnet / GPT-4o (~$0.012/msg)</option>
-                        <option value="premium">Premium — Opus / GPT-4o (~$0.06/msg)</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">API Key propia</label>
-                    <div className="relative">
-                      <input
-                        type={mostrarApiKeyAI ? 'text' : 'password'}
-                        value={configAI.apiKey}
-                        onChange={e => setConfigAI({ ...configAI, apiKey: e.target.value })}
-                        placeholder="sk-ant-... o sk-..."
-                        className="input-field w-full pr-10"
-                      />
-                      <button type="button" onClick={() => setMostrarApiKeyAI(!mostrarApiKeyAI)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                        {mostrarApiKeyAI ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Si no se configura, se usa la key global del servidor (compartida)</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Modelo exacto (opcional)</label>
-                    <input
-                      type="text"
-                      value={configAI.modelOverride}
-                      onChange={e => setConfigAI({ ...configAI, modelOverride: e.target.value })}
-                      placeholder="Dejar vacío para usar el nivel seleccionado"
-                      className="input-field w-full"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Ej: <span className="font-mono">claude-haiku-4-5-20251001</span></p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t flex justify-end">
-              {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
-                <button onClick={guardarConfigAI} disabled={guardandoAI} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
-                  {guardandoAI ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
-                  Guardar
-                </button>
-              )}
-            </div>
-          </div>
-
-        </div>
-      )}
     </div>
   )
 }
