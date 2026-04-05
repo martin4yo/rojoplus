@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Clock, Phone, Truck, ShoppingBag, X, Users, CheckCircle, Trash2 } from 'lucide-react'
+import DetallePedidoModal from '../../../components/buffet/DetallePedidoModal'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -22,6 +23,10 @@ export default function BuffetTakeAway() {
   const [pedidoActivo, setPedidoActivo] = useState(null)
   const [pedidos, setPedidos] = useState([])
   const [loading, setLoading] = useState(true)
+
+  // Modal detalle (solo lectura)
+  const [pedidoDetalle, setPedidoDetalle] = useState(null)
+  const [detalleItems, setDetalleItems] = useState(null)
 
   // Modales
   const [modalNuevoPedido, setModalNuevoPedido] = useState(false)
@@ -73,7 +78,18 @@ export default function BuffetTakeAway() {
     return () => clearInterval(interval)
   }, [cargarPedidos])
 
-  function abrirPedido(pedido) {
+  async function abrirPedido(pedido) {
+    setPedidoDetalle(pedido)
+    setDetalleItems(null)
+    try {
+      const data = await api.get(`/admin/buffet/takeaway/${pedido.id}`)
+      setDetalleItems(data?.items || [])
+    } catch {
+      setDetalleItems([])
+    }
+  }
+
+  function abrirGestion(pedido) {
     setPedidoActivo(pedido)
     setModoVista('detalle')
   }
@@ -149,9 +165,9 @@ export default function BuffetTakeAway() {
 
       await cargarPedidos()
 
-      // Abrir el pedido recién creado
+      // Abrir el pedido recién creado en modo gestión
       const pedidoCreado = res.data || res
-      abrirPedido(pedidoCreado)
+      abrirGestion(pedidoCreado)
     } catch (err) {
       console.error('Error creando pedido:', err)
       toast.error(err.response?.data?.error || 'Error al crear pedido')
@@ -189,6 +205,14 @@ export default function BuffetTakeAway() {
     if (tipo === 'RAPPI') return 'Rappi'
     return 'Retiro'
   }
+
+  function getTipoColor(tipo) {
+    if (tipo === 'DELIVERY') return 'blue'
+    if (tipo === 'PEDIDOSYA' || tipo === 'RAPPI') return 'orange'
+    return 'green'
+  }
+
+  const ESTADOS_ACTIVOS = ['RECIBIDO', 'PENDIENTE', 'EN_PREPARACION', 'LISTO']
 
   function tiempoTranscurrido(pedido) {
     if (!pedido.horaRecibido) return 0
@@ -335,42 +359,35 @@ export default function BuffetTakeAway() {
             className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-green-500"
           >
             {/* Header del pedido */}
-            <div className="p-4 border-b bg-gradient-to-r from-green-50 to-white">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-lg text-gray-900">#{pedido.numero}</h3>
-                    <StatusBadge status={pedido.estado} type="pedidoTakeAway" size="sm" />
+            <div className="p-3 border-b bg-gradient-to-r from-green-50 to-white">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="font-bold text-sm text-gray-900 whitespace-nowrap">#{pedido.numero}</h3>
+                    <p className="font-medium text-sm text-gray-700 truncate">{pedido.nombreCliente}</p>
                   </div>
-                  <p className="font-medium text-gray-700">{pedido.nombreCliente}</p>
                   {pedido.socio && (
-                    <div className="flex items-center gap-1 text-xs text-gray-600 mt-1">
-                      <img src="/images/logo.png" alt="Socio" className="w-4 h-4 object-contain" />
+                    <div className="flex items-center gap-1 text-xs text-gray-600 mt-0.5">
+                      <img src="/images/logo.png" alt="Socio" className="w-3 h-3 object-contain" />
                       <span>Socio #{pedido.socio.nroSocio}</span>
                     </div>
                   )}
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg border border-gray-200">
-                    {getTipoIcon(pedido.tipo)}
-                    <span className="text-xs font-medium text-gray-700">
-                      {getTipoLabel(pedido.tipo)}
-                    </span>
-                  </div>
                   {pedido.telefono && (
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                      <Phone size={12} />
+                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                      <Phone size={11} />
                       <span>{pedido.telefono}</span>
                     </div>
                   )}
-                  {/* Icono de eliminar - solo si se puede eliminar */}
+                </div>
+                <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
+                  <StatusBadge status={pedido.estado} type="pedidoTakeAway" size="sm" />
                   {puedeEliminar(pedido) && tienePermiso(PERMISOS.BUFFET_MESAS) && (
                     <button
                       onClick={(e) => eliminarPedido(pedido, e)}
                       className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
                       title="Eliminar pedido"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>
@@ -378,31 +395,32 @@ export default function BuffetTakeAway() {
             </div>
 
             {/* Info del pedido */}
-            <div className="p-4">
-              <div className="space-y-2 text-sm">
+            <div className="p-3">
+              <div className="space-y-1.5 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Items:</span>
-                  <span className="font-medium">{pedido.items?.length || 0}</span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Total:</span>
-                  <span className="text-lg font-bold text-green-600">
-                    {formatCurrency(pedido.total || 0, { showSymbol: false })}
+                  <span className="text-gray-600">
+                    Items: <span className="font-medium text-gray-800">{pedido.items?.length || 0}</span>
+                    <span className="text-gray-400 mx-1">·</span>
+                    Total: <span className="font-bold text-green-600">{formatCurrency(pedido.total || 0, { showSymbol: false })}</span>
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center justify-between pt-1.5 border-t">
                   <div className="flex items-center gap-1 text-gray-500">
-                    <Clock size={14} />
+                    <Clock size={13} />
                     <span className="text-xs">Hace {tiempoTranscurrido(pedido)} min</span>
                   </div>
-                  {pedido.horaEstimada && (
-                    <span className="text-xs text-gray-600">
-                      Estimado: {new Date(pedido.horaEstimada).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white rounded border border-gray-200">
+                    {getTipoIcon(pedido.tipo)}
+                    <span className="text-xs font-medium text-gray-700">{getTipoLabel(pedido.tipo)}</span>
+                  </div>
                 </div>
+
+                {pedido.horaEstimada && (
+                  <div className="text-xs text-gray-500">
+                    Estimado: {new Date(pedido.horaEstimada).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                )}
 
                 {pedido.observaciones && (
                   <div className="pt-2 border-t">
@@ -602,6 +620,24 @@ export default function BuffetTakeAway() {
       </Modal>
 
       <ConfirmDialog />
+
+      {/* Modal detalle de pedido */}
+      {pedidoDetalle && (
+        <DetallePedidoModal
+          numero={pedidoDetalle.numero}
+          tipoLabel={getTipoLabel(pedidoDetalle.tipo)}
+          tipoColor={getTipoColor(pedidoDetalle.tipo)}
+          fecha={pedidoDetalle.horaPagado || pedidoDetalle.horaRecibido}
+          total={pedidoDetalle.total}
+          items={detalleItems}
+          onClose={() => setPedidoDetalle(null)}
+          onGestionar={
+            ESTADOS_ACTIVOS.includes(pedidoDetalle.estado)
+              ? () => { setPedidoDetalle(null); abrirGestion(pedidoDetalle) }
+              : undefined
+          }
+        />
+      )}
     </div>
   )
 }

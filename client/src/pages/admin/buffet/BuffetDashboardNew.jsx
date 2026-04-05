@@ -17,6 +17,7 @@ import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
 import ChatWidget from '../../../components/chat/ChatWidget'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import DetallePedidoModal from '../../../components/buffet/DetallePedidoModal'
 
 // Rangos de fecha predefinidos
 const RANGOS_FECHA = [
@@ -896,46 +897,15 @@ export default function BuffetDashboard() {
 
       {/* Modal detalle de venta */}
       {ventaDetalle && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setVentaDetalle(null)}>
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <div>
-                <span className="font-semibold text-gray-800">{ventaDetalle.numero}</span>
-                <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-medium ${
-                  ventaDetalle.tipo === 'COMANDA' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700'
-                }`}>
-                  {ventaDetalle.tipo === 'COMANDA' ? `Mesa ${ventaDetalle.mesa || '?'}` : 'TakeAway'}
-                </span>
-              </div>
-              <button onClick={() => setVentaDetalle(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 p-4">
-              {loadingDetalle ? (
-                <div className="py-8 text-center text-sm text-gray-400">Cargando...</div>
-              ) : detalleItems === null ? null : detalleItems.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">Sin detalle disponible</div>
-              ) : (
-                <div className="space-y-2">
-                  {detalleItems.map((item, i) => (
-                    <div key={i} className="flex items-start justify-between gap-2 py-1.5 border-b border-gray-50 last:border-0">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm text-gray-700">{item.cantidad}x {item.productoBuffet?.nombre || item.producto?.nombre || item.nombre || '—'}</span>
-                        {item.observaciones && <p className="text-xs text-gray-400 mt-0.5">{item.observaciones}</p>}
-                      </div>
-                      <span className="text-sm font-medium text-gray-800 whitespace-nowrap">{formatMoney(Number(item.subtotal || 0))}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="px-4 py-3 border-t border-gray-100 flex justify-between items-center">
-              <span className="text-sm text-gray-500">{ventaDetalle.fecha ? new Date(ventaDetalle.fecha).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : ''}</span>
-              <span className="font-bold text-gray-800">{formatMoney(ventaDetalle.total)}</span>
-            </div>
-          </div>
-        </div>
+        <DetallePedidoModal
+          numero={ventaDetalle.numero}
+          tipoLabel={ventaDetalle.tipo === 'COMANDA' ? `Mesa ${ventaDetalle.mesa || '?'}` : 'TakeAway'}
+          tipoColor={ventaDetalle.tipo === 'COMANDA' ? 'orange' : 'purple'}
+          fecha={ventaDetalle.fecha}
+          total={ventaDetalle.total}
+          items={loadingDetalle ? null : detalleItems}
+          onClose={() => setVentaDetalle(null)}
+        />
       )}
     </div>
   )
