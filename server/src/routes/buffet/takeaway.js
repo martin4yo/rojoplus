@@ -594,8 +594,10 @@ router.delete('/takeaway/:id/items/:itemId', authAdmin, checkPermiso('BUFFET_MES
  */
 router.delete('/takeaway/limpiar-barra', authAdmin, async (req, res) => {
   try {
+    // Solo eliminar pedidos de barra PENDIENTES (no cobrados) para no perder historial
     const pedidos = await req.db.pedidoTakeAway.findMany({
       where: {
+        estado: { in: ['RECIBIDO', 'EN_PREPARACION', 'LISTO'] },
         OR: [
           { tipo: 'BARRA' },
           { nombreCliente: { contains: 'Venta Barra' } },
@@ -1377,25 +1379,8 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       }
     }
 
-    // Si es un pedido de BARRA, eliminarlo después de cobrar para no ensuciar la gestión
-    if (pedido.tipo === 'BARRA') {
-      try {
-        // Quitar referencias FK antes de borrar
-        await req.db.movimientoCaja.updateMany({
-          where: { pedidoTakeAwayId: parseInt(id) },
-          data: { pedidoTakeAwayId: null }
-        })
-        await req.db.comprobanteElectronico.updateMany({
-          where: { pedidoTakeawayId: parseInt(id) },
-          data: { pedidoTakeawayId: null }
-        })
-        await req.db.pedidoTakeAway.delete({ where: { id: parseInt(id) } })
-        console.log(`[TakeAway] Pedido BARRA ${pedido.numero} eliminado después de cobrar`)
-      } catch (deleteErr) {
-        console.error('Error eliminando pedido BARRA:', deleteErr)
-        // No fallar el cobro si falla la eliminación
-      }
-    }
+    // Los pedidos de BARRA se conservan como ENTREGADO para que queden en el historial
+    // y el dashboard pueda contarlos correctamente (via pedidoTakeAwayId FK)
 
     // Descontar stock para productos que tienen variantes
     await descontarStockVentaBuffet(
