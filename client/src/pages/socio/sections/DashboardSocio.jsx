@@ -65,11 +65,16 @@ export default function DashboardSocio({ socio, tokenPortal, onNavigate }) {
   return (
     <div className="space-y-6">
       {/* Bienvenida */}
-      <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg p-6 text-white">
+      <div
+        className="rounded-xl shadow-lg p-6 text-white"
+        style={{ background: 'linear-gradient(to right, var(--color-primary), var(--color-primary-dark, var(--color-primary)))' }}
+      >
         <h2 className="text-2xl font-bold mb-2">
-          ¡Hola, {socio.apellidoNombre?.split(' ')[0] || 'Socio'}!
+          ¡Hola, {socio.apellidoNombre?.includes(',')
+            ? socio.apellidoNombre.split(',')[1]?.trim()
+            : socio.apellidoNombre}!
         </h2>
-        <p className="text-red-100">Bienvenido a tu portal del club</p>
+        <p className="text-white/70">Bienvenido a tu portal del club</p>
       </div>
 
       {/* Cards de resumen */}

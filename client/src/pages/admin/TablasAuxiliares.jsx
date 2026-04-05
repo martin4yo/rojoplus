@@ -85,7 +85,7 @@ export default function TablasAuxiliares() {
   // Configuración Agente IA WhatsApp
   const [configWaAgent, setConfigWaAgent] = useState({
     enabled: 'false', horarioInicio: '7', horarioFin: '23', msgFueraHorario: '', whitelist: '',
-    nombre: '', promptExtra: '', prompt: '',
+    nombre: '', promptExtra: '', prompt: '', chatEnabled: 'true',
   })
   const [guardandoWaAgent, setGuardandoWaAgent] = useState(false)
 
@@ -492,7 +492,7 @@ export default function TablasAuxiliares() {
 
   async function cargarConfigWaAgent() {
     try {
-      const claves = ['WA_AGENT_ENABLED', 'WA_AGENT_HORARIO_INICIO', 'WA_AGENT_HORARIO_FIN', 'WA_AGENT_MSG_FUERA_HORARIO', 'WA_AGENT_WHITELIST', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA', 'WA_AGENT_SYSTEM_PROMPT']
+      const claves = ['WA_AGENT_ENABLED', 'WA_AGENT_HORARIO_INICIO', 'WA_AGENT_HORARIO_FIN', 'WA_AGENT_MSG_FUERA_HORARIO', 'WA_AGENT_WHITELIST', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA', 'WA_AGENT_SYSTEM_PROMPT', 'CHAT_AGENT_ENABLED']
       const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
       const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
       setConfigWaAgent({
@@ -504,6 +504,7 @@ export default function TablasAuxiliares() {
         nombre: cfg.WA_AGENT_NOMBRE || '',
         promptExtra: cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA || '',
         prompt: cfg.WA_AGENT_SYSTEM_PROMPT || '',
+        chatEnabled: cfg.CHAT_AGENT_ENABLED !== '' ? cfg.CHAT_AGENT_ENABLED : 'true',
       })
     } catch (err) { console.error('Error cargando config WA Agent:', err) }
   }
@@ -513,7 +514,8 @@ export default function TablasAuxiliares() {
     setError(null)
     try {
       const campos = [
-        { clave: 'WA_AGENT_ENABLED', valor: configWaAgent.enabled, descripcion: 'Agente IA habilitado' },
+        { clave: 'WA_AGENT_ENABLED', valor: configWaAgent.enabled, descripcion: 'Agente IA WhatsApp habilitado' },
+        { clave: 'CHAT_AGENT_ENABLED', valor: configWaAgent.chatEnabled, descripcion: 'Asistente de chat interno habilitado' },
         { clave: 'WA_AGENT_HORARIO_INICIO', valor: configWaAgent.horarioInicio, descripcion: 'Hora inicio agente' },
         { clave: 'WA_AGENT_HORARIO_FIN', valor: configWaAgent.horarioFin, descripcion: 'Hora fin agente' },
         { clave: 'WA_AGENT_MSG_FUERA_HORARIO', valor: configWaAgent.msgFueraHorario, descripcion: 'Mensaje fuera de horario' },
@@ -1861,6 +1863,38 @@ export default function TablasAuxiliares() {
       {/* Tab: Agente IA */}
       {activeTab === 'agente' && (
         <div className="space-y-6 max-w-3xl">
+
+          {/* Chat interno (Portal del Socio) */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-blue-100">
+                <Bot className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Asistente de chat (Portal del Socio)</h3>
+                    <p className="text-sm text-gray-500 mt-1">Widget de chat con IA disponible dentro del portal web del socio</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigWaAgent({ ...configWaAgent, chatEnabled: configWaAgent.chatEnabled === 'true' ? 'false' : 'true' })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${configWaAgent.chatEnabled === 'true' ? 'bg-blue-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configWaAgent.chatEnabled === 'true' ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t flex justify-end">
+              {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+                <button onClick={guardarConfigWaAgent} disabled={guardandoWaAgent} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
+                  {guardandoWaAgent ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                  Guardar
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Agente IA WhatsApp */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">

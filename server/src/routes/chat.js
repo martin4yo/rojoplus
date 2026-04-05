@@ -93,6 +93,18 @@ router.post(
       })
     }
 
+    // Verificar que el chat interno esté habilitado para este tenant
+    const chatEnabledCfg = await req.db.configuracion.findFirst({
+      where: { clave: 'CHAT_AGENT_ENABLED' }
+    }).catch(() => null)
+    if (chatEnabledCfg && chatEnabledCfg.valor === 'false') {
+      return res.status(503).json({
+        success: false,
+        message: 'El asistente de chat no está disponible en este momento.',
+        error: 'CHAT_AGENT_DISABLED'
+      })
+    }
+
     const { message, tokenPortal, role } = req.body
 
     console.log('\n🎯 ===== NUEVA SOLICITUD AL CHATBOT =====')
