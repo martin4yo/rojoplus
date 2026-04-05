@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { UtensilsCrossed, Users, Clock, ChefHat, ShoppingBag, Coffee, AlertCircle, RefreshCw, Settings, UserCheck, Trash2 } from 'lucide-react'
+import { UtensilsCrossed, Users, Clock, ChefHat, ShoppingBag, Coffee, AlertCircle, RefreshCw, Settings, UserCheck, Trash2, Receipt, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -11,6 +11,38 @@ import Modal from '../../../components/Modal'
 import { useConfirm } from '../../../hooks/useConfirm'
 import ChatWidget from '../../../components/chat/ChatWidget'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+
+const RANGOS = [
+  { label: 'Hoy',        key: 'hoy' },
+  { label: 'Ayer',       key: 'ayer' },
+  { label: 'Esta semana',key: 'semana' },
+  { label: 'Este mes',   key: 'mes' },
+]
+
+function getRangoDates(key) {
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const fmt = d => d.toISOString().slice(0, 10)
+  switch (key) {
+    case 'hoy':    return { desde: fmt(hoy), hasta: fmt(hoy) }
+    case 'ayer': { const a = new Date(hoy); a.setDate(a.getDate() - 1); return { desde: fmt(a), hasta: fmt(a) } }
+    case 'semana': { const s = new Date(hoy); s.setDate(s.getDate() - s.getDay()); return { desde: fmt(s), hasta: fmt(hoy) } }
+    case 'mes':    return { desde: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: fmt(hoy) }
+    default:       return { desde: fmt(hoy), hasta: fmt(hoy) }
+  }
+}
+
+function fmtMonto(n) {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)
+}
+
+function fmtHora(s) {
+  return new Date(s).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtFecha(s) {
+  return new Date(s).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+}
 
 export default function BuffetMesas() {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -28,6 +60,11 @@ export default function BuffetMesas() {
   const [verMisMesas, setVerMisMesas] = useState(soloMesas) // Auto-activar para camareros
   const [modalAsignacion, setModalAsignacion] = useState(false)
   const [asignaciones, setAsignaciones] = useState({}) // { mesaId: mozoId }
+
+  // Ventas del período
+  const [rangoVentas, setRangoVentas] = useState('hoy')
+  const [ventas, setVentas] = useState([])
+  const [loadingVentas, setLoadingVentas] = useState(false)
 
   // Filtro de estado de mesas (solo uno a la vez, o null para ver todas)
   const [estadoFiltro, setEstadoFiltro] = useState(null)
@@ -85,6 +122,20 @@ export default function BuffetMesas() {
     }
   }
 
+  const cargarVentas = useCallback(async (rango) => {
+    if (!puedeVerKpis) return
+    try {
+      setLoadingVentas(true)
+      const { desde, hasta } = getRangoDates(rango)
+      const res = await api.get(`/admin/buffet/ultimas-ventas?desde=${desde}&hasta=${hasta}&limit=100`)
+      setVentas(res.data || res || [])
+    } catch (err) {
+      console.error('Error cargando ventas:', err)
+    } finally {
+      setLoadingVentas(false)
+    }
+  }, [puedeVerKpis])
+
   useEffect(() => {
     cargarDatos()
     const interval = setInterval(cargarDatos, 30000)
@@ -96,6 +147,10 @@ export default function BuffetMesas() {
       cargarMozos()
     }
   }, [puedeAsignar])
+
+  useEffect(() => {
+    cargarVentas(rangoVentas)
+  }, [rangoVentas, cargarVentas])
 
 
   const handleAsignacionChange = (mesaId, mozoId) => {
@@ -596,6 +651,115 @@ export default function BuffetMesas() {
           </p>
         )}
       </div>
+
+      {/* Lista de Ventas del Período */}
+      {puedeVerKpis && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Receipt size={20} className="text-gray-500" />
+              Ventas del período
+            </h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              {RANGOS.map(r => (
+                <button
+                  key={r.key}
+                  onClick={() => setRangoVentas(r.key)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    rangoVentas === r.key
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+              <button
+                onClick={() => cargarVentas(rangoVentas)}
+                className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600"
+                title="Actualizar"
+              >
+                <RefreshCw size={15} className={loadingVentas ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </div>
+
+          {loadingVentas ? (
+            <div className="py-8 text-center text-gray-500 text-sm">Cargando ventas...</div>
+          ) : ventas.length === 0 ? (
+            <div className="py-8 text-center text-gray-400 text-sm">
+              <FileText size={32} className="mx-auto mb-2 opacity-40" />
+              Sin ventas en el período seleccionado
+            </div>
+          ) : (
+            <>
+              {/* Resumen */}
+              <div className="flex flex-wrap gap-4 mb-4 text-sm">
+                <span className="text-gray-600">
+                  <span className="font-semibold text-gray-900">{ventas.length}</span> ventas
+                </span>
+                <span className="text-gray-600">
+                  Total: <span className="font-semibold text-gray-900">{fmtMonto(ventas.reduce((s, v) => s + (v.total || 0), 0))}</span>
+                </span>
+              </div>
+
+              {/* Tabla */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium">Hora</th>
+                      <th className="px-3 py-2 text-left font-medium">Tipo</th>
+                      <th className="px-3 py-2 text-left font-medium">N°</th>
+                      <th className="px-3 py-2 text-left font-medium">Detalle</th>
+                      <th className="px-3 py-2 text-left font-medium">Items</th>
+                      <th className="px-3 py-2 text-right font-medium">Total</th>
+                      <th className="px-3 py-2 text-left font-medium">Comprobante</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {ventas.map((v) => (
+                      <tr key={`${v.tipo}-${v.id}`} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                          {rangoVentas !== 'hoy' && <span className="text-gray-400 mr-1">{fmtFecha(v.fecha)}</span>}
+                          {fmtHora(v.fecha)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            v.tipo === 'COMANDA' ? 'bg-blue-100 text-blue-700' :
+                            v.tipo === 'TAKEAWAY' ? 'bg-purple-100 text-purple-700' :
+                            'bg-orange-100 text-orange-700'
+                          }`}>
+                            {v.tipo === 'COMANDA' ? 'Mesa' : v.tipo === 'TAKEAWAY' ? 'TakeAway' : 'Kiosco'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-mono text-gray-600">{v.numero}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {v.mesa ? `Mesa ${v.mesa}` : ''}
+                          {v.cliente ? v.cliente : ''}
+                          {v.socio ? <span className="text-xs text-gray-500"> · {v.socio}</span> : ''}
+                          {v.cobradoPor ? <span className="text-xs text-gray-400 ml-1">({v.cobradoPor})</span> : ''}
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 text-center">{v.itemsCount}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-gray-900">{fmtMonto(v.total)}</td>
+                        <td className="px-3 py-2">
+                          {v.comprobante ? (
+                            <span className="text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded">
+                              {v.comprobante.tipo} {v.comprobante.puntoVenta?.toString().padStart(4,'0')}-{v.comprobante.numero?.toString().padStart(8,'0')}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">No fiscal</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Modal Asignación de Mozos */}
       <Modal

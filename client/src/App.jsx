@@ -238,6 +238,7 @@ import TenantsList from './pages/super-admin/TenantsList'
 import TenantForm from './pages/super-admin/TenantForm'
 import TenantDetail from './pages/super-admin/TenantDetail'
 import TenantUsage from './pages/super-admin/TenantUsage'
+import IAMetricas from './pages/admin/IAMetricas'
 
 function App() {
   return (
@@ -502,6 +503,7 @@ function App() {
         <Route path="tenants/:id" element={<TenantDetail />} />
         <Route path="tenants/:id/editar" element={<TenantForm />} />
         <Route path="uso" element={<TenantUsage />} />
+        <Route path="ia-metricas" element={<IAMetricas />} />
       </Route>
             </Routes>
             </NotificacionBuffetProvider>

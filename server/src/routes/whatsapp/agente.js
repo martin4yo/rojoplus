@@ -144,20 +144,25 @@ async function ejecutarTool(name, input, { db, socio, tenantId, telefono }) {
 
     case 'consultar_actividades': {
       if (!socio) return { error: 'No estás registrado como socio del club.' }
+      const hoy = new Date()
       const inscripciones = await db.inscripcion.findMany({
-        where: { socioId: socio.id, activo: true },
+        where: {
+          socioId: socio.id,
+          estado: 'ACTIVA',
+          OR: [{ fechaFin: null }, { fechaFin: { gte: hoy } }]
+        },
         include: {
-          actividad: {
-            include: { entrenador: { select: { nombre: true } } }
+          categoriaActividad: {
+            include: { actividad: { select: { nombre: true } } }
           }
         }
       }).catch(() => [])
       return {
         actividades: inscripciones.map(i => ({
-          actividad: i.actividad?.nombre,
-          horario: i.actividad?.horario,
-          entrenador: i.actividad?.entrenador?.nombre,
-          categoria: i.categoria
+          actividad: i.categoriaActividad?.actividad?.nombre,
+          categoria: i.categoriaActividad?.nombre,
+          horario: i.categoriaActividad?.horarioEntrenamiento,
+          dias: i.categoriaActividad?.diasEntrenamiento,
         }))
       }
     }

@@ -7734,4 +7734,71 @@ router.get('/categorias-actividad/:id/plantel/excel', authAdmin, asyncHandler(as
   res.send(excelBuffer)
 }))
 
+// ============================================================
+// GET /api/admin/ia/metricas - Métricas de uso del agente IA
+// ============================================================
+router.get('/ia/metricas', authAdmin, asyncHandler(async (req, res) => {
+  const { desde, hasta } = req.query
+  const fechaDesde = desde ? new Date(desde) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const fechaHasta = hasta ? new Date(hasta + 'T23:59:59') : new Date()
+  const tenantId = req.tenantId
+
+  // Verificar que la tabla existe
+  const tableExists = await req.db.aiUsageLog.count({ where: { tenantId } }).catch(() => null)
+  if (tableExists === null) {
+    return res.json({ mensajes: 0, inputTokens: 0, outputTokens: 0, costoUSD: 0, porDia: [], porModelo: [] })
+  }
+
+  const [porModelo, porDia] = await Promise.all([
+    // Agrupado por modelo
+    req.db.aiUsageLog.groupBy({
+      by: ['provider', 'model'],
+      where: { tenantId, createdAt: { gte: fechaDesde, lte: fechaHasta } },
+      _count: { id: true },
+      _sum: { inputTokens: true, outputTokens: true },
+      orderBy: { _count: { id: 'desc' } },
+    }),
+    // Agrupado por día (últimos registros)
+    req.db.$queryRaw`
+      SELECT
+        DATE(created_at AT TIME ZONE 'America/Argentina/Buenos_Aires') AS dia,
+        COUNT(*)::int AS mensajes,
+        SUM(input_tokens)::int AS input_tokens,
+        SUM(output_tokens)::int AS output_tokens
+      FROM ai_usage_logs
+      WHERE tenant_id = ${tenantId}
+        AND created_at >= ${fechaDesde}
+        AND created_at <= ${fechaHasta}
+      GROUP BY dia
+      ORDER BY dia ASC
+    `.catch(() => []),
+  ])
+
+  const costosPorModelo = porModelo.map(g => {
+    const inp = g._sum.inputTokens || 0
+    const out = g._sum.outputTokens || 0
+    const costo = calcularCostoIA(g.model, inp, out)
+    return { provider: g.provider, model: g.model, mensajes: g._count.id, inputTokens: inp, outputTokens: out, costoUSD: costo }
+  })
+
+  const totales = costosPorModelo.reduce((acc, r) => ({
+    mensajes: acc.mensajes + r.mensajes,
+    inputTokens: acc.inputTokens + r.inputTokens,
+    outputTokens: acc.outputTokens + r.outputTokens,
+    costoUSD: acc.costoUSD + r.costoUSD,
+  }), { mensajes: 0, inputTokens: 0, outputTokens: 0, costoUSD: 0 })
+
+  res.json({ ...totales, porModelo: costosPorModelo, porDia })
+}))
+
+function calcularCostoIA(model, inp, out) {
+  const m = model.toLowerCase()
+  if (m.includes('haiku'))  return (inp * 0.80 + out * 4.00) / 1_000_000
+  if (m.includes('sonnet')) return (inp * 3.00 + out * 15.00) / 1_000_000
+  if (m.includes('opus'))   return (inp * 15.00 + out * 75.00) / 1_000_000
+  if (m.includes('gpt-4o-mini')) return (inp * 0.15 + out * 0.60) / 1_000_000
+  if (m.includes('gpt-4o')) return (inp * 5.00 + out * 15.00) / 1_000_000
+  return (inp * 3.00 + out * 15.00) / 1_000_000
+}
+
 export default router

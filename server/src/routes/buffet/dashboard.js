@@ -99,19 +99,31 @@ router.get('/dashboard', authAdmin, checkPermiso('BUFFET_VER'), async (req, res)
 
 /**
  * GET /ultimas-ventas
- * Obtener últimas ventas del día (para reimprimir tickets)
+ * Obtener últimas ventas del período (para reimprimir tickets)
+ * Query params: desde, hasta (YYYY-MM-DD), limit
  */
-router.get('/ultimas-ventas', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_KIOSCO'), async (req, res) => {
+router.get('/ultimas-ventas', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_KIOSCO', 'BUFFET_VER'), async (req, res) => {
   try {
-    const { limit = 20 } = req.query
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
+    const { limit = 50, desde, hasta } = req.query
 
-    // Comandas cerradas hoy
+    const AR_OFFSET_MS = 3 * 60 * 60 * 1000
+    let fechaDesde, fechaHasta
+    if (desde && hasta) {
+      const d = new Date(desde); d.setHours(0, 0, 0, 0)
+      const h = new Date(hasta); h.setHours(23, 59, 59, 999)
+      fechaDesde = new Date(d.getTime() - AR_OFFSET_MS)
+      fechaHasta = new Date(h.getTime() - AR_OFFSET_MS)
+    } else {
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+      fechaDesde = new Date(hoy.getTime() - AR_OFFSET_MS)
+      fechaHasta = new Date()
+    }
+
+    // Comandas cerradas en el período
     const comandas = await req.db.comanda.findMany({
       where: {
         estado: 'CERRADA',
-        horaCierre: { gte: hoy }
+        horaCierre: { gte: fechaDesde, lte: fechaHasta }
       },
       orderBy: { horaCierre: 'desc' },
       take: parseInt(limit),
@@ -125,11 +137,11 @@ router.get('/ultimas-ventas', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
       }
     })
 
-    // Pedidos takeaway pagados hoy
+    // Pedidos takeaway pagados en el período
     const takeaway = await prisma.pedidoTakeAway.findMany({
       where: {
         estado: { in: ['PAGADO', 'ENTREGADO'] },
-        horaPagado: { gte: hoy }
+        horaPagado: { gte: fechaDesde, lte: fechaHasta }
       },
       orderBy: { horaPagado: 'desc' },
       take: parseInt(limit),

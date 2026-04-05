@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Bot, Cpu, Key } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Bot, Cpu, Key, BarChart2 } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -1996,7 +1996,14 @@ export default function TablasAuxiliares() {
                 </div>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t flex justify-end">
+            <div className="mt-4 pt-4 border-t flex items-center justify-between">
+              <button
+                onClick={() => navigate('/admin/ia-metricas')}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-purple-700 hover:bg-purple-50 rounded-lg transition"
+              >
+                <BarChart2 className="w-4 h-4" />
+                Ver métricas de uso
+              </button>
               {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
                 <button onClick={guardarConfigWaAgent} disabled={guardandoWaAgent} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark disabled:opacity-50 transition">
                   {guardandoWaAgent ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
