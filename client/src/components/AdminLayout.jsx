@@ -147,13 +147,29 @@ export default function AdminLayout() {
     const rutasPermitidas = ['/admin/login', '/admin/mi-perfil']
     if (rutasPermitidas.some(r => path.startsWith(r))) return
 
+    // Rutas companion: páginas de detalle que no están en el menú pero
+    // son accesibles si el usuario tiene acceso a la ruta padre.
+    const RUTAS_COMPANION = {
+      '/admin/periodos': ['/admin/cuotas'],
+      '/admin/socios':   ['/admin/socios/nuevo'],
+      '/admin/reportes/centros-costo': ['/admin/reportes/centros-costo/movimientos'],
+    }
+
     // Construir lista de URLs permitidas desde el menú
     const urlsPermitidas = new Set()
     menuItems.forEach(item => {
-      if (item.path) urlsPermitidas.add(item.path)
+      if (item.path) {
+        urlsPermitidas.add(item.path)
+        const companions = RUTAS_COMPANION[item.path] || []
+        companions.forEach(c => urlsPermitidas.add(c))
+      }
       if (item.submenu) {
         item.submenu.forEach(sub => {
-          if (sub.path) urlsPermitidas.add(sub.path)
+          if (sub.path) {
+            urlsPermitidas.add(sub.path)
+            const companions = RUTAS_COMPANION[sub.path] || []
+            companions.forEach(c => urlsPermitidas.add(c))
+          }
         })
       }
     })

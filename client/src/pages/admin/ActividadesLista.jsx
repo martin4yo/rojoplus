@@ -137,9 +137,6 @@ export default function ActividadesLista() {
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-500 mt-0.5">
                     <span>{actividad.categorias?.length || 0} categorías</span>
-                    {actividad.cuotaMensual && (
-                      <span className="text-green-600 font-medium">${actividad.cuotaMensual.toLocaleString()}/mes</span>
-                    )}
                     {actividad.requiereAptaFisica && (
                       <span className="text-orange-600">Requiere apta física</span>
                     )}
@@ -191,11 +188,6 @@ export default function ActividadesLista() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-sm text-gray-500 flex items-center gap-4">
-                        {cat.cuotaMensual ? (
-                          <span className="text-green-600 font-medium">${cat.cuotaMensual.toLocaleString()}/mes</span>
-                        ) : actividad.cuotaMensual ? (
-                          <span className="text-gray-400">(hereda ${actividad.cuotaMensual.toLocaleString()})</span>
-                        ) : null}
                         {cat.edadMinima || cat.edadMaxima ? (
                           <span>{cat.edadMinima || '?'} - {cat.edadMaxima || '?'} años</span>
                         ) : null}

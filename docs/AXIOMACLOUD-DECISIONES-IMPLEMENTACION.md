@@ -218,6 +218,30 @@ RESULTADO FINAL:
 
 ## 6. Decisiones sobre la autenticación del widget
 
+### Roles, permisos y menú: cada app los gestiona solos
+
+Core no federa roles ni permisos a las apps. Solo provee identidad y contexto de tenant. Cada app recibe del JWT de Core:
+
+- **Quién es el usuario** (userId, email, name)
+- **A qué tenant pertenece** (remoteTenantId)
+
+Con eso, cada app decide internamente:
+- Qué rol le asigna (puede ser configurable por tenant en la propia app)
+- Qué puede hacer (permisos propios de la app)
+- Qué menú ve (gestor de menú propio de la app)
+
+**Primer SSO de un usuario nuevo en una app:**
+```
+Mini recibe el JWT de Core con { email: 'juan@empresa.com', remoteTenantId: 'empresa-abc' }
+  → busca el usuario por email en el tenant 'empresa-abc'
+  → si no existe: crea el usuario con rol por defecto (configurable por el admin del tenant)
+  → si existe: actualiza nombre si cambió, no toca el rol (lo gestiona la app)
+```
+
+El admin del tenant en cada app puede luego ajustar el rol del usuario dentro de esa app, sin que afecte a otras apps ni a Core.
+
+---
+
 ### El serviceToken
 
 Cuando una app consumidora monta un widget de otra app, necesita un token que el backend de la app proveedora acepte. Este token:

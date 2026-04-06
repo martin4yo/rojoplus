@@ -293,13 +293,13 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
       ],
     },
     include: {
-      tipoSocioRel: true,
+      tipoSocioRel: { include: { conceptoTesoreria: true } },
       categoriaSocioRel: true,
       inscripciones: {
         where: { estado: 'ACTIVA' },
         include: {
           categoriaActividad: {
-            include: { actividad: true },
+            include: { actividad: { include: { conceptoTesoreria: true } } },
           },
         },
       },
@@ -330,16 +330,19 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
     if (!esTitularOUnico) {
       sociosNoTitulares++
     }
-    if (!socio.tipoSocioRel?.cuotaMensual) {
+    const cuotaSocialMonto = socio.tipoSocioRel?.conceptoTesoreria?.cuotaMensual
+      ? Number(socio.tipoSocioRel.conceptoTesoreria.cuotaMensual)
+      : Number(socio.tipoSocioRel?.cuotaMensual || 0)
+
+    if (!cuotaSocialMonto) {
       sociosSinCuotaMensual++
     }
 
-    if (esTitularOUnico && socio.tipoSocioRel?.cuotaMensual && !yaTeníaCuotaSocial) {
-      const montoBase = Number(socio.tipoSocioRel.cuotaMensual)
+    if (esTitularOUnico && cuotaSocialMonto && !yaTeníaCuotaSocial) {
+      const montoBase = cuotaSocialMonto
       const montoBonificacion = montoBase * (descuentoPct / 100)
       const montoTotal = montoBase - montoBonificacion
 
-      // Determinar tipo de cuota: Grupo Familiar si tiene miembros, sino Socio Único
       const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
       const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
 
@@ -349,6 +352,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
         grupoFamiliarId: socio.titularFamiliaId || socio.id,
         categoria: 'CUOTA_SOCIAL',
         tipoCuota,
+        conceptoTesoreriaId: socio.tipoSocioRel?.conceptoTesoreriaId || null,
         descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'}`,
         montoOriginal: montoBase,
         montoBonificacion,
@@ -377,10 +381,10 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
       const categoria = inscripcion.categoriaActividad
       const actividad = categoria.actividad
 
-      // Determinar monto: primero categoría, luego actividad
-      let montoBase = categoria.cuotaMensual
-        ? Number(categoria.cuotaMensual)
-        : (actividad.cuotaMensual ? Number(actividad.cuotaMensual) : 0)
+      // Determinar monto: concepto de tesorería de la actividad → categoría → actividad (fallbacks)
+      let montoBase = actividad.conceptoTesoreria?.cuotaMensual
+        ? Number(actividad.conceptoTesoreria.cuotaMensual)
+        : (categoria.cuotaMensual ? Number(categoria.cuotaMensual) : (actividad.cuotaMensual ? Number(actividad.cuotaMensual) : 0))
 
       // Aplicar porcentaje de inscripción si no es 100%
       if (inscripcion.porcentajeCuota && Number(inscripcion.porcentajeCuota) !== 100) {
@@ -397,6 +401,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
           grupoFamiliarId: socio.titularFamiliaId || socio.id,
           categoria: 'CUOTA_ACTIVIDAD',
           categoriaActividadId: categoria.id,
+          conceptoTesoreriaId: actividad.conceptoTesoreriaId || null,
           descripcion: `${actividad.nombre} - ${categoria.nombre}`,
           montoOriginal: montoBase,
           montoBonificacion,

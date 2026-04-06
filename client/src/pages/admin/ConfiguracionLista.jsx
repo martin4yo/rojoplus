@@ -174,11 +174,6 @@ export default function ConfiguracionLista() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">{item.descripcion || '-'}</td>
-                {tabla === 'tipos-socio' && (
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {item.cuotaMensual ? `$${Number(item.cuotaMensual).toLocaleString()}` : '-'}
-                  </td>
-                )}
                 {tabla === 'categorias-socio' && (
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {item.porcentajeDescuento > 0 ? `${item.porcentajeDescuento}%` : '-'}

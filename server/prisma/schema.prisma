@@ -127,6 +127,7 @@ model ConceptoTesoreria {
   orden                Int                  @default(0)
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
+  cuotaMensual         Decimal?             @map("cuota_mensual") @db.Decimal(12, 2)
   usaEnCompras         Boolean              @default(false) @map("usa_en_compras")
   usaEnTesoreria       Boolean              @default(true) @map("usa_en_tesoreria")
   usaEnVentas          Boolean              @default(false) @map("usa_en_ventas")
@@ -143,6 +144,7 @@ model ConceptoTesoreria {
   tiposSocioMora       TipoSocio[]          @relation("TipoSocioConceptoMora")
   tiposSocio           TipoSocio[]          @relation("TipoSocioConcepto")
   mediosPago           MedioPago[]
+  cargos               Cargo[]
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
@@ -644,10 +646,12 @@ model Cargo {
   updatedAt            DateTime            @updatedAt @map("updated_at")
   categoria            String              @default("CUOTA_SOCIAL")
   tipoCuota            String?             @map("tipo_cuota")
+  conceptoTesoreriaId  Int?                @map("concepto_tesoreria_id")
   cargoOrigen          Cargo?              @relation("CargosDerivados", fields: [cargoOrigenId], references: [id])
   cargosDerivados      Cargo[]             @relation("CargosDerivados")
   categoriaActividad   CategoriaActividad? @relation(fields: [categoriaActividadId], references: [id])
   centroCosto          CentroCosto?        @relation(fields: [centroCostoId], references: [id])
+  conceptoTesoreria    ConceptoTesoreria?  @relation(fields: [conceptoTesoreriaId], references: [id])
   archivoDebito        ArchivoDebito?      @relation(fields: [incluidoEnDebitoId], references: [id])
   pago                 Pago?               @relation(fields: [pagoId], references: [id])
   periodo              Periodo?            @relation(fields: [periodoId], references: [id])

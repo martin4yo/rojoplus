@@ -81,6 +81,7 @@ import DashboardEjecutivoCentros from './pages/admin/centros-costo/DashboardEjec
 import EvolucionTemporalCentros from './pages/admin/centros-costo/EvolucionTemporal'
 import RentabilidadActividades from './pages/admin/centros-costo/RentabilidadActividades'
 import PresupuestoVsReal from './pages/admin/centros-costo/PresupuestoVsReal'
+import MovimientosCentroCosto from './pages/admin/centros-costo/MovimientosCentroCosto'
 import AdminReporteMorosidad from './pages/admin/ReporteMorosidadAvanzado'
 import AdminEntrenadoresLista from './pages/admin/EntrenadoresLista'
 import AdminEntrenadorForm from './pages/admin/EntrenadorForm'
@@ -327,6 +328,7 @@ function App() {
         <Route path="reportes/centros-costo/evolucion" element={<EvolucionTemporalCentros />} />
         <Route path="reportes/centros-costo/rentabilidad" element={<RentabilidadActividades />} />
         <Route path="reportes/centros-costo/presupuesto" element={<PresupuestoVsReal />} />
+        <Route path="reportes/centros-costo/movimientos" element={<MovimientosCentroCosto />} />
         <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
         <Route path="configuracion" element={<AdminTablasAuxiliares />} />
         <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />

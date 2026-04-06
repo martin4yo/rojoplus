@@ -126,9 +126,6 @@ export default function CategoriaActividadForm() {
           </h1>
           <p className="text-gray-500 text-sm">
             {actividad?.nombre}
-            {actividad?.cuotaMensual && (
-              <span className="ml-2 text-green-600">(cuota base: ${actividad.cuotaMensual.toLocaleString()})</span>
-            )}
           </p>
         </div>
       </div>
@@ -234,27 +231,6 @@ export default function CategoriaActividadForm() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 mt-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Cuota Mensual
-              {!form.cuotaMensual && actividad?.cuotaMensual && (
-                <span className="text-gray-400 font-normal ml-1">(hereda ${actividad.cuotaMensual.toLocaleString()})</span>
-              )}
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-400">$</span>
-              <input
-                type="number"
-                name="cuotaMensual"
-                value={form.cuotaMensual}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                placeholder={actividad?.cuotaMensual ? `Hereda ${actividad.cuotaMensual}` : '0'}
-              />
-            </div>
-          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Orden</label>

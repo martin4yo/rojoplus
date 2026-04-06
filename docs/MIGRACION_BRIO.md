@@ -117,44 +117,97 @@
 
 ## Paso 5 — Cuotas de Socios
 
-**Archivo:** `Cuotas.xlsx` (112.806 filas)
+**Archivo:** `Cuotas.xlsx` (114.057 filas totales)
 **Script:** `node scripts/importar-cuotas.js`
-**Tablas destino:** `cargos`, `pagos`
+**Tabla destino:** `cargos`
 
-**Tipos de cuota en el archivo:**
+### Configuración del script
 
-| Tipo Cuota Brio | Mapeo en RojoPlus |
+Editar las constantes al inicio del archivo antes de ejecutar:
+
+```js
+const TENANT_SLUG        = 'sportivotest'   // tenant destino
+const PERIODO_DESDE_ANIO = 2026             // importar desde...
+const PERIODO_DESDE_MES  = 4               // ...abril 2026 inclusive
+```
+
+El script **borra y reimporta** los cargos con `origen = 'MIGRACION_BRIO'` del tenant configurado, por lo que es seguro volver a ejecutar.
+
+### Filtro de períodos
+
+Solo se importan registros cuyo `Periodo` sea ≥ `PERIODO_DESDE_MES/PERIODO_DESDE_ANIO`.
+Ejemplo con los valores por defecto: importa desde **04/2026** en adelante.
+
+### Tipos de cuota
+
+| Tipo Cuota Brio | Mapeo `categoria` | Lógica |
+|---|---|---|
+| CUOTA SOCIAL | `CUOTA_SOCIAL` | directo |
+| ACTIVIDAD | `ACTIVIDAD` | intenta matchear `Desc.Cuota` ("ACT - CAT") contra tablas `actividades`/`categorias_actividad`; si hay match setea `categoriaActividadId`; si no → `CONCEPTO` |
+| CONCEPTO | `CONCEPTO` | directo |
+| MOROSIDAD | `MORA` | directo |
+| FINANCIADO | `FINANCIADO` | directo |
+| (otros) | `CONCEPTO` | fallback; `tipoCuota` guarda el texto original |
+
+### Estados
+
+| Est. Cuota Brio | Mapeo `cargo.estado` | Notas |
+|---|---|---|
+| PAGADA | `PAGADO` | `fechaPago` = Fecha Cobro |
+| PENDIENTE | `PENDIENTE` | sin fechaPago |
+| NOTA DE CRÉDITO | `PAGADO` | `montoOriginal` y `montoTotal` negativos; `categoria = 'NOTA_CREDITO'` |
+
+### Columnas mapeadas para `cargos`
+
+| Columna Excel | Campo BD |
 |---|---|
-| CUOTA SOCIAL | `cargo.categoria = 'CUOTA_SOCIAL'` |
-| ACTIVIDAD | `cargo.categoria = 'ACTIVIDAD'` |
-| CONCEPTO | `cargo.categoria = 'CONCEPTO'` |
-| MOROSIDAD | `cargo.categoria = 'MORA'` |
-| FINANCIADO | `cargo.categoria = 'FINANCIADO'` |
+| Nro. Socio | `socioId` |
+| Tipo Cuota | `tipoCuota` (texto original), `categoria` (mapeado) |
+| Periodo | `periodoId` (crea el periodo si no existe) |
+| Desc. Cuota | `descripcion`, y match actividad+categoría |
+| Precio × Porc. Cuota | `montoOriginal` |
+| Importe Real | `montoTotal` |
+| Precio×Porc − Importe Real | `montoBonificacion` |
+| Fecha Gen. | `fechaGeneracion` |
+| Fecha Cobro | `fechaPago` (si PAGADA) |
+| Categ. Socio / Estado | `observaciones` |
 
-**Estados:**
+> ⚠️ **Nota sobre Periodos:** la tabla `periodos` tiene unique `[anio, mes]` sin `tenantId` — los períodos son compartidos entre tenants. El script busca primero sin filtrar tenant.
 
-| Est. Cuota Brio | Mapeo en RojoPlus |
+### Prerequisito
+Paso 1 (Socios) y Paso 3a (Actividades/Categorías) completados para el tenant destino.
+
+### Ejecución
+
+```bash
+cd server
+node scripts/importar-cuotas.js
+```
+
+Al finalizar imprime: importados / saltados por período / sin socio / errores / conteo por estado en BD.
+
+### Actualización de cuotaMensual (incluida en el mismo script)
+
+Al terminar la importación de cargos, el script también actualiza `cuotaMensual` en:
+
+- **`TipoSocio`** — calcula el máximo del Excel y lo asigna:
+
+| Código | Lógica | Valor (sportivopilar) |
+|---|---|---|
+| `SOCIO_UNICO` | Máx. CUOTA SOCIAL sin "GRUPO FAMILIAR", < $40.000 | $23.000 |
+| `TITULAR_FAMILIA` | Máx. CUOTA SOCIAL con "GRUPO FAMILIAR" en Desc.Cuota | $43.000 |
+
+- **`CategoriaActividad`** — para cada actividad, toma el máximo importe de las filas con Tipo Cuota = ACTIVIDAD cuyo prefijo (antes del ` - `) coincida con el nombre de la actividad en BD. Aplica el mismo valor a todas las categorías de esa actividad.
+
+| Actividad | Valor (sportivopilar) |
 |---|---|
-| PAGADA | `cargo.estado = 'PAGADO'` → crear registro en `pagos` |
-| (sin Est. Cuota) | `cargo.estado = 'PENDIENTE'` |
+| BASQUET | $38.000 |
+| FUTBOL ESCUELITA | $30.000 |
+| FUTBOL LIGA | $30.000 |
+| FUTSAL | $30.000 |
+| VOLEY | $30.000 |
 
-**Columnas mapeadas para `cargos`:**
-- Nro. Socio → socioId
-- Periodo → descripcion / periodoId
-- Desc. Cuota → descripcion
-- Precio, Porc. Cuota, Importe Real → montoOriginal, montoBonificacion, montoTotal
-- Fecha Gen. → fechaGeneracion
-- Tipo Cuota → categoria / tipoCuota
-
-**Columnas mapeadas para `pagos`** (solo cuotas PAGADAS):
-- Fecha Cobro → fecha
-- Forma Pago / Medio de Pago → medioPagoId
-- Caja → cajaId
-- Comprobante (Nro. Cuenta) → comprobanteNro
-- Importe Real → montoTotal + montoRecibido
-
-**Prerequisito:** Paso 1 completado
-**Estado:** ✅ Listo — `node scripts/importar-cuotas.js`
+**Estado:** ✅ Listo
 
 ---
 

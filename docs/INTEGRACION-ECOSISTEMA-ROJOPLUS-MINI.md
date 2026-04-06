@@ -289,21 +289,31 @@ Se evaluaron tres variantes de integración frontend:
 
 ### Tenant Mapping
 
-```sql
--- Nueva tabla en RojoPlus DB
-CREATE TABLE integraciones_externas (
-  id            SERIAL PRIMARY KEY,
-  tenant_id     INT REFERENCES tenants(id),
-  sistema       VARCHAR(50),    -- 'MINI_ERP'
-  ext_tenant_id VARCHAR(100),   -- slug del tenant en Mini
-  api_key       VARCHAR(200),   -- API key de servicio en Mini
-  base_url      VARCHAR(200),   -- http://localhost:4001
-  activo        BOOLEAN DEFAULT true,
-  config        JSONB           -- config adicional por módulo
-);
+> **Nota:** Este diseño fue elaborado antes de definir el rol central de Core en el ecosistema. El diseño final establece que el tenant mapping vive en **Core** vía la tabla `TenantAppMapping`, no en Clubix. Ver `AXIOMACLOUD-ECOSISTEMA-ARQUITECTURA.md` para el diseño definitivo.
+
+El mapeo entre el tenant de Clubix y el tenant correspondiente en Mini se configura en Core:
+
+```typescript
+// Core DB — TenantAppMapping
+{
+  coreTenantId: 17,          // tenant "Club Pilar" en Core
+  appName: 'mini-erp',
+  remoteTenantId: 'club-pilar-erp',   // slug del tenant en Mini
+  remoteBaseUrl: 'https://api.mini.axiomacloud.com',
+  config: { /* config adicional */ }
+}
 ```
 
-La activación de la integración para un club es manual por el super-admin: ingresa el slug y API key del tenant correspondiente en Mini. No hay provisioning automático (decisión explícita: mantener control manual).
+Cuando Clubix necesita un service token para usar un widget de Mini, lo pide a Core (no a Mini directamente):
+
+```
+Clubix Backend → POST /api/sso/service-session a Core
+  { coreTenantId: 17, targetApp: 'mini-erp', scope: ['invoicing'] }
+Core consulta TenantAppMapping → devuelve sessionToken con remoteTenantId incluido
+Clubix pasa el token al widget como prop serviceToken
+```
+
+La activación del mapeo es manual por el super-admin en Core: ingresa el slug y configura qué apps tiene habilitadas cada tenant. No hay provisioning automático (decisión explícita: mantener control manual).
 
 ---
 

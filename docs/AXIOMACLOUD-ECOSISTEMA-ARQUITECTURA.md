@@ -34,83 +34,155 @@
 
 ---
 
-## 2. Core es el Centro del Ecosistema
+## 2. Las Tres Reglas Base del Ecosistema
 
-### El descubrimiento clave
+Estas reglas definen todo el diseño de integración:
 
-Core ya resuelve dos de los tres problemas más difíciles de un ecosistema de apps:
+### Regla 1 — Tenants propios, vinculados a Core
+
+Cada app gestiona sus propios tenants de forma independiente. No hay creación top-down desde Core. Cuando una empresa ya existe en Mini y en Hub, sus tenants se **vinculan** a Core mediante una tabla de mapeo. Core no crea ni destruye tenants en las apps — solo los conoce.
 
 ```
-Problema 1: ¿Cómo se autentica un usuario en múltiples apps?
-→ RESUELTO: Core tiene SSO. El usuario se loguea una vez y accede a todas las apps.
-
-Problema 2: ¿Dónde se registra qué apps existen y qué ofrecen?
-→ RESUELTO: Core tiene Application Registry. Cada app está registrada con su config.
-
-Problema 3: ¿Cómo se mapean los tenants entre apps?
-→ PENDIENTE: Core gestiona tenants y TenantUserApplication. Se puede extender.
+Mini ERP  → tiene tenant 'empresa-abc'   ──┐
+Hub       → tiene tenant_id: 15          ──┼──→ Core tenant_id: 42 (Empresa ABC)
+Elore     → tiene tenant_id: 8           ──┘
 ```
 
-### Lo que Core ya tiene
+### Regla 2 — Apps habilitadas por contrato
 
-- **SSO:** Un JWT de Core es reconocido por todas las apps (o puede serlo con mínima configuración)
-- **Application Registry:** `Application` model con config, menú y permisos por tenant
-- **Tenant Management:** Tenants centralizados con usuarios asignados por app
-- **RBAC:** Roles y permisos que pueden federarse entre apps
-- **Audit Log:** Trazabilidad centralizada de acciones cross-app
-- **Session Management:** Control de sesiones activas, revocación remota
-- **Holdings:** Agrupación de tenants (empresas madre con múltiples subsidiarias)
+Cada tenant tiene un subconjunto de apps habilitadas según lo que contrató. Core gestiona esto a través de su modelo `TenantUserApplication`. El launcher de Core solo muestra las apps activas para ese tenant. Un tenant puede contratar Mini + Hub + Elore y no tener acceso a MediFlow ni Clubix.
 
-### Lo que hay que agregar a Core
+```
+Empresa ABC contrata: [Mini ERP] [Hub] [Elore] [Parse]
+Clínica XYZ contrata: [MediFlow] [Checkpoint] [Mini ERP] [AxiomaDocs]
+Club Pilar  contrata: [Clubix] [Checkpoint] [Mini ERP]
+```
 
-Solo tres cosas nuevas para soportar la integración de widgets:
+### Regla 3 — Roles, permisos y menú son propios de cada app
 
-```typescript
-// 1. Campo federationUrl en el modelo Application
-model Application {
-  // ... campos existentes ...
-  federationUrl    String?   // URL del bundle ESM de widgets
-  widgetsManifest  Json?     // Qué widgets expone y su interfaz
-}
+Core **no** federa roles ni permisos a las apps. Cada app tiene su propio sistema de RBAC y su propio gestor de menú. Core solo provee la identidad del usuario (quién es) y el contexto de tenant (a cuál pertenece). Lo que ese usuario puede hacer dentro de cada app lo decide cada app por su cuenta.
 
-// 2. Endpoint de service session (para auth de widgets)
-// POST /api/sso/service-session
-// Body: { applicationId, targetAppId, tenantId, scope: ['invoicing'] }
-// Return: { sessionToken, expiresAt }
-// Genera un JWT corto de vida para que un widget de App B
-// pueda llamar al backend de App B desde dentro de App A
-
-// 3. Endpoint de tenant mapping
-// GET /api/tenants/:tenantId/app-mapping/:applicationId
-// Return: { remoteTenantId, remoteConfig }
+```
+Core dice: "este es Juan Pérez, pertenece a Empresa ABC"
+Mini decide: "Juan Pérez es Contador en este tenant, puede ver pero no emitir facturas"
+Elore decide: "Juan Pérez es Developer, puede crear tareas pero no administrar proyectos"
+Checkpoint decide: "Juan Pérez es RRHH, puede ver legajos pero no liquidar"
 ```
 
 ---
 
-## 3. El Patrón de Integración: Tres Capas
+## 3. Core como Centro del Ecosistema
+
+### Lo que Core ya tiene
+
+- **SSO:** Login único, el usuario se autentica una vez para todas las apps
+- **Application Registry:** Registro central de todas las apps del ecosistema
+- **Tenant Management:** Tenants con usuarios asignados y apps habilitadas por contrato
+- **TenantUserApplication:** Controla qué usuarios acceden a qué apps por tenant
+- **Audit Log:** Trazabilidad de acciones cross-app
+- **Session Management:** Sesiones activas, revocación remota
+- **Holdings:** Agrupación de tenants (grupos empresariales con múltiples subsidiarias)
+
+### Lo que hay que agregar a Core
+
+```typescript
+// 1. Tabla de mapeo de tenants entre apps
+model TenantAppMapping {
+  id              Int     @id @default(autoincrement())
+  coreTenantId    Int     // tenant en Core
+  appName         String  // 'mini-erp', 'hub', 'elore', etc.
+  remoteTenantId  String  // ID o slug del tenant en esa app
+  remoteBaseUrl   String  // URL del backend de esa app
+  active          Boolean @default(true)
+  config          Json?   // config adicional (ej. subdomain para Clubix)
+
+  @@unique([coreTenantId, appName])
+}
+
+// 2. Campo federationUrl en Application (para cargar widgets)
+model Application {
+  // ... campos existentes ...
+  federationUrl   String?  // URL del bundle ESM de widgets
+  widgetsManifest Json?    // qué widgets expone y su interfaz
+}
+
+// 3. Endpoint de SSO redirect
+// POST /api/sso/redirect-token
+// Body: { coreTenantId, targetApp }
+// → busca TenantAppMapping → genera JWT corto con remoteTenantId
+// → devuelve { token, redirectUrl }
+
+// 4. Endpoint de service session (para widgets)
+// POST /api/sso/service-session
+// Body: { coreTenantId, targetApp, scope: ['invoicing'] }
+// → valida que el tenant tiene esa app contratada
+// → genera JWT de servicio con remoteTenantId + scope
+// → devuelve { sessionToken, expiresAt }
+
+// 5. JWKS endpoint (para que las apps validen los JWT de Core)
+// GET /.well-known/jwks.json
+```
+
+---
+
+## 4. El Patrón de Integración: Tres Capas
 
 ### Capa 1 — Identidad (Core como fuente de verdad)
 
+**Flujo SSO: usuario salta de Core a una app**
+
 ```
-Usuario se loguea en Core
-  → Core emite JWT principal (7 días, acceso a todas sus apps)
-  → Usuario navega a Clubix, Mini, MediFlow, etc.
-  → Cada app valida el JWT de Core (shared secret o JWKS endpoint)
-  → No hay login separado por app
+1. Usuario se loguea en Core
+   → Core emite JWT principal
+   → Core muestra launcher con las apps contratadas por ese tenant
+
+2. Usuario hace clic en "Mini ERP"
+   → Core consulta TenantAppMapping: coreTenantId=42 + app='mini-erp'
+   → Obtiene remoteTenantId='empresa-abc'
+   → Genera JWT de redirect (vida: 5 minutos):
+     { userId, email, name, coreTenantId: 42, remoteTenantId: 'empresa-abc' }
+   → Redirige a: https://mini.axiomacloud.com/sso?token=<jwt>
+
+3. Mini recibe el redirect
+   → Valida el JWT contra JWKS de Core
+   → Extrae userId + remoteTenantId
+   → Busca el usuario en Mini (por email) dentro del tenant 'empresa-abc'
+   → Si no existe: lo crea con datos básicos del JWT
+   → Asigna rol según las reglas propias de Mini (no las de Core)
+   → Crea sesión local y redirige al dashboard de Mini
+   → El usuario está dentro, sin haber escrito nada
 ```
 
-Cuando una app necesita embeber un widget de otra:
+**Lo que el JWT de Core le dice a cada app:**
+```json
+{
+  "userId": "uuid-de-core",
+  "email": "juan@empresa.com",
+  "name": "Juan Pérez",
+  "coreTenantId": 42,
+  "remoteTenantId": "empresa-abc"
+}
+```
+
+**Lo que el JWT de Core NO le dice a cada app:**
+- Qué rol tiene el usuario → cada app decide
+- Qué puede hacer → cada app decide
+- Qué menú ve → cada app decide
+
+**Flujo de widget: App A embebe widget de App B**
 
 ```
 App A (consumidora) necesita widget de App B (proveedora)
   → App A pide a Core un service session token:
     POST /api/sso/service-session
-    { targetApp: 'mini-erp', tenantMapping: {...}, scope: ['invoicing'] }
-  → Core valida que el tenant de App A tiene acceso a App B
-  → Core emite JWT corto (1 hora) con scope limitado
-  → App A pasa ese token al widget de App B como prop
+    { coreTenantId: 42, targetApp: 'mini-erp', scope: ['invoicing'] }
+  → Core verifica: ¿el tenant 42 tiene 'mini-erp' contratado? → sí
+  → Core consulta TenantAppMapping → remoteTenantId='empresa-abc'
+  → Core emite JWT de servicio (vida: 1 hora):
+    { coreTenantId: 42, remoteTenantId: 'empresa-abc', scope: ['invoicing'] }
+  → App A pasa ese token al widget como prop serviceToken
   → El widget llama al backend de App B con ese token
-  → App B valida el token contra Core (o localmente con shared secret)
+  → App B valida el JWT y opera en el tenant correcto con el scope permitido
 ```
 
 ### Capa 2 — Federation (widgets compartidos)
@@ -156,7 +228,7 @@ Flujo correcto:
 
 ---
 
-## 4. El Protocolo de Widgets
+## 5. El Protocolo de Widgets
 
 ### Interfaz estándar
 
@@ -236,7 +308,7 @@ Core puede leer estos manifests y almacenarlos en su `Application` registry, dan
 
 ---
 
-## 5. Mapa de Capacidades por App
+## 6. Mapa de Capacidades por App
 
 ### Lo que cada app ofrece al ecosistema
 
@@ -357,7 +429,7 @@ Core puede leer estos manifests y almacenarlos en su `Application` registry, dan
 
 ---
 
-## 6. Casos de Uso Cross-App Más Relevantes
+## 7. Casos de Uso Cross-App Más Relevantes
 
 | App consumidora | App proveedora | Widget / Servicio | Valor |
 |-----------------|----------------|-------------------|-------|
@@ -386,7 +458,7 @@ Core puede leer estos manifests y almacenarlos en su `Application` registry, dan
 
 ---
 
-## 7. Implementación Técnica
+## 8. Implementación Técnica
 
 ### Estructura de federation en cada app
 
@@ -550,7 +622,7 @@ export function useServiceSession(targetApp: string) {
 
 ---
 
-## 8. Configuración en Core
+## 9. Configuración en Core
 
 ### Extensión del modelo Application en Core
 
@@ -577,7 +649,7 @@ Una sección nueva en el admin de Core: **"Integraciones del Ecosistema"**
 
 ---
 
-## 9. Plan de Implementación del Ecosistema
+## 10. Plan de Implementación del Ecosistema
 
 ### Fase 0 — Estándares (sin código de producto)
 - [ ] Definir `AxiomaWidgetProps` interface en repositorio/package compartido
@@ -624,7 +696,7 @@ Una sección nueva en el admin de Core: **"Integraciones del Ecosistema"**
 
 ---
 
-## 10. Principios del Ecosistema
+## 11. Principios del Ecosistema
 
 Estos principios guían toda decisión de integración:
 
@@ -646,7 +718,7 @@ Estos principios guían toda decisión de integración:
 
 ---
 
-## 11. Árbol de Dependencias del Ecosistema
+## 12. Árbol de Dependencias del Ecosistema
 
 ```
                         ┌─────────┐

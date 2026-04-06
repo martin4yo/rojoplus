@@ -152,4 +152,4 @@ cd server && npm run dev   # Backend :3000
 cd client && npm run dev   # Frontend :5173
 npx prisma db push && npx prisma generate
 ```
-Admin: admin@rojoplus.com / admin123 | DB: postgres:Q27G4B98@localhost/rojoplus
+Admin: admin@rojoplus.com / admin123 | DB: ver server/.env (DATABASE_URL)

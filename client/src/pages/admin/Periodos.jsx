@@ -218,15 +218,8 @@ export default function Periodos() {
 
   // Filtrar periodos hasta el periodo seleccionado
   const periodosFiltrados = periodos.filter(periodo => {
-    // Extraer año y mes del nombre del periodo (ej: "Enero 2026")
-    const partes = periodo.nombre.split(' ')
-    if (partes.length !== 2) return true
-    const mesNombre = partes[0]
-    const año = parseInt(partes[1])
-    const mes = MESES.indexOf(mesNombre) + 1
-    if (mes === 0 || isNaN(año)) return true
-
-    const periodoKey = `${año}-${String(mes).padStart(2, '0')}`
+    if (!periodo.anio || !periodo.mes) return true
+    const periodoKey = `${periodo.anio}-${String(periodo.mes).padStart(2, '0')}`
     return periodoKey <= periodoHasta
   })
 
