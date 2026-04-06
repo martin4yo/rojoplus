@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart,
   ChefHat, Coffee, Truck, RefreshCw, ArrowRight,
   CreditCard, Banknote, QrCode, BarChart3, ArrowUpCircle, ArrowDownCircle, Scale,
-  ChevronDown, ChevronRight, Wallet, Printer, Download, Eye, X, ChevronLeft
+  ChevronDown, ChevronRight, Wallet, Printer, Download, X, ChevronLeft
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -17,7 +17,7 @@ import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
 import ChatWidget from '../../../components/chat/ChatWidget'
 import LoadingSpinner from '../../../components/LoadingSpinner'
-import DetallePedidoModal from '../../../components/buffet/DetallePedidoModal'
+import TicketPreview from '../../../components/buffet/TicketPreview'
 
 // Rangos de fecha predefinidos
 const RANGOS_FECHA = [
@@ -84,9 +84,7 @@ export default function BuffetDashboard() {
   const [ventasTotalPages, setVentasTotalPages] = useState(1)
   const [loadingVentas, setLoadingVentas] = useState(false)
   const [ventasExpanded, setVentasExpanded] = useState(false)
-  const [ventaDetalle, setVentaDetalle] = useState(null) // { tipo, id, numero }
-  const [loadingDetalle, setLoadingDetalle] = useState(false)
-  const [detalleItems, setDetalleItems] = useState(null)
+  const [ticketPreview, setTicketPreview] = useState(null)
 
   // Obtener fechas según el rango seleccionado
   const obtenerFechas = useCallback(() => {
@@ -161,22 +159,58 @@ export default function BuffetDashboard() {
     cargarVentas(1)
   }, [cargarVentas])
 
-  // Cargar detalle de una venta
-  const verDetalle = async (venta) => {
-    setVentaDetalle(venta)
-    setDetalleItems(null)
-    setLoadingDetalle(true)
+
+  // Mostrar preview de ticket de una venta
+  const verTicket = async (venta) => {
     try {
-      const endpoint = venta.tipo === 'COMANDA'
-        ? `/admin/buffet/comandas/${venta.id}`
-        : `/admin/buffet/takeaway/${venta.id}`
-      const data = await api.get(endpoint)
-      const items = data?.items || []
-      setDetalleItems(items)
-    } catch {
-      setDetalleItems([])
-    } finally {
-      setLoadingDetalle(false)
+      const tipo = venta.tipo === 'COMANDA' ? 'comanda' : 'takeaway'
+      // El backend retorna { success, ...campos } con spread, no { data: {...} }
+      // Usar getFull para recibir el objeto completo
+      const data = await api.getFull(`/admin/buffet/preview-ticket/${tipo}/${venta.id}`)
+
+      let ticket
+      if (data.comprobante) {
+        // Ticket fiscal
+        ticket = {
+          tipo: 'FISCAL',
+          empresa: data.empresa,
+          comprobante: {
+            tipo: data.comprobante.tipo,
+            puntoVenta: data.comprobante.puntoVenta,
+            numero: data.comprobante.numero,
+            fecha: data.comprobante.fecha,
+            cae: data.comprobante.cae,
+            fechaVtoCae: data.comprobante.fechaVtoCae
+          },
+          cliente: {
+            nombre: data.comprobante.nombreReceptor || 'Consumidor Final',
+            documento: data.comprobante.docReceptor,
+            tipoDoc: data.comprobante.tipoDocReceptor,
+            condicionIva: data.comprobante.condicionIvaReceptor
+          },
+          items: data.items,
+          total: data.comprobante.total,
+          qrUrl: data.qrUrl,
+          medioPago: data.medioPago
+        }
+      } else {
+        // Ticket no fiscal
+        const ref = data.comanda || data.pedido
+        ticket = {
+          tipo: venta.tipo, // 'COMANDA', 'TAKEAWAY', 'KIOSCO'
+          numero: ref?.numero || venta.numero,
+          mesa: ref?.mesa?.numero ?? ref?.mesa ?? null,
+          cliente: ref?.nombreCliente || null,
+          fecha: venta.fecha,
+          items: data.items,
+          total: ref?.total ?? venta.total,
+          medioPago: data.medioPago
+        }
+      }
+
+      setTicketPreview(ticket)
+    } catch (err) {
+      toast.error('No se pudo cargar el ticket')
     }
   }
 
@@ -452,7 +486,7 @@ export default function BuffetDashboard() {
                         <tr key={i} className="hover:bg-gray-50">
                           <td className="px-4 py-2.5 text-gray-500 font-mono text-xs">{v.numero || '-'}</td>
                           <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">
-                            {v.fecha ? new Date(v.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            {v.fecha ? new Date(v.fecha).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
                           </td>
                           <td className="px-4 py-2.5">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -479,11 +513,11 @@ export default function BuffetDashboard() {
                           </td>
                           <td className="px-2 py-2.5">
                             <button
-                              onClick={() => verDetalle(v)}
-                              className="p-1 rounded hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors"
-                              title="Ver detalle"
+                              onClick={() => verTicket(v)}
+                              className="p-1 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                              title="Ver ticket"
                             >
-                              <Eye size={14} />
+                              <Printer size={14} />
                             </button>
                           </td>
                         </tr>
@@ -895,16 +929,11 @@ export default function BuffetDashboard() {
       {/* Xavi - Chat Widget para Camareros */}
       <ChatWidget role="camarero" position="bottom-right" />
 
-      {/* Modal detalle de venta */}
-      {ventaDetalle && (
-        <DetallePedidoModal
-          numero={ventaDetalle.numero}
-          tipoLabel={ventaDetalle.tipo === 'COMANDA' ? `Mesa ${ventaDetalle.mesa || '?'}` : 'TakeAway'}
-          tipoColor={ventaDetalle.tipo === 'COMANDA' ? 'orange' : 'purple'}
-          fecha={ventaDetalle.fecha}
-          total={ventaDetalle.total}
-          items={loadingDetalle ? null : detalleItems}
-          onClose={() => setVentaDetalle(null)}
+
+      {ticketPreview && (
+        <TicketPreview
+          ticket={ticketPreview}
+          onClose={() => setTicketPreview(null)}
         />
       )}
     </div>

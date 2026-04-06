@@ -356,11 +356,11 @@ router.get('/centros-costo-reporte-comparativo', authAdmin, asyncHandler(async (
   if (fechaHasta) {
     whereMovCaja = {
       ...whereMovCaja,
-      fecha: { ...whereMovCaja.fecha, lte: new Date(fechaHasta) },
+      fecha: { ...whereMovCaja.fecha, lte: new Date(fechaHasta + 'T23:59:59') },
     }
     whereMovContable = {
       ...whereMovContable,
-      fecha: { ...whereMovContable.fecha, lte: new Date(fechaHasta) },
+      fecha: { ...whereMovContable.fecha, lte: new Date(fechaHasta + 'T23:59:59') },
     }
   }
 
@@ -380,7 +380,7 @@ router.get('/centros-costo-reporte-comparativo', authAdmin, asyncHandler(async (
       ])
 
       // Movimientos contables
-      const movContables = await req.prisma.movimientoContable.findMany({
+      const movContables = await req.db.movimientoContable.findMany({
         where: { ...whereMovContable, centroCostoId: centro.id },
         select: { tipo: true, montoTotal: true },
       })
@@ -943,11 +943,11 @@ router.get('/centros-costo-export-comparativo', authAdmin, asyncHandler(async (r
   if (fechaHasta) {
     whereMovCaja = {
       ...whereMovCaja,
-      fecha: { ...whereMovCaja.fecha, lte: new Date(fechaHasta) },
+      fecha: { ...whereMovCaja.fecha, lte: new Date(fechaHasta + 'T23:59:59') },
     }
     whereMovContable = {
       ...whereMovContable,
-      fecha: { ...whereMovContable.fecha, lte: new Date(fechaHasta) },
+      fecha: { ...whereMovContable.fecha, lte: new Date(fechaHasta + 'T23:59:59') },
     }
   }
 
@@ -1269,19 +1269,59 @@ router.get('/centros-costo-export-presupuesto', authAdmin, asyncHandler(async (r
 // GET /api/admin/centros-costo/:id/movimientos - Movimientos detallados de un centro de costo
 router.get('/centros-costo/:id/movimientos', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { fechaDesde, fechaHasta, tipo = 'caja', page = 1 } = req.query
+  const { fechaDesde, fechaHasta, tipo = 'caja', page = 1, agrupar, concepto: conceptoFiltro } = req.query
   const limit = 50
   const skip = (parseInt(page) - 1) * limit
 
   const centro = await req.db.centroCosto.findUnique({ where: { id: parseInt(id) } })
   if (!centro) throw new AppError('Centro de costo no encontrado', 404, 'NOT_FOUND')
 
+  const TIPOS_INGRESO = ['FACTURA_VENTA', 'RECIBO_COBRO', 'NOTA_CREDITO_CLIENTE']
+
   if (tipo === 'caja') {
     const where = { centroCostoId: parseInt(id), anulado: false }
     if (fechaDesde) where.fecha = { ...where.fecha, gte: new Date(fechaDesde) }
-    if (fechaHasta) where.fecha = { ...where.fecha, lte: new Date(fechaHasta) }
+    if (fechaHasta) where.fecha = { ...where.fecha, lte: new Date(fechaHasta + 'T23:59:59') }
+    if (conceptoFiltro) where.concepto = conceptoFiltro
 
-    const [movimientos, total] = await Promise.all([
+    // Modo agrupado: devuelve totales por concepto
+    if (agrupar) {
+      const grupos = await req.db.movimientoCaja.groupBy({
+        by: ['concepto', 'tipo'],
+        where,
+        _sum: { monto: true },
+        _count: { _all: true },
+      })
+
+      // Consolida filas del mismo concepto (puede tener INGRESO y EGRESO)
+      const mapa = {}
+      for (const g of grupos) {
+        if (!mapa[g.concepto]) mapa[g.concepto] = { concepto: g.concepto, cantidad: 0, ingresos: 0, egresos: 0 }
+        mapa[g.concepto].cantidad += g._count._all
+        if (g.tipo === 'INGRESO') mapa[g.concepto].ingresos += parseFloat(g._sum.monto || 0)
+        else mapa[g.concepto].egresos += parseFloat(g._sum.monto || 0)
+      }
+      const gruposConsolidados = Object.values(mapa).sort((a, b) => (b.ingresos + b.egresos) - (a.ingresos + a.egresos))
+
+      const [aggIngresos, aggEgresos] = await Promise.all([
+        req.db.movimientoCaja.aggregate({ where: { ...where, tipo: 'INGRESO' }, _sum: { monto: true } }),
+        req.db.movimientoCaja.aggregate({ where: { ...where, tipo: 'EGRESO' }, _sum: { monto: true } }),
+      ])
+
+      return res.json({
+        success: true,
+        data: {
+          centro,
+          grupos: gruposConsolidados,
+          totales: {
+            ingresos: parseFloat(aggIngresos._sum.monto || 0),
+            egresos: parseFloat(aggEgresos._sum.monto || 0),
+          },
+        },
+      })
+    }
+
+    const [movimientos, total, aggIngresos, aggEgresos] = await Promise.all([
       req.db.movimientoCaja.findMany({
         where,
         skip,
@@ -1289,14 +1329,20 @@ router.get('/centros-costo/:id/movimientos', authAdmin, asyncHandler(async (req,
         orderBy: { fecha: 'desc' },
         include: {
           caja: { select: { nombre: true } },
-          concepto: { select: { nombre: true } },
-          socio: { select: { nroSocio: true, apellidoNombre: true } },
+          medioPagoRel: { select: { nombre: true } },
+          pago: { select: { socio: { select: { nroSocio: true, apellidoNombre: true } } } },
+          movimientoContable: {
+            select: {
+              id: true, numero: true, tipo: true, tipoComprobante: true,
+              numeroComprobante: true, montoTotal: true, estado: true,
+              entidad: { select: { razonSocial: true } },
+              socio: { select: { nroSocio: true, apellidoNombre: true } },
+              items: { select: { descripcion: true, cantidad: true, precioUnitario: true, subtotal: true } },
+            },
+          },
         },
       }),
       req.db.movimientoCaja.count({ where }),
-    ])
-
-    const [totalIngresos, totalEgresos] = await Promise.all([
       req.db.movimientoCaja.aggregate({ where: { ...where, tipo: 'INGRESO' }, _sum: { monto: true } }),
       req.db.movimientoCaja.aggregate({ where: { ...where, tipo: 'EGRESO' }, _sum: { monto: true } }),
     ])
@@ -1307,8 +1353,8 @@ router.get('/centros-costo/:id/movimientos', authAdmin, asyncHandler(async (req,
         centro,
         movimientos,
         totales: {
-          ingresos: parseFloat(totalIngresos._sum.monto || 0),
-          egresos: parseFloat(totalEgresos._sum.monto || 0),
+          ingresos: parseFloat(aggIngresos._sum.monto || 0),
+          egresos: parseFloat(aggEgresos._sum.monto || 0),
         },
         pagination: { page: parseInt(page), limit, total, pages: Math.ceil(total / limit) },
       },
@@ -1318,26 +1364,66 @@ router.get('/centros-costo/:id/movimientos', authAdmin, asyncHandler(async (req,
   // tipo === 'contable'
   const where = { centroCostoId: parseInt(id), estado: { not: 'ANULADO' } }
   if (fechaDesde) where.fecha = { ...where.fecha, gte: new Date(fechaDesde) }
-  if (fechaHasta) where.fecha = { ...where.fecha, lte: new Date(fechaHasta) }
+  if (fechaHasta) where.fecha = { ...where.fecha, lte: new Date(fechaHasta + 'T23:59:59') }
+  if (conceptoFiltro) where.tipo = conceptoFiltro
+
+  // Modo agrupado: devuelve totales por tipo de movimiento
+  if (agrupar) {
+    const grupos = await req.db.movimientoContable.groupBy({
+      by: ['tipo'],
+      where,
+      _sum: { montoTotal: true },
+      _count: { _all: true },
+    })
+
+    const gruposConsolidados = grupos.map(g => ({
+      concepto: g.tipo,
+      cantidad: g._count._all,
+      ingresos: TIPOS_INGRESO.includes(g.tipo) ? parseFloat(g._sum.montoTotal || 0) : 0,
+      egresos: !TIPOS_INGRESO.includes(g.tipo) ? parseFloat(g._sum.montoTotal || 0) : 0,
+    })).sort((a, b) => (b.ingresos + b.egresos) - (a.ingresos + a.egresos))
+
+    const allMov = await req.db.movimientoContable.findMany({ where, select: { tipo: true, montoTotal: true } })
+    const totalIngresos = allMov.filter(m => TIPOS_INGRESO.includes(m.tipo)).reduce((s, m) => s + parseFloat(m.montoTotal || 0), 0)
+    const totalEgresos = allMov.filter(m => !TIPOS_INGRESO.includes(m.tipo)).reduce((s, m) => s + parseFloat(m.montoTotal || 0), 0)
+
+    return res.json({
+      success: true,
+      data: {
+        centro,
+        grupos: gruposConsolidados,
+        totales: { ingresos: totalIngresos, egresos: totalEgresos },
+      },
+    })
+  }
 
   const [movimientos, total] = await Promise.all([
-    req.prisma.movimientoContable.findMany({
+    req.db.movimientoContable.findMany({
       where,
       skip,
       take: limit,
       orderBy: { fecha: 'desc' },
       include: {
         concepto: { select: { nombre: true } },
-        socio: { select: { nroSocio: true, apellidoNombre: true } },
         entidad: { select: { razonSocial: true } },
+        socio: { select: { nroSocio: true, apellidoNombre: true } },
+        items: { select: { descripcion: true, cantidad: true, precioUnitario: true, subtotal: true } },
+        movimientosCaja: {
+          where: { anulado: false },
+          select: {
+            id: true, numero: true, fecha: true, tipo: true, monto: true,
+            concepto: true, estado: true,
+            caja: { select: { nombre: true } },
+            medioPagoRel: { select: { nombre: true } },
+          },
+        },
       },
     }),
-    req.prisma.movimientoContable.count({ where }),
+    req.db.movimientoContable.count({ where }),
   ])
 
-  const tiposIngreso = ['FACTURA_VENTA', 'RECIBO_COBRO', 'NOTA_CREDITO_CLIENTE']
-  const totalIngresos = movimientos.filter(m => tiposIngreso.includes(m.tipo)).reduce((s, m) => s + parseFloat(m.montoTotal || 0), 0)
-  const totalEgresos = movimientos.filter(m => !tiposIngreso.includes(m.tipo)).reduce((s, m) => s + parseFloat(m.montoTotal || 0), 0)
+  const totalIngresos = movimientos.filter(m => TIPOS_INGRESO.includes(m.tipo)).reduce((s, m) => s + parseFloat(m.montoTotal || 0), 0)
+  const totalEgresos = movimientos.filter(m => !TIPOS_INGRESO.includes(m.tipo)).reduce((s, m) => s + parseFloat(m.montoTotal || 0), 0)
 
   res.json({
     success: true,

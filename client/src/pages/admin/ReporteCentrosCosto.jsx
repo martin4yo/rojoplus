@@ -1,37 +1,67 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../../services/api'
 import { ChartBarIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, Eye } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
+const toISO = d => d.toISOString().split('T')[0]
+
+const RANGOS = [
+  { id: 'hoy', label: 'Hoy', getDates: () => {
+    const d = new Date(); return { desde: toISO(new Date(d.getFullYear(), d.getMonth(), d.getDate())), hasta: toISO(d) }
+  }},
+  { id: 'semana', label: 'Esta Semana', getDates: () => {
+    const hoy = new Date(); const dia = hoy.getDay()
+    const desde = new Date(hoy); desde.setDate(hoy.getDate() - (dia === 0 ? 6 : dia - 1))
+    return { desde: toISO(desde), hasta: toISO(hoy) }
+  }},
+  { id: 'mes', label: 'Este Mes', getDates: () => {
+    const hoy = new Date()
+    return { desde: toISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: toISO(hoy) }
+  }},
+  { id: 'mesAnterior', label: 'Mes Anterior', getDates: () => {
+    const hoy = new Date()
+    return { desde: toISO(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)), hasta: toISO(new Date(hoy.getFullYear(), hoy.getMonth(), 0)) }
+  }},
+  { id: 'personalizado', label: 'Personalizado', getDates: () => null },
+]
+
 export default function ReporteCentrosCosto() {
+  const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [fechaDesde, setFechaDesde] = useState('')
-  const [fechaHasta, setFechaHasta] = useState('')
-
-  useEffect(() => {
-    // Inicializar con el mes actual
+  const [rango, setRango] = useState('mes')
+  const [fechaDesde, setFechaDesde] = useState(() => {
     const hoy = new Date()
-    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
-    setFechaDesde(primerDiaMes.toISOString().split('T')[0])
-    setFechaHasta(hoy.toISOString().split('T')[0])
+    return toISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
+  })
+  const [fechaHasta, setFechaHasta] = useState(() => toISO(new Date()))
+
+  // Carga inicial
+  useEffect(() => {
+    const fechas = RANGOS.find(r => r.id === 'mes').getDates()
+    cargarReporte(fechas.desde, fechas.hasta)
   }, [])
 
-  useEffect(() => {
-    if (fechaDesde && fechaHasta) {
-      cargarReporte()
+  const handleRango = (id) => {
+    setRango(id)
+    if (id !== 'personalizado') {
+      const fechas = RANGOS.find(r => r.id === id).getDates()
+      setFechaDesde(fechas.desde)
+      setFechaHasta(fechas.hasta)
+      cargarReporte(fechas.desde, fechas.hasta)
     }
-  }, [fechaDesde, fechaHasta])
+  }
 
-  const cargarReporte = async () => {
+  const cargarReporte = async (desde, hasta) => {
     try {
       setLoading(true)
       const response = await api.get('/admin/centros-costo-reporte-comparativo', {
-        params: { fechaDesde, fechaHasta }
+        params: { fechaDesde: desde, fechaHasta: hasta }
       })
-      setData(response.data)
+      setData(response)
       setError(null)
     } catch (err) {
       setError(err.message)
@@ -39,6 +69,10 @@ export default function ReporteCentrosCosto() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const aplicarPersonalizado = () => {
+    if (fechaDesde && fechaHasta) cargarReporte(fechaDesde, fechaHasta)
   }
 
   const formatMonto = (monto) => {
@@ -56,9 +90,10 @@ export default function ReporteCentrosCosto() {
 
   const exportarExcel = async () => {
     try {
+      const desde = fechaDesde, hasta = fechaHasta
       const params = new URLSearchParams({
-        fechaDesde,
-        fechaHasta,
+        fechaDesde: desde,
+        fechaHasta: hasta,
       })
       const token = localStorage.getItem('adminToken')
       const response = await fetch(`/api/admin/centros-costo-export-comparativo?${params}`, {
@@ -77,9 +112,10 @@ export default function ReporteCentrosCosto() {
 
   const exportarPDF = async () => {
     try {
+      const desde = fechaDesde, hasta = fechaHasta
       const params = new URLSearchParams({
-        fechaDesde,
-        fechaHasta,
+        fechaDesde: desde,
+        fechaHasta: hasta,
         formato: 'pdf',
       })
       const token = localStorage.getItem('adminToken')
@@ -142,33 +178,50 @@ export default function ReporteCentrosCosto() {
         </div>
       )}
 
-      {/* Filtros */}
-      <div className="bg-white shadow-sm rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fecha Desde
-            </label>
+      {/* Filtros de fecha */}
+      <div className="flex flex-wrap items-center gap-2">
+        {RANGOS.map(r => (
+          <button
+            key={r.id}
+            onClick={() => handleRango(r.id)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              rango === r.id ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      {rango === 'personalizado' && (
+        <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Desde:</label>
             <input
               type="date"
               value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+              onChange={e => setFechaDesde(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fecha Hasta
-            </label>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Hasta:</label>
             <input
               type="date"
               value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+              onChange={e => setFechaHasta(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
             />
           </div>
+          <button
+            onClick={aplicarPersonalizado}
+            disabled={!fechaDesde || !fechaHasta}
+            className="px-4 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 disabled:opacity-50"
+          >
+            Aplicar
+          </button>
         </div>
-      </div>
+      )}
 
       {data && (
         <>
@@ -218,8 +271,8 @@ export default function ReporteCentrosCosto() {
             </div>
           </div>
 
-          {/* Top 5 Ingresos y Egresos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Top 5 Ingresos, Egresos y Resultado */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Top Ingresos */}
             <div className="bg-white shadow-sm rounded-lg overflow-hidden">
               <div className="bg-green-50 px-6 py-3 border-b border-green-200">
@@ -281,6 +334,55 @@ export default function ReporteCentrosCosto() {
                 )}
               </div>
             </div>
+
+            {/* Top 5 Resultado */}
+            {(() => {
+              const top5 = [...data.centros]
+                .filter(c => c.ingresos > 0 || c.egresos > 0)
+                .sort((a, b) => b.resultado - a.resultado)
+                .slice(0, 5)
+              const maxAbs = Math.max(...top5.map(c => Math.abs(c.resultado)), 1)
+              return (
+                <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+                  <div className="bg-indigo-50 px-6 py-3 border-b border-indigo-200">
+                    <h2 className="text-lg font-semibold text-indigo-900">Top 5 Resultado</h2>
+                  </div>
+                  <div className="p-6">
+                    {top5.length > 0 ? (
+                      <div className="space-y-4">
+                        {top5.map((centro, index) => {
+                          const positivo = centro.resultado >= 0
+                          const pct = Math.round((Math.abs(centro.resultado) / maxAbs) * 100)
+                          return (
+                            <div key={centro.id} className="flex items-center gap-3">
+                              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-800 font-bold text-sm shrink-0">
+                                {index + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-center mb-1">
+                                  <p className="font-medium text-gray-900 text-sm truncate">{centro.nombre}</p>
+                                  <p className={`text-sm font-bold ml-2 shrink-0 ${positivo ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatMonto(centro.resultado)}
+                                  </p>
+                                </div>
+                                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${positivo ? 'bg-green-500' : 'bg-red-400'}`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-center text-gray-500">Sin movimientos en el período</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Tabla Detallada */}
@@ -313,6 +415,7 @@ export default function ReporteCentrosCosto() {
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Resultado
                     </th>
+                    <th className="px-6 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -349,6 +452,15 @@ export default function ReporteCentrosCosto() {
                         centro.resultado >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
                         {formatMonto(centro.resultado)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => navigate(`/admin/reportes/centros-costo/movimientos?centroId=${centro.id}&fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}`)}
+                          className="p-1.5 text-gray-400 hover:text-primary hover:bg-gray-100 rounded"
+                          title="Ver movimientos"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}

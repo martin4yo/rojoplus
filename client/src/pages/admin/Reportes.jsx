@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Store, Dumbbell, Receipt, Users, BarChart3, PieChart, AlertTriangle } from 'lucide-react'
+import { Store, Dumbbell, Receipt, Users, BarChart3, PieChart, AlertTriangle, Pencil, Play } from 'lucide-react'
 
 export default function AdminReportes() {
   const navigate = useNavigate()
@@ -14,6 +14,31 @@ export default function AdminReportes() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div
+          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:shadow-md transition min-h-[160px]"
+          onClick={() => navigate('/admin/reportes/ejecutar')}
+        >
+          <div className="p-4 rounded-full bg-primary/10">
+            <Play className="w-8 h-8 text-primary" />
+          </div>
+          <div className="text-center">
+            <p className="font-semibold text-gray-800 text-lg">Ejecutar Reportes</p>
+            <p className="text-sm text-gray-500">Reportes personalizados con PDF</p>
+          </div>
+        </div>
+
+        <div
+          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:shadow-md transition min-h-[160px]"
+          onClick={() => navigate('/admin/reportes/designer')}
+        >
+          <div className="p-4 rounded-full bg-primary/10">
+            <Pencil className="w-8 h-8 text-primary" />
+          </div>
+          <div className="text-center">
+            <p className="font-semibold text-gray-800 text-lg">Diseñador</p>
+            <p className="text-sm text-gray-500">Creá reportes con HTML + PDF</p>
+          </div>
+        </div>
         <div
           className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:shadow-md transition min-h-[160px]"
           onClick={() => navigate('/admin/reportes/cuotas')}

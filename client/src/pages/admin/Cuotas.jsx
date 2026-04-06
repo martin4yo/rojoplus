@@ -52,7 +52,6 @@ export default function Cuotas() {
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [medioPagoId, setMedioPagoId] = useState('')
   const [cajaId, setCajaId] = useState('')
-  const [centroCostoId, setCentroCostoId] = useState('')
   const [registrandoPago, setRegistrandoPago] = useState(false)
   const [success, setSuccess] = useState(null)
   const [showPagoExitosoModal, setShowPagoExitosoModal] = useState(false)
@@ -382,7 +381,6 @@ export default function Cuotas() {
         cuotaIds: seleccionadas,
         medioPagoId: parseInt(medioPagoId),
         cajaId: parseInt(cajaId),
-        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       })
       setNumeroRecibo(result.numero)
       setPagoId(result.id)
@@ -746,16 +744,6 @@ export default function Cuotas() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo</label>
-              <SelectCentroCosto
-                value={centroCostoId}
-                onChange={(val) => setCentroCostoId(val)}
-                className="w-full"
-              />
-              <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
             </div>
 
             <div className="flex gap-3 pt-4 border-t">

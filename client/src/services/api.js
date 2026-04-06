@@ -35,14 +35,21 @@ function getCurrentTenantSlug() {
 }
 
 async function request(endpoint, options = {}, returnFullResponse = false) {
-  const url = `${API_URL}${endpoint}`
+  const { params, ...restOptions } = options
+  let url = `${API_URL}${endpoint}`
+  if (params) {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    ).toString()
+    if (qs) url += `?${qs}`
+  }
 
   const config = {
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...restOptions.headers,
     },
-    ...options,
+    ...restOptions,
   }
 
   // Agregar token JWT si existe (para admin)
@@ -97,7 +104,7 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
 }
 
 const api = {
-  get: (endpoint) => request(endpoint, { method: 'GET' }),
+  get: (endpoint, options = {}) => request(endpoint, { method: 'GET', ...options }),
 
   // Devuelve la respuesta completa (con pagination, etc.)
   getFull: (endpoint) => request(endpoint, { method: 'GET' }, true),

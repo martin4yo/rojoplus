@@ -4157,6 +4157,16 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
   const esFamilia = socio.miembrosFamilia?.length > 0 || socio.titularFamiliaId !== null
   const titularId = socio.titularFamiliaId || socio.id
 
+  // Si es miembro (no titular), cargar los miembros del titular para tener la lista completa
+  let todosMiembros = socio.miembrosFamilia || []
+  if (esFamilia && socio.titularFamiliaId) {
+    const titular = await req.db.socio.findUnique({
+      where: { id: titularId },
+      include: { miembrosFamilia: { select: { id: true, nroSocio: true, apellidoNombre: true } } },
+    })
+    todosMiembros = titular?.miembrosFamilia || []
+  }
+
   // Construir query - por defecto solo trae cuotas PENDIENTES (cobrables)
   const where = {}
   if (estado) {
@@ -4168,8 +4178,12 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
   if (periodoId) where.periodoId = parseInt(periodoId)
 
   if (esFamilia) {
-    // Buscar por grupo familiar
-    where.grupoFamiliarId = titularId
+    // Buscar por grupo familiar (incluye cargos creados sin grupoFamiliarId)
+    const allSocioIds = [titularId, ...todosMiembros.map(m => m.id)]
+    where.OR = [
+      { grupoFamiliarId: titularId },
+      { socioId: { in: allSocioIds }, grupoFamiliarId: null },
+    ]
   } else {
     // Buscar solo del socio
     where.socioId = socio.id
@@ -4627,89 +4641,89 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       data: { saldoActual: { increment: montoTotal } },
     })
 
-    // Determinar el concepto de tesorería según el tipo de cargo
-    let conceptoCobranza = null
-
-    // Si hay cuotas de actividad, intentar usar el concepto específico de la actividad
-    const cuotasActividad = cuotas.filter(c => c.categoria === 'CUOTA_ACTIVIDAD' && c.categoriaActividad)
-    if (cuotasActividad.length > 0) {
-      const categoriaActividad = cuotasActividad[0].categoriaActividad
-      if (categoriaActividad?.conceptoTesoreriaId) {
-        conceptoCobranza = await tx.conceptoTesoreria.findUnique({
-          where: { id: categoriaActividad.conceptoTesoreriaId }
-        })
-      }
+    // Cargar el concepto por defecto (fallback para cargos sin concepto específico)
+    const configConcepto = await tx.configuracion.findFirst({
+      where: { clave: 'CONCEPTO_COBRANZA_CUOTAS' }
+    })
+    if (!configConcepto?.valor) {
+      throw new AppError(
+        'No se configuró el concepto de tesorería para cobranza de cuotas. Configuralo en Configuración > Configuración General.',
+        400, 'CONCEPTO_NO_CONFIGURADO'
+      )
+    }
+    const conceptoPorDefecto = await tx.conceptoTesoreria.findUnique({
+      where: { id: parseInt(configConcepto.valor) }
+    })
+    if (!conceptoPorDefecto) {
+      throw new AppError('No se pudo determinar el concepto de tesorería. Configurá los conceptos.', 400, 'CONCEPTO_NO_ENCONTRADO')
+    }
+    if (!conceptoPorDefecto.activo) {
+      throw new AppError('El concepto de tesorería para esta cobranza está inactivo.', 400, 'CONCEPTO_INACTIVO')
     }
 
-    // Si no se encontró concepto específico, usar el fallback de configuración
-    if (!conceptoCobranza) {
-      const configConcepto = await tx.configuracion.findFirst({
-        where: { clave: 'CONCEPTO_COBRANZA_CUOTAS' }
-      })
+    // Agrupar cargos por centro de costo efectivo
+    // Prioridad: cargo.centroCostoId → CC del concepto de la actividad → CC del concepto por defecto → CC de la caja
+    const gruposPorCC = {}
+    for (const cuota of cuotas) {
+      const montoEfectivo = Number(cuota.montoTotal) + cuota.recargoCalculado
+      const ccEfectivo =
+        cuota.centroCostoId ??
+        cuota.categoriaActividad?.conceptoTesoreria?.centroCostoId ??
+        conceptoPorDefecto.centroCostoId ??
+        caja.centroCostoId
 
-      if (!configConcepto || !configConcepto.valor) {
+      if (!ccEfectivo) {
         throw new AppError(
-          'No se configuró el concepto de tesorería para cobranza de cuotas. Por favor, configuralo en Configuración > Configuración General.',
-          400,
-          'CONCEPTO_NO_CONFIGURADO'
+          `El cargo "${cuota.descripcion || '#' + cuota.id}" no tiene centro de costo asignado. Configurá el CC en el concepto o en la caja antes de cobrar.`,
+          400, 'CC_REQUERIDO'
         )
       }
 
-      conceptoCobranza = await tx.conceptoTesoreria.findUnique({
-        where: { id: parseInt(configConcepto.valor) }
-      })
+      const conceptoNombre = (cuota.categoriaActividad?.conceptoTesoreria?.activo)
+        ? cuota.categoriaActividad.conceptoTesoreria.nombre
+        : conceptoPorDefecto.nombre
+
+      if (!gruposPorCC[ccEfectivo]) {
+        gruposPorCC[ccEfectivo] = { centroCostoId: ccEfectivo, monto: 0, conceptoNombre }
+      }
+      gruposPorCC[ccEfectivo].monto += montoEfectivo
     }
 
-    if (!conceptoCobranza) {
-      throw new AppError(
-        'No se pudo determinar el concepto de tesorería para esta cobranza. Por favor, configurá los conceptos en Configuración.',
-        400,
-        'CONCEPTO_NO_ENCONTRADO'
-      )
-    }
-
-    if (!conceptoCobranza.activo) {
-      throw new AppError(
-        'El concepto de tesorería para esta cobranza está inactivo. Por favor, activalo o configurá otro.',
-        400,
-        'CONCEPTO_INACTIVO'
-      )
-    }
-
-    // Crear MovimientoCaja para tracking de tesoreria
+    // Crear un MovimientoCaja por grupo de CC
     const anioMov = new Date().getFullYear()
     const prefijoMov = `MV-${anioMov}-`
-    const ultimoMov = await tx.movimientoCaja.findFirst({
+    const ultimoMovBase = await tx.movimientoCaja.findFirst({
       where: { numero: { startsWith: prefijoMov } },
       orderBy: { numero: 'desc' }
     })
-    let siguienteMov = 1
-    if (ultimoMov) {
-      const partesMov = ultimoMov.numero.split('-')
-      siguienteMov = (parseInt(partesMov[partesMov.length - 1]) || 0) + 1
+    let siguienteMov = ultimoMovBase
+      ? (parseInt(ultimoMovBase.numero.split('-').pop()) || 0) + 1
+      : 1
+
+    for (const grupo of Object.values(gruposPorCC)) {
+      const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
+      siguienteMov++
+      await tx.movimientoCaja.create({
+        data: {
+          numero: numeroMov,
+          cajaId: caja.id,
+          cuentaContableId: caja.cuentaContableId,
+          medioPagoId: parseInt(medioPagoId),
+          fecha: new Date(),
+          tipo: 'INGRESO',
+          concepto: grupo.conceptoNombre,
+          monto: grupo.monto,
+          descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
+          pagoId: pago.id,
+          registradoPor: req.admin.id,
+          centroCostoId: grupo.centroCostoId,
+          conciliado: !caja.requiereConciliacion,
+        }
+      })
     }
-    const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
 
-    await tx.movimientoCaja.create({
-      data: {
-        numero: numeroMov,
-        cajaId: caja.id,
-        cuentaContableId: caja.cuentaContableId,
-        fecha: new Date(),
-        tipo: 'INGRESO',
-        concepto: conceptoCobranza.nombre,
-        monto: montoTotal,
-        descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
-        pagoId: pago.id,
-        registradoPor: req.admin.id,
-        // Si la caja requiere conciliación, el movimiento queda pendiente (conciliado=false)
-        // Si no requiere, se marca como conciliado automáticamente
-        conciliado: !caja.requiereConciliacion
-      }
-    })
-
-    // Obtener pago con relaciones para respuesta
-    return await tx.pago.findUnique({
+    // Obtener pago con relaciones para respuesta (findFirst para mantenerse dentro de la transacción)
+    const pagoFinal = await tx.pago.findFirst({
       where: { id: pago.id },
       include: {
         socio: {
@@ -4735,12 +4749,15 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         },
       },
     })
+    if (!pagoFinal) throw new Error('No se pudo recuperar el pago creado')
+    return pagoFinal
   })
 
   // Generar asiento contable automático (fuera de transacción, no debe fallar el pago)
   generarAsientoPagoCuota(req.db, {
     pago: pagoCompleto,
     caja,
+    medioPago,
     cargos: pagoCompleto.cargos || [],
     registradoPor: req.admin.id,
   }).catch(err => {

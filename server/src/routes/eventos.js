@@ -1089,6 +1089,13 @@ router.post('/venta-kiosco', authAdmin, checkPermiso('BUFFET_COBRAR'), async (re
       }
 
       // Crear MovimientoCaja único para todas las entradas
+      const cajaKiosco = await tx.caja.findUnique({
+        where: { id: parseInt(cajaId) },
+        select: { cuentaContableId: true, nombre: true, centroCostoId: true }
+      })
+
+      const ccEvento = resultados[0]?.evento?.centroCostoId ?? cajaKiosco?.centroCostoId ?? null
+
       const numeroMovimiento = `MOV-${Date.now()}`
       const movimientoCaja = await tx.movimientoCaja.create({
         data: {
@@ -1099,15 +1106,13 @@ router.post('/venta-kiosco', authAdmin, checkPermiso('BUFFET_COBRAR'), async (re
           monto: totalGeneral,
           concepto: `Venta Entradas Kiosco`,
           medioPagoId: medioPagoId ? parseInt(medioPagoId) : null,
+          centroCostoId: ccEvento,
           registradoPor: req.admin.id
         }
       })
 
       // Crear Asiento Contable
-      const caja = await tx.caja.findUnique({
-        where: { id: parseInt(cajaId) },
-        select: { cuentaContableId: true, nombre: true }
-      })
+      const caja = cajaKiosco
 
       if (!caja?.cuentaContableId) {
         throw new Error('La caja seleccionada no tiene una cuenta contable asociada')

@@ -780,6 +780,7 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
               descripcion: `Débito automático - Socio #${resultado.socioId} - ${archivo.numero}`,
               pagoId: pago.id,
               registradoPor: req.admin.id,
+              centroCostoId: caja.centroCostoId ?? null,
               // Si la caja requiere conciliación, queda pendiente de acreditar
               conciliado: !caja.requiereConciliacion
             }

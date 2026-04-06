@@ -56,10 +56,20 @@ export default function SocioDetalle() {
   const [busquedaMiembro, setBusquedaMiembro] = useState('')
   const [miembrosEncontrados, setMiembrosEncontrados] = useState([])
   const [buscandoMiembro, setBuscandoMiembro] = useState(false)
+  // Hermanos de familia (cuando soy miembro)
+  const [hermanosFamilia, setHermanosFamilia] = useState([])
 
   useEffect(() => {
     cargarSocio()
   }, [id])
+
+  useEffect(() => {
+    if (activeTab === 'familia' && socio?.titularFamilia) {
+      api.get(`/admin/socios/${socio.titularFamilia.id}`)
+        .then(data => setHermanosFamilia(data.socio?.miembrosFamilia || []))
+        .catch(() => {})
+    }
+  }, [activeTab, socio?.titularFamilia?.id])
 
   async function cargarSocio() {
     setLoading(true)
@@ -587,27 +597,53 @@ export default function SocioDetalle() {
               </div>
             )}
 
-            {/* Si es Miembro de Familia - mostrar titular y opcion de cambiar */}
+            {/* Si es Miembro de Familia - mostrar grupo familiar completo */}
             {socio.titularFamilia && (
               <div>
                 <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
-                  <Users className="w-4 h-4" /> Titular de Familia
+                  <Users className="w-4 h-4" /> Grupo Familiar ({1 + hermanosFamilia.length} integrantes)
                 </h3>
-                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg border border-purple-200">
-                  <Link to={`/admin/socios/${socio.titularFamilia.id}`} className="flex-1">
-                    <p className="font-medium text-gray-800">{socio.titularFamilia.apellidoNombre}</p>
-                    <p className="text-sm text-gray-500">
-                      #{socio.titularFamilia.nroSocio}
-                      {socio.parentescoTitular && ` • Parentesco: ${socio.parentescoTitular}`}
-                    </p>
-                  </Link>
-                  <button
-                    onClick={desvincularFamilia}
-                    disabled={asignandoFamilia}
-                    className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition"
-                  >
-                    Desvincular
-                  </button>
+                <div className="space-y-2">
+                  {/* Titular */}
+                  <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <Link to={`/admin/socios/${socio.titularFamilia.id}`} className="flex-1 hover:text-primary">
+                      <p className="font-medium text-gray-800">{socio.titularFamilia.apellidoNombre}</p>
+                      <p className="text-sm text-gray-500">#{socio.titularFamilia.nroSocio}</p>
+                    </Link>
+                    <span className="text-xs px-2 py-0.5 bg-purple-200 text-purple-800 rounded-full font-medium">Titular</span>
+                  </div>
+                  {/* Otros miembros del grupo (hermanos) */}
+                  {hermanosFamilia.filter(m => m.id !== socio.id).map(miembro => (
+                    <div key={miembro.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <Link to={`/admin/socios/${miembro.id}`} className="flex-1 hover:text-primary">
+                        <p className="font-medium text-gray-800">{miembro.apellidoNombre}</p>
+                        <p className="text-sm text-gray-500">
+                          #{miembro.nroSocio}
+                          {miembro.parentescoTitular && ` • ${miembro.parentescoTitular}`}
+                        </p>
+                      </Link>
+                    </div>
+                  ))}
+                  {/* Socio actual (yo) */}
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">{socio.apellidoNombre}</p>
+                      <p className="text-sm text-gray-500">
+                        #{socio.nroSocio}
+                        {socio.parentescoTitular && ` • ${socio.parentescoTitular}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-0.5 bg-blue-200 text-blue-800 rounded-full font-medium">Este socio</span>
+                      <button
+                        onClick={desvincularFamilia}
+                        disabled={asignandoFamilia}
+                        className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition"
+                      >
+                        Desvincular
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

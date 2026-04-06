@@ -98,16 +98,25 @@ export default function MovimientoCajaForm() {
       }
     }
 
-    // Al seleccionar concepto, sobreescribir cuenta contable y centro de costo desde el concepto
+    // Al seleccionar concepto: actualizar cuenta contable (siempre) y CC (solo si la caja no tiene uno)
     if (name === 'conceptoId' && value) {
       const concepto = conceptos.find(c => c.id === parseInt(value))
       if (concepto) {
-        setForm(prev => ({
-          ...prev,
-          concepto: concepto.nombre,
-          cuentaContableId: concepto.cuentaContableId ? String(concepto.cuentaContableId) : prev.cuentaContableId,
-          centroCostoId: concepto.centroCostoId || prev.centroCostoId
-        }))
+        const cuentaId = concepto.cuentaContable?.id || concepto.cuentaContableId
+        setForm(prev => {
+          const cajaActual = cajas.find(c => c.id === parseInt(prev.cajaId))
+          const cajaTieneCc = !!cajaActual?.centroCostoId
+          return {
+            ...prev,
+            concepto: concepto.nombre,
+            cuentaContableId: cuentaId ? String(cuentaId) : prev.cuentaContableId,
+            centroCostoId: cajaTieneCc ? prev.centroCostoId : (concepto.centroCostoId || prev.centroCostoId),
+          }
+        })
+        // Abrir el acordeón si el concepto tiene datos contables para mostrar
+        if (cuentaId || concepto.centroCostoId) {
+          setDatosContablesOpen(true)
+        }
       }
     }
   }
@@ -135,14 +144,19 @@ export default function MovimientoCajaForm() {
       const conceptoCreado = res
       setConceptos(prev => [...prev, conceptoCreado])
 
-      setForm(prev => ({
-        ...prev,
-        conceptoId: String(conceptoCreado.id),
-        concepto: conceptoCreado.nombre,
-        cuentaContableId: String(conceptoCreado.cuentaContableId),
-        centroCostoId: conceptoCreado.centroCostoId || prev.centroCostoId
-      }))
+      setForm(prev => {
+        const cajaActual = cajas.find(c => c.id === parseInt(prev.cajaId))
+        const cajaTieneCc = !!cajaActual?.centroCostoId
+        return {
+          ...prev,
+          conceptoId: String(conceptoCreado.id),
+          concepto: conceptoCreado.nombre,
+          cuentaContableId: String(conceptoCreado.cuentaContableId),
+          centroCostoId: cajaTieneCc ? prev.centroCostoId : (conceptoCreado.centroCostoId || prev.centroCostoId),
+        }
+      })
 
+      setDatosContablesOpen(true)
       setShowConceptoModal(false)
       setNuevoConcepto({ codigo: '', nombre: '', tipo: 'INGRESO', cuentaContableId: '', centroCostoId: null })
       setError(null)
@@ -449,11 +463,13 @@ export default function MovimientoCajaForm() {
                   required
                 >
                   <option value="">Seleccionar cuenta...</option>
-                  {cuentasContables.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.codigo} - {c.nombre}
-                    </option>
-                  ))}
+                  {(() => {
+                    const conceptoActual = form.conceptoId ? conceptos.find(c => c.id === parseInt(form.conceptoId)) : null
+                    const cuentaConcepto = conceptoActual?.cuentaContable
+                    const lista = [...cuentasContables]
+                    if (cuentaConcepto && !lista.find(c => c.id === cuentaConcepto.id)) lista.push(cuentaConcepto)
+                    return lista.map(c => <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>)
+                  })()}
                 </select>
               </div>
               <div>

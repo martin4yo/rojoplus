@@ -8,34 +8,36 @@
  * Se loguean los errores pero se permite continuar.
  */
 
-// Códigos de cuentas contables estándar (deben coincidir con seed.js)
+// Códigos de cuentas contables estándar — se buscan por getCuentaId que usa findFirst,
+// por lo que si el tenant usa códigos diferentes el admin debe configurar cuentaContableId
+// en cada ConceptoTesoreria. Estos son los códigos de fallback estándar para clubes argentinos.
 const CUENTAS = {
   // Activo
-  CAJA_EFECTIVO: '1.1.1.01',
-  BANCO_CC: '1.1.1.02',
-  CLIENTES: '1.1.2.01',
-  DEUDORES_CUOTAS: '1.1.2.02',
-  IVA_CF_21: '1.1.3.01',
-  IVA_CF_105: '1.1.3.02',
-  IVA_CF_27: '1.1.3.03',
-  MERCADERIAS: '1.1.4.01',
+  CAJA_EFECTIVO: '1.1.1',
+  BANCO_CC: '1.1.2',
+  CLIENTES: '1.1.3',       // Deudores por cuotas / clientes
+  DEUDORES_CUOTAS: '1.1.3',
+  IVA_CF_21: '1.1.4.01',
+  IVA_CF_105: '1.1.4.02',
+  IVA_CF_27: '1.1.4.03',
+  MERCADERIAS: '1.1.5.01',
 
   // Pasivo
-  PROVEEDORES: '2.1.1.01',
+  PROVEEDORES: '2.1.1',
   IVA_DF_21: '2.1.2.01',
   IVA_DF_105: '2.1.2.02',
   IVA_DF_27: '2.1.2.03',
 
   // Ingresos
-  CUOTA_SOCIAL: '4.1.01',
-  CUOTA_DEPORTIVA: '4.1.02',
-  VENTAS_MERCADERIA: '4.2.01',
-  INGRESOS_MORA: '4.2.02', // Ingresos financieros por recargos
-  OTROS_INGRESOS: '4.3.99',
+  CUOTA_SOCIAL: '4.1',       // Cuotas sociales
+  CUOTA_DEPORTIVA: '4.2',    // Actividades deportivas
+  VENTAS_MERCADERIA: '4.3',  // Buffet / ventas
+  INGRESOS_MORA: '4.4',      // Mora y recargos
+  OTROS_INGRESOS: '4.9',
 
   // Egresos
-  GASTOS_PERSONAL: '5.2.01', // Sueldos y jornales
-  GASTOS_VARIOS: '5.9.99',
+  GASTOS_PERSONAL: '5.1',    // Sueldos y jornales
+  GASTOS_VARIOS: '5.9',
 }
 
 /**
@@ -48,8 +50,8 @@ const CUENTAS = {
  * Requiere que medioPago se haya fetched con `include: { conceptoTesoreria: true }`.
  */
 export function resolverCuentaCashId(medioPago, caja) {
-  return medioPago?.conceptoTesoreria?.cuentaContableId
-    || caja?.cuentaContableId
+  return caja?.cuentaContableId
+    || medioPago?.conceptoTesoreria?.cuentaContableId
     || null
 }
 
@@ -78,13 +80,14 @@ async function generarNumeroAsiento(prisma) {
  * Obtiene el ID de una cuenta contable por su código
  */
 async function getCuentaId(prisma, codigo) {
-  const cuenta = await prisma.cuentaContable.findUnique({
+  if (!codigo) return null
+  const cuenta = await prisma.cuentaContable.findFirst({
     where: { codigo },
   })
   if (!cuenta) {
-    throw new Error(`Cuenta contable ${codigo} no encontrada`)
+    console.warn(`[AsientoContable] Cuenta contable "${codigo}" no encontrada en el plan de cuentas`)
   }
-  return cuenta.id
+  return cuenta?.id ?? null
 }
 
 /**
@@ -118,19 +121,36 @@ async function crearAsiento(prisma, datos) {
   }
 
   // Obtener IDs de cuentas — acepta cuentaContableId directo o cuentaCodigo string
-  const lineasConIds = await Promise.all(
-    lineasConMonto.map(async (linea, index) => ({
-      cuentaContableId: linea.cuentaContableId != null
+  const lineasResueltas = await Promise.all(
+    lineasConMonto.map(async (linea, index) => {
+      const cuentaContableId = linea.cuentaContableId != null
         ? linea.cuentaContableId
-        : await getCuentaId(prisma, linea.cuentaCodigo),
-      descripcion: linea.descripcion || null,
-      debe: linea.debe || 0,
-      haber: linea.haber || 0,
-      // Usar centro de costo de la línea o el del asiento
-      centroCostoId: linea.centroCostoId || centroCostoId || null,
-      orden: index + 1,
-    }))
+        : await getCuentaId(prisma, linea.cuentaCodigo)
+      if (!cuentaContableId) {
+        console.warn(`[AsientoContable] Línea ${index + 1} sin cuenta contable (código: ${linea.cuentaCodigo}) — se omite`)
+        return null
+      }
+      return {
+        cuentaContableId,
+        descripcion: linea.descripcion || null,
+        debe: linea.debe || 0,
+        haber: linea.haber || 0,
+        centroCostoId: linea.centroCostoId || centroCostoId || null,
+        orden: index + 1,
+      }
+    })
   )
+  const lineasConIds = lineasResueltas.filter(Boolean)
+
+  // Re-validar balance después de filtrar líneas sin cuenta
+  if (lineasConIds.length < 2) {
+    throw new Error(`El asiento no tiene suficientes líneas con cuenta contable configurada (${lineasConIds.length}/2 mínimo). Configurá las cuentas contables en los conceptos de tesorería.`)
+  }
+  const totalDebeF = lineasConIds.reduce((s, l) => s + l.debe, 0)
+  const totalHaberF = lineasConIds.reduce((s, l) => s + l.haber, 0)
+  if (Math.abs(totalDebeF - totalHaberF) > 0.01) {
+    throw new Error(`Asiento desbalanceado tras omitir líneas sin cuenta: Debe=${totalDebeF}, Haber=${totalHaberF}`)
+  }
 
   // Crear asiento sin lineas (nested create no recibe tenantId del extension)
   const asiento = await prisma.asiento.create({
@@ -171,84 +191,110 @@ async function generarAsientoPagoCuota(prisma, datos) {
   try {
     // Cuenta del lado cash: medioPago.conceptoTesoreria > caja > fallback por tipo
     const cuentaCajaId = resolverCuentaCashId(medioPago, caja)
-    let cuentaCajaCodigo = null
-    if (!cuentaCajaId) {
-      cuentaCajaCodigo = caja.cuentaContable?.codigo
-        || (caja.tipo === 'BANCO' ? CUENTAS.BANCO_CC : CUENTAS.CAJA_EFECTIVO)
-    }
+    const cuentaCajaCodigo = cuentaCajaId ? null
+      : (caja.cuentaContable?.codigo || (caja.tipo === 'BANCO' ? CUENTAS.BANCO_CC : CUENTAS.CAJA_EFECTIVO))
 
-    // Determinar centro de costo según los cargos pagados
-    // Obtener los cargos con sus categorías de actividad para determinar el centro
-    const cargosConActividad = await Promise.all(
-      cargos.map(async cargo => {
-        const cargoCompleto = await prisma.cargo.findUnique({
-          where: { id: cargo.id },
-          include: {
-            categoriaActividad: {
-              include: {
-                actividad: {
-                  include: { centroCosto: true },
-                },
-              },
+    // Cargar cargos completos con sus categorías, conceptos y centros de costo
+    const cargosCompletos = await Promise.all(
+      cargos.map(cargo => prisma.cargo.findFirst({
+        where: { id: cargo.id },
+        include: {
+          categoriaActividad: {
+            include: {
+              conceptoTesoreria: true,
+              actividad: { include: { centroCosto: true } },
             },
           },
-        })
-        return cargoCompleto
-      })
+        },
+      }))
     )
 
-    // Determinar centro de costo:
-    // - Si hay cargos de CUOTA_ACTIVIDAD con actividad, usar ese centro
-    // - Si solo hay CUOTA_SOCIAL, usar Administración
-    let centroCostoId = null
-    const cargosDeportivos = cargosConActividad.filter(c => c?.categoria === 'CUOTA_ACTIVIDAD' && c?.categoriaActividad)
+    // Concepto por defecto para fallback de CC
+    const configConcepto = await prisma.configuracion.findFirst({ where: { clave: 'CONCEPTO_COBRANZA_CUOTAS' } })
+    const conceptoPorDefecto = configConcepto?.valor
+      ? await prisma.conceptoTesoreria.findFirst({ where: { id: parseInt(configConcepto.valor) } })
+      : null
 
-    if (cargosDeportivos.length > 0 && cargosDeportivos.every(c => c.categoriaActividad?.actividad?.centroCostoId)) {
-      // Usar el centro de la primera actividad (si todas son iguales, será el mismo)
-      centroCostoId = cargosDeportivos[0].categoriaActividad.actividad.centroCostoId
-    } else {
-      // Usar Administración (ADM)
-      const centroAdm = await prisma.centroCosto.findUnique({
-        where: { codigo: 'ADM' },
-      })
-      centroCostoId = centroAdm?.id || null
-    }
-
-    // Calcular montos base y recargos
     const montoTotal = Number(pago.montoTotal)
-    const montoRecargo = cargos.reduce((sum, cargo) => sum + Number(cargo.montoRecargo || 0), 0)
-    const montoBase = montoTotal - montoRecargo
 
-    // Líneas del asiento
-    const lineaCash = cuentaCajaId
-      ? { cuentaContableId: cuentaCajaId, debe: montoTotal, haber: 0 }
-      : { cuentaCodigo: cuentaCajaCodigo, debe: montoTotal, haber: 0 }
-    const lineas = [ lineaCash ]
+    // DEBE: ingreso de fondos en caja — CC de la caja
+    const lineaCaja = cuentaCajaId
+      ? { cuentaContableId: cuentaCajaId, debe: montoTotal, haber: 0, centroCostoId: caja.centroCostoId || null }
+      : { cuentaCodigo: cuentaCajaCodigo, debe: montoTotal, haber: 0, centroCostoId: caja.centroCostoId || null }
+    const lineas = [lineaCaja]
 
-    // HABER: Ingresos por cuotas (monto base)
-    if (montoBase > 0) {
-      lineas.push({ cuentaCodigo: CUENTAS.CUOTA_SOCIAL, debe: 0, haber: montoBase })
+    // HABER: ingresos por cuotas — agrupados por CC efectivo del cargo
+    // Prioridad CC: cargo.centroCostoId → actividad.centroCostoId → conceptoTesoreria.centroCostoId → conceptoPorDefecto.centroCostoId → caja.centroCostoId
+    const gruposIngresos = {}
+    let totalRecargo = 0
+
+    for (const cargo of cargosCompletos) {
+      if (!cargo) continue
+      const montoBase = Number(cargo.montoTotal) - Number(cargo.montoRecargo || 0)
+      const montoRecargo = Number(cargo.montoRecargo || 0)
+      totalRecargo += montoRecargo
+
+      const esDeportivo = cargo.categoria === 'CUOTA_ACTIVIDAD' && cargo.categoriaActividad?.actividad
+      const ccEfectivo =
+        cargo.centroCostoId ??
+        cargo.categoriaActividad?.actividad?.centroCostoId ??
+        cargo.categoriaActividad?.conceptoTesoreria?.centroCostoId ??
+        conceptoPorDefecto?.centroCostoId ??
+        caja.centroCostoId ??
+        null
+
+      // Cuenta de ingresos: prioridad cuentaContableId del concepto, luego código CUENTAS
+      const conceptoCargo = cargo.categoriaActividad?.conceptoTesoreria
+      const cuentaIngresoId = conceptoCargo?.cuentaContableId || conceptoPorDefecto?.cuentaContableId || null
+      const cuentaIngresoCodigo = esDeportivo ? CUENTAS.CUOTA_DEPORTIVA : CUENTAS.CUOTA_SOCIAL
+      const grupoKey = `${ccEfectivo}_${cuentaIngresoId || cuentaIngresoCodigo}`
+
+      if (!gruposIngresos[grupoKey]) {
+        gruposIngresos[grupoKey] = {
+          cuentaContableId: cuentaIngresoId || null,
+          cuentaCodigo: cuentaIngresoId ? null : cuentaIngresoCodigo,
+          centroCostoId: ccEfectivo,
+          haber: 0,
+        }
+      }
+      if (montoBase > 0) gruposIngresos[grupoKey].haber += montoBase
+
+      // Mora al mismo CC
+      if (montoRecargo > 0) {
+        const moraKey = `${ccEfectivo}_MORA`
+        if (!gruposIngresos[moraKey]) {
+          gruposIngresos[moraKey] = { cuentaCodigo: CUENTAS.INGRESOS_MORA, centroCostoId: ccEfectivo, haber: 0 }
+        }
+        gruposIngresos[moraKey].haber += montoRecargo
+      }
     }
 
-    // HABER: Ingresos por mora (recargos)
-    if (montoRecargo > 0) {
-      lineas.push({ cuentaCodigo: CUENTAS.INGRESOS_MORA, debe: 0, haber: montoRecargo })
+    for (const grupo of Object.values(gruposIngresos)) {
+      if (grupo.haber > 0) {
+        lineas.push({
+          ...(grupo.cuentaContableId ? { cuentaContableId: grupo.cuentaContableId } : { cuentaCodigo: grupo.cuentaCodigo }),
+          debe: 0,
+          haber: grupo.haber,
+          centroCostoId: grupo.centroCostoId,
+        })
+      }
     }
 
     const asiento = await crearAsiento(prisma, {
-      concepto: `Cobranza cuota socio #${pago.socio?.nroSocio || pago.socioId}${montoRecargo > 0 ? ' (inc. mora)' : ''}`,
+      concepto: `Cobranza cuota socio #${pago.socio?.nroSocio || pago.socioId}${totalRecargo > 0 ? ' (inc. mora)' : ''}`,
       fecha: pago.fecha,
       tipoOrigen: 'PAGO_CUOTA',
       origenId: pago.id,
       registradoPor,
-      centroCostoId,
+      centroCostoId: null, // CC definido por línea, no a nivel de asiento
       lineas,
     })
 
     console.log(`[AsientoContable] Creado asiento ${asiento.numero} para pago cuota ${pago.numero}`)
     return asiento
   } catch (error) {
-    console.error(`[AsientoContable] Error generando asiento para pago cuota ${pago.id}:`, error.message)
+    console.error(`[AsientoContable] Error generando asiento para pago cuota ${pago?.id}:`, error.message)
+    console.error(error)
     return null // No fallar la operación principal
   }
 }
@@ -281,14 +327,16 @@ async function generarAsientoMovimientoCaja(prisma, datos) {
 
   const monto = Number(movimiento.monto)
   const obs = movimiento.descripcion || null
+  const ccMov = movimiento.centroCostoId || null
+  const ccCaja = caja.centroCostoId || ccMov  // Caja line gets caja's CC, fallback to movimiento CC
   const lineas = movimiento.tipo === 'INGRESO'
     ? [
-        { ...lineaCashBase,                                         debe: monto, haber: 0,     descripcion: obs },
-        { cuentaCodigo: cuentaConceptoCodigo,                       debe: 0,     haber: monto, descripcion: obs },
+        { ...lineaCashBase, debe: monto, haber: 0,     descripcion: obs, centroCostoId: ccCaja },
+        { cuentaCodigo: cuentaConceptoCodigo, debe: 0, haber: monto, descripcion: obs, centroCostoId: ccMov },
       ]
     : [
-        { cuentaCodigo: cuentaConceptoCodigo,                       debe: monto, haber: 0,     descripcion: obs },
-        { ...lineaCashBase,                                         debe: 0,     haber: monto, descripcion: obs },
+        { cuentaCodigo: cuentaConceptoCodigo, debe: monto, haber: 0, descripcion: obs, centroCostoId: ccMov },
+        { ...lineaCashBase, debe: 0, haber: monto, descripcion: obs, centroCostoId: ccCaja },
       ]
 
   const asiento = await crearAsiento(prisma, {
@@ -297,7 +345,7 @@ async function generarAsientoMovimientoCaja(prisma, datos) {
     tipoOrigen: 'MOV_CAJA',
     origenId: movimiento.id,
     registradoPor,
-    centroCostoId: movimiento.centroCostoId || null,
+    centroCostoId: null, // CC definido por línea
     lineas,
   })
 
@@ -326,45 +374,29 @@ async function generarAsientoFacturaCompra(prisma, datos) {
       cuentaGastoCodigo = concepto.cuentaContable.codigo
     }
 
+    const cc = factura.centroCostoId || null
     const subtotal = Number(factura.subtotal) || 0
     if (subtotal > 0) {
-      lineas.push({
-        cuentaCodigo: cuentaGastoCodigo,
-        debe: subtotal,
-        haber: 0,
-        descripcion: 'Subtotal compra',
-      })
+      lineas.push({ cuentaCodigo: cuentaGastoCodigo, debe: subtotal, haber: 0, descripcion: 'Subtotal compra', centroCostoId: cc })
     }
 
-    // IVA Crédito Fiscal 21%
     const iva21 = Number(factura.iva21) || 0
     if (iva21 > 0) {
-      lineas.push({
-        cuentaCodigo: CUENTAS.IVA_CF_21,
-        debe: iva21,
-        haber: 0,
-        descripcion: 'IVA CF 21%',
-      })
+      lineas.push({ cuentaCodigo: CUENTAS.IVA_CF_21, debe: iva21, haber: 0, descripcion: 'IVA CF 21%', centroCostoId: cc })
     }
 
-    // IVA Crédito Fiscal 10.5%
     const iva105 = Number(factura.iva105) || 0
     if (iva105 > 0) {
-      lineas.push({
-        cuentaCodigo: CUENTAS.IVA_CF_105,
-        debe: iva105,
-        haber: 0,
-        descripcion: 'IVA CF 10.5%',
-      })
+      lineas.push({ cuentaCodigo: CUENTAS.IVA_CF_105, debe: iva105, haber: 0, descripcion: 'IVA CF 10.5%', centroCostoId: cc })
     }
 
-    // Proveedores (Haber)
     const montoTotal = Number(factura.montoTotal)
     lineas.push({
       cuentaCodigo: CUENTAS.PROVEEDORES,
       debe: 0,
       haber: montoTotal,
       descripcion: `Factura ${factura.tipoComprobante || ''} ${factura.puntoVenta || ''}-${factura.numeroComprobante || ''}`.trim(),
+      centroCostoId: cc,
     })
 
     const nombreProveedor = factura.entidad?.razonSocial || factura.entidad?.nombreFantasia || 'Proveedor'
@@ -375,7 +407,7 @@ async function generarAsientoFacturaCompra(prisma, datos) {
       tipoOrigen: 'FACTURA_COMPRA',
       origenId: factura.id,
       registradoPor,
-      centroCostoId: factura.centroCostoId || null, // Usar centro de costo de la factura
+      centroCostoId: null, // CC definido por línea
       lineas,
     })
 
@@ -402,56 +434,35 @@ async function generarAsientoFacturaVenta(prisma, datos) {
   try {
     const lineas = []
 
-    // Clientes (Debe)
+    const cc = factura.centroCostoId || null
     const montoTotal = Number(factura.montoTotal)
     lineas.push({
       cuentaCodigo: CUENTAS.CLIENTES,
       debe: montoTotal,
       haber: 0,
       descripcion: `Factura ${factura.tipoComprobante || ''} ${factura.puntoVenta || ''}-${factura.numeroComprobante || ''}`.trim(),
+      centroCostoId: cc,
     })
-
-    // Ventas (Haber) - cuenta del concepto o genérica
-    let cuentaVentaCodigo = CUENTAS.VENTAS_MERCADERIA
-    if (concepto?.cuentaContable?.codigo) {
-      cuentaVentaCodigo = concepto.cuentaContable.codigo
-    }
 
     const subtotal = Number(factura.subtotal) || 0
     if (subtotal > 0) {
-      lineas.push({
-        cuentaCodigo: cuentaVentaCodigo,
-        debe: 0,
-        haber: subtotal,
-        descripcion: 'Subtotal venta',
-      })
+      const ventaLine = concepto?.cuentaContableId
+        ? { cuentaContableId: concepto.cuentaContableId }
+        : { cuentaCodigo: concepto?.cuentaContable?.codigo || CUENTAS.VENTAS_MERCADERIA }
+      lineas.push({ ...ventaLine, debe: 0, haber: subtotal, descripcion: 'Subtotal venta', centroCostoId: cc })
     }
 
-    // IVA Débito Fiscal 21%
     const iva21 = Number(factura.iva21) || 0
     if (iva21 > 0) {
-      lineas.push({
-        cuentaCodigo: CUENTAS.IVA_DF_21,
-        debe: 0,
-        haber: iva21,
-        descripcion: 'IVA DF 21%',
-      })
+      lineas.push({ cuentaCodigo: CUENTAS.IVA_DF_21, debe: 0, haber: iva21, descripcion: 'IVA DF 21%', centroCostoId: cc })
     }
 
-    // IVA Débito Fiscal 10.5%
     const iva105 = Number(factura.iva105) || 0
     if (iva105 > 0) {
-      lineas.push({
-        cuentaCodigo: CUENTAS.IVA_DF_105,
-        debe: 0,
-        haber: iva105,
-        descripcion: 'IVA DF 10.5%',
-      })
+      lineas.push({ cuentaCodigo: CUENTAS.IVA_DF_105, debe: 0, haber: iva105, descripcion: 'IVA DF 10.5%', centroCostoId: cc })
     }
 
-    const nombreCliente = factura.entidad?.razonSocial
-      || factura.socio?.apellidoNombre
-      || 'Cliente'
+    const nombreCliente = factura.entidad?.razonSocial || factura.socio?.apellidoNombre || 'Cliente'
 
     const asiento = await crearAsiento(prisma, {
       concepto: `Factura venta ${nombreCliente}`,
@@ -459,7 +470,7 @@ async function generarAsientoFacturaVenta(prisma, datos) {
       tipoOrigen: 'FACTURA_VENTA',
       origenId: factura.id,
       registradoPor,
-      centroCostoId: factura.centroCostoId || null, // Usar centro de costo de la factura
+      centroCostoId: null, // CC definido por línea
       lineas,
     })
 
@@ -488,45 +499,34 @@ async function generarAsientoOrdenPago(prisma, datos) {
     const monto = Number(ordenPago.montoTotal)
     const nombreProveedor = ordenPago.entidad?.razonSocial || 'Proveedor'
 
-    // Línea de débito: Proveedores
+    const ccOrden = ordenPago.centroCostoId || null
     const lineas = [
-      { cuentaCodigo: CUENTAS.PROVEEDORES, debe: monto, haber: 0, descripcion: 'Cancelación deuda' },
+      { cuentaCodigo: CUENTAS.PROVEEDORES, debe: monto, haber: 0, descripcion: 'Cancelación deuda', centroCostoId: ccOrden },
     ]
 
-    // Si hay múltiples pagos, crear una línea de haber por cada uno
     if (pagos && pagos.length > 0 && cajas && cajas.length > 0) {
       for (let i = 0; i < pagos.length; i++) {
         const pago = pagos[i]
         const cajaDelPago = cajas.find(c => c.id === parseInt(pago.cajaId)) || cajas[i]
-
-        let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
-        if (cajaDelPago?.cuentaContable?.codigo) {
-          cuentaCajaCodigo = cajaDelPago.cuentaContable.codigo
-        } else if (cajaDelPago?.tipo === 'BANCO') {
-          cuentaCajaCodigo = CUENTAS.BANCO_CC
-        }
-
+        const cuentaCajaCodigo = cajaDelPago?.cuentaContable?.codigo
+          || (cajaDelPago?.tipo === 'BANCO' ? CUENTAS.BANCO_CC : CUENTAS.CAJA_EFECTIVO)
         lineas.push({
           cuentaCodigo: cuentaCajaCodigo,
           debe: 0,
           haber: parseFloat(pago.monto),
-          descripcion: `${pago.medioPago} - OP ${ordenPago.numero}`
+          descripcion: `${pago.medioPago} - OP ${ordenPago.numero}`,
+          centroCostoId: cajaDelPago?.centroCostoId || ccOrden,
         })
       }
     } else if (caja) {
-      // Fallback: un solo pago (compatibilidad con código anterior)
-      let cuentaCajaCodigo = CUENTAS.CAJA_EFECTIVO
-      if (caja.cuentaContable?.codigo) {
-        cuentaCajaCodigo = caja.cuentaContable.codigo
-      } else if (caja.tipo === 'BANCO') {
-        cuentaCajaCodigo = CUENTAS.BANCO_CC
-      }
-
+      const cuentaCajaCodigo = caja.cuentaContable?.codigo
+        || (caja.tipo === 'BANCO' ? CUENTAS.BANCO_CC : CUENTAS.CAJA_EFECTIVO)
       lineas.push({
         cuentaCodigo: cuentaCajaCodigo,
         debe: 0,
         haber: monto,
-        descripcion: `OP ${ordenPago.numero}`
+        descripcion: `OP ${ordenPago.numero}`,
+        centroCostoId: caja.centroCostoId || ccOrden,
       })
     }
 
@@ -536,7 +536,7 @@ async function generarAsientoOrdenPago(prisma, datos) {
       tipoOrigen: 'ORDEN_PAGO',
       origenId: ordenPago.id,
       registradoPor,
-      centroCostoId: ordenPago.centroCostoId || null,
+      centroCostoId: null, // CC definido por línea
       lineas,
     })
 
@@ -566,9 +566,12 @@ async function generarAsientoReciboCobro(prisma, datos) {
       : { cuentaCodigo: caja?.cuentaContable?.codigo || (caja?.tipo === 'BANCO' ? CUENTAS.BANCO_CC : CUENTAS.CAJA_EFECTIVO), debe: Number(recibo.montoTotal), haber: 0, descripcion: `Recibo ${recibo.numero}` }
 
     const monto = Number(recibo.montoTotal)
-    const nombreCliente = recibo.entidad?.razonSocial
-      || recibo.socio?.apellidoNombre
-      || 'Cliente'
+    const ccRecibo = recibo.centroCostoId || null
+    const ccCaja = caja?.centroCostoId || ccRecibo
+    const nombreCliente = recibo.entidad?.razonSocial || recibo.socio?.apellidoNombre || 'Cliente'
+
+    // DEBE (caja): CC de la caja donde se recibe el dinero
+    const lineaCashConCC = { ...lineaCash, centroCostoId: ccCaja }
 
     const asiento = await crearAsiento(prisma, {
       concepto: `Cobro de ${nombreCliente}`,
@@ -576,10 +579,10 @@ async function generarAsientoReciboCobro(prisma, datos) {
       tipoOrigen: 'RECIBO_COBRO',
       origenId: recibo.id,
       registradoPor,
-      centroCostoId: recibo.centroCostoId || null,
+      centroCostoId: null, // CC definido por línea
       lineas: [
-        lineaCash,
-        { cuentaCodigo: CUENTAS.CLIENTES, debe: 0, haber: monto, descripcion: 'Cobro deuda' },
+        lineaCashConCC,
+        { cuentaCodigo: CUENTAS.CLIENTES, debe: 0, haber: monto, descripcion: 'Cobro deuda', centroCostoId: ccRecibo },
       ],
     })
 
@@ -613,16 +616,17 @@ async function generarAsientoPagoSueldo(prisma, datos) {
     const monto = Number(itemLiquidacion.netoAPagar)
     const nombreEmpleado = entidad?.razonSocial || 'Personal'
 
+    const ccCaja = caja.centroCostoId || null
     const asiento = await crearAsiento(prisma, {
       concepto: `Pago sueldo ${liquidacion.periodo} - ${nombreEmpleado}`,
       fecha: ordenPago.fecha,
       tipoOrigen: 'PAGO_SUELDO',
       origenId: ordenPago.id,
       registradoPor,
-      centroCostoId: null, // TODO: Asignar centro de costo según departamento del empleado
+      centroCostoId: null, // CC definido por línea
       lineas: [
-        { cuentaCodigo: CUENTAS.GASTOS_PERSONAL, debe: monto, haber: 0, descripcion: `Liquidación ${liquidacion.numero}` },
-        { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto, descripcion: `OP ${ordenPago.numero}` },
+        { cuentaCodigo: CUENTAS.GASTOS_PERSONAL, debe: monto, haber: 0, descripcion: `Liquidación ${liquidacion.numero}`, centroCostoId: ccCaja },
+        { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto, descripcion: `OP ${ordenPago.numero}`, centroCostoId: ccCaja },
       ],
     })
 
@@ -691,10 +695,10 @@ async function crearAsientoTransferencia(prisma, datos) {
     tipoOrigen: 'TRANSFERENCIA',
     origenId: transferencia.id,
     registradoPor,
-    centroCostoId: centroCostoId || null,
+    centroCostoId: null, // CC definido por línea
     lineas: [
-      { cuentaCodigo: cuentaDestino.codigo, debe: monto, haber: 0,    descripcion: descripcion || null },
-      { cuentaCodigo: cuentaOrigen.codigo,  debe: 0,    haber: monto, descripcion: descripcion || null },
+      { cuentaCodigo: cuentaDestino.codigo, debe: monto, haber: 0,    descripcion: descripcion || null, centroCostoId: centroCostoId || null },
+      { cuentaCodigo: cuentaOrigen.codigo,  debe: 0,    haber: monto, descripcion: descripcion || null, centroCostoId: centroCostoId || null },
     ],
   })
 

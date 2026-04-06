@@ -19,6 +19,8 @@ import cobranzasRoutes from './cobranzas.js'
 import recuperoRoutes from './recupero.js'
 import comunicacionesRoutes from './comunicaciones.js'
 import paginasRoutes from './paginas.js'
+import reportTemplatesRoutes from './report-templates.js'
+import reportPresetsRoutes from './report-presets.js'
 
 const router = Router()
 
@@ -41,5 +43,7 @@ router.use('/cobranzas', cobranzasRoutes)
 router.use('/recupero', recuperoRoutes)
 router.use('/comunicaciones', comunicacionesRoutes)
 router.use(paginasRoutes)
+router.use(reportTemplatesRoutes)
+router.use(reportPresetsRoutes)
 
 export default router

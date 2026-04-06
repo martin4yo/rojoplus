@@ -487,6 +487,8 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
     })
     const numero = `OP-${year}-${(count + 1).toString().padStart(5, '0')}`
 
+    const cajaPago = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+
     const ordenPago = await prisma.$transaction(async (tx) => {
       // Crear la orden de pago
       const op = await tx.movimientoContable.create({
@@ -503,6 +505,7 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
           nroOperacion,
           observaciones: observaciones || `Pago sueldo ${item.liquidacion.periodo} - ${item.entidad.razonSocial}`,
           estado: 'PAGADO',
+          centroCostoId: cajaPago?.centroCostoId ?? null,
           registradoPor: req.admin.id
         }
       })
@@ -540,6 +543,7 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
           concepto: `Pago sueldo ${item.liquidacion.periodo}`,
           descripcion: item.entidad.razonSocial,
           movimientoContableId: op.id,
+          centroCostoId: cajaPago?.centroCostoId ?? null,
           registradoPor: req.admin.id
         }
       })
@@ -637,6 +641,8 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
       return res.status(400).json({ error: 'No hay cuentas contables configuradas' })
     }
 
+    const cajaBatch = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+
     const year = new Date().getFullYear()
 
     await prisma.$transaction(async (tx) => {
@@ -663,6 +669,7 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
             nroOperacion,
             observaciones: `Pago sueldo ${liquidacion.periodo} - ${item.entidad.razonSocial}`,
             estado: 'PAGADO',
+            centroCostoId: cajaBatch?.centroCostoId ?? null,
             registradoPor: req.admin.id
           }
         })
@@ -692,6 +699,7 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
             concepto: `Pago sueldo ${liquidacion.periodo}`,
             descripcion: item.entidad.razonSocial,
             movimientoContableId: op.id,
+            centroCostoId: cajaBatch?.centroCostoId ?? null,
             registradoPor: req.admin.id
           }
         })

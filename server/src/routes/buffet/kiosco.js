@@ -119,7 +119,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
     const productosVenta = []
 
     for (const item of items) {
-      const producto = await req.db.productoBuffet.findUnique({ where: { id: item.productoBuffetId } })
+      const producto = await req.db.productoBuffet.findUnique({ where: { id: item.productoBuffetId }, include: { conceptoVenta: true } })
       if (!producto) continue
 
       const cantidad = item.cantidad || 1
@@ -184,6 +184,11 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       })
     }
 
+    // Centro de costo fallback: primer producto con concepto de venta que tenga CC
+    const ccItemsFallback = productosVenta
+      .map(p => p.productoBuffet?.conceptoVenta?.centroCostoId)
+      .find(cc => cc != null) ?? null
+
     const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0
     const movimientos = []
 
@@ -220,7 +225,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             cajaId: parseInt(pago.cajaId || cajaId),
             tipo: 'INGRESO',
             cuentaContableId: cuentaContable?.id || 1,
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             monto: parseFloat(pago.monto),
             medioPagoId: medioPago.id,
             concepto: `Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
@@ -278,7 +283,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           cajaId: parseInt(cajaId),
           tipo: 'INGRESO',
           cuentaContableId: cuentaContable?.id || 1,
-          centroCostoId: caja.centroCostoId,
+          centroCostoId: caja.centroCostoId ?? ccItemsFallback,
           monto: totalFinal,
           medioPagoId: medioPago.id,
           concepto: `Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
@@ -469,7 +474,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             estado: 'PAGADO',
             cajaId: cajaUsadaId,
             medioPago: medioPagoUsado?.nombre || 'VARIOS',
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             registradoPor: req.admin.id,
             observaciones: `Venta Kiosco - ${detalleItems.join(', ')}`
           },
@@ -479,7 +484,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           }
         })
 
-        await generarAsientoFacturaVenta(prisma, {
+        await generarAsientoFacturaVenta(req.db, {
           factura: {
             id: movimientoContableVenta.id,
             numero: numeroMCVenta,
@@ -491,7 +496,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             iva21: ivaTotal,
             iva105: 0,
             montoTotal: totalFinal,
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             socio: movimientoContableVenta.socio,
             entidad: movimientoContableVenta.entidad
           },
@@ -515,19 +520,19 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             estado: 'CONFIRMADO',
             cajaId: cajaUsadaId,
             medioPago: medioPagoUsado?.nombre || 'VARIOS',
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             registradoPor: req.admin.id,
             observaciones: `Cobro Venta Kiosco`
           }
         })
 
-        await generarAsientoReciboCobro(prisma, {
+        await generarAsientoReciboCobro(req.db, {
           recibo: {
             id: movimientoContableCobro.id,
             numero: numeroMCCobro,
             fecha: new Date(),
             montoTotal: totalFinal,
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             socio: movimientoContableVenta.socio,
             entidad: movimientoContableVenta.entidad
           },

@@ -54,6 +54,10 @@ import AdminSocioDetalle from './pages/admin/SocioDetalle'
 import AdminSocioForm from './pages/admin/SocioForm'
 import AdminSociosCargar from './pages/admin/SociosCargar'
 import AdminReportes from './pages/admin/Reportes'
+import ReportTemplatesPage from './pages/admin/reportes/ReportTemplatesPage'
+import ReportDesignerPage from './pages/admin/reportes/ReportDesignerPage'
+import ReportViewerPage from './pages/admin/reportes/ReportViewerPage'
+import RunReportsPage from './pages/admin/reportes/RunReportsPage'
 import AdminTablasAuxiliares from './pages/admin/TablasAuxiliares'
 import AdminSolicitudes from './pages/admin/Solicitudes'
 import AdminInscripciones from './pages/admin/Inscripciones'
@@ -318,6 +322,11 @@ function App() {
         <Route path="contenido/paginas/:slug" element={<ContenidoPaginas />} />
         <Route path="contenido/paginas" element={<ContenidoPaginas />} />
         <Route path="reportes" element={<AdminReportes />} />
+        <Route path="reportes/designer" element={<ReportTemplatesPage />} />
+        <Route path="reportes/designer/nuevo" element={<ReportDesignerPage />} />
+        <Route path="reportes/designer/:id/editar" element={<ReportDesignerPage />} />
+        <Route path="reportes/designer/:id/ejecutar" element={<ReportViewerPage />} />
+        <Route path="reportes/ejecutar" element={<RunReportsPage />} />
         <Route path="reportes/actividades" element={<AdminReporteActividades />} />
         <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />
         <Route path="reportes/cuotas" element={<AdminReporteCuotas />} />

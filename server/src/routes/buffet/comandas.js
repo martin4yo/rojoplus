@@ -1108,6 +1108,12 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       })
     }
 
+    // Centro de costo fallback: primer item no anulado que tenga concepto de venta con CC
+    const ccItemsFallback = comanda.items
+      .filter(i => i.estado !== 'ANULADO')
+      .map(i => i.productoBuffet?.producto?.conceptoVenta?.centroCostoId)
+      .find(cc => cc != null) ?? null
+
     // Crear movimientos de caja
     const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0
     const movimientos = []
@@ -1145,7 +1151,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cajaId: parseInt(pago.cajaId || cajaId),
             tipo: 'INGRESO',
             cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             monto: parseFloat(pago.monto),
             medioPagoId: medioPago.id,
             concepto: `Venta Buffet - Comanda ${comanda.numero} - ${medioPago.nombre}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
@@ -1163,7 +1169,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cuentaContableId: cuentaDebeBuffetMulti,
             debe: parseFloat(pago.monto),
             haber: 0,
-            centroCostoId: caja.centroCostoId || null,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback ?? null,
             descripcion: `Ingreso por venta buffet - ${medioPago.nombre}`
           }
         ]
@@ -1182,7 +1188,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             cuentaContableId,
             debe: 0,
             haber: montoCuenta,
-            centroCostoId: caja.centroCostoId || null,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback ?? null,
             descripcion: `Venta buffet - Comanda ${comanda.numero}`
           })
         }
@@ -1221,7 +1227,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cajaId: parseInt(cajaId),
           tipo: 'INGRESO',
           cuentaContableId: caja.cuentaContableId || cuentaContableFallback?.id,
-          centroCostoId: caja.centroCostoId,
+          centroCostoId: caja.centroCostoId ?? ccItemsFallback,
           monto: totalFinal,
           medioPagoId: medioPago.id,
           concepto: `Venta Buffet - Comanda ${comanda.numero}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
@@ -1239,7 +1245,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cuentaContableId: cuentaDebeBuffet,
           debe: totalFinal,
           haber: 0,
-          centroCostoId: caja.centroCostoId || null,
+          centroCostoId: caja.centroCostoId ?? ccItemsFallback ?? null,
           descripcion: `Ingreso por venta buffet - ${medioPago.nombre}`
         }
       ]
@@ -1258,7 +1264,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           cuentaContableId,
           debe: 0,
           haber: montoCuenta,
-          centroCostoId: caja.centroCostoId || null,
+          centroCostoId: caja.centroCostoId ?? ccItemsFallback ?? null,
           descripcion: `Venta buffet - Comanda ${comanda.numero}`
         })
       }
@@ -1558,7 +1564,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             estado: 'PAGADO',
             cajaId: cajaUsadaId,
             medioPago: medioPagoUsado?.nombre || 'VARIOS',
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             registradoPor: req.admin.id,
             observaciones: `Venta Buffet - Comanda ${comanda.numero}${comanda.mesa ? ` - Mesa ${comanda.mesa.numero}` : ''}`
           },
@@ -1569,7 +1575,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         })
 
         // Generar asiento de venta
-        const asientoVenta = await generarAsientoFacturaVenta(prisma, {
+        const asientoVenta = await generarAsientoFacturaVenta(req.db, {
           factura: {
             id: movimientoContableVenta.id,
             numero: numeroMCVenta,
@@ -1581,7 +1587,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             iva21: ivaTotal,
             iva105: 0,
             montoTotal: totalFinal,
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             socio: movimientoContableVenta.socio,
             entidad: movimientoContableVenta.entidad
           },
@@ -1610,7 +1616,7 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             estado: 'CONFIRMADO',
             cajaId: cajaUsadaId,
             medioPago: medioPagoUsado?.nombre || 'VARIOS',
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             registradoPor: req.admin.id,
             observaciones: `Cobro Venta Buffet - Comanda ${comanda.numero}`
           },
@@ -1621,13 +1627,13 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         })
 
         // Generar asiento de cobranza
-        const asientoCobro = await generarAsientoReciboCobro(prisma, {
+        const asientoCobro = await generarAsientoReciboCobro(req.db, {
           recibo: {
             id: movimientoContableCobro.id,
             numero: numeroMCCobro,
             fecha: new Date(),
             montoTotal: totalFinal,
-            centroCostoId: caja.centroCostoId,
+            centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             socio: movimientoContableCobro.socio,
             entidad: movimientoContableCobro.entidad
           },

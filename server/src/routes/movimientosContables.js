@@ -521,24 +521,24 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
   try {
     if (tipo === 'FACTURA_COMPRA') {
       const concepto = resultado.concepto
-        ? await prisma.conceptoTesoreria.findUnique({
+        ? await req.db.conceptoTesoreria.findUnique({
             where: { id: resultado.concepto.id },
             include: { cuentaContable: true }
           })
         : null
-      generarAsientoFacturaCompra(prisma, {
+      generarAsientoFacturaCompra(req.db, {
         factura: resultado,
         concepto,
         registradoPor: req.admin.id,
       }).catch(err => console.error('Error generando asiento factura compra:', err))
     } else if (tipo === 'FACTURA_VENTA') {
       const concepto = resultado.concepto
-        ? await prisma.conceptoTesoreria.findUnique({
+        ? await req.db.conceptoTesoreria.findUnique({
             where: { id: resultado.concepto.id },
             include: { cuentaContable: true }
           })
         : null
-      generarAsientoFacturaVenta(prisma, {
+      generarAsientoFacturaVenta(req.db, {
         factura: resultado,
         concepto,
         registradoPor: req.admin.id,
@@ -550,7 +550,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
             include: { cuentaContable: true }
           })
         : null
-      generarAsientoOrdenPago(prisma, {
+      generarAsientoOrdenPago(req.db, {
         ordenPago: resultado,
         caja,
         registradoPor: req.admin.id,
@@ -562,7 +562,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
             include: { cuentaContable: true }
           })
         : null
-      generarAsientoReciboCobro(prisma, {
+      generarAsientoReciboCobro(req.db, {
         recibo: resultado,
         caja,
         registradoPor: req.admin.id,
@@ -1074,7 +1074,7 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
 
   // Generar asiento contable automático para la orden de pago
   const cajasConCuenta = pagos.map(p => p.caja)
-  generarAsientoOrdenPago(prisma, {
+  generarAsientoOrdenPago(req.db, {
     ordenPago: resultado,
     cajas: cajasConCuenta,
     pagos: pagos,
@@ -1280,7 +1280,7 @@ router.post('/recibos-cobro', asyncHandler(async (req, res) => {
     where: { id: parseInt(cajaId) },
     include: { cuentaContable: true }
   })
-  generarAsientoReciboCobro(prisma, {
+  generarAsientoReciboCobro(req.db, {
     recibo: resultado,
     caja: cajaConCuenta,
     registradoPor: req.admin.id,

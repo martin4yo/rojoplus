@@ -4052,3 +4052,66 @@ model AiUsageLog {
   @@index([createdAt])
   @@map("ai_usage_logs")
 }
+
+
+// ===== REPORTES A MEDIDA =====
+
+model ReportTemplate {
+  id               String   @id @default(cuid())
+  tenantId         Int      @map("tenant_id")
+  name             String
+  description      String?
+  category         String   @default("general")
+  queryKey         String?  @map("query_key")
+  customScript     String?  @db.Text @map("custom_script")
+  parameters       Json     @default("[]")
+  htmlTemplate     String   @db.Text @default("") @map("html_template")
+  pageSetup        Json     @default("{}") @map("page_setup")
+  sortOrder        Int      @default(0) @map("sort_order")
+  isPublic         Boolean  @default(false) @map("is_public")
+  isActive         Boolean  @default(true) @map("is_active")
+  isSystemTemplate Boolean  @default(false) @map("is_system_template")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  executions       ReportExecution[]
+  presets          ReportPreset[]
+
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("report_templates")
+}
+
+model ReportPreset {
+  id          String   @id @default(cuid())
+  tenantId    Int      @map("tenant_id")
+  templateId  String   @map("template_id")
+  name        String
+  description String?
+  params      Json     @default("{}")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  template    ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("report_presets")
+}
+
+model ReportExecution {
+  id         String   @id @default(cuid())
+  tenantId   Int      @map("tenant_id")
+  templateId String   @map("template_id")
+  userId     Int?     @map("user_id")
+  parameters Json     @default("{}")
+  durationMs Int?     @map("duration_ms")
+  error      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  template   ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([templateId])
+  @@map("report_executions")
+}
