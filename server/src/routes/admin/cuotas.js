@@ -209,6 +209,7 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
       nombre,
       fechaVencimiento: fechaVenc,
       estado: 'PENDIENTE',
+      tenantId: req.tenantId,
     },
   })
 
