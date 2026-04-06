@@ -83,6 +83,7 @@ export default function DebitoAutomaticoSocio({ tokenPortal }) {
     tarjetaNumero: '',
     tarjetaVencimiento: '',
     tarjetaTitular: '',
+    cvv: '',
   })
 
   // Marca detectada automáticamente
@@ -136,11 +137,12 @@ export default function DebitoAutomaticoSocio({ tokenPortal }) {
         tarjetaMarca: marcaDetectada,
         tarjetaVencimiento: formData.tarjetaVencimiento,
         tarjetaTitular: formData.tarjetaTitular,
+        cvv: formData.cvv || undefined,
       }
       const res = await api.post(`/socio/${tokenPortal}/debito-automatico/solicitar`, payload)
       toast.success(res.message || 'Solicitud enviada correctamente')
       setMostrarFormulario(false)
-      setFormData({ tarjetaNumero: '', tarjetaVencimiento: '', tarjetaTitular: '' })
+      setFormData({ tarjetaNumero: '', tarjetaVencimiento: '', tarjetaTitular: '', cvv: '' })
       cargarEstado()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al enviar solicitud')
@@ -243,7 +245,7 @@ export default function DebitoAutomaticoSocio({ tokenPortal }) {
 
             {/* Mostrar datos de tarjeta */}
             {estado?.tarjetaUltimos4 && (
-              <div className="mt-4">
+              <div className="mt-4 space-y-2">
                 <div className="flex items-center gap-3 text-sm">
                   <MarcaLogo marca={estado.tarjetaMarca} size="small" />
                   <span className="font-mono text-gray-600">**** **** **** {estado.tarjetaUltimos4}</span>
@@ -251,6 +253,12 @@ export default function DebitoAutomaticoSocio({ tokenPortal }) {
                     <span className="text-gray-500 text-xs">Vto: {estado.tarjetaVencimiento}</span>
                   )}
                 </div>
+                {estado?.tokenizadoPayway && (
+                  <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+                    <CheckCircleIcon className="w-3 h-3" />
+                    Tokenizado via Payway
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -390,10 +398,26 @@ export default function DebitoAutomaticoSocio({ tokenPortal }) {
                 />
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
-                <p className="text-xs text-blue-800">
-                  <strong>Nota:</strong> El CVV no se solicita por seguridad.
-                </p>
+              {/* CVV — opcional, usado para tokenización Payway */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    CVV (opcional)
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.cvv}
+                    onChange={(e) => setFormData({ ...formData, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                    placeholder="123"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 font-mono text-sm text-center"
+                    maxLength={4}
+                  />
+                </div>
+                <div className="flex items-end pb-0.5">
+                  <p className="text-xs text-gray-500">
+                    Si lo ingresás, tu tarjeta se tokeniza de forma segura para cobros automáticos.
+                  </p>
+                </div>
               </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5">
@@ -408,7 +432,7 @@ export default function DebitoAutomaticoSocio({ tokenPortal }) {
                   type="button"
                   onClick={() => {
                     setMostrarFormulario(false)
-                    setFormData({ tarjetaNumero: '', tarjetaVencimiento: '', tarjetaTitular: '' })
+                    setFormData({ tarjetaNumero: '', tarjetaVencimiento: '', tarjetaTitular: '', cvv: '' })
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors text-sm"
                   disabled={enviando}

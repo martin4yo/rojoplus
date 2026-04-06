@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, ChevronDown, ChevronRight, Search, X } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import CentroCostoSelector from '../../../components/CentroCostoSelector'
+import ConceptoTesoreriaModal from '../../../components/ConceptoTesoreriaModal'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
@@ -31,23 +32,22 @@ export default function MovimientoCajaForm() {
     centroCostoId: null,
     concepto: '',
     descripcion: '',
-    medioPagoId: ''
+    medioPagoId: '',
+    socioId: null,
+    entidadId: null,
   })
+
+  // Selector Socio/Entidad
+  const [busquedaPersona, setBusquedaPersona] = useState('')
+  const [resultadosPersona, setResultadosPersona] = useState([])
+  const [personaSeleccionada, setPersonaSeleccionada] = useState(null)
+  const [buscandoPersona, setBuscandoPersona] = useState(false)
 
   useEffect(() => {
     cargarDatos()
   }, [])
 
-  // Estado para el modal de nuevo concepto
   const [showConceptoModal, setShowConceptoModal] = useState(false)
-  const [nuevoConcepto, setNuevoConcepto] = useState({
-    codigo: '',
-    nombre: '',
-    tipo: 'INGRESO',
-    cuentaContableId: '',
-    centroCostoId: null
-  })
-  const [savingConcepto, setSavingConcepto] = useState(false)
 
   async function cargarDatos() {
     try {
@@ -121,50 +121,54 @@ export default function MovimientoCajaForm() {
     }
   }
 
-  async function handleCrearConcepto() {
-    if (!nuevoConcepto.codigo || !nuevoConcepto.nombre || !nuevoConcepto.cuentaContableId) {
-      setError('Código, nombre y cuenta contable son requeridos para el concepto')
-      return
-    }
-    if (!nuevoConcepto.centroCostoId) {
-      setError('El centro de costo es requerido para el concepto')
-      return
-    }
+  function handleConceptoCreado(conceptoCreado) {
+    setConceptos(prev => [...prev, conceptoCreado])
+    setForm(prev => {
+      const cajaActual = cajas.find(c => c.id === parseInt(prev.cajaId))
+      const cajaTieneCc = !!cajaActual?.centroCostoId
+      return {
+        ...prev,
+        conceptoId: String(conceptoCreado.id),
+        concepto: conceptoCreado.nombre,
+        cuentaContableId: String(conceptoCreado.cuentaContableId),
+        centroCostoId: cajaTieneCc ? prev.centroCostoId : (conceptoCreado.centroCostoId || prev.centroCostoId),
+      }
+    })
+    setDatosContablesOpen(true)
+  }
 
-    setSavingConcepto(true)
+  async function buscarPersona(q) {
+    if (q.length < 2) { setResultadosPersona([]); return }
+    setBuscandoPersona(true)
     try {
-      const res = await api.post('/admin/conceptos-tesoreria', {
-        codigo: nuevoConcepto.codigo,
-        nombre: nuevoConcepto.nombre,
-        tipo: nuevoConcepto.tipo,
-        cuentaContableId: parseInt(nuevoConcepto.cuentaContableId),
-        centroCostoId: parseInt(nuevoConcepto.centroCostoId)
-      })
-
-      const conceptoCreado = res
-      setConceptos(prev => [...prev, conceptoCreado])
-
-      setForm(prev => {
-        const cajaActual = cajas.find(c => c.id === parseInt(prev.cajaId))
-        const cajaTieneCc = !!cajaActual?.centroCostoId
-        return {
-          ...prev,
-          conceptoId: String(conceptoCreado.id),
-          concepto: conceptoCreado.nombre,
-          cuentaContableId: String(conceptoCreado.cuentaContableId),
-          centroCostoId: cajaTieneCc ? prev.centroCostoId : (conceptoCreado.centroCostoId || prev.centroCostoId),
-        }
-      })
-
-      setDatosContablesOpen(true)
-      setShowConceptoModal(false)
-      setNuevoConcepto({ codigo: '', nombre: '', tipo: 'INGRESO', cuentaContableId: '', centroCostoId: null })
-      setError(null)
-    } catch (err) {
-      setError(err.message || 'Error al crear concepto')
+      const [sociosRes, entidadesRes] = await Promise.all([
+        api.getFull(`/admin/socios?q=${encodeURIComponent(q)}&limit=5`),
+        api.getFull(`/admin/entidades?busqueda=${encodeURIComponent(q)}&limit=5`).catch(() => ({ data: [] })),
+      ])
+      const socios = (sociosRes.data || []).map(s => ({ tipo: 'socio', id: s.id, label: `${s.apellido}, ${s.nombre} — Socio #${s.numeroSocio}` }))
+      const entidades = (entidadesRes.data || []).map(e => ({ tipo: 'entidad', id: e.id, label: `${e.razonSocial || e.nombre} — ${e.tipo || 'Entidad'}` }))
+      setResultadosPersona([...socios, ...entidades])
     } finally {
-      setSavingConcepto(false)
+      setBuscandoPersona(false)
     }
+  }
+
+  function seleccionarPersona(p) {
+    setPersonaSeleccionada(p)
+    setBusquedaPersona('')
+    setResultadosPersona([])
+    setForm(prev => ({
+      ...prev,
+      socioId: p.tipo === 'socio' ? p.id : null,
+      entidadId: p.tipo === 'entidad' ? p.id : null,
+    }))
+  }
+
+  function limpiarPersona() {
+    setPersonaSeleccionada(null)
+    setBusquedaPersona('')
+    setResultadosPersona([])
+    setForm(prev => ({ ...prev, socioId: null, entidadId: null }))
   }
 
   async function handleSubmit(e) {
@@ -208,7 +212,9 @@ export default function MovimientoCajaForm() {
         centroCostoId: form.centroCostoId || null,
         concepto: form.concepto || null,
         descripcion: form.descripcion || null,
-        medioPagoId: parseInt(form.medioPagoId)
+        medioPagoId: parseInt(form.medioPagoId),
+        socioId: form.socioId || null,
+        entidadId: form.entidadId || null,
       })
 
       if (cajaIdParam) {
@@ -379,10 +385,7 @@ export default function MovimientoCajaForm() {
                 </select>
                 <button
                   type="button"
-                  onClick={() => {
-                    setNuevoConcepto(prev => ({ ...prev, tipo: form.tipo }))
-                    setShowConceptoModal(true)
-                  }}
+                  onClick={() => setShowConceptoModal(true)}
                   className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600"
                   title="Crear nuevo concepto"
                 >
@@ -403,6 +406,48 @@ export default function MovimientoCajaForm() {
                 placeholder="Detalle obligatorio del movimiento..."
                 required
               />
+            </div>
+
+            {/* Socio / Entidad (opcional) */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Socio / Entidad <span className="text-gray-400 font-normal">(opcional)</span></label>
+              {personaSeleccionada ? (
+                <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <span className="flex-1 text-sm text-blue-800">{personaSeleccionada.label}</span>
+                  <button type="button" onClick={limpiarPersona} className="p-1 hover:bg-blue-100 rounded text-blue-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={busquedaPersona}
+                      onChange={(e) => { setBusquedaPersona(e.target.value); buscarPersona(e.target.value) }}
+                      className="input-field w-full pl-9"
+                      placeholder="Buscar socio o entidad..."
+                    />
+                    {buscandoPersona && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>}
+                  </div>
+                  {resultadosPersona.length > 0 && (
+                    <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-auto">
+                      {resultadosPersona.map((p, i) => (
+                        <li key={i}>
+                          <button
+                            type="button"
+                            onClick={() => seleccionarPersona(p)}
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                          >
+                            {p.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -498,92 +543,12 @@ export default function MovimientoCajaForm() {
         </div>
       </form>
 
-      {/* Modal Crear Concepto */}
-      {showConceptoModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Nuevo Concepto</h3>
-              <button
-                onClick={() => setShowConceptoModal(false)}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Código *</label>
-                <input
-                  type="text"
-                  value={nuevoConcepto.codigo}
-                  onChange={(e) => setNuevoConcepto(prev => ({ ...prev, codigo: e.target.value.toUpperCase() }))}
-                  className="input-field w-full"
-                  placeholder="Ej: ALQUILER, VENTA_MERCH"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                <input
-                  type="text"
-                  value={nuevoConcepto.nombre}
-                  onChange={(e) => setNuevoConcepto(prev => ({ ...prev, nombre: e.target.value }))}
-                  className="input-field w-full"
-                  placeholder="Descripción del concepto"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                <select
-                  value={nuevoConcepto.tipo}
-                  onChange={(e) => setNuevoConcepto(prev => ({ ...prev, tipo: e.target.value }))}
-                  className="input-field w-full"
-                >
-                  <option value="INGRESO">Ingreso</option>
-                  <option value="EGRESO">Egreso</option>
-                  <option value="AMBOS">Ambos</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Contable *</label>
-                <select
-                  value={nuevoConcepto.cuentaContableId}
-                  onChange={(e) => setNuevoConcepto(prev => ({ ...prev, cuentaContableId: e.target.value }))}
-                  className="input-field w-full"
-                >
-                  <option value="">Seleccionar cuenta...</option>
-                  {cuentasContables.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.codigo} - {c.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Centro de Costo *
-                </label>
-                <CentroCostoSelector
-                  value={nuevoConcepto.centroCostoId}
-                  onChange={(id) => setNuevoConcepto(prev => ({ ...prev, centroCostoId: id }))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="secondary" onClick={() => setShowConceptoModal(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCrearConcepto} loading={savingConcepto}>
-                <Plus className="w-4 h-4 mr-2" />
-                Crear Concepto
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConceptoTesoreriaModal
+        isOpen={showConceptoModal}
+        onClose={() => setShowConceptoModal(false)}
+        onCreated={handleConceptoCreado}
+        tipoDefault={form.tipo}
+      />
     </div>
   )
 }

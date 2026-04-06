@@ -232,15 +232,13 @@ export default function Periodos() {
   return (
     <div>
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Receipt className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Periodos de Cuota</h1>
-            <p className="text-gray-500 text-sm">Genera y administra las cuotas mensuales</p>
-          </div>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+            <Receipt className="w-7 h-7 text-primary" />
+            Periodos de Cuota
+          </h1>
+          <p className="text-gray-600 mt-1">Genera y administra las cuotas mensuales</p>
         </div>
         {tienePermiso(PERMISOS.CUOTAS_GENERAR) && (
           <Button onClick={() => setShowCrearModal(true)} className="flex items-center gap-2">

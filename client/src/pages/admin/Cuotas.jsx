@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Receipt, CheckCircle, DollarSign, X, Users, ChevronDown, ChevronUp, Edit2, Plus, Trash2, CreditCard } from 'lucide-react'
+import { Receipt, CheckCircle, DollarSign, X, Users, ChevronDown, ChevronUp, Edit2, Plus, Trash2, CreditCard, Download, Mail, MessageCircle, Loader2 } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import Modal from '../../components/Modal'
@@ -50,13 +50,15 @@ export default function Cuotas() {
   const [mediosPago, setMediosPago] = useState([])
   const [cajas, setCajas] = useState([])
   const [showPagoModal, setShowPagoModal] = useState(false)
-  const [medioPagoId, setMedioPagoId] = useState('')
-  const [cajaId, setCajaId] = useState('')
+  // splits: [{ medioPagoId, cajaId, monto }]
+  const [splits, setSplits] = useState([{ medioPagoId: '', cajaId: '', monto: '' }])
   const [registrandoPago, setRegistrandoPago] = useState(false)
   const [success, setSuccess] = useState(null)
   const [showPagoExitosoModal, setShowPagoExitosoModal] = useState(false)
   const [numeroRecibo, setNumeroRecibo] = useState(null)
   const [pagoId, setPagoId] = useState(null)
+  const [enviandoRecibo, setEnviandoRecibo] = useState({})
+  const [resultadoRecibo, setResultadoRecibo] = useState({})
 
   // Edicion de cargo
   const [showEditModal, setShowEditModal] = useState(false)
@@ -143,13 +145,11 @@ export default function Cuotas() {
       setPeriodos(periodosData || [])
       setMediosPago(mediosData || [])
       setCategoriasCargo(categoriasData || [])
-      setCajas(cajasData || [])
-      if (mediosData?.length > 0) {
-        setMedioPagoId(mediosData[0].id.toString())
-      }
-      if (cajasData?.length > 0) {
-        setCajaId(cajasData[0].id.toString())
-      }
+      setCajas((cajasData || []).filter(c => c.paraCaja))
+      // Pre-seleccionar defaults en splits
+      const defaultMedio = mediosData?.[0]?.id?.toString() || ''
+      const defaultCaja = cajasData?.find(c => c.paraCaja)?.id?.toString() || ''
+      setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: '' }])
     } catch (err) {
       console.error('Error cargando datos iniciales:', err)
     }
@@ -309,6 +309,14 @@ export default function Cuotas() {
     }
   }
 
+  function abrirModalPago() {
+    const total = calcularTotalSeleccionado().total
+    const defaultMedio = mediosPago[0]?.id?.toString() || ''
+    const defaultCaja = cajas[0]?.id?.toString() || ''
+    setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: total.toFixed(2) }])
+    setShowPagoModal(true)
+  }
+
   function salirModoCobranza() {
     setModoCobranza(false)
     setCobranzaData(null)
@@ -362,11 +370,23 @@ export default function Cuotas() {
   }
 
   async function registrarPago() {
-    if (seleccionadas.length === 0 || !medioPagoId || !cajaId) return
+    if (seleccionadas.length === 0) return
 
-    // Obtener el titular o socio principal para el pago
+    const total = calcularTotalSeleccionado().total
+    const sumaSplits = splits.reduce((s, sp) => s + (parseFloat(sp.monto) || 0), 0)
+
+    for (const sp of splits) {
+      if (!sp.medioPagoId || !sp.cajaId || !sp.monto) {
+        setError('Completá todos los campos en los medios de pago')
+        return
+      }
+    }
+    if (Math.abs(sumaSplits - total) > 1) {
+      setError(`La suma de los medios de pago ($${sumaSplits.toFixed(2)}) debe ser igual al total ($${total.toFixed(2)})`)
+      return
+    }
+
     const socioIdPago = cobranzaData?.titular?.id || cobranzaData?.sociosPorCobrar?.[0]?.socio?.id
-
     if (!socioIdPago) {
       setError('No se pudo determinar el socio para el pago')
       return
@@ -379,8 +399,11 @@ export default function Cuotas() {
       const result = await api.post('/admin/pagos', {
         socioId: socioIdPago,
         cuotaIds: seleccionadas,
-        medioPagoId: parseInt(medioPagoId),
-        cajaId: parseInt(cajaId),
+        mediosPago: splits.map(sp => ({
+          medioPagoId: parseInt(sp.medioPagoId),
+          cajaId: parseInt(sp.cajaId),
+          monto: parseFloat(sp.monto),
+        })),
       })
       setNumeroRecibo(result.numero)
       setPagoId(result.id)
@@ -394,10 +417,50 @@ export default function Cuotas() {
     }
   }
 
+  async function descargarReciboPDF() {
+    if (!pagoId) return
+    try {
+      const token = localStorage.getItem('adminToken')
+      const apiUrl = import.meta.env.VITE_API_URL || '/api'
+      const tenantSlug = window.location.hostname.match(/^([^.]+)\.localhost/)?.[1] || null
+      const headers = {}
+      if (token) headers.Authorization = `Bearer ${token}`
+      if (tenantSlug) headers['X-Tenant-Slug'] = tenantSlug
+
+      const response = await fetch(`${apiUrl}/admin/pagos/${pagoId}/recibo-pdf`, { headers })
+      if (!response.ok) throw new Error('Error al generar PDF')
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `recibo-${numeroRecibo || pagoId}.pdf`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error descargando PDF:', err)
+    }
+  }
+
+  async function enviarReciboPorCanal(canal) {
+    if (!pagoId) return
+    setEnviandoRecibo(prev => ({ ...prev, [canal]: true }))
+    try {
+      const res = await api.postFull(`/admin/pagos/${pagoId}/enviar-recibo`, { canales: [canal] })
+      const resultado = res?.data?.[canal]
+      setResultadoRecibo(prev => ({ ...prev, [canal]: resultado }))
+    } catch (err) {
+      setResultadoRecibo(prev => ({ ...prev, [canal]: { ok: false, mensaje: 'Error al enviar' } }))
+    } finally {
+      setEnviandoRecibo(prev => ({ ...prev, [canal]: false }))
+    }
+  }
+
   function cerrarModalPagoExitoso() {
     setShowPagoExitosoModal(false)
     setNumeroRecibo(null)
     setPagoId(null)
+    setEnviandoRecibo({})
+    setResultadoRecibo({})
 
     // Si vino desde otra página (con cobrarSocioId), volver atrás
     const cobrarSocioId = searchParams.get('cobrarSocioId')
@@ -519,7 +582,7 @@ export default function Cuotas() {
             )}
           </div>
           <Button
-            onClick={() => setShowPagoModal(true)}
+            onClick={abrirModalPago}
             disabled={seleccionadas.length === 0}
             className="flex items-center gap-2"
           >
@@ -584,7 +647,7 @@ export default function Cuotas() {
                     Plan de Pagos
                   </Button>
                   <Button
-                    onClick={() => setShowPagoModal(true)}
+                    onClick={abrirModalPago}
                     disabled={seleccionadas.length === 0}
                     className="flex items-center gap-2"
                   >
@@ -647,22 +710,26 @@ export default function Cuotas() {
                             />
                             <div className="flex-1">
                               <p className="text-sm font-medium text-gray-800">
-                                {formatCategoria(cuota.categoria)}
+                                {cuota.conceptoTesoreria
+                                  ? cuota.conceptoTesoreria.nombre
+                                  : formatCategoria(cuota.categoria)}
                                 {cuota.categoriaActividad && (
                                   <span className="text-gray-500 font-normal">
                                     {' - '}{cuota.categoriaActividad.actividad?.nombre} / {cuota.categoriaActividad.nombre}
                                   </span>
                                 )}
-                                {cuota.categoria === 'FINANCIACION' && cuota.descripcion && (
+                                {cuota.categoria === 'FINANCIACION' && cuota.descripcion && !cuota.conceptoTesoreria && (
                                   <span className="text-blue-600 font-normal">
                                     {' - '}{cuota.descripcion.match(/Cuota \d+\/\d+/)?.[0] || ''}
                                   </span>
                                 )}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {cuota.categoria === 'FINANCIACION' && cuota.descripcion
+                                {cuota.categoria === 'FINANCIACION' && cuota.descripcion && !cuota.conceptoTesoreria
                                   ? cuota.descripcion.replace(/ - Cuota \d+\/\d+$/, '').replace('Financiación: ', '')
-                                  : cuota.periodo?.nombre}
+                                  : cuota.descripcion && !cuota.periodo
+                                    ? cuota.descripcion
+                                    : cuota.periodo?.nombre}
                               </p>
                             </div>
                             <div className="text-right">
@@ -691,79 +758,124 @@ export default function Cuotas() {
           isOpen={showPagoModal}
           onClose={() => setShowPagoModal(false)}
           title="Confirmar Pago"
-          maxWidth="max-w-md"
+          maxWidth="max-w-lg"
         >
-          <div className="space-y-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600">Total a cobrar</p>
-              <p className="text-3xl font-bold text-gray-800">
-                {formatCurrency(calcularTotalSeleccionado().total)}
-              </p>
-              {calcularTotalSeleccionado().recargo > 0 && (
-                <div className="text-sm mt-2 space-y-1">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Cuotas:</span>
-                    <span>{formatCurrency(calcularTotalSeleccionado().base)}</span>
-                  </div>
-                  <div className="flex justify-between text-red-600">
-                    <span>Recargo por mora:</span>
-                    <span>{formatCurrency(calcularTotalSeleccionado().recargo)}</span>
-                  </div>
+          {(() => {
+            const totalAPagar = calcularTotalSeleccionado().total
+            const sumaSplits = splits.reduce((s, sp) => s + (parseFloat(sp.monto) || 0), 0)
+            const diferencia = Math.round((totalAPagar - sumaSplits) * 100) / 100
+
+            function updateSplit(idx, field, value) {
+              setSplits(prev => prev.map((sp, i) => i === idx ? { ...sp, [field]: value } : sp))
+            }
+            function addSplit() {
+              const restante = Math.max(0, Math.round((totalAPagar - sumaSplits) * 100) / 100)
+              const defaultMedio = mediosPago[0]?.id?.toString() || ''
+              const defaultCaja = cajas[0]?.id?.toString() || ''
+              setSplits(prev => [...prev, { medioPagoId: defaultMedio, cajaId: defaultCaja, monto: restante.toFixed(2) }])
+            }
+            function removeSplit(idx) {
+              setSplits(prev => prev.filter((_, i) => i !== idx))
+            }
+
+            return (
+              <div className="space-y-4">
+                {/* Resumen total */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Total a cobrar</p>
+                  <p className="text-3xl font-bold text-gray-800">{formatCurrency(totalAPagar)}</p>
+                  {calcularTotalSeleccionado().recargo > 0 && (
+                    <div className="text-xs mt-1 space-y-0.5">
+                      <div className="flex justify-between text-gray-500">
+                        <span>Cuotas/Cargos:</span><span>{formatCurrency(calcularTotalSeleccionado().base)}</span>
+                      </div>
+                      <div className="flex justify-between text-red-500">
+                        <span>Recargo mora:</span><span>{formatCurrency(calcularTotalSeleccionado().recargo)}</span>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">{seleccionadas.length} ítem{seleccionadas.length > 1 ? 's' : ''}</p>
                 </div>
-              )}
-              <p className="text-sm text-gray-500 mt-1">
-                {seleccionadas.length} cuota{seleccionadas.length > 1 ? 's' : ''}
-              </p>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago</label>
-              <select
-                value={medioPagoId}
-                onChange={e => setMedioPagoId(e.target.value)}
-                className="input-field w-full"
-                required
-              >
-                {mediosPago.map(mp => (
-                  <option key={mp.id} value={mp.id}>{mp.nombre}</option>
-                ))}
-              </select>
-            </div>
+                {/* Splits de medios de pago */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Medios de Pago</label>
+                    <button
+                      type="button"
+                      onClick={addSplit}
+                      className="flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      <Plus className="w-3 h-3" /> Agregar medio
+                    </button>
+                  </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Caja</label>
-              <select
-                value={cajaId}
-                onChange={e => setCajaId(e.target.value)}
-                className="input-field w-full"
-                required
-              >
-                {cajas.map(caja => (
-                  <option key={caja.id} value={caja.id}>
-                    {caja.nombre} {caja.tipo ? `(${caja.tipo})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+                  <div className="space-y-2">
+                    {splits.map((sp, idx) => (
+                      <div key={idx} className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 items-center">
+                        <select
+                          value={sp.medioPagoId}
+                          onChange={e => updateSplit(idx, 'medioPagoId', e.target.value)}
+                          className="input-field text-sm"
+                        >
+                          <option value="">Medio...</option>
+                          {mediosPago.map(mp => <option key={mp.id} value={mp.id}>{mp.nombre}</option>)}
+                        </select>
+                        <select
+                          value={sp.cajaId}
+                          onChange={e => updateSplit(idx, 'cajaId', e.target.value)}
+                          className="input-field text-sm"
+                        >
+                          <option value="">Caja...</option>
+                          {cajas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                        </select>
+                        <input
+                          type="number"
+                          value={sp.monto}
+                          onChange={e => updateSplit(idx, 'monto', e.target.value)}
+                          className="input-field text-sm w-28 text-right"
+                          step="0.01"
+                          min="0.01"
+                          placeholder="0.00"
+                        />
+                        {splits.length > 1 && (
+                          <button type="button" onClick={() => removeSplit(idx)} className="p-1 text-red-400 hover:text-red-600">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
-            <div className="flex gap-3 pt-4 border-t">
-              <Button
-                onClick={registrarPago}
-                loading={registrandoPago}
-                className="flex-1 flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="w-4 h-4" />
-                Confirmar Pago
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setShowPagoModal(false)}
-              >
-                Cancelar
-              </Button>
-            </div>
-          </div>
+                  {/* Indicador diferencia */}
+                  {diferencia !== 0 && (
+                    <div className={`mt-2 text-sm font-medium flex justify-between px-1 ${diferencia > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                      <span>{diferencia > 0 ? 'Falta asignar:' : 'Excede en:'}</span>
+                      <span>{formatCurrency(Math.abs(diferencia))}</span>
+                    </div>
+                  )}
+                  {diferencia === 0 && sumaSplits > 0 && (
+                    <p className="mt-2 text-sm text-green-600 text-right font-medium">✓ Montos completos</p>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t">
+                  <Button
+                    onClick={registrarPago}
+                    loading={registrandoPago}
+                    disabled={diferencia !== 0}
+                    className="flex-1 flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Confirmar Pago
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => setShowPagoModal(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )
+          })()}
         </Modal>
 
         {/* Modal de pago exitoso */}
@@ -788,10 +900,58 @@ export default function Cuotas() {
             )}
           </div>
 
-          {/* Sección de adjuntos */}
+          {/* Acciones del recibo */}
           {pagoId && (
-            <div className="border-t pt-4 mt-4">
-              <AdjuntosComprobante tipo="pago" comprobanteId={pagoId} />
+            <div className="border-t pt-4 mt-4 space-y-3">
+              <p className="text-sm text-gray-500 text-center mb-2">Acciones del comprobante</p>
+
+              {/* Descargar PDF */}
+              <button
+                onClick={descargarReciboPDF}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium"
+              >
+                <Download className="w-4 h-4" />
+                Descargar PDF
+              </button>
+
+              {/* Enviar por email */}
+              <div>
+                <button
+                  onClick={() => enviarReciboPorCanal('email')}
+                  disabled={!!enviandoRecibo.email || resultadoRecibo.email?.ok}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-blue-300 rounded-lg text-blue-700 hover:bg-blue-50 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {enviandoRecibo.email
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Mail className="w-4 h-4" />}
+                  {resultadoRecibo.email?.ok ? 'Email enviado ✓' : 'Enviar por Email'}
+                </button>
+                {resultadoRecibo.email && !resultadoRecibo.email.ok && (
+                  <p className="text-xs text-red-500 mt-1 text-center">{resultadoRecibo.email.mensaje}</p>
+                )}
+              </div>
+
+              {/* Enviar por WhatsApp */}
+              <div>
+                <button
+                  onClick={() => enviarReciboPorCanal('whatsapp')}
+                  disabled={!!enviandoRecibo.whatsapp || resultadoRecibo.whatsapp?.ok}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-green-300 rounded-lg text-green-700 hover:bg-green-50 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {enviandoRecibo.whatsapp
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <MessageCircle className="w-4 h-4" />}
+                  {resultadoRecibo.whatsapp?.ok ? 'WhatsApp enviado ✓' : 'Enviar por WhatsApp'}
+                </button>
+                {resultadoRecibo.whatsapp && !resultadoRecibo.whatsapp.ok && (
+                  <p className="text-xs text-red-500 mt-1 text-center">{resultadoRecibo.whatsapp.mensaje}</p>
+                )}
+              </div>
+
+              {/* Adjuntos */}
+              <div className="border-t pt-3">
+                <AdjuntosComprobante tipo="pago" comprobanteId={pagoId} />
+              </div>
             </div>
           )}
 

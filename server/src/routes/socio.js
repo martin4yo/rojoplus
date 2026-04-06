@@ -4,6 +4,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
 import { enviarLinkPortal } from '../services/whatsappService.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
+import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.js'
 import { generatePDF } from '../services/pdfGenerator.js'
 
 const router = Router()
@@ -164,22 +165,158 @@ router.post('/enviar-link-whatsapp', asyncHandler(async (req, res) => {
   })
 }))
 
+// POST /api/socio/enviar-qr-whatsapp - Enviar imagen del QR por WhatsApp
+router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
+  const { busqueda } = req.body
+
+  if (!busqueda?.trim()) {
+    throw new AppError('Ingresa tu número de socio o DNI', 400, 'VALIDATION_ERROR')
+  }
+
+  const socio = await req.db.socio.findFirst({
+    where: {
+      OR: [
+        { nroSocio: busqueda.trim() },
+        { documento: busqueda.trim() },
+      ],
+    },
+    select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      celular: true,
+      tokenPortal: true,
+      estado: true,
+    },
+  })
+
+  if (!socio) {
+    throw new AppError('No se encontró un socio con ese número o DNI', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  const estadoUpper = socio.estado?.toUpperCase() || ''
+  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
+  if (!esActivo) {
+    throw new AppError('Tu membresía no está activa. Regularizá tu situación en el club.', 403, 'SOCIO_INACTIVO')
+  }
+
+  if (!socio.celular) {
+    throw new AppError('No tenés celular registrado. Contactá al club para actualizarlo.', 400, 'NO_CELULAR')
+  }
+
+  if (!socio.tokenPortal) {
+    throw new AppError('Error al obtener tu QR. Contactá al club.', 500, 'NO_TOKEN')
+  }
+
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+  const tenantSlug = req.tenant?.subdomain
+  let baseUrl = frontendUrl
+  if (tenantSlug && process.env.NODE_ENV === 'production') {
+    const urlObj = new URL(frontendUrl)
+    baseUrl = `${urlObj.protocol}//${tenantSlug}.${urlObj.host}`
+  }
+  const qrUrl = `${baseUrl}/s/${socio.tokenPortal}`
+
+  // Leer color primario del branding del tenant (fallback rojo)
+  const tenant = await req.db.tenant.findUnique({
+    where: { id: req.tenantId },
+    select: { colores: true },
+  })
+  const colores = tenant?.colores && typeof tenant.colores === 'object' ? tenant.colores : {}
+  const colorPrimario = colores.primario || '#DC2626'
+
+  // Generar QR como buffer PNG
+  const QRCode = (await import('qrcode')).default
+  const qrBuffer = await QRCode.toBuffer(qrUrl, {
+    width: 400,
+    errorCorrectionLevel: 'H',
+    margin: 2,
+    color: { dark: colorPrimario, light: '#FFFFFF' },
+  })
+
+  // Componer imagen final: fondo blanco + borde redondeado del color primario + QR centrado
+  const { createCanvas, loadImage } = await import('canvas')
+  const border = 16
+  const radius = 18
+  const qrSize = 400
+  const totalSize = qrSize + border * 2
+
+  const canvas = createCanvas(totalSize, totalSize)
+  const ctx = canvas.getContext('2d')
+
+  // Fondo blanco con borde redondeado
+  ctx.fillStyle = '#FFFFFF'
+  ctx.beginPath()
+  ctx.roundRect(0, 0, totalSize, totalSize, radius)
+  ctx.fill()
+
+  // Borde de color primario
+  ctx.strokeStyle = colorPrimario
+  ctx.lineWidth = border
+  ctx.beginPath()
+  ctx.roundRect(border / 2, border / 2, totalSize - border, totalSize - border, radius - border / 2)
+  ctx.stroke()
+
+  // QR centrado
+  const qrImage = await loadImage(qrBuffer)
+  ctx.drawImage(qrImage, border, border, qrSize, qrSize)
+
+  const imagenBase64 = canvas.toBuffer('image/png').toString('base64')
+
+  const nombre = socio.apellidoNombre.split(',')[0].trim()
+  const caption = `Hola ${nombre}! Este es tu código QR de socio N° ${socio.nroSocio}.\nPresentalo en comercios adheridos para obtener descuentos.`
+
+  const { enviarWhatsAppImagen } = await import('../services/whatsappService.js')
+  const resultado = await enviarWhatsAppImagen({
+    db: req.db,
+    telefono: socio.celular,
+    imagenBase64,
+    caption,
+    ignorarHorario: true,
+  })
+
+  if (!resultado.enviado) {
+    throw new AppError(
+      resultado.motivo || 'No se pudo enviar por WhatsApp. Intentá por email.',
+      503,
+      'WA_NOT_AVAILABLE'
+    )
+  }
+
+  const celularOculto = socio.celular.replace(/(\d{3})\d+(\d{3})/, '$1****$2')
+
+  res.json({
+    success: true,
+    message: 'QR enviado por WhatsApp correctamente',
+    data: { celularEnviado: celularOculto },
+  })
+}))
+
 // ==============================================================================
 // AUTENTICACIÓN - MAGIC LINK
 // ==============================================================================
 
 // POST /api/socio/enviar-link-acceso - Enviar Magic Link al socio
 router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
-  const { metodo, valor } = req.body // metodo: 'email' | 'dni'
+  const { metodo, valor } = req.body // metodo: 'email' | 'dni' | 'whatsapp'
 
   if (!metodo || !valor) {
     throw new AppError('Método y valor son requeridos', 400, 'VALIDATION_ERROR')
   }
 
   // Buscar socio según método
-  const where = metodo === 'email'
-    ? { email: valor.trim().toLowerCase() }
-    : { documento: valor.trim() }
+  let where
+  if (metodo === 'email') {
+    where = { email: valor.trim().toLowerCase() }
+  } else if (metodo === 'dni') {
+    where = { documento: valor.trim() }
+  } else if (metodo === 'whatsapp') {
+    // Buscar en los 3 campos de teléfono
+    const tel = valor.trim().replace(/\D/g, '')
+    where = { OR: [{ celular: { contains: tel } }, { celularSecundario: { contains: tel } }, { telefonoFijo: { contains: tel } }] }
+  } else {
+    throw new AppError('Método inválido', 400, 'VALIDATION_ERROR')
+  }
 
   const socio = await req.db.socio.findFirst({
     where,
@@ -191,6 +328,8 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
       documento: true,
       estado: true,
       celular: true,
+      celularSecundario: true,
+      telefonoFijo: true,
       notifWhatsapp: true,
     },
   })
@@ -199,8 +338,15 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
     throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
   }
 
-  if (!socio.email) {
+  if (metodo !== 'whatsapp' && !socio.email) {
     throw new AppError('Este socio no tiene email registrado. Contactá al club para actualizarlo', 400, 'NO_EMAIL')
+  }
+
+  if (metodo === 'whatsapp') {
+    const telefono = socio.celular || socio.celularSecundario || socio.telefonoFijo
+    if (!telefono) {
+      throw new AppError('Este socio no tiene teléfono registrado. Contactá al club.', 400, 'NO_PHONE')
+    }
   }
 
   // Verificar estado activo
@@ -225,20 +371,33 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
     },
   })
 
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+  const portalLink = `${frontendUrl}/s/${token}`
+
+  if (metodo === 'whatsapp') {
+    // Enviar solo por WhatsApp
+    const telefono = socio.celular || socio.celularSecundario || socio.telefonoFijo
+    await enviarLinkPortal({ db: req.db, socio: { ...socio, celular: telefono }, link: portalLink })
+    const telOculto = telefono.replace(/(\d{3})\d+(\d{3})/, '$1****$2')
+    res.json({
+      success: true,
+      message: 'Link de acceso enviado por WhatsApp',
+      data: { telefonoEnviado: telOculto },
+    })
+    return
+  }
+
   // Enviar email con Magic Link
   await enviarMagicLinkSocio(socio, token, req.db)
 
-  // Enviar por WhatsApp si el socio tiene el canal habilitado y el tenant lo permite
-  if (socio.notifWhatsapp && socio.celular) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+  // Enviar también por WhatsApp si el socio tiene el canal habilitado
+  if (socio.notifWhatsapp && (socio.celular || socio.celularSecundario)) {
     req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_MAGIC_LINK' } })
       .then(flag => {
         if (flag?.valor !== 'false') {
-          enviarLinkPortal({
-            db: req.db,
-            socio,
-            link: `${frontendUrl}/s/${token}`,
-          }).catch(err => console.error('Error enviando magic link por WA:', err.message))
+          const tel = socio.celular || socio.celularSecundario
+          enviarLinkPortal({ db: req.db, socio: { ...socio, celular: tel }, link: portalLink })
+            .catch(err => console.error('Error enviando magic link por WA:', err.message))
         }
       })
       .catch(err => console.error('Error leyendo flag WA magic link:', err.message))
@@ -1200,7 +1359,6 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
     where: { socioId: { in: socioIds } },
     include: {
       periodo: { select: { nombre: true, mes: true, anio: true } },
-      tipoCuota: { select: { nombre: true } },
       categoriaActividad: { select: { nombre: true, actividad: { select: { nombre: true } } } },
       socio: { select: { nroSocio: true, apellidoNombre: true } },
     },
@@ -1221,7 +1379,7 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
   let movId = 1
 
   cargos.forEach(cargo => {
-    let concepto = cargo.tipoCuota?.nombre || cargo.concepto || 'Cargo'
+    let concepto = cargo.descripcion || cargo.tipoCuota || cargo.categoria || 'Cargo'
     let detalle = ''
     if (cargo.periodo) {
       detalle = cargo.periodo.nombre || `${cargo.periodo.mes}/${cargo.periodo.anio}`
@@ -1325,6 +1483,13 @@ router.get('/:token/config-pagos', asyncHandler(async (req, res) => {
     configMap[c.clave] = c.valor
   })
 
+  // Verificar si Parse está habilitado para este tenant
+  const [parseFeature, parseKey] = await Promise.all([
+    req.db.tenantConfiguracion.findFirst({ where: { clave: 'PLAN_FEATURE_PARSE' } }).catch(() => null),
+    req.db.tenantConfiguracion.findFirst({ where: { clave: 'PARSE_API_KEY' } }).catch(() => null),
+  ])
+  const parseDisponible = parseFeature?.valor === 'true' && !!parseKey?.valor
+
   res.json({
     success: true,
     data: {
@@ -1332,6 +1497,7 @@ router.get('/:token/config-pagos', asyncHandler(async (req, res) => {
       alias: configMap.PAGO_ALIAS || '',
       telefono: configMap.PAGO_TELEFONO || '',
       titular: configMap.PAGO_TITULAR || '',
+      parseDisponible,
     },
   })
 }))
@@ -1413,6 +1579,69 @@ router.post('/:token/informar-pago', asyncHandler(async (req, res) => {
     success: true,
     message: 'Pago informado correctamente. Será procesado en breve.',
     pagoInformadoId: pagoInformado.id,
+  })
+}))
+
+// POST /api/socio/:token/parse-comprobante — escanear imagen con OCR
+router.post('/:token/parse-comprobante', asyncHandler(async (req, res) => {
+  const { token } = req.params
+  const { imagen, nombreArchivo } = req.body
+
+  if (!imagen) throw new AppError('imagen requerida', 400)
+
+  // Verificar socio
+  const socio = await req.db.socio.findUnique({
+    where: { tokenPortal: token },
+    select: { id: true },
+  })
+  if (!socio) throw new AppError('Token inválido', 401)
+
+  // Verificar feature habilitada
+  const [parseFeature, parseKeyConfig] = await Promise.all([
+    req.db.tenantConfiguracion.findFirst({ where: { clave: 'PLAN_FEATURE_PARSE' } }),
+    req.db.tenantConfiguracion.findFirst({ where: { clave: 'PARSE_API_KEY' } }),
+  ])
+
+  if (parseFeature?.valor !== 'true' || !parseKeyConfig?.valor) {
+    throw new AppError('Función de escaneo no disponible', 403)
+  }
+
+  const apiKey = parseKeyConfig.valor
+  const parseApiUrl = process.env.PARSE_API_URL || 'https://api.axioma.cloud'
+
+  // Convertir base64 a Buffer
+  const base64Data = imagen.replace(/^data:image\/\w+;base64,/, '')
+  const imageBuffer = Buffer.from(base64Data, 'base64')
+
+  // Detectar mime type
+  const ext = (nombreArchivo || 'comprobante.jpg').split('.').pop().toLowerCase()
+  const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
+
+  // Llamar a Parse API con multipart
+  const formData = new FormData()
+  formData.append('file', new Blob([imageBuffer], { type: mimeType }), nombreArchivo || 'comprobante.jpg')
+
+  const parseResponse = await fetch(`${parseApiUrl}/parse/document`, {
+    method: 'POST',
+    headers: { 'X-API-Key': apiKey },
+    body: formData,
+  })
+
+  if (!parseResponse.ok) {
+    const errText = await parseResponse.text().catch(() => '')
+    console.error('[Parse] Error API:', parseResponse.status, errText)
+    throw new AppError('Error al procesar el comprobante', 502)
+  }
+
+  const result = await parseResponse.json()
+
+  res.json({
+    success: true,
+    data: {
+      monto: result.monto ?? result.amount ?? null,
+      fecha: result.fecha ?? result.date ?? null,
+      referencia: result.referencia ?? result.reference ?? result.numero ?? null,
+    },
   })
 }))
 
@@ -1660,6 +1889,8 @@ router.get('/:tokenPortal/debito-automatico', asyncHandler(async (req, res) => {
       tarjetaMarca: true,
       tarjetaUltimos4: true,
       tarjetaVencimiento: true,
+      tarjetaToken: true,
+      tarjetaTokenizador: true,
       enviaDebito: true,
       debitoVerificado: true,
     },
@@ -1700,6 +1931,7 @@ router.get('/:tokenPortal/debito-automatico', asyncHandler(async (req, res) => {
       tarjetaMarca: socio.tarjetaMarca,
       tarjetaUltimos4: socio.tarjetaUltimos4,
       tarjetaVencimiento: socio.tarjetaVencimiento,
+      tokenizadoPayway: socio.tarjetaTokenizador === 'PAYWAY' && !!socio.tarjetaToken,
     },
   })
 }))
@@ -1774,15 +2006,42 @@ router.post('/:tokenPortal/debito-automatico/solicitar', asyncHandler(async (req
       tarjetaUltimos4: null,
     }
   } else {
-    // TARJETA - Solo guardamos los últimos 4 dígitos por seguridad
+    // TARJETA
     const ultimos4 = tarjetaNumero.slice(-4)
+    const { cvv } = req.body
+
+    // Intentar tokenizar con Payway si hay configuración activa para este tenant
+    let paywayToken = null
+    let paywayUltimos4 = ultimos4
+    try {
+      const configPayway = await req.db.configuracionDebito.findFirst({
+        where: { tenantId: req.tenantId, plataforma: 'PAYWAY', activo: true }
+      })
+      if (configPayway?.apiKey) {
+        const tokenResult = await paywayTokenizar({
+          numero: tarjetaNumero,
+          vencimiento: tarjetaVencimiento,
+          titular: req.body.tarjetaTitular,
+          cvv: cvv || '000',
+          marca: tarjetaMarca,
+          configuracion: configPayway
+        })
+        paywayToken = tokenResult.token
+        paywayUltimos4 = tokenResult.ultimosCuatro || ultimos4
+      }
+    } catch (err) {
+      // Tokenización falló — continuar sin token (flujo PRISMA)
+      console.warn('[Débito solicitar] Payway tokenización falló:', err.message)
+    }
+
     updateData = {
       ...updateData,
-      tarjetaNumero: tarjetaNumero, // En producción esto debería tokenizarse
+      tarjetaNumero: tarjetaNumero,
       tarjetaMarca: tarjetaMarca,
       tarjetaVencimiento: tarjetaVencimiento,
-      tarjetaUltimos4: ultimos4,
-      // Limpiar datos de CBU si existían
+      tarjetaUltimos4: paywayUltimos4,
+      tarjetaToken: paywayToken,
+      tarjetaTokenizador: paywayToken ? 'PAYWAY' : null,
       cbuDebito: null,
       bancoDebito: null,
       aliasDebito: null,
@@ -2144,8 +2403,24 @@ router.post('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res)
   // Actualizar conversación
   await req.db.conversacion.update({
     where: { id: parseInt(id) },
-    data: { ultimoMensaje: new Date() }
+    data: { ultimoMensaje: new Date(), mensajesNoLeidos: { increment: 1 } }
   })
+
+  // Emitir al panel admin para que el entrenador reciba en tiempo real
+  try {
+    const { getIO } = await import('../services/socketService.js')
+    getIO().emit('chat:nuevo-mensaje', {
+      conversacionId: parseInt(id),
+      mensaje: {
+        id: mensaje.id,
+        contenido: mensaje.contenido,
+        emisorTipo: 'SOCIO',
+        esPropio: false,
+        createdAt: mensaje.createdAt
+      },
+      socioNombre: socio.apellidoNombre
+    })
+  } catch (e) {}
 
   res.status(201).json({
     success: true,

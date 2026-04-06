@@ -3,11 +3,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Edit, QrCode, Users, CreditCard, Activity,
   Phone, Mail, MapPin, Calendar, User, AlertCircle,
-  Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List
+  Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List, PlusCircle
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
 import { Button } from '../../components/Button'
+import ConceptoTesoreriaModal from '../../components/ConceptoTesoreriaModal'
 import { Alert } from '../../components/Alert'
 import Modal from '../../components/Modal'
 import { useConfirm } from '../../hooks/useConfirm'
@@ -41,6 +42,14 @@ export default function SocioDetalle() {
 
   // Foto
   const [fotoError, setFotoError] = useState(false)
+
+  // Modal Cargo
+  const [cargoModal, setCargoModal] = useState(false)
+  const [cargoForm, setCargoForm] = useState({ conceptoTesoreriaId: '', montoOriginal: '', fechaVencimiento: '', observaciones: '' })
+  const [conceptosCargo, setConceptosCargo] = useState([])
+  const [showNuevoConceptoCargo, setShowNuevoConceptoCargo] = useState(false)
+  const [savingCargo, setSavingCargo] = useState(false)
+  const [errorCargo, setErrorCargo] = useState(null)
 
   // Actividades
   const [mostrarTodasActividades, setMostrarTodasActividades] = useState(false)
@@ -278,6 +287,43 @@ export default function SocioDetalle() {
     }
   }
 
+  async function abrirCargoModal() {
+    setCargoForm({ conceptoTesoreriaId: '', montoOriginal: '', fechaVencimiento: new Date().toISOString().split('T')[0], observaciones: '' })
+    setErrorCargo(null)
+    try {
+      const res = await api.getFull('/admin/conceptos-tesoreria')
+      setConceptosCargo(res.data || [])
+    } catch {
+      setConceptosCargo([])
+    }
+    setCargoModal(true)
+  }
+
+  async function handleGuardarCargo() {
+    if (!cargoForm.conceptoTesoreriaId || !cargoForm.montoOriginal) {
+      setErrorCargo('Concepto y monto son requeridos')
+      return
+    }
+    setSavingCargo(true)
+    setErrorCargo(null)
+    try {
+      await api.post('/admin/cargos', {
+        socioId: parseInt(id),
+        conceptoTesoreriaId: parseInt(cargoForm.conceptoTesoreriaId),
+        montoOriginal: parseFloat(cargoForm.montoOriginal),
+        fechaVencimiento: cargoForm.fechaVencimiento || undefined,
+        observaciones: cargoForm.observaciones || undefined,
+      })
+      toast.success('Cargo generado correctamente')
+      setCargoModal(false)
+      cargarSocio()
+    } catch (err) {
+      setErrorCargo(err.message || 'Error al generar el cargo')
+    } finally {
+      setSavingCargo(false)
+    }
+  }
+
   const parentescoOptions = ['Conyuge', 'Hijo/a', 'Padre', 'Madre', 'Hermano/a', 'Otro']
 
   if (loading) {
@@ -350,6 +396,10 @@ export default function SocioDetalle() {
           <Button variant="secondary" onClick={() => setQrModal(true)} className="flex items-center gap-2">
             <QrCode className="w-4 h-4" />
             QR
+          </Button>
+          <Button variant="secondary" onClick={abrirCargoModal} className="flex items-center gap-2">
+            <PlusCircle className="w-4 h-4" />
+            Cargo
           </Button>
           <Button variant="secondary" onClick={() => navigate(`/admin/cuotas?cobrarSocioId=${id}`)} className="flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
@@ -1267,6 +1317,95 @@ export default function SocioDetalle() {
           </Button>
         </div>
       </Modal>
+      {/* Modal Generar Cargo */}
+      <ConceptoTesoreriaModal
+        isOpen={showNuevoConceptoCargo}
+        onClose={() => setShowNuevoConceptoCargo(false)}
+        onCreated={(c) => {
+          setConceptosCargo(prev => [...prev, c])
+          setCargoForm(prev => ({ ...prev, conceptoTesoreriaId: String(c.id) }))
+          setShowNuevoConceptoCargo(false)
+        }}
+        tipoDefault="INGRESO"
+      />
+      <Modal
+        isOpen={cargoModal}
+        onClose={() => setCargoModal(false)}
+        title="Generar Cargo"
+        maxWidth="max-w-md"
+      >
+        {errorCargo && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
+            {errorCargo}
+          </div>
+        )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Concepto *</label>
+            <div className="flex gap-2">
+              <select
+                value={cargoForm.conceptoTesoreriaId}
+                onChange={(e) => setCargoForm(prev => ({ ...prev, conceptoTesoreriaId: e.target.value }))}
+                className="input-field flex-1"
+              >
+                <option value="">Seleccionar concepto...</option>
+                {conceptosCargo.map(c => (
+                  <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowNuevoConceptoCargo(true)}
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600"
+                title="Crear nuevo concepto"
+              >
+                <PlusCircle className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
+            <input
+              type="number"
+              value={cargoForm.montoOriginal}
+              onChange={(e) => setCargoForm(prev => ({ ...prev, montoOriginal: e.target.value }))}
+              className="input-field w-full"
+              step="0.01"
+              min="0.01"
+              placeholder="0.00"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
+            <input
+              type="date"
+              value={cargoForm.fechaVencimiento}
+              onChange={(e) => setCargoForm(prev => ({ ...prev, fechaVencimiento: e.target.value }))}
+              className="input-field w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+            <textarea
+              value={cargoForm.observaciones}
+              onChange={(e) => setCargoForm(prev => ({ ...prev, observaciones: e.target.value }))}
+              className="input-field w-full"
+              rows={2}
+              placeholder="Notas adicionales..."
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="secondary" onClick={() => setCargoModal(false)} disabled={savingCargo}>
+            Cancelar
+          </Button>
+          <Button onClick={handleGuardarCargo} loading={savingCargo}>
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Generar Cargo
+          </Button>
+        </div>
+      </Modal>
+
       <ConfirmDialog />
     </div>
   )

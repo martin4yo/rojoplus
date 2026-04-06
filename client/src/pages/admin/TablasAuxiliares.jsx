@@ -42,6 +42,10 @@ export default function TablasAuxiliares() {
   const [conceptoCobranzaCuotas, setConceptoCobranzaCuotas] = useState('')
   const [guardandoConceptoCobranza, setGuardandoConceptoCobranza] = useState(false)
 
+  // Configuración de deportes
+  const [espacioObligatorio, setEspacioObligatorio] = useState(false)
+  const [guardandoDeportes, setGuardandoDeportes] = useState(false)
+
   // Configuración de recargos
   const [recargo, setRecargo] = useState({ tipo: 'FIJO', porcentaje: '10', cadaDias: '15', topeMaximo: '' })
   const [guardandoRecargo, setGuardandoRecargo] = useState(false)
@@ -172,16 +176,36 @@ export default function TablasAuxiliares() {
 
   async function cargarConfiguracion() {
     try {
-      const [configDia, configMes, configConcepto] = await Promise.all([
+      const [configDia, configMes, configConcepto, configEspacio] = await Promise.all([
         api.get('/admin/sistema/configuracion/CUOTA_DIA_VENCIMIENTO'),
         api.get('/admin/sistema/configuracion/CUOTA_VENCE_MISMO_MES'),
         api.get('/admin/sistema/configuracion/CONCEPTO_COBRANZA_CUOTAS'),
+        api.get('/admin/sistema/configuracion/HORARIO_ESPACIO_OBLIGATORIO').catch(() => null),
       ])
       setDiaVencimiento(configDia?.valor || '10')
       setVenceMismoMes(configMes?.valor === 'true')
       setConceptoCobranzaCuotas(configConcepto?.valor || '')
+      setEspacioObligatorio(configEspacio?.valor === 'true')
     } catch (err) {
       console.error('Error cargando configuración:', err)
+    }
+  }
+
+  async function guardarConfigDeportes() {
+    setGuardandoDeportes(true)
+    try {
+      await api.put('/admin/sistema/configuracion/HORARIO_ESPACIO_OBLIGATORIO', {
+        valor: espacioObligatorio ? 'true' : 'false',
+        tipo: 'BOOLEAN',
+        modulo: 'DEPORTES',
+        descripcion: 'Requiere asignación de espacio al crear horarios recurrentes',
+      })
+      setSuccess('Configuración de deportes guardada')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Error al guardar configuración de deportes')
+    } finally {
+      setGuardandoDeportes(false)
     }
   }
 
@@ -674,6 +698,58 @@ export default function TablasAuxiliares() {
                 title="Guardar"
               >
                 {guardandoVencimiento ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Configuración de Deportes */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[200px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-orange-100">
+                <Activity className="w-6 h-6 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Deportes y Horarios</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Configuración del módulo de actividades y agendamiento
+                </p>
+                <div className="mt-4 flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Espacio obligatorio</label>
+                    <p className="text-xs text-gray-500">
+                      {espacioObligatorio
+                        ? 'Se requiere asignar espacio al agendar'
+                        : 'El espacio es opcional al agendar'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEspacioObligatorio(!espacioObligatorio)}
+                    className={`relative w-14 h-7 rounded-full transition-colors ${
+                      espacioObligatorio ? 'bg-primary' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
+                        espacioObligatorio ? 'translate-x-7' : ''
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+            {tienePermiso(PERMISOS.CONFIGURACION_SISTEMA) && (
+              <button
+                onClick={guardarConfigDeportes}
+                disabled={guardandoDeportes}
+                className="absolute bottom-4 right-4 p-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoDeportes ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Save className="w-5 h-5" />
@@ -1207,14 +1283,26 @@ export default function TablasAuxiliares() {
                     <div className="p-3 rounded-xl bg-amber-100">
                       <Percent className="w-6 h-6 text-amber-600" />
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/descuentos-disponibles/nuevo') }}
-                      className="flex items-center gap-1"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Nuevo
-                    </Button>
+                    <div className="flex gap-2">
+                      {descuentosDisponibles.length === 0 && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={async (e) => { e.stopPropagation(); await api.post('/admin/descuentos-disponibles/inicializar'); window.location.reload() }}
+                          className="flex items-center gap-1 !bg-amber-100 !text-amber-800 hover:!bg-amber-200"
+                        >
+                          Inicializar
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/descuentos-disponibles/nuevo') }}
+                        className="flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Nuevo
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-4">
                     <h3 className="text-base font-semibold text-gray-800">Descuentos Disponibles</h3>

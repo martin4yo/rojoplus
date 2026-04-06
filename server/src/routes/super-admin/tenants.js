@@ -419,8 +419,7 @@ router.post('/register', async (req, res) => {
         data: {
           nombre: adminData.nombre,
           email: adminData.email,
-          nombreUsuario: adminData.nombreUsuario || adminData.email.split('@')[0],
-          password: hashedPassword,
+          passwordHash: hashedPassword,
           activo: true,
         }
       })

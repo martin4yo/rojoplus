@@ -4,7 +4,7 @@ import {
   Calendar, Users, DollarSign, CheckCircle, XCircle,
   AlertTriangle, Clock, Settings, ChevronRight, Eye,
   Search, Filter, Building, Send, RotateCcw, BarChart3,
-  UserPlus, Check, X
+  UserPlus, Check, X, Landmark, Mail, MessageCircle, Bell
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../../components/Button'
@@ -37,10 +37,25 @@ export default function DebitoAutomatico() {
   const [archivoSeleccionado, setArchivoSeleccionado] = useState(null)
   const [showDetalleModal, setShowDetalleModal] = useState(false)
 
-  // Estado para Importar
+  // Estado para Importar (PRISMA)
   const [archivoImportar, setArchivoImportar] = useState(null)
   const [contenidoRespuesta, setContenidoRespuesta] = useState('')
   const [resultadoImportacion, setResultadoImportacion] = useState(null)
+
+  // Estado para Importar Respuesta Bancaria (CBU)
+  const [archivoBancoImportar, setArchivoBancoImportar] = useState(null)
+  const [bancoSeleccionado, setBancoSeleccionado] = useState('GALICIA')
+  const [contenidoRespuestaBanco, setContenidoRespuestaBanco] = useState('')
+  const [nombreArchivoBanco, setNombreArchivoBanco] = useState('')
+  const [resultadoImportacionBanco, setResultadoImportacionBanco] = useState(null)
+
+  // Estado para Payway
+  const [configsPayway, setConfigsPayway] = useState([])
+  const [archivoPayway, setArchivoPayway] = useState(null)
+  const [configPaywayId, setConfigPaywayId] = useState('')
+  const [procesandoPayway, setProcesandoPayway] = useState(false)
+  const [resultadoPayway, setResultadoPayway] = useState(null)
+  const [progresoPayway, setProgresoPayway] = useState(null)
 
   // Estado para Estadísticas
   const [estadisticas, setEstadisticas] = useState(null)
@@ -68,10 +83,11 @@ export default function DebitoAutomatico() {
     cargarConfiguraciones()
     cargarEstadisticas()
     cargarAdhesiones()
+    cargarConfigsPayway()
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'archivos') {
+    if (activeTab === 'archivos' || activeTab === 'banco' || activeTab === 'payway') {
       cargarArchivos()
     }
     if (activeTab === 'adhesiones') {
@@ -276,12 +292,92 @@ export default function DebitoAutomatico() {
     }
   }
 
+  async function cargarConfigsPayway() {
+    try {
+      const data = await api.get('/admin/payway/configuraciones')
+      setConfigsPayway(data?.data || [])
+    } catch {
+      // Silencioso — puede no tener configs aún
+    }
+  }
+
+  async function cobrarLotePayway() {
+    if (!archivoPayway || !configPaywayId) {
+      setError('Seleccioná el archivo y la configuración Payway')
+      return
+    }
+    setProcesandoPayway(true)
+    setResultadoPayway(null)
+    setError(null)
+    try {
+      const data = await api.post(`/admin/payway/cobrar-lote/${archivoPayway}`, {
+        configuracionId: configPaywayId
+      })
+      setResultadoPayway(data)
+      cargarArchivos()
+      cargarEstadisticas()
+      toast.success(`Payway: ${data.resumen.cobrados} cobrados, ${data.resumen.rechazados} rechazados`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setProcesandoPayway(false)
+    }
+  }
+
+  async function importarRespuestaBanco() {
+    if (!archivoBancoImportar || !contenidoRespuestaBanco) {
+      setError('Seleccione el archivo de débito y cargue el archivo de respuesta bancaria')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.post(`/admin/debito/archivos/${archivoBancoImportar}/importar-respuesta-banco`, {
+        contenido: contenidoRespuestaBanco,
+        nombreArchivo: nombreArchivoBanco || `${bancoSeleccionado}_respuesta.txt`,
+        banco: bancoSeleccionado
+      })
+      setResultadoImportacionBanco(data)
+      cargarArchivos()
+      cargarEstadisticas()
+      toast.success(`Importación completada: ${data.resumen.cobrados} cobrados, ${data.resumen.rechazados} rechazados`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleFileBancoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setNombreArchivoBanco(file.name)
+    const reader = new FileReader()
+    reader.onload = (ev) => setContenidoRespuestaBanco(ev.target.result)
+    reader.readAsText(file, 'latin1')
+  }
+
   async function reintentarRechazados(id) {
     setLoading(true)
     try {
       const data = await api.post(`/admin/debito/archivos/${id}/reintentar-rechazados`)
       toast.success(data.mensaje)
       cargarArchivos()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function reenviarRecibos(id) {
+    setLoading(true)
+    try {
+      const data = await api.post(`/admin/debito/archivos/${id}/reenviar-recibos`)
+      const n = data.notificaciones
+      toast.success(
+        `Recibos reenviados — Email: ${n.emailOk} ok / ${n.emailFail} fallaron · WhatsApp: ${n.waOk} ok / ${n.waFail} fallaron`
+      )
     } catch (err) {
       setError(err.message)
     } finally {
@@ -354,11 +450,37 @@ export default function DebitoAutomatico() {
 
   const adhesionesPendientes = (adhesiones || []).filter(a => a.estadoAdhesion === 'PENDIENTE').length
 
+  // Sub-componente inline: muestra stats de email + WA enviados
+  function NotifStats({ stats }) {
+    if (!stats) return null
+    return (
+      <div className="border-t border-green-200 pt-3 mt-1">
+        <p className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
+          <Bell className="w-3 h-3" /> Notificaciones enviadas
+        </p>
+        <div className="flex flex-wrap gap-3 text-xs">
+          <span className="flex items-center gap-1 text-blue-700">
+            <Mail className="w-3 h-3" />
+            Email: <strong>{stats.emailOk}</strong> ok
+            {stats.emailFail > 0 && <span className="text-red-500 ml-1">/ {stats.emailFail} fallaron</span>}
+          </span>
+          <span className="flex items-center gap-1 text-green-700">
+            <MessageCircle className="w-3 h-3" />
+            WhatsApp: <strong>{stats.waOk}</strong> ok
+            {stats.waFail > 0 && <span className="text-red-500 ml-1">/ {stats.waFail} fallaron</span>}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   const tabs = [
     { id: 'adhesiones', label: 'Adhesiones', icon: UserPlus, badge: adhesionesPendientes > 0 ? adhesionesPendientes : null },
     { id: 'generar', label: 'Generar Archivo', icon: FileText },
     { id: 'archivos', label: 'Archivos', icon: Download },
     { id: 'importar', label: 'Importar Respuesta', icon: Upload },
+    { id: 'payway', label: 'Payway', icon: CreditCard },
+    { id: 'banco', label: 'Resp. Bancaria', icon: Landmark },
     { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
     { id: 'configuracion', label: 'Configuración', icon: Settings }
   ]
@@ -861,6 +983,16 @@ export default function DebitoAutomatico() {
                               <RotateCcw className="w-4 h-4" />
                             </Button>
                           )}
+                          {archivo.estado === 'PROCESADO' && archivo.estadisticas?.cobrados > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => reenviarRecibos(archivo.id)}
+                              title="Reenviar recibos (email + WhatsApp)"
+                            >
+                              <Bell className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -936,7 +1068,7 @@ export default function DebitoAutomatico() {
               {resultadoImportacion && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <h4 className="font-medium text-green-900 mb-3">Resultado de la Importación</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                     <div>
                       <span className="text-gray-600">Total procesados:</span>
                       <span className="ml-2 font-bold text-gray-900">{resultadoImportacion.resumen.total}</span>
@@ -956,6 +1088,284 @@ export default function DebitoAutomatico() {
                       </span>
                     </div>
                   </div>
+                  {resultadoImportacion.resumen.notificaciones && (
+                    <NotifStats stats={resultadoImportacion.resumen.notificaciones} />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Payway */}
+          {activeTab === 'payway' && (
+            <div className="space-y-6">
+              {configsPayway.length === 0 ? (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-5">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-medium text-yellow-900">Sin configuración Payway</p>
+                      <p className="text-sm text-yellow-800 mt-1">
+                        Creá una configuración con plataforma "PAYWAY" desde el tab Configuración,
+                        ingresando el <strong>site_id</strong> en "Código Comercio",
+                        la <strong>private key</strong> en "API Key" y la <strong>public key</strong> en "API Secret".
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Cobro via API Payway</h4>
+                    <p className="text-sm text-blue-800">
+                      A diferencia de PRISMA, Payway procesa cada cobro en tiempo real por API.
+                      Cada socio debe tener su tarjeta tokenizada en Payway previamente.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Configuración Payway</label>
+                      <select
+                        value={configPaywayId}
+                        onChange={e => setConfigPaywayId(e.target.value)}
+                        className="input-field"
+                      >
+                        <option value="">Seleccionar...</option>
+                        {configsPayway.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre} — site_id: {c.codigoComercio}
+                            {c.ambiente === 'SANDBOX' ? ' (Sandbox)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Archivo de Débito</label>
+                      <select
+                        value={archivoPayway || ''}
+                        onChange={e => setArchivoPayway(e.target.value)}
+                        className="input-field"
+                      >
+                        <option value="">Seleccionar archivo...</option>
+                        {archivos.filter(a => a.estado !== 'PROCESADO').map(a => (
+                          <option key={a.id} value={a.id}>
+                            {a.numero} — {a.cantidadRegistros} registros ({formatCurrency(a.montoTotal)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {tienePermiso(PERMISOS.DEBITO_AUTOMATICO) && (
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={cobrarLotePayway}
+                        loading={procesandoPayway}
+                        disabled={!archivoPayway || !configPaywayId}
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Cobrar via Payway
+                      </Button>
+                    </div>
+                  )}
+
+                  {resultadoPayway && (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h4 className="font-medium text-green-900 mb-3">Resultado Payway</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                          <div>
+                            <span className="text-gray-600">Total:</span>
+                            <span className="ml-2 font-bold text-gray-900">{resultadoPayway.resumen.total}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Cobrados:</span>
+                            <span className="ml-2 font-bold text-green-600">{resultadoPayway.resumen.cobrados}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Rechazados:</span>
+                            <span className="ml-2 font-bold text-red-600">{resultadoPayway.resumen.rechazados}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Monto cobrado:</span>
+                            <span className="ml-2 font-bold text-green-600">{formatCurrency(resultadoPayway.resumen.montoCobrado)}</span>
+                          </div>
+                        </div>
+                        {resultadoPayway.resumen.notificaciones && (
+                          <NotifStats stats={resultadoPayway.resumen.notificaciones} />
+                        )}
+                      </div>
+
+                      {/* Detalle por socio */}
+                      <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-2 text-left font-medium text-gray-600">Socio</th>
+                              <th className="px-4 py-2 text-left font-medium text-gray-600">Tarjeta</th>
+                              <th className="px-4 py-2 text-right font-medium text-gray-600">Importe</th>
+                              <th className="px-4 py-2 text-center font-medium text-gray-600">Estado</th>
+                              <th className="px-4 py-2 text-left font-medium text-gray-600">Detalle</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {resultadoPayway.detalles.map((d, i) => (
+                              <tr key={i} className={d.estado === 'RECHAZADO' ? 'bg-red-50' : ''}>
+                                <td className="px-4 py-2 text-gray-900">{d.nombre}</td>
+                                <td className="px-4 py-2 font-mono text-gray-500">{d.tarjeta}</td>
+                                <td className="px-4 py-2 text-right">{formatCurrency(d.importe)}</td>
+                                <td className="px-4 py-2 text-center">
+                                  {d.estado === 'COBRADO'
+                                    ? <CheckCircle className="w-4 h-4 text-green-600 mx-auto" />
+                                    : <XCircle className="w-4 h-4 text-red-500 mx-auto" />
+                                  }
+                                </td>
+                                <td className="px-4 py-2 text-xs text-gray-500">
+                                  {d.autorizacion ? `Aut: ${d.autorizacion}` : d.motivoRechazo || ''}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Respuesta Bancaria (CBU) */}
+          {activeTab === 'banco' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">Débito bancario por CBU</h4>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                  <li>Seleccione el banco que devuelve el archivo de respuesta</li>
+                  <li>Seleccione el archivo de débito original generado</li>
+                  <li>Suba el archivo de retorno del banco (texto posición fija)</li>
+                  <li>Haga clic en "Procesar Respuesta Bancaria"</li>
+                </ol>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Banco</label>
+                  <select
+                    value={bancoSeleccionado}
+                    onChange={(e) => setBancoSeleccionado(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="GALICIA">Banco Galicia</option>
+                    <option value="MACRO">Banco Macro</option>
+                    <option value="SANTANDER">Banco Santander</option>
+                    <option value="PROVINCIA">Banco Provincia</option>
+                    <option value="GENERICO">Genérico (CSV/separado)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Archivo de Débito Original
+                  </label>
+                  <select
+                    value={archivoBancoImportar || ''}
+                    onChange={(e) => setArchivoBancoImportar(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="">Seleccionar archivo...</option>
+                    {archivos.filter(a => a.estado !== 'PROCESADO').map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.numero} - {a.cantidadRegistros} registros ({formatCurrency(a.montoTotal)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Archivo de Retorno del Banco
+                  </label>
+                  <input
+                    type="file"
+                    accept=".txt,.dat,.ret,.rsp,.csv"
+                    onChange={handleFileBancoUpload}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
+                  />
+                  {nombreArchivoBanco && (
+                    <p className="mt-1 text-xs text-gray-500">{nombreArchivoBanco}</p>
+                  )}
+                </div>
+              </div>
+
+              {contenidoRespuestaBanco && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Vista previa (primeras líneas)
+                  </label>
+                  <pre className="bg-gray-900 text-green-400 rounded-lg p-4 text-xs font-mono overflow-x-auto max-h-40">
+                    {contenidoRespuestaBanco.split('\n').slice(0, 10).join('\n')}
+                    {contenidoRespuestaBanco.split('\n').length > 10 && '\n...'}
+                  </pre>
+                </div>
+              )}
+
+              {tienePermiso(PERMISOS.DEBITO_AUTOMATICO) && (
+                <div className="flex justify-end">
+                  <Button
+                    onClick={importarRespuestaBanco}
+                    loading={loading}
+                    disabled={!archivoBancoImportar || !contenidoRespuestaBanco}
+                  >
+                    <Landmark className="w-4 h-4 mr-2" />
+                    Procesar Respuesta Bancaria
+                  </Button>
+                </div>
+              )}
+
+              {resultadoImportacionBanco && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-medium text-green-900 mb-3">Resultado de la Importación Bancaria</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                    <div>
+                      <span className="text-gray-600">Total procesados:</span>
+                      <span className="ml-2 font-bold text-gray-900">{resultadoImportacionBanco.resumen.total}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Cobrados:</span>
+                      <span className="ml-2 font-bold text-green-600">{resultadoImportacionBanco.resumen.cobrados}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Rechazados:</span>
+                      <span className="ml-2 font-bold text-red-600">{resultadoImportacionBanco.resumen.rechazados}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Monto cobrado:</span>
+                      <span className="ml-2 font-bold text-green-600">
+                        {formatCurrency(resultadoImportacionBanco.resumen.montoCobrado)}
+                      </span>
+                    </div>
+                  </div>
+                  {resultadoImportacionBanco.resumen.notificaciones && (
+                    <NotifStats stats={resultadoImportacionBanco.resumen.notificaciones} />
+                  )}
+                  {resultadoImportacionBanco.resumen.detalles?.filter(d => d.estado === 'RECHAZADO').length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-red-700 mb-2">Rechazos:</p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {resultadoImportacionBanco.resumen.detalles
+                          .filter(d => d.estado === 'RECHAZADO')
+                          .map((d, i) => (
+                            <div key={i} className="text-xs text-red-800 bg-red-50 rounded px-3 py-1 flex justify-between">
+                              <span>CBU ...{d.cbu}</span>
+                              <span>{d.motivoRechazo || d.codigoRechazo}</span>
+                              <span>{formatCurrency(d.importe)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

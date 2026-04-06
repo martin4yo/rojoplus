@@ -91,6 +91,7 @@ import AdminEntrenadoresLista from './pages/admin/EntrenadoresLista'
 import AdminEntrenadorForm from './pages/admin/EntrenadorForm'
 import AdminPeriodos from './pages/admin/Periodos'
 import AdminCuotas from './pages/admin/Cuotas'
+import AdminCargosAdicionales from './pages/admin/CargosAdicionales'
 import PlaceholderPage from './pages/admin/PlaceholderPage'
 import Branding from './pages/admin/Branding'
 
@@ -232,6 +233,8 @@ import GestionRecupero from './pages/admin/GestionRecupero'
 
 // Gestión de Comunicaciones
 import GestionComunicaciones from './pages/admin/GestionComunicaciones'
+import DetalleCampana from './pages/admin/DetalleCampana'
+import AdminChatEntrenadores from './pages/admin/ChatEntrenadores'
 
 // Layout admin
 import AdminLayout from './components/AdminLayout'
@@ -368,6 +371,7 @@ function App() {
         <Route path="entrenadores/nuevo" element={<AdminEntrenadorForm />} />
         <Route path="entrenadores/:id" element={<AdminEntrenadorForm />} />
         <Route path="cuotas" element={<AdminCuotas />} />
+        <Route path="cargos-adicionales" element={<AdminCargosAdicionales />} />
         <Route path="periodos" element={<AdminPeriodos />} />
 
         {/* Ingresos */}
@@ -507,6 +511,10 @@ function App() {
 
         {/* Gestión de Comunicaciones */}
         <Route path="comunicaciones" element={<GestionComunicaciones />} />
+        <Route path="comunicaciones/campanas/:id" element={<DetalleCampana />} />
+
+        {/* Chat Entrenadores */}
+        <Route path="chat-entrenadores" element={<AdminChatEntrenadores />} />
 
         {/* Gestión de Tenants (solo superadmin) */}
         <Route path="tenants" element={<TenantsList />} />

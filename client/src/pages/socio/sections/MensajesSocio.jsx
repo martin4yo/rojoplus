@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { io } from 'socket.io-client'
 import api from '../../../services/api'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../../components/LoadingSpinner'
@@ -8,6 +9,8 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/outline'
 
+const API_BASE = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000'
+
 export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) {
   const [conversaciones, setConversaciones] = useState([])
   const [conversacionActiva, setConversacionActiva] = useState(null)
@@ -16,6 +19,43 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
   const [loading, setLoading] = useState(true)
   const [enviando, setEnviando] = useState(false)
   const mensajesEndRef = useRef(null)
+  const socketRef = useRef(null)
+  const conversacionActivaRef = useRef(null)
+
+  // Mantener ref sincronizada para usar en el closure del socket
+  useEffect(() => {
+    conversacionActivaRef.current = conversacionActiva
+  }, [conversacionActiva])
+
+  // Conectar Socket.io namespace /socio
+  useEffect(() => {
+    if (!tokenPortal) return
+    const socket = io(`${API_BASE}/socio`, {
+      auth: { tokenPortal },
+      reconnectionAttempts: 5
+    })
+    socket.on('connect', () => console.log('[Chat socio] Socket conectado'))
+    socket.on('nuevo:mensaje', ({ conversacionId, mensaje }) => {
+      // Actualizar lista de conversaciones
+      setConversaciones(prev => prev.map(c =>
+        c.id === conversacionId
+          ? { ...c, ultimoMensaje: { contenido: mensaje.contenido, createdAt: mensaje.createdAt }, mensajesNoLeidos: (c.mensajesNoLeidos || 0) + 1 }
+          : c
+      ))
+      // Si es la conversación activa, agregar el mensaje directamente
+      if (conversacionActivaRef.current === conversacionId) {
+        setMensajes(prev => [...prev, {
+          id: mensaje.id,
+          contenido: mensaje.contenido,
+          emisorTipo: 'ENTRENADOR',
+          esPropio: false,
+          createdAt: mensaje.createdAt
+        }])
+      }
+    })
+    socketRef.current = socket
+    return () => socket.disconnect()
+  }, [tokenPortal])
 
   useEffect(() => {
     cargarConversaciones()
@@ -35,9 +75,10 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
     try {
       setLoading(true)
       const response = await api.get(`/socio/${tokenPortal}/conversaciones`)
-      setConversaciones(response.data || [])
-      if (response.data?.length > 0 && !conversacionActiva) {
-        setConversacionActiva(response.data[0].id)
+      const convs = response?.data || []
+      setConversaciones(convs)
+      if (convs.length > 0 && !conversacionActiva) {
+        setConversacionActiva(convs[0].id)
       }
     } catch (err) {
       console.error('Error cargando conversaciones:', err)
@@ -49,11 +90,10 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
   const cargarMensajes = async (conversacionId) => {
     try {
       const response = await api.get(`/socio/${tokenPortal}/conversaciones/${conversacionId}/mensajes`)
-      setMensajes(response.data || [])
-
-      // Marcar como leídos
-      await api.post(`/socio/${tokenPortal}/conversaciones/${conversacionId}/marcar-leido`)
-      onMensajesLeidos()
+      setMensajes(response?.data?.mensajes || [])
+      // Limpiar contador de no leídos
+      setConversaciones(prev => prev.map(c => c.id === conversacionId ? { ...c, mensajesNoLeidos: 0 } : c))
+      onMensajesLeidos?.()
     } catch (err) {
       console.error('Error cargando mensajes:', err)
     }
@@ -65,11 +105,12 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
 
     try {
       setEnviando(true)
-      await api.post(`/socio/${tokenPortal}/conversaciones/${conversacionActiva}/mensajes`, {
-        mensaje: nuevoMensaje,
+      const res = await api.post(`/socio/${tokenPortal}/conversaciones/${conversacionActiva}/mensajes`, {
+        contenido: nuevoMensaje,
       })
+      const msg = res?.data || res
+      setMensajes(prev => [...prev, msg])
       setNuevoMensaje('')
-      await cargarMensajes(conversacionActiva)
     } catch (err) {
       toast.error('Error al enviar: ' + err.message)
     } finally {
@@ -138,15 +179,19 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
                     <UserCircleIcon className="h-8 w-8 text-gray-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{conv.entrenador}</p>
+                    <p className="font-semibold text-gray-900 truncate">
+                      {conv.entrenador?.nombre || conv.entrenador}
+                    </p>
                     <p className="text-sm text-gray-600 truncate">{conv.actividad}</p>
                     {conv.ultimoMensaje && (
-                      <p className="text-xs text-gray-500 mt-1 truncate">{conv.ultimoMensaje}</p>
+                      <p className="text-xs text-gray-500 mt-1 truncate">
+                        {conv.ultimoMensaje?.contenido || conv.ultimoMensaje}
+                      </p>
                     )}
                   </div>
-                  {conv.noLeidos > 0 && (
+                  {conv.mensajesNoLeidos > 0 && (
                     <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                      {conv.noLeidos}
+                      {conv.mensajesNoLeidos}
                     </span>
                   )}
                 </div>
@@ -163,32 +208,34 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
               <UserCircleIcon className="h-8 w-8 text-gray-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">{conversacion?.entrenador}</h3>
+              <h3 className="font-semibold text-gray-900">
+                {conversacion?.entrenador?.nombre || conversacion?.entrenador}
+              </h3>
               <p className="text-sm text-gray-600">{conversacion?.actividad}</p>
             </div>
           </div>
 
           {/* Lista de mensajes */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
-            {mensajes.map((msg) => (
+            {mensajes.map((msg, idx) => (
               <div
-                key={msg.id}
-                className={`flex ${msg.esDelSocio ? 'justify-end' : 'justify-start'}`}
+                key={msg.id || idx}
+                className={`flex ${msg.esPropio ? 'justify-end' : 'justify-start'}`}
               >
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                    msg.esDelSocio
+                    msg.esPropio
                       ? 'bg-red-600 text-white'
                       : 'bg-white text-gray-900 shadow-sm'
                   }`}
                 >
-                  <p className="text-sm">{msg.mensaje}</p>
+                  <p className="text-sm">{msg.contenido}</p>
                   <p
                     className={`text-xs mt-1 ${
-                      msg.esDelSocio ? 'text-red-100' : 'text-gray-500'
+                      msg.esPropio ? 'text-red-100' : 'text-gray-500'
                     }`}
                   >
-                    {formatFecha(msg.fecha)}
+                    {formatFecha(msg.createdAt)}
                   </p>
                 </div>
               </div>

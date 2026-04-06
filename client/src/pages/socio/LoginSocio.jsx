@@ -7,6 +7,7 @@ import {
   PaperAirplaneIcon,
   CheckCircleIcon,
   ShieldCheckIcon,
+  ChatBubbleLeftEllipsisIcon,
 } from '@heroicons/react/24/outline'
 import { Lightbulb, Smartphone } from 'lucide-react'
 import { useTenant } from '../../contexts/TenantContext'
@@ -14,7 +15,7 @@ import TenantLogo from '../../components/TenantLogo'
 
 export default function LoginSocio() {
   const { tenant } = useTenant()
-  const [metodo, setMetodo] = useState('email') // 'email' | 'dni'
+  const [metodo, setMetodo] = useState('email') // 'email' | 'dni' | 'whatsapp'
   const [valor, setValor] = useState('')
   const [loading, setLoading] = useState(false)
   const [linkEnviado, setLinkEnviado] = useState(false)
@@ -51,11 +52,10 @@ export default function LoginSocio() {
 
           <h1 className="text-2xl font-bold text-gray-900 mb-3">¡Link enviado!</h1>
           <p className="text-gray-600 mb-6">
-            Revisa tu email{' '}
-            <span className="font-semibold text-gray-900">
-              {metodo === 'email' ? valor : 'registrado'}
-            </span>
-            . Hemos enviado un link de acceso que será válido por 24 horas.
+            {metodo === 'whatsapp'
+              ? 'Revisá tu WhatsApp. Hemos enviado un link de acceso válido por 24 horas.'
+              : <>Revisa tu email{' '}<span className="font-semibold text-gray-900">{metodo === 'email' ? valor : 'registrado'}</span>. Hemos enviado un link de acceso válido por 24 horas.</>
+            }
           </p>
 
           <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 mb-6">
@@ -145,7 +145,7 @@ export default function LoginSocio() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Selector de método */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setMetodo('email')}
@@ -175,25 +175,42 @@ export default function LoginSocio() {
                   Por DNI
                 </p>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setMetodo('whatsapp')}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  metodo === 'whatsapp'
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <ChatBubbleLeftEllipsisIcon className={`h-8 w-8 mx-auto mb-2 ${metodo === 'whatsapp' ? 'text-green-600' : 'text-gray-400'}`} />
+                <p className={`text-sm font-medium ${metodo === 'whatsapp' ? 'text-green-600' : 'text-gray-600'}`}>
+                  Por WhatsApp
+                </p>
+              </button>
             </div>
 
             {/* Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {metodo === 'email' ? 'Tu Email' : 'Tu DNI'}
+                {metodo === 'email' ? 'Tu Email' : metodo === 'dni' ? 'Tu DNI' : 'Tu Número de WhatsApp'}
               </label>
               <input
                 type={metodo === 'email' ? 'email' : 'text'}
                 value={valor}
                 onChange={(e) => setValor(e.target.value)}
-                placeholder={metodo === 'email' ? 'socio@ejemplo.com' : '12345678'}
+                placeholder={metodo === 'email' ? 'socio@ejemplo.com' : metodo === 'dni' ? '12345678' : '11 1234-5678'}
                 required
                 className="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               />
               <p className="mt-2 text-xs text-gray-500">
                 {metodo === 'email'
                   ? 'Usaremos tu email registrado en el club'
-                  : 'Ingresa tu DNI sin puntos ni espacios'}
+                  : metodo === 'dni'
+                  ? 'Ingresa tu DNI sin puntos ni espacios'
+                  : 'Ingresa el número registrado en el club (con o sin código de área)'}
               </p>
             </div>
 

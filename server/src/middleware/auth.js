@@ -141,7 +141,7 @@ export async function authComercio(req, res, next) {
     throw new AppError('Token no proporcionado', 401, 'AUTH_REQUIRED')
   }
 
-  const comercio = await req.prisma.comercio.findUnique({
+  const comercio = await req.prisma.comercio.findFirst({
     where: { token },
     include: { rubro: true },
   })

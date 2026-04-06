@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import * as XLSX from 'xlsx'
 import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
@@ -70,6 +71,30 @@ router.put('/formatos/:id', asyncHandler(async (req, res) => {
   })
 
   res.json({ success: true, data: formato })
+}))
+
+// POST /api/admin/conciliacion/formatos/presets-argentinos - Crear formatos predefinidos bancos AR
+router.post('/formatos/presets-argentinos', asyncHandler(async (req, res) => {
+  let creados = 0
+  let existentes = 0
+
+  for (const preset of PRESETS_BANCOS_AR) {
+    const existe = await prisma.formatoExtracto.findFirst({
+      where: { nombre: preset.nombre }
+    })
+    if (!existe) {
+      await prisma.formatoExtracto.create({ data: preset })
+      creados++
+    } else {
+      existentes++
+    }
+  }
+
+  res.json({
+    success: true,
+    message: `${creados} formatos creados, ${existentes} ya existían`,
+    data: { creados, existentes }
+  })
 }))
 
 // DELETE /api/admin/conciliacion/formatos/:id - Eliminar formato
@@ -633,7 +658,7 @@ function parsearExtracto(contenido, formato) {
     case 'TXT':
       return parsearTXT(contenido, config)
     case 'XLSX':
-      throw new AppError('Formato XLSX requiere procesamiento especial', 400)
+      return parsearXLSX(contenido, config)
     default:
       throw new AppError('Tipo de archivo no soportado', 400)
   }
@@ -870,6 +895,153 @@ function parsearFecha(fechaStr, formato) {
 
   return new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia))
 }
+
+/**
+ * Parser XLSX
+ * contenido: base64 string (con o sin prefijo data:...)
+ */
+function parsearXLSX(contenidoBase64, config) {
+  const {
+    hoja = 0,
+    primeraFila = 1,
+    formatoFecha = 'DD/MM/YYYY',
+    columnas = {}
+  } = config
+
+  const base64 = contenidoBase64.replace(/^data:[^;]+;base64,/, '')
+  const buffer = Buffer.from(base64, 'base64')
+
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true })
+  const sheetName = typeof hoja === 'number' ? workbook.SheetNames[hoja] : hoja
+  const sheet = workbook.Sheets[sheetName]
+  if (!sheet) throw new Error(`Hoja "${sheetName}" no encontrada en el archivo`)
+
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  const movimientos = []
+  let saldoInicial = 0
+  let saldoFinal = 0
+
+  for (let i = primeraFila; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row || row.every(c => c === '' || c === null || c === undefined)) continue
+
+    const col = (idx) => (idx !== undefined && idx !== null) ? row[idx] : undefined
+
+    const fechaVal = col(columnas.fecha ?? 0)
+    const concepto = String(col(columnas.concepto ?? 1) || '').trim()
+
+    let importe = 0
+    let tipo = 'CREDITO'
+
+    if (columnas.debito !== undefined && columnas.credito !== undefined) {
+      const deb = parseFloat(String(col(columnas.debito) || '0').replace(/[^\d,.-]/g, '').replace(',', '.')) || 0
+      const cred = parseFloat(String(col(columnas.credito) || '0').replace(/[^\d,.-]/g, '').replace(',', '.')) || 0
+      if (deb > 0) { importe = deb; tipo = 'DEBITO' } else { importe = cred; tipo = 'CREDITO' }
+    } else if (columnas.importe !== undefined) {
+      const imp = parseFloat(String(col(columnas.importe) || '0').replace(/[^\d,.-]/g, '').replace(',', '.')) || 0
+      importe = Math.abs(imp)
+      tipo = imp < 0 ? 'DEBITO' : 'CREDITO'
+    }
+
+    if (!fechaVal || importe === 0) continue
+
+    let fecha
+    if (fechaVal instanceof Date) {
+      fecha = fechaVal
+    } else {
+      try { fecha = parsearFecha(String(fechaVal), formatoFecha) } catch { continue }
+    }
+
+    const saldo = columnas.saldo !== undefined
+      ? parseFloat(String(col(columnas.saldo) || '0').replace(/[^\d,.-]/g, '').replace(',', '.')) || null
+      : null
+
+    movimientos.push({
+      fecha,
+      tipo,
+      importe,
+      concepto: concepto || 'Movimiento',
+      descripcion: columnas.descripcion !== undefined ? String(col(columnas.descripcion) || '').trim() : null,
+      referencia: columnas.referencia !== undefined ? String(col(columnas.referencia) || '').trim() : null,
+      saldo
+    })
+
+    if (movimientos.length === 1 && saldo !== null) {
+      saldoInicial = saldo - (tipo === 'CREDITO' ? importe : -importe)
+    }
+    if (saldo !== null) saldoFinal = saldo
+  }
+
+  return { movimientos, saldoInicial, saldoFinal }
+}
+
+// Presets de formatos para bancos argentinos
+const PRESETS_BANCOS_AR = [
+  {
+    nombre: 'Banco Galicia - Extracto CSV',
+    banco: 'GALICIA',
+    tipoArchivo: 'CSV',
+    descripcion: 'Extracto cuenta corriente/caja de ahorro — exportación Home Banking Galicia',
+    configuracion: { delimitador: ';', primeraFila: 2, formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, descripcion: 1, referencia: 2, debito: 3, credito: 4, saldo: 5 } }
+  },
+  {
+    nombre: 'Banco Galicia - Extracto Excel',
+    banco: 'GALICIA',
+    tipoArchivo: 'XLSX',
+    descripcion: 'Extracto Galicia en formato Excel (.xlsx)',
+    configuracion: { hoja: 0, primeraFila: 2, formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, descripcion: 1, referencia: 2, debito: 3, credito: 4, saldo: 5 } }
+  },
+  {
+    nombre: 'Santander Argentina - Extracto CSV',
+    banco: 'SANTANDER',
+    tipoArchivo: 'CSV',
+    descripcion: 'Extracto cuenta Santander Argentina — exportación Online Banking',
+    configuracion: { delimitador: ';', primeraFila: 2, formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, referencia: 2, importe: 3, saldo: 4 } }
+  },
+  {
+    nombre: 'Santander Argentina - Extracto Excel',
+    banco: 'SANTANDER',
+    tipoArchivo: 'XLSX',
+    descripcion: 'Extracto Santander en formato Excel (.xlsx)',
+    configuracion: { hoja: 0, primeraFila: 2, formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, referencia: 2, importe: 3, saldo: 4 } }
+  },
+  {
+    nombre: 'Banco Macro - Extracto CSV',
+    banco: 'MACRO',
+    tipoArchivo: 'CSV',
+    descripcion: 'Extracto cuenta Banco Macro',
+    configuracion: { delimitador: ';', primeraFila: 1, formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, debito: 2, credito: 3, saldo: 4 } }
+  },
+  {
+    nombre: 'Banco Macro - Extracto Excel',
+    banco: 'MACRO',
+    tipoArchivo: 'XLSX',
+    descripcion: 'Extracto Banco Macro en formato Excel',
+    configuracion: { hoja: 0, primeraFila: 1, formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, debito: 2, credito: 3, saldo: 4 } }
+  },
+  {
+    nombre: 'Banco Provincia - Extracto CSV',
+    banco: 'PROVINCIA',
+    tipoArchivo: 'CSV',
+    descripcion: 'Extracto cuenta Banco Provincia de Buenos Aires',
+    configuracion: { delimitador: ';', primeraFila: 2, formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, descripcion: 2, importe: 3, saldo: 4 } }
+  },
+  {
+    nombre: 'Banco Provincia - Extracto Excel',
+    banco: 'PROVINCIA',
+    tipoArchivo: 'XLSX',
+    descripcion: 'Extracto Banco Provincia en formato Excel',
+    configuracion: { hoja: 0, primeraFila: 2, formatoFecha: 'DD/MM/YYYY',
+      columnas: { fecha: 0, concepto: 1, descripcion: 2, importe: 3, saldo: 4 } }
+  }
+]
 
 /**
  * Busca sugerencias de matching automático

@@ -941,3 +941,111 @@ handlebars.registerHelper('formatCurrency', function(value) {
 handlebars.registerHelper('formatDate', function(date) {
   return new Date(date).toLocaleDateString('es-AR')
 })
+
+/**
+ * Genera un PDF de recibo directamente desde un objeto pago de Prisma.
+ * No requiere template en DB.
+ */
+export async function generarReciboPagoPDF(pago) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 })
+      const buffers = []
+      doc.on('data', buffers.push.bind(buffers))
+      doc.on('end', () => resolve(Buffer.concat(buffers)))
+      doc.on('error', reject)
+
+      const fecha = new Date(pago.fecha).toLocaleDateString('es-AR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      })
+
+      // Encabezado
+      doc.rect(0, 0, doc.page.width, 70).fill('#DC2626')
+      doc.fillColor('white').fontSize(18).font('Helvetica-Bold')
+         .text('RECIBO DE PAGO', 50, 20, { align: 'center' })
+      doc.fontSize(10).font('Helvetica')
+         .text('Club Sportivo Pilar', 50, 44, { align: 'center' })
+
+      // Datos del recibo
+      doc.fillColor('#1f2937').fontSize(11).font('Helvetica-Bold').moveDown(2)
+      doc.text(`Recibo N°: ${pago.numero}`, { continued: true })
+         .font('Helvetica').text(`          Fecha: ${fecha}`)
+      doc.moveDown(0.5)
+
+      // Datos del socio
+      doc.font('Helvetica-Bold').text('Socio: ', { continued: true })
+         .font('Helvetica').text(`${pago.socio?.apellidoNombre || '-'}`)
+      doc.font('Helvetica-Bold').text('N° Socio: ', { continued: true })
+         .font('Helvetica').text(`${pago.socio?.nroSocio || '-'}`)
+      if (pago.socio?.documento) {
+        doc.font('Helvetica-Bold').text('DNI: ', { continued: true })
+           .font('Helvetica').text(pago.socio.documento)
+      }
+
+      // Medio de pago
+      doc.moveDown(0.5)
+      doc.font('Helvetica-Bold').text('Medio de pago: ', { continued: true })
+         .font('Helvetica').text(pago.medioPago?.nombre || '-')
+      if (pago.nroOperacion) {
+        doc.font('Helvetica-Bold').text('N° Operación: ', { continued: true })
+           .font('Helvetica').text(pago.nroOperacion)
+      }
+
+      // Línea separadora
+      doc.moveDown()
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e5e7eb').stroke()
+      doc.moveDown(0.5)
+
+      // Header de tabla
+      doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold')
+      doc.text('CONCEPTO', 50, doc.y, { width: 220, continued: true })
+         .text('PERIODO', { width: 140, continued: true })
+         .text('ACTIVIDAD', { width: 100, continued: true })
+         .text('IMPORTE', { width: 90, align: 'right' })
+      doc.moveDown(0.3)
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e5e7eb').stroke()
+      doc.moveDown(0.3)
+
+      // Items
+      const cargos = pago.cargos || pago.cuotas || []
+      doc.fillColor('#1f2937').fontSize(9).font('Helvetica')
+      cargos.forEach(c => {
+        const concepto = c.conceptoTesoreria?.nombre || c.tipoCuota?.nombre || c.descripcion || 'Cuota'
+        const periodo = c.periodo?.nombre || '-'
+        const actividad = c.categoriaActividad
+          ? `${c.categoriaActividad.actividad?.nombre || ''} ${c.categoriaActividad.nombre || ''}`
+          : '-'
+        const monto = `$${Number(c.montoTotal).toLocaleString('es-AR')}`
+
+        doc.text(concepto, 50, doc.y, { width: 220, continued: true })
+           .text(periodo, { width: 140, continued: true })
+           .text(actividad, { width: 100, continued: true })
+           .text(monto, { width: 90, align: 'right' })
+        doc.moveDown(0.4)
+      })
+
+      // Total
+      doc.moveDown(0.5)
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e5e7eb').stroke()
+      doc.moveDown(0.5)
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#DC2626')
+         .text(`TOTAL PAGADO: $${Number(pago.montoTotal).toLocaleString('es-AR')}`, { align: 'right' })
+
+      // Observaciones
+      if (pago.observaciones) {
+        doc.moveDown().fontSize(9).fillColor('#6b7280').font('Helvetica')
+           .text(`Observaciones: ${pago.observaciones}`)
+      }
+
+      // Pie
+      doc.moveDown(3)
+      doc.fontSize(8).fillColor('#9ca3af')
+         .text('Comprobante generado automáticamente. Conservalo como constancia de pago.', { align: 'center' })
+
+      doc.end()
+    } catch (error) {
+      reject(error)
+    }
+  })
+}

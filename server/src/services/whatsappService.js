@@ -85,6 +85,58 @@ export function normalizarNumero(telefono) {
 }
 
 /**
+ * Envía una imagen por WhatsApp usando sendMedia de Evolution API.
+ * @param {object} params
+ * @param {object} params.db
+ * @param {string} params.telefono
+ * @param {string} params.imagenBase64 - PNG en base64 (sin el prefijo data:...)
+ * @param {string} params.caption - Texto opcional debajo de la imagen
+ * @param {boolean} params.ignorarHorario
+ */
+export async function enviarWhatsAppImagen({ db, telefono, imagenBase64, caption = '', ignorarHorario = false }) {
+  const cfg = await getWhatsAppConfig(db)
+  if (!cfg) return { enviado: false, motivo: 'WhatsApp no configurado o deshabilitado' }
+
+  if (!ignorarHorario && !dentroDelHorario(cfg.horaInicio, cfg.horaFin)) {
+    return { enviado: false, motivo: 'Fuera del horario de envío' }
+  }
+
+  const numero = normalizarNumero(telefono)
+  if (!numero) return { enviado: false, motivo: 'Número inválido' }
+
+  try {
+    const url = `${cfg.apiUrl}/message/sendMedia/${cfg.instance}`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': cfg.apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        number: numero,
+        mediatype: 'image',
+        mimetype: 'image/png',
+        media: imagenBase64,
+        caption,
+        fileName: 'qr-socio.png',
+        delay: cfg.delayMs,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.text()
+      console.error('[WhatsApp] Error enviando imagen:', err)
+      return { enviado: false, motivo: `Error API: ${res.status}` }
+    }
+
+    return { enviado: true, numero }
+  } catch (err) {
+    console.error('[WhatsApp] Error de red (imagen):', err.message)
+    return { enviado: false, motivo: err.message }
+  }
+}
+
+/**
  * Envía un mensaje de texto por WhatsApp.
  * @param {object} params
  * @param {object} params.db - Prisma client del tenant
@@ -272,13 +324,28 @@ async function resolverTemplate(db, clave, variables) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? '')
 }
 
+// ─── Helper: obtener primer teléfono disponible del socio ────────────────────
+
+/**
+ * Devuelve el primer número de teléfono válido del socio,
+ * buscando en orden: celular → celularSecundario → telefonoFijo.
+ */
+export function obtenerTelefonoSocio(socio) {
+  const candidatos = [socio?.celular, socio?.celularSecundario, socio?.telefonoFijo]
+  for (const tel of candidatos) {
+    if (normalizarNumero(tel)) return tel
+  }
+  return null
+}
+
 // ─── Mensajes predefinidos ───────────────────────────────────────────────────
 
 /**
  * Notifica a un socio que se registró un pago.
  */
 export async function notificarPago({ db, socio, pago }) {
-  if (!socio?.celular) return
+  const telefono = obtenerTelefonoSocio(socio)
+  if (!telefono) return
 
   const monto = Number(pago.importe || pago.monto || 0).toLocaleString('es-AR', {
     style: 'currency', currency: 'ARS', maximumFractionDigits: 0
@@ -288,14 +355,15 @@ export async function notificarPago({ db, socio, pago }) {
     nombre: socio.apellidoNombre,
     monto,
   })
-  return enviarWhatsApp({ db, telefono: socio.celular, texto })
+  return enviarWhatsApp({ db, telefono, texto })
 }
 
 /**
  * Notifica a un socio que tiene una cuota próxima a vencer.
  */
 export async function notificarVencimiento({ db, socio, cuota }) {
-  if (!socio?.celular) return
+  const telefono = obtenerTelefonoSocio(socio)
+  if (!telefono) return
 
   const vencimiento = new Date(cuota.vencimiento).toLocaleDateString('es-AR')
   const monto = Number(cuota.importe).toLocaleString('es-AR', {
@@ -307,14 +375,15 @@ export async function notificarVencimiento({ db, socio, cuota }) {
     monto,
     vencimiento,
   })
-  return enviarWhatsApp({ db, telefono: socio.celular, texto })
+  return enviarWhatsApp({ db, telefono, texto })
 }
 
 /**
  * Notifica a un socio que tiene una cuota vencida.
  */
 export async function notificarMora({ db, socio, deuda }) {
-  if (!socio?.celular) return
+  const telefono = obtenerTelefonoSocio(socio)
+  if (!telefono) return
 
   const total = Number(deuda.total).toLocaleString('es-AR', {
     style: 'currency', currency: 'ARS', maximumFractionDigits: 0
@@ -324,18 +393,19 @@ export async function notificarMora({ db, socio, deuda }) {
     nombre: socio.apellidoNombre,
     total,
   })
-  return enviarWhatsApp({ db, telefono: socio.celular, texto })
+  return enviarWhatsApp({ db, telefono, texto })
 }
 
 /**
  * Envía el link de acceso al portal del socio.
  */
 export async function enviarLinkPortal({ db, socio, link }) {
-  if (!socio?.celular) return
+  const telefono = obtenerTelefonoSocio(socio)
+  if (!telefono) return
 
   const texto = await resolverTemplate(db, 'NOTIF_WA_PORTAL', {
     nombre: socio.apellidoNombre,
     link,
   })
-  return enviarWhatsApp({ db, telefono: socio.celular, texto, ignorarHorario: true })
+  return enviarWhatsApp({ db, telefono, texto, ignorarHorario: true })
 }

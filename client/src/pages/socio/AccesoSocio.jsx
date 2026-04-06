@@ -34,7 +34,7 @@ export default function AccesoSocio() {
     setBuscando('whatsapp')
     setError(null)
     try {
-      const data = await api.post('/socio/enviar-link-whatsapp', { busqueda: busqueda.trim() })
+      const data = await api.post('/socio/enviar-qr-whatsapp', { busqueda: busqueda.trim() })
       setEnviado({ via: 'whatsapp', destino: data.celularEnviado || '' })
     } catch (err) {
       setError(err.message || 'No se pudo enviar por WhatsApp')
@@ -74,7 +74,7 @@ export default function AccesoSocio() {
             <h1 className="text-2xl font-bold text-gray-800 mb-3">¡Link enviado!</h1>
 
             <p className="text-gray-600 mb-2">
-              {esWhatsApp ? 'Enviamos tu link de acceso al portal por WhatsApp a:' : 'Enviamos tu código QR y acceso al portal a:'}
+              {esWhatsApp ? 'Enviamos tu código QR de socio por WhatsApp a:' : 'Enviamos tu código QR y acceso al portal a:'}
             </p>
 
             <div className="inline-flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg mb-6">

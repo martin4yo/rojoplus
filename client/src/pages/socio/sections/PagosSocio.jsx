@@ -22,7 +22,7 @@ import StatusBadge from '../../../components/StatusBadge'
 import ChatWidget from '../../../components/chat/ChatWidget'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
-export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
+export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensajesNoLeidos = 0, onNavigate }) {
   const [cuotas, setCuotas] = useState([])
   const [historial, setHistorial] = useState([])
   const [cuentaCorriente, setCuentaCorriente] = useState(null)
@@ -38,6 +38,9 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   const [comprobante, setComprobante] = useState(null)
   const [comprobantePreview, setComprobantePreview] = useState(null)
   const [enviandoPago, setEnviandoPago] = useState(false)
+  const [escaneando, setEscaneando] = useState(false)
+  const [datosEscaneados, setDatosEscaneados] = useState(null)
+  const [montoManual, setMontoManual] = useState('')
   const fileInputRef = useRef(null)
   const { showModal, ModalComponent } = useModal()
 
@@ -71,10 +74,29 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
 
   const cargarConfigPagos = async () => {
     try {
-      const config = await api.get(`/socio/${tokenPortal}/config-pagos`)
-      setConfigPagos(config)
+      const res = await api.get(`/socio/${tokenPortal}/config-pagos`)
+      setConfigPagos(res?.data || res)
     } catch (err) {
       console.error('Error cargando config de pagos:', err)
+    }
+  }
+
+  const escanearComprobante = async () => {
+    if (!comprobante || escaneando) return
+    setEscaneando(true)
+    setDatosEscaneados(null)
+    try {
+      const res = await api.post(`/socio/${tokenPortal}/parse-comprobante`, {
+        imagen: comprobante,
+        nombreArchivo: fileInputRef.current?.files[0]?.name || 'comprobante.jpg',
+      })
+      const datos = res?.data || res
+      setDatosEscaneados(datos)
+      if (datos.monto) setMontoManual(String(datos.monto))
+    } catch (err) {
+      showModal({ type: 'error', message: 'No se pudo leer el comprobante automáticamente. Ingresá el monto manualmente.' })
+    } finally {
+      setEscaneando(false)
     }
   }
 
@@ -177,10 +199,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
 
   const informarPago = async () => {
     if (!comprobante) {
-      showModal({
-        type: 'error',
-        message: 'Debes cargar el comprobante de pago',
-      })
+      showModal({ type: 'error', message: 'Debes cargar el comprobante de pago' })
       return
     }
 
@@ -188,10 +207,11 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
       setEnviandoPago(true)
 
       const cuotasIds = cuotas.map((c) => c.id)
+      const montoFinal = montoManual ? parseFloat(montoManual) : totalPendiente
 
       await api.post(`/socio/${tokenPortal}/informar-pago`, {
         cuotasIds,
-        monto: totalPendiente,
+        monto: montoFinal,
         comprobante,
         comprobanteOriginal: fileInputRef.current?.files[0]?.name || 'comprobante.jpg',
         observaciones: 'Pago informado desde el portal del socio',
@@ -206,6 +226,8 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
       setMostrarInformarPago(false)
       setComprobante(null)
       setComprobantePreview(null)
+      setDatosEscaneados(null)
+      setMontoManual('')
 
       // Recargar datos
       await cargarDatos()
@@ -297,7 +319,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
   return (
     <div className="space-y-6">
       {/* Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-500">
           <div className="flex items-center justify-between mb-2">
             <div className="bg-yellow-100 rounded-lg p-3">
@@ -326,6 +348,36 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
           </div>
           <h3 className="text-sm font-medium text-gray-600 mb-1">Total a Pagar</h3>
           <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalPendiente, { minimumFractionDigits: 0 })}</p>
+        </div>
+
+        {/* Avisos — siempre visible */}
+        <div className={`bg-white rounded-xl shadow-sm p-6 border-l-4 ${mensajesNoLeidos > 0 ? 'border-orange-500' : 'border-gray-300'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className={`rounded-lg p-3 ${mensajesNoLeidos > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
+              <CheckCircleIcon className={`h-6 w-6 ${mensajesNoLeidos > 0 ? 'text-orange-600' : 'text-gray-400'}`} />
+            </div>
+            {mensajesNoLeidos > 0 && (
+              <span className="inline-flex items-center justify-center w-6 h-6 bg-red-600 text-white text-xs font-bold rounded-full">
+                {mensajesNoLeidos}
+              </span>
+            )}
+          </div>
+          <h3 className="text-sm font-medium text-gray-600 mb-1">Mis Avisos</h3>
+          {mensajesNoLeidos === 0 ? (
+            <p className="text-lg font-bold text-gray-500">Sin novedades</p>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-orange-600">
+                {mensajesNoLeidos} mensaje{mensajesNoLeidos > 1 ? 's' : ''} sin leer
+              </p>
+              <button
+                onClick={() => onNavigate?.('mensajes')}
+                className="mt-2 text-xs font-semibold text-orange-600 hover:text-orange-700"
+              >
+                Ver →
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -533,14 +585,58 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                             {comprobante ? 'Cambiar comprobante' : 'Seleccionar archivo'}
                           </button>
                           {comprobantePreview && (
-                            <div className="mt-3">
+                            <div className="mt-3 space-y-3">
                               <img
                                 src={comprobantePreview}
                                 alt="Preview"
                                 className="w-full max-h-64 object-contain rounded-lg border"
                               />
+                              {/* Botón escanear si está disponible */}
+                              {configPagos?.parseDisponible && (
+                                <button
+                                  type="button"
+                                  onClick={escanearComprobante}
+                                  disabled={escaneando}
+                                  className="w-full flex items-center justify-center gap-2 py-2 border-2 border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors text-sm font-medium disabled:opacity-60"
+                                >
+                                  {escaneando ? (
+                                    <>
+                                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                      Escaneando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                      Escanear comprobante automáticamente
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                              {/* Datos extraídos */}
+                              {datosEscaneados && (
+                                <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm space-y-1">
+                                  <p className="font-semibold text-teal-800 mb-2">Datos detectados:</p>
+                                  {datosEscaneados.monto && <p className="text-teal-700">💰 Monto: <span className="font-bold">${Number(datosEscaneados.monto).toLocaleString('es-AR')}</span></p>}
+                                  {datosEscaneados.fecha && <p className="text-teal-700">📅 Fecha: {datosEscaneados.fecha}</p>}
+                                  {datosEscaneados.referencia && <p className="text-teal-700">🔖 Referencia: {datosEscaneados.referencia}</p>}
+                                </div>
+                              )}
                             </div>
                           )}
+                        </div>
+                        {/* Campo monto (editable, pre-relleno si se escaneó) */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Monto transferido
+                          </label>
+                          <input
+                            type="number"
+                            value={montoManual}
+                            onChange={e => setMontoManual(e.target.value)}
+                            placeholder={`${formatCurrency(totalPendiente, { minimumFractionDigits: 0 })} (pendiente)`}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          />
+                          <p className="text-xs text-gray-400 mt-0.5">Dejá vacío para usar el total pendiente</p>
                         </div>
                         <div className="flex gap-3">
                           <button
@@ -555,6 +651,8 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                               setMostrarInformarPago(false)
                               setComprobante(null)
                               setComprobantePreview(null)
+                              setDatosEscaneados(null)
+                              setMontoManual('')
                             }}
                             className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                           >
@@ -576,7 +674,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado }) {
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-gray-900">{cuota.concepto}</h3>
                           <p className="text-gray-600 mt-1">
-                            Periodo: {cuota.periodo} {cuota.anio}
+                            Periodo: {cuota.periodo}
                           </p>
                           <div className="mt-2">
                             <StatusBadge status={cuota.estado} type="cuota" />

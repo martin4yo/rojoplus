@@ -137,7 +137,7 @@ router.post('/:token/ventas/calcular', asyncHandler(authComercio), asyncHandler(
     const fechaLimite = new Date()
     fechaLimite.setDate(fechaLimite.getDate() - comercio.acumPeriodoDias)
 
-    comprasEnPeriodo = await req.prisma.venta.count({
+    comprasEnPeriodo = await req.db.venta.count({
       where: {
         comercioId: comercio.id,
         socioId,
@@ -213,7 +213,7 @@ router.post('/:token/ventas', asyncHandler(authComercio), asyncHandler(async (re
       const fechaLimite = new Date()
       fechaLimite.setDate(fechaLimite.getDate() - comercio.acumPeriodoDias)
 
-      const comprasEnPeriodo = await req.prisma.venta.count({
+      const comprasEnPeriodo = await req.db.venta.count({
         where: {
           comercioId: comercio.id,
           socioId,
@@ -233,7 +233,7 @@ router.post('/:token/ventas', asyncHandler(authComercio), asyncHandler(async (re
   }
 
   // Crear venta
-  const venta = await req.prisma.venta.create({
+  const venta = await req.db.venta.create({
     data: {
       comercio: { connect: { id: comercio.id } },
       socio: { connect: { id: socioId } },

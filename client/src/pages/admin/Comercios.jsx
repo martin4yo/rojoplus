@@ -153,6 +153,9 @@ export default function AdminComercios() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
                   Descuento
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
+                  Ventas
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                   Acciones
                 </th>
@@ -180,6 +183,19 @@ export default function AdminComercios() {
                   </td>
                   <td className="px-6 py-4 text-gray-600 hidden md:table-cell">
                     {comercio.descuentoPct}%
+                  </td>
+                  <td className="px-6 py-4 hidden lg:table-cell">
+                    <div className="flex items-center gap-2 min-w-[120px]">
+                      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${Math.min(comercio.pctVentas || 0, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-500 w-20 text-right whitespace-nowrap">
+                        {comercio.cantVentas} ({comercio.pctVentas ?? 0}%)
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     {comercio.estado === 'PENDIENTE' && tienePermiso(PERMISOS.COMERCIOS_GESTIONAR) && (

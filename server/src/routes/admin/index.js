@@ -18,6 +18,7 @@ import inscripcionesRoutes from './inscripciones.js'
 import cobranzasRoutes from './cobranzas.js'
 import recuperoRoutes from './recupero.js'
 import comunicacionesRoutes from './comunicaciones.js'
+import chatRoutes from './chat.js'
 import paginasRoutes from './paginas.js'
 import reportTemplatesRoutes from './report-templates.js'
 import reportPresetsRoutes from './report-presets.js'
@@ -42,6 +43,7 @@ router.use(inscripcionesRoutes)
 router.use('/cobranzas', cobranzasRoutes)
 router.use('/recupero', recuperoRoutes)
 router.use('/comunicaciones', comunicacionesRoutes)
+router.use('/chat', chatRoutes)
 router.use(paginasRoutes)
 router.use(reportTemplatesRoutes)
 router.use(reportPresetsRoutes)

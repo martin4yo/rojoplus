@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import api from '../../services/api'
 import {
   HomeIcon,
@@ -238,13 +238,13 @@ export default function PortalSocioNuevo() {
       <header className="shadow-lg sticky top-0 z-40" style={headerStyle}>
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <Link to="/" className="flex items-center space-x-3 hover:opacity-90 transition-opacity">
               <img src={branding?.logoUrl || '/images/logo.png'} alt="Logo" className="h-12 w-auto" />
               <div>
                 <h1 className="text-white font-bold text-lg">{branding?.nombre || 'Portal'}</h1>
                 <p className="text-white/70 text-xs">Portal del Socio</p>
               </div>
-            </div>
+            </Link>
             <div className="text-right">
               <p className="text-white font-semibold">{socio.apellidoNombre}</p>
               <p className="text-red-100 text-sm">Socio N° {socio.nroSocio}</p>
@@ -255,12 +255,12 @@ export default function PortalSocioNuevo() {
 
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {activeTab === 'inicio' && <DashboardSocio socio={socio} tokenPortal={tokenPortal} onNavigate={setActiveTab} />}
+        {activeTab === 'inicio' && <DashboardSocio socio={socio} tokenPortal={tokenPortal} onNavigate={setActiveTab} mensajesNoLeidos={mensajesNoLeidos} />}
         {activeTab === 'eventos' && <EventosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'reservas' && <ReservasSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'beneficios' && <BeneficiosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'actividades' && <MisActividadesSocio socio={socio} tokenPortal={tokenPortal} />}
-        {activeTab === 'pagos' && <PagosSocio socio={socio} tokenPortal={tokenPortal} onPagoRealizado={cargarDatosSocio} />}
+        {activeTab === 'pagos' && <PagosSocio socio={socio} tokenPortal={tokenPortal} onPagoRealizado={cargarDatosSocio} mensajesNoLeidos={mensajesNoLeidos} onNavigate={setActiveTab} />}
         {activeTab === 'notificaciones' && <NotificacionesSocio tokenPortal={tokenPortal} />}
         {activeTab === 'perfil' && <MiPerfilSocio socio={socio} tokenPortal={tokenPortal} onUpdate={cargarDatosSocio} />}
       </main>

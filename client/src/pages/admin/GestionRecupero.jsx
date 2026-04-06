@@ -151,15 +151,16 @@ export default function GestionRecupero() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
+    <div>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <TrendingUp className="w-7 h-7 text-primary" />
               Gestión de Recupero de Socios
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mt-1">
               Campañas para recuperar socios dados de baja
             </p>
           </div>
@@ -325,9 +326,9 @@ export default function GestionRecupero() {
                           {formatDate(campana.fechaInicio)} - {formatDate(campana.fechaFin)}
                         </span>
                       </div>
-                      {campana.creadoPor && (
+                      {campana.admin && (
                         <span>
-                          Por {campana.creadoPor.nombre} {campana.creadoPor.apellido}
+                          Por {campana.admin.nombre} {campana.admin.apellido}
                         </span>
                       )}
                     </div>

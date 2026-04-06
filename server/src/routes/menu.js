@@ -398,6 +398,13 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
         { titulo: 'Solicitudes Alta', icono: 'UserPlus', url: '/admin/solicitudes', orden: 2 },
         { titulo: 'Inscripciones', icono: 'ClipboardList', url: '/admin/inscripciones', orden: 3 },
         { titulo: 'Cuotas y Periodos', icono: 'Receipt', url: '/admin/periodos', orden: 4 },
+        { titulo: 'Recupero', icono: 'UserCheck', url: '/admin/recupero', orden: 5 },
+      ]
+    },
+    {
+      titulo: 'Comunicaciones', icono: 'Send', orden: 4,
+      children: [
+        { titulo: 'Campañas', icono: 'Mail', url: '/admin/comunicaciones', orden: 1 },
       ]
     },
     {
@@ -461,7 +468,7 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
       children: [
         { titulo: 'Partidos', icono: 'Trophy', url: '/admin/partidos', orden: 1 },
         { titulo: 'Entrenamientos', icono: 'Calendar', url: '/admin/deportes/entrenamientos', orden: 2 },
-        { titulo: 'Horarios', icono: 'ClipboardList', url: '/admin/deportes/horarios', orden: 3 },
+        { titulo: 'Agenda', icono: 'CalendarDays', url: '/admin/deportes/horarios', orden: 3 },
         { titulo: 'Espacios', icono: 'MapPin', url: '/admin/deportes/espacios', orden: 4 },
         { titulo: 'Tipos de Espacio', icono: 'Settings', url: '/admin/deportes/tipos-espacio', orden: 5 },
         { titulo: 'Reportes Deportivos', icono: 'BarChart3', url: '/admin/reportes/deportivos', orden: 6 },
@@ -523,6 +530,17 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
       ]
     },
   ]
+
+  // Actualizar títulos de items renombrados
+  const renombres = [
+    { url: '/admin/deportes/horarios', titulo: 'Agenda', icono: 'CalendarDays' },
+  ]
+  for (const r of renombres) {
+    await req.db.menuItem.updateMany({
+      where: { url: r.url },
+      data: { titulo: r.titulo, icono: r.icono }
+    })
+  }
 
   // Obtener items existentes para comparar
   const existingItems = await req.db.menuItem.findMany({

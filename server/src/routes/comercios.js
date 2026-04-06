@@ -83,8 +83,8 @@ router.post('/registro', asyncHandler(async (req, res) => {
     throw new AppError('Todos los campos son obligatorios', 400, 'VALIDATION_ERROR')
   }
 
-  // Verificar que el email no exista
-  const existente = await req.prisma.comercio.findUnique({
+  // Verificar que el email no exista en este tenant
+  const existente = await req.db.comercio.findFirst({
     where: { email },
   })
 
@@ -95,7 +95,7 @@ router.post('/registro', asyncHandler(async (req, res) => {
   // Obtener descuento del descuento disponible seleccionado, o default
   let descuentoPct = 10
   if (descuentoDisponibleId) {
-    const descuentoDisponible = await req.prisma.descuentoDisponible.findUnique({
+    const descuentoDisponible = await req.db.descuentoDisponible.findUnique({
       where: { id: parseInt(descuentoDisponibleId) },
     })
     if (descuentoDisponible) {
@@ -109,7 +109,7 @@ router.post('/registro', asyncHandler(async (req, res) => {
   }
 
   // Crear comercio (sin logo primero para tener el ID)
-  const comercio = await req.prisma.comercio.create({
+  const comercio = await req.db.comercio.create({
     data: {
       nombre,
       direccion,
@@ -131,7 +131,7 @@ router.post('/registro', asyncHandler(async (req, res) => {
   if (logo) {
     const logoUrl = guardarLogo(logo, comercio.id)
     if (logoUrl) {
-      await req.prisma.comercio.update({
+      await req.db.comercio.update({
         where: { id: comercio.id },
         data: { logo: logoUrl },
       })
@@ -154,7 +154,7 @@ router.post('/registro', asyncHandler(async (req, res) => {
 router.get('/', asyncHandler(async (req, res) => {
   const { lat, lng } = req.query
 
-  const comercios = await req.prisma.comercio.findMany({
+  const comercios = await req.db.comercio.findMany({
     where: { estado: 'ACTIVO' },
     include: { rubro: true },
     orderBy: { nombre: 'asc' },
@@ -217,7 +217,7 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
 
 // GET /api/comercios/rubros - Obtener lista de rubros (público)
 router.get('/rubros', asyncHandler(async (req, res) => {
-  const rubros = await req.prisma.rubro.findMany({
+  const rubros = await req.db.rubro.findMany({
     where: { activo: true },
     orderBy: { orden: 'asc' },
   })
@@ -230,7 +230,7 @@ router.get('/rubros', asyncHandler(async (req, res) => {
 
 // GET /api/comercios/descuentos-disponibles - Obtener lista de descuentos disponibles (público)
 router.get('/descuentos-disponibles', asyncHandler(async (req, res) => {
-  const descuentos = await req.prisma.descuentoDisponible.findMany({
+  const descuentos = await req.db.descuentoDisponible.findMany({
     where: { activo: true },
     orderBy: { orden: 'asc' },
     select: {
@@ -256,7 +256,7 @@ router.put('/:token/actualizar', asyncHandler(async (req, res) => {
   } = req.body
 
   // Buscar comercio por token
-  const comercio = await req.prisma.comercio.findUnique({
+  const comercio = await req.db.comercio.findUnique({
     where: { token },
   })
 
@@ -271,7 +271,7 @@ router.put('/:token/actualizar', asyncHandler(async (req, res) => {
 
   // Verificar que el email no exista en otro comercio
   if (email !== comercio.email) {
-    const existente = await req.prisma.comercio.findUnique({
+    const existente = await req.db.comercio.findFirst({
       where: { email },
     })
     if (existente) {
@@ -283,7 +283,7 @@ router.put('/:token/actualizar', asyncHandler(async (req, res) => {
   let descuentoPct = comercio.descuentoPct
   if (descuentoDisponibleId !== undefined && descuentoDisponibleId !== comercio.descuentoDisponibleId) {
     if (descuentoDisponibleId) {
-      const descuentoDisponible = await req.prisma.descuentoDisponible.findUnique({
+      const descuentoDisponible = await req.db.descuentoDisponible.findUnique({
         where: { id: parseInt(descuentoDisponibleId) },
       })
       if (descuentoDisponible) {
@@ -313,7 +313,7 @@ router.put('/:token/actualizar', asyncHandler(async (req, res) => {
   }
 
   // Actualizar comercio
-  const comercioActualizado = await req.prisma.comercio.update({
+  const comercioActualizado = await req.db.comercio.update({
     where: { id: comercio.id },
     data: {
       nombre,

@@ -13,7 +13,8 @@ import {
   Clock,
   XCircle,
   BarChart3,
-  Eye
+  Eye,
+  Loader2
 } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
@@ -32,9 +33,12 @@ export default function GestionComunicaciones() {
 
   const [campanas, setCampanas] = useState([])
   const [templates, setTemplates] = useState([])
+  const [actividades, setActividades] = useState([])
+  const [categoriasActividad, setCategoriasActividad] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [enviandoCampana, setEnviandoCampana] = useState(null)
 
   // Filtros
   const [tipo, setTipo] = useState('')
@@ -53,7 +57,8 @@ export default function GestionComunicaciones() {
     smsTemplate: '',
     segmentacion: {
       estado: ['ACTIVO', 'VIGENTE'],
-      categoria: [],
+      actividadId: '',
+      categoriaActividadId: '',
       edadMin: '',
       edadMax: '',
       deudores: null
@@ -64,14 +69,41 @@ export default function GestionComunicaciones() {
   useEffect(() => {
     cargarCampanas()
     cargarTemplates()
+    api.getFull('/admin/actividades?limit=100').then(r => setActividades(r?.data || r || []))
   }, [page, tipo, estado])
 
   const cargarTemplates = async () => {
     try {
-      const res = await api.get('/admin/templates/email')
-      setTemplates(res.data || [])
+      const res = await api.getFull('/admin/templates/email')
+      setTemplates(res?.data || res || [])
     } catch (err) {
       console.error('Error cargando templates:', err)
+    }
+  }
+
+  const handleActividadChange = async (actividadId) => {
+    setFormCampana(prev => ({
+      ...prev,
+      segmentacion: { ...prev.segmentacion, actividadId, categoriaActividadId: '' }
+    }))
+    if (actividadId) {
+      const cats = await api.getFull(`/admin/categorias-actividad?actividadId=${actividadId}&limit=100`)
+      setCategoriasActividad(cats?.data || cats || [])
+    } else {
+      setCategoriasActividad([])
+    }
+  }
+
+  const handleEnviarCampana = async (campanaId) => {
+    setEnviandoCampana(campanaId)
+    try {
+      const res = await api.postFull(`/admin/comunicaciones/campanas/${campanaId}/enviar`, {})
+      setSuccess(res?.message || 'Campaña enviada correctamente')
+      await cargarCampanas()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setEnviandoCampana(null)
     }
   }
 
@@ -137,7 +169,8 @@ export default function GestionComunicaciones() {
         smsTemplate: '',
         segmentacion: {
           estado: ['ACTIVO', 'VIGENTE'],
-          categoria: [],
+          actividadId: '',
+          categoriaActividadId: '',
           edadMin: '',
           edadMax: '',
           deudores: null
@@ -195,15 +228,16 @@ export default function GestionComunicaciones() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
+    <div>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <Mail className="w-7 h-7 text-primary" />
               Campañas de Comunicación
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mt-1">
               Gestión de comunicaciones masivas con socios
             </p>
           </div>
@@ -403,22 +437,24 @@ export default function GestionComunicaciones() {
                           <span>Enviada: {formatDateTime(campana.fechaEnvio)}</span>
                         </div>
                       )}
-                      {campana.creadoPor && (
+                      {campana.admin && (
                         <span>
-                          Por {campana.creadoPor.nombre} {campana.creadoPor.apellido}
+                          Por {campana.admin.nombre} {campana.admin.apellido}
                         </span>
                       )}
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {campana.enviados > 0 && (
+                      {(campana.estado === 'BORRADOR' || campana.estado === 'PROGRAMADA') && (
                         <Button
-                          variant="ghost"
+                          variant="primary"
                           size="sm"
-                          onClick={() => navigate(`/admin/comunicaciones/campanas/${campana.id}`)}
+                          disabled={enviandoCampana === campana.id}
+                          onClick={() => handleEnviarCampana(campana.id)}
                         >
-                          <BarChart3 className="w-4 h-4 mr-1" />
-                          Estadísticas
+                          {enviandoCampana === campana.id
+                            ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Enviando...</>
+                            : <><Send className="w-4 h-4 mr-1" />Enviar</>}
                         </Button>
                       )}
                       <Button
@@ -614,6 +650,33 @@ export default function GestionComunicaciones() {
                         <span className="ml-2 text-sm text-gray-700">{est}</span>
                       </label>
                     ))}
+                  </div>
+                </div>
+
+                {/* Actividad / Categoría */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Actividad (opcional)</label>
+                    <select
+                      value={formCampana.segmentacion.actividadId}
+                      onChange={(e) => handleActividadChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                    >
+                      <option value="">Todas</option>
+                      {actividades.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Categoría (opcional)</label>
+                    <select
+                      value={formCampana.segmentacion.categoriaActividadId}
+                      onChange={(e) => setFormCampana(prev => ({ ...prev, segmentacion: { ...prev.segmentacion, categoriaActividadId: e.target.value } }))}
+                      disabled={!formCampana.segmentacion.actividadId}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                    >
+                      <option value="">Todas</option>
+                      {categoriasActividad.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </select>
                   </div>
                 </div>
 

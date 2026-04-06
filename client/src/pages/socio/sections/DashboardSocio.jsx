@@ -11,7 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { Calendar, Clock, MapPin } from 'lucide-react'
 
-export default function DashboardSocio({ socio, tokenPortal, onNavigate }) {
+export default function DashboardSocio({ socio, tokenPortal, onNavigate, mensajesNoLeidos = 0 }) {
   const [estadoCuenta, setEstadoCuenta] = useState(null)
   const [proximosEventos, setProximosEventos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -78,7 +78,7 @@ export default function DashboardSocio({ socio, tokenPortal, onNavigate }) {
       </div>
 
       {/* Cards de resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Estado de cuotas */}
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
           <div className="flex items-center justify-between mb-4">
@@ -130,6 +130,49 @@ export default function DashboardSocio({ socio, tokenPortal, onNavigate }) {
           >
             Ver mi QR →
           </button>
+        </div>
+
+        {/* Notificaciones — siempre visible */}
+        <div
+          className={`bg-white rounded-xl shadow-sm p-6 border-l-4 ${
+            cuotasPendientes > 0 || mensajesNoLeidos > 0
+              ? 'border-orange-500'
+              : 'border-gray-300'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className={`rounded-lg p-3 ${cuotasPendientes > 0 || mensajesNoLeidos > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
+              <CheckCircleIcon className={`h-6 w-6 ${cuotasPendientes > 0 || mensajesNoLeidos > 0 ? 'text-orange-600' : 'text-gray-500'}`} />
+            </div>
+            {(cuotasPendientes > 0 || mensajesNoLeidos > 0) && (
+              <span className="inline-flex items-center justify-center w-6 h-6 bg-red-600 text-white text-xs font-bold rounded-full">
+                {cuotasPendientes + mensajesNoLeidos}
+              </span>
+            )}
+          </div>
+          <h3 className="text-sm font-medium text-gray-600 mb-1">Mis Avisos</h3>
+          {cuotasPendientes === 0 && mensajesNoLeidos === 0 ? (
+            <p className="text-lg font-bold text-gray-500">Sin novedades</p>
+          ) : (
+            <>
+              {cuotasPendientes > 0 && (
+                <p className="text-sm font-semibold text-orange-600">
+                  {cuotasPendientes} cuota{cuotasPendientes > 1 ? 's' : ''} pendiente{cuotasPendientes > 1 ? 's' : ''}
+                </p>
+              )}
+              {mensajesNoLeidos > 0 && (
+                <p className="text-sm font-semibold text-blue-600">
+                  {mensajesNoLeidos} mensaje{mensajesNoLeidos > 1 ? 's' : ''} sin leer
+                </p>
+              )}
+              <button
+                onClick={() => onNavigate?.(cuotasPendientes > 0 ? 'pagos' : 'mensajes')}
+                className="mt-2 text-xs font-semibold text-orange-600 hover:text-orange-700"
+              >
+                Ver →
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -217,26 +260,6 @@ export default function DashboardSocio({ socio, tokenPortal, onNavigate }) {
         </div>
       </div>
 
-      {/* Notificaciones */}
-      {cuotasPendientes > 0 && (
-        <div className="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-4">
-          <div className="flex">
-            <ExclamationTriangleIcon className="h-5 w-5 text-orange-500 mr-3" />
-            <div>
-              <h4 className="text-sm font-medium text-orange-800">Tienes cuotas pendientes</h4>
-              <p className="text-sm text-orange-700 mt-1">
-                Evita recargos pagando antes del vencimiento
-              </p>
-              <button
-                onClick={() => onNavigate?.('pagos')}
-                className="mt-2 text-sm font-semibold text-orange-600 hover:text-orange-700"
-              >
-                Pagar ahora →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -421,6 +421,29 @@ router.delete('/descuentos-disponibles/:id', authAdmin, asyncHandler(async (req,
   res.json({ success: true, data: { mensaje: 'Descuento eliminado' } })
 }))
 
+// POST /api/admin/descuentos-disponibles/inicializar - Crear descuentos por defecto para este tenant
+router.post('/descuentos-disponibles/inicializar', authAdmin, asyncHandler(async (req, res) => {
+  const DESCUENTOS_DEFAULT = [
+    { nombre: '5% - Descuento Básico', porcentaje: 5, descripcion: 'Descuento inicial para comercios adheridos', orden: 1 },
+    { nombre: '10% - Descuento Estándar', porcentaje: 10, descripcion: 'Descuento estándar más utilizado', orden: 2 },
+    { nombre: '15% - Descuento Plus', porcentaje: 15, descripcion: 'Descuento intermedio atractivo', orden: 3 },
+    { nombre: '20% - Descuento Premium', porcentaje: 20, descripcion: 'Descuento destacado para socios', orden: 4 },
+    { nombre: '25% - Descuento Especial', porcentaje: 25, descripcion: 'Descuento promocional excepcional', orden: 5 },
+    { nombre: '30% - Descuento VIP', porcentaje: 30, descripcion: 'Máximo descuento disponible', orden: 6 },
+  ]
+
+  const existentes = await req.db.descuentoDisponible.count({})
+  if (existentes > 0) {
+    return res.json({ success: true, data: { mensaje: `Ya existen ${existentes} descuentos para este tenant`, creados: 0 } })
+  }
+
+  await req.db.descuentoDisponible.createMany({
+    data: DESCUENTOS_DEFAULT,
+  })
+
+  res.status(201).json({ success: true, data: { mensaje: 'Descuentos por defecto creados', creados: DESCUENTOS_DEFAULT.length } })
+}))
+
 // ==================== RUBROS ====================
 
 // GET /api/admin/rubros

@@ -483,6 +483,14 @@ router.post('/horarios-recurrentes', asyncHandler(async (req, res) => {
     throw new AppError('Categoria, dia, hora inicio y hora fin son requeridos', 400)
   }
 
+  // Verificar config espacio obligatorio
+  const configEspacio = await req.db.configuracion.findFirst({
+    where: { tenantId: req.tenantId, clave: 'HORARIO_ESPACIO_OBLIGATORIO' }
+  })
+  if (configEspacio?.valor === 'true' && !espacioId) {
+    throw new AppError('La asignación de espacio es obligatoria según la configuración del sistema', 400)
+  }
+
   // Verificar que la categoria existe
   const categoria = await req.db.categoriaActividad.findFirst({ where: { id: parseInt(categoriaActividadId), tenantId: req.tenantId } })
   if (!categoria) {
@@ -1620,9 +1628,10 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
     }
 
     // WhatsApp (preparar link, no enviar directamente)
-    if ((tipo === 'whatsapp' || tipo === 'todos') && socio.celular) {
+    const telefonoSocio = socio.celular || socio.celularSecundario || socio.telefonoFijo
+    if ((tipo === 'whatsapp' || tipo === 'todos') && telefonoSocio) {
       // Generar link de WhatsApp
-      const celularLimpio = socio.celular.replace(/\D/g, '')
+      const celularLimpio = telefonoSocio.replace(/\D/g, '')
       const whatsappUrl = `https://wa.me/${celularLimpio}?text=${encodeURIComponent(mensaje)}`
 
       updateData.notificadoWhatsapp = false // Marcar como pendiente, el admin debe enviar manualmente

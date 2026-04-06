@@ -230,7 +230,7 @@ router.get('/campanas', authAdmin, asyncHandler(async (req, res) => {
       skip,
       take: parseInt(limit),
       include: {
-        creadoPor: {
+        admin: {
           select: {
             id: true,
             nombre: true,
@@ -294,10 +294,10 @@ router.post('/campanas', authAdmin, asyncHandler(async (req, res) => {
       contactados: 0,
       interesados: 0,
       recuperados: 0,
-      creadoPorId: req.user.id
+      creadoPor: req.user.id
     },
     include: {
-      creadoPor: {
+      admin: {
         select: {
           id: true,
           nombre: true,
@@ -321,7 +321,7 @@ router.get('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
   const campana = await req.prisma.campanaRecupero.findUnique({
     where: { id: parseInt(id) },
     include: {
-      creadoPor: {
+      admin: {
         select: {
           id: true,
           nombre: true,
@@ -369,7 +369,7 @@ router.put('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
       mesesDescuento: mesesDescuento ? parseInt(mesesDescuento) : undefined
     },
     include: {
-      creadoPor: {
+      admin: {
         select: {
           id: true,
           nombre: true,

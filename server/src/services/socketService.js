@@ -140,7 +140,39 @@ export function initSocket(httpServer) {
     registrarEventosPrintAgent(io)
   }
 
-  console.log('[Socket.io] Inicializado')
+  // ── Namespace /socio para portal del socio ──
+  const socioNS = io.of('/socio')
+
+  socioNS.use(async (socket, next) => {
+    try {
+      const tokenPortal = socket.handshake.auth.tokenPortal
+      if (!tokenPortal) return next(new Error('tokenPortal requerido'))
+
+      // Resolución lazy del tenant: buscar el socio en cualquier tenant
+      const socio = await prisma.socio.findFirst({
+        where: { tokenPortal },
+        select: { id: true, apellidoNombre: true, tokenPortal: true }
+      })
+
+      if (!socio) return next(new Error('Token inválido'))
+      socket.socio = socio
+      next()
+    } catch (err) {
+      next(new Error('Error de autenticación'))
+    }
+  })
+
+  socioNS.on('connection', (socket) => {
+    const socio = socket.socio
+    socket.join(`socio:${socio.tokenPortal}`)
+    console.log(`[Socket/socio] ${socio.apellidoNombre} conectado`)
+
+    socket.on('disconnect', () => {
+      console.log(`[Socket/socio] ${socio.apellidoNombre} desconectado`)
+    })
+  })
+
+  console.log('[Socket.io] Inicializado (+ namespace /socio)')
   return io
 }
 

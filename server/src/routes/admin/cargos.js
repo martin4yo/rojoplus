@@ -152,6 +152,7 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
     categoria,
     periodoId,
     categoriaActividadId,
+    conceptoTesoreriaId,
     descripcion,
     montoOriginal,
     montoRecargo = 0,
@@ -160,13 +161,26 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
     cargoOrigenId
   } = req.body
 
-  if (!socioId || !categoria || !montoOriginal) {
-    throw new AppError('socioId, categoria y montoOriginal son requeridos', 400, 'VALIDATION_ERROR')
+  if (!socioId || !montoOriginal) {
+    throw new AppError('socioId y montoOriginal son requeridos', 400, 'VALIDATION_ERROR')
   }
 
+  // Si no viene categoría, derivarla del concepto o usar CUOTA_ACTIVIDAD por defecto
+  let categoriaFinal = categoria || 'CUOTA_ACTIVIDAD'
+
   // Validar categoría
-  if (!CATEGORIAS_CARGO.includes(categoria)) {
+  if (!CATEGORIAS_CARGO.includes(categoriaFinal)) {
     throw new AppError(`Categoría inválida. Opciones: ${CATEGORIAS_CARGO.join(', ')}`, 400, 'INVALID_CATEGORIA')
+  }
+
+  // Resolver descripción desde el concepto si no viene explícita
+  let descripcionFinal = descripcion
+  if (conceptoTesoreriaId && !descripcionFinal) {
+    const concepto = await req.db.conceptoTesoreria.findUnique({
+      where: { id: parseInt(conceptoTesoreriaId) },
+      select: { nombre: true },
+    })
+    if (concepto) descripcionFinal = concepto.nombre
   }
 
   // Verificar que exista el socio
@@ -185,10 +199,11 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
     data: {
       socioId: parseInt(socioId),
       grupoFamiliarId: socio.titularFamiliaId || socio.id,
-      categoria,
+      categoria: categoriaFinal,
       periodoId: periodoId ? parseInt(periodoId) : null,
       categoriaActividadId: categoriaActividadId ? parseInt(categoriaActividadId) : null,
-      descripcion,
+      conceptoTesoreriaId: conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null,
+      descripcion: descripcionFinal,
       montoOriginal: parseFloat(montoOriginal),
       montoRecargo: parseFloat(montoRecargo),
       montoBonificacion: parseFloat(montoBonificacion),
@@ -228,6 +243,143 @@ router.delete('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
   })
 
   res.json({ success: true, message: 'Cargo anulado correctamente' })
+}))
+
+// ============================================
+// CARGOS MASIVOS
+// ============================================
+
+// Función auxiliar: construye el where de socios según filtros
+function buildFiltrosSocios(filtros = {}) {
+  const where = {}
+
+  if (filtros.estado && filtros.estado.length > 0) {
+    where.estado = { in: Array.isArray(filtros.estado) ? filtros.estado : [filtros.estado] }
+  }
+
+  if (filtros.actividadId) {
+    where.inscripciones = {
+      some: {
+        categoriaActividad: {
+          actividadId: parseInt(filtros.actividadId)
+        },
+        estado: 'ACTIVA'
+      }
+    }
+  }
+
+  if (filtros.categoriaActividadId) {
+    where.inscripciones = {
+      some: {
+        categoriaActividadId: parseInt(filtros.categoriaActividadId),
+        estado: 'ACTIVA'
+      }
+    }
+  }
+
+  return where
+}
+
+// POST /api/admin/cargos/preview-masivo - Preview de socios afectados
+router.post('/cargos/preview-masivo', authAdmin, asyncHandler(async (req, res) => {
+  const { filtros = {} } = req.body
+  const where = buildFiltrosSocios(filtros)
+
+  const socios = await req.db.socio.findMany({
+    where,
+    select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      estado: true,
+      inscripciones: {
+        where: { estado: 'ACTIVA' },
+        select: {
+          categoriaActividad: {
+            select: { nombre: true, actividad: { select: { nombre: true } } }
+          }
+        }
+      }
+    },
+    orderBy: { apellidoNombre: 'asc' }
+  })
+
+  res.json({ success: true, data: socios, total: socios.length })
+}))
+
+// POST /api/admin/cargos/masivo - Generar cargos masivos
+router.post('/cargos/masivo', authAdmin, asyncHandler(async (req, res) => {
+  const { conceptos, filtros = {} } = req.body
+
+  if (!conceptos || !Array.isArray(conceptos) || conceptos.length === 0) {
+    throw new AppError('Debe definir al menos un concepto', 400, 'VALIDATION_ERROR')
+  }
+
+  // Validar cada concepto
+  for (const c of conceptos) {
+    if (!c.conceptoTesoreriaId || !c.montoOriginal || !c.fechaVencimiento) {
+      throw new AppError('Cada concepto requiere conceptoTesoreriaId, montoOriginal y fechaVencimiento', 400, 'VALIDATION_ERROR')
+    }
+  }
+
+  // Resolver nombres de conceptos
+  const conceptoIds = conceptos.map(c => parseInt(c.conceptoTesoreriaId))
+  const conceptosDB = await req.db.conceptoTesoreria.findMany({
+    where: { id: { in: conceptoIds } },
+    select: { id: true, nombre: true }
+  })
+  const conceptoMap = Object.fromEntries(conceptosDB.map(c => [c.id, c]))
+
+  // Obtener socios según filtros
+  const where = buildFiltrosSocios(filtros)
+  const socios = await req.db.socio.findMany({
+    where,
+    select: { id: true, titularFamiliaId: true }
+  })
+
+  if (socios.length === 0) {
+    throw new AppError('No hay socios que cumplan los filtros seleccionados', 400, 'NO_SOCIOS')
+  }
+
+  // Crear cargos en batch
+  let creados = 0
+  const errores = []
+
+  for (const socio of socios) {
+    for (const concepto of conceptos) {
+      try {
+        const cId = parseInt(concepto.conceptoTesoreriaId)
+        const nombreConcepto = conceptoMap[cId]?.nombre || `Concepto #${cId}`
+        const monto = parseFloat(concepto.montoOriginal)
+
+        await req.db.cargo.create({
+          data: {
+            socioId: socio.id,
+            grupoFamiliarId: socio.titularFamiliaId || socio.id,
+            categoria: concepto.categoria || 'CUOTA_ACTIVIDAD',
+            conceptoTesoreriaId: cId,
+            descripcion: nombreConcepto,
+            montoOriginal: monto,
+            montoRecargo: 0,
+            montoBonificacion: 0,
+            montoTotal: monto,
+            fechaVencimiento: new Date(concepto.fechaVencimiento),
+            origen: 'MASIVO',
+            estado: 'PENDIENTE'
+          }
+        })
+        creados++
+      } catch (err) {
+        errores.push({ socioId: socio.id, error: err.message })
+      }
+    }
+  }
+
+  res.json({
+    success: true,
+    data: { creados, errores, totalSocios: socios.length },
+    message: `Se generaron ${creados} cargos para ${socios.length} socios`
+  })
 }))
 
 // ============================================

@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
+import { enviarEmail } from '../../services/email.js'
+import { enviarWhatsApp, obtenerTelefonoSocio } from '../../services/whatsappService.js'
 
 const router = Router()
 
@@ -24,12 +26,12 @@ router.get('/campanas', authAdmin, asyncHandler(async (req, res) => {
   if (estado) where.estado = estado
 
   const [campanas, total] = await Promise.all([
-    req.prisma.campanaComunicacion.findMany({
+    req.db.campanaComunicacion.findMany({
       where,
       skip,
       take: parseInt(limit),
       include: {
-        creadoPor: {
+        admin: {
           select: {
             id: true,
             nombre: true,
@@ -40,13 +42,13 @@ router.get('/campanas', authAdmin, asyncHandler(async (req, res) => {
           select: {
             id: true,
             nombre: true,
-            asunto: true
+            subject: true
           }
         }
       },
       orderBy: { createdAt: 'desc' }
     }),
-    req.prisma.campanaComunicacion.count({ where })
+    req.db.campanaComunicacion.count({ where })
   ])
 
   res.json({
@@ -94,9 +96,9 @@ router.post('/campanas', authAdmin, asyncHandler(async (req, res) => {
 
   // Calcular destinatarios según segmentación
   const segmentacionObj = typeof segmentacion === 'string' ? JSON.parse(segmentacion) : segmentacion
-  const destinatarios = await calcularDestinatarios(req.prisma, segmentacionObj)
+  const destinatarios = await calcularDestinatarios(req.db, segmentacionObj)
 
-  const campana = await req.prisma.campanaComunicacion.create({
+  const campana = await req.db.campanaComunicacion.create({
     data: {
       nombre,
       descripcion: descripcion || null,
@@ -116,10 +118,10 @@ router.post('/campanas', authAdmin, asyncHandler(async (req, res) => {
       clicks: 0,
       rebotados: 0,
       errores: 0,
-      creadoPorId: req.user.id
+      creadoPor: req.user.id
     },
     include: {
-      creadoPor: {
+      admin: {
         select: {
           id: true,
           nombre: true,
@@ -130,7 +132,7 @@ router.post('/campanas', authAdmin, asyncHandler(async (req, res) => {
         select: {
           id: true,
           nombre: true,
-          asunto: true
+          subject: true
         }
       }
     }
@@ -147,24 +149,35 @@ router.post('/campanas', authAdmin, asyncHandler(async (req, res) => {
 async function calcularDestinatarios(prisma, segmentacion) {
   const where = {}
 
-  // Aplicar filtros de segmentación
-  if (segmentacion.estado) {
+  if (segmentacion.estado && segmentacion.estado.length > 0) {
     where.estado = { in: Array.isArray(segmentacion.estado) ? segmentacion.estado : [segmentacion.estado] }
   }
 
-  if (segmentacion.categoria) {
-    where.categoria = { in: Array.isArray(segmentacion.categoria) ? segmentacion.categoria : [segmentacion.categoria] }
+  if (segmentacion.actividadId) {
+    where.inscripciones = {
+      some: {
+        categoriaActividad: { actividadId: parseInt(segmentacion.actividadId) },
+        estado: 'ACTIVA'
+      }
+    }
+  }
+
+  if (segmentacion.categoriaActividadId) {
+    where.inscripciones = {
+      some: {
+        categoriaActividadId: parseInt(segmentacion.categoriaActividadId),
+        estado: 'ACTIVA'
+      }
+    }
   }
 
   if (segmentacion.edadMin || segmentacion.edadMax) {
     const hoy = new Date()
     where.fechaNacimiento = {}
-
     if (segmentacion.edadMax) {
       const fechaMin = new Date(hoy.getFullYear() - parseInt(segmentacion.edadMax), hoy.getMonth(), hoy.getDate())
       where.fechaNacimiento.gte = fechaMin
     }
-
     if (segmentacion.edadMin) {
       const fechaMax = new Date(hoy.getFullYear() - parseInt(segmentacion.edadMin), hoy.getMonth(), hoy.getDate())
       where.fechaNacimiento.lte = fechaMax
@@ -173,10 +186,7 @@ async function calcularDestinatarios(prisma, segmentacion) {
 
   if (segmentacion.deudores === true) {
     where.cargos = {
-      some: {
-        estado: 'PENDIENTE',
-        fechaVencimiento: { lt: new Date() }
-      }
+      some: { estado: 'PENDIENTE', fechaVencimiento: { lt: new Date() } }
     }
   }
 
@@ -196,15 +206,16 @@ async function calcularDestinatarios(prisma, segmentacion) {
     ]
   }
 
-  // Buscar socios
-  const socios = await req.db.socio.findMany({
+  const socios = await prisma.socio.findMany({
     where,
     select: {
       id: true,
       nroSocio: true,
       apellidoNombre: true,
       email: true,
-      celular: true
+      celular: true,
+      celularSecundario: true,
+      telefonoFijo: true
     }
   })
 
@@ -215,10 +226,10 @@ async function calcularDestinatarios(prisma, segmentacion) {
 router.get('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const campana = await req.prisma.campanaComunicacion.findUnique({
+  const campana = await req.db.campanaComunicacion.findUnique({
     where: { id: parseInt(id) },
     include: {
-      creadoPor: {
+      admin: {
         select: {
           id: true,
           nombre: true,
@@ -230,8 +241,8 @@ router.get('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
         select: {
           id: true,
           nombre: true,
-          asunto: true,
-          cuerpo: true
+          subject: true,
+          bodyHtml: true
         }
       },
       envios: {
@@ -270,7 +281,7 @@ router.put('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
     fechaProgramada
   } = req.body
 
-  const campana = await req.prisma.campanaComunicacion.findUnique({
+  const campana = await req.db.campanaComunicacion.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -283,7 +294,7 @@ router.put('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('No se puede modificar una campaña ya enviada', 400, 'INVALID_STATE')
   }
 
-  const updated = await req.prisma.campanaComunicacion.update({
+  const updated = await req.db.campanaComunicacion.update({
     where: { id: parseInt(id) },
     data: {
       nombre: nombre || undefined,
@@ -292,7 +303,7 @@ router.put('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
       fechaProgramada: fechaProgramada ? new Date(fechaProgramada) : undefined
     },
     include: {
-      creadoPor: {
+      admin: {
         select: {
           id: true,
           nombre: true,
@@ -309,50 +320,55 @@ router.put('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
   })
 }))
 
+// Reemplaza variables {{nombre}}, {{nroSocio}}, etc. en texto
+function compilarTemplate(texto, socio) {
+  return texto
+    .replace(/\{\{nombre\}\}/gi, socio.apellidoNombre || '')
+    .replace(/\{\{nroSocio\}\}/gi, socio.nroSocio || '')
+    .replace(/\{\{email\}\}/gi, socio.email || '')
+}
+
 // POST /api/admin/comunicaciones/campanas/:id/enviar - Enviar campaña
 router.post('/campanas/:id/enviar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const campana = await req.prisma.campanaComunicacion.findUnique({
+  const campana = await req.db.campanaComunicacion.findUnique({
     where: { id: parseInt(id) },
-    include: {
-      emailTemplate: true
-    }
+    include: { emailTemplate: true }
   })
 
-  if (!campana) {
-    throw new AppError('Campaña no encontrada', 404, 'NOT_FOUND')
-  }
+  if (!campana) throw new AppError('Campaña no encontrada', 404, 'NOT_FOUND')
+  if (campana.estado === 'ENVIADA') throw new AppError('Esta campaña ya fue enviada', 400, 'ALREADY_SENT')
 
-  if (campana.estado === 'ENVIADA') {
-    throw new AppError('Esta campaña ya fue enviada', 400, 'ALREADY_SENT')
-  }
-
-  // Obtener destinatarios
   const destinatarios = JSON.parse(campana.destinatarios || '[]')
+  if (destinatarios.length === 0) throw new AppError('No hay destinatarios para esta campaña', 400, 'NO_RECIPIENTS')
 
-  if (destinatarios.length === 0) {
-    throw new AppError('No hay destinatarios para esta campaña', 400, 'NO_RECIPIENTS')
-  }
-
-  // Crear registros de envío para cada destinatario
   const canales = JSON.parse(campana.canales || '[]')
+
+  // Marcar como EN_CURSO inmediatamente
+  await req.db.campanaComunicacion.update({
+    where: { id: parseInt(id) },
+    data: { estado: 'EN_CURSO', fechaEnvio: new Date() }
+  })
+
+  let enviados = 0
+  let errores = 0
 
   for (const socio of destinatarios) {
     for (const canal of canales) {
+      const telSocio = obtenerTelefonoSocio(socio)
       let destinatario = ''
 
       if (canal === 'email' && socio.email) {
         destinatario = socio.email
-      } else if (canal === 'whatsapp' && socio.celular) {
-        destinatario = socio.celular
-      } else if (canal === 'sms' && socio.celular) {
-        destinatario = socio.celular
+      } else if ((canal === 'whatsapp' || canal === 'sms') && telSocio) {
+        destinatario = telSocio
       } else {
-        continue // No tiene este canal disponible
+        continue
       }
 
-      await req.prisma.envioCampana.create({
+      // Crear registro de envío
+      const envio = await req.db.envioCampana.create({
         data: {
           campanaId: campana.id,
           socioId: socio.id,
@@ -365,28 +381,55 @@ router.post('/campanas/:id/enviar', authAdmin, asyncHandler(async (req, res) => 
           intentos: 0
         }
       })
+
+      // Enviar de verdad
+      let enviado = false
+      let errorMsg = null
+
+      try {
+        if (canal === 'email' && campana.emailTemplate) {
+          const html = compilarTemplate(campana.emailTemplate.bodyHtml, socio)
+          const subject = compilarTemplate(campana.emailTemplate.subject, socio)
+          await enviarEmail({ to: destinatario, subject, html, db: req.db })
+          enviado = true
+        } else if (canal === 'whatsapp' && campana.whatsappTemplate) {
+          const texto = compilarTemplate(campana.whatsappTemplate, socio)
+          await enviarWhatsApp({ db: req.db, telefono: destinatario, texto })
+          enviado = true
+        }
+      } catch (err) {
+        errorMsg = err.message
+        errores++
+      }
+
+      if (enviado) enviados++
+
+      // Actualizar estado del envío
+      await req.db.envioCampana.update({
+        where: { id: envio.id },
+        data: {
+          estado: enviado ? 'ENVIADO' : 'ERROR',
+          intentos: 1,
+          ...(errorMsg && { errorMensaje: errorMsg })
+        }
+      })
     }
   }
 
-  // Actualizar estado de campaña
-  await req.prisma.campanaComunicacion.update({
+  // Marcar campaña como ENVIADA y actualizar contadores
+  await req.db.campanaComunicacion.update({
     where: { id: parseInt(id) },
     data: {
-      estado: 'EN_CURSO',
-      fechaEnvio: new Date()
+      estado: 'ENVIADA',
+      enviados,
+      errores
     }
   })
 
-  // TODO: Aquí se debe integrar con el servicio de envío real (email, WhatsApp, SMS)
-  // Por ahora solo creamos los registros de envío
-
   res.json({
     success: true,
-    message: 'Campaña enviada correctamente',
-    data: {
-      totalDestinatarios: destinatarios.length,
-      canales
-    }
+    message: `Campaña enviada: ${enviados} enviados, ${errores} errores`,
+    data: { totalDestinatarios: destinatarios.length, enviados, errores, canales }
   })
 }))
 
@@ -394,7 +437,7 @@ router.post('/campanas/:id/enviar', authAdmin, asyncHandler(async (req, res) => 
 router.delete('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const campana = await req.prisma.campanaComunicacion.findUnique({
+  const campana = await req.db.campanaComunicacion.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -406,7 +449,7 @@ router.delete('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar una campaña en curso o enviada', 400, 'INVALID_STATE')
   }
 
-  await req.prisma.campanaComunicacion.delete({
+  await req.db.campanaComunicacion.delete({
     where: { id: parseInt(id) }
   })
 
@@ -420,7 +463,7 @@ router.delete('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
 router.get('/campanas/:id/estadisticas', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const campana = await req.prisma.campanaComunicacion.findUnique({
+  const campana = await req.db.campanaComunicacion.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -435,26 +478,26 @@ router.get('/campanas/:id/estadisticas', authAdmin, asyncHandler(async (req, res
     tasaApertura,
     tasaClicks
   ] = await Promise.all([
-    req.prisma.envioCampana.count({
+    req.db.envioCampana.count({
       where: { campanaId: parseInt(id) }
     }),
-    req.prisma.envioCampana.groupBy({
+    req.db.envioCampana.groupBy({
       by: ['canal'],
       where: { campanaId: parseInt(id) },
       _count: true
     }),
-    req.prisma.envioCampana.groupBy({
+    req.db.envioCampana.groupBy({
       by: ['estado'],
       where: { campanaId: parseInt(id) },
       _count: true
     }),
-    req.prisma.envioCampana.count({
+    req.db.envioCampana.count({
       where: {
         campanaId: parseInt(id),
         abierto: true
       }
     }),
-    req.prisma.envioCampana.count({
+    req.db.envioCampana.count({
       where: {
         campanaId: parseInt(id),
         clickeo: true

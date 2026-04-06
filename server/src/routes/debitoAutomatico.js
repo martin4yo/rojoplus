@@ -3,12 +3,94 @@ import { Prisma } from '@prisma/client'
 import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { enviarReciboPago } from '../services/email.js'
+import { notificarPago, obtenerTelefonoSocio } from '../services/whatsappService.js'
 
 const router = Router()
 
 // Helper para manejar errores async
 const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next)
+}
+
+// ============================================
+// HELPER: Notificaciones de recibo (email + WA)
+// ============================================
+
+/**
+ * Envía email + WhatsApp para una lista de pagos cobrados.
+ * Retorna { emailOk, emailFail, waOk, waFail } para mostrar en UI.
+ * No lanza excepciones — todos los errores son capturados.
+ */
+export async function enviarNotificacionesRecibo(pagosIds, db) {
+  const stats = { emailOk: 0, emailFail: 0, waOk: 0, waFail: 0 }
+  if (!pagosIds?.length) return stats
+
+  for (const pagoId of pagosIds) {
+    try {
+      const pago = await db.pago.findUnique({
+        where: { id: pagoId },
+        include: {
+          socio: {
+            select: {
+              id: true,
+              nroSocio: true,
+              apellidoNombre: true,
+              documento: true,
+              email: true,
+              celular: true,
+              celularSecundario: true,
+              telefonoFijo: true
+            }
+          },
+          medioPago: { select: { id: true, nombre: true } },
+          cargos: {
+            include: {
+              periodo: { select: { nombre: true } },
+              categoriaActividad: {
+                select: {
+                  nombre: true,
+                  actividad: { select: { nombre: true } }
+                }
+              }
+            }
+          }
+        }
+      })
+
+      if (!pago) continue
+
+      // Email
+      if (pago.socio?.email) {
+        try {
+          await enviarReciboPago(pago, db)
+          stats.emailOk++
+        } catch (err) {
+          console.error(`[Débito] Error email recibo pago ${pagoId}:`, err.message)
+          stats.emailFail++
+        }
+      }
+
+      // WhatsApp
+      const telefono = obtenerTelefonoSocio(pago.socio)
+      if (telefono) {
+        try {
+          await notificarPago({
+            db,
+            socio: pago.socio,
+            pago: { importe: pago.montoTotal, numero: pago.numero }
+          })
+          stats.waOk++
+        } catch (err) {
+          console.error(`[Débito] Error WA recibo pago ${pagoId}:`, err.message)
+          stats.waFail++
+        }
+      }
+    } catch (err) {
+      console.error(`[Débito] Error obteniendo pago ${pagoId} para notificar:`, err.message)
+    }
+  }
+
+  return stats
 }
 
 // ============================================
@@ -836,48 +918,9 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
     return importacion
   })
 
-  // Enviar recibos por email a los socios con pagos exitosos (fuera de la transacción)
-  const pagosExitosos = resultados.filter(r => r.estado === 'COBRADO' && r.pagoId)
-  for (const item of pagosExitosos) {
-    try {
-      // Obtener pago completo con relaciones para el email
-      const pagoCompleto = await req.db.pago.findUnique({
-        where: { id: item.pagoId },
-        include: {
-          socio: {
-            select: {
-              id: true,
-              nroSocio: true,
-              apellidoNombre: true,
-              documento: true,
-              email: true
-            }
-          },
-          medioPago: { select: { id: true, nombre: true } },
-          cargos: {
-            include: {
-              periodo: { select: { nombre: true } },
-              categoriaActividad: {
-                select: {
-                  nombre: true,
-                  actividad: { select: { nombre: true } }
-                }
-              }
-            }
-          }
-        }
-      })
-
-      if (pagoCompleto) {
-        // Enviar recibo async (no esperar, no debe fallar el proceso)
-        enviarReciboPago(pagoCompleto).catch(err => {
-          console.error(`Error enviando recibo para pago ${pagoCompleto.numero}:`, err)
-        })
-      }
-    } catch (err) {
-      console.error(`Error obteniendo pago ${item.pagoId} para enviar recibo:`, err)
-    }
-  }
+  // Enviar recibos (email + WhatsApp) a los cobrados
+  const pagosIds = resultados.filter(r => r.estado === 'COBRADO' && r.pagoId).map(r => r.pagoId)
+  const notifStats = await enviarNotificacionesRecibo(pagosIds, req.db)
 
   res.json({
     importacion: resultado,
@@ -888,6 +931,7 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
       montoCobrado: resultados
         .filter(r => r.estado === 'COBRADO')
         .reduce((sum, r) => sum + r.importe, 0),
+      notificaciones: notifStats,
       detalles: resultados.map(r => ({
         tarjeta: r.tarjeta?.slice(-4) || '****',
         importe: r.importe,
@@ -896,6 +940,54 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
         motivoRechazo: r.motivoRechazo
       }))
     }
+  })
+}))
+
+// ============================================
+// REENVÍO DE RECIBOS
+// ============================================
+
+// POST /api/admin/debito/archivos/:id/reenviar-recibos
+// Re-envía email + WhatsApp a todos los cobrados de un archivo ya procesado
+router.post('/archivos/:id/reenviar-recibos', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  // Obtener detalles cobrados del archivo
+  const detalles = await req.db.detalleDebito.findMany({
+    where: {
+      archivoId: parseInt(id),
+      tenantId: req.tenantId,
+      estado: 'COBRADO'
+    }
+  })
+
+  if (detalles.length === 0) {
+    return res.status(400).json({ error: 'No hay registros cobrados en este archivo' })
+  }
+
+  // Obtener los pagoIds buscando pagos vinculados a los socios + archivo
+  const pagos = await req.db.pago.findMany({
+    where: {
+      tenantId: req.tenantId,
+      origen: { in: ['DEBITO_AUTOMATICO'] },
+      socioId: { in: detalles.map(d => d.socioId) },
+      cargos: {
+        some: { incluidoEnDebitoId: parseInt(id) }
+      }
+    },
+    select: { id: true }
+  })
+
+  if (pagos.length === 0) {
+    return res.status(400).json({ error: 'No se encontraron pagos asociados a este archivo' })
+  }
+
+  const notifStats = await enviarNotificacionesRecibo(pagos.map(p => p.id), req.db)
+
+  res.json({
+    mensaje: 'Recibos reenviados',
+    pagos: pagos.length,
+    notificaciones: notifStats
   })
 }))
 
@@ -1399,6 +1491,379 @@ function obtenerMotivoRechazo(codigo) {
   }
   return motivos[codigo] || `Rechazo código ${codigo}`
 }
+
+// ============================================
+// PARSER RESPUESTA BANCARIA (CBU)
+// ============================================
+
+/**
+ * Parsea el archivo de respuesta de débito bancario según el banco.
+ * Cada banco tiene un formato de texto fijo distinto.
+ * Matching por CBU completo (detalles.cbuEnviado).
+ */
+function parsearRespuestaBanco(banco, contenido, detallesOriginal) {
+  const lineas = contenido.split(/\r?\n/)
+  const resultados = []
+
+  // Mapa CBU → detalle para búsqueda rápida
+  const mapCBU = {}
+  for (const d of detallesOriginal) {
+    if (d.cbuEnviado) mapCBU[d.cbuEnviado.trim()] = d
+  }
+
+  // Códigos de rechazo bancarios comunes
+  const motivosBancarios = {
+    '00': 'Acreditado',
+    '01': 'Cuenta inexistente',
+    '02': 'CBU inválido',
+    '03': 'Cuenta cerrada',
+    '04': 'Cuenta bloqueada',
+    '05': 'Fondos insuficientes',
+    '06': 'Titular fallecido',
+    '07': 'Orden de no pago',
+    '08': 'Importe excede límite',
+    '09': 'Dato inconsistente',
+    '10': 'Moneda no habilitada',
+    '11': 'Cuenta embargada',
+    '12': 'Acuerdo rescindido',
+    '13': 'CBU inhabilitado por el cliente',
+    '14': 'Cuenta en gestión judicial',
+    '99': 'Error general'
+  }
+
+  const obtenerMotivoB = (cod) => motivosBancarios[cod] || `Rechazo código ${cod}`
+
+  if (banco === 'GALICIA') {
+    // Formato Galicia: pos fija, CBU en col 10-32 (22 dígitos), importe col 55-69 (15 dígitos, 2 dec), resultado col 80-82
+    for (const linea of lineas) {
+      if (linea.length < 82) continue
+      const tipo = linea.substring(0, 1)
+      if (tipo !== '1' && tipo !== 'D') continue // solo registros de detalle
+      const cbu = linea.substring(9, 31).trim()
+      const importeStr = linea.substring(54, 69).trim()
+      const resultado = linea.substring(79, 82).trim()
+      const detalle = mapCBU[cbu]
+      if (!detalle) continue
+      const importe = parseInt(importeStr || '0') / 100
+      const esCobrado = resultado === '000' || resultado === '00' || resultado === ''
+      resultados.push({
+        detalleId: detalle.id,
+        socioId: detalle.socioId,
+        tarjeta: cbu.slice(-4),
+        importe: importe || parseFloat(detalle.importeEnviado),
+        estado: esCobrado ? 'COBRADO' : 'RECHAZADO',
+        codigoRechazo: esCobrado ? null : resultado,
+        motivoRechazo: esCobrado ? null : obtenerMotivoB(resultado)
+      })
+    }
+  } else if (banco === 'SANTANDER') {
+    // Formato Santander: CBU col 3-24, importe col 40-53 (14 dígitos, 2 dec), código resultado col 75-77
+    for (const linea of lineas) {
+      if (linea.length < 77) continue
+      if (linea.substring(0, 1) === '0' || linea.substring(0, 1) === '9') continue // cabecera/pie
+      const cbu = linea.substring(2, 24).trim()
+      const importeStr = linea.substring(39, 53).trim()
+      const codigoRes = linea.substring(74, 77).trim()
+      const detalle = mapCBU[cbu]
+      if (!detalle) continue
+      const importe = parseInt(importeStr || '0') / 100
+      const esCobrado = codigoRes === '000' || codigoRes === '00' || codigoRes === ''
+      resultados.push({
+        detalleId: detalle.id,
+        socioId: detalle.socioId,
+        tarjeta: cbu.slice(-4),
+        importe: importe || parseFloat(detalle.importeEnviado),
+        estado: esCobrado ? 'COBRADO' : 'RECHAZADO',
+        codigoRechazo: esCobrado ? null : codigoRes,
+        motivoRechazo: esCobrado ? null : obtenerMotivoB(codigoRes)
+      })
+    }
+  } else if (banco === 'MACRO') {
+    // Formato Macro: tipo col 1, CBU col 2-23, importe col 40-54 (15 dígitos, 2 dec), estado col 70 ('A'=aprobado,'R'=rechazo), código col 71-73
+    for (const linea of lineas) {
+      if (linea.length < 73) continue
+      const tipo = linea.substring(0, 1)
+      if (tipo !== '1' && tipo !== 'D') continue
+      const cbu = linea.substring(1, 23).trim()
+      const importeStr = linea.substring(39, 54).trim()
+      const estado = linea.substring(69, 70).trim()
+      const codigoRes = linea.substring(70, 73).trim()
+      const detalle = mapCBU[cbu]
+      if (!detalle) continue
+      const importe = parseInt(importeStr || '0') / 100
+      const esCobrado = estado === 'A' || codigoRes === '000' || codigoRes === '00'
+      resultados.push({
+        detalleId: detalle.id,
+        socioId: detalle.socioId,
+        tarjeta: cbu.slice(-4),
+        importe: importe || parseFloat(detalle.importeEnviado),
+        estado: esCobrado ? 'COBRADO' : 'RECHAZADO',
+        codigoRechazo: esCobrado ? null : codigoRes,
+        motivoRechazo: esCobrado ? null : obtenerMotivoB(codigoRes)
+      })
+    }
+  } else if (banco === 'PROVINCIA') {
+    // Formato Provincia de Buenos Aires: CBU col 5-26, importe col 45-58 (14 dígitos, 2 dec), resultado col 80-82
+    for (const linea of lineas) {
+      if (linea.length < 82) continue
+      if (linea.substring(0, 1) === '0' || linea.substring(0, 1) === '9') continue
+      const cbu = linea.substring(4, 26).trim()
+      const importeStr = linea.substring(44, 58).trim()
+      const codigoRes = linea.substring(79, 82).trim()
+      const detalle = mapCBU[cbu]
+      if (!detalle) continue
+      const importe = parseInt(importeStr || '0') / 100
+      const esCobrado = codigoRes === '000' || codigoRes === '00' || codigoRes === ''
+      resultados.push({
+        detalleId: detalle.id,
+        socioId: detalle.socioId,
+        tarjeta: cbu.slice(-4),
+        importe: importe || parseFloat(detalle.importeEnviado),
+        estado: esCobrado ? 'COBRADO' : 'RECHAZADO',
+        codigoRechazo: esCobrado ? null : codigoRes,
+        motivoRechazo: esCobrado ? null : obtenerMotivoB(codigoRes)
+      })
+    }
+  } else {
+    // Fallback genérico: CSV con columnas cbu,importe,resultado
+    for (const linea of lineas) {
+      const partes = linea.split(/[,;|\t]/)
+      if (partes.length < 3) continue
+      const cbu = partes[0].trim()
+      const importeStr = partes[1].trim()
+      const codigoRes = partes[2].trim()
+      const detalle = mapCBU[cbu]
+      if (!detalle) continue
+      const importe = parseFloat(importeStr.replace(',', '.')) || parseFloat(detalle.importeEnviado)
+      const esCobrado = codigoRes === '00' || codigoRes === '000' || codigoRes.toLowerCase() === 'ok'
+      resultados.push({
+        detalleId: detalle.id,
+        socioId: detalle.socioId,
+        tarjeta: cbu.slice(-4),
+        importe,
+        estado: esCobrado ? 'COBRADO' : 'RECHAZADO',
+        codigoRechazo: esCobrado ? null : codigoRes,
+        motivoRechazo: esCobrado ? null : obtenerMotivoB(codigoRes)
+      })
+    }
+  }
+
+  // Si no se encontraron coincidencias por CBU, fallback por posición
+  if (resultados.length === 0 && detallesOriginal.length > 0) {
+    let idx = 0
+    for (const linea of lineas) {
+      if (linea.length < 10) continue
+      if (linea.substring(0, 1) === '0' || linea.substring(0, 1) === '9') continue
+      if (idx >= detallesOriginal.length) break
+      const detalle = detallesOriginal[idx]
+      resultados.push({
+        detalleId: detalle.id,
+        socioId: detalle.socioId,
+        tarjeta: detalle.cbuEnviado?.slice(-4) || '****',
+        importe: parseFloat(detalle.importeEnviado),
+        estado: 'COBRADO',
+        codigoRechazo: null,
+        motivoRechazo: null
+      })
+      idx++
+    }
+  }
+
+  return resultados
+}
+
+// POST /api/admin/debito/archivos/:id/importar-respuesta-banco - Importar respuesta de banco (CBU)
+router.post('/archivos/:id/importar-respuesta-banco', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { contenido, nombreArchivo, banco } = req.body
+
+  if (!contenido) {
+    return res.status(400).json({ error: 'Se requiere el contenido del archivo' })
+  }
+  if (!banco) {
+    return res.status(400).json({ error: 'Se requiere el banco (GALICIA, MACRO, SANTANDER, PROVINCIA)' })
+  }
+
+  const archivo = await req.db.archivoDebito.findFirst({
+    where: { id: parseInt(id), tenantId: req.tenantId },
+    include: {
+      configuracion: true,
+      detalles: {
+        include: {
+          socio: { select: { id: true, nroSocio: true } }
+        }
+      }
+    }
+  })
+
+  if (!archivo) {
+    return res.status(404).json({ error: 'Archivo no encontrado' })
+  }
+
+  const resultados = parsearRespuestaBanco(banco, contenido, archivo.detalles)
+
+  if (resultados.length === 0) {
+    return res.status(422).json({ error: 'No se encontraron registros coincidentes en el archivo. Verificá el formato y el banco seleccionado.' })
+  }
+
+  // Generar número de importación
+  const ultimaImportacion = await req.db.importacionCobranza.findFirst({
+    where: { tenantId: req.tenantId },
+    orderBy: { numero: 'desc' }
+  })
+  const secuencia = ultimaImportacion
+    ? parseInt(ultimaImportacion.numero.split('-').pop()) + 1
+    : 1
+  const numeroImportacion = `IMP-${new Date().getFullYear()}-${String(secuencia).padStart(4, '0')}`
+
+  const resultado = await req.db.$transaction(async (tx) => {
+    const importacion = await tx.importacionCobranza.create({
+      data: {
+        archivoDebitoId: parseInt(id),
+        numero: numeroImportacion,
+        tipo: 'DEBITO_BANCARIO',
+        nombreArchivo: nombreArchivo || `${banco}_respuesta.txt`,
+        registrosTotales: resultados.length,
+        registrosCobrados: resultados.filter(r => r.estado === 'COBRADO').length,
+        registrosRechazados: resultados.filter(r => r.estado === 'RECHAZADO').length,
+        montoCobrado: resultados.filter(r => r.estado === 'COBRADO').reduce((s, r) => s + r.importe, 0),
+        importadoPor: req.admin.id,
+        tenantId: req.tenantId
+      }
+    })
+
+    for (const res of resultados) {
+      await tx.detalleDebito.update({
+        where: { id: res.detalleId },
+        data: {
+          estado: res.estado,
+          codigoRechazo: res.codigoRechazo,
+          motivoRechazo: res.motivoRechazo,
+          fechaProceso: new Date()
+        }
+      })
+
+      if (res.estado === 'COBRADO') {
+        const cargos = await tx.cargo.findMany({
+          where: { socioId: res.socioId, incluidoEnDebitoId: parseInt(id), saldo: { gt: 0 } }
+        })
+
+        if (cargos.length > 0) {
+          const medioPagoId = await obtenerMedioPagoDebito(tx)
+          const caja = await obtenerCajaDebito(tx)
+
+          const ultimoPago = await tx.pago.findFirst({ orderBy: { id: 'desc' }, select: { numero: true } })
+          const nuevoNumero = ultimoPago
+            ? String(parseInt(ultimoPago.numero) + 1).padStart(8, '0')
+            : '00000001'
+
+          const pago = await tx.pago.create({
+            data: {
+              numero: nuevoNumero,
+              socioId: res.socioId,
+              fecha: new Date(),
+              montoTotal: res.importe,
+              montoRecibido: res.importe,
+              montoACuenta: 0,
+              medioPagoId,
+              cajaId: caja.id,
+              origen: 'DEBITO_AUTOMATICO',
+              observaciones: `Débito bancario ${banco} - ${archivo.numero}`,
+              registradoPor: req.admin.id,
+              tenantId: req.tenantId
+            }
+          })
+
+          const anioMov = new Date().getFullYear()
+          const prefijoMov = `MV-${anioMov}-`
+          const ultimoMov = await tx.movimientoCaja.findFirst({
+            where: { numero: { startsWith: prefijoMov } },
+            orderBy: { numero: 'desc' }
+          })
+          const siguienteMov = ultimoMov
+            ? (parseInt(ultimoMov.numero.split('-').pop()) || 0) + 1
+            : 1
+          const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
+
+          await tx.movimientoCaja.create({
+            data: {
+              numero: numeroMov,
+              cajaId: caja.id,
+              cuentaContableId: caja.cuentaContableId,
+              fecha: new Date(),
+              tipo: 'INGRESO',
+              concepto: 'Débito Bancario',
+              monto: res.importe,
+              descripcion: `Débito bancario ${banco} - Socio #${res.socioId} - ${archivo.numero}`,
+              pagoId: pago.id,
+              registradoPor: req.admin.id,
+              centroCostoId: caja.centroCostoId ?? null,
+              conciliado: !caja.requiereConciliacion,
+              tenantId: req.tenantId
+            }
+          })
+
+          await tx.caja.update({
+            where: { id: caja.id },
+            data: { saldoActual: { increment: res.importe } }
+          })
+
+          res.pagoId = pago.id
+
+          let montoRestante = res.importe
+          for (const cargo of cargos) {
+            if (montoRestante <= 0) break
+            const saldoCargo = parseFloat(cargo.saldo) + parseFloat(cargo.recargo || 0)
+            const aplicar = Math.min(montoRestante, saldoCargo)
+            await tx.cargo.update({
+              where: { id: cargo.id },
+              data: {
+                pagoId: pago.id,
+                estado: aplicar >= saldoCargo ? 'PAGADO' : 'PARCIAL',
+                saldo: parseFloat(cargo.saldo) - Math.min(montoRestante, parseFloat(cargo.saldo)),
+                recargo: 0,
+                fechaPago: aplicar >= saldoCargo ? new Date() : null
+              }
+            })
+            montoRestante -= aplicar
+          }
+        }
+      }
+    }
+
+    const todosResueltos = resultados.every(r => r.estado !== 'PENDIENTE')
+    if (todosResueltos) {
+      await tx.archivoDebito.update({
+        where: { id: parseInt(id) },
+        data: { estado: 'PROCESADO', fechaProceso: new Date() }
+      })
+    }
+
+    return importacion
+  })
+
+  // Enviar recibos (email + WhatsApp) a los cobrados
+  const pagosIds = resultados.filter(r => r.estado === 'COBRADO' && r.pagoId).map(r => r.pagoId)
+  const notifStats = await enviarNotificacionesRecibo(pagosIds, req.db)
+
+  res.json({
+    importacion: resultado,
+    resumen: {
+      total: resultados.length,
+      cobrados: resultados.filter(r => r.estado === 'COBRADO').length,
+      rechazados: resultados.filter(r => r.estado === 'RECHAZADO').length,
+      montoCobrado: resultados.filter(r => r.estado === 'COBRADO').reduce((s, r) => s + r.importe, 0),
+      notificaciones: notifStats,
+      detalles: resultados.map(r => ({
+        cbu: r.tarjeta,
+        importe: r.importe,
+        estado: r.estado,
+        codigoRechazo: r.codigoRechazo,
+        motivoRechazo: r.motivoRechazo
+      }))
+    }
+  })
+}))
 
 // Obtener o crear medio de pago para débito automático
 /**

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Calendar, Plus, Edit, Trash2, Clock, MapPin } from 'lucide-react'
+import { Calendar, Plus, Edit, Trash2, Clock, MapPin, Settings2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
 import { Alert } from '../../../components/Alert'
@@ -25,6 +25,8 @@ export default function HorariosRecurrentes() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [espacioObligatorio, setEspacioObligatorio] = useState(false)
+  const [guardandoConfig, setGuardandoConfig] = useState(false)
 
   // Filtros
   const [filtroActividad, setFiltroActividad] = useState('')
@@ -57,10 +59,12 @@ export default function HorariosRecurrentes() {
 
   async function cargarDatos() {
     try {
-      const [actividadesRes, espaciosRes] = await Promise.all([
+      const [actividadesRes, espaciosRes, configEspacio] = await Promise.all([
         api.getFull('/admin/actividades?activo=true'),
-        api.getFull('/admin/espacios-deportivos?activo=true')
+        api.getFull('/admin/espacios-deportivos?activo=true'),
+        api.get('/admin/sistema/configuracion/HORARIO_ESPACIO_OBLIGATORIO').catch(() => null),
       ])
+      setEspacioObligatorio(configEspacio?.valor === 'true')
       setActividades(actividadesRes.data || [])
       setEspacios(espaciosRes.data || [])
 
@@ -130,12 +134,35 @@ export default function HorariosRecurrentes() {
     setModalAbierto(true)
   }
 
+  async function toggleEspacioObligatorio() {
+    const nuevoValor = !espacioObligatorio
+    setGuardandoConfig(true)
+    try {
+      await api.put('/admin/sistema/configuracion/HORARIO_ESPACIO_OBLIGATORIO', {
+        valor: nuevoValor ? 'true' : 'false',
+        tipo: 'BOOLEAN',
+        modulo: 'DEPORTES',
+        descripcion: 'Espacio deportivo obligatorio en horarios recurrentes'
+      })
+      setEspacioObligatorio(nuevoValor)
+      setSuccess(`Espacio ${nuevoValor ? 'obligatorio' : 'opcional'} a partir de ahora`)
+    } catch (err) {
+      setError('Error al guardar la configuración')
+    } finally {
+      setGuardandoConfig(false)
+    }
+  }
+
   async function guardarHorario(e) {
     e.preventDefault()
     setError(null)
 
     if (!form.categoriaActividadId || form.diaSemana === '' || !form.horaInicio || !form.horaFin) {
       setError('Categoria, dia, hora inicio y hora fin son requeridos')
+      return
+    }
+    if (espacioObligatorio && !form.espacioId) {
+      setError('La asignación de espacio es obligatoria según la configuración del sistema')
       return
     }
 
@@ -215,7 +242,7 @@ export default function HorariosRecurrentes() {
             <Calendar className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Horarios Recurrentes</h1>
+            <h1 className="text-2xl font-bold text-gray-800">Agendar Actividad</h1>
             <p className="text-gray-500 text-sm">Templates de horarios semanales por categoria</p>
           </div>
         </div>
@@ -232,7 +259,7 @@ export default function HorariosRecurrentes() {
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap items-end gap-4">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">Actividad</label>
             <select
@@ -246,6 +273,20 @@ export default function HorariosRecurrentes() {
               ))}
             </select>
           </div>
+          {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+            <div className="flex items-center gap-3 py-1.5 px-3 bg-gray-50 rounded-lg border border-gray-200">
+              <Settings2 className="w-4 h-4 text-gray-500" />
+              <span className="text-sm text-gray-700 whitespace-nowrap">Espacio obligatorio</span>
+              <button
+                type="button"
+                onClick={toggleEspacioObligatorio}
+                disabled={guardandoConfig}
+                className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${espacioObligatorio ? 'bg-primary' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${espacioObligatorio ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -332,7 +373,7 @@ export default function HorariosRecurrentes() {
       <Modal
         isOpen={modalAbierto}
         onClose={() => setModalAbierto(false)}
-        title={horarioEditando ? 'Editar Horario' : 'Nuevo Horario Recurrente'}
+        title={horarioEditando ? 'Editar Actividad Agendada' : 'Agendar Nueva Actividad'}
       >
         <form onSubmit={guardarHorario} className="space-y-4">
           <div>
@@ -392,19 +433,24 @@ export default function HorariosRecurrentes() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Espacio (opcional)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Espacio {espacioObligatorio ? <span className="text-red-500">*</span> : <span className="text-gray-400">(opcional)</span>}
+            </label>
             <select
               value={form.espacioId}
               onChange={(e) => setForm({ ...form, espacioId: e.target.value })}
               className="input-field w-full"
+              required={espacioObligatorio}
             >
-              <option value="">Sin espacio asignado</option>
+              <option value="">{espacioObligatorio ? 'Seleccionar espacio...' : 'Sin espacio asignado'}</option>
               {espacios.map((esp) => (
                 <option key={esp.id} value={esp.id}>{esp.nombre}</option>
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Si asignas un espacio, se validaran conflictos de horario
+              {espacioObligatorio
+                ? 'Requerido por configuración del sistema'
+                : 'Si asignás un espacio, se validarán conflictos de horario'}
             </p>
           </div>
 

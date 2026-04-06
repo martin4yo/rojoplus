@@ -3,7 +3,8 @@ import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
 import { enviarReciboPago } from '../../services/email.js'
 import { generarAsientoPagoCuota } from '../../services/asientosContables.js'
-import { notificarPago as notificarPagoWA } from '../../services/whatsappService.js'
+import { notificarPago as notificarPagoWA, obtenerTelefonoSocio } from '../../services/whatsappService.js'
+import { generarReciboPagoPDF } from '../../services/pdfGenerator.js'
 
 const router = Router()
 
@@ -164,9 +165,7 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
     })
   }
 
-  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-  const nombre = `${meses[mesInt - 1]} ${anio}`
+  const nombre = `${String(mesInt).padStart(2, '0')} / ${anio}`
 
   // Calcular fecha de vencimiento según configuración
   let fechaVenc
@@ -687,6 +686,7 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
           actividad: { select: { id: true, nombre: true } },
         },
       },
+      conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
     },
   })
 
@@ -842,12 +842,116 @@ router.get('/pagos/:id', authAdmin, asyncHandler(async (req, res) => {
   res.json({ success: true, data: pago })
 }))
 
+// GET /api/admin/pagos/:id/recibo-pdf - Descargar recibo como PDF
+router.get('/pagos/:id/recibo-pdf', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const pago = await req.db.pago.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      socio: {
+        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true }
+      },
+      medioPago: { select: { id: true, nombre: true } },
+      cargos: {
+        include: {
+          conceptoTesoreria: { select: { id: true, nombre: true } },
+          periodo: { select: { nombre: true } },
+          categoriaActividad: {
+            select: { nombre: true, actividad: { select: { nombre: true } } }
+          }
+        }
+      }
+    }
+  })
+
+  if (!pago) throw new AppError('Pago no encontrado', 404, 'NOT_FOUND')
+
+  const pdfBuffer = await generarReciboPagoPDF(pago)
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="recibo-${pago.numero}.pdf"`)
+  res.send(pdfBuffer)
+}))
+
+// POST /api/admin/pagos/:id/enviar-recibo - Reenviar recibo por email y/o WhatsApp
+router.post('/pagos/:id/enviar-recibo', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { canales = ['email'] } = req.body
+
+  const pago = await req.db.pago.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      socio: {
+        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true, notifWhatsapp: true }
+      },
+      medioPago: { select: { id: true, nombre: true } },
+      cargos: {
+        include: {
+          conceptoTesoreria: { select: { id: true, nombre: true } },
+          periodo: { select: { nombre: true } },
+          categoriaActividad: {
+            select: { nombre: true, actividad: { select: { nombre: true } } }
+          }
+        }
+      }
+    }
+  })
+
+  if (!pago) throw new AppError('Pago no encontrado', 404, 'NOT_FOUND')
+
+  const resultados = {}
+
+  if (canales.includes('email')) {
+    if (!pago.socio?.email) {
+      resultados.email = { ok: false, mensaje: 'El socio no tiene email registrado' }
+    } else {
+      try {
+        await enviarReciboPago(pago, req.db)
+        resultados.email = { ok: true, mensaje: `Recibo enviado a ${pago.socio.email}` }
+      } catch (err) {
+        resultados.email = { ok: false, mensaje: err.message }
+      }
+    }
+  }
+
+  if (canales.includes('whatsapp')) {
+    const tel = obtenerTelefonoSocio(pago.socio)
+    if (!tel) {
+      resultados.whatsapp = { ok: false, mensaje: 'El socio no tiene teléfono registrado' }
+    } else {
+      try {
+        await notificarPagoWA({ db: req.db, socio: pago.socio, pago })
+        resultados.whatsapp = { ok: true, mensaje: `Mensaje enviado a ${tel}` }
+      } catch (err) {
+        resultados.whatsapp = { ok: false, mensaje: err.message }
+      }
+    }
+  }
+
+  res.json({ success: true, data: resultados })
+}))
+
 // POST /api/admin/pagos - Registrar pago
 router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
-  const { socioId, cuotaIds, medioPagoId, cajaId, montoRecibido, observaciones } = req.body
+  const { socioId, cuotaIds, medioPagoId, cajaId, montoRecibido, observaciones, mediosPago: mediosPagoInput } = req.body
 
-  if (!socioId || !cuotaIds || !cuotaIds.length || !medioPagoId || !cajaId) {
-    throw new AppError('socioId, cuotaIds, medioPagoId y cajaId son requeridos', 400, 'VALIDATION_ERROR')
+  if (!socioId || !cuotaIds || !cuotaIds.length) {
+    throw new AppError('socioId y cuotaIds son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  // Normalizar splits: aceptar array nuevo O par medioPagoId/cajaId legacy
+  let splits // [{ medioPagoId, cajaId, monto }]
+  if (Array.isArray(mediosPagoInput) && mediosPagoInput.length > 0) {
+    splits = mediosPagoInput.map(s => ({
+      medioPagoId: parseInt(s.medioPagoId),
+      cajaId: parseInt(s.cajaId),
+      monto: parseFloat(s.monto),
+    }))
+  } else if (medioPagoId && cajaId) {
+    splits = [{ medioPagoId: parseInt(medioPagoId), cajaId: parseInt(cajaId), monto: null }] // monto se calcula después
+  } else {
+    throw new AppError('Debe indicar al menos un medio de pago y caja', 400, 'VALIDATION_ERROR')
   }
 
   // Obtener cuotas a pagar (fuera de transacción para validar)
@@ -885,29 +989,38 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   const montoTotal = montoBase + totalRecargo
   const montoRecibidoNum = parseFloat(montoRecibido) || montoTotal
 
-  // Obtener caja y medio de pago con sus datos contables
-  const [caja, medioPago] = await Promise.all([
-    req.db.caja.findUnique({
-      where: { id: parseInt(cajaId) },
-      include: { cuentaContable: true },
-    }),
-    req.db.medioPago.findUnique({
-      where: { id: parseInt(medioPagoId) },
-      include: { conceptoTesoreria: true },
-    }),
+  // Si el split legacy no tiene monto, asignar el total
+  if (splits[0].monto === null) splits[0].monto = montoTotal
+
+  // Validar que la suma de splits sea consistente (tolerancia de $1 por redondeo)
+  const sumaSplits = splits.reduce((s, sp) => s + sp.monto, 0)
+  if (Math.abs(sumaSplits - montoTotal) > 1) {
+    throw new AppError(`La suma de los medios de pago ($${sumaSplits.toFixed(2)}) no coincide con el total ($${montoTotal.toFixed(2)})`, 400, 'MONTO_INCORRECTO')
+  }
+
+  // Obtener cajas y medios de pago para todos los splits
+  const cajasIds = [...new Set(splits.map(s => s.cajaId))]
+  const mediosIds = [...new Set(splits.map(s => s.medioPagoId))]
+
+  const [cajasData, mediosData] = await Promise.all([
+    req.db.caja.findMany({ where: { id: { in: cajasIds } }, include: { cuentaContable: true } }),
+    req.db.medioPago.findMany({ where: { id: { in: mediosIds } }, include: { conceptoTesoreria: true } }),
   ])
 
-  if (!caja) {
-    throw new AppError('La caja seleccionada no existe', 400, 'CAJA_NO_ENCONTRADA')
+  const cajaMap = Object.fromEntries(cajasData.map(c => [c.id, c]))
+  const medioMap = Object.fromEntries(mediosData.map(m => [m.id, m]))
+
+  // Validar cajas
+  for (const split of splits) {
+    const caja = cajaMap[split.cajaId]
+    if (!caja) throw new AppError(`Caja ${split.cajaId} no encontrada`, 400, 'CAJA_NO_ENCONTRADA')
+    if (!caja.activo) throw new AppError(`La caja "${caja.nombre}" está inactiva`, 400, 'CAJA_INACTIVA')
+    if (!caja.cuentaContableId) throw new AppError(`La caja "${caja.nombre}" no tiene cuenta contable configurada`, 400, 'CAJA_SIN_CUENTA_CONTABLE')
   }
 
-  if (!caja.activo) {
-    throw new AppError('La caja seleccionada está inactiva', 400, 'CAJA_INACTIVA')
-  }
-
-  if (!caja.cuentaContableId) {
-    throw new AppError('La caja seleccionada no tiene una cuenta contable configurada. Por favor, configurá la cuenta contable en Tesorería > Cajas.', 400, 'CAJA_SIN_CUENTA_CONTABLE')
-  }
+  // Usar primera caja/medio como primarios (para Pago.cajaId y Pago.medioPagoId — backwards compat)
+  const caja = cajaMap[splits[0].cajaId]
+  const medioPago = medioMap[splits[0].medioPagoId]
 
   // Todo dentro de una transacción
   const pagoCompleto = await req.db.$transaction(async (tx) => {
@@ -953,11 +1066,23 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       })
     }
 
-    // Actualizar saldo de caja
-    await tx.caja.update({
-      where: { id: caja.id },
-      data: { saldoActual: { increment: montoTotal } },
-    })
+    // Registrar splits de medios de pago
+    for (const split of splits) {
+      await tx.pagoMedioPago.create({
+        data: {
+          pagoId: pago.id,
+          medioPagoId: split.medioPagoId,
+          cajaId: split.cajaId,
+          monto: split.monto,
+          tenantId: pago.tenantId || (await tx.caja.findUnique({ where: { id: split.cajaId }, select: { tenantId: true } }))?.tenantId || 0,
+        }
+      })
+      // Actualizar saldo de cada caja con su porción
+      await tx.caja.update({
+        where: { id: split.cajaId },
+        data: { saldoActual: { increment: split.monto } },
+      })
+    }
 
     // Cargar el concepto por defecto (fallback para cargos sin concepto específico)
     const configConcepto = await tx.configuracion.findFirst({
@@ -1007,7 +1132,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       gruposPorCC[ccEfectivo].monto += montoEfectivo
     }
 
-    // Crear un MovimientoCaja por grupo de CC
+    // Crear un MovimientoCaja por (split × grupo CC) distribuido proporcionalmente
     const anioMov = new Date().getFullYear()
     const prefijoMov = `MV-${anioMov}-`
     const ultimoMovBase = await tx.movimientoCaja.findFirst({
@@ -1018,26 +1143,36 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       ? (parseInt(ultimoMovBase.numero.split('-').pop()) || 0) + 1
       : 1
 
-    for (const grupo of Object.values(gruposPorCC)) {
-      const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
-      siguienteMov++
-      await tx.movimientoCaja.create({
-        data: {
-          numero: numeroMov,
-          cajaId: caja.id,
-          cuentaContableId: caja.cuentaContableId,
-          medioPagoId: parseInt(medioPagoId),
-          fecha: new Date(),
-          tipo: 'INGRESO',
-          concepto: grupo.conceptoNombre,
-          monto: grupo.monto,
-          descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
-          pagoId: pago.id,
-          registradoPor: req.admin.id,
-          centroCostoId: grupo.centroCostoId,
-          conciliado: !caja.requiereConciliacion,
-        }
-      })
+    const gruposCC = Object.values(gruposPorCC)
+    const totalGrupos = gruposCC.reduce((s, g) => s + g.monto, 0)
+
+    for (const split of splits) {
+      const cajaActual = cajaMap[split.cajaId]
+      for (const grupo of gruposCC) {
+        // Distribuir proporcionalmente el monto del split entre los CC groups
+        const proporcion = totalGrupos > 0 ? grupo.monto / totalGrupos : 1 / gruposCC.length
+        const montoMov = Math.round(split.monto * proporcion * 100) / 100
+        if (montoMov <= 0) continue
+        const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
+        siguienteMov++
+        await tx.movimientoCaja.create({
+          data: {
+            numero: numeroMov,
+            cajaId: split.cajaId,
+            cuentaContableId: cajaActual.cuentaContableId,
+            medioPagoId: split.medioPagoId,
+            fecha: new Date(),
+            tipo: 'INGRESO',
+            concepto: grupo.conceptoNombre,
+            monto: montoMov,
+            descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
+            pagoId: pago.id,
+            registradoPor: req.admin.id,
+            centroCostoId: grupo.centroCostoId,
+            conciliado: !cajaActual.requiereConciliacion,
+          }
+        })
+      }
     }
 
     // Obtener pago con relaciones para respuesta (findFirst para mantenerse dentro de la transacción)
@@ -1090,7 +1225,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Notificar pago por WhatsApp si el socio tiene el canal habilitado y el tenant lo permite
-  if (pagoCompleto.socio?.notifWhatsapp && pagoCompleto.socio?.celular) {
+  if (pagoCompleto.socio?.notifWhatsapp && obtenerTelefonoSocio(pagoCompleto.socio)) {
     req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_PAGO' } })
       .then(flag => {
         if (flag?.valor !== 'false') {

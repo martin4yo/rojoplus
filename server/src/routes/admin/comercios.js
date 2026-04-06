@@ -12,15 +12,16 @@ router.get('/comercios', authAdmin, asyncHandler(async (req, res) => {
 
   const where = estado ? { estado } : {}
 
-  const [comercios, total] = await Promise.all([
+  const [comercios, total, totalVentasGlobal] = await Promise.all([
     req.prisma.comercio.findMany({
       where,
-      include: { rubro: true },
+      include: { rubro: true, _count: { select: { ventas: true } } },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: parseInt(limit),
     }),
     req.prisma.comercio.count({ where }),
+    req.prisma.venta.count(),
   ])
 
   res.json({
@@ -34,6 +35,8 @@ router.get('/comercios', authAdmin, asyncHandler(async (req, res) => {
         estado: c.estado,
         descuentoPct: Number(c.descuentoPct),
         createdAt: c.createdAt,
+        cantVentas: c._count.ventas,
+        pctVentas: totalVentasGlobal > 0 ? Math.round((c._count.ventas / totalVentasGlobal) * 100 * 10) / 10 : 0,
       })),
       pagination: {
         page: parseInt(page),

@@ -12,6 +12,8 @@ const menuData = [
       { titulo: 'Solicitudes Alta', icono: 'UserPlus', url: '/admin/solicitudes', orden: 2 },
       { titulo: 'Inscripciones', icono: 'ClipboardList', url: '/admin/inscripciones', orden: 3 },
       { titulo: 'Cuotas y Periodos', icono: 'Receipt', url: '/admin/periodos', orden: 4 },
+      { titulo: 'Cargos Adicionales', icono: 'Zap', url: '/admin/cargos-adicionales', orden: 5 },
+      { titulo: 'Chat Entrenadores', icono: 'MessageCircle', url: '/admin/chat-entrenadores', orden: 6 },
     ]
   },
   {

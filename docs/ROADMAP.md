@@ -823,16 +823,16 @@ Portal responsive y mobile-first donde el socio puede gestionar toda su informac
 - [x] **35.8** Estadísticas y KPIs (cobrados, rechazados, tasa éxito)
 - [x] **35.9** UI completa con 5 pestañas (Generar, Archivos, Importar, Estadísticas, Configuración)
 
-### Payway ⏳
-- [ ] **35.10** Configuración de credenciales Payway
-- [ ] **35.11** Integración con API REST de Payway
-- [ ] **35.12** Generación de débitos vía API
-- [ ] **35.13** Webhook para recibir respuestas
-- [ ] **35.14** Procesamiento de archivo de respuesta alternativo
+### Payway ✅
+- [x] **35.10** Configuración de credenciales Payway (site_id, private key, public key, ambiente SANDBOX/PRODUCCION)
+- [x] **35.11** Integración con API REST de Payway (paywayService.js — sandbox + prod)
+- [x] **35.12** Generación de débitos vía API (cobrar-lote, tokenización automática al adherirse)
+- [x] **35.13** Webhook para recibir respuestas async de Payway
+- [x] **35.14** Tokenización server-side en sandbox / badge en portal socio
 
-### Débito Directo Bancario ⏳
-- [ ] **35.15** Formato de archivo Banco Galicia
-- [ ] **35.16** Formato de archivo Banco Macro
+### Débito Directo Bancario ✅
+- [x] **35.15** Formato de archivo Banco Galicia
+- [x] **35.16** Formato de archivo Banco Macro
 - [ ] **35.17** Formato de archivo Banco Santander
 - [ ] **35.18** Formato de archivo Banco Provincia
 - [ ] **35.19** Importación de respuestas por banco

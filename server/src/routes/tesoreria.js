@@ -402,7 +402,7 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/movimientos-caja - Crear movimiento manual
 router.post('/movimientos-caja', asyncHandler(async (req, res) => {
-  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion, centroCostoId, medioPago, medioPagoId: medioPagoIdBody, fecha } = req.body
+  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion, centroCostoId, medioPago, medioPagoId: medioPagoIdBody, fecha, socioId, entidadId } = req.body
 
   if (!cajaId || !tipo || !monto || !cuentaContableId) {
     throw new AppError('Caja, tipo, monto y cuenta contable son requeridos', 400)
@@ -508,11 +508,15 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
       concepto: concepto || cuentaContable.nombre,
       descripcion: descripcion || null,
       medioPagoId: medioPagoRecord.id,
-      registradoPor: req.admin.id
+      registradoPor: req.admin.id,
+      socioId: socioId ? parseInt(socioId) : null,
+      entidadId: entidadId ? parseInt(entidadId) : null,
     },
     include: {
       caja: { select: { id: true, codigo: true, nombre: true } },
-      cuentaContable: { select: { id: true, codigo: true, nombre: true } }
+      cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+      socio: { select: { id: true, apellidoNombre: true, nroSocio: true } },
+      entidad: { select: { id: true, razonSocial: true, tipo: true } },
     }
   })
 

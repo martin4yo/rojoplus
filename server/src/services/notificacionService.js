@@ -3,7 +3,7 @@ import Handlebars from 'handlebars'
 import { enviarNotificacionPush } from './webPush.js'
 import { getMailConfig } from './email.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
-import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora } from './whatsappService.js'
+import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora, obtenerTelefonoSocio } from './whatsappService.js'
 
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
@@ -369,7 +369,7 @@ export async function notificarCuotaProximaVencer(cargo) {
     }
 
     // WhatsApp
-    if (socio.notifWhatsapp && socio.celular) {
+    if (socio.notifWhatsapp && obtenerTelefonoSocio(socio)) {
       const db = createTenantPrisma(socio.tenantId)
       db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_VENCIMIENTO' } })
         .then(flag => {
@@ -428,7 +428,7 @@ export async function notificarCuotaVencida(cargo) {
     }
 
     // WhatsApp
-    if (socio.notifWhatsapp && socio.celular) {
+    if (socio.notifWhatsapp && obtenerTelefonoSocio(socio)) {
       const db = createTenantPrisma(socio.tenantId)
       db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_VENCIMIENTO' } })
         .then(flag => {
@@ -507,7 +507,7 @@ export async function notificarMorosidad(socioId) {
     }
 
     // WhatsApp
-    if (socio.notifWhatsapp && socio.celular) {
+    if (socio.notifWhatsapp && obtenerTelefonoSocio(socio)) {
       const db = createTenantPrisma(socio.tenantId)
       db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_MORA' } })
         .then(flag => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Users, Settings, FileText, Bot, MessageCircle, Cpu, Key, Eye, EyeOff, Save, BarChart2 } from 'lucide-react'
+import { ArrowLeft, Edit, Users, Settings, FileText, Bot, MessageCircle, Cpu, Key, Eye, EyeOff, Save, BarChart2, ScanLine } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -11,8 +11,11 @@ export default function TenantDetail() {
   const [tenant, setTenant] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('info')
-  const [features, setFeatures] = useState({ whatsapp: false, waAgent: false })
+  const [features, setFeatures] = useState({ whatsapp: false, waAgent: false, parse: false })
   const [guardandoFeature, setGuardandoFeature] = useState(null) // key del feature que se está guardando
+  const [parseApiKey, setParseApiKey] = useState('')
+  const [guardandoParseKey, setGuardandoParseKey] = useState(false)
+  const [mostrarParseKey, setMostrarParseKey] = useState(false)
   const [configIA, setConfigIA] = useState({
     enabled: 'false', chatEnabled: 'true',
     horarioInicio: '7', horarioFin: '23', msgFueraHorario: '', whitelist: '',
@@ -42,13 +45,34 @@ export default function TenantDetail() {
 
   async function cargarFeatures() {
     try {
-      const [wa, agent] = await Promise.all([
+      const [wa, agent, parse, parseKey] = await Promise.all([
         api.getFull(`/super-admin/tenants/${id}/configuracion/PLAN_FEATURE_WHATSAPP`).catch(() => ({ valor: null })),
         api.getFull(`/super-admin/tenants/${id}/configuracion/PLAN_FEATURE_WA_AGENT`).catch(() => ({ valor: null })),
+        api.getFull(`/super-admin/tenants/${id}/configuracion/PLAN_FEATURE_PARSE`).catch(() => ({ valor: null })),
+        api.getFull(`/super-admin/tenants/${id}/configuracion/PARSE_API_KEY`).catch(() => ({ valor: null })),
       ])
-      setFeatures({ whatsapp: wa.valor === 'true', waAgent: agent.valor === 'true' })
+      setFeatures({ whatsapp: wa.valor === 'true', waAgent: agent.valor === 'true', parse: parse.valor === 'true' })
+      setParseApiKey(parseKey.valor || '')
     } catch {
       // silencioso
+    }
+  }
+
+  async function guardarParseApiKey() {
+    setGuardandoParseKey(true)
+    try {
+      await api.postFull(`/super-admin/tenants/${id}/configuracion`, {
+        clave: 'PARSE_API_KEY',
+        valor: parseApiKey.trim(),
+        tipo: 'STRING',
+        modulo: 'PLAN',
+        descripcion: 'API Key de Axioma Parse para escaneo de comprobantes'
+      })
+      toast.success('API Key de Parse guardada')
+    } catch (err) {
+      toast.error('Error: ' + err.message)
+    } finally {
+      setGuardandoParseKey(false)
     }
   }
 
@@ -388,6 +412,60 @@ export default function TenantDetail() {
                 >
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${features.waAgent && features.whatsapp ? 'translate-x-6' : ''}`} />
                 </button>
+              </div>
+
+              {/* Parse — Escaneo de comprobantes */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-teal-100 rounded-lg">
+                      <ScanLine className="w-5 h-5 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Escaneo de comprobantes (Parse)</p>
+                      <p className="text-sm text-gray-500">OCR automático al subir comprobante de transferencia — extrae monto, fecha y referencia</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={guardandoFeature === 'parse'}
+                    onClick={() => toggleFeature('parse', 'PLAN_FEATURE_PARSE', 'Escaneo de comprobantes')}
+                    className={`relative w-12 h-6 rounded-full transition-colors disabled:opacity-50 ${features.parse ? 'bg-teal-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${features.parse ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
+                {features.parse && (
+                  <div className="pt-2 border-t space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">API Key de Axioma Parse</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type={mostrarParseKey ? 'text' : 'password'}
+                          value={parseApiKey}
+                          onChange={e => setParseApiKey(e.target.value)}
+                          placeholder="pk-..."
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setMostrarParseKey(!mostrarParseKey)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {mostrarParseKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <button
+                        onClick={guardarParseApiKey}
+                        disabled={guardandoParseKey || !parseApiKey.trim()}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm"
+                      >
+                        {guardandoParseKey ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                        Guardar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

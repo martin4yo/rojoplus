@@ -33,6 +33,7 @@ import dashboardEjecutivoRoutes from './routes/dashboardEjecutivo.js'
 import reportesMorosidadRoutes from './routes/reportesMorosidad.js'
 import pushSubscriptionRoutes from './routes/pushSubscription.js'
 import debitoAutomaticoRoutes from './routes/debitoAutomatico.js'
+import paywayRoutes from './routes/payway.js'
 import bannersRoutes from './routes/banners.js'
 import noticiasRoutes from './routes/noticias.js'
 import contactoRoutes from './routes/contacto.js'
@@ -170,8 +171,14 @@ app.use('/api/auth', authRoutes)
 
 // Rutas
 app.use('/api/rubros', rubrosRoutes)
-app.use('/api/comercios', comerciosRoutes)
-app.use('/api/comercio', comercioRoutes)
+app.use('/api/comercios', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+}, comerciosRoutes)
+app.use('/api/comercio', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+}, comercioRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/admin', contabilidadRoutes)
 app.use('/api/admin', tesoreriaRoutes)
@@ -189,6 +196,8 @@ app.use('/api/admin/reportes/morosidad', reportesMorosidadRoutes)
 app.use('/api/socio', socioRoutes)
 app.use('/api/socio', pushSubscriptionRoutes)
 app.use('/api/admin/debito', debitoAutomaticoRoutes)
+app.use('/api/admin/payway', paywayRoutes)
+app.use('/api/payway', paywayRoutes) // webhook público (sin auth)
 app.use('/api/pagos', pagosRoutes)
 app.use('/api/public', publicRoutes)
 app.use('/api', bannersRoutes)

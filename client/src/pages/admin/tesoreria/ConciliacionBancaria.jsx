@@ -121,6 +121,7 @@ export default function ConciliacionBancaria() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    const esXlsx = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')
     const reader = new FileReader()
     reader.onload = (event) => {
       setImportForm(prev => ({
@@ -129,7 +130,22 @@ export default function ConciliacionBancaria() {
         nombreArchivo: file.name
       }))
     }
-    reader.readAsText(file)
+    if (esXlsx) {
+      reader.readAsDataURL(file)
+    } else {
+      reader.readAsText(file)
+    }
+  }
+
+  async function importarPresetsBancos() {
+    try {
+      const res = await api.postFull('/admin/conciliacion/formatos/presets-argentinos', {})
+      toast.success(res.message || 'Presets importados')
+      cargarFormatos()
+      cargarDatos()
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   async function handleImportar() {
@@ -444,7 +460,15 @@ export default function ConciliacionBancaria() {
       {/* Tab Formatos */}
       {tab === 'formatos' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={importarPresetsBancos}
+              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+              title="Crea formatos predefinidos para Galicia, Santander, Macro y Provincia"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-green-600" />
+              Importar presets bancos argentinos
+            </button>
             <Button onClick={handleNuevoFormato}>
               <Plus className="w-4 h-4 mr-2" />
               Nuevo Formato

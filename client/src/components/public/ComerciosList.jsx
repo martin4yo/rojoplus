@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { MapPin, Phone, Navigation, Store, Percent } from 'lucide-react'
+import { MapPin, Phone, Navigation, Store, Percent, CheckCircle, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -356,29 +356,64 @@ export default function ComerciosList({ showHeader = true, showInfo = true, clas
 
         {/* Info adicional */}
         {showInfo && (
-          <div className="mt-8 bg-gray-100 rounded-lg p-4">
-            <h3 className="text-gray-800 font-semibold mb-2">Como obtener descuentos?</h3>
-            <ol className="text-gray-600 text-sm space-y-2 list-decimal list-inside">
-              <li>Accede a tu QR desde el portal de socios</li>
-              <li>Visita cualquiera de estos comercios adheridos</li>
-              <li>Presenta tu QR al momento de pagar</li>
-              <li>El comerciante aplicara automaticamente el descuento</li>
-            </ol>
-            <div className="mt-4 flex flex-wrap gap-4">
+          <>
+            <div className="mt-8 bg-gray-100 rounded-lg p-4">
+              <h3 className="text-gray-800 font-semibold mb-2">Como obtener descuentos?</h3>
+              <ol className="text-gray-600 text-sm space-y-2 list-decimal list-inside">
+                <li>Accede a tu QR desde el portal de socios</li>
+                <li>Visita cualquiera de estos comercios adheridos</li>
+                <li>Presenta tu QR al momento de pagar</li>
+                <li>El comerciante aplicara automaticamente el descuento</li>
+              </ol>
+              <div className="mt-4 flex flex-wrap gap-4">
+                <Link
+                  to="/mi-qr"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark font-medium"
+                >
+                  Obtener mi QR
+                </Link>
+                <Link
+                  to="/inscripcion-socio"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary-50 font-medium"
+                >
+                  Quiero ser Socio
+                </Link>
+              </div>
+            </div>
+
+            {/* CTA para comercios */}
+            <div className="mt-6 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="bg-primary/10 rounded-lg p-2">
+                  <Store className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-gray-800 font-semibold text-lg">¿Tenés un comercio?</h3>
+              </div>
+              <p className="text-gray-600 text-sm mb-4">
+                Sumate al programa de beneficios y accedé a miles de socios activos como potenciales clientes.
+                El proceso de adhesión es rápido y gratuito.
+              </p>
+              <ul className="text-sm text-gray-600 space-y-2 mb-5">
+                {[
+                  'Aparecés en el mapa y la lista de comercios adheridos',
+                  'Los socios te escanean el QR al pagar — vos elegís el descuento',
+                  'Panel propio para gestionar tu perfil y ver estadísticas',
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
               <Link
-                to="/mi-qr"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark font-medium"
+                to="/registro"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark font-medium transition-colors"
               >
-                Obtener mi QR
-              </Link>
-              <Link
-                to="/inscripcion-socio"
-                className="inline-flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary-50 font-medium"
-              >
-                Quiero ser Socio
+                Adherir mi comercio
+                <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
