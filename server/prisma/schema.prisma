@@ -615,7 +615,7 @@ model Periodo {
   cargos           Cargo[]
 
   tenantId    Int      @map("tenant_id")
-  @@unique([anio, mes])
+  @@unique([anio, mes, tenantId])
   @@index([tenantId])
   @@map("periodos")
 }

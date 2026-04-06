@@ -148,8 +148,8 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
   const anioInt = parseInt(anio)
   const mesInt = parseInt(mes)
 
-  // Verificar si ya existe un periodo con el mismo año/mes
-  const periodoExistente = await req.prisma.periodo.findFirst({
+  // Verificar si ya existe un periodo con el mismo año/mes para este tenant
+  const periodoExistente = await req.db.periodo.findFirst({
     where: { anio: anioInt, mes: mesInt }
   })
 
@@ -202,14 +202,13 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
     fechaVenc = new Date(anioVenc, mesVenc - 1, diaVencimiento)
   }
 
-  const periodo = await req.prisma.periodo.create({
+  const periodo = await req.db.periodo.create({
     data: {
       anio: anioInt,
       mes: mesInt,
       nombre,
       fechaVencimiento: fechaVenc,
       estado: 'PENDIENTE',
-      tenantId: req.tenantId,
     },
   })
 
@@ -257,7 +256,7 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
 router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const periodo = await req.prisma.periodo.findUnique({
+  const periodo = await req.db.periodo.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -427,7 +426,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
   })
 
   if (totalCuotasPeriodo > 0) {
-    await req.prisma.periodo.update({
+    await req.db.periodo.update({
       where: { id: periodo.id },
       data: {
         estado: 'GENERADO',
