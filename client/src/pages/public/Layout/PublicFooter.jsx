@@ -139,7 +139,7 @@ export default function PublicFooter() {
               </Link>
               <p className="text-gray-600 text-xs">
                 Desarrollado con <span className="text-primary">♥</span> por{' '}
-                <span className="text-gray-400">Clubix</span>
+                <span className="text-gray-400">AxiomaCloud</span>
               </p>
             </div>
           </div>
