@@ -364,7 +364,7 @@ async function enriquecerSocios(prisma, socios) {
         estado: 'PENDIENTE',
         fechaVencimiento: { lt: hoy }
       },
-      _sum: { importe: true },
+      _sum: { montoTotal: true },
       _count: { id: true }
     }),
     prisma.inscripcion.findMany({
@@ -374,7 +374,7 @@ async function enriquecerSocios(prisma, socios) {
     })
   ])
 
-  const deudaMap = Object.fromEntries(cargos.map(c => [c.socioId, { total: c._sum.importe || 0, count: c._count.id }]))
+  const deudaMap = Object.fromEntries(cargos.map(c => [c.socioId, { total: Number(c._sum.montoTotal) || 0, count: c._count.id }]))
   const actividadMap = {}
   for (const ins of inscripciones) {
     if (!actividadMap[ins.socioId]) {
