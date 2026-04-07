@@ -357,7 +357,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
     },
   })
 
-  const portalLink = `${getTenantFrontendUrl(req.tenant)}/s/${token}`
+  const portalLink = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${token}`
 
   if (metodo === 'whatsapp') {
     // Enviar solo por WhatsApp
