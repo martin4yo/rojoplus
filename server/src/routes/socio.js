@@ -1347,7 +1347,7 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
       categoriaActividad: { select: { nombre: true, actividad: { select: { nombre: true } } } },
       socio: { select: { nroSocio: true, apellidoNombre: true } },
     },
-    orderBy: { fechaEmision: 'asc' },
+    orderBy: { fechaGeneracion: 'asc' },
   })
 
   // Obtener pagos
