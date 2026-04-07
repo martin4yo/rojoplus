@@ -26,6 +26,21 @@ function avatarData(nombre) {
   return { ini: ini.toUpperCase(), bg, color }
 }
 
+function SocioAvatar({ nombre, fotoUrl, size = 'md' }) {
+  const [imgError, setImgError] = useState(false)
+  const { ini, bg, color } = avatarData(nombre)
+  const cls = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-10 h-10 text-sm'
+  if (fotoUrl && !imgError) {
+    return <img src={fotoUrl} alt="" className={`${cls} rounded-full object-cover`} onError={() => setImgError(true)} />
+  }
+  return (
+    <div className={`${cls} rounded-full flex items-center justify-center font-medium`}
+      style={{ backgroundColor: bg, color }}>
+      {ini}
+    </div>
+  )
+}
+
 export default function PartidoDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -379,18 +394,7 @@ export default function PartidoDetalle() {
                           className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                         >
                           <div className="flex items-center gap-3">
-                            {socio.fotoUrl ? (
-                              <img
-                                src={socio.fotoUrl}
-                                alt=""
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm"
-                                style={{ backgroundColor: avatarData(socio.apellidoNombre).bg, color: avatarData(socio.apellidoNombre).color }}>
-                                {avatarData(socio.apellidoNombre).ini}
-                              </div>
-                            )}
+                            <SocioAvatar nombre={socio.apellidoNombre} fotoUrl={socio.fotoUrl} />
                             <div>
                               <p className="font-medium text-gray-900">{socio.apellidoNombre}</p>
                               <p className="text-xs text-gray-500">#{socio.nroSocio}</p>
@@ -449,18 +453,7 @@ export default function PartidoDetalle() {
                           className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                         >
                           <div className="flex items-center gap-3">
-                            {socio.fotoUrl ? (
-                              <img
-                                src={socio.fotoUrl}
-                                alt=""
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm"
-                                style={{ backgroundColor: avatarData(socio.apellidoNombre).bg, color: avatarData(socio.apellidoNombre).color }}>
-                                {avatarData(socio.apellidoNombre).ini}
-                              </div>
-                            )}
+                            <SocioAvatar nombre={socio.apellidoNombre} fotoUrl={socio.fotoUrl} />
                             <div>
                               <p className="font-medium text-gray-900">{socio.apellidoNombre}</p>
                               <p className="text-xs text-gray-500">#{socio.nroSocio}</p>
@@ -580,18 +573,7 @@ export default function PartidoDetalle() {
                         <tr key={est.socioId} className="hover:bg-gray-50">
                           <td className="p-3">
                             <div className="flex items-center gap-2">
-                              {est.socio?.fotoUrl ? (
-                                <img
-                                  src={est.socio.fotoUrl}
-                                  alt=""
-                                  className="w-8 h-8 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
-                                  style={{ backgroundColor: avatarData(est.socio?.apellidoNombre).bg, color: avatarData(est.socio?.apellidoNombre).color }}>
-                                  {avatarData(est.socio?.apellidoNombre).ini}
-                                </div>
-                              )}
+                              <SocioAvatar nombre={est.socio?.apellidoNombre} fotoUrl={est.socio?.fotoUrl} size="sm" />
                               <span className="font-medium">{est.socio?.apellidoNombre}</span>
                             </div>
                           </td>
