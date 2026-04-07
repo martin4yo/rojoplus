@@ -303,7 +303,7 @@ router.delete('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { nombre, subdomain, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, plan, maxSocios, maxAdmins, timezone, moneda } = req.body
+    const { nombre, subdomain, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, plan, maxSocios, maxAdmins, timezone, moneda, dominioCustom } = req.body
 
     // Validaciones
     if (!nombre || !subdomain) {
@@ -314,6 +314,14 @@ router.post('/', async (req, res) => {
     const existing = await prisma.tenant.findUnique({ where: { subdomain } })
     if (existing) {
       return res.status(409).json({ error: 'El subdomain ya existe' })
+    }
+
+    // Verificar dominio custom único (si se especifica)
+    if (dominioCustom) {
+      const existingDomain = await prisma.tenant.findUnique({ where: { dominioCustom } })
+      if (existingDomain) {
+        return res.status(409).json({ error: 'El dominio personalizado ya está en uso' })
+      }
     }
 
     const tenant = await prisma.tenant.create({
@@ -335,7 +343,8 @@ router.post('/', async (req, res) => {
         timezone: timezone || 'America/Argentina/Buenos_Aires',
         moneda: moneda || 'ARS',
         estado: 'PENDING_APPROVAL',
-        activo: false
+        activo: false,
+        ...(dominioCustom ? { dominioCustom } : {})
       }
     })
 
@@ -353,7 +362,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const { nombre, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, plan, maxSocios, maxAdmins, timezone, moneda, logoUrl, horarios, redesSociales } = req.body
+    const { nombre, email, telefono, direccion, ciudad, provincia, codigoPostal, descripcion, slogan, plan, maxSocios, maxAdmins, timezone, moneda, logoUrl, horarios, redesSociales, dominioCustom } = req.body
 
     const tenant = await prisma.tenant.update({
       where: { id: parseInt(id) },
@@ -376,6 +385,7 @@ router.put('/:id', async (req, res) => {
         ...(horarios !== undefined && { horarios }),
         ...(redesSociales !== undefined && { redesSociales }),
         ...(req.body.heroImageUrl !== undefined && { heroImageUrl: req.body.heroImageUrl }),
+        ...(dominioCustom !== undefined && { dominioCustom: dominioCustom || null }),
       }
     })
 

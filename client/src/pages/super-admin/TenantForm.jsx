@@ -180,6 +180,17 @@ export default function TenantForm() {
               />
               <p className="text-xs text-gray-500 mt-1">URL: {form.subdomain}.clubix.com</p>
             </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Dominio personalizado <span className="text-gray-400 font-normal">(opcional)</span></label>
+              <input
+                type="text"
+                value={form.dominioCustom || ''}
+                onChange={(e) => setForm({ ...form, dominioCustom: e.target.value.toLowerCase().trim() })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                placeholder="ej: sportivopilar.com.ar"
+              />
+              <p className="text-xs text-gray-500 mt-1">El club podrá ingresar usando su propio dominio</p>
+            </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Email</label>

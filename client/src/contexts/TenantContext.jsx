@@ -6,8 +6,8 @@ const TenantContext = createContext()
 const DEFAULT_SLUG = import.meta.env.VITE_DEFAULT_TENANT_SLUG || 'clubix-sport'
 
 /**
- * Devuelve el slug efectivo del tenant actual (mismo criterio que api.js).
- * Prioridad: subdomain real > superadmin_tenant_slug > DEFAULT_SLUG
+ * Devuelve el slug efectivo del tenant actual.
+ * Prioridad: subdomain real > superadmin_tenant_slug > slug resuelto por dominio custom > DEFAULT_SLUG
  */
 function getEffectiveSlug() {
   // Prioridad 1: subdomain real en la URL (siempre gana)
@@ -23,6 +23,10 @@ function getEffectiveSlug() {
   // Prioridad 2: superadmin eligió un tenant (solo cuando no hay subdomain)
   const selected = localStorage.getItem('superadmin_tenant_slug')
   if (selected) return selected
+
+  // Prioridad 3: slug resuelto desde dominio custom (guardado tras el primer fetch)
+  const resolved = localStorage.getItem('resolved_tenant_slug')
+  if (resolved) return resolved
 
   return DEFAULT_SLUG
 }
@@ -119,10 +123,16 @@ export function TenantProvider({ children }) {
       const colores = tenantData?.colores || {}
       applyTheme(colores)
 
+      // Guardar el slug resuelto por el backend para que en visitas futuras
+      // (con dominio custom sin subdomain) el cache key sea correcto y no haya FOUC
+      if (tenantData?.subdomain) {
+        try { localStorage.setItem('resolved_tenant_slug', tenantData.subdomain) } catch (_) {}
+      }
+
       // Siempre actualizar el cache (incluso si está vacío),
       // así la próxima visita no aplica datos stale de otra sesión
       try {
-        localStorage.setItem(getCacheKey(), JSON.stringify(colores))
+        localStorage.setItem(getCacheKey(tenantData?.subdomain), JSON.stringify(colores))
       } catch (_) {}
 
       applyFavicon(tenantData?.faviconUrl || tenantData?.logoUrl)

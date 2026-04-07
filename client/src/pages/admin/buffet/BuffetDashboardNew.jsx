@@ -19,6 +19,15 @@ import ChatWidget from '../../../components/chat/ChatWidget'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import TicketPreview from '../../../components/buffet/TicketPreview'
 
+// Formatea una Date a "YYYY-MM-DD" usando componentes locales del browser.
+// Se usa en lugar de toISOString() para evitar desfases por timezone del browser.
+function toDateStr(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 // Rangos de fecha predefinidos
 const RANGOS_FECHA = [
   { id: 'hoy', label: 'Hoy', getDates: () => {
@@ -89,9 +98,13 @@ export default function BuffetDashboard() {
   // Obtener fechas según el rango seleccionado
   const obtenerFechas = useCallback(() => {
     if (rangoSeleccionado === 'personalizado') {
+      // Los inputs date retornan "YYYY-MM-DD", los parseamos como fecha local
+      if (!fechaDesde || !fechaHasta) return { desde: null, hasta: null }
+      const [dy, dm, dd] = fechaDesde.split('-').map(Number)
+      const [hy, hm, hd] = fechaHasta.split('-').map(Number)
       return {
-        desde: fechaDesde ? new Date(fechaDesde + 'T00:00:00') : null,
-        hasta: fechaHasta ? new Date(fechaHasta + 'T23:59:59') : null
+        desde: new Date(dy, dm - 1, dd, 0, 0, 0, 0),
+        hasta: new Date(hy, hm - 1, hd, 23, 59, 59, 999)
       }
     }
     const rango = RANGOS_FECHA.find(r => r.id === rangoSeleccionado)
@@ -116,8 +129,8 @@ export default function BuffetDashboard() {
       }
 
       const params = new URLSearchParams({
-        desde: desde.toISOString(),
-        hasta: hasta.toISOString()
+        desde: toDateStr(desde),
+        hasta: toDateStr(hasta)
       })
 
       const res = await api.get(`/admin/buffet/dashboard-estadisticas?${params}`)
@@ -142,7 +155,7 @@ export default function BuffetDashboard() {
     if (!desde || !hasta) return
     setLoadingVentas(true)
     try {
-      const params = new URLSearchParams({ desde: desde.toISOString(), hasta: hasta.toISOString(), limit: 50, page: pagina })
+      const params = new URLSearchParams({ desde: toDateStr(desde), hasta: toDateStr(hasta), limit: 50, page: pagina })
       const res = await api.getFull(`/admin/buffet/ventas-periodo?${params}`)
       setVentas(res?.data || [])
       setVentasTotal(res?.total || 0)
@@ -232,8 +245,8 @@ export default function BuffetDashboard() {
     setImprimiendo(true)
     try {
       const reporte = await api.post('/admin/buffet/reporte-cierre', {
-        desde: desde.toISOString(),
-        hasta: hasta.toISOString()
+        desde: toDateStr(desde),
+        hasta: toDateStr(hasta)
       })
       const { ticketBase64 } = reporte || {}
       await api.post('/admin/buffet/imprimir-ticket-directo', {
@@ -582,7 +595,7 @@ export default function BuffetDashboard() {
           </div>
 
           {/* Evolución de ingresos y egresos por día */}
-          {kpis.ventasPorDia && kpis.ventasPorDia.length > 1 && (
+          {kpis.ventasPorDia?.length > 0 && !['hoy', 'ayer'].includes(rangoSeleccionado) && (
             <div className="bg-white rounded-xl shadow p-4">
               <h3 className="font-semibold text-gray-800 mb-4">Ingresos y egresos por día</h3>
               <ResponsiveContainer width="100%" height={240}>

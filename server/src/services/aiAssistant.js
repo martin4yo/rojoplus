@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { resolverModelo } from '../config/aiModels.js'
 
 /**
- * AI Assistant Service - Xavi
+ * AI Assistant Service - Axio
  *
  * Servicio para procesar comandos de lenguaje natural
  * y ejecutar acciones en Clubix (socios, admins, camareros)
@@ -83,7 +83,7 @@ class AIAssistantService {
    */
   async processCommand(message, context) {
     try {
-      console.log('\n🤖 [Xavi] Procesando comando...')
+      console.log('\n🤖 [Axio] Procesando comando...')
       console.log(`   Usuario: ${context.userName}`)
       console.log(`   Rol: ${context.role}`)
       console.log(`   Mensaje: "${message}"`)
@@ -133,7 +133,7 @@ class AIAssistantService {
    * Construye el prompt del sistema según el rol
    */
   buildSystemPrompt(context) {
-    const botName = context?.botName || 'Xavi'
+    const botName = context?.botName || 'Axio'
     const basePrompt = `Eres ${botName}, el asistente inteligente del club.
 
 SOBRE TI:

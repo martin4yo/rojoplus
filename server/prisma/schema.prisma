@@ -37,6 +37,9 @@ model Tenant {
   horarios              String?   @db.Text
   redesSociales         Json      @default("{}") @map("redes_sociales")
 
+  // Dominio personalizado (ej: sportivopilar.com.ar)
+  dominioCustom         String?   @unique @map("dominio_custom")
+
   // Configuración técnica
   timezone              String    @default("America/Argentina/Buenos_Aires")
   moneda                String    @default("ARS")

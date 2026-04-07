@@ -14,11 +14,13 @@ import {
   XCircle,
   BarChart3,
   Eye,
-  Loader2
+  Loader2,
+  Search,
+  Trash2
 } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
-import Modal from '../../components/Modal'
+import Modal, { useModal } from '../../components/Modal'
 import Pagination from '../../components/Pagination'
 import StatusBadge from '../../components/StatusBadge'
 import { formatDate, formatDateTime } from '../../utils/formatters'
@@ -30,6 +32,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 export default function GestionComunicaciones() {
   const navigate = useNavigate()
   const { page, pagination, setPagination, goToPage } = usePagination()
+  const { showModal, ModalComponent } = useModal()
 
   const [campanas, setCampanas] = useState([])
   const [templates, setTemplates] = useState([])
@@ -39,6 +42,12 @@ export default function GestionComunicaciones() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [enviandoCampana, setEnviandoCampana] = useState(null)
+  const [reenviandoCampana, setReenviandoCampana] = useState(null)
+  const [modalReenvio, setModalReenvio] = useState(null) // campana o null
+
+  // Modal destinatarios
+  const [destinatariosModal, setDestinatariosModal] = useState({ open: false, lista: [], total: 0, loading: false, titulo: '' })
+  const [destinatariosBusqueda, setDestinatariosBusqueda] = useState('')
 
   // Filtros
   const [tipo, setTipo] = useState('')
@@ -61,7 +70,8 @@ export default function GestionComunicaciones() {
       categoriaActividadId: '',
       edadMin: '',
       edadMax: '',
-      deudores: null
+      deudores: null,
+      nrosSocio: ''
     },
     fechaProgramada: ''
   })
@@ -94,6 +104,77 @@ export default function GestionComunicaciones() {
     }
   }
 
+  const abrirDestinatariosCampana = async (campana) => {
+    setDestinatariosBusqueda('')
+    setDestinatariosModal({ open: true, lista: [], total: 0, loading: true, titulo: campana.nombre })
+    try {
+      const res = await api.getFull(`/admin/comunicaciones/campanas/${campana.id}/destinatarios`)
+      setDestinatariosModal({ open: true, lista: res.data || [], total: res.total || 0, loading: false, titulo: campana.nombre })
+    } catch {
+      setDestinatariosModal(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const previsualizarDestinatarios = async () => {
+    if (!formCampana.segmentacion) return
+    setDestinatariosBusqueda('')
+    setDestinatariosModal({ open: true, lista: [], total: 0, loading: true, titulo: 'Previsualización de destinatarios' })
+    try {
+      const res = await api.postFull('/admin/comunicaciones/previsualizar-destinatarios', {
+        segmentacion: formCampana.segmentacion,
+        canales: formCampana.canales
+      })
+      setDestinatariosModal({ open: true, lista: res.data || [], total: res.total || 0, loading: false, titulo: 'Previsualización de destinatarios' })
+    } catch {
+      setDestinatariosModal(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const handleReenviar = async (campana, modo) => {
+    setReenviandoCampana(campana.id)
+    setModalReenvio(null)
+    try {
+      const res = await api.postFull(`/admin/comunicaciones/campanas/${campana.id}/reenviar`, { modo })
+      setSuccess(res?.message || 'Reenvío completado')
+      await cargarCampanas()
+      setTimeout(() => setSuccess(null), 4000)
+    } catch (err) {
+      setError(err.message || 'Error al reenviar')
+    } finally {
+      setReenviandoCampana(null)
+    }
+  }
+
+  const handleDuplicar = async (campana) => {
+    try {
+      const res = await api.postFull(`/admin/comunicaciones/campanas/${campana.id}/duplicar`, {})
+      setSuccess(`Campaña duplicada: "${res.data?.nombre || ''}"`)
+      await cargarCampanas()
+      setTimeout(() => setSuccess(null), 4000)
+    } catch (err) {
+      setError(err.message || 'Error al duplicar')
+    }
+  }
+
+  const handleEliminarCampana = (campana) => {
+    showModal({
+      type: 'warning',
+      title: 'Eliminar campaña',
+      message: `¿Seguro que querés eliminar la campaña "${campana.nombre}"? Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/admin/comunicaciones/campanas/${campana.id}`)
+          setSuccess('Campaña eliminada')
+          await cargarCampanas()
+          setTimeout(() => setSuccess(null), 3000)
+        } catch (err) {
+          setError(err.message || 'Error al eliminar la campaña')
+        }
+      }
+    })
+  }
+
   const handleEnviarCampana = async (campanaId) => {
     setEnviandoCampana(campanaId)
     try {
@@ -112,13 +193,13 @@ export default function GestionComunicaciones() {
       setLoading(true)
       setError(null)
 
-      const params = { page, limit: 10 }
-      if (tipo) params.tipo = tipo
-      if (estado) params.estado = estado
+      const qs = new URLSearchParams({ page, limit: 10 })
+      if (tipo) qs.append('tipo', tipo)
+      if (estado) qs.append('estado', estado)
 
-      const res = await api.get('/admin/comunicaciones/campanas', { params })
-      const data = res.data?.data || []
-      const pag = res.data?.pagination
+      const res = await api.getFull(`/admin/comunicaciones/campanas?${qs}`)
+      const data = res.data || []
+      const pag = res.pagination
 
       setCampanas(data)
       if (pag) {
@@ -173,7 +254,8 @@ export default function GestionComunicaciones() {
           categoriaActividadId: '',
           edadMin: '',
           edadMax: '',
-          deudores: null
+          deudores: null,
+          nrosSocio: ''
         },
         fechaProgramada: ''
       })
@@ -205,8 +287,8 @@ export default function GestionComunicaciones() {
         return { variant: 'info', label: 'Programada', icon: Calendar }
       case 'EN_CURSO':
         return { variant: 'warning', label: 'En Curso', icon: Send }
-      case 'ENVIADA':
-        return { variant: 'success', label: 'Enviada', icon: CheckCircle }
+      case 'COMPLETADA':
+        return { variant: 'success', label: 'Completada', icon: CheckCircle }
       case 'CANCELADA':
         return { variant: 'danger', label: 'Cancelada', icon: XCircle }
       default:
@@ -285,7 +367,7 @@ export default function GestionComunicaciones() {
               <option value="BORRADOR">Borrador</option>
               <option value="PROGRAMADA">Programada</option>
               <option value="EN_CURSO">En Curso</option>
-              <option value="ENVIADA">Enviada</option>
+              <option value="COMPLETADA">Completada</option>
               <option value="CANCELADA">Cancelada</option>
             </select>
           </div>
@@ -423,48 +505,81 @@ export default function GestionComunicaciones() {
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-200 gap-4">
+                    <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
                       {campana.fechaProgramada && (
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <Calendar className="w-4 h-4 shrink-0" />
                           <span>Programada: {formatDateTime(campana.fechaProgramada)}</span>
                         </div>
                       )}
                       {campana.fechaEnvio && (
-                        <div className="flex items-center gap-1">
-                          <Send className="w-4 h-4" />
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <Send className="w-4 h-4 shrink-0" />
                           <span>Enviada: {formatDateTime(campana.fechaEnvio)}</span>
                         </div>
                       )}
                       {campana.admin && (
-                        <span>
+                        <span className="whitespace-nowrap">
                           Por {campana.admin.nombre} {campana.admin.apellido}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => abrirDestinatariosCampana(campana)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors whitespace-nowrap"
+                      >
+                        <Users className="w-4 h-4 shrink-0" />
+                        {campana.totalDestinatarios} destinatarios
+                      </button>
                       {(campana.estado === 'BORRADOR' || campana.estado === 'PROGRAMADA') && (
-                        <Button
-                          variant="primary"
-                          size="sm"
+                        <button
                           disabled={enviandoCampana === campana.id}
                           onClick={() => handleEnviarCampana(campana.id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                         >
                           {enviandoCampana === campana.id
-                            ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Enviando...</>
-                            : <><Send className="w-4 h-4 mr-1" />Enviar</>}
-                        </Button>
+                            ? <><Loader2 className="w-4 h-4 shrink-0 animate-spin" />Enviando...</>
+                            : <><Send className="w-4 h-4 shrink-0" />Enviar</>}
+                        </button>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      {(campana.estado === 'COMPLETADA' || campana.estado === 'EN_CURSO') && (
+                        <>
+                          <button
+                            disabled={reenviandoCampana === campana.id}
+                            onClick={() => setModalReenvio(campana)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 hover:bg-blue-50 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50"
+                          >
+                            {reenviandoCampana === campana.id
+                              ? <><Loader2 className="w-4 h-4 shrink-0 animate-spin" />Reenviando...</>
+                              : <><Send className="w-4 h-4 shrink-0" />Reenviar</>}
+                          </button>
+                          <button
+                            onClick={() => handleDuplicar(campana)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors whitespace-nowrap"
+                          >
+                            Duplicar
+                          </button>
+                        </>
+                      )}
+                      <button
                         onClick={() => navigate(`/admin/comunicaciones/campanas/${campana.id}`)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors whitespace-nowrap"
                       >
-                        <Eye className="w-4 h-4 mr-1" />
+                        <Eye className="w-4 h-4 shrink-0" />
                         Ver Detalle
-                      </Button>
+                      </button>
+                      {campana.estado !== 'EN_CURSO' && campana.estado !== 'COMPLETADA' && (
+                        <button
+                          onClick={() => handleEliminarCampana(campana)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors shrink-0"
+                          title="Eliminar campaña"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -490,149 +605,164 @@ export default function GestionComunicaciones() {
         isOpen={showNuevaCampanaModal}
         onClose={() => setShowNuevaCampanaModal(false)}
         title="Nueva Campaña de Comunicación"
-        size="lg"
+        maxWidth="max-w-3xl"
       >
         <form onSubmit={handleCrearCampana}>
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-            {/* Nombre */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre de la Campaña *
-              </label>
-              <input
-                type="text"
-                value={formCampana.nombre}
-                onChange={(e) => setFormCampana({ ...formCampana, nombre: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                placeholder="Ej: Newsletter Enero 2024"
-                required
-              />
-            </div>
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
 
-            {/* Descripción */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripción
-              </label>
-              <textarea
-                value={formCampana.descripcion}
-                onChange={(e) => setFormCampana({ ...formCampana, descripcion: e.target.value })}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                placeholder="Descripción breve de la campaña..."
-              />
-            </div>
-
-            {/* Tipo */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tipo *
-              </label>
-              <select
-                value={formCampana.tipo}
-                onChange={(e) => setFormCampana({ ...formCampana, tipo: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                required
-              >
-                <option value="INFORMATIVA">Informativa</option>
-                <option value="PROMOCIONAL">Promocional</option>
-                <option value="RECORDATORIO">Recordatorio</option>
-              </select>
-            </div>
-
-            {/* Canales */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Canales de Comunicación *
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formCampana.canales.includes('email')}
-                    onChange={() => handleToggleCanal('email')}
-                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                  />
-                  <Mail className="w-4 h-4 ml-2 mr-1 text-gray-600" />
-                  <span className="text-sm text-gray-700">Email</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formCampana.canales.includes('whatsapp')}
-                    onChange={() => handleToggleCanal('whatsapp')}
-                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                  />
-                  <MessageSquare className="w-4 h-4 ml-2 mr-1 text-gray-600" />
-                  <span className="text-sm text-gray-700">WhatsApp</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formCampana.canales.includes('sms')}
-                    onChange={() => handleToggleCanal('sms')}
-                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                  />
-                  <MessageSquare className="w-4 h-4 ml-2 mr-1 text-gray-600" />
-                  <span className="text-sm text-gray-700">SMS</span>
-                </label>
+            {/* Fila 1: Nombre + Tipo */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la Campaña *</label>
+                <input
+                  type="text"
+                  value={formCampana.nombre}
+                  onChange={(e) => setFormCampana({ ...formCampana, nombre: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  placeholder="Ej: Newsletter Enero 2024"
+                  required
+                />
               </div>
-            </div>
-
-            {/* Template Email */}
-            {formCampana.canales.includes('email') && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Template de Email *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
                 <select
-                  value={formCampana.emailTemplateId}
-                  onChange={(e) => setFormCampana({ ...formCampana, emailTemplateId: e.target.value })}
+                  value={formCampana.tipo}
+                  onChange={(e) => setFormCampana({ ...formCampana, tipo: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   required
                 >
-                  <option value="">Seleccionar template...</option>
-                  {templates.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.nombre} - {t.asunto}
-                    </option>
-                  ))}
+                  <option value="INFORMATIVA">Informativa</option>
+                  <option value="PROMOCIONAL">Promocional</option>
+                  <option value="RECORDATORIO">Recordatorio</option>
                 </select>
               </div>
-            )}
+            </div>
 
-            {/* Template WhatsApp */}
-            {formCampana.canales.includes('whatsapp') && (
+            {/* Fila 2: Canales + Descripción */}
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mensaje de WhatsApp *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Canales *</label>
+                <div className="space-y-1.5">
+                  {[
+                    { id: 'email', label: 'Email', Icon: Mail },
+                    { id: 'whatsapp', label: 'WhatsApp', Icon: MessageSquare },
+                    { id: 'sms', label: 'SMS', Icon: MessageSquare },
+                  ].map(({ id, label, Icon }) => (
+                    <label key={id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formCampana.canales.includes(id)}
+                        onChange={() => handleToggleCanal(id)}
+                        className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                      />
+                      <Icon className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                 <textarea
-                  value={formCampana.whatsappTemplate}
-                  onChange={(e) => setFormCampana({ ...formCampana, whatsappTemplate: e.target.value })}
+                  value={formCampana.descripcion}
+                  onChange={(e) => setFormCampana({ ...formCampana, descripcion: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Escribe el mensaje para WhatsApp..."
-                  required
+                  placeholder="Descripción breve de la campaña..."
                 />
+              </div>
+            </div>
+
+            {/* Templates (condicionales) */}
+            {(formCampana.canales.includes('email') || formCampana.canales.includes('whatsapp')) && (
+              <div className="grid grid-cols-2 gap-3">
+                {formCampana.canales.includes('email') && (
+                  <div className={!formCampana.canales.includes('whatsapp') ? 'col-span-2' : ''}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Template de Email *</label>
+                    <select
+                      value={formCampana.emailTemplateId}
+                      onChange={(e) => setFormCampana({ ...formCampana, emailTemplateId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="">Seleccionar template...</option>
+                      {templates.map(t => (
+                        <option key={t.id} value={t.id}>{t.nombre} - {t.asunto}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {formCampana.canales.includes('whatsapp') && (
+                  <div className={!formCampana.canales.includes('email') ? 'col-span-2' : ''}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje WhatsApp *</label>
+                    <textarea
+                      value={formCampana.whatsappTemplate}
+                      onChange={(e) => setFormCampana({ ...formCampana, whatsappTemplate: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent font-mono text-sm"
+                      placeholder="Ej: Hola {{nombre}}, tu deuda es {{deuda_total}}."
+                      required
+                    />
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {['{{nombre}}','{{nroSocio}}','{{celular}}','{{email}}','{{deuda_total}}','{{cuotas_vencidas}}','{{actividad}}'].map(v => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setFormCampana(prev => ({ ...prev, whatsappTemplate: (prev.whatsappTemplate || '') + v }))}
+                          className="px-1.5 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 rounded font-mono transition-colors"
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Segmentación */}
-            <div className="pt-4 border-t border-gray-200">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">
-                Segmentación de Destinatarios
-              </h3>
+            <div className="border-t border-gray-200 pt-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-800">Segmentación de Destinatarios</h3>
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={!!formCampana.segmentacion.nrosSocio}
+                    onChange={(e) => setFormCampana(prev => ({
+                      ...prev,
+                      segmentacion: { ...prev.segmentacion, nrosSocio: e.target.checked ? prev.segmentacion.nrosSocio || ' ' : '' }
+                    }))}
+                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  Lista específica de socios
+                </label>
+              </div>
 
-              <div className="space-y-4">
-                {/* Estado de socios */}
+              {formCampana.segmentacion.nrosSocio !== undefined && formCampana.segmentacion.nrosSocio !== '' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estado de Socios
+                    Números de socio <span className="text-gray-400 font-normal">(separados por coma)</span>
                   </label>
-                  <div className="flex gap-2 flex-wrap">
+                  <textarea
+                    value={formCampana.segmentacion.nrosSocio}
+                    onChange={(e) => setFormCampana(prev => ({
+                      ...prev,
+                      segmentacion: { ...prev.segmentacion, nrosSocio: e.target.value }
+                    }))}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm font-mono"
+                    placeholder="Ej: 1001, 1042, 1187, 2034"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Solo se enviará a estos socios. Los demás filtros de segmentación son ignorados.</p>
+                </div>
+              ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {/* Estado socios */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Estado de Socios</label>
+                  <div className="space-y-1">
                     {['ACTIVO', 'VIGENTE', 'BAJA'].map(est => (
-                      <label key={est} className="flex items-center">
+                      <label key={est} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={formCampana.segmentacion.estado?.includes(est)}
@@ -640,23 +770,20 @@ export default function GestionComunicaciones() {
                             const estados = e.target.checked
                               ? [...(formCampana.segmentacion.estado || []), est]
                               : formCampana.segmentacion.estado.filter(s => s !== est)
-                            setFormCampana({
-                              ...formCampana,
-                              segmentacion: { ...formCampana.segmentacion, estado: estados }
-                            })
+                            setFormCampana({ ...formCampana, segmentacion: { ...formCampana.segmentacion, estado: estados } })
                           }}
                           className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                         />
-                        <span className="ml-2 text-sm text-gray-700">{est}</span>
+                        <span className="text-sm text-gray-700">{est}</span>
                       </label>
                     ))}
                   </div>
                 </div>
 
-                {/* Actividad / Categoría */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Actividad + Categoría */}
+                <div className="space-y-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Actividad (opcional)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Actividad</label>
                     <select
                       value={formCampana.segmentacion.actividadId}
                       onChange={(e) => handleActividadChange(e.target.value)}
@@ -667,7 +794,7 @@ export default function GestionComunicaciones() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Categoría (opcional)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
                     <select
                       value={formCampana.segmentacion.categoriaActividadId}
                       onChange={(e) => setFormCampana(prev => ({ ...prev, segmentacion: { ...prev.segmentacion, categoriaActividadId: e.target.value } }))}
@@ -680,89 +807,184 @@ export default function GestionComunicaciones() {
                   </div>
                 </div>
 
-                {/* Deudores */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Socios con Deuda
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="deudores"
-                        checked={formCampana.segmentacion.deudores === true}
-                        onChange={() => setFormCampana({
-                          ...formCampana,
-                          segmentacion: { ...formCampana.segmentacion, deudores: true }
-                        })}
-                        className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Solo deudores</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="deudores"
-                        checked={formCampana.segmentacion.deudores === false}
-                        onChange={() => setFormCampana({
-                          ...formCampana,
-                          segmentacion: { ...formCampana.segmentacion, deudores: false }
-                        })}
-                        className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Sin deuda</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="deudores"
-                        checked={formCampana.segmentacion.deudores === null}
-                        onChange={() => setFormCampana({
-                          ...formCampana,
-                          segmentacion: { ...formCampana.segmentacion, deudores: null }
-                        })}
-                        className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Todos</span>
-                    </label>
+                {/* Deudores + Fecha programada */}
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Socios con Deuda</label>
+                    <div className="space-y-1">
+                      {[
+                        { value: true, label: 'Solo deudores' },
+                        { value: false, label: 'Sin deuda' },
+                        { value: null, label: 'Todos' },
+                      ].map(({ value, label }) => (
+                        <label key={label} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="deudores"
+                            checked={formCampana.segmentacion.deudores === value}
+                            onChange={() => setFormCampana({ ...formCampana, segmentacion: { ...formCampana.segmentacion, deudores: value } })}
+                            className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
+                          />
+                          <span className="text-sm text-gray-700">{label}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
+              )}
             </div>
 
             {/* Fecha programada */}
-            <div className="pt-4 border-t border-gray-200">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha Programada (opcional)
-              </label>
-              <input
-                type="datetime-local"
-                value={formCampana.fechaProgramada}
-                onChange={(e) => setFormCampana({ ...formCampana, fechaProgramada: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Si no se especifica, la campaña quedará en borrador
-              </p>
+            <div className="border-t border-gray-200 pt-3">
+              <div className="grid grid-cols-2 gap-3 items-start">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Programada (opcional)</label>
+                  <input
+                    type="datetime-local"
+                    value={formCampana.fechaProgramada}
+                    onChange={(e) => setFormCampana({ ...formCampana, fechaProgramada: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Si no se especifica, quedará en borrador</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowNuevaCampanaModal(false)}
-              disabled={guardandoCampana}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" variant="primary" disabled={guardandoCampana}>
-              {guardandoCampana ? 'Creando...' : 'Crear Campaña'}
-            </Button>
+          <div className="flex justify-between gap-2 mt-4 pt-4 border-t border-gray-200">
+            <button type="button" onClick={previsualizarDestinatarios} disabled={guardandoCampana}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50">
+              <Users className="w-4 h-4 shrink-0" />
+              Ver destinatarios
+            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setShowNuevaCampanaModal(false)} disabled={guardandoCampana}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50">
+                Cancelar
+              </button>
+              <button type="submit" disabled={guardandoCampana}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
+                {guardandoCampana ? 'Creando...' : 'Crear Campaña'}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>
 
+      {/* Modal destinatarios */}
+      <Modal
+        isOpen={destinatariosModal.open}
+        onClose={() => setDestinatariosModal(prev => ({ ...prev, open: false }))}
+        title={`${destinatariosModal.titulo} — Destinatarios (${destinatariosModal.total})`}
+        maxWidth="max-w-4xl"
+      >
+        <div className="space-y-3">
+          {/* Buscador */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={destinatariosBusqueda}
+              onChange={e => setDestinatariosBusqueda(e.target.value)}
+              placeholder="Buscar por nombre, email o teléfono..."
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+
+          {destinatariosModal.loading ? (
+            <LoadingSpinner />
+          ) : destinatariosModal.lista.length === 0 ? (
+            <p className="text-center text-gray-500 py-6">No hay destinatarios</p>
+          ) : (
+            <div className="max-h-[60vh] overflow-y-auto border border-gray-200 rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Socio</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Teléfono</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {destinatariosModal.lista
+                    .filter(d => {
+                      if (!destinatariosBusqueda) return true
+                      const q = destinatariosBusqueda.toLowerCase()
+                      return (
+                        d.apellidoNombre?.toLowerCase().includes(q) ||
+                        d.email?.toLowerCase().includes(q) ||
+                        d.telefono?.includes(q) ||
+                        d.nroSocio?.toString().includes(q)
+                      )
+                    })
+                    .map(d => (
+                      <tr key={d.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-gray-500">{d.nroSocio}</td>
+                        <td className="px-4 py-2 font-medium text-gray-800">{d.apellidoNombre}</td>
+                        <td className="px-4 py-2 text-gray-600">{d.email || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-4 py-2 text-gray-600">{d.telefono || <span className="text-gray-300">—</span>}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Modal modo reenvío */}
+      <Modal
+        isOpen={!!modalReenvio}
+        onClose={() => setModalReenvio(null)}
+        title="Reenviar campaña"
+        maxWidth="max-w-sm"
+      >
+        {modalReenvio && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              ¿A quién querés reenviar <strong>"{modalReenvio.nombre}"</strong>?
+            </p>
+            {modalReenvio.errores > 0 && (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Esta campaña tuvo <strong>{modalReenvio.errores}</strong> envíos con error.
+              </p>
+            )}
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                onClick={() => handleReenviar(modalReenvio, 'todos')}
+                className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors"
+              >
+                <Send className="w-4 h-4 shrink-0" />
+                <div className="text-left">
+                  <div>A todos los destinatarios</div>
+                  <div className="text-xs opacity-80">{modalReenvio.totalDestinatarios} socios</div>
+                </div>
+              </button>
+              <button
+                disabled={!modalReenvio.errores}
+                onClick={() => handleReenviar(modalReenvio, 'errores')}
+                className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-red-700 border border-red-300 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <XCircle className="w-4 h-4 shrink-0" />
+                <div className="text-left">
+                  <div>Solo los que fallaron</div>
+                  <div className="text-xs opacity-70">{modalReenvio.errores} con error</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setModalReenvio(null)}
+                className="text-sm text-gray-500 hover:text-gray-700 py-1"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {ModalComponent}
       <ChatWidget />
     </div>
   )

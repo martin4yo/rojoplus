@@ -21,16 +21,27 @@ export async function extractTenant(req, res, next) {
       subdomain = process.env.DEFAULT_TENANT_SUBDOMAIN || 'sportivopilar';
     }
 
-    if (!subdomain) {
+    // Buscar tenant: primero por subdomain, luego por dominio custom
+    let tenant = null;
+
+    if (subdomain) {
+      tenant = await prisma.tenant.findUnique({ where: { subdomain } });
+    }
+
+    // Si no se encontró por subdomain, intentar por dominio custom (ej: sportivopilar.com.ar)
+    if (!tenant) {
+      const hostSinPuerto = (host || '').split(':')[0];
+      if (hostSinPuerto) {
+        tenant = await prisma.tenant.findUnique({ where: { dominioCustom: hostSinPuerto } });
+      }
+    }
+
+    if (!tenant) {
       return res.status(400).json({
         error: 'No se pudo identificar el tenant',
         code: 'TENANT_REQUIRED'
       });
     }
-
-    const tenant = await prisma.tenant.findUnique({
-      where: { subdomain }
-    });
 
     if (!tenant || !tenant.activo) {
       return res.status(404).json({
@@ -65,16 +76,19 @@ export async function extractTenantOptional(req, res, next) {
     const tenantSlugHeader = req.get('X-Tenant-Slug');
     const subdomain = tenantSlugHeader || extractSubdomain(host);
 
-    if (!subdomain) {
-      // No hay subdomain, continuar sin tenant
-      req.tenant = null;
-      req.tenantId = null;
-      return next();
+    let tenant = null;
+
+    if (subdomain) {
+      tenant = await prisma.tenant.findUnique({ where: { subdomain } });
     }
 
-    const tenant = await prisma.tenant.findUnique({
-      where: { subdomain }
-    });
+    // Intentar por dominio custom si no se encontró por subdomain
+    if (!tenant) {
+      const hostSinPuerto = (host || '').split(':')[0];
+      if (hostSinPuerto) {
+        tenant = await prisma.tenant.findUnique({ where: { dominioCustom: hostSinPuerto } });
+      }
+    }
 
     if (!tenant || !tenant.activo) {
       // Tenant no encontrado, continuar sin él

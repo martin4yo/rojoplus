@@ -9,6 +9,20 @@ import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 const router = express.Router()
 
 /**
+ * Parsea strings "YYYY-MM-DD" a fechas UTC que coinciden directamente
+ * con los timestamps sin zona horaria almacenados en la DB (hora local Argentina).
+ * Elimina la necesidad de correcciones de offset por timezone del browser/servidor.
+ */
+function parseFechas(desdeStr, hastaStr) {
+  const [dy, dm, dd] = desdeStr.split('-').map(Number)
+  const [hy, hm, hd] = hastaStr.split('-').map(Number)
+  return {
+    fd: new Date(Date.UTC(dy, dm - 1, dd, 0, 0, 0, 0)),
+    fh: new Date(Date.UTC(hy, hm - 1, hd, 23, 59, 59, 999)),
+  }
+}
+
+/**
  * GET /dashboard
  * KPIs del buffet
  */
@@ -105,17 +119,15 @@ router.get('/ultimas-ventas', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
   try {
     const { limit = 50, desde, hasta } = req.query
 
-    const AR_OFFSET_MS = 3 * 60 * 60 * 1000
     let fechaDesde, fechaHasta
     if (desde && hasta) {
-      const d = new Date(desde); d.setHours(0, 0, 0, 0)
-      const h = new Date(hasta); h.setHours(23, 59, 59, 999)
-      fechaDesde = new Date(d.getTime() - AR_OFFSET_MS)
-      fechaHasta = new Date(h.getTime() - AR_OFFSET_MS)
+      const { fd, fh } = parseFechas(desde, hasta)
+      fechaDesde = fd
+      fechaHasta = fh
     } else {
-      const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
-      fechaDesde = new Date(hoy.getTime() - AR_OFFSET_MS)
-      fechaHasta = new Date()
+      const hoy = new Date()
+      fechaDesde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate(), 0, 0, 0, 0))
+      fechaHasta = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate(), 23, 59, 59, 999))
     }
 
     // Comandas cerradas en el período
@@ -228,22 +240,13 @@ router.get('/dashboard-estadisticas', authAdmin, checkPermiso('BUFFET_VER'), asy
       return res.status(400).json({ success: false, error: 'Fechas requeridas' })
     }
 
-    const fechaDesde = new Date(desde)
-    const fechaHasta = new Date(hasta)
+    // desde/hasta llegan como "YYYY-MM-DD" desde el frontend
+    const { fd, fh } = parseFechas(desde, hasta)
 
-    // Calcular período anterior para comparación
-    const duracion = fechaHasta - fechaDesde
-    const fechaDesdeAnterior = new Date(fechaDesde - duracion)
-    const fechaHastaAnterior = new Date(fechaDesde)
-
-    // Las columnas fecha/horaCierre/horaPagado son `timestamp without time zone`
-    // guardadas en hora local Argentina (UTC-3). Prisma envía UTC epoch como string literal,
-    // así que ajustamos -3h para que la comparación sea correcta.
-    const AR_OFFSET_MS = 3 * 60 * 60 * 1000
-    const fd = new Date(fechaDesde.getTime() - AR_OFFSET_MS)
-    const fh = new Date(fechaHasta.getTime() - AR_OFFSET_MS)
-    const fdAnt = new Date(fechaDesdeAnterior.getTime() - AR_OFFSET_MS)
-    const fhAnt = new Date(fechaHastaAnterior.getTime() - AR_OFFSET_MS)
+    // Calcular período anterior para comparación (misma duración en días)
+    const duracion = fh.getTime() - fd.getTime()
+    const fdAnt = new Date(fd.getTime() - duracion - 1)
+    const fhAnt = new Date(fd.getTime() - 1)
 
     // Cajas del buffet (fuente de verdad para todos los totales)
     const cajasBuffet = await req.db.caja.findMany({
@@ -585,11 +588,7 @@ router.get('/ventas-periodo', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_K
       return res.status(400).json({ success: false, error: 'Fechas requeridas' })
     }
 
-    const fechaDesde = new Date(desde)
-    const fechaHasta = new Date(hasta)
-    const AR = 3 * 60 * 60 * 1000
-    const fd = new Date(fechaDesde.getTime() - AR)
-    const fh = new Date(fechaHasta.getTime() - AR)
+    const { fd, fh } = parseFechas(desde, hasta)
     const pageSize = parseInt(limit)
     const pageNum = Math.max(1, parseInt(page))
 
@@ -680,8 +679,7 @@ router.post('/reporte-cierre', authAdmin, checkPermiso('BUFFET_VER'), async (req
       return res.status(400).json({ success: false, error: 'Fechas requeridas' })
     }
 
-    const fechaDesde = new Date(desde)
-    const fechaHasta = new Date(hasta)
+    const { fd: fechaDesde, fh: fechaHasta } = parseFechas(desde, hasta)
 
     // Configuración del club
     const clubConfigRows = await req.db.configuracion.findMany({

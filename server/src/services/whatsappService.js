@@ -24,6 +24,9 @@ export async function getWhatsAppConfig(db) {
             'WHATSAPP_DELAY_MS',
             'WHATSAPP_HORA_INICIO',
             'WHATSAPP_HORA_FIN',
+            'WHATSAPP_WHITELIST',
+            'WHATSAPP_DEMO_NUMERO',
+            'MODO_DEMO',
           ]
         }
       }
@@ -34,6 +37,19 @@ export async function getWhatsAppConfig(db) {
     if (cfg.WHATSAPP_ENABLED !== 'true') return null
     if (!cfg.WHATSAPP_API_URL || !cfg.WHATSAPP_INSTANCE || !cfg.WHATSAPP_API_KEY) return null
 
+    // Parsear whitelist: números separados por coma, normalizados
+    let whitelist = null
+    if (cfg.WHATSAPP_WHITELIST && cfg.WHATSAPP_WHITELIST.trim()) {
+      whitelist = cfg.WHATSAPP_WHITELIST
+        .split(',')
+        .map(n => normalizarNumero(n.trim()))
+        .filter(Boolean)
+    }
+
+    // Modo demo: redirige todos los mensajes a un número de prueba
+    const modoDemo = cfg.MODO_DEMO === 'true'
+    const numeroDemoNorm = normalizarNumero(cfg.WHATSAPP_DEMO_NUMERO || '')
+
     return {
       apiUrl: cfg.WHATSAPP_API_URL,
       instance: cfg.WHATSAPP_INSTANCE,
@@ -41,6 +57,9 @@ export async function getWhatsAppConfig(db) {
       delayMs: parseInt(cfg.WHATSAPP_DELAY_MS) || 3000,
       horaInicio: parseInt(cfg.WHATSAPP_HORA_INICIO) || 8,
       horaFin: parseInt(cfg.WHATSAPP_HORA_FIN) || 21,
+      whitelist,
+      modoDemo,
+      numeroDemo: numeroDemoNorm || null,
     }
   } catch (err) {
     console.error('[WhatsApp] Error obteniendo config:', err.message)
@@ -101,8 +120,17 @@ export async function enviarWhatsAppImagen({ db, telefono, imagenBase64, caption
     return { enviado: false, motivo: 'Fuera del horario de envío' }
   }
 
-  const numero = normalizarNumero(telefono)
+  let numero = normalizarNumero(telefono)
   if (!numero) return { enviado: false, motivo: 'Número inválido' }
+
+  if (cfg.modoDemo) {
+    if (!cfg.numeroDemo) return { enviado: false, motivo: 'Modo demo activo pero sin número de prueba configurado (WHATSAPP_DEMO_NUMERO)' }
+    console.log(`📱 MODO DEMO: Redirigiendo WhatsApp (imagen) de ${numero} a ${cfg.numeroDemo}`)
+    caption = `[DEMO - Para: ${numero}]\n${caption}`
+    numero = cfg.numeroDemo
+  } else if (cfg.whitelist && !cfg.whitelist.includes(numero)) {
+    return { enviado: false, motivo: 'Número no está en la lista blanca' }
+  }
 
   try {
     const url = `${cfg.apiUrl}/message/sendMedia/${cfg.instance}`
@@ -152,8 +180,17 @@ export async function enviarWhatsApp({ db, telefono, texto, ignorarHorario = fal
     return { enviado: false, motivo: 'Fuera del horario de envío' }
   }
 
-  const numero = normalizarNumero(telefono)
+  let numero = normalizarNumero(telefono)
   if (!numero) return { enviado: false, motivo: 'Número inválido' }
+
+  if (cfg.modoDemo) {
+    if (!cfg.numeroDemo) return { enviado: false, motivo: 'Modo demo activo pero sin número de prueba configurado (WHATSAPP_DEMO_NUMERO)' }
+    console.log(`📱 MODO DEMO: Redirigiendo WhatsApp de ${numero} a ${cfg.numeroDemo}`)
+    texto = `[DEMO - Para: ${numero}]\n${texto}`
+    numero = cfg.numeroDemo
+  } else if (cfg.whitelist && !cfg.whitelist.includes(numero)) {
+    return { enviado: false, motivo: 'Número no está en la lista blanca' }
+  }
 
   try {
     const url = `${cfg.apiUrl}/message/sendText/${cfg.instance}`

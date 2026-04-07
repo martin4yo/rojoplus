@@ -5,7 +5,7 @@ import chatService from '../../services/chatService'
 
 /**
  * ChatWidget Component
- * Widget flotante de chat con Xavi
+ * Widget flotante de chat con Axio
  *
  * Props:
  * - tokenPortal: Token del socio (para rol socio)
@@ -32,7 +32,7 @@ export default function ChatWidget({
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isAvailable, setIsAvailable] = useState(null) // null = cargando
-  const [agentName, setAgentName] = useState('Xavi')
+  const [agentName, setAgentName] = useState('Axio')
   const [dragPos, setDragPos] = useState(null) // { x, y } desde esquina inferior derecha, null = posición default
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)

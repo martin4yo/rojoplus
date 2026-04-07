@@ -88,7 +88,7 @@ router.post(
     if (!assistant) {
       return res.status(503).json({
         success: false,
-        message: '🚧 El asistente Xavi no está disponible en este momento. Por favor, intentá más tarde.',
+        message: '🚧 El asistente Axio no está disponible en este momento. Por favor, intentá más tarde.',
         error: 'AI Assistant no está configurado. Verifica ANTHROPIC_API_KEY en .env'
       })
     }
@@ -222,7 +222,7 @@ router.post(
  */
 router.get('/health', asyncHandler(async (req, res) => {
   const assistant = getAIAssistant()
-  let agentName = 'Xavi'
+  let agentName = 'Axio'
   if (req.db && req.tenantId) {
     const cfg = await req.db.configuracion.findFirst({
       where: { clave: 'WA_AGENT_NOMBRE' }

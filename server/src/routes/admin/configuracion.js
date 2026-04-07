@@ -1119,44 +1119,39 @@ router.put('/sistema/configuracion/:clave', authAdmin, asyncHandler(async (req, 
 
 // PUT /api/admin/sistema/modo-demo - Actualizar modo demo (shortcut)
 router.put('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
-  const { activo, email } = req.body
+  const { activo, email, whatsappNumero } = req.body
 
-  // Actualizar MODO_DEMO
   await req.db.configuracion.upsert({
     where: { tenantId_clave: { tenantId: req.tenantId, clave: 'MODO_DEMO' } },
     update: { valor: activo ? 'true' : 'false' },
-    create: {
-      clave: 'MODO_DEMO',
-      valor: activo ? 'true' : 'false',
-      tipo: 'BOOLEAN',
-      modulo: 'SISTEMA',
-      descripcion: 'Modo demo activo',
-    },
+    create: { clave: 'MODO_DEMO', valor: activo ? 'true' : 'false', tipo: 'BOOLEAN', modulo: 'SISTEMA', descripcion: 'Modo demo activo' },
   })
 
-  // Actualizar EMAIL_DEMO si se proporciona
   if (email !== undefined) {
     await req.db.configuracion.upsert({
       where: { tenantId_clave: { tenantId: req.tenantId, clave: 'EMAIL_DEMO' } },
       update: { valor: email || '' },
-      create: {
-        clave: 'EMAIL_DEMO',
-        valor: email || '',
-        tipo: 'STRING',
-        modulo: 'SISTEMA',
-        descripcion: 'Email para recibir notificaciones en modo demo',
-      },
+      create: { clave: 'EMAIL_DEMO', valor: email || '', tipo: 'STRING', modulo: 'SISTEMA', descripcion: 'Email de prueba en modo demo' },
     })
   }
 
-  res.json({ success: true, data: { activo, email } })
+  if (whatsappNumero !== undefined) {
+    await req.db.configuracion.upsert({
+      where: { tenantId_clave: { tenantId: req.tenantId, clave: 'WHATSAPP_DEMO_NUMERO' } },
+      update: { valor: whatsappNumero || '' },
+      create: { clave: 'WHATSAPP_DEMO_NUMERO', valor: whatsappNumero || '', tipo: 'STRING', modulo: 'SISTEMA', descripcion: 'Número de WhatsApp de prueba en modo demo' },
+    })
+  }
+
+  res.json({ success: true, data: { activo, email, whatsappNumero } })
 }))
 
 // GET /api/admin/sistema/modo-demo - Obtener estado del modo demo
 router.get('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
-  const [modoDemo, emailDemo] = await Promise.all([
+  const [modoDemo, emailDemo, waDemo] = await Promise.all([
     req.db.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
     req.db.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
+    req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_DEMO_NUMERO' } }),
   ])
 
   res.json({
@@ -1164,6 +1159,7 @@ router.get('/sistema/modo-demo', authAdmin, asyncHandler(async (req, res) => {
     data: {
       activo: modoDemo?.valor === 'true',
       email: emailDemo?.valor || '',
+      whatsappNumero: waDemo?.valor || '',
     },
   })
 }))

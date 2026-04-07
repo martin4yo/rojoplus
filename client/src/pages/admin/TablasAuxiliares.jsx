@@ -30,7 +30,7 @@ export default function TablasAuxiliares() {
   const [centrosCosto, setCentrosCosto] = useState([])
 
   // Modo Demo
-  const [modoDemo, setModoDemo] = useState({ activo: false, email: '' })
+  const [modoDemo, setModoDemo] = useState({ activo: false, email: '', whatsappNumero: '' })
   const [guardandoDemo, setGuardandoDemo] = useState(false)
 
   // Configuración de cuotas
@@ -168,7 +168,7 @@ export default function TablasAuxiliares() {
   async function cargarModoDemo() {
     try {
       const data = await api.get('/admin/sistema/modo-demo')
-      setModoDemo(data || { activo: false, email: '' })
+      setModoDemo(data || { activo: false, email: '', whatsappNumero: '' })
     } catch (err) {
       console.error('Error cargando modo demo:', err)
     }
@@ -978,6 +978,17 @@ export default function TablasAuxiliares() {
                       placeholder="test@ejemplo.com"
                       className="input-field w-full"
                     />
+                    <label className="block text-sm font-medium text-gray-700 mb-1 mt-3">
+                      Número WhatsApp de prueba
+                    </label>
+                    <input
+                      type="text"
+                      value={modoDemo.whatsappNumero}
+                      onChange={(e) => setModoDemo({ ...modoDemo, whatsappNumero: e.target.value })}
+                      placeholder="Ej: 2314123456"
+                      className="input-field w-full"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Todos los WhatsApp se redirigirán a este número</p>
                   </div>
                 )}
               </div>

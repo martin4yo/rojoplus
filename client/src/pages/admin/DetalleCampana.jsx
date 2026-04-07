@@ -11,6 +11,65 @@ import { formatDateTime } from '../../utils/formatters'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
+function EnviosList({ envios }) {
+  const [filtro, setFiltro] = useState('todos')
+
+  const errores = envios.filter(e => e.estado === 'ERROR')
+  const lista = filtro === 'errores' ? errores : envios
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-gray-800">Envíos ({envios.length})</h2>
+        {errores.length > 0 && (
+          <div className="flex gap-1">
+            <button
+              onClick={() => setFiltro('todos')}
+              className={`px-3 py-1 text-xs rounded-lg transition-colors ${filtro === 'todos' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFiltro('errores')}
+              className={`px-3 py-1 text-xs rounded-lg transition-colors ${filtro === 'errores' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+            >
+              Solo errores ({errores.length})
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="divide-y divide-gray-100">
+        {lista.map(envio => {
+          const cfg = ESTADO_ENVIO_CONFIG[envio.estado] || ESTADO_ENVIO_CONFIG.PENDIENTE
+          return (
+            <div key={envio.id} className="py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {envio.canal === 'email'
+                    ? <Mail className="w-4 h-4 text-blue-400 shrink-0" />
+                    : <MessageSquare className="w-4 h-4 text-green-400 shrink-0" />}
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">
+                      {envio.socio?.apellidoNombre || envio.destinatario}
+                    </p>
+                    <p className="text-xs text-gray-400">{envio.destinatario}</p>
+                  </div>
+                </div>
+                <StatusBadge {...cfg} />
+              </div>
+              {envio.estado === 'ERROR' && envio.error && (
+                <p className="mt-1 ml-7 text-xs text-red-600 bg-red-50 rounded px-2 py-1">
+                  {envio.error}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const ESTADO_ENVIO_CONFIG = {
   PENDIENTE: { variant: 'secondary', label: 'Pendiente', icon: Clock },
   ENVIADO:   { variant: 'success',   label: 'Enviado',   icon: CheckCircle },
@@ -22,7 +81,7 @@ const ESTADO_CAMPANA_CONFIG = {
   BORRADOR:   { variant: 'secondary', label: 'Borrador' },
   PROGRAMADA: { variant: 'info',      label: 'Programada' },
   EN_CURSO:   { variant: 'warning',   label: 'En Curso' },
-  ENVIADA:    { variant: 'success',   label: 'Enviada' },
+  COMPLETADA: { variant: 'success',   label: 'Completada' },
   CANCELADA:  { variant: 'danger',    label: 'Cancelada' },
 }
 
@@ -110,20 +169,19 @@ export default function DetalleCampana() {
           </div>
           {campana.descripcion && <p className="text-gray-500 text-sm mt-1">{campana.descripcion}</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {(campana.estado === 'BORRADOR' || campana.estado === 'PROGRAMADA') && (
             <>
-              <Button
-                variant="primary"
+              <button
                 disabled={enviando}
                 onClick={handleEnviar}
-                className="flex items-center gap-2"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 {enviando
-                  ? <><Loader2 className="w-4 h-4 animate-spin" />Enviando...</>
-                  : <><Send className="w-4 h-4" />Enviar Ahora</>}
-              </Button>
-              <button onClick={handleEliminar} className="text-red-400 hover:text-red-600 p-2">
+                  ? <><Loader2 className="w-4 h-4 shrink-0 animate-spin" />Enviando...</>
+                  : <><Send className="w-4 h-4 shrink-0" />Enviar Ahora</>}
+              </button>
+              <button onClick={handleEliminar} className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors">
                 <Trash2 className="w-4 h-4" />
               </button>
             </>
@@ -171,32 +229,7 @@ export default function DetalleCampana() {
 
           {/* Lista de envíos */}
           {campana.envios && campana.envios.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="font-semibold text-gray-800 mb-4">
-                Envíos ({campana.envios.length})
-              </h2>
-              <div className="divide-y divide-gray-100">
-                {campana.envios.map(envio => {
-                  const cfg = ESTADO_ENVIO_CONFIG[envio.estado] || ESTADO_ENVIO_CONFIG.PENDIENTE
-                  return (
-                    <div key={envio.id} className="flex items-center justify-between py-2.5">
-                      <div className="flex items-center gap-3">
-                        {envio.canal === 'email'
-                          ? <Mail className="w-4 h-4 text-blue-400" />
-                          : <MessageSquare className="w-4 h-4 text-green-400" />}
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">
-                            {envio.socio?.apellidoNombre || envio.destinatario}
-                          </p>
-                          <p className="text-xs text-gray-400">{envio.destinatario}</p>
-                        </div>
-                      </div>
-                      <StatusBadge {...cfg} />
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <EnviosList envios={campana.envios} />
           )}
         </div>
 
