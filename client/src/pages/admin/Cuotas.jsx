@@ -1677,7 +1677,7 @@ export default function Cuotas() {
         )}
       </Modal>
 
-      {/* Xavi - Chat Widget para Admins */}
+      {/* Axio - Chat Widget para Admins */}
       <ChatWidget role="admin" position="bottom-right" />
     </div>
   )

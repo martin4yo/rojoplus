@@ -218,7 +218,7 @@ export default function BuffetBarra() {
         </div>
       )}
 
-      {/* Xavi - Chat Widget para Camareros */}
+      {/* Axio - Chat Widget para Camareros */}
       <ChatWidget role="camarero" position="bottom-right" />
     </div>
   )

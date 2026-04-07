@@ -1,5 +1,5 @@
 /**
- * Chat Service - Xavi
+ * Chat Service - Axio
  * Servicio para comunicación con el asistente inteligente
  */
 

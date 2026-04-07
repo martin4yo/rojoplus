@@ -690,7 +690,7 @@ export default function BuffetEstadoMesas() {
 
       <ConfirmDialog />
 
-      {/* Xavi - Chat Widget para Camareros */}
+      {/* Axio - Chat Widget para Camareros */}
       <ChatWidget role="camarero" position="bottom-right" />
     </div>
   )

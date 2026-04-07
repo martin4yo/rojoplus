@@ -413,7 +413,7 @@ export default function PortalSocioNuevo() {
       {/* Botón instalar app */}
       <InstallAppButton />
 
-      {/* Xavi - Chat Widget */}
+      {/* Axio - Chat Widget */}
       <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
     </div>
   )
