@@ -98,6 +98,31 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // Editor Monaco (muy pesado ~2MB por sí solo)
+          'vendor-monaco': ['@monaco-editor/react'],
+          // Gráficos
+          'vendor-charts': ['chart.js', 'react-chartjs-2', 'recharts'],
+          // Mapas
+          'vendor-maps': ['leaflet', 'react-leaflet'],
+          // Exportación Excel
+          'vendor-xlsx': ['xlsx'],
+          // Iconos
+          'vendor-icons': ['lucide-react', '@heroicons/react'],
+          // Socket + Query
+          'vendor-realtime': ['socket.io-client', '@tanstack/react-query'],
+          // Resto de deps
+          'vendor-misc': ['date-fns', 'react-hot-toast', 'react-markdown', 'qrcode.react', '@yudiel/react-qr-scanner', 'react-google-recaptcha'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     port: 5173,
     proxy: {

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import ScrollToTop from './components/ScrollToTop'
@@ -7,246 +8,250 @@ import { TenantProvider } from './contexts/TenantContext'
 import { TicketProvider } from './contexts/TicketContext'
 import { NotificacionBuffetProvider } from './contexts/NotificacionBuffetContext'
 
-// Páginas públicas - Sitio web del club
+// Layouts (no lazy — son el shell, se necesitan siempre)
 import PublicLayout from './pages/public/Layout/PublicLayout'
-import HomePublic from './pages/public/Home'
-import ActividadesPublic from './pages/public/Actividades'
-import HistoriaPublic from './pages/public/Historia'
-import ContactoPublic from './pages/public/Contacto'
-import NoticiasPublic from './pages/public/Noticias'
-import NoticiaDetallePublic from './pages/public/NoticiaDetalle'
-import InstalacionesPublic from './pages/public/Instalaciones'
-import AutoridadesPublic from './pages/public/Autoridades'
-import MisionPublic from './pages/public/Mision'
-import ActividadDetallePublic from './pages/public/ActividadDetalle'
-import CalendarioPublic from './pages/public/Calendario'
-import CronogramaPublic from './pages/public/Cronograma'
-import GaleriaPublic from './pages/public/Galeria'
-import NotFoundPublic from './pages/public/NotFound'
+import AdminLayout from './components/AdminLayout'
+import SuperAdminLayout from './components/SuperAdminLayout'
 
-// Registro comercios y clubs
-import Registro from './pages/registro/Registro'
-import RegistroExito from './pages/registro/RegistroExito'
-import RegistroClub from './pages/registro/RegistroClub'
+// Páginas públicas
+const HomePublic = lazy(() => import('./pages/public/Home'))
+const ActividadesPublic = lazy(() => import('./pages/public/Actividades'))
+const HistoriaPublic = lazy(() => import('./pages/public/Historia'))
+const ContactoPublic = lazy(() => import('./pages/public/Contacto'))
+const NoticiasPublic = lazy(() => import('./pages/public/Noticias'))
+const NoticiaDetallePublic = lazy(() => import('./pages/public/NoticiaDetalle'))
+const InstalacionesPublic = lazy(() => import('./pages/public/Instalaciones'))
+const AutoridadesPublic = lazy(() => import('./pages/public/Autoridades'))
+const MisionPublic = lazy(() => import('./pages/public/Mision'))
+const ActividadDetallePublic = lazy(() => import('./pages/public/ActividadDetalle'))
+const CalendarioPublic = lazy(() => import('./pages/public/Calendario'))
+const CronogramaPublic = lazy(() => import('./pages/public/Cronograma'))
+const GaleriaPublic = lazy(() => import('./pages/public/Galeria'))
+const NotFoundPublic = lazy(() => import('./pages/public/NotFound'))
+const ComerciosPublicos = lazy(() => import('./pages/public/Comercios'))
+const InscripcionSocio = lazy(() => import('./pages/public/InscripcionSocio'))
+const AgregarFamiliares = lazy(() => import('./pages/public/AgregarFamiliares'))
+const MenuBuffet = lazy(() => import('./pages/public/MenuBuffet'))
+const ReservasPublico = lazy(() => import('./pages/public/ReservasPublico'))
 
-// Página del comerciante
-import Comercio from './pages/comercio/Comercio'
-import ComercioEditar from './pages/comercio/ComercioEditar'
-import TokenInvalido from './pages/comercio/TokenInvalido'
+// Registro
+const Registro = lazy(() => import('./pages/registro/Registro'))
+const RegistroExito = lazy(() => import('./pages/registro/RegistroExito'))
+const RegistroClub = lazy(() => import('./pages/registro/RegistroClub'))
 
-// Página del socio
-import SocioPortal from './pages/socio/SocioPortal'
-import AccesoSocio from './pages/socio/AccesoSocio'
-import LoginSocio from './pages/socio/LoginSocio'
-import PortalSocioNuevo from './pages/socio/PortalSocioNuevo'
-import ComerciosPublicos from './pages/public/Comercios'
-import InscripcionSocio from './pages/public/InscripcionSocio'
-import AgregarFamiliares from './pages/public/AgregarFamiliares'
+// Comercio
+const Comercio = lazy(() => import('./pages/comercio/Comercio'))
+const ComercioEditar = lazy(() => import('./pages/comercio/ComercioEditar'))
+const TokenInvalido = lazy(() => import('./pages/comercio/TokenInvalido'))
 
-// Páginas admin
-import AdminLogin from './pages/admin/Login'
-import AdminDashboard from './pages/admin/Dashboard'
-import AdminDashboardEjecutivo from './pages/admin/DashboardEjecutivo'
-import AdminComercios from './pages/admin/Comercios'
-import AdminComercioDetalle from './pages/admin/ComercioDetalle'
-import AdminSocios from './pages/admin/Socios'
-import AdminSocioDetalle from './pages/admin/SocioDetalle'
-import AdminSocioForm from './pages/admin/SocioForm'
-import AdminSociosCargar from './pages/admin/SociosCargar'
-import AdminReportes from './pages/admin/Reportes'
-import ReportTemplatesPage from './pages/admin/reportes/ReportTemplatesPage'
-import ReportDesignerPage from './pages/admin/reportes/ReportDesignerPage'
-import ReportViewerPage from './pages/admin/reportes/ReportViewerPage'
-import RunReportsPage from './pages/admin/reportes/RunReportsPage'
-import AdminTablasAuxiliares from './pages/admin/TablasAuxiliares'
-import AdminSolicitudes from './pages/admin/Solicitudes'
-import AdminInscripciones from './pages/admin/Inscripciones'
-import AdminCierreCaja from './pages/admin/CierreCaja'
-import AdminDebitoAutomatico from './pages/admin/DebitoAutomatico'
-import AdminPublicidad from './pages/admin/Publicidad'
-import AdminNoticias from './pages/admin/Noticias'
-import ContenidoPaginas from './pages/admin/ContenidoPaginas'
-import AdminAutoridades from './pages/admin/Autoridades'
-import AdminConfiguracionLista from './pages/admin/ConfiguracionLista'
-import AdminConfiguracionForm from './pages/admin/ConfiguracionForm'
-import AdminConfiguracionPagos from './pages/admin/ConfiguracionPagos'
-import EmailTemplates from './pages/admin/templates/EmailTemplates'
-import PdfTemplates from './pages/admin/templates/PdfTemplates'
-import AdminActividadesLista from './pages/admin/ActividadesLista'
-import AdminActividadForm from './pages/admin/ActividadForm'
-import AdminCategoriaActividadForm from './pages/admin/CategoriaActividadForm'
-import AdminReporteActividades from './pages/admin/ReporteActividades'
-import AdminReporteActividadDetalle from './pages/admin/ReporteActividadDetalle'
-import AdminReporteCuotas from './pages/admin/ReporteCuotas'
-import AdminReporteSocios from './pages/admin/ReporteSocios'
-import AdminReporteComercios from './pages/admin/ReporteComercios'
-import AdminReporteCentrosCosto from './pages/admin/ReporteCentrosCosto'
-import DashboardEjecutivoCentros from './pages/admin/centros-costo/DashboardEjecutivo'
-import EvolucionTemporalCentros from './pages/admin/centros-costo/EvolucionTemporal'
-import RentabilidadActividades from './pages/admin/centros-costo/RentabilidadActividades'
-import PresupuestoVsReal from './pages/admin/centros-costo/PresupuestoVsReal'
-import MovimientosCentroCosto from './pages/admin/centros-costo/MovimientosCentroCosto'
-import AdminReporteMorosidad from './pages/admin/ReporteMorosidadAvanzado'
-import AdminEntrenadoresLista from './pages/admin/EntrenadoresLista'
-import AdminEntrenadorForm from './pages/admin/EntrenadorForm'
-import AdminPeriodos from './pages/admin/Periodos'
-import AdminCuotas from './pages/admin/Cuotas'
-import AdminCargosAdicionales from './pages/admin/CargosAdicionales'
-import PlaceholderPage from './pages/admin/PlaceholderPage'
-import Branding from './pages/admin/Branding'
+// Portal Socio
+const SocioPortal = lazy(() => import('./pages/socio/SocioPortal'))
+const AccesoSocio = lazy(() => import('./pages/socio/AccesoSocio'))
+const LoginSocio = lazy(() => import('./pages/socio/LoginSocio'))
+const PortalSocioNuevo = lazy(() => import('./pages/socio/PortalSocioNuevo'))
+
+// Admin — generales
+const AdminLogin = lazy(() => import('./pages/admin/Login'))
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'))
+const AdminDashboardEjecutivo = lazy(() => import('./pages/admin/DashboardEjecutivo'))
+const AdminComercios = lazy(() => import('./pages/admin/Comercios'))
+const AdminComercioDetalle = lazy(() => import('./pages/admin/ComercioDetalle'))
+const AdminSocios = lazy(() => import('./pages/admin/Socios'))
+const AdminSocioDetalle = lazy(() => import('./pages/admin/SocioDetalle'))
+const AdminSocioForm = lazy(() => import('./pages/admin/SocioForm'))
+const AdminSociosCargar = lazy(() => import('./pages/admin/SociosCargar'))
+const AdminReportes = lazy(() => import('./pages/admin/Reportes'))
+const ReportTemplatesPage = lazy(() => import('./pages/admin/reportes/ReportTemplatesPage'))
+const ReportDesignerPage = lazy(() => import('./pages/admin/reportes/ReportDesignerPage'))
+const ReportViewerPage = lazy(() => import('./pages/admin/reportes/ReportViewerPage'))
+const RunReportsPage = lazy(() => import('./pages/admin/reportes/RunReportsPage'))
+const AdminTablasAuxiliares = lazy(() => import('./pages/admin/TablasAuxiliares'))
+const AdminSolicitudes = lazy(() => import('./pages/admin/Solicitudes'))
+const AdminInscripciones = lazy(() => import('./pages/admin/Inscripciones'))
+const AdminCierreCaja = lazy(() => import('./pages/admin/CierreCaja'))
+const AdminDebitoAutomatico = lazy(() => import('./pages/admin/DebitoAutomatico'))
+const AdminPublicidad = lazy(() => import('./pages/admin/Publicidad'))
+const AdminNoticias = lazy(() => import('./pages/admin/Noticias'))
+const ContenidoPaginas = lazy(() => import('./pages/admin/ContenidoPaginas'))
+const AdminAutoridades = lazy(() => import('./pages/admin/Autoridades'))
+const AdminConfiguracionLista = lazy(() => import('./pages/admin/ConfiguracionLista'))
+const AdminConfiguracionForm = lazy(() => import('./pages/admin/ConfiguracionForm'))
+const AdminConfiguracionPagos = lazy(() => import('./pages/admin/ConfiguracionPagos'))
+const EmailTemplates = lazy(() => import('./pages/admin/templates/EmailTemplates'))
+const PdfTemplates = lazy(() => import('./pages/admin/templates/PdfTemplates'))
+const AdminActividadesLista = lazy(() => import('./pages/admin/ActividadesLista'))
+const AdminActividadForm = lazy(() => import('./pages/admin/ActividadForm'))
+const AdminCategoriaActividadForm = lazy(() => import('./pages/admin/CategoriaActividadForm'))
+const AdminReporteActividades = lazy(() => import('./pages/admin/ReporteActividades'))
+const AdminReporteActividadDetalle = lazy(() => import('./pages/admin/ReporteActividadDetalle'))
+const AdminReporteCuotas = lazy(() => import('./pages/admin/ReporteCuotas'))
+const AdminReporteSocios = lazy(() => import('./pages/admin/ReporteSocios'))
+const AdminReporteComercios = lazy(() => import('./pages/admin/ReporteComercios'))
+const AdminReporteCentrosCosto = lazy(() => import('./pages/admin/ReporteCentrosCosto'))
+const DashboardEjecutivoCentros = lazy(() => import('./pages/admin/centros-costo/DashboardEjecutivo'))
+const EvolucionTemporalCentros = lazy(() => import('./pages/admin/centros-costo/EvolucionTemporal'))
+const RentabilidadActividades = lazy(() => import('./pages/admin/centros-costo/RentabilidadActividades'))
+const PresupuestoVsReal = lazy(() => import('./pages/admin/centros-costo/PresupuestoVsReal'))
+const MovimientosCentroCosto = lazy(() => import('./pages/admin/centros-costo/MovimientosCentroCosto'))
+const AdminReporteMorosidad = lazy(() => import('./pages/admin/ReporteMorosidadAvanzado'))
+const AdminEntrenadoresLista = lazy(() => import('./pages/admin/EntrenadoresLista'))
+const AdminEntrenadorForm = lazy(() => import('./pages/admin/EntrenadorForm'))
+const AdminPeriodos = lazy(() => import('./pages/admin/Periodos'))
+const AdminCuotas = lazy(() => import('./pages/admin/Cuotas'))
+const AdminCargosAdicionales = lazy(() => import('./pages/admin/CargosAdicionales'))
+const PlaceholderPage = lazy(() => import('./pages/admin/PlaceholderPage'))
+const Branding = lazy(() => import('./pages/admin/Branding'))
+const MiPerfil = lazy(() => import('./pages/admin/MiPerfil'))
+const IAMetricas = lazy(() => import('./pages/admin/IAMetricas'))
 
 // Usuarios y Roles
-import UsuariosLista from './pages/admin/usuarios/UsuariosLista'
-import UsuarioForm from './pages/admin/usuarios/UsuarioForm'
-import RolesLista from './pages/admin/usuarios/RolesLista'
-import RolForm from './pages/admin/usuarios/RolForm'
+const UsuariosLista = lazy(() => import('./pages/admin/usuarios/UsuariosLista'))
+const UsuarioForm = lazy(() => import('./pages/admin/usuarios/UsuarioForm'))
+const RolesLista = lazy(() => import('./pages/admin/usuarios/RolesLista'))
+const RolForm = lazy(() => import('./pages/admin/usuarios/RolForm'))
 
-// Entidades (Proveedores, Clientes, Personal)
-import EntidadesLista from './pages/admin/entidades/EntidadesLista'
-import EntidadForm from './pages/admin/entidades/EntidadForm'
-import EntidadDetalle from './pages/admin/entidades/EntidadDetalle'
+// Entidades
+const EntidadesLista = lazy(() => import('./pages/admin/entidades/EntidadesLista'))
+const EntidadForm = lazy(() => import('./pages/admin/entidades/EntidadForm'))
+const EntidadDetalle = lazy(() => import('./pages/admin/entidades/EntidadDetalle'))
 
 // Tesoreria
-import CajasLista from './pages/admin/tesoreria/CajasLista'
-import CajaForm from './pages/admin/tesoreria/CajaForm'
-import CajaDetalle from './pages/admin/tesoreria/CajaDetalle'
-import MovimientosCajaLista from './pages/admin/tesoreria/MovimientosCajaLista'
-import MovimientoCajaForm from './pages/admin/tesoreria/MovimientoCajaForm'
-import TransferenciasLista from './pages/admin/tesoreria/TransferenciasLista'
-import TransferenciaForm from './pages/admin/tesoreria/TransferenciaForm'
-import PendientesConciliar from './pages/admin/tesoreria/PendientesConciliar'
-import ConciliacionBancaria from './pages/admin/tesoreria/ConciliacionBancaria'
-import ConciliacionDetalle from './pages/admin/tesoreria/ConciliacionDetalle'
+const CajasLista = lazy(() => import('./pages/admin/tesoreria/CajasLista'))
+const CajaForm = lazy(() => import('./pages/admin/tesoreria/CajaForm'))
+const CajaDetalle = lazy(() => import('./pages/admin/tesoreria/CajaDetalle'))
+const MovimientosCajaLista = lazy(() => import('./pages/admin/tesoreria/MovimientosCajaLista'))
+const MovimientoCajaForm = lazy(() => import('./pages/admin/tesoreria/MovimientoCajaForm'))
+const TransferenciasLista = lazy(() => import('./pages/admin/tesoreria/TransferenciasLista'))
+const TransferenciaForm = lazy(() => import('./pages/admin/tesoreria/TransferenciaForm'))
+const PendientesConciliar = lazy(() => import('./pages/admin/tesoreria/PendientesConciliar'))
+const ConciliacionBancaria = lazy(() => import('./pages/admin/tesoreria/ConciliacionBancaria'))
+const ConciliacionDetalle = lazy(() => import('./pages/admin/tesoreria/ConciliacionDetalle'))
 
 // Contabilidad
-import PlanCuentasLista from './pages/admin/contabilidad/PlanCuentasLista'
-import CuentaContableForm from './pages/admin/contabilidad/CuentaContableForm'
-import CentrosCostoLista from './pages/admin/configuracion/CentrosCostoLista'
-import ConfiguracionFiscal from './pages/admin/configuracion/ConfiguracionFiscal'
-import MenuAdmin from './pages/admin/configuracion/MenuAdmin'
-import AsientosLista from './pages/admin/contabilidad/AsientosLista'
-import AsientoForm from './pages/admin/contabilidad/AsientoForm'
-import AsientoDetalle from './pages/admin/contabilidad/AsientoDetalle'
-import LibroMayor from './pages/admin/contabilidad/LibroMayor'
-import PresupuestosLista from './pages/admin/contabilidad/PresupuestosLista'
-import PresupuestoEditor from './pages/admin/contabilidad/PresupuestoEditor'
-import PresupuestoEjecucion from './pages/admin/contabilidad/PresupuestoEjecucion'
-import PresupuestoVigente from './pages/admin/contabilidad/PresupuestoVigente'
+const PlanCuentasLista = lazy(() => import('./pages/admin/contabilidad/PlanCuentasLista'))
+const CuentaContableForm = lazy(() => import('./pages/admin/contabilidad/CuentaContableForm'))
+const CentrosCostoLista = lazy(() => import('./pages/admin/configuracion/CentrosCostoLista'))
+const ConfiguracionFiscal = lazy(() => import('./pages/admin/configuracion/ConfiguracionFiscal'))
+const MenuAdmin = lazy(() => import('./pages/admin/configuracion/MenuAdmin'))
+const AsientosLista = lazy(() => import('./pages/admin/contabilidad/AsientosLista'))
+const AsientoForm = lazy(() => import('./pages/admin/contabilidad/AsientoForm'))
+const AsientoDetalle = lazy(() => import('./pages/admin/contabilidad/AsientoDetalle'))
+const LibroMayor = lazy(() => import('./pages/admin/contabilidad/LibroMayor'))
+const PresupuestosLista = lazy(() => import('./pages/admin/contabilidad/PresupuestosLista'))
+const PresupuestoEditor = lazy(() => import('./pages/admin/contabilidad/PresupuestoEditor'))
+const PresupuestoEjecucion = lazy(() => import('./pages/admin/contabilidad/PresupuestoEjecucion'))
+const PresupuestoVigente = lazy(() => import('./pages/admin/contabilidad/PresupuestoVigente'))
 
 // Stock
-import ProductosLista from './pages/admin/stock/ProductosLista'
-import ProductoForm from './pages/admin/stock/ProductoForm'
-import CategoriasProducto from './pages/admin/stock/CategoriasProducto'
-import MovimientosStockLista from './pages/admin/stock/MovimientosStockLista'
-import AjusteStockForm from './pages/admin/stock/AjusteStockForm'
-import AlertasStock from './pages/admin/stock/AlertasStock'
+const ProductosLista = lazy(() => import('./pages/admin/stock/ProductosLista'))
+const ProductoForm = lazy(() => import('./pages/admin/stock/ProductoForm'))
+const CategoriasProducto = lazy(() => import('./pages/admin/stock/CategoriasProducto'))
+const MovimientosStockLista = lazy(() => import('./pages/admin/stock/MovimientosStockLista'))
+const AjusteStockForm = lazy(() => import('./pages/admin/stock/AjusteStockForm'))
+const AlertasStock = lazy(() => import('./pages/admin/stock/AlertasStock'))
 
 // Egresos - Ordenes de Compra
-import OrdenesCompraLista from './pages/admin/egresos/OrdenesCompraLista'
-import OrdenCompraForm from './pages/admin/egresos/OrdenCompraForm'
-import OrdenCompraDetalle from './pages/admin/egresos/OrdenCompraDetalle'
+const OrdenesCompraLista = lazy(() => import('./pages/admin/egresos/OrdenesCompraLista'))
+const OrdenCompraForm = lazy(() => import('./pages/admin/egresos/OrdenCompraForm'))
+const OrdenCompraDetalle = lazy(() => import('./pages/admin/egresos/OrdenCompraDetalle'))
 
 // Egresos - Facturas de Compra
-import FacturasCompraLista from './pages/admin/egresos/FacturasCompraLista'
-import FacturaCompraForm from './pages/admin/egresos/FacturaCompraForm'
-import FacturaCompraDetalle from './pages/admin/egresos/FacturaCompraDetalle'
+const FacturasCompraLista = lazy(() => import('./pages/admin/egresos/FacturasCompraLista'))
+const FacturaCompraForm = lazy(() => import('./pages/admin/egresos/FacturaCompraForm'))
+const FacturaCompraDetalle = lazy(() => import('./pages/admin/egresos/FacturaCompraDetalle'))
 
 // Egresos - Ordenes de Pago
-import OrdenesPagoLista from './pages/admin/egresos/OrdenesPagoLista'
-import OrdenPagoForm from './pages/admin/egresos/OrdenPagoForm'
-import OrdenPagoDetalle from './pages/admin/egresos/OrdenPagoDetalle'
+const OrdenesPagoLista = lazy(() => import('./pages/admin/egresos/OrdenesPagoLista'))
+const OrdenPagoForm = lazy(() => import('./pages/admin/egresos/OrdenPagoForm'))
+const OrdenPagoDetalle = lazy(() => import('./pages/admin/egresos/OrdenPagoDetalle'))
 
 // Ingresos - Pedidos
-import PedidosLista from './pages/admin/ingresos/PedidosLista'
-import PedidoForm from './pages/admin/ingresos/PedidoForm'
-import PedidoDetalle from './pages/admin/ingresos/PedidoDetalle'
+const PedidosLista = lazy(() => import('./pages/admin/ingresos/PedidosLista'))
+const PedidoForm = lazy(() => import('./pages/admin/ingresos/PedidoForm'))
+const PedidoDetalle = lazy(() => import('./pages/admin/ingresos/PedidoDetalle'))
 
 // Ingresos - Facturas de Venta
-import FacturasVentaLista from './pages/admin/ingresos/FacturasVentaLista'
-import FacturaVentaForm from './pages/admin/ingresos/FacturaVentaForm'
-import FacturaVentaDetalle from './pages/admin/ingresos/FacturaVentaDetalle'
+const FacturasVentaLista = lazy(() => import('./pages/admin/ingresos/FacturasVentaLista'))
+const FacturaVentaForm = lazy(() => import('./pages/admin/ingresos/FacturaVentaForm'))
+const FacturaVentaDetalle = lazy(() => import('./pages/admin/ingresos/FacturaVentaDetalle'))
 
 // Ingresos - Recibos de Cobro
-import RecibosCobroLista from './pages/admin/ingresos/RecibosCobroLista'
-import ReciboCobroForm from './pages/admin/ingresos/ReciboCobroForm'
-import ReciboCobroDetalle from './pages/admin/ingresos/ReciboCobroDetalle'
+const RecibosCobroLista = lazy(() => import('./pages/admin/ingresos/RecibosCobroLista'))
+const ReciboCobroForm = lazy(() => import('./pages/admin/ingresos/ReciboCobroForm'))
+const ReciboCobroDetalle = lazy(() => import('./pages/admin/ingresos/ReciboCobroDetalle'))
 
 // Liquidaciones de Sueldos
-import LiquidacionesLista from './pages/admin/liquidaciones/LiquidacionesLista'
-import LiquidacionForm from './pages/admin/liquidaciones/LiquidacionForm'
-import LiquidacionDetalle from './pages/admin/liquidaciones/LiquidacionDetalle'
-import ConceptosLiquidacion from './pages/admin/liquidaciones/ConceptosLiquidacion'
+const LiquidacionesLista = lazy(() => import('./pages/admin/liquidaciones/LiquidacionesLista'))
+const LiquidacionForm = lazy(() => import('./pages/admin/liquidaciones/LiquidacionForm'))
+const LiquidacionDetalle = lazy(() => import('./pages/admin/liquidaciones/LiquidacionDetalle'))
+const ConceptosLiquidacion = lazy(() => import('./pages/admin/liquidaciones/ConceptosLiquidacion'))
 
 // Deportes
-import EspaciosLista from './pages/admin/deportes/EspaciosLista'
-import EspacioForm from './pages/admin/deportes/EspacioForm'
-import TiposEspacioConfig from './pages/admin/deportes/TiposEspacioConfig'
-import HorariosRecurrentes from './pages/admin/deportes/HorariosRecurrentes'
-import EntrenamientosCalendario from './pages/admin/deportes/EntrenamientosCalendario'
-import AsistenciaEntrenamiento from './pages/admin/deportes/AsistenciaEntrenamiento'
-import Partidos from './pages/admin/Partidos'
-import PartidoDetalle from './pages/admin/PartidoDetalle'
-import ReportesDeportivos from './pages/admin/ReportesDeportivos'
-import PasajeCategoria from './pages/admin/PasajeCategoria'
-import MiPerfil from './pages/admin/MiPerfil'
+const EspaciosLista = lazy(() => import('./pages/admin/deportes/EspaciosLista'))
+const EspacioForm = lazy(() => import('./pages/admin/deportes/EspacioForm'))
+const TiposEspacioConfig = lazy(() => import('./pages/admin/deportes/TiposEspacioConfig'))
+const HorariosRecurrentes = lazy(() => import('./pages/admin/deportes/HorariosRecurrentes'))
+const EntrenamientosCalendario = lazy(() => import('./pages/admin/deportes/EntrenamientosCalendario'))
+const AsistenciaEntrenamiento = lazy(() => import('./pages/admin/deportes/AsistenciaEntrenamiento'))
+const Partidos = lazy(() => import('./pages/admin/Partidos'))
+const PartidoDetalle = lazy(() => import('./pages/admin/PartidoDetalle'))
+const ReportesDeportivos = lazy(() => import('./pages/admin/ReportesDeportivos'))
+const PasajeCategoria = lazy(() => import('./pages/admin/PasajeCategoria'))
 
 // Buffet
-import BuffetDashboard from './pages/admin/buffet/BuffetDashboardNew'
-import BuffetEstadoMesas from './pages/admin/buffet/BuffetEstadoMesas'
-import BuffetMesas from './pages/admin/buffet/BuffetMesas'
-import BuffetCategorias from './pages/admin/buffet/BuffetCategorias'
-import BuffetProductos from './pages/admin/buffet/BuffetProductos'
-import BuffetProductoOpciones from './pages/admin/buffet/BuffetProductoOpciones'
-import BuffetPrecios from './pages/admin/buffet/BuffetPrecios'
-import ImportarProductos from './pages/admin/buffet/ImportarProductos'
-import BuffetComanda from './pages/admin/buffet/BuffetComanda'
-import BuffetCocina from './pages/admin/buffet/BuffetCocina'
-import BuffetKiosco from './pages/admin/buffet/BuffetKiosco'
-import BuffetTakeAway from './pages/admin/buffet/BuffetTakeAway'
-import BuffetBarra from './pages/admin/buffet/BuffetBarra'
-import BuffetImpresoras from './pages/admin/buffet/BuffetImpresoras'
-import MenuBuffet from './pages/public/MenuBuffet'
-import ReservasPublico from './pages/public/ReservasPublico'
+const BuffetDashboard = lazy(() => import('./pages/admin/buffet/BuffetDashboardNew'))
+const BuffetEstadoMesas = lazy(() => import('./pages/admin/buffet/BuffetEstadoMesas'))
+const BuffetMesas = lazy(() => import('./pages/admin/buffet/BuffetMesas'))
+const BuffetCategorias = lazy(() => import('./pages/admin/buffet/BuffetCategorias'))
+const BuffetProductos = lazy(() => import('./pages/admin/buffet/BuffetProductos'))
+const BuffetProductoOpciones = lazy(() => import('./pages/admin/buffet/BuffetProductoOpciones'))
+const BuffetPrecios = lazy(() => import('./pages/admin/buffet/BuffetPrecios'))
+const ImportarProductos = lazy(() => import('./pages/admin/buffet/ImportarProductos'))
+const BuffetComanda = lazy(() => import('./pages/admin/buffet/BuffetComanda'))
+const BuffetCocina = lazy(() => import('./pages/admin/buffet/BuffetCocina'))
+const BuffetKiosco = lazy(() => import('./pages/admin/buffet/BuffetKiosco'))
+const BuffetTakeAway = lazy(() => import('./pages/admin/buffet/BuffetTakeAway'))
+const BuffetBarra = lazy(() => import('./pages/admin/buffet/BuffetBarra'))
+const BuffetImpresoras = lazy(() => import('./pages/admin/buffet/BuffetImpresoras'))
 
 // Control de Accesos
-import MonitorAccesos from './pages/admin/accesos/MonitorAccesos'
-import IntentosDenegados from './pages/admin/accesos/IntentosDenegados'
-import Habilitaciones from './pages/admin/accesos/Habilitaciones'
-import ControlPWA from './pages/admin/accesos/ControlPWA'
+const MonitorAccesos = lazy(() => import('./pages/admin/accesos/MonitorAccesos'))
+const IntentosDenegados = lazy(() => import('./pages/admin/accesos/IntentosDenegados'))
+const Habilitaciones = lazy(() => import('./pages/admin/accesos/Habilitaciones'))
+const ControlPWA = lazy(() => import('./pages/admin/accesos/ControlPWA'))
 
 // Eventos
-import EventosLista from './pages/admin/eventos/EventosLista'
-import EventoForm from './pages/admin/eventos/EventoForm'
-import EventoDetalle from './pages/admin/eventos/EventoDetalle'
-import VentaEntradas from './pages/admin/eventos/VentaEntradas'
+const EventosLista = lazy(() => import('./pages/admin/eventos/EventosLista'))
+const EventoForm = lazy(() => import('./pages/admin/eventos/EventoForm'))
+const EventoDetalle = lazy(() => import('./pages/admin/eventos/EventoDetalle'))
+const VentaEntradas = lazy(() => import('./pages/admin/eventos/VentaEntradas'))
 
 // Reservas
-import ReservasCalendario from './pages/admin/reservas/ReservasCalendario'
-import ConfigReservas from './pages/admin/reservas/ConfigReservas'
+const ReservasCalendario = lazy(() => import('./pages/admin/reservas/ReservasCalendario'))
+const ConfigReservas = lazy(() => import('./pages/admin/reservas/ConfigReservas'))
 
-// Gestión de Cobranzas
-import GestionCobranzas from './pages/admin/GestionCobranzas'
-import DetalleGestion from './pages/admin/DetalleGestion'
-
-// Gestión de Recupero
-import GestionRecupero from './pages/admin/GestionRecupero'
-
-// Gestión de Comunicaciones
-import GestionComunicaciones from './pages/admin/GestionComunicaciones'
-import DetalleCampana from './pages/admin/DetalleCampana'
-import AdminChatEntrenadores from './pages/admin/ChatEntrenadores'
-
-// Layout admin
-import AdminLayout from './components/AdminLayout'
+// Cobranzas / Recupero / Comunicaciones
+const GestionCobranzas = lazy(() => import('./pages/admin/GestionCobranzas'))
+const DetalleGestion = lazy(() => import('./pages/admin/DetalleGestion'))
+const GestionRecupero = lazy(() => import('./pages/admin/GestionRecupero'))
+const GestionComunicaciones = lazy(() => import('./pages/admin/GestionComunicaciones'))
+const DetalleCampana = lazy(() => import('./pages/admin/DetalleCampana'))
+const AdminChatEntrenadores = lazy(() => import('./pages/admin/ChatEntrenadores'))
 
 // Super-Admin
-import SuperAdminLayout from './components/SuperAdminLayout'
-import SuperAdminDashboard from './pages/super-admin/Dashboard'
-import TenantsList from './pages/super-admin/TenantsList'
-import TenantForm from './pages/super-admin/TenantForm'
-import TenantDetail from './pages/super-admin/TenantDetail'
-import TenantUsage from './pages/super-admin/TenantUsage'
-import IAMetricas from './pages/admin/IAMetricas'
+const SuperAdminDashboard = lazy(() => import('./pages/super-admin/Dashboard'))
+const TenantsList = lazy(() => import('./pages/super-admin/TenantsList'))
+const TenantForm = lazy(() => import('./pages/super-admin/TenantForm'))
+const TenantDetail = lazy(() => import('./pages/super-admin/TenantDetail'))
+const TenantUsage = lazy(() => import('./pages/super-admin/TenantUsage'))
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600" />
+    </div>
+  )
+}
 
 function App() {
   return (
@@ -257,279 +262,282 @@ function App() {
           <NotificacionBuffetProvider>
             <ScrollToTop />
             <Toaster position="top-right" />
-            <Routes>
-        {/* Sitio web público del club */}
-        <Route path="/" element={<PublicLayout />}>
-          <Route index element={<HomePublic />} />
-          <Route path="actividades" element={<ActividadesPublic />} />
-          <Route path="actividades/:id" element={<ActividadDetallePublic />} />
-          <Route path="calendario" element={<CalendarioPublic />} />
-          <Route path="cronograma" element={<CronogramaPublic />} />
-          <Route path="galeria" element={<GaleriaPublic />} />
-          <Route path="historia" element={<HistoriaPublic />} />
-          <Route path="mision" element={<MisionPublic />} />
-          <Route path="autoridades" element={<AutoridadesPublic />} />
-          <Route path="instalaciones" element={<InstalacionesPublic />} />
-          <Route path="contacto" element={<ContactoPublic />} />
-          <Route path="noticias" element={<NoticiasPublic />} />
-          <Route path="noticias/:slug" element={<NoticiaDetallePublic />} />
-          <Route path="comercios" element={<ComerciosPublicos />} />
-          <Route path="*" element={<NotFoundPublic />} />
-        </Route>
-      <Route path="/registro" element={<Registro />} />
-      <Route path="/registro/exito" element={<RegistroExito />} />
-      <Route path="/registro-club" element={<RegistroClub />} />
-      <Route path="/inscripcion-socio" element={<InscripcionSocio />} />
-      <Route path="/inscripcion-socio/:solicitudId/familiares" element={<AgregarFamiliares />} />
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {/* Sitio web público del club */}
+                <Route path="/" element={<PublicLayout />}>
+                  <Route index element={<HomePublic />} />
+                  <Route path="actividades" element={<ActividadesPublic />} />
+                  <Route path="actividades/:id" element={<ActividadDetallePublic />} />
+                  <Route path="calendario" element={<CalendarioPublic />} />
+                  <Route path="cronograma" element={<CronogramaPublic />} />
+                  <Route path="galeria" element={<GaleriaPublic />} />
+                  <Route path="historia" element={<HistoriaPublic />} />
+                  <Route path="mision" element={<MisionPublic />} />
+                  <Route path="autoridades" element={<AutoridadesPublic />} />
+                  <Route path="instalaciones" element={<InstalacionesPublic />} />
+                  <Route path="contacto" element={<ContactoPublic />} />
+                  <Route path="noticias" element={<NoticiasPublic />} />
+                  <Route path="noticias/:slug" element={<NoticiaDetallePublic />} />
+                  <Route path="comercios" element={<ComerciosPublicos />} />
+                  <Route path="*" element={<NotFoundPublic />} />
+                </Route>
 
-      {/* Ruta del comerciante */}
-      <Route path="/comercio/:token" element={<Comercio />} />
-      <Route path="/comercio/:token/editar" element={<ComercioEditar />} />
-      <Route path="/c/:token" element={<Comercio />} />
-      <Route path="/c/:token/editar" element={<ComercioEditar />} />
-      <Route path="/acceso-invalido" element={<TokenInvalido />} />
+                <Route path="/registro" element={<Registro />} />
+                <Route path="/registro/exito" element={<RegistroExito />} />
+                <Route path="/registro-club" element={<RegistroClub />} />
+                <Route path="/inscripcion-socio" element={<InscripcionSocio />} />
+                <Route path="/inscripcion-socio/:solicitudId/familiares" element={<AgregarFamiliares />} />
 
-      {/* Rutas del socio */}
-      <Route path="/mi-qr" element={<AccesoSocio />} />
-      <Route path="/s/:tokenPortal" element={<SocioPortal />} />
-      <Route path="/login-socio" element={<LoginSocio />} />
-      <Route path="/portal-socio/:tokenPortal" element={<PortalSocioNuevo />} />
+                {/* Ruta del comerciante */}
+                <Route path="/comercio/:token" element={<Comercio />} />
+                <Route path="/comercio/:token/editar" element={<ComercioEditar />} />
+                <Route path="/c/:token" element={<Comercio />} />
+                <Route path="/c/:token/editar" element={<ComercioEditar />} />
+                <Route path="/acceso-invalido" element={<TokenInvalido />} />
 
-      {/* Menú Buffet Público */}
-      <Route path="/buffet/menu" element={<MenuBuffet />} />
-      <Route path="/menu-buffet" element={<MenuBuffet />} />
+                {/* Rutas del socio */}
+                <Route path="/mi-qr" element={<AccesoSocio />} />
+                <Route path="/s/:tokenPortal" element={<SocioPortal />} />
+                <Route path="/login-socio" element={<LoginSocio />} />
+                <Route path="/portal-socio/:tokenPortal" element={<PortalSocioNuevo />} />
 
-      {/* Reservas públicas */}
-      <Route path="/reservas" element={<ReservasPublico />} />
-      <Route path="/reservas/confirmacion" element={<ReservasPublico />} />
+                {/* Menú Buffet Público */}
+                <Route path="/buffet/menu" element={<MenuBuffet />} />
+                <Route path="/menu-buffet" element={<MenuBuffet />} />
 
-      {/* Rutas admin */}
-      <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<AdminDashboard />} />
-        <Route path="mi-perfil" element={<MiPerfil />} />
-        <Route path="dashboard-ejecutivo" element={<AdminDashboardEjecutivo />} />
-        <Route path="comercios" element={<AdminComercios />} />
-        <Route path="comercios/:id" element={<AdminComercioDetalle />} />
-        <Route path="socios" element={<AdminSocios />} />
-        <Route path="socios/nuevo" element={<AdminSocioForm />} />
-        <Route path="socios/cargar" element={<AdminSociosCargar />} />
-        <Route path="socios/:id" element={<AdminSocioDetalle />} />
-        <Route path="socios/:id/editar" element={<AdminSocioForm />} />
-        <Route path="solicitudes" element={<AdminSolicitudes />} />
-        <Route path="inscripciones" element={<AdminInscripciones />} />
-        <Route path="cierres-caja" element={<AdminCierreCaja />} />
-        <Route path="debito-automatico" element={<AdminDebitoAutomatico />} />
-        <Route path="publicidad" element={<AdminPublicidad />} />
-        <Route path="noticias" element={<AdminNoticias />} />
-        <Route path="contenido/paginas/:slug" element={<ContenidoPaginas />} />
-        <Route path="contenido/paginas" element={<ContenidoPaginas />} />
-        <Route path="reportes" element={<AdminReportes />} />
-        <Route path="reportes/designer" element={<ReportTemplatesPage />} />
-        <Route path="reportes/designer/nuevo" element={<ReportDesignerPage />} />
-        <Route path="reportes/designer/:id/editar" element={<ReportDesignerPage />} />
-        <Route path="reportes/designer/:id/ejecutar" element={<ReportViewerPage />} />
-        <Route path="reportes/ejecutar" element={<RunReportsPage />} />
-        <Route path="reportes/actividades" element={<AdminReporteActividades />} />
-        <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />
-        <Route path="reportes/cuotas" element={<AdminReporteCuotas />} />
-        <Route path="reportes/socios" element={<AdminReporteSocios />} />
-        <Route path="reportes/comercios" element={<AdminReporteComercios />} />
-        <Route path="reportes/centros-costo" element={<AdminReporteCentrosCosto />} />
-        <Route path="reportes/centros-costo/dashboard" element={<DashboardEjecutivoCentros />} />
-        <Route path="reportes/centros-costo/evolucion" element={<EvolucionTemporalCentros />} />
-        <Route path="reportes/centros-costo/rentabilidad" element={<RentabilidadActividades />} />
-        <Route path="reportes/centros-costo/presupuesto" element={<PresupuestoVsReal />} />
-        <Route path="reportes/centros-costo/movimientos" element={<MovimientosCentroCosto />} />
-        <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
-        <Route path="configuracion" element={<AdminTablasAuxiliares />} />
-        <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
-        <Route path="configuracion/autoridades" element={<AdminAutoridades />} />
-        <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
-        <Route path="configuracion/fiscal" element={<ConfiguracionFiscal />} />
-        <Route path="configuracion/menu" element={<MenuAdmin />} />
-        <Route path="configuracion/templates/email" element={<EmailTemplates />} />
-        <Route path="configuracion/templates/pdf" element={<PdfTemplates />} />
-        <Route path="configuracion/branding" element={<Branding />} />
-        <Route path="configuracion/:tabla" element={<AdminConfiguracionLista />} />
-        <Route path="configuracion/:tabla/nuevo" element={<AdminConfiguracionForm />} />
-        <Route path="configuracion/:tabla/:id" element={<AdminConfiguracionForm />} />
+                {/* Reservas públicas */}
+                <Route path="/reservas" element={<ReservasPublico />} />
+                <Route path="/reservas/confirmacion" element={<ReservasPublico />} />
 
-        {/* Usuarios y Roles */}
-        <Route path="configuracion/usuarios" element={<UsuariosLista />} />
-        <Route path="configuracion/usuarios/nuevo" element={<UsuarioForm />} />
-        <Route path="configuracion/usuarios/:id" element={<UsuarioForm />} />
-        <Route path="configuracion/roles" element={<RolesLista />} />
-        <Route path="configuracion/roles/nuevo" element={<RolForm />} />
-        <Route path="configuracion/roles/:id" element={<RolForm />} />
-        <Route path="actividades" element={<AdminActividadesLista />} />
-        <Route path="actividades/nueva" element={<AdminActividadForm />} />
-        <Route path="actividades/:id" element={<AdminActividadForm />} />
-        <Route path="actividades/:id/categoria/nueva" element={<AdminCategoriaActividadForm />} />
-        <Route path="actividades/:id/categoria/:catId" element={<AdminCategoriaActividadForm />} />
-        <Route path="entrenadores" element={<AdminEntrenadoresLista />} />
-        <Route path="entrenadores/nuevo" element={<AdminEntrenadorForm />} />
-        <Route path="entrenadores/:id" element={<AdminEntrenadorForm />} />
-        <Route path="cuotas" element={<AdminCuotas />} />
-        <Route path="cargos-adicionales" element={<AdminCargosAdicionales />} />
-        <Route path="periodos" element={<AdminPeriodos />} />
+                {/* Rutas admin */}
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="mi-perfil" element={<MiPerfil />} />
+                  <Route path="dashboard-ejecutivo" element={<AdminDashboardEjecutivo />} />
+                  <Route path="comercios" element={<AdminComercios />} />
+                  <Route path="comercios/:id" element={<AdminComercioDetalle />} />
+                  <Route path="socios" element={<AdminSocios />} />
+                  <Route path="socios/nuevo" element={<AdminSocioForm />} />
+                  <Route path="socios/cargar" element={<AdminSociosCargar />} />
+                  <Route path="socios/:id" element={<AdminSocioDetalle />} />
+                  <Route path="socios/:id/editar" element={<AdminSocioForm />} />
+                  <Route path="solicitudes" element={<AdminSolicitudes />} />
+                  <Route path="inscripciones" element={<AdminInscripciones />} />
+                  <Route path="cierres-caja" element={<AdminCierreCaja />} />
+                  <Route path="debito-automatico" element={<AdminDebitoAutomatico />} />
+                  <Route path="publicidad" element={<AdminPublicidad />} />
+                  <Route path="noticias" element={<AdminNoticias />} />
+                  <Route path="contenido/paginas/:slug" element={<ContenidoPaginas />} />
+                  <Route path="contenido/paginas" element={<ContenidoPaginas />} />
+                  <Route path="reportes" element={<AdminReportes />} />
+                  <Route path="reportes/designer" element={<ReportTemplatesPage />} />
+                  <Route path="reportes/designer/nuevo" element={<ReportDesignerPage />} />
+                  <Route path="reportes/designer/:id/editar" element={<ReportDesignerPage />} />
+                  <Route path="reportes/designer/:id/ejecutar" element={<ReportViewerPage />} />
+                  <Route path="reportes/ejecutar" element={<RunReportsPage />} />
+                  <Route path="reportes/actividades" element={<AdminReporteActividades />} />
+                  <Route path="reportes/actividades/:id" element={<AdminReporteActividadDetalle />} />
+                  <Route path="reportes/cuotas" element={<AdminReporteCuotas />} />
+                  <Route path="reportes/socios" element={<AdminReporteSocios />} />
+                  <Route path="reportes/comercios" element={<AdminReporteComercios />} />
+                  <Route path="reportes/centros-costo" element={<AdminReporteCentrosCosto />} />
+                  <Route path="reportes/centros-costo/dashboard" element={<DashboardEjecutivoCentros />} />
+                  <Route path="reportes/centros-costo/evolucion" element={<EvolucionTemporalCentros />} />
+                  <Route path="reportes/centros-costo/rentabilidad" element={<RentabilidadActividades />} />
+                  <Route path="reportes/centros-costo/presupuesto" element={<PresupuestoVsReal />} />
+                  <Route path="reportes/centros-costo/movimientos" element={<MovimientosCentroCosto />} />
+                  <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
+                  <Route path="configuracion" element={<AdminTablasAuxiliares />} />
+                  <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
+                  <Route path="configuracion/autoridades" element={<AdminAutoridades />} />
+                  <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
+                  <Route path="configuracion/fiscal" element={<ConfiguracionFiscal />} />
+                  <Route path="configuracion/menu" element={<MenuAdmin />} />
+                  <Route path="configuracion/templates/email" element={<EmailTemplates />} />
+                  <Route path="configuracion/templates/pdf" element={<PdfTemplates />} />
+                  <Route path="configuracion/branding" element={<Branding />} />
+                  <Route path="configuracion/:tabla" element={<AdminConfiguracionLista />} />
+                  <Route path="configuracion/:tabla/nuevo" element={<AdminConfiguracionForm />} />
+                  <Route path="configuracion/:tabla/:id" element={<AdminConfiguracionForm />} />
 
-        {/* Ingresos */}
-        <Route path="ingresos/clientes" element={<EntidadesLista tipo="CLIENTE" />} />
-        <Route path="ingresos/clientes/nuevo" element={<EntidadForm tipo="CLIENTE" />} />
-        <Route path="ingresos/clientes/:id" element={<EntidadDetalle tipo="CLIENTE" />} />
-        <Route path="ingresos/clientes/:id/editar" element={<EntidadForm tipo="CLIENTE" />} />
-        <Route path="ingresos/pedidos" element={<PedidosLista />} />
-        <Route path="ingresos/pedidos/nuevo" element={<PedidoForm />} />
-        <Route path="ingresos/pedidos/:id" element={<PedidoDetalle />} />
-        <Route path="ingresos/pedidos/:id/editar" element={<PedidoForm />} />
-        <Route path="ingresos/facturas" element={<FacturasVentaLista />} />
-        <Route path="ingresos/facturas/nueva" element={<FacturaVentaForm />} />
-        <Route path="ingresos/facturas/:id" element={<FacturaVentaDetalle />} />
-        <Route path="ingresos/recibos" element={<RecibosCobroLista />} />
-        <Route path="ingresos/recibos/nuevo" element={<ReciboCobroForm />} />
-        <Route path="ingresos/recibos/:id" element={<ReciboCobroDetalle />} />
+                  {/* Usuarios y Roles */}
+                  <Route path="configuracion/usuarios" element={<UsuariosLista />} />
+                  <Route path="configuracion/usuarios/nuevo" element={<UsuarioForm />} />
+                  <Route path="configuracion/usuarios/:id" element={<UsuarioForm />} />
+                  <Route path="configuracion/roles" element={<RolesLista />} />
+                  <Route path="configuracion/roles/nuevo" element={<RolForm />} />
+                  <Route path="configuracion/roles/:id" element={<RolForm />} />
+                  <Route path="actividades" element={<AdminActividadesLista />} />
+                  <Route path="actividades/nueva" element={<AdminActividadForm />} />
+                  <Route path="actividades/:id" element={<AdminActividadForm />} />
+                  <Route path="actividades/:id/categoria/nueva" element={<AdminCategoriaActividadForm />} />
+                  <Route path="actividades/:id/categoria/:catId" element={<AdminCategoriaActividadForm />} />
+                  <Route path="entrenadores" element={<AdminEntrenadoresLista />} />
+                  <Route path="entrenadores/nuevo" element={<AdminEntrenadorForm />} />
+                  <Route path="entrenadores/:id" element={<AdminEntrenadorForm />} />
+                  <Route path="cuotas" element={<AdminCuotas />} />
+                  <Route path="cargos-adicionales" element={<AdminCargosAdicionales />} />
+                  <Route path="periodos" element={<AdminPeriodos />} />
 
-        {/* Egresos */}
-        <Route path="egresos/proveedores" element={<EntidadesLista tipo="PROVEEDOR" />} />
-        <Route path="egresos/proveedores/nuevo" element={<EntidadForm tipo="PROVEEDOR" />} />
-        <Route path="egresos/proveedores/:id" element={<EntidadDetalle tipo="PROVEEDOR" />} />
-        <Route path="egresos/proveedores/:id/editar" element={<EntidadForm tipo="PROVEEDOR" />} />
-        <Route path="egresos/personal" element={<EntidadesLista tipo="PERSONAL" />} />
-        <Route path="egresos/personal/nuevo" element={<EntidadForm tipo="PERSONAL" />} />
-        <Route path="egresos/personal/:id" element={<EntidadDetalle tipo="PERSONAL" />} />
-        <Route path="egresos/personal/:id/editar" element={<EntidadForm tipo="PERSONAL" />} />
-        <Route path="egresos/ordenes-compra" element={<OrdenesCompraLista />} />
-        <Route path="egresos/ordenes-compra/nueva" element={<OrdenCompraForm />} />
-        <Route path="egresos/ordenes-compra/:id" element={<OrdenCompraDetalle />} />
-        <Route path="egresos/ordenes-compra/:id/editar" element={<OrdenCompraForm />} />
-        <Route path="egresos/ordenes-compra/:id/recibir" element={<OrdenCompraDetalle />} />
-        <Route path="egresos/facturas" element={<FacturasCompraLista />} />
-        <Route path="egresos/facturas/nueva" element={<FacturaCompraForm />} />
-        <Route path="egresos/facturas/:id" element={<FacturaCompraDetalle />} />
-        <Route path="egresos/facturas/:id/pagar" element={<FacturaCompraDetalle />} />
-        <Route path="egresos/ordenes-pago" element={<OrdenesPagoLista />} />
-        <Route path="egresos/ordenes-pago/nueva" element={<OrdenPagoForm />} />
-        <Route path="egresos/ordenes-pago/:id" element={<OrdenPagoDetalle />} />
+                  {/* Ingresos */}
+                  <Route path="ingresos/clientes" element={<EntidadesLista tipo="CLIENTE" />} />
+                  <Route path="ingresos/clientes/nuevo" element={<EntidadForm tipo="CLIENTE" />} />
+                  <Route path="ingresos/clientes/:id" element={<EntidadDetalle tipo="CLIENTE" />} />
+                  <Route path="ingresos/clientes/:id/editar" element={<EntidadForm tipo="CLIENTE" />} />
+                  <Route path="ingresos/pedidos" element={<PedidosLista />} />
+                  <Route path="ingresos/pedidos/nuevo" element={<PedidoForm />} />
+                  <Route path="ingresos/pedidos/:id" element={<PedidoDetalle />} />
+                  <Route path="ingresos/pedidos/:id/editar" element={<PedidoForm />} />
+                  <Route path="ingresos/facturas" element={<FacturasVentaLista />} />
+                  <Route path="ingresos/facturas/nueva" element={<FacturaVentaForm />} />
+                  <Route path="ingresos/facturas/:id" element={<FacturaVentaDetalle />} />
+                  <Route path="ingresos/recibos" element={<RecibosCobroLista />} />
+                  <Route path="ingresos/recibos/nuevo" element={<ReciboCobroForm />} />
+                  <Route path="ingresos/recibos/:id" element={<ReciboCobroDetalle />} />
 
-        {/* Tesoreria */}
-        <Route path="tesoreria/cajas" element={<CajasLista />} />
-        <Route path="tesoreria/cajas/nueva" element={<CajaForm />} />
-        <Route path="tesoreria/cajas/:id" element={<CajaDetalle />} />
-        <Route path="tesoreria/cajas/:id/editar" element={<CajaForm />} />
-        <Route path="tesoreria/movimientos" element={<MovimientosCajaLista />} />
-        <Route path="tesoreria/movimientos/nuevo" element={<MovimientoCajaForm />} />
-        <Route path="tesoreria/transferencias" element={<TransferenciasLista />} />
-        <Route path="tesoreria/transferencias/nueva" element={<TransferenciaForm />} />
-        <Route path="tesoreria/pendientes-conciliar" element={<PendientesConciliar />} />
-        <Route path="tesoreria/conciliacion" element={<ConciliacionBancaria />} />
-        <Route path="tesoreria/conciliacion/:id" element={<ConciliacionDetalle />} />
+                  {/* Egresos */}
+                  <Route path="egresos/proveedores" element={<EntidadesLista tipo="PROVEEDOR" />} />
+                  <Route path="egresos/proveedores/nuevo" element={<EntidadForm tipo="PROVEEDOR" />} />
+                  <Route path="egresos/proveedores/:id" element={<EntidadDetalle tipo="PROVEEDOR" />} />
+                  <Route path="egresos/proveedores/:id/editar" element={<EntidadForm tipo="PROVEEDOR" />} />
+                  <Route path="egresos/personal" element={<EntidadesLista tipo="PERSONAL" />} />
+                  <Route path="egresos/personal/nuevo" element={<EntidadForm tipo="PERSONAL" />} />
+                  <Route path="egresos/personal/:id" element={<EntidadDetalle tipo="PERSONAL" />} />
+                  <Route path="egresos/personal/:id/editar" element={<EntidadForm tipo="PERSONAL" />} />
+                  <Route path="egresos/ordenes-compra" element={<OrdenesCompraLista />} />
+                  <Route path="egresos/ordenes-compra/nueva" element={<OrdenCompraForm />} />
+                  <Route path="egresos/ordenes-compra/:id" element={<OrdenCompraDetalle />} />
+                  <Route path="egresos/ordenes-compra/:id/editar" element={<OrdenCompraForm />} />
+                  <Route path="egresos/ordenes-compra/:id/recibir" element={<OrdenCompraDetalle />} />
+                  <Route path="egresos/facturas" element={<FacturasCompraLista />} />
+                  <Route path="egresos/facturas/nueva" element={<FacturaCompraForm />} />
+                  <Route path="egresos/facturas/:id" element={<FacturaCompraDetalle />} />
+                  <Route path="egresos/facturas/:id/pagar" element={<FacturaCompraDetalle />} />
+                  <Route path="egresos/ordenes-pago" element={<OrdenesPagoLista />} />
+                  <Route path="egresos/ordenes-pago/nueva" element={<OrdenPagoForm />} />
+                  <Route path="egresos/ordenes-pago/:id" element={<OrdenPagoDetalle />} />
 
-        {/* Contabilidad */}
-        <Route path="contabilidad/plan-cuentas" element={<PlanCuentasLista />} />
-        <Route path="contabilidad/plan-cuentas/nuevo" element={<CuentaContableForm />} />
-        <Route path="contabilidad/plan-cuentas/:id" element={<CuentaContableForm />} />
-        <Route path="contabilidad/asientos" element={<AsientosLista />} />
-        <Route path="contabilidad/asientos/nuevo" element={<AsientoForm />} />
-        <Route path="contabilidad/asientos/:id" element={<AsientoDetalle />} />
-        <Route path="contabilidad/asientos/:id/editar" element={<AsientoForm />} />
-        <Route path="contabilidad/libro-mayor" element={<LibroMayor />} />
-        <Route path="contabilidad/presupuestos" element={<PresupuestosLista />} />
-        <Route path="contabilidad/presupuestos/vigente" element={<PresupuestoVigente />} />
-        <Route path="contabilidad/presupuestos/:id" element={<PresupuestoEditor />} />
-        <Route path="contabilidad/presupuestos/:id/ejecucion" element={<PresupuestoEjecucion />} />
+                  {/* Tesoreria */}
+                  <Route path="tesoreria/cajas" element={<CajasLista />} />
+                  <Route path="tesoreria/cajas/nueva" element={<CajaForm />} />
+                  <Route path="tesoreria/cajas/:id" element={<CajaDetalle />} />
+                  <Route path="tesoreria/cajas/:id/editar" element={<CajaForm />} />
+                  <Route path="tesoreria/movimientos" element={<MovimientosCajaLista />} />
+                  <Route path="tesoreria/movimientos/nuevo" element={<MovimientoCajaForm />} />
+                  <Route path="tesoreria/transferencias" element={<TransferenciasLista />} />
+                  <Route path="tesoreria/transferencias/nueva" element={<TransferenciaForm />} />
+                  <Route path="tesoreria/pendientes-conciliar" element={<PendientesConciliar />} />
+                  <Route path="tesoreria/conciliacion" element={<ConciliacionBancaria />} />
+                  <Route path="tesoreria/conciliacion/:id" element={<ConciliacionDetalle />} />
 
-        {/* Stock */}
-        <Route path="stock/productos" element={<ProductosLista />} />
-        <Route path="stock/productos/nuevo" element={<ProductoForm />} />
-        <Route path="stock/productos/:id" element={<ProductoForm />} />
-        <Route path="stock/categorias" element={<CategoriasProducto />} />
-        <Route path="stock/movimientos" element={<MovimientosStockLista />} />
-        <Route path="stock/movimientos/ajuste" element={<AjusteStockForm />} />
-        <Route path="stock/alertas" element={<AlertasStock />} />
+                  {/* Contabilidad */}
+                  <Route path="contabilidad/plan-cuentas" element={<PlanCuentasLista />} />
+                  <Route path="contabilidad/plan-cuentas/nuevo" element={<CuentaContableForm />} />
+                  <Route path="contabilidad/plan-cuentas/:id" element={<CuentaContableForm />} />
+                  <Route path="contabilidad/asientos" element={<AsientosLista />} />
+                  <Route path="contabilidad/asientos/nuevo" element={<AsientoForm />} />
+                  <Route path="contabilidad/asientos/:id" element={<AsientoDetalle />} />
+                  <Route path="contabilidad/asientos/:id/editar" element={<AsientoForm />} />
+                  <Route path="contabilidad/libro-mayor" element={<LibroMayor />} />
+                  <Route path="contabilidad/presupuestos" element={<PresupuestosLista />} />
+                  <Route path="contabilidad/presupuestos/vigente" element={<PresupuestoVigente />} />
+                  <Route path="contabilidad/presupuestos/:id" element={<PresupuestoEditor />} />
+                  <Route path="contabilidad/presupuestos/:id/ejecucion" element={<PresupuestoEjecucion />} />
 
-        {/* Liquidaciones de Sueldos */}
-        <Route path="liquidaciones" element={<LiquidacionesLista />} />
-        <Route path="liquidaciones/nueva" element={<LiquidacionForm />} />
-        <Route path="liquidaciones/:id" element={<LiquidacionDetalle />} />
-        <Route path="liquidaciones/conceptos" element={<ConceptosLiquidacion />} />
+                  {/* Stock */}
+                  <Route path="stock/productos" element={<ProductosLista />} />
+                  <Route path="stock/productos/nuevo" element={<ProductoForm />} />
+                  <Route path="stock/productos/:id" element={<ProductoForm />} />
+                  <Route path="stock/categorias" element={<CategoriasProducto />} />
+                  <Route path="stock/movimientos" element={<MovimientosStockLista />} />
+                  <Route path="stock/movimientos/ajuste" element={<AjusteStockForm />} />
+                  <Route path="stock/alertas" element={<AlertasStock />} />
 
-        {/* Deportes */}
-        <Route path="deportes/tipos-espacio" element={<TiposEspacioConfig />} />
-        <Route path="deportes/espacios" element={<EspaciosLista />} />
-        <Route path="deportes/espacios/nuevo" element={<EspacioForm />} />
-        <Route path="deportes/espacios/:id" element={<EspacioForm />} />
-        <Route path="deportes/horarios" element={<HorariosRecurrentes />} />
-        <Route path="deportes/entrenamientos" element={<EntrenamientosCalendario />} />
-        <Route path="deportes/asistencia/:id" element={<AsistenciaEntrenamiento />} />
-        <Route path="partidos" element={<Partidos />} />
-        <Route path="partidos/:id" element={<PartidoDetalle />} />
-        <Route path="reportes/deportivos" element={<ReportesDeportivos />} />
-        <Route path="deportes/pasaje-categoria" element={<PasajeCategoria />} />
+                  {/* Liquidaciones de Sueldos */}
+                  <Route path="liquidaciones" element={<LiquidacionesLista />} />
+                  <Route path="liquidaciones/nueva" element={<LiquidacionForm />} />
+                  <Route path="liquidaciones/:id" element={<LiquidacionDetalle />} />
+                  <Route path="liquidaciones/conceptos" element={<ConceptosLiquidacion />} />
 
-        {/* Buffet */}
-        <Route path="buffet" element={<BuffetDashboard />} />
-        <Route path="buffet/estado" element={<BuffetEstadoMesas />} />
-        <Route path="buffet/mesas" element={<BuffetMesas />} />
-        <Route path="buffet/categorias" element={<BuffetCategorias />} />
-        <Route path="buffet/productos" element={<BuffetProductos />} />
-        <Route path="buffet/productos/importar" element={<ImportarProductos />} />
-        <Route path="buffet/productos/:productoId/opciones" element={<BuffetProductoOpciones />} />
-        <Route path="buffet/precios" element={<BuffetPrecios />} />
-        <Route path="buffet/comanda/:mesaId" element={<BuffetComanda />} />
-        <Route path="buffet/kds" element={<BuffetCocina />} />
-        <Route path="buffet/kds/:sector" element={<BuffetCocina />} />
-        <Route path="buffet/cocina" element={<BuffetCocina />} />
-        <Route path="buffet/kiosco" element={<BuffetKiosco />} />
-        <Route path="buffet/takeaway" element={<BuffetTakeAway />} />
-        <Route path="buffet/barra" element={<BuffetBarra />} />
-        <Route path="buffet/impresoras" element={<BuffetImpresoras />} />
+                  {/* Deportes */}
+                  <Route path="deportes/tipos-espacio" element={<TiposEspacioConfig />} />
+                  <Route path="deportes/espacios" element={<EspaciosLista />} />
+                  <Route path="deportes/espacios/nuevo" element={<EspacioForm />} />
+                  <Route path="deportes/espacios/:id" element={<EspacioForm />} />
+                  <Route path="deportes/horarios" element={<HorariosRecurrentes />} />
+                  <Route path="deportes/entrenamientos" element={<EntrenamientosCalendario />} />
+                  <Route path="deportes/asistencia/:id" element={<AsistenciaEntrenamiento />} />
+                  <Route path="partidos" element={<Partidos />} />
+                  <Route path="partidos/:id" element={<PartidoDetalle />} />
+                  <Route path="reportes/deportivos" element={<ReportesDeportivos />} />
+                  <Route path="deportes/pasaje-categoria" element={<PasajeCategoria />} />
 
-        {/* Control de Accesos */}
-        <Route path="accesos/monitor" element={<MonitorAccesos />} />
-        <Route path="accesos/intentos-denegados" element={<IntentosDenegados />} />
-        <Route path="accesos/habilitaciones" element={<Habilitaciones />} />
-        <Route path="accesos/control-pwa" element={<ControlPWA />} />
+                  {/* Buffet */}
+                  <Route path="buffet" element={<BuffetDashboard />} />
+                  <Route path="buffet/estado" element={<BuffetEstadoMesas />} />
+                  <Route path="buffet/mesas" element={<BuffetMesas />} />
+                  <Route path="buffet/categorias" element={<BuffetCategorias />} />
+                  <Route path="buffet/productos" element={<BuffetProductos />} />
+                  <Route path="buffet/productos/importar" element={<ImportarProductos />} />
+                  <Route path="buffet/productos/:productoId/opciones" element={<BuffetProductoOpciones />} />
+                  <Route path="buffet/precios" element={<BuffetPrecios />} />
+                  <Route path="buffet/comanda/:mesaId" element={<BuffetComanda />} />
+                  <Route path="buffet/kds" element={<BuffetCocina />} />
+                  <Route path="buffet/kds/:sector" element={<BuffetCocina />} />
+                  <Route path="buffet/cocina" element={<BuffetCocina />} />
+                  <Route path="buffet/kiosco" element={<BuffetKiosco />} />
+                  <Route path="buffet/takeaway" element={<BuffetTakeAway />} />
+                  <Route path="buffet/barra" element={<BuffetBarra />} />
+                  <Route path="buffet/impresoras" element={<BuffetImpresoras />} />
 
-        {/* Eventos */}
-        <Route path="eventos" element={<EventosLista />} />
-        <Route path="eventos/vender" element={<VentaEntradas />} />
-        <Route path="eventos/nuevo" element={<EventoForm />} />
-        <Route path="eventos/:id" element={<EventoDetalle />} />
-        <Route path="eventos/:id/editar" element={<EventoForm />} />
+                  {/* Control de Accesos */}
+                  <Route path="accesos/monitor" element={<MonitorAccesos />} />
+                  <Route path="accesos/intentos-denegados" element={<IntentosDenegados />} />
+                  <Route path="accesos/habilitaciones" element={<Habilitaciones />} />
+                  <Route path="accesos/control-pwa" element={<ControlPWA />} />
 
-        {/* Reservas */}
-        <Route path="reservas" element={<ReservasCalendario />} />
-        <Route path="reservas/config" element={<ConfigReservas />} />
+                  {/* Eventos */}
+                  <Route path="eventos" element={<EventosLista />} />
+                  <Route path="eventos/vender" element={<VentaEntradas />} />
+                  <Route path="eventos/nuevo" element={<EventoForm />} />
+                  <Route path="eventos/:id" element={<EventoDetalle />} />
+                  <Route path="eventos/:id/editar" element={<EventoForm />} />
 
-        {/* Gestión de Cobranzas */}
-        <Route path="cobranzas" element={<GestionCobranzas />} />
-        <Route path="cobranzas/:id" element={<DetalleGestion />} />
+                  {/* Reservas */}
+                  <Route path="reservas" element={<ReservasCalendario />} />
+                  <Route path="reservas/config" element={<ConfigReservas />} />
 
-        {/* Gestión de Recupero */}
-        <Route path="recupero" element={<GestionRecupero />} />
+                  {/* Gestión de Cobranzas */}
+                  <Route path="cobranzas" element={<GestionCobranzas />} />
+                  <Route path="cobranzas/:id" element={<DetalleGestion />} />
 
-        {/* Gestión de Comunicaciones */}
-        <Route path="comunicaciones" element={<GestionComunicaciones />} />
-        <Route path="comunicaciones/campanas/:id" element={<DetalleCampana />} />
+                  {/* Gestión de Recupero */}
+                  <Route path="recupero" element={<GestionRecupero />} />
 
-        {/* Chat Entrenadores */}
-        <Route path="chat-entrenadores" element={<AdminChatEntrenadores />} />
+                  {/* Gestión de Comunicaciones */}
+                  <Route path="comunicaciones" element={<GestionComunicaciones />} />
+                  <Route path="comunicaciones/campanas/:id" element={<DetalleCampana />} />
 
-        {/* Gestión de Tenants (solo superadmin) */}
-        <Route path="tenants" element={<TenantsList />} />
-        <Route path="tenants/nuevo" element={<TenantForm />} />
-        <Route path="tenants/:id" element={<TenantDetail />} />
-        <Route path="tenants/:id/editar" element={<TenantForm />} />
-        <Route path="uso" element={<TenantUsage />} />
-        <Route path="ia-metricas" element={<IAMetricas />} />
-      </Route>
-            </Routes>
-            </NotificacionBuffetProvider>
-          </TicketProvider>
-        </TenantProvider>
-      </ErrorBoundary>
-    )
-  }
+                  {/* Chat Entrenadores */}
+                  <Route path="chat-entrenadores" element={<AdminChatEntrenadores />} />
+
+                  {/* Gestión de Tenants (solo superadmin) */}
+                  <Route path="tenants" element={<TenantsList />} />
+                  <Route path="tenants/nuevo" element={<TenantForm />} />
+                  <Route path="tenants/:id" element={<TenantDetail />} />
+                  <Route path="tenants/:id/editar" element={<TenantForm />} />
+                  <Route path="uso" element={<TenantUsage />} />
+                  <Route path="ia-metricas" element={<IAMetricas />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </NotificacionBuffetProvider>
+        </TicketProvider>
+      </TenantProvider>
+    </ErrorBoundary>
+  )
+}
 
 export default App
