@@ -10,6 +10,22 @@ import toast from 'react-hot-toast'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
+const AVATAR_COLORS = [
+  ['#1a73e8', '#fff'], ['#e53935', '#fff'], ['#43a047', '#fff'],
+  ['#fb8c00', '#fff'], ['#8e24aa', '#fff'], ['#00897b', '#fff'],
+  ['#d81b60', '#fff'], ['#3949ab', '#fff'], ['#6d4c41', '#fff'],
+]
+
+function avatarData(nombre) {
+  const partes = (nombre || '?').trim().split(/\s+/)
+  const ini = partes.length >= 2
+    ? partes[0][0] + partes[1][0]
+    : partes[0].slice(0, 2)
+  const idx = (nombre || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % AVATAR_COLORS.length
+  const [bg, color] = AVATAR_COLORS[idx]
+  return { ini: ini.toUpperCase(), bg, color }
+}
+
 export default function PartidoDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -370,8 +386,9 @@ export default function PartidoDetalle() {
                                 className="w-10 h-10 rounded-full object-cover"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-medium">
-                                {socio.apellidoNombre?.charAt(0)}
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm"
+                                style={{ backgroundColor: avatarData(socio.apellidoNombre).bg, color: avatarData(socio.apellidoNombre).color }}>
+                                {avatarData(socio.apellidoNombre).ini}
                               </div>
                             )}
                             <div>
@@ -439,8 +456,9 @@ export default function PartidoDetalle() {
                                 className="w-10 h-10 rounded-full object-cover"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-medium">
-                                {socio.apellidoNombre?.charAt(0)}
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm"
+                                style={{ backgroundColor: avatarData(socio.apellidoNombre).bg, color: avatarData(socio.apellidoNombre).color }}>
+                                {avatarData(socio.apellidoNombre).ini}
                               </div>
                             )}
                             <div>
@@ -569,8 +587,9 @@ export default function PartidoDetalle() {
                                   className="w-8 h-8 rounded-full object-cover"
                                 />
                               ) : (
-                                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-xs font-medium">
-                                  {est.socio?.apellidoNombre?.charAt(0)}
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
+                                  style={{ backgroundColor: avatarData(est.socio?.apellidoNombre).bg, color: avatarData(est.socio?.apellidoNombre).color }}>
+                                  {avatarData(est.socio?.apellidoNombre).ini}
                                 </div>
                               )}
                               <span className="font-medium">{est.socio?.apellidoNombre}</span>
