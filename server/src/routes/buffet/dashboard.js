@@ -8,17 +8,33 @@ import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 
 const router = express.Router()
 
+// UTC-3 (Argentina). Medianoche Argentina = UTC 03:00.
+const AR_UTC_OFFSET = 3
+
 /**
- * Parsea strings "YYYY-MM-DD" a fechas UTC que coinciden directamente
- * con los timestamps sin zona horaria almacenados en la DB (hora local Argentina).
- * Elimina la necesidad de correcciones de offset por timezone del browser/servidor.
+ * Parsea strings "YYYY-MM-DD" a timestamps UTC que representan el inicio/fin
+ * del día en horario de Argentina (UTC-3).
  */
 function parseFechas(desdeStr, hastaStr) {
   const [dy, dm, dd] = desdeStr.split('-').map(Number)
   const [hy, hm, hd] = hastaStr.split('-').map(Number)
   return {
-    fd: new Date(Date.UTC(dy, dm - 1, dd, 0, 0, 0, 0)),
-    fh: new Date(Date.UTC(hy, hm - 1, hd, 23, 59, 59, 999)),
+    fd: new Date(Date.UTC(dy, dm - 1, dd, AR_UTC_OFFSET, 0, 0, 0)),
+    fh: new Date(Date.UTC(hy, hm - 1, hd, 23 + AR_UTC_OFFSET, 59, 59, 999)),
+  }
+}
+
+/**
+ * Retorna { hoy, manana } como timestamps UTC correspondientes a
+ * inicio y fin del día actual en Argentina (UTC-3).
+ */
+function getArgentinaDayBounds() {
+  const now = new Date()
+  const arNow = new Date(now.getTime() - AR_UTC_OFFSET * 60 * 60 * 1000)
+  const y = arNow.getUTCFullYear(), m = arNow.getUTCMonth(), d = arNow.getUTCDate()
+  return {
+    hoy: new Date(Date.UTC(y, m, d, AR_UTC_OFFSET, 0, 0, 0)),
+    manana: new Date(Date.UTC(y, m, d + 1, AR_UTC_OFFSET, 0, 0, 0)),
   }
 }
 
@@ -28,10 +44,7 @@ function parseFechas(desdeStr, hastaStr) {
  */
 router.get('/dashboard', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) => {
   try {
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
-    const manana = new Date(hoy)
-    manana.setDate(manana.getDate() + 1)
+    const { hoy, manana } = getArgentinaDayBounds()
 
     // Mesas
     const mesasTotal = await req.db.mesa.count({ where: { activo: true } })
