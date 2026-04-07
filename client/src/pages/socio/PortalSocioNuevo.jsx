@@ -401,6 +401,9 @@ export default function PortalSocioNuevo() {
 
             {/* Espacio adicional para botón home en iOS */}
             <div className="h-8"></div>
+
+            {/* Powered by */}
+            <p className="text-center text-[10px] text-gray-400 pb-2">Powered by AxiomaCloud</p>
           </div>
         </div>
       )}

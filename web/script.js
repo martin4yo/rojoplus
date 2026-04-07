@@ -86,6 +86,45 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
+// ── Feature cards: 3D tilt + cursor glow ─────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const tiltCards = document.querySelectorAll('[data-tilt]');
+
+    tiltCards.forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect   = card.getBoundingClientRect();
+            const x      = e.clientX - rect.left;
+            const y      = e.clientY - rect.top;
+            const cx     = rect.width  / 2;
+            const cy     = rect.height / 2;
+            const dx     = (x - cx) / cx;   // -1 … +1
+            const dy     = (y - cy) / cy;
+            const tiltX  = -dy * 8;          // ±8°
+            const tiltY  =  dx * 8;
+            card.style.transform = `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateZ(4px)`;
+            // brillo que sigue al cursor
+            card.style.setProperty('--mx', `${(x / rect.width)  * 100}%`);
+            card.style.setProperty('--my', `${(y / rect.height) * 100}%`);
+        });
+
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = '';
+        });
+    });
+});
+
+// ── Parallax sutil en el fondo de features ───────────────
+window.addEventListener('scroll', () => {
+    const bg = document.querySelector('.features-parallax-bg');
+    if (!bg) return;
+    const section = bg.closest('.features');
+    if (!section) return;
+    const rect   = section.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+    const progress = (window.innerHeight - rect.top) / (window.innerHeight + rect.height);
+    bg.style.transform = `translateY(${(progress - 0.5) * 80}px)`;
+}, { passive: true });
+
 // Contact form submission
 const contactForm = document.querySelector('.contact-form');
 

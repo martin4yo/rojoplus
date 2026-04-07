@@ -450,6 +450,11 @@ export default function AdminLayout() {
               Ver sitio web
             </span>
           </a>
+          {!sidebarCollapsed && (
+            <p className="px-3 pt-2 text-[10px] text-gray-600 whitespace-nowrap">
+              Powered by AxiomaCloud
+            </p>
+          )}
         </div>
 
         {/* Flyout de segundo nivel cuando sidebar está colapsado */}
