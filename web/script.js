@@ -125,6 +125,29 @@ window.addEventListener('scroll', () => {
     bg.style.transform = `translateY(${(progress - 0.5) * 80}px)`;
 }, { passive: true });
 
+// Toast notification
+function showToast(message, type = 'success') {
+    const existing = document.getElementById('clubix-toast');
+    if (existing) existing.remove();
+
+    const icons = {
+        success: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>`,
+        error:   `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>`,
+    };
+
+    const toast = document.createElement('div');
+    toast.id = 'clubix-toast';
+    toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${message}</span>`;
+    toast.className = `clubix-toast clubix-toast--${type}`;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('clubix-toast--show'));
+    setTimeout(() => {
+        toast.classList.remove('clubix-toast--show');
+        setTimeout(() => toast.remove(), 400);
+    }, 4000);
+}
+
 // Contact form submission
 const contactForm = document.querySelector('.contact-form');
 
@@ -132,24 +155,26 @@ if (contactForm) {
     contactForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        const formData = new FormData(contactForm);
-        const data = Object.fromEntries(formData);
-
-        // Show loading state
         const submitBtn = contactForm.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
         submitBtn.textContent = 'Enviando...';
         submitBtn.disabled = true;
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            const data = Object.fromEntries(new FormData(contactForm));
 
-            // Show success message
-            alert('¡Gracias! Nos pondremos en contacto contigo pronto.');
+            const res = await fetch('https://formspree.io/f/mvzvljyq', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(data),
+            });
+
+            if (!res.ok) throw new Error('Error al enviar');
+
+            showToast('¡Gracias! Nos pondremos en contacto contigo pronto.');
             contactForm.reset();
         } catch (error) {
-            alert('Hubo un error. Por favor intenta nuevamente.');
+            showToast('Hubo un error. Por favor intenta nuevamente.', 'error');
         } finally {
             submitBtn.textContent = originalText;
             submitBtn.disabled = false;
@@ -278,9 +303,46 @@ document.querySelectorAll('.btn-primary, .btn-secondary').forEach(button => {
     });
 });
 
-// Add CSS for ripple effect
+// Add CSS for ripple effect + toast
 const style = document.createElement('style');
 style.textContent = `
+    /* ── Toast ─────────────────────────────────────────── */
+    .clubix-toast {
+        position: fixed;
+        bottom: 32px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 24px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 500;
+        color: #fff;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        opacity: 0;
+        transition: opacity 0.35s ease, transform 0.35s ease;
+        z-index: 9999;
+        max-width: 90vw;
+        pointer-events: none;
+    }
+    .clubix-toast--show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    .clubix-toast--success {
+        background: linear-gradient(135deg, #3B9FF3, #00D4D4);
+    }
+    .clubix-toast--error {
+        background: linear-gradient(135deg, #ef4444, #b91c1c);
+    }
+    .toast-icon {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
     .btn-primary, .btn-secondary {
         position: relative;
         overflow: hidden;
