@@ -129,7 +129,7 @@ export default function AccesoSocio() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-light rounded-full mb-4">
             <QrCode className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Accedé a tu portal</h1>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Obtené tu QR para acceder a los beneficios en comercios</h1>
           <p className="text-gray-600">
             Ingresá tu número de socio o DNI y te enviamos el link de acceso
             {waEnabled ? ' por email o WhatsApp' : ' a tu email registrado'}
