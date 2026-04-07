@@ -6,6 +6,7 @@ import { enviarLinkPortal } from '../services/whatsappService.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
 import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.js'
 import { generatePDF } from '../services/pdfGenerator.js'
+import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 
 const router = Router()
 
@@ -59,9 +60,9 @@ router.post('/enviar-qr', asyncHandler(async (req, res) => {
   }
 
   // Generar URL del QR y portal
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-  const portalUrl = `${frontendUrl}/portal-socio/${socio.tokenPortal}`
-  const qrUrl = `${frontendUrl}/s/${socio.tokenPortal}`
+  const baseUrl = getTenantFrontendUrl(req.tenant)
+  const portalUrl = `${baseUrl}/portal-socio/${socio.tokenPortal}`
+  const qrUrl = `${baseUrl}/s/${socio.tokenPortal}`
 
   // Enviar email con QR
   const { enviarEmailQRSocio } = await import('../services/email.js')
@@ -129,15 +130,7 @@ router.post('/enviar-link-whatsapp', asyncHandler(async (req, res) => {
     throw new AppError('Error al obtener tu acceso. Contacta al club.', 500, 'NO_TOKEN')
   }
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-  // Construir URL con tenant slug para multi-tenant
-  const tenantSlug = req.tenant?.subdomain
-  let baseUrl = frontendUrl
-  if (tenantSlug && process.env.NODE_ENV === 'production') {
-    const urlObj = new URL(frontendUrl)
-    baseUrl = `${urlObj.protocol}//${tenantSlug}.${urlObj.host}`
-  }
-  const portalUrl = `${baseUrl}/portal-socio/${socio.tokenPortal}`
+  const portalUrl = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${socio.tokenPortal}`
 
   const { enviarWhatsApp } = await import('../services/whatsappService.js')
   const resultado = await enviarWhatsApp({
@@ -208,14 +201,7 @@ router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
     throw new AppError('Error al obtener tu QR. Contactá al club.', 500, 'NO_TOKEN')
   }
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-  const tenantSlug = req.tenant?.subdomain
-  let baseUrl = frontendUrl
-  if (tenantSlug && process.env.NODE_ENV === 'production') {
-    const urlObj = new URL(frontendUrl)
-    baseUrl = `${urlObj.protocol}//${tenantSlug}.${urlObj.host}`
-  }
-  const qrUrl = `${baseUrl}/s/${socio.tokenPortal}`
+  const qrUrl = `${getTenantFrontendUrl(req.tenant)}/s/${socio.tokenPortal}`
 
   // Leer color primario del branding del tenant (fallback rojo)
   const tenant = await req.db.tenant.findUnique({
@@ -371,8 +357,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
     },
   })
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-  const portalLink = `${frontendUrl}/s/${token}`
+  const portalLink = `${getTenantFrontendUrl(req.tenant)}/s/${token}`
 
   if (metodo === 'whatsapp') {
     // Enviar solo por WhatsApp
@@ -1171,7 +1156,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
 
   if (metodoPago === 'MERCADOPAGO') {
     // Integración con MercadoPago
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    const baseUrl = getTenantFrontendUrl(req.tenant)
 
     const periodo = cargo.periodo ? `${cargo.periodo.nombre}/${cargo.periodo.anio}` : ''
 
@@ -1274,7 +1259,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
 
   if (metodoPago === 'MERCADOPAGO') {
     // Integración con MercadoPago
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    const baseUrl = getTenantFrontendUrl(req.tenant)
 
     const preferencia = await crearPreferenciaPago({
       title: `Pago de ${cargos.length} cuota(s)`,

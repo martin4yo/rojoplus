@@ -4,8 +4,17 @@ import { enviarNotificacionPush } from './webPush.js'
 import { getMailConfig } from './email.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
 import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora, obtenerTelefonoSocio } from './whatsappService.js'
+import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 
-const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+// Caché simple de URLs por tenantId para no repetir queries en el mismo ciclo de jobs
+const _tenantUrlCache = new Map()
+async function getTenantUrl(tenantId) {
+  if (_tenantUrlCache.has(tenantId)) return _tenantUrlCache.get(tenantId)
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { subdomain: true, dominioCustom: true } })
+  const url = getTenantFrontendUrl(tenant)
+  _tenantUrlCache.set(tenantId, url)
+  return url
+}
 
 // ============================================================================
 // FUNCIONES AUXILIARES
@@ -350,7 +359,7 @@ export async function notificarCuotaProximaVencer(cargo) {
       montoTotal: cargo.montoTotal.toString(),
       fechaVencimiento: fechaVencimiento.toLocaleDateString('es-AR'),
       diasRestantes: diasRestantes.toString(),
-      linkPortal: `${frontendUrl}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
     }
 
     // Email
@@ -409,7 +418,7 @@ export async function notificarCuotaVencida(cargo) {
       cargoDescripcion: cargo.descripcion || 'Cuota mensual',
       montoTotal: cargo.montoTotal.toString(),
       fechaVencimiento: new Date(cargo.fechaVencimiento).toLocaleDateString('es-AR'),
-      linkPortal: `${frontendUrl}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
     }
 
     // Email
@@ -483,7 +492,7 @@ export async function notificarMorosidad(socioId) {
       nroSocio: socio.nroSocio,
       cantidadCuotas: cuotasVencidas.length.toString(),
       totalAdeudado: totalAdeudado.toFixed(2),
-      linkPortal: `${frontendUrl}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
       cuotas: cuotasVencidas.map((c) => ({
         descripcion: c.descripcion,
         monto: c.montoTotal.toString(),
@@ -555,7 +564,7 @@ export async function notificarInscripcionConfirmada(inscripcionId) {
       actividad: inscripcion.categoriaActividad.actividad.nombre,
       categoria: inscripcion.categoriaActividad.nombre,
       fechaInicio: new Date(inscripcion.fechaInicio).toLocaleDateString('es-AR'),
-      linkPortal: `${frontendUrl}/s/${inscripcion.socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(inscripcion.socio.tenantId)}/s/${inscripcion.socio.tokenPortal}`,
     }
 
     await programarNotificacion({
@@ -597,8 +606,8 @@ export async function notificarBienvenida(socioId) {
       socioNombre: socio.apellidoNombre,
       nroSocio: socio.nroSocio,
       fechaAlta: socio.fechaAlta ? new Date(socio.fechaAlta).toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR'),
-      linkPortal: `${frontendUrl}/s/${socio.tokenPortal}`,
-      linkMiQR: `${frontendUrl}/mi-qr`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
+      linkMiQR: `${await getTenantUrl(socio.tenantId)}/mi-qr`,
     }
 
     await programarNotificacion({
@@ -838,7 +847,7 @@ export async function notificarConvocatoriaPartido(partidoId, socioId) {
       hora: partido.hora || '',
       lugar: partido.lugar || '',
       esLocal: partido.esLocal ? 'LOCAL' : 'VISITANTE',
-      linkPortal: `${frontendUrl}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
     }
 
     await programarNotificacion({
