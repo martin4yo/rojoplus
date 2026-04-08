@@ -211,13 +211,11 @@ export default function MenuAdmin() {
   }
 
   async function handleDelete(item) {
-    const confirmado = await confirm({
-      title: 'Eliminar Item de Menú',
-      message: `¿Eliminar "${item.titulo}"${item.children?.length > 0 ? ` y sus ${item.children.length} subitems` : ''}?`,
-      confirmText: 'Eliminar',
-      cancelText: 'Cancelar',
-      isDangerous: true
-    })
+    const confirmado = await confirm(
+      'Eliminar Item de Menú',
+      `¿Eliminar "${item.titulo}"${item.children?.length > 0 ? ` y sus ${item.children.length} subitems` : ''}?`,
+      { confirmText: 'Eliminar', cancelText: 'Cancelar', variant: 'danger' }
+    )
 
     if (!confirmado) return
 
@@ -288,12 +286,11 @@ export default function MenuAdmin() {
   }
 
   async function handleSeedMenu() {
-    const confirmado = await confirm({
-      title: 'Crear Menú Inicial',
-      message: '¿Crear el menú inicial? Solo funciona si la tabla está vacía.',
-      confirmText: 'Crear',
-      cancelText: 'Cancelar'
-    })
+    const confirmado = await confirm(
+      'Crear Menú Inicial',
+      '¿Crear el menú inicial? Solo funciona si la tabla está vacía.',
+      { confirmText: 'Crear', cancelText: 'Cancelar', variant: 'primary' }
+    )
 
     if (!confirmado) return
 

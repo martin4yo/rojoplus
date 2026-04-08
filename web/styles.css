@@ -1130,45 +1130,124 @@ body {
         display: flex;
     }
 
+    /* Hero */
     .hero-content {
         grid-template-columns: 1fr;
+        gap: 32px;
         text-align: center;
+        padding: 40px 0;
     }
 
     .hero-text h1 {
-        font-size: 36px;
+        font-size: 32px;
+    }
+
+    .hero-subtitle {
+        font-size: 16px;
     }
 
     .hero-buttons {
         flex-direction: column;
+        align-items: center;
     }
 
     .stats-bar {
+        flex-wrap: wrap;
         justify-content: center;
-        gap: 24px;
+        gap: 20px;
     }
 
     .dashboard-preview {
         transform: none;
     }
 
+    /* Sections padding */
+    .features {
+        padding: 70px 0 60px;
+    }
+
+    .modules {
+        padding: 60px 0;
+    }
+
+    .rojo-ia {
+        padding: 60px 0;
+    }
+
+    .benefits {
+        padding: 60px 0;
+    }
+
+    .pricing {
+        padding: 60px 0;
+    }
+
+    .cta {
+        padding: 60px 0;
+    }
+
+    .contact {
+        padding: 60px 0;
+    }
+
+    /* Section headings */
+    .section-header {
+        margin-bottom: 40px;
+    }
+
+    .section-header h2 {
+        font-size: 28px;
+    }
+
+    .section-header p {
+        font-size: 16px;
+    }
+
+    .features-header h2 {
+        font-size: 28px;
+    }
+
+    /* Features */
     .features-grid {
         grid-template-columns: 1fr;
     }
 
+    /* Modules — fix minmax overflow */
     .modules-grid {
         grid-template-columns: 1fr;
     }
 
+    .module-card {
+        padding: 28px 20px;
+    }
+
+    /* IA */
     .rojo-ia-content {
         grid-template-columns: 1fr;
+        gap: 40px;
         text-align: center;
     }
 
-    .contact-grid {
-        grid-template-columns: 1fr;
+    .rojo-ia-text h2 {
+        font-size: 28px;
     }
 
+    .ai-visual {
+        width: 200px;
+        height: 200px;
+    }
+
+    .ai-circle:nth-child(1) { width: 170px; height: 170px; top: 15px; left: 15px; }
+    .ai-circle:nth-child(2) { width: 130px; height: 130px; top: 35px; left: 35px; }
+    .ai-circle:nth-child(3) { width: 100px; height: 100px; top: 50px; left: 50px; }
+
+    /* Benefits */
+    .benefits-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+    }
+
+    /* Pricing — fix minmax overflow */
     .pricing-grid {
         grid-template-columns: 1fr;
     }
@@ -1177,11 +1256,66 @@ body {
         transform: none;
     }
 
-    .footer-content {
-        grid-template-columns: 1fr;
+    .pricing-card {
+        padding: 28px 20px;
     }
 
+    /* CTA */
+    .cta-content h2 {
+        font-size: 28px;
+    }
+
+    .cta-content p {
+        font-size: 16px;
+    }
+
+    /* Contact */
+    .contact-grid {
+        grid-template-columns: 1fr;
+        gap: 40px;
+    }
+
+    .contact-info h2 {
+        font-size: 28px;
+    }
+
+    .contact-form {
+        padding: 24px 16px;
+    }
+
+    /* WhatsApp IA */
+    .whatsapp-ia-grid {
+        grid-template-columns: 1fr !important;
+        gap: 40px !important;
+    }
+
+    .whatsapp-chat-mockup {
+        width: 100% !important;
+        max-width: 320px;
+        box-sizing: border-box;
+    }
+
+    /* Parallax */
     .parallax-image {
         background-attachment: scroll;
+    }
+
+    .parallax-overlay h2 {
+        font-size: 28px;
+    }
+
+    .parallax-overlay p {
+        font-size: 16px;
+    }
+
+    /* Footer */
+    .footer-content {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+
+    .footer-links {
+        flex-wrap: wrap;
+        gap: 32px;
     }
 }
