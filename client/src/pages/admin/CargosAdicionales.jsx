@@ -417,34 +417,53 @@ function TabGenerar({ conceptosDB, actividades, categoriasActividad, categoriasC
 }
 
 // ── Tab Consultar ────────────────────────────────────────────────────────────
-function TabConsultar({ loteInicial }) {
-  const [loteInput, setLoteInput] = useState(loteInicial || '')
+function TabConsultar({ loteInicial, conceptos, categoriasCargo }) {
+  const [filtros, setFiltros] = useState({ fechaDesde: '', fechaHasta: '', conceptoTesoreriaId: '', categoria: '' })
   const [buscando, setBuscando] = useState(false)
-  const [lote, setLote] = useState(null)
+  const [lotes, setLotes] = useState(null)
+  const [loteId, setLoteId] = useState(null)
+  const [detalle, setDetalle] = useState(null)
+  const [cargandoDetalle, setCargandoDetalle] = useState(false)
   const [error, setError] = useState(null)
   const [eliminando, setEliminando] = useState(false)
   const [confirmEliminar, setConfirmEliminar] = useState(false)
 
   useEffect(() => {
-    if (loteInicial) {
-      setLoteInput(loteInicial)
-      buscarLote(loteInicial)
-    }
+    if (loteInicial) cargarDetalle(loteInicial)
   }, [loteInicial])
 
-  async function buscarLote(id) {
-    const loteId = id || loteInput.trim()
-    if (!loteId) return
+  async function buscarLotes() {
     setBuscando(true)
     setError(null)
-    setLote(null)
+    setLotes(null)
+    setLoteId(null)
+    setDetalle(null)
     try {
-      const res = await api.get(`/admin/cargos/lote/${loteId}`)
-      setLote({ id: loteId, ...res })
+      const params = new URLSearchParams()
+      if (filtros.fechaDesde) params.append('fechaDesde', filtros.fechaDesde)
+      if (filtros.fechaHasta) params.append('fechaHasta', filtros.fechaHasta)
+      if (filtros.conceptoTesoreriaId) params.append('conceptoTesoreriaId', filtros.conceptoTesoreriaId)
+      if (filtros.categoria) params.append('categoria', filtros.categoria)
+      const res = await api.get(`/admin/cargos/lotes?${params}`)
+      setLotes(res || [])
+    } catch (err) {
+      setError(err.message || 'Error al buscar lotes')
+    } finally {
+      setBuscando(false)
+    }
+  }
+
+  async function cargarDetalle(id) {
+    setCargandoDetalle(true)
+    setError(null)
+    try {
+      const res = await api.get(`/admin/cargos/lote/${id}`)
+      setLoteId(id)
+      setDetalle(res)
     } catch (err) {
       setError(err.message || 'Lote no encontrado')
     } finally {
-      setBuscando(false)
+      setCargandoDetalle(false)
     }
   }
 
@@ -452,10 +471,15 @@ function TabConsultar({ loteInicial }) {
     setEliminando(true)
     setError(null)
     try {
-      await api.delete(`/admin/cargos/lote/${lote.id}`)
+      await api.delete(`/admin/cargos/lote/${loteId}`)
       setConfirmEliminar(false)
-      // Recargar el lote para reflejar el estado actualizado
-      await buscarLote(lote.id)
+      await cargarDetalle(loteId)
+      // Actualizar el lote en la lista si está visible
+      if (lotes) {
+        setLotes(prev => prev.map(l =>
+          l.loteId === loteId ? { ...l, pendientes: 0 } : l
+        ))
+      }
     } catch (err) {
       setError(err.message || 'Error al eliminar')
     } finally {
@@ -471,27 +495,60 @@ function TabConsultar({ loteInicial }) {
 
   return (
     <div className="space-y-6">
-      {/* Buscador */}
+
+      {/* Filtros */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-800 mb-3">Buscar por lote</h2>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={loteInput}
-            onChange={e => setLoteInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && buscarLote()}
-            placeholder="Pegá el ID del lote..."
-            className="flex-1 border border-gray-300 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary font-mono"
-          />
-          <button
-            onClick={() => buscarLote()}
-            disabled={buscando || !loteInput.trim()}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 disabled:opacity-60"
-          >
-            {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            Buscar
-          </button>
+        <h2 className="font-semibold text-gray-800 mb-4">Buscar lotes</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Desde</label>
+            <input
+              type="date"
+              value={filtros.fechaDesde}
+              onChange={e => setFiltros(p => ({ ...p, fechaDesde: e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+            <input
+              type="date"
+              value={filtros.fechaHasta}
+              onChange={e => setFiltros(p => ({ ...p, fechaHasta: e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Concepto</label>
+            <select
+              value={filtros.conceptoTesoreriaId}
+              onChange={e => setFiltros(p => ({ ...p, conceptoTesoreriaId: e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Todos</option>
+              {conceptos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Categoría</label>
+            <select
+              value={filtros.categoria}
+              onChange={e => setFiltros(p => ({ ...p, categoria: e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Todas</option>
+              {categoriasCargo.map(c => <option key={c.codigo} value={c.codigo}>{c.nombre}</option>)}
+            </select>
+          </div>
         </div>
+        <button
+          onClick={buscarLotes}
+          disabled={buscando}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 disabled:opacity-60"
+        >
+          {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          Buscar lotes
+        </button>
       </div>
 
       {error && (
@@ -501,88 +558,152 @@ function TabConsultar({ loteInicial }) {
         </div>
       )}
 
-      {lote && (
-        <>
-          {/* Resumen del lote */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-semibold text-gray-800">Lote encontrado</h2>
-                <p className="text-xs text-gray-400 font-mono mt-0.5">{lote.id}</p>
-              </div>
-              {lote.resumen.pendientes > 0 && (
-                <button
-                  onClick={() => setConfirmEliminar(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Eliminar pendientes
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-gray-800">{lote.resumen.total}</p>
-                <p className="text-xs text-gray-500">Total cargos</p>
-              </div>
-              <div className="bg-yellow-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-yellow-700">{lote.resumen.pendientes}</p>
-                <p className="text-xs text-yellow-600">Pendientes</p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-green-700">{lote.resumen.pagados}</p>
-                <p className="text-xs text-green-600">Pagados</p>
-              </div>
-              <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-blue-700">
-                  ${lote.resumen.importePendiente.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-blue-600">Saldo pendiente</p>
-              </div>
-            </div>
-
-            {/* Tabla de cargos */}
-            <div className="overflow-x-auto border border-gray-100 rounded-lg">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                  <tr>
-                    <th className="text-left px-3 py-2">Socio</th>
-                    <th className="text-left px-3 py-2">Concepto</th>
-                    <th className="text-right px-3 py-2">Monto</th>
-                    <th className="text-left px-3 py-2">Vencimiento</th>
-                    <th className="text-left px-3 py-2">Estado</th>
+      {/* Lista de lotes */}
+      {lotes !== null && !loteId && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {lotes.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-400">No se encontraron lotes con esos filtros</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                <tr>
+                  <th className="text-left px-4 py-3">Fecha</th>
+                  <th className="text-left px-4 py-3">Concepto</th>
+                  <th className="text-left px-4 py-3">Categoría</th>
+                  <th className="text-right px-4 py-3">Cargos</th>
+                  <th className="text-right px-4 py-3">Pendientes</th>
+                  <th className="text-right px-4 py-3">Importe total</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {lotes.map(l => (
+                  <tr key={l.loteId} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                      {new Date(l.fechaCreacion).toLocaleDateString('es-AR')}
+                    </td>
+                    <td className="px-4 py-3 text-gray-800">{l.concepto || '-'}</td>
+                    <td className="px-4 py-3 text-gray-600">{l.categoria || '-'}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{l.totalCargos}</td>
+                    <td className="px-4 py-3 text-right">
+                      {l.pendientes > 0
+                        ? <span className="text-yellow-700 font-medium">{l.pendientes}</span>
+                        : <span className="text-green-600">{l.pendientes}</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-800">
+                      ${l.importeTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => cargarDetalle(l.loteId)}
+                        className="text-primary text-xs hover:underline whitespace-nowrap"
+                      >
+                        Ver detalle
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {lote.cargos.map(c => (
-                    <tr key={c.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2">
-                        <span className="font-medium text-gray-800">{c.socio?.apellidoNombre}</span>
-                        <span className="text-gray-400 ml-1 text-xs">#{c.socio?.nroSocio}</span>
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">{c.conceptoTesoreria?.nombre || c.descripcion}</td>
-                      <td className="px-3 py-2 text-right font-medium text-gray-800">
-                        ${Number(c.montoTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-3 py-2 text-gray-500">
-                        {c.fechaVencimiento ? new Date(c.fechaVencimiento).toLocaleDateString('es-AR') : '-'}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[c.estado] || 'bg-gray-100 text-gray-600'}`}>
-                          {c.estado}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
-      {/* Modal confirmación eliminar */}
+      {/* Detalle del lote */}
+      {cargandoDetalle && (
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+        </div>
+      )}
+
+      {loteId && detalle && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              {lotes && (
+                <button
+                  onClick={() => { setLoteId(null); setDetalle(null) }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  ← Volver
+                </button>
+              )}
+              <div>
+                <h2 className="font-semibold text-gray-800">Detalle del lote</h2>
+                <p className="text-xs text-gray-400 font-mono mt-0.5">{loteId}</p>
+              </div>
+            </div>
+            {detalle.resumen.pendientes > 0 && (
+              <button
+                onClick={() => setConfirmEliminar(true)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                Eliminar pendientes
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{detalle.resumen.total}</p>
+              <p className="text-xs text-gray-500">Total cargos</p>
+            </div>
+            <div className="bg-yellow-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-yellow-700">{detalle.resumen.pendientes}</p>
+              <p className="text-xs text-yellow-600">Pendientes</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-green-700">{detalle.resumen.pagados}</p>
+              <p className="text-xs text-green-600">Pagados</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-3 text-center">
+              <p className="text-lg font-bold text-blue-700">
+                ${detalle.resumen.importePendiente.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-blue-600">Saldo pendiente</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto border border-gray-100 rounded-lg">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                <tr>
+                  <th className="text-left px-3 py-2">Socio</th>
+                  <th className="text-left px-3 py-2">Concepto</th>
+                  <th className="text-right px-3 py-2">Monto</th>
+                  <th className="text-left px-3 py-2">Vencimiento</th>
+                  <th className="text-left px-3 py-2">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {detalle.cargos.map(c => (
+                  <tr key={c.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2">
+                      <span className="font-medium text-gray-800">{c.socio?.apellidoNombre}</span>
+                      <span className="text-gray-400 ml-1 text-xs">#{c.socio?.nroSocio}</span>
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">{c.conceptoTesoreria?.nombre || c.descripcion}</td>
+                    <td className="px-3 py-2 text-right font-medium text-gray-800">
+                      ${Number(c.montoTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">
+                      {c.fechaVencimiento ? new Date(c.fechaVencimiento).toLocaleDateString('es-AR') : '-'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[c.estado] || 'bg-gray-100 text-gray-600'}`}>
+                        {c.estado}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <Modal
         isOpen={confirmEliminar}
         onClose={() => setConfirmEliminar(false)}
@@ -590,7 +711,7 @@ function TabConsultar({ loteInicial }) {
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-700">
-            Se van a eliminar <strong>{lote?.resumen.pendientes}</strong> cargo{lote?.resumen.pendientes !== 1 ? 's' : ''} pendiente{lote?.resumen.pendientes !== 1 ? 's' : ''} de este lote.
+            Se van a eliminar <strong>{detalle?.resumen.pendientes}</strong> cargo{detalle?.resumen.pendientes !== 1 ? 's' : ''} pendiente{detalle?.resumen.pendientes !== 1 ? 's' : ''} de este lote.
             Los cargos ya pagados no se tocan.
           </p>
           <div className="flex justify-end gap-3">
@@ -699,7 +820,11 @@ export default function CargosAdicionales() {
       )}
 
       {tab === 'consultar' && (
-        <TabConsultar loteInicial={loteGenerado} />
+        <TabConsultar
+          loteInicial={loteGenerado}
+          conceptos={conceptosDB}
+          categoriasCargo={categoriasCargo}
+        />
       )}
     </div>
   )

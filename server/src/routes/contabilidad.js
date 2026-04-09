@@ -717,7 +717,8 @@ router.post('/ordenes-compra', asyncHandler(async (req, res) => {
       descripcion: item.descripcion || null,
       cantidad: parseFloat(item.cantidad),
       precioUnitario: parseFloat(item.precioUnitario),
-      subtotal: itemSubtotal
+      subtotal: itemSubtotal,
+      tenantId: req.tenantId
     }
   })
 
@@ -794,7 +795,8 @@ router.put('/ordenes-compra/:id', asyncHandler(async (req, res) => {
         descripcion: item.descripcion || null,
         cantidad: parseFloat(item.cantidad),
         precioUnitario: parseFloat(item.precioUnitario),
-        subtotal: itemSubtotal
+        subtotal: itemSubtotal,
+        tenantId: req.tenantId
       }
     })
 

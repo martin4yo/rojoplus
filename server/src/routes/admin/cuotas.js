@@ -52,6 +52,38 @@ async function calcularRecargoCargo(prisma, cargo) {
   return { recargo, porcentaje: porcentajeRecargo, diasMora, montoConRecargo }
 }
 
+// Función helper para calcular descuento por pago anticipado
+async function calcularDescuentoAnticipado(prisma, cargo) {
+  if (!cargo.fechaVencimiento || cargo.estado !== 'PENDIENTE') {
+    return { descuento: 0, porcentaje: 0, diasRestantes: 0 }
+  }
+
+  const hoy = new Date()
+  const vencimiento = new Date(cargo.fechaVencimiento)
+  const diasRestantes = Math.floor((vencimiento - hoy) / (1000 * 60 * 60 * 24))
+
+  if (diasRestantes <= 0) {
+    return { descuento: 0, porcentaje: 0, diasRestantes: 0 }
+  }
+
+  const [cfgActivo, cfgPct, cfgDias] = await Promise.all([
+    prisma.configuracion.findFirst({ where: { clave: 'DESCUENTO_ANTICIPADO_ACTIVO' } }),
+    prisma.configuracion.findFirst({ where: { clave: 'DESCUENTO_ANTICIPADO_PCT' } }),
+    prisma.configuracion.findFirst({ where: { clave: 'DESCUENTO_ANTICIPADO_DIAS' } }),
+  ])
+
+  if (cfgActivo?.valor !== 'true') return { descuento: 0, porcentaje: 0, diasRestantes }
+
+  const pct = parseFloat(cfgPct?.valor || '0')
+  const diasMin = parseInt(cfgDias?.valor || '0')
+
+  if (pct === 0) return { descuento: 0, porcentaje: 0, diasRestantes }
+  if (diasMin > 0 && diasRestantes < diasMin) return { descuento: 0, porcentaje: 0, diasRestantes }
+
+  const descuento = Math.round(Number(cargo.montoOriginal) * pct / 100)
+  return { descuento, porcentaje: pct, diasRestantes }
+}
+
 // ============================================
 // PERIODOS
 // ============================================
@@ -695,15 +727,22 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
     },
   })
 
-  // Calcular recargo para cada cuota
+  // Calcular recargo y descuento anticipado para cada cuota
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
-    const recargoCalc = await calcularRecargoCargo(req.prisma, cuota)
+    const [recargoCalc, descuentoCalc] = await Promise.all([
+      calcularRecargoCargo(req.prisma, cuota),
+      calcularDescuentoAnticipado(req.prisma, cuota),
+    ])
+    const montoFinal = Number(cuota.montoTotal) + recargoCalc.recargo - descuentoCalc.descuento
     return {
       ...cuota,
       recargoCalculado: recargoCalc.recargo,
       porcentajeRecargo: recargoCalc.porcentaje,
       diasMora: recargoCalc.diasMora,
-      montoConRecargo: Number(cuota.montoTotal) + recargoCalc.recargo,
+      descuentoCalculado: descuentoCalc.descuento,
+      porcentajeDescuentoAnticipado: descuentoCalc.porcentaje,
+      diasRestantes: descuentoCalc.diasRestantes,
+      montoConRecargo: montoFinal,
     }
   }))
 
@@ -981,19 +1020,25 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Algunas cuotas no existen o ya están pagadas', 400, 'INVALID_CUOTAS')
   }
 
-  // Calcular recargo para cada cuota
+  // Calcular recargo y descuento anticipado para cada cuota
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
-    const recargoCalc = await calcularRecargoCargo(req.prisma, cuota)
+    const [recargoCalc, descuentoCalc] = await Promise.all([
+      calcularRecargoCargo(req.prisma, cuota),
+      calcularDescuentoAnticipado(req.prisma, cuota),
+    ])
     return {
       ...cuota,
       recargoCalculado: recargoCalc.recargo,
+      descuentoCalculado: descuentoCalc.descuento,
+      porcentajeDescuentoAnticipado: descuentoCalc.porcentaje,
     }
   }))
 
-  // Calcular total incluyendo recargos
+  // Calcular total incluyendo recargos y descuentos
   const montoBase = cuotas.reduce((sum, c) => sum + Number(c.montoTotal), 0)
   const totalRecargo = cuotas.reduce((sum, c) => sum + c.recargoCalculado, 0)
-  const montoTotal = montoBase + totalRecargo
+  const totalDescuento = cuotas.reduce((sum, c) => sum + c.descuentoCalculado, 0)
+  const montoTotal = montoBase + totalRecargo - totalDescuento
   const montoRecibidoNum = parseFloat(montoRecibido) || montoTotal
 
   // Si el split legacy no tiene monto, asignar el total
@@ -1056,10 +1101,17 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       },
     })
 
-    // Actualizar cada cuota con su recargo y marcar como pagada
+    // Actualizar cada cuota con su recargo/descuento y marcar como pagada
     for (const cuota of cuotas) {
       const nuevoMontoRecargo = Number(cuota.montoRecargo) + cuota.recargoCalculado
-      const nuevoMontoTotal = Number(cuota.montoOriginal) + nuevoMontoRecargo - Number(cuota.montoBonificacion)
+      const nuevaMontoBonificacion = Number(cuota.montoBonificacion) + cuota.descuentoCalculado
+      const nuevoMontoTotal = Number(cuota.montoOriginal) + nuevoMontoRecargo - nuevaMontoBonificacion
+
+      const motivoDesc = cuota.descuentoCalculado > 0
+        ? (cuota.motivoBonificacion
+            ? `${cuota.motivoBonificacion} + Descuento pago anticipado (${cuota.porcentajeDescuentoAnticipado}%)`
+            : `Descuento pago anticipado (${cuota.porcentajeDescuentoAnticipado}%)`)
+        : cuota.motivoBonificacion
 
       await tx.cargo.update({
         where: { id: cuota.id },
@@ -1068,7 +1120,9 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
           fechaPago: new Date(),
           pagoId: pago.id,
           montoRecargo: nuevoMontoRecargo,
+          montoBonificacion: nuevaMontoBonificacion,
           montoTotal: nuevoMontoTotal,
+          motivoBonificacion: motivoDesc || null,
         },
       })
     }
@@ -1115,7 +1169,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     // Prioridad: cargo.centroCostoId → CC del concepto de la actividad → CC del concepto por defecto → CC de la caja
     const gruposPorCC = {}
     for (const cuota of cuotas) {
-      const montoEfectivo = Number(cuota.montoTotal) + cuota.recargoCalculado
+      const montoEfectivo = Number(cuota.montoTotal) + cuota.recargoCalculado - cuota.descuentoCalculado
       const ccEfectivo =
         cuota.centroCostoId ??
         cuota.categoriaActividad?.conceptoTesoreria?.centroCostoId ??

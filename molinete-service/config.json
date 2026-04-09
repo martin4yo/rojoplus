@@ -5,11 +5,14 @@
   "puertoWebSocket": 3003,
 
   "lectorUSB": {
-    "tipo": "HID",
-    "vendorId": "0x05FE",
-    "productId": "0x1010",
     "habilitado": true,
-    "descripcion": "Lector de código de barras USB (keyboard wedge)"
+    "dispositivos": [
+      {
+        "vendorId": "0x05FE",
+        "productId": "0x1010",
+        "descripcion": "Lector de código de barras USB"
+      }
+    ]
   },
 
   "lectorRFID": {

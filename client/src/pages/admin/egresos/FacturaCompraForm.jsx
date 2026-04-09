@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Search, FileText, Package, ClipboardList, Check, CreditCard, Wallet, Info } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
@@ -30,6 +30,7 @@ const TIPOS_FACTURA = [
 
 export default function FacturaCompraForm() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { showModal, ModalComponent } = useModal()
 
   const [saving, setSaving] = useState(false)
@@ -43,7 +44,8 @@ export default function FacturaCompraForm() {
     params: { tipo: 'PROVEEDOR', activo: true, limit: 500 }
   })
   const { data: productos = [], loading: loadingProductos } = useApiData('/admin/productos', {
-    params: { activo: true, limit: 500 }
+    params: { activo: true, limit: 500, soloCompras: true },
+    initialData: []
   })
   const { data: conceptos = [], loading: loadingConceptos } = useApiData('/admin/conceptos-tesoreria', {
     params: { activo: true },
@@ -184,6 +186,36 @@ export default function FacturaCompraForm() {
   useEffect(() => {
     calcularTotales()
   }, [form.items])
+
+  // Pre-seleccionar proveedor y OC si vienen por query params (desde OrdenCompraDetalle)
+  useEffect(() => {
+    const entidadIdParam = searchParams.get('entidadId')
+    const ordenCompraIdParam = searchParams.get('ordenCompraId')
+    if (entidadIdParam) {
+      const proveedor = proveedores.find(p => p.id === parseInt(entidadIdParam))
+      if (proveedor) {
+        setCondicionIvaProveedor(proveedor.condicionIva || 'INSCRIPTO')
+        setForm(prev => ({
+          ...prev,
+          entidadId: entidadIdParam,
+          ordenCompraId: ordenCompraIdParam || ''
+        }))
+      }
+    }
+  }, [proveedores]) // se dispara una sola vez cuando proveedores carga
+
+  // Auto-seleccionar la OC cuando llegan las OC del proveedor (solo si vine desde detalle)
+  useEffect(() => {
+    const ordenCompraIdParam = searchParams.get('ordenCompraId')
+    if (ordenCompraIdParam && ordenesCompra.length > 0) {
+      const oc = ordenesCompra.find(o => o.id === parseInt(ordenCompraIdParam))
+      if (oc) {
+        setOrdenSeleccionada(oc)
+        setMostrarItemsOC(true)
+        setForm(prev => ({ ...prev, ordenCompraId: ordenCompraIdParam }))
+      }
+    }
+  }, [ordenesCompra])
 
   // Cargar OC cuando cambia el proveedor
   useEffect(() => {

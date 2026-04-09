@@ -39,7 +39,8 @@ export default function ProductoForm() {
     precioVenta: '',
     conceptoCompraId: '',
     conceptoVentaId: '',
-    activo: true
+    activo: true,
+    aparecerEnCompras: true
   })
 
   // Variantes (talles)
@@ -85,7 +86,8 @@ export default function ProductoForm() {
         precioVenta: producto.precioVenta || '',
         conceptoCompraId: producto.conceptoCompraId ? String(producto.conceptoCompraId) : '',
         conceptoVentaId: producto.conceptoVentaId ? String(producto.conceptoVentaId) : '',
-        activo: producto.activo !== false
+        activo: producto.activo !== false,
+        aparecerEnCompras: producto.aparecerEnCompras !== false
       })
       setVariantes(producto.variantes || [])
       setFotos(producto.fotos || [])
@@ -122,7 +124,8 @@ export default function ProductoForm() {
         precioVenta: form.precioVenta ? parseFloat(form.precioVenta) : null,
         conceptoCompraId: form.conceptoCompraId ? parseInt(form.conceptoCompraId) : null,
         conceptoVentaId: form.conceptoVentaId ? parseInt(form.conceptoVentaId) : null,
-        activo: form.activo
+        activo: form.activo,
+        aparecerEnCompras: form.aparecerEnCompras
       }
 
       // Si es nuevo, incluir variantes iniciales
@@ -387,7 +390,7 @@ export default function ProductoForm() {
                     ))}
                   </select>
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-end gap-4">
                   {isEditing && (
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -400,6 +403,16 @@ export default function ProductoForm() {
                       <span className="text-sm text-gray-700">Producto activo</span>
                     </label>
                   )}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.aparecerEnCompras}
+                      onChange={e => setForm({ ...form, aparecerEnCompras: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-primary"
+                      disabled={isEditing && !editMode}
+                    />
+                    <span className="text-sm text-gray-700">Aparece en Compras</span>
+                  </label>
                 </div>
               </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Search, ShoppingCart, Package, User, Building2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
@@ -9,6 +9,7 @@ import LoadingSpinner from '../../../components/LoadingSpinner'
 export default function PedidoForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { showModal, ModalComponent } = useModal()
   const isEditing = !!id
 
@@ -47,6 +48,33 @@ export default function PedidoForm() {
   useEffect(() => {
     if (id) cargarPedido()
   }, [id])
+
+  // Repetir pedido: pre-llenar con datos de un pedido existente
+  useEffect(() => {
+    const repetirId = searchParams.get('repetirId')
+    if (!isEditing && repetirId) {
+      api.getFull(`/admin/pedidos/${repetirId}`).then(res => {
+        const pedido = res.data
+        setTipoCliente(pedido.socioId ? 'socio' : 'cliente')
+        setForm({
+          entidadId: pedido.entidadId?.toString() || '',
+          socioId: pedido.socioId?.toString() || '',
+          socioNombre: pedido.socio?.apellidoNombre || '',
+          fechaEntrega: '',
+          observaciones: pedido.observaciones || '',
+          items: pedido.items.map(item => ({
+            productoVarianteId: item.productoVarianteId?.toString() || '',
+            descripcion: item.descripcion || '',
+            cantidad: item.cantidad.toString(),
+            precioUnitario: item.precioUnitario.toString(),
+            iva: '21',
+            producto: item.productoVariante?.producto || null,
+            variante: item.productoVariante || null
+          }))
+        })
+      }).catch(() => {})
+    }
+  }, [searchParams])
 
   useEffect(() => {
     calcularTotales()

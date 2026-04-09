@@ -364,11 +364,12 @@ export default function Cuotas() {
   }
 
   function calcularTotalSeleccionado() {
-    if (!cobranzaData) return { base: 0, recargo: 0, total: 0 }
+    if (!cobranzaData) return { base: 0, recargo: 0, descuento: 0, total: 0 }
     const seleccionadasData = cobranzaData.cuotas?.filter(c => seleccionadas.includes(c.id)) || []
     const base = seleccionadasData.reduce((sum, c) => sum + Number(c.montoTotal), 0)
     const recargo = seleccionadasData.reduce((sum, c) => sum + (c.recargoCalculado || 0), 0)
-    return { base, recargo, total: base + recargo }
+    const descuento = seleccionadasData.reduce((sum, c) => sum + (c.descuentoCalculado || 0), 0)
+    return { base, recargo, descuento, total: base + recargo - descuento }
   }
 
   async function registrarPago() {
@@ -629,7 +630,12 @@ export default function Cuotas() {
                   </p>
                   {calcularTotalSeleccionado().recargo > 0 && (
                     <p className="text-sm text-red-600">
-                      Incluye {formatCurrency(calcularTotalSeleccionado().recargo)} de recargo
+                      Incluye {formatCurrency(calcularTotalSeleccionado().recargo)} de recargo por mora
+                    </p>
+                  )}
+                  {calcularTotalSeleccionado().descuento > 0 && (
+                    <p className="text-sm text-green-600 font-medium">
+                      Descuento por pago anticipado: -{formatCurrency(calcularTotalSeleccionado().descuento)}
                     </p>
                   )}
                   {cobranzaData?.esFamilia && (

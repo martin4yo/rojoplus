@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Search, ShoppingCart, Package } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
@@ -14,6 +14,7 @@ import LoadingSpinner from '../../../components/LoadingSpinner'
 export default function OrdenCompraForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { showModal, ModalComponent } = useModal()
   const isEditing = !!id
 
@@ -23,11 +24,13 @@ export default function OrdenCompraForm() {
 
   // Cargar datos iniciales con useApiData
   const { data: proveedores = [], loading: loadingProveedores } = useApiData('/admin/entidades', {
-    params: { tipo: 'PROVEEDOR', activo: true, limit: 500 }
+    params: { tipo: 'PROVEEDOR', activo: true, limit: 500 },
+    initialData: []
   })
 
   const { data: productos = [], loading: loadingProductos } = useApiData('/admin/productos', {
-    params: { activo: true, limit: 500 }
+    params: { activo: true, limit: 500, excluirBuffet: true },
+    initialData: []
   })
 
   const [form, setForm] = useState({
@@ -44,6 +47,30 @@ export default function OrdenCompraForm() {
       cargarOrden()
     }
   }, [id])
+
+  // Repetir OC: pre-llenar con datos de una OC existente
+  useEffect(() => {
+    const repetirId = searchParams.get('repetirId')
+    if (!isEditing && repetirId) {
+      api.getFull(`/admin/ordenes-compra/${repetirId}`).then(res => {
+        const oc = res.data
+        setForm({
+          entidadId: oc.entidadId?.toString() || '',
+          fechaEntrega: '',
+          observaciones: oc.observaciones || '',
+          centroCostoId: oc.centroCostoId?.toString() || '',
+          items: oc.items.map(item => ({
+            productoVarianteId: item.productoVarianteId?.toString() || '',
+            descripcion: item.descripcion || '',
+            cantidad: item.cantidad?.toString() || '',
+            precioUnitario: item.precioUnitario?.toString() || '',
+            producto: item.productoVariante?.producto || null,
+            variante: item.productoVariante || null
+          }))
+        })
+      }).catch(() => {})
+    }
+  }, [searchParams])
 
   async function cargarOrden() {
     try {

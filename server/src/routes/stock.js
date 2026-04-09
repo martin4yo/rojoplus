@@ -122,11 +122,12 @@ router.put('/categorias-producto/:id', asyncHandler(async (req, res) => {
 
 // GET /api/admin/productos - Listar productos
 router.get('/productos', asyncHandler(async (req, res) => {
-  const { categoriaId, activo, busqueda, page = 1, limit = 50 } = req.query
+  const { categoriaId, activo, busqueda, soloCompras, page = 1, limit = 50 } = req.query
 
   const where = {}
   if (categoriaId) where.categoriaId = parseInt(categoriaId)
   if (activo !== undefined) where.activo = activo === 'true'
+  if (soloCompras === 'true') where.aparecerEnCompras = true
   if (busqueda) {
     where.OR = [
       { codigo: { contains: busqueda, mode: 'insensitive' } },
@@ -230,7 +231,7 @@ router.get('/productos/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/productos - Crear producto
 router.post('/productos', asyncHandler(async (req, res) => {
-  const { codigo, nombre, descripcion, categoriaId, precioCompra, precioVenta, conceptoCompraId, conceptoVentaId, variantes } = req.body
+  const { codigo, nombre, descripcion, categoriaId, precioCompra, precioVenta, conceptoCompraId, conceptoVentaId, aparecerEnCompras, variantes } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Codigo y nombre son requeridos', 400)
@@ -252,6 +253,7 @@ router.post('/productos', asyncHandler(async (req, res) => {
       precioVenta: precioVenta ? parseFloat(precioVenta) : null,
       conceptoCompraId: conceptoCompraId ? parseInt(conceptoCompraId) : null,
       conceptoVentaId: conceptoVentaId ? parseInt(conceptoVentaId) : null,
+      aparecerEnCompras: aparecerEnCompras !== undefined ? aparecerEnCompras : true,
       tenantId: req.tenantId,
       variantes: variantes?.length ? {
         create: variantes.map(v => ({
@@ -290,7 +292,7 @@ router.post('/productos', asyncHandler(async (req, res) => {
 // PUT /api/admin/productos/:id - Actualizar producto
 router.put('/productos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, categoriaId, precioCompra, precioVenta, conceptoCompraId, conceptoVentaId, activo } = req.body
+  const { codigo, nombre, descripcion, categoriaId, precioCompra, precioVenta, conceptoCompraId, conceptoVentaId, activo, aparecerEnCompras } = req.body
 
   const existente = await prisma.producto.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
@@ -315,7 +317,8 @@ router.put('/productos/:id', asyncHandler(async (req, res) => {
       precioVenta: precioVenta !== undefined ? (precioVenta ? parseFloat(precioVenta) : null) : existente.precioVenta,
       conceptoCompraId: conceptoCompraId !== undefined ? (conceptoCompraId ? parseInt(conceptoCompraId) : null) : existente.conceptoCompraId,
       conceptoVentaId: conceptoVentaId !== undefined ? (conceptoVentaId ? parseInt(conceptoVentaId) : null) : existente.conceptoVentaId,
-      activo: activo !== undefined ? activo : existente.activo
+      activo: activo !== undefined ? activo : existente.activo,
+      aparecerEnCompras: aparecerEnCompras !== undefined ? aparecerEnCompras : existente.aparecerEnCompras
     },
     include: {
       categoria: true,

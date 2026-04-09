@@ -75,20 +75,87 @@ El lector de código de barras / QR se conecta por USB y es reconocido como disp
 npm run detectar-usb
 ```
 
-El script lista todos los dispositivos HID con su `vendorId` y `productId`. Ejemplo de salida:
+El script lista **todos** los dispositivos HID conectados: teclados, mouse, hubs, lectores, etc. Si hay varios lectores conectados al mismo tiempo, todos van a aparecer en la lista.
+
+Ejemplo de salida con múltiples dispositivos:
 
 ```
+Dispositivo #1
+  Fabricante:   Logitech
+  Producto:     USB Keyboard
+  Vendor ID:    0x046D  (1133)
+  Product ID:   0xC31C  (49948)
+  Usage:        6  ← teclado HID
+  UsagePage:    1
+
+Dispositivo #2
+  Fabricante:   Logitech
+  Producto:     USB Mouse
+  Vendor ID:    0x046D  (1133)
+  Product ID:   0xC077  (49271)
+  Usage:        2  ← mouse HID
+  UsagePage:    1
+
 Dispositivo #3
   Fabricante:   Honeywell
   Producto:     Barcode Scanner
   Vendor ID:    0x0C2E  (3118)
   Product ID:   0x0200  (512)
-  Interface:    0
-  Usage:        6
+  Usage:        6  ← teclado HID (lector de barras)
+  UsagePage:    1
+
+Dispositivo #4
+  Fabricante:   Datalogic
+  Producto:     QR Scanner
+  Vendor ID:    0x05F9  (1529)
+  Product ID:   0x2204  (8708)
+  Usage:        6  ← teclado HID (lector QR)
   UsagePage:    1
 ```
 
-El lector es el que tiene `usagePage: 1` y `usage: 6` (teclado HID). Anotar el `Vendor ID` y `Product ID`.
+### Cómo identificar cuál es cuál cuando hay varios lectores
+
+Los lectores de código de barras y QR aparecen igual que un teclado (`usage: 6`, `usagePage: 1`). Para distinguirlos:
+
+**Método 1 — Por fabricante/producto:** Si el `Fabricante` y `Producto` son legibles, es suficiente.
+
+**Método 2 — Desconectar y reconectar:** Ejecutar `npm run detectar-usb` con todos desconectados, luego conectar uno por vez y volver a ejecutar — el nuevo dispositivo que aparece es el que se acaba de conectar.
+
+**Método 3 — Administrador de Dispositivos:** Abrir `devmgmt.msc`, expandir "Dispositivos de interfaz humana" (HID). Al conectar cada lector, aparece el nuevo dispositivo resaltado.
+
+### Si hay dos lectores del mismo modelo (mismo VID/PID)
+
+Cuando dos lectores son idénticos (mismo fabricante y modelo), tienen el mismo `vendorId` y `productId`. En ese caso, el campo `Path` del script identifica a cada uno de forma única:
+
+```
+  Path:  \\?\HID#VID_0C2E&PID_0200#7&1234abcd&0&0000#{...}
+```
+
+El segmento `7&1234abcd` es el identificador de la instancia — diferente para cada dispositivo aunque tengan el mismo VID/PID. Ese path puede usarse directamente en el código para abrir el dispositivo correcto.
+
+### Qué anotar
+
+Para cada lector, anotar `Vendor ID` y `Product ID`. Luego agregarlos en `config.json` dentro del array `dispositivos`:
+
+```json
+"lectorUSB": {
+  "habilitado": true,
+  "dispositivos": [
+    {
+      "vendorId": "0x0C2E",
+      "productId": "0x0200",
+      "descripcion": "Lector código de barras"
+    },
+    {
+      "vendorId": "0x05F9",
+      "productId": "0x2204",
+      "descripcion": "Lector QR"
+    }
+  ]
+}
+```
+
+El servicio abre todos los dispositivos de la lista simultáneamente. Cualquier lectura de cualquiera de ellos se procesa de la misma forma. Se pueden agregar tantos como sea necesario.
 
 ### Problema con lectores en modo teclado
 
@@ -153,9 +220,14 @@ Editar `config.json` con los valores obtenidos en los pasos anteriores:
   "puerto": 3002,
 
   "lectorUSB": {
-    "vendorId": "0x0C2E",
-    "productId": "0x0200",
-    "habilitado": true
+    "habilitado": true,
+    "dispositivos": [
+      {
+        "vendorId": "0x0C2E",
+        "productId": "0x0200",
+        "descripcion": "Lector código de barras entrada"
+      }
+    ]
   },
 
   "lectorRFID": {

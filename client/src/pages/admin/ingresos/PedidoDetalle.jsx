@@ -165,6 +165,14 @@ export default function PedidoDetalle() {
               Facturar
             </Button>
           )}
+          {pedido.estado !== 'CANCELADA' && (
+            <Button
+              variant="secondary"
+              onClick={() => navigate(`/admin/ingresos/pedidos/nuevo?repetirId=${id}`)}
+            >
+              Repetir Pedido
+            </Button>
+          )}
         </div>
       </div>
 

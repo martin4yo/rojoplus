@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Edit, ShoppingCart, Package, CheckCircle, XCircle, Truck, Building2 } from 'lucide-react'
+import { ArrowLeft, Edit, ShoppingCart, Package, CheckCircle, XCircle, Truck, Building2, FileText } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
@@ -140,6 +140,22 @@ export default function OrdenCompraDetalle() {
             <Button onClick={() => setModoRecepcion(true)}>
               <CheckCircle className="w-4 h-4 mr-2" />
               Registrar Recepcion
+            </Button>
+          )}
+          {(orden.estado === 'RECIBIDA' || orden.estado === 'PARCIAL') && !modoRecepcion && (
+            <Button
+              onClick={() => navigate(`/admin/egresos/facturas/nueva?ordenCompraId=${orden.id}&entidadId=${orden.entidadId}`)}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Generar Factura
+            </Button>
+          )}
+          {orden.estado !== 'CANCELADA' && !modoRecepcion && (
+            <Button
+              variant="secondary"
+              onClick={() => navigate(`/admin/egresos/ordenes-compra/nueva?repetirId=${orden.id}`)}
+            >
+              Repetir OC
             </Button>
           )}
         </div>

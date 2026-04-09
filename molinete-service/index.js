@@ -47,7 +47,7 @@ const logger = winston.createLogger({
 })
 
 // Variables globales
-let lectorUSBDevice = null
+let lectorUSBDevices = []
 let lectorRFIDPort = null
 let molinetePort = null
 let estadoConexion = {
@@ -80,60 +80,61 @@ function broadcast(data) {
 // ============================================
 
 /**
- * Inicializar lector USB (HID keyboard wedge)
+ * Inicializar lectores USB (HID keyboard wedge) — soporta múltiples dispositivos
  */
 async function inicializarLectorUSB() {
   if (!config.lectorUSB.habilitado) {
-    logger.info('Lector USB deshabilitado en config')
+    logger.info('Lectores USB deshabilitados en config')
     return
   }
 
   try {
-    // Importación dinámica para evitar errores si no está instalado
     const HID = (await import('node-hid')).default
+    const dispositivosConectados = HID.devices()
+    let conectados = 0
 
-    const vendorId = parseInt(config.lectorUSB.vendorId)
-    const productId = parseInt(config.lectorUSB.productId)
+    for (const cfg of config.lectorUSB.dispositivos) {
+      const vendorId = parseInt(cfg.vendorId)
+      const productId = parseInt(cfg.productId)
 
-    // Buscar dispositivo
-    const devices = HID.devices()
-    const device = devices.find(d => d.vendorId === vendorId && d.productId === productId)
+      const device = dispositivosConectados.find(d => d.vendorId === vendorId && d.productId === productId)
 
-    if (!device) {
-      logger.warn(`Lector USB no encontrado (VID: ${config.lectorUSB.vendorId}, PID: ${config.lectorUSB.productId})`)
-      logger.info('Ejecute: npm run detectar-usb para encontrar el dispositivo')
-      estadoConexion.usb = false
-      return
+      if (!device) {
+        logger.warn(`Lector USB no encontrado: ${cfg.descripcion || ''} (VID: ${cfg.vendorId}, PID: ${cfg.productId})`)
+        logger.info('Ejecute: npm run detectar-usb para encontrar el dispositivo')
+        continue
+      }
+
+      const hidDevice = new HID.HID(device.path)
+      lectorUSBDevices.push(hidDevice)
+
+      let buffer = ''
+      hidDevice.on('data', (data) => {
+        const chars = data.toString('utf8').replace(/\0/g, '')
+        buffer += chars
+
+        if (chars.includes('\n') || chars.includes('\r') || buffer.length > 20) {
+          const valorLeido = buffer.trim()
+          if (valorLeido) {
+            handleUSBData(valorLeido)
+          }
+          buffer = ''
+        }
+      })
+
+      hidDevice.on('error', (err) => {
+        logger.error(`Error en lector USB ${cfg.descripcion || cfg.vendorId}: ${err.message}`)
+        if (lectorUSBDevices.every(d => d._closed)) estadoConexion.usb = false
+      })
+
+      logger.info(`✓ Lector USB inicializado: ${device.product || cfg.descripcion || 'Desconocido'}`)
+      conectados++
     }
 
-    lectorUSBDevice = new HID.HID(device.path)
-    estadoConexion.usb = true
-
-    let buffer = ''
-    lectorUSBDevice.on('data', (data) => {
-      // Procesar datos del lector USB (keyboard wedge)
-      const chars = data.toString('utf8').replace(/\0/g, '')
-      buffer += chars
-
-      // Detectar fin de lectura (Enter o suficiente longitud)
-      if (chars.includes('\n') || chars.includes('\r') || buffer.length > 20) {
-        const valorLeido = buffer.trim()
-        if (valorLeido) {
-          handleUSBData(valorLeido)
-        }
-        buffer = ''
-      }
-    })
-
-    lectorUSBDevice.on('error', (err) => {
-      logger.error(`Error en lector USB: ${err.message}`)
-      estadoConexion.usb = false
-    })
-
-    logger.info(`✓ Lector USB inicializado: ${device.product || 'Desconocido'}`)
+    estadoConexion.usb = conectados > 0
 
   } catch (error) {
-    logger.error(`Error inicializando lector USB: ${error.message}`)
+    logger.error(`Error inicializando lectores USB: ${error.message}`)
     estadoConexion.usb = false
   }
 }
@@ -235,14 +236,21 @@ function handleUSBData(valorLeido) {
   else if (/^\d{7,8}$/.test(valorLeido)) {
     tipoLectura = 'DNI'
   }
-  // Código de barras PDF417 del DNI es más largo
-  else if (valorLeido.length > 20) {
+  // Código de barras PDF417 del DNI argentino (largo, campos separados por @)
+  else if (valorLeido.includes('@') || valorLeido.length > 20) {
     tipoLectura = 'DNI'
-    // Extraer DNI del PDF417 (formato específico argentino)
-    // El DNI suele estar en una posición fija
-    const match = valorLeido.match(/\d{7,8}/)
-    if (match) {
-      valorLeido = match[0]
+    // Formato PDF417 DNI argentino: APELLIDO@NOMBRE@NOMBRE2@DNI@D@FECHA@SEXO@NACION@TRAMITE
+    const partes = valorLeido.split('@')
+    if (partes.length >= 4) {
+      // El DNI siempre está en el índice 3
+      const dniExtraido = partes[3].replace(/\D/g, '')
+      if (/^\d{7,8}$/.test(dniExtraido)) {
+        valorLeido = dniExtraido
+      }
+    } else {
+      // Fallback: primer grupo de 7-8 dígitos
+      const match = valorLeido.match(/\b\d{7,8}\b/)
+      if (match) valorLeido = match[0]
     }
   }
 
@@ -748,7 +756,7 @@ async function iniciar() {
 // Manejo de errores y cierre graceful
 process.on('SIGINT', () => {
   logger.info('Cerrando servicio...')
-  if (lectorUSBDevice) lectorUSBDevice.close()
+  lectorUSBDevices.forEach(d => d.close())
   if (lectorRFIDPort) lectorRFIDPort.close()
   if (molinetePort) molinetePort.close()
   process.exit(0)

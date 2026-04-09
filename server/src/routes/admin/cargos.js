@@ -407,6 +407,61 @@ router.post('/cargos/masivo', authAdmin, asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/admin/cargos/lotes - Listar lotes con filtros
+router.get('/cargos/lotes', authAdmin, asyncHandler(async (req, res) => {
+  const { fechaDesde, fechaHasta, conceptoTesoreriaId, categoria, estado } = req.query
+
+  const where = { loteId: { not: null } }
+  if (fechaDesde || fechaHasta) {
+    where.createdAt = {}
+    if (fechaDesde) where.createdAt.gte = new Date(fechaDesde)
+    if (fechaHasta) where.createdAt.lte = new Date(fechaHasta + 'T23:59:59.999Z')
+  }
+  if (conceptoTesoreriaId) where.conceptoTesoreriaId = parseInt(conceptoTesoreriaId)
+  if (categoria) where.categoria = categoria
+  if (estado) where.estado = estado
+
+  const agrupados = await req.db.cargo.groupBy({
+    by: ['loteId'],
+    where,
+    _count: { id: true },
+    _sum: { montoTotal: true },
+    _min: { createdAt: true },
+  })
+
+  // Ordenar por fecha desc
+  agrupados.sort((a, b) => new Date(b._min.createdAt) - new Date(a._min.createdAt))
+
+  const lotes = await Promise.all(agrupados.map(async (g) => {
+    const primer = await req.db.cargo.findFirst({
+      where: { loteId: g.loteId },
+      select: {
+        categoria: true,
+        conceptoTesoreria: { select: { id: true, nombre: true } },
+        observaciones: true,
+      }
+    })
+    const [pendientes, pagados] = await Promise.all([
+      req.db.cargo.count({ where: { loteId: g.loteId, estado: 'PENDIENTE' } }),
+      req.db.cargo.count({ where: { loteId: g.loteId, estado: 'PAGADO' } }),
+    ])
+    return {
+      loteId: g.loteId,
+      fechaCreacion: g._min.createdAt,
+      totalCargos: g._count.id,
+      importeTotal: Number(g._sum.montoTotal),
+      pendientes,
+      pagados,
+      categoria: primer?.categoria,
+      concepto: primer?.conceptoTesoreria?.nombre,
+      conceptoId: primer?.conceptoTesoreria?.id,
+      observaciones: primer?.observaciones,
+    }
+  }))
+
+  res.json({ success: true, data: lotes })
+}))
+
 // GET /api/admin/cargos/lote/:loteId - Cargos de un lote
 router.get('/cargos/lote/:loteId', authAdmin, asyncHandler(async (req, res) => {
   const { loteId } = req.params

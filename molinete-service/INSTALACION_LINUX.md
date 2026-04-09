@@ -199,21 +199,98 @@ El lector de código de barras / QR se conecta por USB y es reconocido como disp
 npm run detectar-usb
 ```
 
-Ejemplo de salida:
+El script lista **todos** los dispositivos HID conectados: teclados, mouse, hubs, lectores, etc. Si hay varios lectores conectados al mismo tiempo, todos van a aparecer en la lista.
+
+Ejemplo de salida con múltiples dispositivos:
 
 ```
+Dispositivo #1
+  Fabricante:   Logitech
+  Producto:     USB Keyboard
+  Vendor ID:    0x046D  (1133)
+  Product ID:   0xC31C  (49948)
+  Usage:        6  ← teclado HID
+  UsagePage:    1
+  Path:         /dev/hidraw0
+
+Dispositivo #2
+  Fabricante:   Logitech
+  Producto:     USB Mouse
+  Vendor ID:    0x046D  (1133)
+  Product ID:   0xC077  (49271)
+  Usage:        2  ← mouse HID
+  UsagePage:    1
+  Path:         /dev/hidraw1
+
 Dispositivo #3
   Fabricante:   Honeywell
   Producto:     Barcode Scanner
   Vendor ID:    0x0C2E  (3118)
   Product ID:   0x0200  (512)
-  Interface:    0
-  Usage:        6
+  Usage:        6  ← teclado HID (lector de barras)
   UsagePage:    1
   Path:         /dev/hidraw2
+
+Dispositivo #4
+  Fabricante:   Datalogic
+  Producto:     QR Scanner
+  Vendor ID:    0x05F9  (1529)
+  Product ID:   0x2204  (8708)
+  Usage:        6  ← teclado HID (lector QR)
+  UsagePage:    1
+  Path:         /dev/hidraw3
 ```
 
-El lector es el que tiene `usagePage: 1` y `usage: 6` (teclado HID). Anotar el `Vendor ID`, `Product ID` y el `Path`.
+### Cómo identificar cuál es cuál cuando hay varios lectores
+
+Los lectores de código de barras y QR aparecen igual que un teclado (`usage: 6`, `usagePage: 1`). Para distinguirlos:
+
+**Método 1 — Por fabricante/producto:** Si el `Fabricante` y `Producto` son legibles, es suficiente para identificar el lector correcto.
+
+**Método 2 — Desconectar y reconectar:** Ejecutar `npm run detectar-usb` con todos desconectados, luego conectar uno por vez y volver a ejecutar — el nuevo dispositivo que aparece es el que se acaba de conectar.
+
+**Método 3 — Por Path (`/dev/hidrawX`):** Cada dispositivo tiene un path único. Para saber a cuál corresponde cada path:
+```bash
+# Ver qué dispositivo físico corresponde a cada hidraw
+for dev in /dev/hidraw*; do
+  echo -n "$dev → "
+  udevadm info -q property -n $dev | grep -E "ID_MODEL=|ID_VENDOR="
+done
+```
+
+### Si hay dos lectores del mismo modelo (mismo VID/PID)
+
+Cuando dos lectores son idénticos (mismo fabricante y modelo), tienen el mismo `vendorId` y `productId`. En ese caso, usar el `Path` para diferenciarlos:
+
+- El `path` en Linux es estable mientras el dispositivo esté conectado al mismo puerto USB físico.
+- Si se desconecta y reconecta en el mismo puerto, suele mantener el mismo path.
+- Si se cambia de puerto USB, el path puede cambiar.
+
+Para que el path sea siempre el mismo independientemente del puerto, crear una regla udev basada en el número de serie del dispositivo (ver sección de Troubleshooting).
+
+### Qué anotar
+
+Para cada lector, anotar `Vendor ID` y `Product ID`. Luego agregarlos en `config.json` dentro del array `dispositivos`:
+
+```json
+"lectorUSB": {
+  "habilitado": true,
+  "dispositivos": [
+    {
+      "vendorId": "0x0C2E",
+      "productId": "0x0200",
+      "descripcion": "Lector código de barras"
+    },
+    {
+      "vendorId": "0x05F9",
+      "productId": "0x2204",
+      "descripcion": "Lector QR"
+    }
+  ]
+}
+```
+
+El servicio abre todos los dispositivos de la lista simultáneamente. Cualquier lectura de cualquiera de ellos se procesa de la misma forma. Se pueden agregar tantos como sea necesario.
 
 ### Permisos HID
 
@@ -298,9 +375,14 @@ Editar `config.json` con los valores obtenidos en los pasos anteriores:
   "puerto": 3002,
 
   "lectorUSB": {
-    "vendorId": "0x0C2E",
-    "productId": "0x0200",
-    "habilitado": true
+    "habilitado": true,
+    "dispositivos": [
+      {
+        "vendorId": "0x0C2E",
+        "productId": "0x0200",
+        "descripcion": "Lector código de barras entrada"
+      }
+    ]
   },
 
   "lectorRFID": {
