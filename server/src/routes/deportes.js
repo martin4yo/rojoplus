@@ -1096,13 +1096,14 @@ router.delete('/entrenamientos/:id/asistencia/:socioId', asyncHandler(async (req
 
 // GET /api/admin/partidos - Listar partidos
 router.get('/partidos', asyncHandler(async (req, res) => {
-  const { categoriaActividadId, actividadId, fechaDesde, fechaHasta, estado, condicion, tipo } = req.query
+  const { categoriaActividadId, actividadId, fechaDesde, fechaHasta, estado, condicion, tipo, sinCampeonato } = req.query
 
   const where = {}
   if (categoriaActividadId) where.categoriaActividadId = parseInt(categoriaActividadId)
   if (estado) where.estado = estado
   if (condicion) where.condicion = condicion
   if (tipo) where.tipo = tipo
+  if (sinCampeonato === 'true') where.campeonatoId = null
 
   // Filtro por rango de fechas
   if (fechaDesde || fechaHasta) {
@@ -1172,7 +1173,7 @@ router.get('/partidos/:id', asyncHandler(async (req, res) => {
 
 // POST /api/admin/partidos - Crear partido
 router.post('/partidos', asyncHandler(async (req, res) => {
-  const { categoriaActividadId, fecha, hora, tipo, condicion, rival, ubicacion, espacioId, observaciones } = req.body
+  const { categoriaActividadId, fecha, hora, tipo, condicion, rival, ubicacion, espacioId, campeonatoId, observaciones } = req.body
 
   if (!categoriaActividadId || !fecha || !hora || !condicion || !rival) {
     throw new AppError('Categoría, fecha, hora, condición y rival son requeridos', 400)
@@ -1209,6 +1210,7 @@ router.post('/partidos', asyncHandler(async (req, res) => {
       rival,
       ubicacion: ubicacion || null,
       espacioId: espacioId ? parseInt(espacioId) : null,
+      campeonatoId: campeonatoId ? parseInt(campeonatoId) : null,
       observaciones: observaciones || null,
       registradoPor: req.admin.id
     },
@@ -1226,7 +1228,7 @@ router.post('/partidos', asyncHandler(async (req, res) => {
 // PUT /api/admin/partidos/:id - Actualizar partido
 router.put('/partidos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { fecha, hora, tipo, condicion, rival, ubicacion, espacioId, observaciones, estado } = req.body
+  const { fecha, hora, tipo, condicion, rival, ubicacion, espacioId, campeonatoId, observaciones, estado } = req.body
 
   const existente = await req.db.partido.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
@@ -1243,6 +1245,7 @@ router.put('/partidos/:id', asyncHandler(async (req, res) => {
       rival: rival || existente.rival,
       ubicacion: ubicacion !== undefined ? ubicacion : existente.ubicacion,
       espacioId: espacioId !== undefined ? (espacioId ? parseInt(espacioId) : null) : existente.espacioId,
+      campeonatoId: campeonatoId !== undefined ? (campeonatoId ? parseInt(campeonatoId) : null) : existente.campeonatoId,
       observaciones: observaciones !== undefined ? observaciones : existente.observaciones,
       estado: estado || existente.estado
     },
@@ -1906,6 +1909,422 @@ router.get('/estadisticas/ranking', asyncHandler(async (req, res) => {
   }))
 
   res.json({ success: true, data: ranking })
+}))
+
+// =============================================================================
+// PLANILLAS DE ENTRENAMIENTO
+// =============================================================================
+
+// GET /api/admin/entrenamientos/:id/planilla
+router.get('/entrenamientos/:id/planilla', asyncHandler(async (req, res) => {
+  const entId = parseInt(req.params.id)
+
+  const ent = await req.db.entrenamiento.findFirst({
+    where: { id: entId, tenantId: req.tenantId },
+    include: {
+      categoriaActividad: { include: { actividad: { select: { nombre: true } } } },
+      espacio: { select: { nombre: true } },
+      planilla: true,
+    }
+  })
+  if (!ent) throw new AppError('Entrenamiento no encontrado', 404)
+
+  res.json({ success: true, data: ent })
+}))
+
+// PUT /api/admin/entrenamientos/:id/planilla — upsert
+router.put('/entrenamientos/:id/planilla', asyncHandler(async (req, res) => {
+  const entId = parseInt(req.params.id)
+  const { objetivos, calentamiento, ejercicios, vueltaCalma, observaciones } = req.body
+
+  const ent = await req.db.entrenamiento.findFirst({ where: { id: entId, tenantId: req.tenantId } })
+  if (!ent) throw new AppError('Entrenamiento no encontrado', 404)
+
+  const planilla = await req.db.planillaEntrenamiento.upsert({
+    where: { entrenamientoId: entId },
+    update: { objetivos, calentamiento, ejercicios: ejercicios ? JSON.stringify(ejercicios) : null, vueltaCalma, observaciones },
+    create: { entrenamientoId: entId, objetivos, calentamiento, ejercicios: ejercicios ? JSON.stringify(ejercicios) : null, vueltaCalma, observaciones, tenantId: req.tenantId },
+  })
+
+  res.json({ success: true, data: planilla })
+}))
+
+// =============================================================================
+// CAMPEONATOS Y TABLA DE POSICIONES
+// =============================================================================
+
+function calcularTabla(partidos, nombreEquipo) {
+  const tabla = {}
+
+  for (const p of partidos) {
+    if (p.estado !== 'FINALIZADO' || p.golesLocal === null || p.golesVisitante === null) continue
+
+    const gl = p.golesLocal
+    const gv = p.golesVisitante
+
+    // Goles nuestro equipo vs rival según condición
+    const [nuestrosGoles, golesRival] = p.condicion === 'LOCAL' ? [gl, gv] : [gv, gl]
+
+    if (!tabla[nombreEquipo]) tabla[nombreEquipo] = { nombre: nombreEquipo, esNuestroEquipo: true, PJ: 0, PG: 0, PE: 0, PP: 0, GF: 0, GC: 0, DG: 0, PTS: 0 }
+    if (!tabla[p.rival])     tabla[p.rival]       = { nombre: p.rival,       esNuestroEquipo: false, PJ: 0, PG: 0, PE: 0, PP: 0, GF: 0, GC: 0, DG: 0, PTS: 0 }
+
+    const nuestro = tabla[nombreEquipo]
+    nuestro.PJ++; nuestro.GF += nuestrosGoles; nuestro.GC += golesRival
+    if (nuestrosGoles > golesRival)      { nuestro.PG++; nuestro.PTS += 3 }
+    else if (nuestrosGoles === golesRival){ nuestro.PE++; nuestro.PTS += 1 }
+    else                                  { nuestro.PP++ }
+
+    const rival = tabla[p.rival]
+    rival.PJ++; rival.GF += golesRival; rival.GC += nuestrosGoles
+    if (golesRival > nuestrosGoles)      { rival.PG++; rival.PTS += 3 }
+    else if (golesRival === nuestrosGoles){ rival.PE++; rival.PTS += 1 }
+    else                                  { rival.PP++ }
+  }
+
+  return Object.values(tabla)
+    .map(t => ({ ...t, DG: t.GF - t.GC }))
+    .sort((a, b) => b.PTS - a.PTS || b.DG - a.DG || b.GF - a.GF)
+}
+
+// GET /api/admin/campeonatos
+router.get('/campeonatos', asyncHandler(async (req, res) => {
+  const { categoriaActividadId, estado } = req.query
+  const where = { tenantId: req.tenantId }
+  if (categoriaActividadId) where.categoriaActividadId = parseInt(categoriaActividadId)
+  if (estado) where.estado = estado
+
+  const campeonatos = await req.db.campeonato.findMany({
+    where,
+    include: {
+      categoriaActividad: { include: { actividad: { select: { nombre: true } } } },
+      _count: { select: { partidos: true } }
+    },
+    orderBy: [{ estado: 'asc' }, { createdAt: 'desc' }]
+  })
+
+  res.json({
+    success: true,
+    data: campeonatos.map(c => ({
+      id: c.id,
+      nombre: c.nombre,
+      tipo: c.tipo,
+      temporada: c.temporada,
+      estado: c.estado,
+      fechaInicio: c.fechaInicio,
+      fechaFin: c.fechaFin,
+      categoriaActividadId: c.categoriaActividadId,
+      actividad: c.categoriaActividad?.actividad?.nombre || null,
+      categoria: c.categoriaActividad?.nombre || null,
+      partidos: c._count.partidos,
+    }))
+  })
+}))
+
+// POST /api/admin/campeonatos
+router.post('/campeonatos', asyncHandler(async (req, res) => {
+  const { nombre, tipo, temporada, categoriaActividadId, fechaInicio, fechaFin, descripcion, nombreEquipo } = req.body
+  if (!nombre) throw new AppError('El nombre es obligatorio', 400)
+
+  const campeonato = await req.db.campeonato.create({
+    data: {
+      nombre,
+      tipo: tipo || 'LIGA',
+      temporada,
+      categoriaActividadId: categoriaActividadId ? parseInt(categoriaActividadId) : null,
+      fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
+      fechaFin: fechaFin ? new Date(fechaFin) : null,
+      descripcion,
+      nombreEquipo,
+      tenantId: req.tenantId,
+    }
+  })
+
+  res.json({ success: true, data: campeonato })
+}))
+
+// GET /api/admin/campeonatos/:id — detalle con partidos y tabla
+router.get('/campeonatos/:id', asyncHandler(async (req, res) => {
+  const campeonato = await req.db.campeonato.findFirst({
+    where: { id: parseInt(req.params.id), tenantId: req.tenantId },
+    include: {
+      categoriaActividad: { include: { actividad: { select: { nombre: true, color: true } } } },
+      partidos: {
+        orderBy: { fecha: 'asc' },
+        select: {
+          id: true, fecha: true, hora: true, tipo: true, condicion: true, rival: true,
+          golesLocal: true, golesVisitante: true, estado: true, ubicacion: true
+        }
+      }
+    }
+  })
+
+  if (!campeonato) throw new AppError('Campeonato no encontrado', 404)
+
+  const nombreEquipo = campeonato.nombreEquipo || campeonato.categoriaActividad?.nombre || 'Nuestro Equipo'
+  const tabla = calcularTabla(campeonato.partidos, nombreEquipo)
+
+  res.json({
+    success: true,
+    data: {
+      ...campeonato,
+      actividad: campeonato.categoriaActividad?.actividad?.nombre || null,
+      actividadColor: campeonato.categoriaActividad?.actividad?.color || null,
+      categoria: campeonato.categoriaActividad?.nombre || null,
+      tabla,
+    }
+  })
+}))
+
+// PUT /api/admin/campeonatos/:id
+router.put('/campeonatos/:id', asyncHandler(async (req, res) => {
+  const { nombre, tipo, temporada, estado, categoriaActividadId, fechaInicio, fechaFin, descripcion, nombreEquipo } = req.body
+
+  await req.db.campeonato.updateMany({
+    where: { id: parseInt(req.params.id), tenantId: req.tenantId },
+    data: {
+      nombre, tipo, temporada, estado,
+      categoriaActividadId: categoriaActividadId !== undefined ? (categoriaActividadId ? parseInt(categoriaActividadId) : null) : undefined,
+      fechaInicio: fechaInicio !== undefined ? (fechaInicio ? new Date(fechaInicio) : null) : undefined,
+      fechaFin: fechaFin !== undefined ? (fechaFin ? new Date(fechaFin) : null) : undefined,
+      descripcion, nombreEquipo,
+    }
+  })
+
+  res.json({ success: true })
+}))
+
+// DELETE /api/admin/campeonatos/:id
+router.delete('/campeonatos/:id', asyncHandler(async (req, res) => {
+  // Solo eliminar si no tiene partidos asociados
+  const count = await req.db.partido.count({ where: { campeonatoId: parseInt(req.params.id) } })
+  if (count > 0) throw new AppError('No se puede eliminar un campeonato con partidos asociados', 400)
+
+  await req.db.campeonato.deleteMany({ where: { id: parseInt(req.params.id), tenantId: req.tenantId } })
+  res.json({ success: true })
+}))
+
+// POST /api/admin/campeonatos/:id/asignar-partido — asignar un partido existente al campeonato
+router.post('/campeonatos/:id/asignar-partido', asyncHandler(async (req, res) => {
+  const campeonatoId = parseInt(req.params.id)
+  const { partidoId } = req.body
+
+  const campeonato = await req.db.campeonato.findFirst({ where: { id: campeonatoId, tenantId: req.tenantId } })
+  if (!campeonato) throw new AppError('Campeonato no encontrado', 404)
+
+  await req.db.partido.updateMany({
+    where: { id: parseInt(partidoId), tenantId: req.tenantId },
+    data: { campeonatoId }
+  })
+
+  res.json({ success: true })
+}))
+
+// DELETE /api/admin/campeonatos/:id/asignar-partido/:partidoId — quitar partido del campeonato
+router.delete('/campeonatos/:id/asignar-partido/:partidoId', asyncHandler(async (req, res) => {
+  await req.db.partido.updateMany({
+    where: { id: parseInt(req.params.partidoId), campeonatoId: parseInt(req.params.id), tenantId: req.tenantId },
+    data: { campeonatoId: null }
+  })
+  res.json({ success: true })
+}))
+
+// =============================================================================
+// EQUIPOS PERMANENTES
+// =============================================================================
+
+// GET /api/admin/equipos
+router.get('/equipos', asyncHandler(async (req, res) => {
+  const { categoriaActividadId, activo } = req.query
+  const where = { tenantId: req.tenantId }
+  if (categoriaActividadId) where.categoriaActividadId = parseInt(categoriaActividadId)
+  if (activo !== undefined) where.activo = activo === 'true'
+
+  const equipos = await req.db.equipo.findMany({
+    where,
+    include: {
+      categoriaActividad: {
+        include: { actividad: { select: { nombre: true } } }
+      },
+      _count: { select: { plantel: { where: { activo: true } } } }
+    },
+    orderBy: [{ categoriaActividadId: 'asc' }, { nombre: 'asc' }]
+  })
+
+  res.json({
+    success: true,
+    data: equipos.map(e => ({
+      id: e.id,
+      nombre: e.nombre,
+      temporada: e.temporada,
+      color: e.color,
+      activo: e.activo,
+      observaciones: e.observaciones,
+      categoriaActividadId: e.categoriaActividadId,
+      actividad: e.categoriaActividad.actividad.nombre,
+      categoria: e.categoriaActividad.nombre,
+      jugadores: e._count.plantel,
+    }))
+  })
+}))
+
+// POST /api/admin/equipos
+router.post('/equipos', asyncHandler(async (req, res) => {
+  const { categoriaActividadId, nombre, temporada, color, observaciones } = req.body
+  if (!categoriaActividadId || !nombre) throw new AppError('Nombre y categoría son obligatorios', 400)
+
+  const equipo = await req.db.equipo.create({
+    data: {
+      categoriaActividadId: parseInt(categoriaActividadId),
+      nombre,
+      temporada,
+      color,
+      observaciones,
+      tenantId: req.tenantId,
+    }
+  })
+  res.json({ success: true, data: equipo })
+}))
+
+// GET /api/admin/equipos/:id
+router.get('/equipos/:id', asyncHandler(async (req, res) => {
+  const equipo = await req.db.equipo.findFirst({
+    where: { id: parseInt(req.params.id), tenantId: req.tenantId },
+    include: {
+      categoriaActividad: {
+        include: { actividad: { select: { nombre: true, color: true } } }
+      },
+      plantel: {
+        where: { activo: true },
+        include: {
+          socio: {
+            select: {
+              id: true, nroSocio: true, apellidoNombre: true,
+              fotoPerfil: true, fechaNacimiento: true
+            }
+          }
+        },
+        orderBy: [{ esTitular: 'desc' }, { dorsal: 'asc' }]
+      }
+    }
+  })
+
+  if (!equipo) throw new AppError('Equipo no encontrado', 404)
+
+  res.json({
+    success: true,
+    data: {
+      ...equipo,
+      actividad: equipo.categoriaActividad.actividad.nombre,
+      actividadColor: equipo.categoriaActividad.actividad.color,
+      categoria: equipo.categoriaActividad.nombre,
+    }
+  })
+}))
+
+// PUT /api/admin/equipos/:id
+router.put('/equipos/:id', asyncHandler(async (req, res) => {
+  const { nombre, temporada, color, activo, observaciones } = req.body
+
+  const equipo = await req.db.equipo.updateMany({
+    where: { id: parseInt(req.params.id), tenantId: req.tenantId },
+    data: { nombre, temporada, color, activo, observaciones }
+  })
+
+  if (equipo.count === 0) throw new AppError('Equipo no encontrado', 404)
+  res.json({ success: true })
+}))
+
+// DELETE /api/admin/equipos/:id
+router.delete('/equipos/:id', asyncHandler(async (req, res) => {
+  await req.db.equipo.updateMany({
+    where: { id: parseInt(req.params.id), tenantId: req.tenantId },
+    data: { activo: false }
+  })
+  res.json({ success: true })
+}))
+
+// POST /api/admin/equipos/:id/plantel — Agregar jugador al plantel
+router.post('/equipos/:id/plantel', asyncHandler(async (req, res) => {
+  const equipoId = parseInt(req.params.id)
+  const { socioId, posicion, dorsal, esTitular, observaciones } = req.body
+
+  if (!socioId) throw new AppError('socioId es obligatorio', 400)
+
+  // Verificar equipo existe y pertenece al tenant
+  const equipo = await req.db.equipo.findFirst({ where: { id: equipoId, tenantId: req.tenantId } })
+  if (!equipo) throw new AppError('Equipo no encontrado', 404)
+
+  // Verificar que el jugador no esté ya activo en este equipo
+  const yaEnPlantel = await req.db.plantelEquipo.findFirst({
+    where: { equipoId, socioId: parseInt(socioId), activo: true }
+  })
+  if (yaEnPlantel) throw new AppError('El socio ya está en el plantel', 400)
+
+  // Verificar dorsal único si se provee
+  if (dorsal) {
+    const dorsalOcupado = await req.db.plantelEquipo.findFirst({
+      where: { equipoId, dorsal: parseInt(dorsal), activo: true }
+    })
+    if (dorsalOcupado) throw new AppError(`El dorsal ${dorsal} ya está en uso`, 400)
+  }
+
+  const entry = await req.db.plantelEquipo.create({
+    data: {
+      equipoId,
+      socioId: parseInt(socioId),
+      posicion,
+      dorsal: dorsal ? parseInt(dorsal) : null,
+      esTitular: !!esTitular,
+      desde: new Date(),
+      observaciones,
+      tenantId: req.tenantId,
+    },
+    include: {
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true, fotoPerfil: true } }
+    }
+  })
+
+  res.json({ success: true, data: entry })
+}))
+
+// PUT /api/admin/equipos/:id/plantel/:plantelId — Actualizar datos del jugador
+router.put('/equipos/:id/plantel/:plantelId', asyncHandler(async (req, res) => {
+  const equipoId = parseInt(req.params.id)
+  const plantelId = parseInt(req.params.plantelId)
+  const { posicion, dorsal, esTitular, observaciones } = req.body
+
+  // Verificar dorsal único si cambia
+  if (dorsal) {
+    const dorsalOcupado = await req.db.plantelEquipo.findFirst({
+      where: { equipoId, dorsal: parseInt(dorsal), activo: true, id: { not: plantelId } }
+    })
+    if (dorsalOcupado) throw new AppError(`El dorsal ${dorsal} ya está en uso`, 400)
+  }
+
+  await req.db.plantelEquipo.updateMany({
+    where: { id: plantelId, equipoId, equipo: { tenantId: req.tenantId } },
+    data: {
+      posicion,
+      dorsal: dorsal ? parseInt(dorsal) : null,
+      esTitular: esTitular !== undefined ? !!esTitular : undefined,
+      observaciones,
+    }
+  })
+
+  res.json({ success: true })
+}))
+
+// DELETE /api/admin/equipos/:id/plantel/:plantelId — Dar de baja del plantel
+router.delete('/equipos/:id/plantel/:plantelId', asyncHandler(async (req, res) => {
+  const equipoId = parseInt(req.params.id)
+  const plantelId = parseInt(req.params.plantelId)
+
+  await req.db.plantelEquipo.updateMany({
+    where: { id: plantelId, equipoId, equipo: { tenantId: req.tenantId } },
+    data: { activo: false, hasta: new Date() }
+  })
+
+  res.json({ success: true })
 }))
 
 export default router

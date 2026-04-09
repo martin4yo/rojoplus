@@ -12,18 +12,27 @@ import {
   PlusCircleIcon,
   CheckCircleIcon,
   XCircleIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline'
 
 export default function MisActividadesSocio({ socio, tokenPortal }) {
   const { confirm, ConfirmDialog } = useConfirm()
   const [inscripciones, setInscripciones] = useState([])
   const [disponibles, setDisponibles] = useState([])
+  const [historial, setHistorial] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('mis-actividades') // 'mis-actividades' | 'disponibles'
+  const [loadingHistorial, setLoadingHistorial] = useState(false)
+  const [tab, setTab] = useState('mis-actividades') // 'mis-actividades' | 'disponibles' | 'asistencia'
 
   useEffect(() => {
     cargarActividades()
   }, [tokenPortal])
+
+  useEffect(() => {
+    if (tab === 'asistencia' && historial.length === 0) {
+      cargarHistorial()
+    }
+  }, [tab])
 
   const cargarActividades = async () => {
     try {
@@ -39,6 +48,18 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
       console.error('Error cargando actividades:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const cargarHistorial = async () => {
+    try {
+      setLoadingHistorial(true)
+      const res = await api.get(`/socio/${tokenPortal}/historial-asistencia?dias=90`)
+      setHistorial(res.data || [])
+    } catch (err) {
+      console.error('Error cargando historial de asistencia:', err)
+    } finally {
+      setLoadingHistorial(false)
     }
   }
 
@@ -78,10 +99,10 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
     <div className="space-y-6">
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-3">
           <button
             onClick={() => setTab('mis-actividades')}
-            className={`py-4 px-6 font-semibold transition-colors ${
+            className={`py-4 px-4 font-semibold transition-colors text-sm ${
               tab === 'mis-actividades'
                 ? 'bg-red-600 text-white'
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
@@ -91,13 +112,23 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
           </button>
           <button
             onClick={() => setTab('disponibles')}
-            className={`py-4 px-6 font-semibold transition-colors ${
+            className={`py-4 px-4 font-semibold transition-colors text-sm ${
               tab === 'disponibles'
                 ? 'bg-red-600 text-white'
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}
           >
             Disponibles ({disponibles.length})
+          </button>
+          <button
+            onClick={() => setTab('asistencia')}
+            className={`py-4 px-4 font-semibold transition-colors text-sm ${
+              tab === 'asistencia'
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Mi Asistencia
           </button>
         </div>
       </div>
@@ -276,6 +307,115 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
                     </button>
                   </div>
                 </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Tab: Asistencia */}
+      {tab === 'asistencia' && (
+        <div className="space-y-6">
+          {loadingHistorial ? (
+            <LoadingSpinner />
+          ) : historial.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+              <ChartBarIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Sin historial de asistencia</h3>
+              <p className="text-gray-600">No hay entrenamientos registrados en los últimos 90 días</p>
+            </div>
+          ) : (
+            historial.map(item => (
+              <div key={item.inscripcionId} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                {/* Cabecera con resumen */}
+                <div className="p-5 border-b border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-lg">{item.actividad}</h3>
+                      <p className="text-sm text-gray-500">{item.categoria}</p>
+                    </div>
+                    {item.resumen.pct !== null && (
+                      <div className={`text-center px-4 py-2 rounded-xl ${
+                        item.resumen.pct >= 75 ? 'bg-green-100' :
+                        item.resumen.pct >= 50 ? 'bg-yellow-100' : 'bg-red-100'
+                      }`}>
+                        <p className={`text-2xl font-bold ${
+                          item.resumen.pct >= 75 ? 'text-green-700' :
+                          item.resumen.pct >= 50 ? 'text-yellow-700' : 'text-red-700'
+                        }`}>{item.resumen.pct}%</p>
+                        <p className="text-xs text-gray-500">asistencia</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Barra de progreso */}
+                  {item.resumen.total > 0 && (
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>{item.resumen.presentes} presentes</span>
+                        <span>{item.resumen.total} entrenamientos</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            item.resumen.pct >= 75 ? 'bg-green-500' :
+                            item.resumen.pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${item.resumen.pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lista de entrenamientos */}
+                {item.entrenamientos.length > 0 && (
+                  <div className="divide-y divide-gray-50">
+                    {item.entrenamientos.map(e => {
+                      const fecha = new Date(e.fecha)
+                      const fechaStr = fecha.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' })
+                      const esPresente = e.asistencia === 'PRESENTE'
+                      const esAusente = e.asistencia === 'AUSENTE'
+
+                      return (
+                        <div key={e.id} className="flex items-center justify-between px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              esPresente ? 'bg-green-500' :
+                              esAusente ? 'bg-red-400' : 'bg-gray-300'
+                            }`} />
+                            <div>
+                              <p className="text-sm font-medium text-gray-800 capitalize">{fechaStr}</p>
+                              <p className="text-xs text-gray-400">{e.horaInicio} - {e.horaFin}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {e.horaLlegada && (
+                              <span className="text-xs text-gray-400">{e.horaLlegada}</span>
+                            )}
+                            {esPresente && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                                <CheckCircleIcon className="h-3.5 w-3.5" />
+                                Presente
+                              </span>
+                            )}
+                            {esAusente && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-medium">
+                                <XCircleIcon className="h-3.5 w-3.5" />
+                                Ausente
+                              </span>
+                            )}
+                            {!e.asistencia && (
+                              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 text-xs">
+                                Sin registro
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             ))
           )}

@@ -840,6 +840,15 @@ export default function SocioDetalle() {
         {/* Tab Medico */}
         {activeTab === 'medico' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2 flex justify-end mb-2">
+              <button
+                onClick={() => navigate(`/admin/socios/${id}/medico`)}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition"
+              >
+                <Heart className="w-4 h-4" />
+                Seguimiento médico completo
+              </button>
+            </div>
             <div>
               <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
                 <Heart className="w-4 h-4" /> Datos Medicos

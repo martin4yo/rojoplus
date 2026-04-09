@@ -1237,6 +1237,380 @@ export async function notificarPasajeCategoria(socioId, categoriaAnterior, categ
   }
 }
 
+// ============================================================================
+// ALERTA DE BAJA ASISTENCIA
+// ============================================================================
+
+/**
+ * Verifica socios con baja asistencia en todos los tenants activos.
+ * Envía un email resumen al EMAIL_CONTACTO de cada tenant con la lista de afectados.
+ */
+export async function verificarBajaAsistencia() {
+  const tenants = await prisma.tenant.findMany({
+    where: { estado: 'ACTIVE' },
+    select: { id: true, nombre: true, subdomain: true, dominioCustom: true }
+  })
+
+  let totalAlertas = 0
+
+  for (const tenant of tenants) {
+    try {
+      const db = createTenantPrisma(tenant.id)
+      const alertas = await _detectarBajaAsistenciaTenant(db, tenant.id)
+      if (alertas.length > 0) {
+        await _enviarResumenBajaAsistencia(db, tenant, alertas)
+        totalAlertas += alertas.length
+      }
+    } catch (err) {
+      console.error(`Error verificando baja asistencia para tenant ${tenant.id}:`, err.message)
+    }
+  }
+
+  return totalAlertas
+}
+
+async function _detectarBajaAsistenciaTenant(db, tenantId) {
+  // Leer config
+  const claves = ['ALERTA_BAJA_ASISTENCIA_ACTIVO', 'ALERTA_BAJA_ASISTENCIA_PCT', 'ALERTA_BAJA_ASISTENCIA_DIAS']
+  const configs = await db.configuracion.findMany({ where: { clave: { in: claves } } })
+  const cfg = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
+
+  if (cfg['ALERTA_BAJA_ASISTENCIA_ACTIVO'] !== 'true') return []
+
+  const umbralPct = parseFloat(cfg['ALERTA_BAJA_ASISTENCIA_PCT'] || '50')
+  const dias = parseInt(cfg['ALERTA_BAJA_ASISTENCIA_DIAS'] || '30')
+
+  const fechaDesde = new Date()
+  fechaDesde.setDate(fechaDesde.getDate() - dias)
+  fechaDesde.setHours(0, 0, 0, 0)
+
+  // Inscripciones activas con socio + categoría
+  const inscripciones = await db.inscripcion.findMany({
+    where: { estado: 'ACTIVA', fechaFin: null },
+    include: {
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true, email: true } },
+      categoriaActividad: {
+        select: {
+          id: true, nombre: true,
+          actividad: { select: { nombre: true } }
+        }
+      }
+    }
+  })
+
+  const alertas = []
+
+  for (const insc of inscripciones) {
+    const catId = insc.categoriaActividadId
+
+    // Entrenamientos realizados (no cancelados) en el período
+    const totalEntrenamientos = await db.entrenamiento.count({
+      where: {
+        categoriaActividadId: catId,
+        fecha: { gte: fechaDesde },
+        estado: { not: 'CANCELADO' }
+      }
+    })
+
+    if (totalEntrenamientos === 0) continue
+
+    // Asistencias PRESENTE del socio en esos entrenamientos
+    const presentes = await db.asistencia.count({
+      where: {
+        socioId: insc.socioId,
+        estado: 'PRESENTE',
+        entrenamiento: {
+          categoriaActividadId: catId,
+          fecha: { gte: fechaDesde },
+          estado: { not: 'CANCELADO' }
+        }
+      }
+    })
+
+    const pct = Math.round((presentes / totalEntrenamientos) * 100)
+
+    if (pct < umbralPct) {
+      alertas.push({
+        socio: insc.socio,
+        actividad: `${insc.categoriaActividad.actividad.nombre} - ${insc.categoriaActividad.nombre}`,
+        presentes,
+        totalEntrenamientos,
+        pct,
+        umbral: umbralPct,
+        dias,
+      })
+    }
+  }
+
+  return alertas
+}
+
+async function _enviarResumenBajaAsistencia(db, tenant, alertas) {
+  const { enviarEmail, getMailConfig } = await import('./email.js')
+  const mailConfig = await getMailConfig(db)
+  if (!mailConfig.emailContacto) return
+
+  const filas = alertas.map(a =>
+    `<tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #eee">${a.socio.nroSocio || '-'}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eee">${a.socio.apellidoNombre}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eee">${a.actividad}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:center">${a.presentes}/${a.totalEntrenamientos}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:center;color:${a.pct < 30 ? '#dc2626' : '#d97706'};font-weight:bold">${a.pct}%</td>
+    </tr>`
+  ).join('')
+
+  const html = `
+    <h2 style="color:#1f2937">Alerta: Socios con Baja Asistencia</h2>
+    <p style="color:#6b7280">Período analizado: últimos ${alertas[0].dias} días · Umbral: ${alertas[0].umbral}%</p>
+    <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:14px">
+      <thead>
+        <tr style="background:#f3f4f6">
+          <th style="padding:8px 12px;text-align:left">N° Socio</th>
+          <th style="padding:8px 12px;text-align:left">Nombre</th>
+          <th style="padding:8px 12px;text-align:left">Actividad</th>
+          <th style="padding:8px 12px;text-align:center">Asistencias</th>
+          <th style="padding:8px 12px;text-align:center">%</th>
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <p style="color:#9ca3af;font-size:12px;margin-top:20px">Generado automáticamente por Clubix</p>
+  `
+
+  await enviarEmail({
+    to: mailConfig.emailContacto,
+    subject: `[Clubix] ${alertas.length} socio${alertas.length > 1 ? 's' : ''} con baja asistencia`,
+    html,
+    db,
+  })
+}
+
+// ============================================================================
+// AUTOMATIZACIÓN DE COMUNICACIONES
+// ============================================================================
+
+/**
+ * Enviar saludos de cumpleaños - itera todos los tenants activos
+ * Se ejecuta diariamente
+ */
+export async function enviarSaludosCumpleanios() {
+  const tenants = await prisma.tenant.findMany({ where: { activo: true } })
+  let total = 0
+  for (const tenant of tenants) {
+    try {
+      const db = createTenantPrisma(tenant.id)
+      const cfg = await db.configuracion.findFirst({ where: { clave: 'CUMPLEANIOS_ACTIVO' } })
+      if (cfg?.valor !== 'true') continue
+      total += await _enviarCumpleaniosTenant(db)
+    } catch (err) {
+      console.error(`[Cumpleaños] Error tenant ${tenant.id}:`, err.message)
+    }
+  }
+  return total
+}
+
+async function _enviarCumpleaniosTenant(db) {
+  const hoy = new Date()
+  const mes = hoy.getMonth() + 1
+  const dia = hoy.getDate()
+
+  const socios = await db.socio.findMany({
+    where: { estado: 'ACTIVO', fechaNacimiento: { not: null } },
+    select: {
+      id: true, apellidoNombre: true, email: true,
+      celular: true, celularSecundario: true, telefonoFijo: true,
+      fechaNacimiento: true, notifEmail: true, notifWhatsapp: true,
+    }
+  })
+
+  const cumpleanieros = socios.filter(s => {
+    const fn = new Date(s.fechaNacimiento)
+    return fn.getMonth() + 1 === mes && fn.getDate() === dia
+  })
+
+  if (cumpleanieros.length === 0) return 0
+
+  const cfgMensaje = await db.configuracion.findFirst({ where: { clave: 'CUMPLEANIOS_MENSAJE' } })
+  const mensajeTpl = cfgMensaje?.valor || 'Feliz cumpleaños, {nombre}! El club te desea un excelente día.'
+
+  const inicioHoy = new Date(hoy)
+  inicioHoy.setHours(0, 0, 0, 0)
+
+  const { enviarEmail: _enviarEmail } = await import('./email.js')
+  let enviados = 0
+
+  for (const socio of cumpleanieros) {
+    const yaEnviado = await db.notificacionLog.findFirst({
+      where: { socioId: socio.id, eventType: 'CUMPLEANIOS', createdAt: { gte: inicioHoy } }
+    })
+    if (yaEnviado) continue
+
+    const nombreCorto = socio.apellidoNombre.includes(',')
+      ? socio.apellidoNombre.split(',')[1].trim().split(' ')[0]
+      : socio.apellidoNombre.split(' ')[0]
+    const mensaje = mensajeTpl.replace(/{nombre}/g, nombreCorto)
+    const html = `<p style="font-family:sans-serif;font-size:16px;color:#374151">${mensaje}</p>`
+
+    let enviado = false
+
+    if (socio.email && socio.notifEmail !== false) {
+      try {
+        await _enviarEmail({ to: socio.email, subject: '¡Feliz Cumpleaños!', html, db })
+        enviado = true
+      } catch (err) {
+        console.error(`[Cumpleaños] Error email ${socio.email}:`, err.message)
+      }
+    }
+
+    if (socio.notifWhatsapp !== false) {
+      const tel = obtenerTelefonoSocio(socio)
+      if (tel) {
+        try {
+          await enviarWhatsApp({ db, telefono: tel, texto: mensaje })
+          enviado = true
+        } catch (err) {
+          console.error(`[Cumpleaños] Error WA ${tel}:`, err.message)
+        }
+      }
+    }
+
+    if (enviado) {
+      await db.notificacionLog.create({
+        data: {
+          tipo: 'EMAIL',
+          eventType: 'CUMPLEANIOS',
+          destinatario: socio.email || obtenerTelefonoSocio(socio) || '-',
+          socioId: socio.id,
+          asunto: '¡Feliz Cumpleaños!',
+          cuerpo: mensaje,
+          enviado: true,
+          fechaEnvio: new Date(),
+          fechaProgramado: new Date(),
+          intentos: 1,
+        }
+      })
+      enviados++
+      console.log(`🎂 [Cumpleaños] Saludo enviado a ${socio.apellidoNombre}`)
+    }
+  }
+
+  return enviados
+}
+
+/**
+ * Recordatorio anticipado de cuotas - configurable por tenant (por defecto D-3)
+ * Se ejecuta diariamente
+ */
+export async function verificarRecordatorioAnticipado() {
+  const tenants = await prisma.tenant.findMany({ where: { activo: true } })
+  let total = 0
+
+  for (const tenant of tenants) {
+    try {
+      const db = createTenantPrisma(tenant.id)
+      const cfgActivo = await db.configuracion.findFirst({ where: { clave: 'RECORDATORIO_ANTICIPADO_ACTIVO' } })
+      if (cfgActivo?.valor !== 'true') continue
+
+      const cfgDias = await db.configuracion.findFirst({ where: { clave: 'RECORDATORIO_ANTICIPADO_DIAS' } })
+      const dias = parseInt(cfgDias?.valor || '3')
+
+      const fechaInicio = new Date()
+      fechaInicio.setDate(fechaInicio.getDate() + dias)
+      fechaInicio.setHours(0, 0, 0, 0)
+      const fechaFin = new Date(fechaInicio)
+      fechaFin.setHours(23, 59, 59, 999)
+
+      const cargos = await db.cargo.findMany({
+        where: {
+          estado: 'PENDIENTE',
+          fechaVencimiento: { gte: fechaInicio, lte: fechaFin },
+          socioId: { not: null },
+        },
+        include: { socio: true }
+      })
+
+      for (const cargo of cargos) {
+        const yaNotificado = await db.notificacionLog.findFirst({
+          where: { eventType: 'CUOTA_RECORDATORIO', cargoId: cargo.id, enviado: true }
+        })
+        if (yaNotificado) continue
+
+        await _notificarRecordatorioAnticipado(cargo, dias, db)
+        total++
+      }
+
+      console.log(`📬 [Recordatorio Anticipado] Tenant ${tenant.id}: ${cargos.length} cuotas próximas en ${dias}d`)
+    } catch (err) {
+      console.error(`[Recordatorio Anticipado] Error tenant ${tenant.id}:`, err.message)
+    }
+  }
+
+  return total
+}
+
+async function _notificarRecordatorioAnticipado(cargo, dias, db) {
+  const socio = cargo.socio
+  if (!socio) return
+
+  const { enviarEmail: _enviarEmail } = await import('./email.js')
+  const fechaVenc = new Date(cargo.fechaVencimiento).toLocaleDateString('es-AR')
+  const monto = Number(cargo.montoTotal).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
+  const nombreCorto = socio.apellidoNombre.includes(',')
+    ? socio.apellidoNombre.split(',')[1].trim().split(' ')[0]
+    : socio.apellidoNombre.split(' ')[0]
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+      <h2 style="color:#1f2937">Recordatorio de cuota</h2>
+      <p>Hola ${nombreCorto},</p>
+      <p>Te recordamos que tu cuota <strong>${cargo.descripcion || 'mensual'}</strong> vence en <strong>${dias} día${dias !== 1 ? 's' : ''}</strong> (${fechaVenc}).</p>
+      <p>Importe: <strong>${monto}</strong></p>
+      <p style="color:#6b7280;font-size:13px">Podés abonarla desde el portal del socio.</p>
+    </div>
+  `
+
+  let enviado = false
+
+  if (socio.email && socio.notifEmail !== false) {
+    try {
+      await _enviarEmail({ to: socio.email, subject: `Recordatorio: tu cuota vence en ${dias} días`, html, db })
+      enviado = true
+    } catch (err) {
+      console.error(`[Recordatorio] Error email ${socio.email}:`, err.message)
+    }
+  }
+
+  if (socio.notifWhatsapp !== false) {
+    const tel = obtenerTelefonoSocio(socio)
+    if (tel) {
+      try {
+        await notifWaVencimiento({ db, socio, cuota: { vencimiento: cargo.fechaVencimiento, importe: cargo.montoTotal } })
+        enviado = true
+      } catch (err) {
+        console.error(`[Recordatorio] Error WA ${tel}:`, err.message)
+      }
+    }
+  }
+
+  if (enviado) {
+    await db.notificacionLog.create({
+      data: {
+        tipo: 'EMAIL',
+        eventType: 'CUOTA_RECORDATORIO',
+        destinatario: socio.email || obtenerTelefonoSocio(socio) || '-',
+        socioId: socio.id,
+        cargoId: cargo.id,
+        asunto: `Recordatorio: cuota vence en ${dias} días`,
+        enviado: true,
+        fechaEnvio: new Date(),
+        fechaProgramado: new Date(),
+        intentos: 1,
+      }
+    })
+  }
+}
+
 export default {
   programarNotificacion,
   procesarNotificacionesPendientes,
@@ -1255,4 +1629,9 @@ export default {
   notificarCancelacionEntrenamiento,
   notificarNuevoEntrenamiento,
   notificarPasajeCategoria,
+  // Alertas deportivas
+  verificarBajaAsistencia,
+  // Automatización de comunicaciones
+  enviarSaludosCumpleanios,
+  verificarRecordatorioAnticipado,
 }

@@ -197,12 +197,21 @@ export default function AsistenciaEntrenamiento() {
             </p>
           </div>
         </div>
-        {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
-          <Button onClick={guardarAsistencias} loading={guardando} disabled={!cambiosPendientes}>
-            <Save className="w-4 h-4 mr-2" />
-            Guardar Asistencia
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate(`/admin/deportes/planilla/${entrenamiento.id}`)}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition"
+          >
+            <ClipboardList className="w-4 h-4" />
+            Planilla
+          </button>
+          {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+            <Button onClick={guardarAsistencias} loading={guardando} disabled={!cambiosPendientes}>
+              <Save className="w-4 h-4 mr-2" />
+              Guardar Asistencia
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}

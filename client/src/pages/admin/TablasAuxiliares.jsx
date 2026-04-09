@@ -51,6 +51,22 @@ export default function TablasAuxiliares() {
   const [recargo, setRecargo] = useState({ tipo: 'FIJO', porcentaje: '10', cadaDias: '15', topeMaximo: '' })
   const [guardandoRecargo, setGuardandoRecargo] = useState(false)
 
+  // Configuración descuento anticipado
+  const [descAnticipado, setDescAnticipado] = useState({ activo: false, porcentaje: '0', diasAnticipacion: '0' })
+  const [guardandoDescAnticipado, setGuardandoDescAnticipado] = useState(false)
+
+  // Configuración alerta baja asistencia
+  const [bajaAsistencia, setBajaAsistencia] = useState({ activo: false, umbralPct: '50', diasVentana: '30' })
+  const [guardandoBajaAsistencia, setGuardandoBajaAsistencia] = useState(false)
+
+  // Configuración cumpleaños
+  const [cumpleanios, setCumpleanios] = useState({ activo: false, mensaje: 'Feliz cumpleaños, {nombre}! El club te desea un excelente día.' })
+  const [guardandoCumpleanios, setGuardandoCumpleanios] = useState(false)
+
+  // Configuración recordatorio anticipado
+  const [recordatorioAnt, setRecordatorioAnt] = useState({ activo: false, dias: '3' })
+  const [guardandoRecordatorioAnt, setGuardandoRecordatorioAnt] = useState(false)
+
   // Configuración fiscal
   const [configFiscal, setConfigFiscal] = useState({
     cuit: '',
@@ -118,6 +134,10 @@ export default function TablasAuxiliares() {
     cargarModoDemo()
     cargarConfiguracion()
     cargarRecargo()
+    cargarDescAnticipado()
+    cargarBajaAsistencia()
+    cargarCumpleanios()
+    cargarRecordatorioAnt()
     cargarConfigFiscal()
     cargarConfigSmtp()
     cargarConfigWa()
@@ -282,6 +302,114 @@ export default function TablasAuxiliares() {
       }
     } catch (err) {
       console.error('Error cargando configuración de recargo:', err)
+    }
+  }
+
+  async function cargarDescAnticipado() {
+    try {
+      const data = await api.get('/admin/configuracion-descuento-anticipado')
+      if (data) {
+        setDescAnticipado({
+          activo: !!data.activo,
+          porcentaje: String(data.porcentaje || '0'),
+          diasAnticipacion: String(data.diasAnticipacion || '0'),
+        })
+      }
+    } catch (err) {
+      console.error('Error cargando configuración de descuento anticipado:', err)
+    }
+  }
+
+  async function guardarDescAnticipado() {
+    setGuardandoDescAnticipado(true)
+    setError(null)
+    try {
+      await api.put('/admin/configuracion-descuento-anticipado', {
+        activo: descAnticipado.activo,
+        porcentaje: parseFloat(descAnticipado.porcentaje) || 0,
+        diasAnticipacion: parseInt(descAnticipado.diasAnticipacion) || 0,
+      })
+      setSuccess('Configuración de descuento anticipado actualizada')
+    } catch (err) {
+      setError(err.message || 'Error al guardar')
+    } finally {
+      setGuardandoDescAnticipado(false)
+    }
+  }
+
+  async function cargarBajaAsistencia() {
+    try {
+      const data = await api.get('/admin/configuracion-baja-asistencia')
+      if (data) {
+        setBajaAsistencia({
+          activo: !!data.activo,
+          umbralPct: String(data.umbralPct || '50'),
+          diasVentana: String(data.diasVentana || '30'),
+        })
+      }
+    } catch (err) {
+      console.error('Error cargando configuración de baja asistencia:', err)
+    }
+  }
+
+  async function guardarBajaAsistencia() {
+    setGuardandoBajaAsistencia(true)
+    setError(null)
+    try {
+      await api.put('/admin/configuracion-baja-asistencia', {
+        activo: bajaAsistencia.activo,
+        umbralPct: parseInt(bajaAsistencia.umbralPct) || 50,
+        diasVentana: parseInt(bajaAsistencia.diasVentana) || 30,
+      })
+      setSuccess('Configuración de alerta de asistencia actualizada')
+    } catch (err) {
+      setError(err.message || 'Error al guardar')
+    } finally {
+      setGuardandoBajaAsistencia(false)
+    }
+  }
+
+  async function cargarCumpleanios() {
+    try {
+      const data = await api.get('/admin/configuracion-cumpleanios')
+      if (data) setCumpleanios({ activo: !!data.activo, mensaje: data.mensaje || '' })
+    } catch (err) {
+      console.error('Error cargando config cumpleaños:', err)
+    }
+  }
+
+  async function guardarCumpleanios() {
+    setGuardandoCumpleanios(true)
+    setError(null)
+    try {
+      await api.put('/admin/configuracion-cumpleanios', { activo: cumpleanios.activo, mensaje: cumpleanios.mensaje })
+      setSuccess('Configuración de cumpleaños actualizada')
+    } catch (err) {
+      setError(err.message || 'Error al guardar')
+    } finally {
+      setGuardandoCumpleanios(false)
+    }
+  }
+
+  async function cargarRecordatorioAnt() {
+    try {
+      const data = await api.get('/admin/configuracion-recordatorio-anticipado')
+      if (data) setRecordatorioAnt({ activo: !!data.activo, dias: String(data.dias || '3') })
+    } catch (err) {
+      console.error('Error cargando config recordatorio anticipado:', err)
+    }
+  }
+
+  async function guardarRecordatorioAnt() {
+    setGuardandoRecordatorioAnt(true)
+    setError(null)
+    try {
+      await api.put('/admin/configuracion-recordatorio-anticipado', { activo: recordatorioAnt.activo, dias: parseInt(recordatorioAnt.dias) || 3 })
+      setSuccess('Configuración de recordatorio anticipado actualizada')
+    } catch (err) {
+      setError(err.message || 'Error al guardar')
+    } finally {
+      setGuardandoRecordatorioAnt(false)
     }
   }
 
@@ -931,6 +1059,291 @@ export default function TablasAuxiliares() {
                 title="Guardar"
               >
                 {guardandoRecargo ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Descuento por Pago Anticipado */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[280px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-green-100">
+                <Percent className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Descuento por Pago Anticipado</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Aplica descuento si el socio paga antes del vencimiento
+                </p>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="descAnticipadoActivo"
+                    checked={descAnticipado.activo}
+                    onChange={e => setDescAnticipado({ ...descAnticipado, activo: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-primary"
+                  />
+                  <label htmlFor="descAnticipadoActivo" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Activar descuento
+                  </label>
+                </div>
+
+                {descAnticipado.activo && (
+                  <>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Porcentaje de descuento</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={descAnticipado.porcentaje}
+                          onChange={e => setDescAnticipado({ ...descAnticipado, porcentaje: e.target.value })}
+                          className="input-field w-20"
+                          min="0" max="100" step="0.5"
+                        />
+                        <span className="text-gray-500">%</span>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Dias minimos de anticipacion
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={descAnticipado.diasAnticipacion}
+                          onChange={e => setDescAnticipado({ ...descAnticipado, diasAnticipacion: e.target.value })}
+                          className="input-field w-20"
+                          min="0"
+                        />
+                        <span className="text-gray-500">dias (0 = cualquier dia antes del venc.)</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 p-2 bg-green-50 rounded-lg">
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Ejemplo:</span>{' '}
+                        {descAnticipado.diasAnticipacion > 0
+                          ? <>Si paga {descAnticipado.diasAnticipacion}+ dias antes del vencimiento → <span className="font-semibold text-green-600">{descAnticipado.porcentaje}% de descuento</span></>
+                          : <>Cualquier pago antes del vencimiento → <span className="font-semibold text-green-600">{descAnticipado.porcentaje}% de descuento</span></>
+                        }
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarDescAnticipado}
+                disabled={guardandoDescAnticipado}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoDescAnticipado ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Alerta de Baja Asistencia */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[500px] relative min-h-[180px]">
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${bajaAsistencia.activo ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                <Bell className={`w-6 h-6 ${bajaAsistencia.activo ? 'text-orange-600' : 'text-gray-500'}`} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Alerta de Baja Asistencia</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Notifica al club cuando un socio tiene poca asistencia a los entrenamientos
+                </p>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="bajaAsistenciaActivo"
+                    checked={bajaAsistencia.activo}
+                    onChange={e => setBajaAsistencia({ ...bajaAsistencia, activo: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-primary"
+                  />
+                  <label htmlFor="bajaAsistenciaActivo" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Activar alerta semanal
+                  </label>
+                </div>
+
+                {bajaAsistencia.activo && (
+                  <>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Umbral de asistencia</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={bajaAsistencia.umbralPct}
+                          onChange={e => setBajaAsistencia({ ...bajaAsistencia, umbralPct: e.target.value })}
+                          className="input-field w-20"
+                          min="0" max="100" step="5"
+                        />
+                        <span className="text-sm text-gray-500">% mínimo de presencias</span>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ventana de análisis</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={bajaAsistencia.diasVentana}
+                          onChange={e => setBajaAsistencia({ ...bajaAsistencia, diasVentana: e.target.value })}
+                          className="input-field w-20"
+                          min="7"
+                        />
+                        <span className="text-sm text-gray-500">últimos días</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 p-2 bg-orange-50 rounded-lg">
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Ejemplo:</span>{' '}
+                        Si un socio asistió menos del <span className="font-semibold text-orange-600">{bajaAsistencia.umbralPct}%</span> de los entrenamientos en los últimos <span className="font-semibold text-orange-600">{bajaAsistencia.diasVentana} días</span>, se incluirá en el reporte semanal
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarBajaAsistencia}
+                disabled={guardandoBajaAsistencia}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoBajaAsistencia ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Saludos de Cumpleaños */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[500px] relative min-h-[180px]">
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${cumpleanios.activo ? 'bg-pink-100' : 'bg-gray-100'}`}>
+                <Calendar className={`w-6 h-6 ${cumpleanios.activo ? 'text-pink-600' : 'text-gray-500'}`} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Saludos de Cumpleaños</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Envía un saludo automático a cada socio el día de su cumpleaños
+                </p>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="cumpleaniosActivo"
+                    checked={cumpleanios.activo}
+                    onChange={e => setCumpleanios({ ...cumpleanios, activo: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-primary"
+                  />
+                  <label htmlFor="cumpleaniosActivo" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Activar saludo automático
+                  </label>
+                </div>
+
+                {cumpleanios.activo && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Mensaje <span className="text-gray-400 font-normal">(usá {'{nombre}'} para el nombre)</span>
+                    </label>
+                    <textarea
+                      value={cumpleanios.mensaje}
+                      onChange={e => setCumpleanios({ ...cumpleanios, mensaje: e.target.value })}
+                      className="input-field w-full h-20 resize-none"
+                      placeholder="Feliz cumpleaños, {nombre}! El club te desea un excelente día."
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Se envía por email y WhatsApp si el socio los tiene configurados</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarCumpleanios}
+                disabled={guardandoCumpleanios}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoCumpleanios ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Recordatorio Anticipado de Cuotas */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[500px] relative min-h-[180px]">
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${recordatorioAnt.activo ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <Bell className={`w-6 h-6 ${recordatorioAnt.activo ? 'text-blue-600' : 'text-gray-500'}`} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Recordatorio Anticipado de Cuotas</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Notifica al socio X días antes del vencimiento (además del recordatorio a 5 días)
+                </p>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="recordatorioAntActivo"
+                    checked={recordatorioAnt.activo}
+                    onChange={e => setRecordatorioAnt({ ...recordatorioAnt, activo: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-primary"
+                  />
+                  <label htmlFor="recordatorioAntActivo" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Activar recordatorio
+                  </label>
+                </div>
+
+                {recordatorioAnt.activo && (
+                  <>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Días antes del vencimiento</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={recordatorioAnt.dias}
+                          onChange={e => setRecordatorioAnt({ ...recordatorioAnt, dias: e.target.value })}
+                          className="input-field w-20"
+                          min="1" max="30"
+                        />
+                        <span className="text-sm text-gray-500">días antes</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 p-2 bg-blue-50 rounded-lg">
+                      <p className="text-xs text-gray-600">
+                        Se enviará un recordatorio <span className="font-semibold text-blue-600">{recordatorioAnt.dias} días antes</span> del vencimiento por email y WhatsApp
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarRecordatorioAnt}
+                disabled={guardandoRecordatorioAnt}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoRecordatorioAnt ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Save className="w-5 h-5" />

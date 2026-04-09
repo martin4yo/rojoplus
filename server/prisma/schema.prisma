@@ -332,6 +332,11 @@ model Socio {
   notifWhatsapp                Boolean                @default(false) @map("notif_whatsapp")
   aceptacionesReglamento       AceptacionReglamento[]
   asistencias                  Asistencia[]
+  plantelEquipo                PlantelEquipo[]
+  fichaMedica                  FichaMedica?
+  aptitudesFisicas             AptitudFisica[]
+  lesiones                     LesionSocio[]
+  votos                        VotoRegistrado[]
   autorizaciones               AutorizacionMenor[]
   cargos                       Cargo[]
   comandas                     Comanda[]
@@ -514,6 +519,8 @@ model CategoriaActividad {
   inscripciones        Inscripcion[]
   noticias             NoticiaDeportiva[]
   partidos             Partido[]
+  campeonatos          Campeonato[]
+  equipos              Equipo[]
   staff                StaffTecnico[]
 
   tenantId    Int      @map("tenant_id")
@@ -1814,6 +1821,7 @@ model Producto {
   precioVenta      Decimal?           @map("precio_venta") @db.Decimal(12, 2)
   margen           Decimal?           @db.Decimal(5, 2)
   activo           Boolean            @default(true)
+  aparecerEnCompras Boolean           @default(true) @map("aparecer_en_compras")
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
   conceptoCompraId Int?               @map("concepto_compra_id")
@@ -2127,6 +2135,7 @@ model Entrenamiento {
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
   asistencias          Asistencia[]
+  planilla             PlanillaEntrenamiento?
   categoriaActividad   CategoriaActividad @relation(fields: [categoriaActividadId], references: [id])
   espacio              EspacioDeportivo?  @relation(fields: [espacioId], references: [id])
 
@@ -2184,6 +2193,7 @@ model Partido {
   rival                String
   ubicacion            String?
   espacioId            Int?                 @map("espacio_id")
+  campeonatoId         Int?                 @map("campeonato_id")
   golesLocal           Int?                 @map("goles_local")
   golesVisitante       Int?                 @map("goles_visitante")
   estado               String               @default("PROGRAMADO")
@@ -2195,6 +2205,7 @@ model Partido {
   estadisticas         EstadisticaPartido[]
   categoriaActividad   CategoriaActividad   @relation(fields: [categoriaActividadId], references: [id])
   espacio              EspacioDeportivo?    @relation(fields: [espacioId], references: [id])
+  campeonato           Campeonato?          @relation(fields: [campeonatoId], references: [id])
   evento               Evento?
 
   tenantId    Int      @map("tenant_id")
@@ -2203,6 +2214,70 @@ model Partido {
   @@index([estado])
   @@index([tenantId])
   @@map("partidos")
+}
+
+model Campeonato {
+  id                   Int                 @id @default(autoincrement())
+  nombre               String
+  tipo                 String              @default("LIGA")
+  temporada            String?
+  categoriaActividadId Int?                @map("categoria_actividad_id")
+  estado               String              @default("ACTIVO")
+  fechaInicio          DateTime?           @map("fecha_inicio") @db.Date
+  fechaFin             DateTime?           @map("fecha_fin") @db.Date
+  descripcion          String?
+  nombreEquipo         String?             @map("nombre_equipo")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  categoriaActividad   CategoriaActividad? @relation(fields: [categoriaActividadId], references: [id])
+  partidos             Partido[]
+
+  tenantId    Int      @map("tenant_id")
+  @@index([tenantId])
+  @@index([categoriaActividadId])
+  @@map("campeonatos")
+}
+
+model Equipo {
+  id                   Int                @id @default(autoincrement())
+  categoriaActividadId Int                @map("categoria_actividad_id")
+  nombre               String
+  temporada            String?
+  color                String?
+  activo               Boolean            @default(true)
+  observaciones        String?
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  categoriaActividad   CategoriaActividad @relation(fields: [categoriaActividadId], references: [id])
+  plantel              PlantelEquipo[]
+
+  tenantId    Int      @map("tenant_id")
+  @@index([categoriaActividadId])
+  @@index([tenantId])
+  @@map("equipos")
+}
+
+model PlantelEquipo {
+  id            Int      @id @default(autoincrement())
+  equipoId      Int      @map("equipo_id")
+  socioId       Int      @map("socio_id")
+  posicion      String?
+  dorsal        Int?
+  esTitular     Boolean  @default(false) @map("es_titular")
+  desde         DateTime @default(now())
+  hasta         DateTime?
+  activo        Boolean  @default(true)
+  observaciones String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  equipo        Equipo   @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  socio         Socio    @relation(fields: [socioId], references: [id])
+
+  tenantId    Int      @map("tenant_id")
+  @@index([equipoId])
+  @@index([socioId])
+  @@index([tenantId])
+  @@map("plantel_equipo")
 }
 
 model Convocatoria {
@@ -2247,6 +2322,158 @@ model EstadisticaPartido {
   @@index([socioId])
   @@index([tenantId])
   @@map("estadisticas_partidos")
+}
+
+model PlanillaEntrenamiento {
+  id              Int           @id @default(autoincrement())
+  entrenamientoId Int           @unique @map("entrenamiento_id")
+  objetivos       String?
+  calentamiento   String?
+  ejercicios      String?
+  vueltaCalma     String?       @map("vuelta_calma")
+  observaciones   String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  entrenamiento   Entrenamiento @relation(fields: [entrenamientoId], references: [id], onDelete: Cascade)
+
+  tenantId  Int    @map("tenant_id")
+  @@index([tenantId])
+  @@map("planillas_entrenamiento")
+}
+
+model FichaMedica {
+  id                 Int      @id @default(autoincrement())
+  socioId            Int      @unique @map("socio_id")
+  grupoSanguineo     String?  @map("grupo_sanguineo")
+  alergias           String?
+  medicamentos       String?
+  condicionesCronicas String? @map("condiciones_cronicas")
+  contactoEmergencia String?  @map("contacto_emergencia")
+  telefonoEmergencia String?  @map("telefono_emergencia")
+  observaciones      String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  socio              Socio    @relation(fields: [socioId], references: [id])
+
+  tenantId  Int    @map("tenant_id")
+  @@index([tenantId])
+  @@map("fichas_medicas")
+}
+
+model AptitudFisica {
+  id           Int       @id @default(autoincrement())
+  socioId      Int       @map("socio_id")
+  estado       String    @default("PENDIENTE")
+  fechaEstudio DateTime? @map("fecha_estudio") @db.Date
+  vencimiento  DateTime? @db.Date
+  medico       String?
+  observaciones String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  socio        Socio     @relation(fields: [socioId], references: [id])
+
+  tenantId  Int    @map("tenant_id")
+  @@index([socioId])
+  @@index([tenantId])
+  @@map("aptitudes_fisicas")
+}
+
+model LesionSocio {
+  id            Int       @id @default(autoincrement())
+  socioId       Int       @map("socio_id")
+  tipo          String
+  descripcion   String
+  fechaLesion   DateTime  @map("fecha_lesion") @db.Date
+  fechaAlta     DateTime? @map("fecha_alta") @db.Date
+  gravedad      String    @default("LEVE")
+  tratamiento   String?
+  restricciones String?
+  alta          Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  socio         Socio     @relation(fields: [socioId], references: [id])
+
+  tenantId  Int    @map("tenant_id")
+  @@index([socioId])
+  @@index([tenantId])
+  @@map("lesiones")
+}
+
+// ============ GOBERNANZA ============
+
+model ActaReunion {
+  id            Int       @id @default(autoincrement())
+  titulo        String
+  tipo          String    @default("COMISION") // COMISION | ASAMBLEA | DIRECTIVA | OTRO
+  fecha         DateTime  @db.Date
+  lugar         String?
+  asistentes    String?   // texto libre
+  temario       String?
+  contenido     String?   // cuerpo del acta
+  resoluciones  String?
+  adjuntoUrl    String?   @map("adjunto_url")
+  estado        String    @default("BORRADOR") // BORRADOR | FIRMADA | ARCHIVADA
+  creadoPor     Int?      @map("creado_por")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tenantId  Int  @map("tenant_id")
+  @@index([tenantId])
+  @@index([fecha])
+  @@map("actas_reunion")
+}
+
+model Votacion {
+  id           Int              @id @default(autoincrement())
+  titulo       String
+  descripcion  String?
+  tipo         String           @default("SIMPLE") // SIMPLE | MULTIPLE
+  estado       String           @default("BORRADOR") // BORRADOR | ABIERTA | CERRADA
+  fechaInicio  DateTime?        @map("fecha_inicio")
+  fechaCierre  DateTime?        @map("fecha_cierre")
+  soloHabilitados Boolean       @default(true) @map("solo_habilitados") // solo socios del padrón
+  opciones     String           // JSON array of strings
+  votos        VotoRegistrado[]
+  creadoPor    Int?             @map("creado_por")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  tenantId  Int  @map("tenant_id")
+  @@index([tenantId])
+  @@map("votaciones")
+}
+
+model VotoRegistrado {
+  id         Int      @id @default(autoincrement())
+  votacionId Int      @map("votacion_id")
+  socioId    Int      @map("socio_id")
+  opcion     String   // valor elegido
+  createdAt  DateTime @default(now()) @map("created_at")
+  votacion   Votacion @relation(fields: [votacionId], references: [id], onDelete: Cascade)
+  socio      Socio    @relation(fields: [socioId], references: [id])
+
+  tenantId  Int  @map("tenant_id")
+  @@unique([votacionId, socioId])
+  @@index([tenantId])
+  @@map("votos_registrados")
+}
+
+model DocumentoClub {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  categoria   String   @default("GENERAL") // ESTATUTO | REGLAMENTO | ACTA | CONTRATO | GENERAL
+  url         String
+  mimeType    String?  @map("mime_type")
+  tamano      Int?     // bytes
+  publico     Boolean  @default(false)
+  creadoPor   Int?     @map("creado_por")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenantId  Int  @map("tenant_id")
+  @@index([tenantId])
+  @@index([categoria])
+  @@map("documentos_club")
 }
 
 model Presupuesto {

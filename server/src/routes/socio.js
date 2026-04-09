@@ -893,6 +893,76 @@ router.post('/:tokenPortal/inscripciones/:id/baja', asyncHandler(async (req, res
   })
 }))
 
+// GET /api/socio/:tokenPortal/historial-asistencia - Historial de asistencia por actividad
+router.get('/:tokenPortal/historial-asistencia', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+  const dias = parseInt(req.query.dias || '90')
+
+  const socio = await req.db.socio.findUnique({ where: { tokenPortal } })
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+
+  const inscripciones = await req.db.inscripcion.findMany({
+    where: { socioId: socio.id, estado: { in: ['ACTIVA', 'BAJA'] } },
+    include: {
+      categoriaActividad: {
+        include: { actividad: { select: { nombre: true } } }
+      }
+    },
+    orderBy: { fechaInscripcion: 'desc' }
+  })
+
+  const fechaDesde = new Date()
+  fechaDesde.setDate(fechaDesde.getDate() - dias)
+  fechaDesde.setHours(0, 0, 0, 0)
+
+  const resultado = await Promise.all(
+    inscripciones.map(async insc => {
+      const categoriaId = insc.categoriaActividadId
+
+      const entrenamientos = await req.db.entrenamiento.findMany({
+        where: {
+          categoriaActividadId: categoriaId,
+          fecha: { gte: fechaDesde },
+          estado: { not: 'CANCELADO' },
+        },
+        include: {
+          asistencias: {
+            where: { socioId: socio.id },
+            select: { estado: true, horaLlegada: true }
+          }
+        },
+        orderBy: { fecha: 'desc' }
+      })
+
+      const total = entrenamientos.length
+      const presentes = entrenamientos.filter(e => e.asistencias[0]?.estado === 'PRESENTE').length
+      const pct = total > 0 ? Math.round((presentes / total) * 100) : null
+
+      return {
+        inscripcionId: insc.id,
+        actividad: insc.categoriaActividad.actividad.nombre,
+        categoria: insc.categoriaActividad.nombre,
+        estado: insc.estado,
+        resumen: { total, presentes, ausentes: total - presentes, pct },
+        entrenamientos: entrenamientos.map(e => ({
+          id: e.id,
+          fecha: e.fecha,
+          horaInicio: e.horaInicio,
+          horaFin: e.horaFin,
+          tipo: e.tipo,
+          asistencia: e.asistencias[0]?.estado || null,
+          horaLlegada: e.asistencias[0]?.horaLlegada || null,
+        }))
+      }
+    })
+  )
+
+  // Solo devolver inscripciones que tienen entrenamientos en el período (o todas las activas)
+  const data = resultado.filter(r => r.estado === 'ACTIVA' || r.resumen.total > 0)
+
+  res.json({ success: true, data })
+}))
+
 // ==============================================================================
 // DASHBOARD
 // ==============================================================================

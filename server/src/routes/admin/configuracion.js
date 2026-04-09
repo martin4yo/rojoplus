@@ -1307,6 +1307,134 @@ router.put('/configuracion-recargo', authAdmin, asyncHandler(async (req, res) =>
   res.json({ success: true, data: config })
 }))
 
+// GET /api/admin/configuracion-descuento-anticipado
+router.get('/configuracion-descuento-anticipado', authAdmin, asyncHandler(async (req, res) => {
+  const claves = ['DESCUENTO_ANTICIPADO_ACTIVO', 'DESCUENTO_ANTICIPADO_PCT', 'DESCUENTO_ANTICIPADO_DIAS']
+  const configs = await req.db.configuracion.findMany({ where: { clave: { in: claves } } })
+  const map = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
+  res.json({
+    success: true,
+    data: {
+      activo: map['DESCUENTO_ANTICIPADO_ACTIVO'] === 'true',
+      porcentaje: parseFloat(map['DESCUENTO_ANTICIPADO_PCT'] || '0'),
+      diasAnticipacion: parseInt(map['DESCUENTO_ANTICIPADO_DIAS'] || '0'),
+    }
+  })
+}))
+
+// PUT /api/admin/configuracion-descuento-anticipado
+router.put('/configuracion-descuento-anticipado', authAdmin, asyncHandler(async (req, res) => {
+  const { activo, porcentaje, diasAnticipacion } = req.body
+  const updates = [
+    { clave: 'DESCUENTO_ANTICIPADO_ACTIVO', valor: activo ? 'true' : 'false' },
+    { clave: 'DESCUENTO_ANTICIPADO_PCT', valor: String(parseFloat(porcentaje) || 0) },
+    { clave: 'DESCUENTO_ANTICIPADO_DIAS', valor: String(parseInt(diasAnticipacion) || 0) },
+  ]
+  for (const { clave, valor } of updates) {
+    await req.db.configuracion.upsert({
+      where: { tenantId_clave: { tenantId: req.tenantId, clave } },
+      update: { valor },
+      create: { clave, valor, tenantId: req.tenantId },
+    })
+  }
+  res.json({ success: true })
+}))
+
+// GET /api/admin/configuracion-baja-asistencia
+router.get('/configuracion-baja-asistencia', authAdmin, asyncHandler(async (req, res) => {
+  const claves = ['ALERTA_BAJA_ASISTENCIA_ACTIVO', 'ALERTA_BAJA_ASISTENCIA_PCT', 'ALERTA_BAJA_ASISTENCIA_DIAS']
+  const configs = await req.db.configuracion.findMany({ where: { clave: { in: claves } } })
+  const map = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
+  res.json({
+    success: true,
+    data: {
+      activo: map['ALERTA_BAJA_ASISTENCIA_ACTIVO'] === 'true',
+      umbralPct: parseInt(map['ALERTA_BAJA_ASISTENCIA_PCT'] || '50'),
+      diasVentana: parseInt(map['ALERTA_BAJA_ASISTENCIA_DIAS'] || '30'),
+    }
+  })
+}))
+
+// PUT /api/admin/configuracion-baja-asistencia
+router.put('/configuracion-baja-asistencia', authAdmin, asyncHandler(async (req, res) => {
+  const { activo, umbralPct, diasVentana } = req.body
+  const updates = [
+    { clave: 'ALERTA_BAJA_ASISTENCIA_ACTIVO', valor: activo ? 'true' : 'false' },
+    { clave: 'ALERTA_BAJA_ASISTENCIA_PCT', valor: String(parseInt(umbralPct) || 50) },
+    { clave: 'ALERTA_BAJA_ASISTENCIA_DIAS', valor: String(parseInt(diasVentana) || 30) },
+  ]
+  for (const { clave, valor } of updates) {
+    await req.db.configuracion.upsert({
+      where: { tenantId_clave: { tenantId: req.tenantId, clave } },
+      update: { valor },
+      create: { clave, valor, tenantId: req.tenantId },
+    })
+  }
+  res.json({ success: true })
+}))
+
+// GET /api/admin/configuracion-cumpleanios
+router.get('/configuracion-cumpleanios', authAdmin, asyncHandler(async (req, res) => {
+  const claves = ['CUMPLEANIOS_ACTIVO', 'CUMPLEANIOS_MENSAJE']
+  const configs = await req.db.configuracion.findMany({ where: { clave: { in: claves } } })
+  const map = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
+  res.json({
+    success: true,
+    data: {
+      activo: map['CUMPLEANIOS_ACTIVO'] === 'true',
+      mensaje: map['CUMPLEANIOS_MENSAJE'] || 'Feliz cumpleaños, {nombre}! El club te desea un excelente día.',
+    }
+  })
+}))
+
+// PUT /api/admin/configuracion-cumpleanios
+router.put('/configuracion-cumpleanios', authAdmin, asyncHandler(async (req, res) => {
+  const { activo, mensaje } = req.body
+  const updates = [
+    { clave: 'CUMPLEANIOS_ACTIVO', valor: activo ? 'true' : 'false' },
+    { clave: 'CUMPLEANIOS_MENSAJE', valor: mensaje || 'Feliz cumpleaños, {nombre}! El club te desea un excelente día.' },
+  ]
+  for (const { clave, valor } of updates) {
+    await req.db.configuracion.upsert({
+      where: { tenantId_clave: { tenantId: req.tenantId, clave } },
+      update: { valor },
+      create: { clave, valor, tenantId: req.tenantId },
+    })
+  }
+  res.json({ success: true })
+}))
+
+// GET /api/admin/configuracion-recordatorio-anticipado
+router.get('/configuracion-recordatorio-anticipado', authAdmin, asyncHandler(async (req, res) => {
+  const claves = ['RECORDATORIO_ANTICIPADO_ACTIVO', 'RECORDATORIO_ANTICIPADO_DIAS']
+  const configs = await req.db.configuracion.findMany({ where: { clave: { in: claves } } })
+  const map = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
+  res.json({
+    success: true,
+    data: {
+      activo: map['RECORDATORIO_ANTICIPADO_ACTIVO'] === 'true',
+      dias: parseInt(map['RECORDATORIO_ANTICIPADO_DIAS'] || '3'),
+    }
+  })
+}))
+
+// PUT /api/admin/configuracion-recordatorio-anticipado
+router.put('/configuracion-recordatorio-anticipado', authAdmin, asyncHandler(async (req, res) => {
+  const { activo, dias } = req.body
+  const updates = [
+    { clave: 'RECORDATORIO_ANTICIPADO_ACTIVO', valor: activo ? 'true' : 'false' },
+    { clave: 'RECORDATORIO_ANTICIPADO_DIAS', valor: String(parseInt(dias) || 3) },
+  ]
+  for (const { clave, valor } of updates) {
+    await req.db.configuracion.upsert({
+      where: { tenantId_clave: { tenantId: req.tenantId, clave } },
+      update: { valor },
+      create: { clave, valor, tenantId: req.tenantId },
+    })
+  }
+  res.json({ success: true })
+}))
+
 // Función para calcular recargo de un cargo
 async function calcularRecargoCargo(prisma, cargo) {
   if (!cargo.fechaVencimiento || cargo.estado !== 'PENDIENTE') {

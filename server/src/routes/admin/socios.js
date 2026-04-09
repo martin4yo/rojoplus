@@ -1551,4 +1551,110 @@ router.get('/socios/:socioId/cuenta-corriente', authAdmin, asyncHandler(async (r
   })
 }))
 
+// =============================================================================
+// SEGUIMIENTO MÉDICO
+// =============================================================================
+
+// GET /api/admin/socios/:id/medico — ficha médica + aptitudes + lesiones
+router.get('/socios/:id/medico', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+
+  const [ficha, aptitudes, lesiones] = await Promise.all([
+    req.db.fichaMedica.findUnique({ where: { socioId } }),
+    req.db.aptitudFisica.findMany({ where: { socioId }, orderBy: { createdAt: 'desc' } }),
+    req.db.lesionSocio.findMany({ where: { socioId }, orderBy: { fechaLesion: 'desc' } }),
+  ])
+
+  res.json({ success: true, data: { ficha, aptitudes, lesiones } })
+}))
+
+// PUT /api/admin/socios/:id/ficha-medica — upsert
+router.put('/socios/:id/ficha-medica', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const { grupoSanguineo, alergias, medicamentos, condicionesCronicas, contactoEmergencia, telefonoEmergencia, observaciones } = req.body
+
+  const ficha = await req.db.fichaMedica.upsert({
+    where: { socioId },
+    update: { grupoSanguineo, alergias, medicamentos, condicionesCronicas, contactoEmergencia, telefonoEmergencia, observaciones },
+    create: { socioId, grupoSanguineo, alergias, medicamentos, condicionesCronicas, contactoEmergencia, telefonoEmergencia, observaciones, tenantId: req.tenantId },
+  })
+
+  res.json({ success: true, data: ficha })
+}))
+
+// POST /api/admin/socios/:id/aptitudes — nueva aptitud
+router.post('/socios/:id/aptitudes', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const { estado, fechaEstudio, vencimiento, medico, observaciones } = req.body
+
+  const aptitud = await req.db.aptitudFisica.create({
+    data: {
+      socioId,
+      estado: estado || 'PENDIENTE',
+      fechaEstudio: fechaEstudio ? new Date(fechaEstudio) : null,
+      vencimiento: vencimiento ? new Date(vencimiento) : null,
+      medico,
+      observaciones,
+      tenantId: req.tenantId,
+    }
+  })
+
+  res.json({ success: true, data: aptitud })
+}))
+
+// DELETE /api/admin/socios/:id/aptitudes/:aptId
+router.delete('/socios/:id/aptitudes/:aptId', authAdmin, asyncHandler(async (req, res) => {
+  await req.db.aptitudFisica.deleteMany({
+    where: { id: parseInt(req.params.aptId), socioId: parseInt(req.params.id) }
+  })
+  res.json({ success: true })
+}))
+
+// POST /api/admin/socios/:id/lesiones — registrar lesión
+router.post('/socios/:id/lesiones', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const { tipo, descripcion, fechaLesion, gravedad, tratamiento, restricciones } = req.body
+
+  if (!tipo || !descripcion || !fechaLesion) throw new AppError('tipo, descripcion y fechaLesion son obligatorios', 400)
+
+  const lesion = await req.db.lesionSocio.create({
+    data: {
+      socioId,
+      tipo,
+      descripcion,
+      fechaLesion: new Date(fechaLesion),
+      gravedad: gravedad || 'LEVE',
+      tratamiento,
+      restricciones,
+      tenantId: req.tenantId,
+    }
+  })
+
+  res.json({ success: true, data: lesion })
+}))
+
+// PUT /api/admin/socios/:id/lesiones/:lesionId — actualizar / dar de alta
+router.put('/socios/:id/lesiones/:lesionId', authAdmin, asyncHandler(async (req, res) => {
+  const { fechaAlta, alta, tratamiento, restricciones, gravedad, descripcion } = req.body
+
+  await req.db.lesionSocio.updateMany({
+    where: { id: parseInt(req.params.lesionId), socioId: parseInt(req.params.id) },
+    data: {
+      fechaAlta: fechaAlta ? new Date(fechaAlta) : undefined,
+      alta: alta !== undefined ? !!alta : undefined,
+      tratamiento, restricciones, gravedad, descripcion,
+    }
+  })
+
+  res.json({ success: true })
+}))
+
+// DELETE /api/admin/socios/:id/lesiones/:lesionId
+router.delete('/socios/:id/lesiones/:lesionId', authAdmin, asyncHandler(async (req, res) => {
+  await req.db.lesionSocio.deleteMany({
+    where: { id: parseInt(req.params.lesionId), socioId: parseInt(req.params.id) }
+  })
+  res.json({ success: true })
+}))
+
 export default router

@@ -19,6 +19,17 @@
 12. [Débito Automático — Recibos Email + WhatsApp](#12-débito-automático--recibos-email--whatsapp)
 13. [Débito Automático — Payway](#13-débito-automático--payway)
 14. [Conciliación Bancaria — Soporte XLSX](#14-conciliación-bancaria--soporte-xlsx)
+15. [Alerta Automática de Baja Asistencia](#15-alerta-automática-de-baja-asistencia)
+16. [Automatización de Comunicaciones](#16-automatización-de-comunicaciones)
+17. [Historial de Asistencia en Portal Socio](#17-historial-de-asistencia-en-portal-socio)
+18. [Deportes — Equipos Permanentes con Plantel](#18-deportes--equipos-permanentes-con-plantel)
+19. [Deportes — Campeonatos y Tabla de Posiciones](#19-deportes--campeonatos-y-tabla-de-posiciones)
+20. [Deportes — Planillas de Entrenamiento](#20-deportes--planillas-de-entrenamiento)
+21. [Seguimiento Médico](#21-seguimiento-médico)
+22. [Gobernanza — Actas de Reunión](#22-gobernanza--actas-de-reunión)
+23. [Gobernanza — Votaciones](#23-gobernanza--votaciones)
+24. [Gobernanza — Documentos del Club](#24-gobernanza--documentos-del-club)
+25. [Nuevo Menú — Deportes y Gobernanza](#25-nuevo-menú--deportes-y-gobernanza)
 
 ---
 
@@ -373,6 +384,251 @@
 
 ---
 
+## 15. Alerta Automática de Baja Asistencia
+
+### Qué se hizo
+- Job cron semanal (lunes 8:00) que detecta socios con asistencia inferior al umbral configurado
+- Configuración en Admin → Tablas Auxiliares: activar/desactivar, umbral % y ventana de días
+- Envía email al EMAIL_CONTACTO del club con el listado de socios en riesgo
+
+### Configuración requerida
+> Admin → Tablas Auxiliares → "Alerta de Baja Asistencia": activar toggle, umbral (ej: 60%), días ventana (ej: 30)
+
+### Checklist
+- [ ] En Tablas Auxiliares aparece la card "Alerta de Baja Asistencia"
+- [ ] El toggle activo/inactivo persiste al guardar
+- [ ] Cambiar umbral y días → se guardan correctamente
+- [ ] El email de alerta llega al contacto del club (verificar el lunes siguiente o via trigger manual en dev)
+- [ ] El email lista socios con asistencia < umbral en el período configurado
+- [ ] Si no hay socios por debajo del umbral, no se envía email (o se envía con lista vacía según config)
+
+---
+
+## 16. Automatización de Comunicaciones
+
+### Qué se hizo
+- Job diario (9:00) que envía saludos de cumpleaños a socios que cumplen ese día
+- Job diario (8:30) que envía recordatorio de cuota próxima a vencer (configurable en días)
+- Ambos configurables desde Admin → Tablas Auxiliares
+- Deduplicación: no envía dos veces en el mismo día al mismo socio (tabla NotificacionLog)
+
+### Configuración requerida
+> **Cumpleaños:** Admin → Tablas Auxiliares → "Saludos de Cumpleaños": activar + personalizar mensaje con `{nombre}`
+> **Recordatorio:** Admin → Tablas Auxiliares → "Recordatorio Anticipado de Cuotas": activar + días antes (ej: 3)
+
+### Checklist
+**Saludos de cumpleaños:**
+- [ ] Card "Saludos de Cumpleaños" visible en Tablas Auxiliares
+- [ ] Activar + personalizar mensaje con `{nombre}` → guardar
+- [ ] Socio que cumple años hoy recibe email con su nombre interpolado
+- [ ] El mismo socio NO recibe dos emails el mismo día (dedup activo)
+- [ ] Socio sin email no genera error
+
+**Recordatorio de cuotas:**
+- [ ] Card "Recordatorio Anticipado de Cuotas" visible en Tablas Auxiliares
+- [ ] Activar + días = 3 → guardar
+- [ ] Socio con cuota que vence en exactamente 3 días recibe email + WhatsApp
+- [ ] Si la cuota ya está paga, no recibe recordatorio
+- [ ] No recibe dos recordatorios por la misma cuota el mismo día
+
+---
+
+## 17. Historial de Asistencia en Portal Socio
+
+### Qué se hizo
+- Nuevo tab "Mi Asistencia" en la sección "Mis Actividades" del portal socio
+- Por inscripción: total entrenamientos, presentes, ausentes, % asistencia con barra de progreso
+- Lista individual de cada entrenamiento con estado (PRESENTE / AUSENTE / Sin registro)
+- Carga lazy: consulta solo cuando el socio abre el tab por primera vez
+
+### Checklist
+- [ ] En portal socio → sección "Mis Actividades" aparece el tab "Mi Asistencia"
+- [ ] Al abrir el tab se muestra spinner y luego los datos
+- [ ] Se muestra una card por cada inscripción activa o con entrenamientos en los últimos 90 días
+- [ ] Cada card muestra: nombre actividad/categoría, % asistencia, barra de progreso coloreada (verde/amarillo/rojo)
+- [ ] Lista de entrenamientos individuales con chip PRESENTE / AUSENTE / Sin registro
+- [ ] Sin inscripciones: mensaje apropiado
+- [ ] Navegar fuera y volver al tab no recarga (cache local)
+
+---
+
+## 18. Deportes — Equipos Permanentes con Plantel
+
+### Qué se hizo
+- CRUD de equipos permanentes por categoría/actividad con color identificatorio
+- Plantel de jugadores (socios del club) con posición, dorsal y flag de titular
+- Búsqueda de socios para agregar al plantel
+- Validación de dorsales duplicados y jugadores repetidos
+
+### Checklist
+- [ ] Ir a Deportes → Equipos → muestra lista con filtros por categoría y activos
+- [ ] Crear equipo: nombre, categoría, temporada, color → se guarda y aparece en lista
+- [ ] Entrar al equipo → muestra plantel agrupado por posición
+- [ ] Agregar jugador: buscar por apellido o número de socio → resultado aparece → seleccionar → se agrega
+- [ ] Editar jugador: cambiar posición, dorsal, marcar titular → persiste
+- [ ] Eliminar jugador del plantel → se remueve
+- [ ] Intentar asignar dorsal ya existente en el mismo equipo → error claro
+- [ ] Intentar agregar socio ya en el plantel → error claro
+- [ ] Filtro activos/todos funciona
+
+---
+
+## 19. Deportes — Campeonatos y Tabla de Posiciones
+
+### Qué se hizo
+- CRUD de campeonatos (LIGA, TORNEO, COPA, AMISTOSO) vinculados a una categoría
+- Asignación de partidos existentes al campeonato (tab "Asignar")
+- Tabla de posiciones calculada en tiempo real: PJ/PG/PE/PP/GF/GC/DG/PTS
+- Nuestro equipo resaltado. Ordenamiento: PTS desc → DG desc → GF desc
+
+### Checklist
+- [ ] Deportes → Campeonatos → lista con filtros En curso / Finalizados / Todos
+- [ ] Crear campeonato: nombre, tipo LIGA, categoría, nombre del equipo propio, fechas → se crea
+- [ ] Badge de tipo con color correcto (LIGA=azul, TORNEO=morado, COPA=amarillo, AMISTOSO=gris)
+- [ ] Entrar al campeonato → tab "Tabla" vacía
+- [ ] Tab "Asignar": lista partidos de la misma categoría sin campeonato
+- [ ] Asignar partido → aparece en tab "Partidos" con botón "Quitar"
+- [ ] Con partidos FINALIZADOS asignados → tab "Tabla" muestra la tabla calculada
+- [ ] PTS = PG×3 + PE×1 (verificar con un partido conocido)
+- [ ] GF/GC/DG calculados correctamente según condición LOCAL o VISITANTE
+- [ ] Nuestro equipo aparece resaltado en la tabla
+- [ ] Quitar partido → tabla se recalcula
+- [ ] Partidos NO FINALIZADOS no afectan la tabla
+
+---
+
+## 20. Deportes — Planillas de Entrenamiento
+
+### Qué se hizo
+- Botón "Planilla" en la pantalla de Asistencia de cada entrenamiento
+- Formulario: Objetivos, Calentamiento, Ejercicios (lista dinámica), Vuelta a la calma, Observaciones
+- Cada ejercicio: nombre, descripción, series × repeticiones, duración, intensidad con badge coloreado
+- Guardado upsert: crea la planilla si no existe, actualiza si ya existe
+
+### Checklist
+- [ ] En pantalla de Asistencia de un entrenamiento aparece botón "Planilla"
+- [ ] La planilla muestra info del entrenamiento: fecha, hora, actividad/categoría
+- [ ] Completar Objetivos y Calentamiento → Guardar → persisten al recargar
+- [ ] Agregar ejercicio con todos los campos → badge de intensidad con color correcto (BAJA verde, MEDIA amarillo, ALTA naranja, MAXIMA rojo)
+- [ ] Agregar múltiples ejercicios → aparecen numerados
+- [ ] Eliminar un ejercicio → los restantes persisten correctamente
+- [ ] Ejercicios sin nombre se filtran al guardar (no se guardan ni generan error)
+- [ ] Sin permiso DEPORTES_EDITAR: todos los campos readonly, sin botón Guardar
+- [ ] Dos entrenamientos distintos tienen planillas independientes
+
+---
+
+## 21. Seguimiento Médico
+
+### Qué se hizo
+- Página `/admin/socios/:id/medico` accesible desde Ficha de Socio → tab Médico → botón "Seguimiento médico completo"
+- 3 tabs: Ficha Médica, Aptitud Física, Lesiones
+- Ficha: grupo sanguíneo, alergias, medicamentos, condiciones crónicas, contacto de emergencia (upsert)
+- Aptitud: historial de estudios con estados APTO/NO_APTO/CONDICIONAL/PENDIENTE, detección de vencimiento
+- Lesiones: tipo, gravedad, fechas lesión/alta, tratamiento, restricciones, flag de alta médica
+
+### Checklist
+**Acceso:**
+- [ ] Ficha de Socio → tab "Médico" → botón "Seguimiento médico completo" visible
+- [ ] El botón navega correctamente a la página de seguimiento
+
+**Ficha Médica:**
+- [ ] Campos editables con permiso SOCIOS_EDITAR
+- [ ] Guardar grupo sanguíneo y alergias → persisten al recargar
+- [ ] Sin permiso: todos los campos readonly, sin botón Guardar
+
+**Aptitud Física:**
+- [ ] Crear registro APTO con médico y fechas → aparece en lista
+- [ ] Registro vencido (fecha vencimiento < hoy) → muestra badge "Vencido" en rojo
+- [ ] Eliminar registro → se remueve
+
+**Lesiones:**
+- [ ] Crear lesión GRAVE con tipo, fechas, descripción → aparece con borde naranja
+- [ ] Editar lesión → marcar "Alta médica" → borde cambia a gris, badge "Alta médica" verde
+- [ ] Eliminar lesión → se remueve
+
+---
+
+## 22. Gobernanza — Actas de Reunión
+
+### Qué se hizo
+- CRUD completo de actas (COMISION / ASAMBLEA / DIRECTIVA / OTRO)
+- Estados: BORRADOR / FIRMADA / ARCHIVADA
+- Campos: título, tipo, fecha, lugar, asistentes, temario, contenido, resoluciones, URL adjunto PDF
+- Filtros por tipo, estado y año
+
+### Checklist
+- [ ] Gobernanza → Actas → lista vacía al inicio
+- [ ] Crear nueva acta: título, tipo ASAMBLEA, fecha → se guarda y aparece en lista
+- [ ] Badges de tipo y estado con colores correctos
+- [ ] Entrar al acta → todos los campos editables
+- [ ] Completar temario, contenido y resoluciones → guardar → persisten
+- [ ] Cambiar estado a FIRMADA → persiste
+- [ ] Agregar URL de adjunto → botón "Ver" abre en nueva pestaña
+- [ ] Eliminar acta → confirmación → se elimina y regresa a la lista
+- [ ] Filtros por tipo, estado y año funcionan correctamente
+
+---
+
+## 23. Gobernanza — Votaciones
+
+### Qué se hizo
+- CRUD de votaciones con opciones configurables
+- Flujo de estados: BORRADOR → ABIERTA → CERRADA
+- Un voto por socio por votación (deduplicado por @@unique)
+- Padrón: socios activos que aún no votaron, con búsqueda
+- Tab Resultados con barras de porcentaje y ganador destacado al cerrar
+
+### Checklist
+- [ ] Gobernanza → Votaciones → lista con filtro por estado
+- [ ] Crear votación: título + 3 opciones → estado BORRADOR
+- [ ] Botón "Abrir votación" → estado cambia a ABIERTA
+- [ ] Tab "Registrar voto": muestra socios activos que no votaron
+- [ ] Buscar socio → filtra correctamente
+- [ ] Registrar voto: elegir opción → confirmar → socio desaparece del padrón
+- [ ] Tab "Resultados": barras con % actualizado
+- [ ] Tab "Votos": lista con opción de anular; al anular, socio vuelve al padrón
+- [ ] Botón "Cerrar votación" → estado CERRADA, ganador destacado en verde
+- [ ] Intentar registrar voto con votación CERRADA → error claro "La votación no está abierta"
+
+---
+
+## 24. Gobernanza — Documentos del Club
+
+### Qué se hizo
+- Repositorio de documentos por categoría (ESTATUTO, REGLAMENTO, ACTA, CONTRATO, GENERAL)
+- Flag "Visible en sitio público" por documento
+- CRUD con lista agrupada por categoría, edición inline
+
+### Checklist
+- [ ] Gobernanza → Documentos → lista vacía al inicio
+- [ ] Filtro de categorías funciona (Todos / ESTATUTO / etc.)
+- [ ] Agregar documento: nombre, categoría ESTATUTO, URL → aparece bajo sección "ESTATUTO"
+- [ ] Botón "Ver" (ícono externo) abre la URL en nueva pestaña
+- [ ] Editar documento: cambiar nombre y categoría → persiste
+- [ ] Flag "Visible en sitio público" → se guarda y muestra etiqueta "Público"
+- [ ] Eliminar documento → confirmación → se elimina
+
+---
+
+## 25. Nuevo Menú — Deportes y Gobernanza
+
+### Qué se hizo
+- "Equipos" y "Campeonatos" agregados al grupo Deportes en el seed del menú
+- Nuevo grupo "Gobernanza" con: Actas, Votaciones, Documentos
+- Los items nuevos se crean via re-seed (idempotente: no duplica items existentes)
+
+### Configuración requerida
+> Ir a **Admin → Configuración → Menú → "Restaurar menú por defecto"** para que aparezcan los nuevos items.
+
+### Checklist
+- [ ] Ejecutar seed de menú → no duplica items ya existentes
+- [ ] Menú lateral muestra "Equipos" y "Campeonatos" bajo Deportes
+- [ ] Menú lateral muestra grupo "Gobernanza" con Actas, Votaciones, Documentos
+- [ ] Todos los links navegan a la pantalla correcta
+
+---
+
 ## Resumen de dependencias externas
 
 | Feature | Servicio externo | Dónde configurar |
@@ -385,6 +641,7 @@
 | Recibos WhatsApp | Evolution API | **LISTO** |
 | Payway cobros | Payway API | Admin → Débito → Configuración |
 | Payway webhook | Payway API | Panel Payway → URL webhook |
+| Jobs automáticos (cumpleaños, baja asistencia, recordatorio) | Cron interno | Admin → Tablas Auxiliares |
 
 ---
 
@@ -396,3 +653,8 @@ Estos puntos existentes pueden haberse visto afectados y conviene verificar:
 - [ ] El módulo de Conciliación Bancaria con CSV sigue funcionando (la lógica XLSX es un branch adicional)
 - [ ] La solicitud de adhesión al débito sin CVV (flujo existente) sigue funcionando sin Payway
 - [ ] Los roles y permisos no se alteraron — verificar que un admin sin permiso `DEBITO_AUTOMATICO` no vea los botones de procesamiento
+- [ ] El flujo de cobro de cuotas aplica correctamente el descuento anticipado cuando la config está activa y no lo aplica cuando está inactiva
+- [ ] Los jobs de notificación no generan duplicados — verificar tabla `NotificacionLog` en días de prueba intensiva
+- [ ] La tabla de posiciones retorna vacía (no error) para campeonatos sin partidos finalizados
+- [ ] Aislamiento multi-tenant: los endpoints nuevos (`/gobernanza/*`, `/socios/:id/medico`, planillas, equipos, campeonatos) NO devuelven datos de otro tenant bajo ninguna circunstancia
+- [ ] **Requiere `npx prisma db push` en producción** antes de usar: ActaReunion, Votacion, VotoRegistrado, DocumentoClub, PlanillaEntrenamiento, FichaMedica, AptitudFisica, LesionSocio, Equipo, PlantelEquipo, Campeonato (+ campos nuevos en Partido, Entrenamiento, Socio)

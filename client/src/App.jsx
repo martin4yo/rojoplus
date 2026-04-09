@@ -193,10 +193,23 @@ const TiposEspacioConfig = lazy(() => import('./pages/admin/deportes/TiposEspaci
 const HorariosRecurrentes = lazy(() => import('./pages/admin/deportes/HorariosRecurrentes'))
 const EntrenamientosCalendario = lazy(() => import('./pages/admin/deportes/EntrenamientosCalendario'))
 const AsistenciaEntrenamiento = lazy(() => import('./pages/admin/deportes/AsistenciaEntrenamiento'))
+const EquiposLista = lazy(() => import('./pages/admin/deportes/EquiposLista'))
+const EquipoDetalle = lazy(() => import('./pages/admin/deportes/EquipoDetalle'))
+const CampeonatosLista = lazy(() => import('./pages/admin/deportes/CampeonatosLista'))
+const CampeonatoDetalle = lazy(() => import('./pages/admin/deportes/CampeonatoDetalle'))
+const PlanillaEntrenamiento = lazy(() => import('./pages/admin/deportes/PlanillaEntrenamiento'))
+const SeguimientoMedico = lazy(() => import('./pages/admin/SeguimientoMedico'))
 const Partidos = lazy(() => import('./pages/admin/Partidos'))
 const PartidoDetalle = lazy(() => import('./pages/admin/PartidoDetalle'))
 const ReportesDeportivos = lazy(() => import('./pages/admin/ReportesDeportivos'))
 const PasajeCategoria = lazy(() => import('./pages/admin/PasajeCategoria'))
+
+// Gobernanza
+const ActasLista = lazy(() => import('./pages/admin/gobernanza/ActasLista'))
+const ActaDetalle = lazy(() => import('./pages/admin/gobernanza/ActaDetalle'))
+const Votaciones = lazy(() => import('./pages/admin/gobernanza/Votaciones'))
+const VotacionDetalle = lazy(() => import('./pages/admin/gobernanza/VotacionDetalle'))
+const DocumentosClub = lazy(() => import('./pages/admin/gobernanza/DocumentosClub'))
 
 // Buffet
 const BuffetDashboard = lazy(() => import('./pages/admin/buffet/BuffetDashboardNew'))
@@ -469,6 +482,20 @@ function App() {
                   <Route path="deportes/horarios" element={<HorariosRecurrentes />} />
                   <Route path="deportes/entrenamientos" element={<EntrenamientosCalendario />} />
                   <Route path="deportes/asistencia/:id" element={<AsistenciaEntrenamiento />} />
+                  <Route path="deportes/equipos" element={<EquiposLista />} />
+                  <Route path="deportes/equipos/:id" element={<EquipoDetalle />} />
+                  <Route path="deportes/campeonatos" element={<CampeonatosLista />} />
+                  <Route path="deportes/campeonatos/:id" element={<CampeonatoDetalle />} />
+                  <Route path="deportes/planilla/:id" element={<PlanillaEntrenamiento />} />
+                  <Route path="socios/:id/medico" element={<SeguimientoMedico />} />
+
+                  {/* Gobernanza */}
+                  <Route path="gobernanza/actas" element={<ActasLista />} />
+                  <Route path="gobernanza/actas/:id" element={<ActaDetalle />} />
+                  <Route path="gobernanza/votaciones" element={<Votaciones />} />
+                  <Route path="gobernanza/votaciones/:id" element={<VotacionDetalle />} />
+                  <Route path="gobernanza/documentos" element={<DocumentosClub />} />
+
                   <Route path="partidos" element={<Partidos />} />
                   <Route path="partidos/:id" element={<PartidoDetalle />} />
                   <Route path="reportes/deportivos" element={<ReportesDeportivos />} />

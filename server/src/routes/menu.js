@@ -473,10 +473,20 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
         { titulo: 'Tipos de Espacio', icono: 'Settings', url: '/admin/deportes/tipos-espacio', orden: 5 },
         { titulo: 'Reportes Deportivos', icono: 'BarChart3', url: '/admin/reportes/deportivos', orden: 6 },
         { titulo: 'Pasaje Categoría', icono: 'ArrowUpCircle', url: '/admin/deportes/pasaje-categoria', orden: 7 },
+        { titulo: 'Equipos', icono: 'Users', url: '/admin/deportes/equipos', orden: 8 },
+        { titulo: 'Campeonatos', icono: 'Trophy', url: '/admin/deportes/campeonatos', orden: 9 },
       ]
     },
     {
-      titulo: 'Buffet', icono: 'UtensilsCrossed', orden: 11,
+      titulo: 'Gobernanza', icono: 'Scale', orden: 11,
+      children: [
+        { titulo: 'Actas', icono: 'FileText', url: '/admin/gobernanza/actas', orden: 1 },
+        { titulo: 'Votaciones', icono: 'Vote', url: '/admin/gobernanza/votaciones', orden: 2 },
+        { titulo: 'Documentos', icono: 'FolderOpen', url: '/admin/gobernanza/documentos', orden: 3 },
+      ]
+    },
+    {
+      titulo: 'Buffet', icono: 'UtensilsCrossed', orden: 12,
       children: [
         { titulo: 'Dashboard', icono: 'LayoutDashboard', url: '/admin/buffet', orden: 1 },
         { titulo: 'Estado Mesas', icono: 'Users', url: '/admin/buffet/estado', orden: 2 },

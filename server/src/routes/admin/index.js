@@ -22,6 +22,7 @@ import chatRoutes from './chat.js'
 import paginasRoutes from './paginas.js'
 import reportTemplatesRoutes from './report-templates.js'
 import reportPresetsRoutes from './report-presets.js'
+import gobernanzaRoutes from './gobernanza.js'
 
 const router = Router()
 
@@ -47,5 +48,6 @@ router.use('/chat', chatRoutes)
 router.use(paginasRoutes)
 router.use(reportTemplatesRoutes)
 router.use(reportPresetsRoutes)
+router.use('/gobernanza', gobernanzaRoutes)
 
 export default router

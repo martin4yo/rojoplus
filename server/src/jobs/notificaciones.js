@@ -6,6 +6,9 @@ import {
   verificarCuotasVencidasHoy,
   verificarMorosidad,
   verificarPartidosProximos,
+  verificarBajaAsistencia,
+  enviarSaludosCumpleanios,
+  verificarRecordatorioAnticipado,
 } from '../services/notificacionService.js'
 import {
   enviarRecordatorioReserva,
@@ -210,6 +213,57 @@ async function cerrarReservasPasadas() {
 }
 
 /**
+ * Saludos de cumpleaños
+ * Se ejecuta todos los días a las 9:00 AM
+ */
+const cumpleaniosCron = cron.schedule('0 9 * * *', async () => {
+  try {
+    console.log('\n🎂 [CRON] Enviando saludos de cumpleaños...')
+    const cantidad = await enviarSaludosCumpleanios()
+    console.log(`✅ [CRON] Cumpleaños: ${cantidad} saludos enviados\n`)
+  } catch (error) {
+    console.error('❌ [CRON] Error enviando cumpleaños:', error.message)
+  }
+}, {
+  scheduled: false,
+  timezone: 'America/Argentina/Buenos_Aires',
+})
+
+/**
+ * Recordatorio anticipado de cuotas (configurable, por defecto D-3)
+ * Se ejecuta todos los días a las 8:30 AM
+ */
+const recordatorioAnticipadoCron = cron.schedule('30 8 * * *', async () => {
+  try {
+    console.log('\n⏳ [CRON] Verificando recordatorios anticipados de cuotas...')
+    const cantidad = await verificarRecordatorioAnticipado()
+    console.log(`✅ [CRON] Recordatorios anticipados: ${cantidad} enviados\n`)
+  } catch (error) {
+    console.error('❌ [CRON] Error en recordatorio anticipado:', error.message)
+  }
+}, {
+  scheduled: false,
+  timezone: 'America/Argentina/Buenos_Aires',
+})
+
+/**
+ * Alerta de baja asistencia
+ * Se ejecuta todos los lunes a las 8:00 AM
+ */
+const bajaAsistenciaCron = cron.schedule('0 8 * * 1', async () => {
+  try {
+    console.log('\n📉 [CRON] Verificando socios con baja asistencia...')
+    await verificarBajaAsistencia()
+    console.log('✅ [CRON] Verificación de baja asistencia completada\n')
+  } catch (error) {
+    console.error('❌ [CRON] Error verificando baja asistencia:', error.message)
+  }
+}, {
+  scheduled: false,
+  timezone: 'America/Argentina/Buenos_Aires',
+})
+
+/**
  * Enviar recordatorios de reservas 24hs antes
  * Se ejecuta todos los días a las 8:00 AM
  */
@@ -256,6 +310,9 @@ export function iniciarCronJobs() {
   console.log('  💰 Morosidad: Lunes y viernes a las 11:00 AM')
   console.log('  ⚽ Recordatorio partidos: Todos los días a las 18:00')
   console.log('  🔄 Sugerir pasajes: 1 de diciembre a las 8:00 AM')
+  console.log('  🎂 Cumpleaños: Todos los días a las 9:00 AM')
+  console.log('  ⏳ Recordatorio anticipado cuotas: Todos los días a las 8:30 AM')
+  console.log('  📉 Baja asistencia: Todos los lunes a las 8:00 AM')
   console.log('  📅 Recordatorios reservas: Todos los días a las 8:00 AM')
   console.log('  🔒 Cerrar reservas pasadas: Todos los días a las 00:30')
   console.log('  🌍 Timezone: America/Argentina/Buenos_Aires\n')
@@ -266,6 +323,9 @@ export function iniciarCronJobs() {
   verificarMorosidadCron.start()
   verificarPartidosCron.start()
   sugerirPasajesCron.start()
+  cumpleaniosCron.start()
+  recordatorioAnticipadoCron.start()
+  bajaAsistenciaCron.start()
   recordatoriosReservasCron.start()
   cerrarReservasPasadasCron.start()
 
@@ -284,6 +344,9 @@ export function detenerCronJobs() {
   verificarMorosidadCron.stop()
   verificarPartidosCron.stop()
   sugerirPasajesCron.stop()
+  cumpleaniosCron.stop()
+  recordatorioAnticipadoCron.stop()
+  bajaAsistenciaCron.stop()
   recordatoriosReservasCron.stop()
   cerrarReservasPasadasCron.stop()
 
@@ -311,6 +374,12 @@ export async function ejecutarManual(tipo) {
       return await enviarRecordatoriosReservas()
     case 'cerrar-reservas':
       return await cerrarReservasPasadas()
+    case 'baja-asistencia':
+      return await verificarBajaAsistencia()
+    case 'cumpleanios':
+      return await enviarSaludosCumpleanios()
+    case 'recordatorio-anticipado':
+      return await verificarRecordatorioAnticipado()
     default:
       throw new Error(`Tipo desconocido: ${tipo}`)
   }
