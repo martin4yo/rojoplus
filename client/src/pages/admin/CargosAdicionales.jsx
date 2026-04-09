@@ -6,21 +6,7 @@ import Modal from '../../components/Modal'
 import ConceptoTesoreriaModal from '../../components/ConceptoTesoreriaModal'
 import api from '../../services/api'
 
-const ESTADOS_SOCIO = [
-  { value: 'ACTIVO', label: 'Activo' },
-  { value: 'INACTIVO', label: 'Inactivo' },
-  { value: 'SUSPENDIDO', label: 'Suspendido' },
-  { value: 'DEUDOR', label: 'Deudor' },
-]
-
-const CATEGORIAS_CARGO = [
-  { value: 'CUOTA_ACTIVIDAD', label: 'Cuota Actividad' },
-  { value: 'CUOTA_SOCIAL', label: 'Cuota Social' },
-  { value: 'CARNET', label: 'Carnet' },
-  { value: 'MOROSIDAD', label: 'Morosidad' },
-]
-
-function ConceptoRow({ row, index, conceptos, onChange, onRemove, onNuevoConcepto }) {
+function ConceptoRow({ row, index, conceptos, categoriasCargo, onChange, onRemove, onNuevoConcepto }) {
   return (
     <div className="grid grid-cols-12 gap-2 items-end border border-gray-200 rounded-lg p-3 bg-gray-50">
       {/* Concepto */}
@@ -56,8 +42,8 @@ function ConceptoRow({ row, index, conceptos, onChange, onRemove, onNuevoConcept
           onChange={e => onChange(index, 'categoria', e.target.value)}
           className="w-full border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
         >
-          {CATEGORIAS_CARGO.map(c => (
-            <option key={c.value} value={c.value}>{c.label}</option>
+          {categoriasCargo.map(c => (
+            <option key={c.codigo} value={c.codigo}>{c.nombre}</option>
           ))}
         </select>
       </div>
@@ -105,15 +91,17 @@ export default function CargosAdicionales() {
   const [conceptosDB, setConceptosDB] = useState([])
   const [actividades, setActividades] = useState([])
   const [categoriasActividad, setCategoriasActividad] = useState([])
+  const [categoriasCargo, setCategoriasCargo] = useState([])
+  const [estadosSocio, setEstadosSocio] = useState([])
 
   // Filas de conceptos a generar
   const [filas, setFilas] = useState([
     { conceptoTesoreriaId: '', categoria: 'CUOTA_ACTIVIDAD', montoOriginal: '', fechaVencimiento: '' }
   ])
 
-  // Filtros
+  // Filtros — estado vacío = todos (se completa cuando carguen los estados)
   const [filtros, setFiltros] = useState({
-    estado: ['ACTIVO'],
+    estado: [],
     actividadId: '',
     categoriaActividadId: '',
   })
@@ -133,6 +121,10 @@ export default function CargosAdicionales() {
   useEffect(() => {
     api.getFull('/admin/conceptos-tesoreria?limit=200').then(r => setConceptosDB(r?.data || r || []))
     api.getFull('/admin/actividades?limit=100').then(r => setActividades(r?.data || r || []))
+    api.get('/admin/categorias-cargo').then(r => setCategoriasCargo(r || []))
+    api.get('/admin/estados-socio?activo=true').then(estados => {
+      setEstadosSocio(estados || [])
+    })
   }, [])
 
   // Cuando cambia actividad filtro, cargar sus categorías
@@ -234,7 +226,7 @@ export default function CargosAdicionales() {
 
   function resetear() {
     setFilas([{ conceptoTesoreriaId: '', categoria: 'CUOTA_ACTIVIDAD', montoOriginal: '', fechaVencimiento: '' }])
-    setFiltros({ estado: ['ACTIVO'], actividadId: '', categoriaActividadId: '' })
+    setFiltros({ estado: [], actividadId: '', categoriaActividadId: '' })
     setPreview(null)
     setResultado(null)
     setError(null)
@@ -293,6 +285,7 @@ export default function CargosAdicionales() {
                   row={fila}
                   index={idx}
                   conceptos={conceptosDB}
+                  categoriasCargo={categoriasCargo}
                   onChange={cambiarFila}
                   onRemove={eliminarFila}
                   onNuevoConcepto={() => setShowNuevoConcepto(true)}
@@ -309,17 +302,17 @@ export default function CargosAdicionales() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Estado del socio</label>
               <div className="flex flex-wrap gap-2">
-                {ESTADOS_SOCIO.map(est => (
+                {estadosSocio.map(est => (
                   <button
-                    key={est.value}
-                    onClick={() => toggleEstado(est.value)}
+                    key={est.codigo}
+                    onClick={() => toggleEstado(est.codigo)}
                     className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                      filtros.estado.includes(est.value)
+                      filtros.estado.includes(est.codigo)
                         ? 'bg-primary text-white border-primary'
                         : 'bg-white text-gray-600 border-gray-300 hover:border-primary'
                     }`}
                   >
-                    {est.label}
+                    {est.nombre}
                   </button>
                 ))}
               </div>

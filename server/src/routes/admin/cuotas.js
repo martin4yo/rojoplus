@@ -488,7 +488,7 @@ router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
       where,
       skip,
       take: limit,
-      orderBy: [{ fechaVencimiento: 'desc' }, { id: 'desc' }],
+      orderBy: [{ socio: { apellidoNombre: 'asc' } }, { fechaVencimiento: 'asc' }],
       include: {
         socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
         periodo: { select: { id: true, nombre: true, anio: true, mes: true } },
@@ -659,7 +659,12 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
     // Por defecto solo traer cuotas pendientes (cobrables)
     where.estado = 'PENDIENTE'
   }
-  if (periodoId) where.periodoId = parseInt(periodoId)
+  if (periodoId) {
+    // Incluir cargos del período Y cargos sin período (masivos/manuales sin período asignado)
+    where.AND = [
+      { OR: [{ periodoId: parseInt(periodoId) }, { periodoId: null }] }
+    ]
+  }
 
   if (esFamilia) {
     // Buscar por grupo familiar (incluye cargos creados sin grupoFamiliarId)
@@ -675,7 +680,7 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
 
   const cuotasRaw = await req.db.cargo.findMany({
     where,
-    orderBy: [{ periodo: { anio: 'desc' } }, { periodo: { mes: 'desc' } }, { socioId: 'asc' }],
+    orderBy: [{ socio: { apellidoNombre: 'asc' } }, { periodo: { anio: 'desc' } }, { periodo: { mes: 'desc' } }],
     include: {
       socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
       periodo: { select: { id: true, nombre: true, anio: true, mes: true } },
@@ -739,7 +744,9 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
     data: {
       esFamilia,
       titular,
-      sociosPorCobrar: Object.values(cuotasPorSocio),
+      sociosPorCobrar: Object.values(cuotasPorSocio).sort((a, b) =>
+        a.socio.apellidoNombre.localeCompare(b.socio.apellidoNombre, 'es', { sensitivity: 'base' })
+      ),
       cuotas, // Lista plana para facilitar selección
       resumen: {
         cantidadSocios: Object.keys(cuotasPorSocio).length,
@@ -1042,7 +1049,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         montoTotal,
         montoRecibido: montoRecibidoNum,
         montoACuenta: montoRecibidoNum > montoTotal ? montoRecibidoNum - montoTotal : 0,
-        medioPagoId: parseInt(medioPagoId),
+        medioPagoId: splits[0].medioPagoId,
         cajaId: caja.id,
         observaciones,
         registradoPor: req.admin.id,

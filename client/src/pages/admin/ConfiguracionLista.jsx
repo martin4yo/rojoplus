@@ -27,6 +27,7 @@ const TITULOS = {
   'descuentos-disponibles': 'Descuentos Disponibles',
   'rubros': 'Rubros',
   'medios-pago': 'Medios de Pago',
+  'categorias-cargo': 'Categorías de Cargo',
 }
 
 const ICONOS = {
@@ -38,6 +39,7 @@ const ICONOS = {
   'descuentos-disponibles': { icon: Percent, bgColor: 'bg-amber-100', color: 'text-amber-600' },
   'rubros': { icon: Tag, bgColor: 'bg-cyan-100', color: 'text-cyan-600' },
   'medios-pago': { icon: CreditCard, bgColor: 'bg-violet-100', color: 'text-violet-600' },
+  'categorias-cargo': { icon: Tag, bgColor: 'bg-orange-100', color: 'text-orange-600' },
 }
 
 export default function ConfiguracionLista() {

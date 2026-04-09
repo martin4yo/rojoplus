@@ -298,6 +298,49 @@ export default function MovimientoCajaForm() {
             </button>
           </div>
 
+          {/* Socio / Entidad (opcional) */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Socio / Entidad <span className="text-gray-400 font-normal">(opcional)</span></label>
+            {personaSeleccionada ? (
+              <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <span className="flex-1 text-sm text-blue-800">{personaSeleccionada.label}</span>
+                <button type="button" onClick={limpiarPersona} className="p-1 hover:bg-blue-100 rounded text-blue-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={busquedaPersona}
+                    onChange={(e) => { setBusquedaPersona(e.target.value); buscarPersona(e.target.value) }}
+                    className="input-field w-full pl-9"
+                    placeholder="Buscar socio o entidad..."
+                  />
+                  {buscandoPersona && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>}
+                </div>
+                {resultadosPersona.length > 0 && (
+                  <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-auto">
+                    {resultadosPersona.map((p, i) => (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => seleccionarPersona(p)}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                        >
+                          {p.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Fila 1: Caja + Medio de Pago */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Caja */}
             <div>
@@ -318,34 +361,6 @@ export default function MovimientoCajaForm() {
               </select>
             </div>
 
-            {/* Monto */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
-              <input
-                type="number"
-                name="monto"
-                value={form.monto}
-                onChange={handleChange}
-                className="input-field w-full text-lg"
-                step="0.01"
-                min="0.01"
-                placeholder="0.00"
-                required
-              />
-            </div>
-
-            {/* Fecha */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-              <input
-                type="date"
-                name="fecha"
-                value={form.fecha}
-                onChange={handleChange}
-                className="input-field w-full"
-              />
-            </div>
-
             {/* Medio de Pago */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago *</label>
@@ -361,6 +376,21 @@ export default function MovimientoCajaForm() {
                   <option key={mp.id} value={mp.id}>{mp.nombre}</option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          {/* Fila 2: Fecha + Concepto + Monto */}
+          <div className="grid grid-cols-1 md:grid-cols-[160px_1fr_180px] gap-4 mt-4">
+            {/* Fecha */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+              <input
+                type="date"
+                name="fecha"
+                value={form.fecha}
+                onChange={handleChange}
+                className="input-field w-full"
+              />
             </div>
 
             {/* Concepto */}
@@ -394,61 +424,35 @@ export default function MovimientoCajaForm() {
               </div>
             </div>
 
-            {/* Observación */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Observación *</label>
-              <textarea
-                name="descripcion"
-                value={form.descripcion}
+            {/* Monto */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
+              <input
+                type="number"
+                name="monto"
+                value={form.monto}
                 onChange={handleChange}
-                className="input-field w-full"
-                rows={2}
-                placeholder="Detalle obligatorio del movimiento..."
+                className="input-field w-full text-lg"
+                step="0.01"
+                min="0.01"
+                placeholder="0.00"
                 required
               />
             </div>
+          </div>
 
-            {/* Socio / Entidad (opcional) */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Socio / Entidad <span className="text-gray-400 font-normal">(opcional)</span></label>
-              {personaSeleccionada ? (
-                <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                  <span className="flex-1 text-sm text-blue-800">{personaSeleccionada.label}</span>
-                  <button type="button" onClick={limpiarPersona} className="p-1 hover:bg-blue-100 rounded text-blue-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={busquedaPersona}
-                      onChange={(e) => { setBusquedaPersona(e.target.value); buscarPersona(e.target.value) }}
-                      className="input-field w-full pl-9"
-                      placeholder="Buscar socio o entidad..."
-                    />
-                    {buscandoPersona && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>}
-                  </div>
-                  {resultadosPersona.length > 0 && (
-                    <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-auto">
-                      {resultadosPersona.map((p, i) => (
-                        <li key={i}>
-                          <button
-                            type="button"
-                            onClick={() => seleccionarPersona(p)}
-                            className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                          >
-                            {p.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
+          {/* Observación */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observación *</label>
+            <textarea
+              name="descripcion"
+              value={form.descripcion}
+              onChange={handleChange}
+              className="input-field w-full"
+              rows={2}
+              placeholder="Detalle obligatorio del movimiento..."
+              required
+            />
           </div>
 
           {/* Preview */}

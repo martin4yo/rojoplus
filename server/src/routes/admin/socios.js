@@ -155,7 +155,7 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   const [socios, total, estados, categorias, tiposSocio, zonas] = await Promise.all([
     req.db.socio.findMany({
       where,
-      orderBy: { nroSocio: 'asc' },
+      orderBy: { apellidoNombre: 'asc' },
       skip: Math.max(0, (parseInt(page) - 1) * parseInt(limit)),
       take: parseInt(limit),
       select: {

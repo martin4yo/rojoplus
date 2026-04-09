@@ -330,6 +330,101 @@ router.delete('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => 
   res.json({ success: true, data: { mensaje: 'Estado de socio eliminado' } })
 }))
 
+// --- CATEGORIAS DE CARGO ---
+
+// GET /api/admin/categorias-cargo
+router.get('/categorias-cargo', authAdmin, asyncHandler(async (req, res) => {
+  const { activo } = req.query
+  const where = activo !== undefined ? { activo: activo === 'true' } : {}
+
+  const categorias = await req.db.categoriaCargo.findMany({
+    where,
+    orderBy: { orden: 'asc' },
+  })
+
+  res.json({ success: true, data: categorias })
+}))
+
+// GET /api/admin/categorias-cargo/:id
+router.get('/categorias-cargo/:id', authAdmin, asyncHandler(async (req, res) => {
+  const categoria = await req.db.categoriaCargo.findUnique({
+    where: { id: parseInt(req.params.id) },
+  })
+  if (!categoria) throw new AppError('Categoría de cargo no encontrada', 404, 'NOT_FOUND')
+  res.json({ success: true, data: categoria })
+}))
+
+// POST /api/admin/categorias-cargo
+router.post('/categorias-cargo', authAdmin, asyncHandler(async (req, res) => {
+  const { codigo, nombre, descripcion, color, orden } = req.body
+
+  if (!codigo || !nombre) {
+    throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  const existente = await req.db.categoriaCargo.findFirst({ where: { codigo } })
+  if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
+
+  const categoria = await req.db.categoriaCargo.create({
+    data: {
+      codigo,
+      nombre,
+      descripcion,
+      color,
+      orden: orden || 0,
+    },
+  })
+
+  res.status(201).json({ success: true, data: categoria })
+}))
+
+// PUT /api/admin/categorias-cargo/:id
+router.put('/categorias-cargo/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { codigo, nombre, descripcion, color, orden, activo } = req.body
+
+  const existente = await req.db.categoriaCargo.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Categoría de cargo no encontrada', 404, 'NOT_FOUND')
+
+  if (codigo && codigo !== existente.codigo) {
+    const duplicado = await req.db.categoriaCargo.findFirst({ where: { codigo } })
+    if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
+  }
+
+  const categoria = await req.db.categoriaCargo.update({
+    where: { id: parseInt(id) },
+    data: {
+      codigo: codigo ?? existente.codigo,
+      nombre: nombre ?? existente.nombre,
+      descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
+      color: color !== undefined ? color : existente.color,
+      orden: orden !== undefined ? orden : existente.orden,
+      activo: activo !== undefined ? activo : existente.activo,
+    },
+  })
+
+  res.json({ success: true, data: categoria })
+}))
+
+// DELETE /api/admin/categorias-cargo/:id
+router.delete('/categorias-cargo/:id', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const existente = await req.db.categoriaCargo.findUnique({ where: { id: parseInt(id) } })
+  if (!existente) throw new AppError('Categoría de cargo no encontrada', 404, 'NOT_FOUND')
+
+  const cargosConCategoria = await req.db.cargo.count({
+    where: { categoria: existente.codigo },
+  })
+
+  if (cargosConCategoria > 0) {
+    throw new AppError(`No se puede eliminar, hay ${cargosConCategoria} cargo(s) con esta categoría`, 400, 'HAS_RELATIONS')
+  }
+
+  await req.db.categoriaCargo.delete({ where: { id: parseInt(id) } })
+  res.json({ success: true, data: { mensaje: 'Categoría de cargo eliminada' } })
+}))
+
 // ==================== DESCUENTOS DISPONIBLES ====================
 
 // GET /api/admin/descuentos-disponibles

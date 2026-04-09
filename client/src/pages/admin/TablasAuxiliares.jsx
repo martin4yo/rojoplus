@@ -28,6 +28,7 @@ export default function TablasAuxiliares() {
   const [roles, setRoles] = useState([])
   const [mediosPago, setMediosPago] = useState([])
   const [centrosCosto, setCentrosCosto] = useState([])
+  const [categoriasCargo, setCategoriasCargo] = useState([])
 
   // Modo Demo
   const [modoDemo, setModoDemo] = useState({ activo: false, email: '', whatsappNumero: '' })
@@ -128,7 +129,7 @@ export default function TablasAuxiliares() {
   async function cargarDatos() {
     setLoading(true)
     try {
-      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, descuentos, rubrosData, cuentas, usrs, rols, medios, centros] = await Promise.all([
+      const [tipos, categorias, estados, acts, entrens, cargos, conceptos, descuentos, rubrosData, cuentas, usrs, rols, medios, centros, catsCargo] = await Promise.all([
         api.get('/admin/tipos-socio'),
         api.get('/admin/categorias-socio'),
         api.get('/admin/estados-socio'),
@@ -143,6 +144,7 @@ export default function TablasAuxiliares() {
         api.get('/admin/roles').catch(() => ({ data: [] })),
         api.getFull('/admin/medios-pago').catch(() => ({ data: [] })),
         api.getFull('/admin/centros-costo').catch(() => ({ data: [] })),
+        api.get('/admin/categorias-cargo').catch(() => []),
       ])
       setTiposSocio(tipos || [])
       setCategoriasSocio(categorias || [])
@@ -158,6 +160,7 @@ export default function TablasAuxiliares() {
       setRoles(rols?.data || rols || [])
       setMediosPago(medios?.data || medios || [])
       setCentrosCosto(centros?.data || centros || [])
+      setCategoriasCargo(catsCargo || [])
     } catch (err) {
       setError('Error al cargar datos')
     } finally {
@@ -1358,6 +1361,38 @@ export default function TablasAuxiliares() {
                     <p className="text-2xl font-bold text-gray-900 mt-1">{conceptosTesoreria.length}</p>
                     <p className="text-xs text-gray-500">
                       {conceptosTesoreria.filter(c => c.activo).length} activos
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-2 bg-gray-50 border-t text-xs text-primary font-medium">
+                  Ver listado →
+                </div>
+              </div>
+
+              {/* Categorías de Cargo */}
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
+                onClick={() => navigate('/admin/configuracion/categorias-cargo')}
+              >
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="p-3 rounded-xl bg-orange-100">
+                      <Tag className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); navigate('/admin/configuracion/categorias-cargo/nuevo') }}
+                      className="flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nuevo
+                    </Button>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-base font-semibold text-gray-800">Categorías de Cargo</h3>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{categoriasCargo.length}</p>
+                    <p className="text-xs text-gray-500">
+                      {categoriasCargo.filter(c => c.activo).length} activas
                     </p>
                   </div>
                 </div>

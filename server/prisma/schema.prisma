@@ -197,7 +197,7 @@ model CategoriaSocio {
 
 model EstadoSocio {
   id                Int      @id @default(autoincrement())
-  codigo            String  
+  codigo            String
   nombre            String
   descripcion       String?
   color             String?
@@ -211,6 +211,22 @@ model EstadoSocio {
   @@index([tenantId])
   @@unique([tenantId, codigo])
   @@map("estados_socio")
+}
+
+model CategoriaCargo {
+  id          Int      @id @default(autoincrement())
+  codigo      String
+  nombre      String
+  descripcion String?
+  color       String?
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  tenantId    Int      @map("tenant_id")
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId])
+  @@map("categorias_cargo")
 }
 
 model Socio {

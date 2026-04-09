@@ -25,6 +25,7 @@ const TITULOS = {
   'descuentos-disponibles': 'Descuento Disponible',
   'rubros': 'Rubro',
   'medios-pago': 'Medio de Pago',
+  'categorias-cargo': 'Categoría de Cargo',
 }
 
 const TIPOS_MEDIO_PAGO = [
@@ -179,6 +180,10 @@ export default function ConfiguracionForm() {
       if (tabla === 'estados-socio') {
         datos.color = form.color
         datos.permiteDescuentos = form.permiteDescuentos
+      }
+
+      if (tabla === 'categorias-cargo') {
+        datos.color = form.color
       }
 
       if (tabla === 'conceptos-tesoreria') {

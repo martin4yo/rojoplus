@@ -782,3 +782,133 @@ sudo systemctl reload nginx
 - [ ] Login super admin: admin@clubix.com.ar / clubix@2026
 - [ ] Contraseña super admin cambiada tras primer login
 - [ ] Tenant `clubix-sport` creado en DB
+
+---
+
+## Monitoreo y Troubleshooting del servidor
+
+### Configuración recomendada post-instalación
+
+#### 1. Agregar Swap (evita crashes por OOM)
+
+Sin swap, si Node.js o PostgreSQL tienen un pico de memoria el kernel mata procesos instantáneamente y puede forzar un reboot.
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Reducir swappiness (usa swap solo cuando es necesario, no preventivamente)
+sudo sysctl vm.swappiness=10
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+
+# Verificar
+free -h
+```
+
+#### 2. Habilitar journal persistente (logs sobreviven reboots)
+
+Por defecto en Ubuntu el journal se guarda en memoria y se pierde al reiniciar. Esto impide investigar crashes.
+
+```bash
+sudo mkdir -p /var/log/journal
+sudo systemd-tmpfiles --create --prefix /var/log/journal
+sudo systemctl restart systemd-journald
+```
+
+Con esto activo, tras un reboot podés ver qué pasó antes con:
+```bash
+sudo journalctl -b -1 | tail -150
+sudo journalctl -b -1 -k | grep -i "oom\|kill\|memory\|panic"
+```
+
+#### 3. Cron de monitoreo de memoria
+
+Registra el uso de memoria cada 5 minutos en un archivo que sobrevive crashes:
+
+```bash
+(crontab -l 2>/dev/null; echo "*/5 * * * * free -m >> /var/log/mem_monitor.log 2>&1") | crontab -
+```
+
+Para revisar el historial:
+```bash
+tail -100 /var/log/mem_monitor.log
+```
+
+#### 4. Netdata — dashboard de monitoreo en tiempo real
+
+```bash
+sudo apt install -y netdata
+sudo systemctl enable netdata
+sudo systemctl start netdata
+```
+
+Acceso: `http://IP-DEL-SERVIDOR:19999`
+
+> **Seguridad:** no abrir el puerto 19999 al público. Acceder via SSH tunnel:
+> ```bash
+> ssh -L 19999:localhost:19999 root@IP-DEL-SERVIDOR
+> ```
+> Luego abrir `http://localhost:19999` en el browser local.
+
+Retención de datos:
+- 1 segundo de resolución → 14 días
+- 1 minuto de resolución → 3 meses
+- 1 hora de resolución → 2 años
+
+---
+
+### Investigar un crash/reboot inesperado
+
+#### Paso 1 — Confirmar que hubo reboot y cuándo
+```bash
+last reboot | head -10
+```
+
+#### Paso 2 — Ver logs del boot anterior
+```bash
+# Requiere journal persistente habilitado (ver arriba)
+sudo journalctl -b -1 | tail -150
+sudo journalctl -b -1 -k | grep -i "oom\|kill\|memory\|panic"
+```
+
+#### Paso 3 — Verificar si el OOM killer mató procesos
+```bash
+sudo dmesg | grep -i "oom\|killed\|out of memory"
+sudo journalctl -k --since "2 hours ago" | grep -i "oom\|killed\|out of memory\|panic\|crash"
+```
+
+#### Paso 4 — Ver estado de PM2
+```bash
+pm2 list
+pm2 show clubix-b | grep restart
+pm2 logs clubix-b --lines 200
+```
+
+#### Paso 5 — Ver memoria actual
+```bash
+free -h
+vmstat 1 5
+ps aux --sort=-%mem | grep node | grep -v grep
+```
+
+#### Paso 6 — Ver logs de Nginx
+```bash
+sudo tail -100 /var/log/nginx/error.log
+sudo tail -100 /var/log/nginx/access.log | grep " 5[0-9][0-9] "
+```
+
+---
+
+### Causa más probable de reboots periódicos
+
+El patrón "funciona varios días, se cae solo" en un VPS sin swap apunta a **OOM (Out of Memory)**:
+
+1. Node.js acumula memoria gradualmente (leak o carga alta)
+2. Sin swap disponible, el kernel no tiene buffer
+3. El OOM killer mata procesos críticos
+4. El sistema queda inestable y se reinicia
+
+**Solución:** swap habilitado + Netdata para detectar la tendencia antes de que explote.

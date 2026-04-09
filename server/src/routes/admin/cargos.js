@@ -51,18 +51,6 @@ async function calcularRecargoCargo(prisma, cargo) {
 // CARGOS ADICIONALES
 // ============================================
 
-// Categorías de cargo disponibles
-const CATEGORIAS_CARGO = ['CUOTA_SOCIAL', 'CUOTA_ACTIVIDAD', 'CARNET', 'MOROSIDAD', 'NOTA_CREDITO', 'FINANCIACION']
-
-// GET /api/admin/categorias-cargo - Listar categorías disponibles
-router.get('/categorias-cargo', authAdmin, asyncHandler(async (req, res) => {
-  const categorias = CATEGORIAS_CARGO.map(cat => ({
-    codigo: cat,
-    nombre: cat.replace(/_/g, ' '),
-  }))
-  res.json({ success: true, data: categorias })
-}))
-
 // GET /api/admin/cargos/:id - Detalle de cargo
 router.get('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
@@ -114,8 +102,11 @@ router.put('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Validar categoría si se envía
-  if (categoria && !CATEGORIAS_CARGO.includes(categoria)) {
-    throw new AppError(`Categoría inválida. Opciones: ${CATEGORIAS_CARGO.join(', ')}`, 400, 'INVALID_CATEGORIA')
+  if (categoria) {
+    const cat = await req.db.categoriaCargo.findFirst({ where: { codigo: categoria } })
+    if (!cat) {
+      throw new AppError(`Categoría inválida: ${categoria}`, 400, 'INVALID_CATEGORIA')
+    }
   }
 
   // Calcular monto total
@@ -169,8 +160,9 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
   let categoriaFinal = categoria || 'CUOTA_ACTIVIDAD'
 
   // Validar categoría
-  if (!CATEGORIAS_CARGO.includes(categoriaFinal)) {
-    throw new AppError(`Categoría inválida. Opciones: ${CATEGORIAS_CARGO.join(', ')}`, 400, 'INVALID_CATEGORIA')
+  const catValida = await req.db.categoriaCargo.findFirst({ where: { codigo: categoriaFinal } })
+  if (!catValida) {
+    throw new AppError(`Categoría inválida: ${categoriaFinal}`, 400, 'INVALID_CATEGORIA')
   }
 
   // Resolver descripción desde el concepto si no viene explícita
@@ -341,6 +333,32 @@ router.post('/cargos/masivo', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('No hay socios que cumplan los filtros seleccionados', 400, 'NO_SOCIOS')
   }
 
+  // Pre-resolver períodos por concepto (mes/año de fechaVencimiento)
+  const periodoMap = {}
+  for (const concepto of conceptos) {
+    const fv = new Date(concepto.fechaVencimiento)
+    const anio = fv.getFullYear()
+    const mes = fv.getMonth() + 1
+    const key = `${anio}-${mes}`
+    if (!periodoMap[key]) {
+      // Buscar período existente, si no existe crearlo
+      let periodo = await req.db.periodo.findFirst({ where: { anio, mes } })
+      if (!periodo) {
+        const nombreMes = fv.toLocaleString('es-AR', { month: 'long', timeZone: 'America/Argentina/Buenos_Aires' })
+        periodo = await req.db.periodo.create({
+          data: {
+            anio,
+            mes,
+            nombre: `${nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)} ${anio}`,
+            fechaVencimiento: fv,
+          }
+        })
+      }
+      periodoMap[key] = periodo.id
+    }
+    concepto._periodoId = periodoMap[key]
+  }
+
   // Crear cargos en batch
   let creados = 0
   const errores = []
@@ -356,6 +374,7 @@ router.post('/cargos/masivo', authAdmin, asyncHandler(async (req, res) => {
           data: {
             socioId: socio.id,
             grupoFamiliarId: socio.titularFamiliaId || socio.id,
+            periodoId: concepto._periodoId,
             categoria: concepto.categoria || 'CUOTA_ACTIVIDAD',
             conceptoTesoreriaId: cId,
             descripcion: nombreConcepto,

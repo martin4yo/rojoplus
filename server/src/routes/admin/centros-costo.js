@@ -595,15 +595,24 @@ router.get('/centros-costo-rentabilidad-actividades', authAdmin, asyncHandler(as
       actividades: {
         where: { activo: true },
         include: {
-          inscripciones: {
-            where: {
-              ...(fechaDesde && { fecha: { gte: new Date(fechaDesde) } }),
-              ...(fechaHasta && { fecha: { lte: new Date(fechaHasta) } }),
-              estado: { not: 'CANCELADA' },
-            },
+          categorias: {
+            where: { activo: true },
             include: {
-              pagos: {
-                where: { estado: 'CONFIRMADO' },
+              inscripciones: {
+                where: {
+                  ...(fechaDesde && { fechaInicio: { gte: new Date(fechaDesde) } }),
+                  ...(fechaHasta && { fechaInicio: { lte: new Date(fechaHasta) } }),
+                  estado: { not: 'CANCELADA' },
+                },
+                select: { id: true },
+              },
+              cargos: {
+                where: {
+                  estado: 'PAGADO',
+                  ...(fechaDesde && { fechaPago: { gte: new Date(fechaDesde) } }),
+                  ...(fechaHasta && { fechaPago: { lte: new Date(fechaHasta) } }),
+                },
+                select: { montoTotal: true },
               },
             },
           },
@@ -614,14 +623,11 @@ router.get('/centros-costo-rentabilidad-actividades', authAdmin, asyncHandler(as
 
   const datosActividades = centros.flatMap(centro =>
     centro.actividades.map(actividad => {
-      const totalInscripciones = actividad.inscripciones.length
-      const totalIngresos = actividad.inscripciones.reduce((sum, insc) => {
-        const pagosTotales = insc.pagos.reduce((s, p) => s + parseFloat(p.monto), 0)
-        return sum + pagosTotales
-      }, 0)
+      const totalInscripciones = actividad.categorias.reduce((sum, cat) => sum + cat.inscripciones.length, 0)
+      const totalIngresos = actividad.categorias.reduce((sum, cat) =>
+        sum + cat.cargos.reduce((s, c) => s + parseFloat(c.montoTotal), 0), 0)
 
-      // Estimar costos (esto puede mejorarse con datos reales)
-      const costoEstimado = totalInscripciones * parseFloat(actividad.precio || 0) * 0.3 // 30% de costo estimado
+      const costoEstimado = totalIngresos * 0.3 // 30% estimado
 
       return {
         centroCosto: { id: centro.id, codigo: centro.codigo, nombre: centro.nombre },
@@ -629,7 +635,7 @@ router.get('/centros-costo-rentabilidad-actividades', authAdmin, asyncHandler(as
           id: actividad.id,
           codigo: actividad.codigo,
           nombre: actividad.nombre,
-          precio: parseFloat(actividad.precio || 0),
+          cuotaMensual: parseFloat(actividad.cuotaMensual || 0),
         },
         inscripciones: totalInscripciones,
         ingresos: totalIngresos,
