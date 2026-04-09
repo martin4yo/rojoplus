@@ -33,6 +33,7 @@ router.get('/cajas', asyncHandler(async (req, res) => {
   })
 
   // Si el usuario tiene rol y no es super admin, filtrar por cajas asignadas
+  console.log('[CAJAS DEBUG] adminId:', req.admin.id, '| rol:', admin?.rol?.nombre, '| esSuperAdmin:', admin?.rol?.esSuperAdmin, '| cajasRol:', admin?.rol?.cajas?.map(c => c.cajaId))
   if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
     const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
     where.id = { in: cajasPermitidas }
@@ -40,6 +41,7 @@ router.get('/cajas', asyncHandler(async (req, res) => {
     // Rol sin cajas asignadas: no puede ver ninguna
     where.id = { in: [] }
   }
+  console.log('[CAJAS DEBUG] where:', JSON.stringify(where))
 
   const cajas = await req.db.caja.findMany({
     where,

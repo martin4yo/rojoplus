@@ -4,6 +4,7 @@
 
 ## Índice
 
+0. [Copiar los archivos a Linux](#0-copiar-los-archivos-a-linux)
 1. [Requisitos previos](#1-requisitos-previos)
 2. [Instalar el servicio](#2-instalar-el-servicio)
 3. [Detectar el lector USB](#3-detectar-el-lector-usb)
@@ -13,6 +14,108 @@
 7. [Registrar como servicio del sistema](#7-registrar-como-servicio-del-sistema)
 8. [Troubleshooting](#8-troubleshooting)
 9. [Espiar señales de una aplicación existente](#9-espiar-señales-de-una-aplicación-existente)
+
+---
+
+## 0. Copiar los archivos a Linux
+
+El proyecto está en Windows y hay que pasarlo a la PC Linux donde va a correr el molinete. Hay tres formas según el escenario.
+
+---
+
+### Opción A — USB (sin internet)
+
+**En Windows:**
+
+1. Copiar la carpeta `molinete-service` al USB. **No copiar `node_modules`** — esa carpeta pesa mucho y los binarios compilados en Windows no sirven en Linux. Solo copiar:
+   ```
+   molinete-service/
+     index.js
+     package.json
+     config.json
+     db/
+     public/
+     scripts/
+   ```
+   Para excluir `node_modules` fácilmente: copiar la carpeta entera al USB y luego borrar `node_modules` del USB antes de sacar.
+
+2. Conectar el USB en la PC Linux.
+
+**En Linux:**
+
+3. Ver dónde montó el USB:
+   ```bash
+   lsblk
+   # o
+   ls /media/$USER/
+   ```
+   Suele aparecer en `/media/usuario/NOMBRE_DEL_USB`.
+
+4. Copiar la carpeta al home:
+   ```bash
+   cp -r /media/$USER/NOMBRE_DEL_USB/molinete-service ~/molinete-service
+   ```
+
+5. Verificar que llegaron los archivos:
+   ```bash
+   ls ~/molinete-service
+   # Debe mostrar: index.js  package.json  config.json  db  public  scripts
+   ```
+
+---
+
+### Opción B — Red local (si ambas PCs están en la misma red)
+
+Sin USB, directamente de Windows a Linux por la red.
+
+**En Windows** — abrir PowerShell y ejecutar:
+
+```powershell
+# Copiar al Linux via SCP (requiere que Linux tenga SSH activo)
+scp -r D:\Desarrollos\React\clubix\molinete-service usuario@192.168.1.XX:/home/usuario/
+```
+
+Reemplazar `usuario` y `192.168.1.XX` con los datos del Linux.
+
+Si Linux no tiene SSH, activarlo:
+```bash
+sudo apt install -y openssh-server
+sudo systemctl enable ssh
+sudo systemctl start ssh
+```
+
+Luego ejecutar el `scp` desde Windows.
+
+---
+
+### Opción C — Git (recomendado si el proyecto está en un repositorio)
+
+Si el proyecto está en GitHub u otro repositorio Git, es la forma más limpia — siempre trae la versión más actualizada y no necesita USB ni red local directa.
+
+**En Linux:**
+
+```bash
+# Instalar git si no está
+sudo apt install -y git
+
+# Clonar solo la carpeta molinete-service (sparse checkout)
+git clone --filter=blob:none --sparse https://github.com/usuario/clubix.git
+cd clubix
+git sparse-checkout set molinete-service
+
+# Mover al home si preferís
+cp -r molinete-service ~/molinete-service
+```
+
+O si querés clonar el repo completo:
+```bash
+git clone https://github.com/usuario/clubix.git
+cd clubix/molinete-service
+```
+
+---
+
+Una vez que los archivos están en Linux, continuar con el paso 1.
 
 ---
 
