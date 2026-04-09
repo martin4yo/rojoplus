@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Edit, Building2, UserCheck, Briefcase, Mail, Phone, MapPin, CreditCard, FileText } from 'lucide-react'
+import { ArrowLeft, Edit, Building2, UserCheck, Briefcase, Mail, Phone, MapPin, CreditCard, FileText, User } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
@@ -86,9 +86,19 @@ export default function EntidadDetalle({ tipo }) {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${config.bgColor}`}>
-              <Icon className={`w-6 h-6 ${config.color}`} />
-            </div>
+            {tipo === 'PERSONAL' ? (
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                {entidad.foto ? (
+                  <img src={entidad.foto} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-6 h-6 text-gray-400" />
+                )}
+              </div>
+            ) : (
+              <div className={`p-2 rounded-lg ${config.bgColor}`}>
+                <Icon className={`w-6 h-6 ${config.color}`} />
+              </div>
+            )}
             <div>
               <h1 className="text-2xl font-bold text-gray-800">{entidad.razonSocial}</h1>
               <p className="text-gray-500 text-sm">

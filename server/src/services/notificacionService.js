@@ -3,7 +3,7 @@ import Handlebars from 'handlebars'
 import { enviarNotificacionPush } from './webPush.js'
 import { getMailConfig } from './email.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
-import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora, obtenerTelefonoSocio } from './whatsappService.js'
+import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora, obtenerTelefonoSocio, enviarWhatsApp, getWhatsAppConfig } from './whatsappService.js'
 import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 
 // Caché simple de URLs por tenantId para no repetir queries en el mismo ciclo de jobs
@@ -995,78 +995,6 @@ export async function verificarPartidosProximos() {
 }
 
 /**
- * Notificar cancelación de entrenamiento
- */
-export async function notificarCancelacionEntrenamiento(entrenamientoId) {
-  try {
-    const entrenamiento = await prisma.entrenamiento.findUnique({
-      where: { id: entrenamientoId },
-      include: {
-        categoriaActividad: {
-          include: {
-            actividad: true,
-            inscripciones: {
-              where: { activo: true },
-              include: {
-                socio: {
-                  select: {
-                    id: true, email: true, apellidoNombre: true,
-                    notificarCancelacionEntreno: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    })
-
-    if (!entrenamiento) return 0
-
-    const fechaEntr = new Date(entrenamiento.fecha)
-    let notificados = 0
-    let omitidos = 0
-
-    for (const inscripcion of entrenamiento.categoriaActividad?.inscripciones || []) {
-      if (!inscripcion.socio?.email) continue
-
-      // Respetar preferencia del socio
-      if (!inscripcion.socio.notificarCancelacionEntreno) {
-        omitidos++
-        continue
-      }
-
-      const metadata = {
-        socioNombre: inscripcion.socio.apellidoNombre,
-        actividad: entrenamiento.categoriaActividad?.actividad?.nombre || '',
-        categoria: entrenamiento.categoriaActividad?.nombre || '',
-        fecha: fechaEntr.toLocaleDateString('es-AR'),
-        hora: entrenamiento.horaInicio || '',
-        motivo: entrenamiento.observaciones || 'Sin especificar',
-      }
-
-      await programarNotificacion({
-        tipo: 'EMAIL',
-        eventType: 'CANCELACION_ENTRENAMIENTO',
-        destinatario: inscripcion.socio.email,
-        socioId: inscripcion.socio.id,
-        asunto: `Entrenamiento cancelado - ${fechaEntr.toLocaleDateString('es-AR')}`,
-        fechaProgramado: new Date(),
-        metadata,
-      })
-
-      notificados++
-    }
-
-    console.log(`📧 Cancelación entrenamiento: ${notificados} notificados, ${omitidos} omitidos por preferencia`)
-    return notificados
-  } catch (error) {
-    console.error('Error notificando cancelación entrenamiento:', error.message)
-    return 0
-  }
-}
-
-/**
  * Notificar nuevo entrenamiento a todos los inscriptos de la categoría
  */
 export async function notificarNuevoEntrenamiento(entrenamientoId) {
@@ -1132,6 +1060,17 @@ export async function notificarNuevoEntrenamiento(entrenamientoId) {
         metadata,
       })
 
+      // WhatsApp
+      const telefono = obtenerTelefonoSocio(inscripcion.socio)
+      if (telefono && inscripcion.socio.notifWhatsapp) {
+        const texto = `📅 *Nuevo entrenamiento programado*\n` +
+          `${metadata.actividad} - ${metadata.categoria}\n` +
+          `Fecha: ${metadata.fecha} a las ${metadata.hora}\n` +
+          (metadata.espacio ? `Lugar: ${metadata.espacio}\n` : '') +
+          (metadata.observaciones ? `Observaciones: ${metadata.observaciones}` : '')
+        await enviarWhatsApp({ db: prisma, telefono, texto }).catch(() => {})
+      }
+
       notificados++
     }
 
@@ -1139,6 +1078,91 @@ export async function notificarNuevoEntrenamiento(entrenamientoId) {
     return notificados
   } catch (error) {
     console.error('Error notificando nuevo entrenamiento:', error.message)
+    return 0
+  }
+}
+
+/**
+ * Notificar cancelación de entrenamiento a inscriptos
+ * @param {number} entrenamientoId
+ * @param {object} db - Prisma tenant-scoped
+ */
+export async function notificarCancelacionEntrenamiento(entrenamientoId, db) {
+  try {
+    const entrenamiento = await db.entrenamiento.findUnique({
+      where: { id: entrenamientoId },
+      include: {
+        categoriaActividad: {
+          include: {
+            actividad: true,
+            inscripciones: {
+              where: { estado: 'ACTIVA', fechaFin: null },
+              include: {
+                socio: {
+                  select: {
+                    id: true, email: true, celular: true, telefono: true,
+                    apellidoNombre: true, notifWhatsapp: true,
+                    notificarNuevoEntrenamiento: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        espacio: true
+      }
+    })
+
+    if (!entrenamiento) return 0
+
+    const fechaEntr = new Date(entrenamiento.fecha)
+    let notificados = 0
+
+    for (const inscripcion of entrenamiento.categoriaActividad?.inscripciones || []) {
+      const socio = inscripcion.socio
+      if (!socio) continue
+      if (!inscripcion.socio.notificarNuevoEntrenamiento) continue
+
+      const metadata = {
+        socioNombre: socio.apellidoNombre,
+        actividad: entrenamiento.categoriaActividad?.actividad?.nombre || '',
+        categoria: entrenamiento.categoriaActividad?.nombre || '',
+        fecha: fechaEntr.toLocaleDateString('es-AR'),
+        hora: entrenamiento.horaInicio || '',
+        espacio: entrenamiento.espacio?.nombre || '',
+        motivo: entrenamiento.motivoCancelacion || '',
+      }
+
+      // Email
+      if (socio.email) {
+        await programarNotificacion({
+          tipo: 'EMAIL',
+          eventType: 'CANCELACION_ENTRENAMIENTO',
+          destinatario: socio.email,
+          socioId: socio.id,
+          asunto: `Entrenamiento cancelado - ${fechaEntr.toLocaleDateString('es-AR')}`,
+          fechaProgramado: new Date(),
+          metadata,
+        })
+      }
+
+      // WhatsApp
+      const telefono = obtenerTelefonoSocio(socio)
+      if (telefono && socio.notifWhatsapp) {
+        const texto = `❌ *Entrenamiento cancelado*\n` +
+          `${metadata.actividad} - ${metadata.categoria}\n` +
+          `Fecha: ${metadata.fecha} a las ${metadata.hora}\n` +
+          (metadata.motivo ? `Motivo: ${metadata.motivo}` : '')
+        await enviarWhatsApp({ db, telefono, texto }).catch(() => {})
+      }
+
+      notificados++
+    }
+
+    console.log(`🚫 Cancelación entrenamiento: ${notificados} notificados`)
+    return notificados
+  } catch (error) {
+    console.error('Error notificando cancelación entrenamiento:', error.message)
     return 0
   }
 }

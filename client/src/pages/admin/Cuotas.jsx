@@ -147,8 +147,9 @@ export default function Cuotas() {
       setCategoriasCargo(categoriasData || [])
       setCajas((cajasData || []).filter(c => c.paraCaja))
       // Pre-seleccionar defaults en splits
-      const defaultMedio = mediosData?.[0]?.id?.toString() || ''
-      const defaultCaja = cajasData?.find(c => c.paraCaja)?.id?.toString() || ''
+      const primerMedio = mediosData?.[0]
+      const defaultMedio = primerMedio?.id?.toString() || ''
+      const defaultCaja = primerMedio?.cajaDefaultId?.toString() || cajasData?.find(c => c.paraCaja)?.id?.toString() || ''
       setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: '' }])
     } catch (err) {
       console.error('Error cargando datos iniciales:', err)
@@ -311,8 +312,9 @@ export default function Cuotas() {
 
   function abrirModalPago() {
     const total = calcularTotalSeleccionado().total
-    const defaultMedio = mediosPago[0]?.id?.toString() || ''
-    const defaultCaja = cajas[0]?.id?.toString() || ''
+    const primerMedio = mediosPago[0]
+    const defaultMedio = primerMedio?.id?.toString() || ''
+    const defaultCaja = primerMedio?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
     setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: total.toFixed(2) }])
     setShowPagoModal(true)
   }
@@ -758,7 +760,7 @@ export default function Cuotas() {
           isOpen={showPagoModal}
           onClose={() => setShowPagoModal(false)}
           title="Confirmar Pago"
-          maxWidth="max-w-lg"
+          maxWidth="max-w-2xl"
         >
           {(() => {
             const totalAPagar = calcularTotalSeleccionado().total
@@ -766,12 +768,23 @@ export default function Cuotas() {
             const diferencia = Math.round((totalAPagar - sumaSplits) * 100) / 100
 
             function updateSplit(idx, field, value) {
-              setSplits(prev => prev.map((sp, i) => i === idx ? { ...sp, [field]: value } : sp))
+              setSplits(prev => prev.map((sp, i) => {
+                if (i !== idx) return sp
+                const updated = { ...sp, [field]: value }
+                // Al cambiar medio de pago, auto-seleccionar caja default si tiene
+                if (field === 'medioPagoId' && value) {
+                  const medio = mediosPago.find(m => m.id.toString() === value)
+                  if (medio?.cajaDefaultId) {
+                    updated.cajaId = medio.cajaDefaultId.toString()
+                  }
+                }
+                return updated
+              }))
             }
             function addSplit() {
               const restante = Math.max(0, Math.round((totalAPagar - sumaSplits) * 100) / 100)
               const defaultMedio = mediosPago[0]?.id?.toString() || ''
-              const defaultCaja = cajas[0]?.id?.toString() || ''
+              const defaultCaja = mediosPago[0]?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
               setSplits(prev => [...prev, { medioPagoId: defaultMedio, cajaId: defaultCaja, monto: restante.toFixed(2) }])
             }
             function removeSplit(idx) {
@@ -812,37 +825,38 @@ export default function Cuotas() {
 
                   <div className="space-y-2">
                     {splits.map((sp, idx) => (
-                      <div key={idx} className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 items-center">
-                        <select
-                          value={sp.medioPagoId}
-                          onChange={e => updateSplit(idx, 'medioPagoId', e.target.value)}
-                          className="input-field text-sm"
-                        >
-                          <option value="">Medio...</option>
-                          {mediosPago.map(mp => <option key={mp.id} value={mp.id}>{mp.nombre}</option>)}
-                        </select>
-                        <select
-                          value={sp.cajaId}
-                          onChange={e => updateSplit(idx, 'cajaId', e.target.value)}
-                          className="input-field text-sm"
-                        >
-                          <option value="">Caja...</option>
-                          {cajas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                        </select>
-                        <input
-                          type="number"
-                          value={sp.monto}
-                          onChange={e => updateSplit(idx, 'monto', e.target.value)}
-                          className="input-field text-sm w-28 text-right"
-                          step="0.01"
-                          min="0.01"
-                          placeholder="0.00"
-                        />
-                        {splits.length > 1 && (
-                          <button type="button" onClick={() => removeSplit(idx)} className="p-1 text-red-400 hover:text-red-600">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                      <div key={idx} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
+                        <div className="grid grid-cols-[1fr_8rem_auto] gap-2">
+                          <select
+                            value={sp.medioPagoId}
+                            onChange={e => updateSplit(idx, 'medioPagoId', e.target.value)}
+                            className="input-field text-sm"
+                          >
+                            <option value="">Medio de pago...</option>
+                            {mediosPago.map(mp => <option key={mp.id} value={mp.id}>{mp.nombre}</option>)}
+                          </select>
+                          <input
+                            type="number"
+                            value={sp.monto}
+                            onChange={e => updateSplit(idx, 'monto', e.target.value)}
+                            className="input-field text-sm text-right"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="0.00"
+                          />
+                          {splits.length > 1
+                            ? <button type="button" onClick={() => removeSplit(idx)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                            : <div />
+                          }
+                          <select
+                            value={sp.cajaId}
+                            onChange={e => updateSplit(idx, 'cajaId', e.target.value)}
+                            className="input-field text-sm col-span-2 mt-2"
+                          >
+                            <option value="">Caja...</option>
+                            {cajas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                          </select>
+                        </div>
                       </div>
                     ))}
                   </div>

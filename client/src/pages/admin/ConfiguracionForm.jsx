@@ -49,6 +49,7 @@ export default function ConfiguracionForm() {
   const [error, setError] = useState(null)
   const [conceptosTesoreria, setConceptosTesoreria] = useState([])
   const [cuentasContables, setCuentasContables] = useState([])
+  const [cajas, setCajas] = useState([])
 
   const titulo = TITULOS[tabla] || 'Registro'
 
@@ -82,11 +83,15 @@ export default function ConfiguracionForm() {
     paraKiosco: true,
     paraTakeaway: true,
     conceptoTesoreriaId: '',
+    cajaDefaultId: '',
   })
 
   useEffect(() => {
     if (tabla === 'tipos-socio' || tabla === 'medios-pago') {
       cargarConceptosTesoreria()
+    }
+    if (tabla === 'medios-pago') {
+      api.get('/admin/cajas').then(r => setCajas((r || []).filter(c => c.paraCaja)))
     }
     if (tabla === 'conceptos-tesoreria') {
       cargarCuentasContables()
@@ -143,6 +148,7 @@ export default function ConfiguracionForm() {
         paraKiosco: data.paraKiosco !== false,
         paraTakeaway: data.paraTakeaway !== false,
         conceptoTesoreriaId: data.conceptoTesoreriaId ? String(data.conceptoTesoreriaId) : '',
+        cajaDefaultId: data.cajaDefaultId ? String(data.cajaDefaultId) : '',
       })
     } catch (err) {
       setError('Error al cargar datos')
@@ -214,6 +220,7 @@ export default function ConfiguracionForm() {
         datos.paraKiosco = form.paraKiosco
         datos.paraTakeaway = form.paraTakeaway
         datos.conceptoTesoreriaId = form.conceptoTesoreriaId ? parseInt(form.conceptoTesoreriaId) : null
+        datos.cajaDefaultId = form.cajaDefaultId ? parseInt(form.cajaDefaultId) : null
         delete datos.color
         delete datos.descripcion
       }
@@ -343,6 +350,21 @@ export default function ConfiguracionForm() {
                     min="0"
                   />
                 </div>
+              </div>
+
+              {/* Caja por defecto */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Caja por defecto</label>
+                <select
+                  value={form.cajaDefaultId}
+                  onChange={e => setForm({ ...form, cajaDefaultId: e.target.value })}
+                  className="input-field w-full"
+                >
+                  <option value="">Sin caja por defecto</option>
+                  {cajas.map(c => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Fila 3: Opciones + Botones */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, MapPin, Users, X, RefreshCw, Settings, Bell } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, MapPin, Users, X, RefreshCw, Settings, Bell, ListChecks } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
 import { Alert } from '../../../components/Alert'
@@ -11,6 +11,7 @@ const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 const DIAS_SEMANA_FULL = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
 
 export default function EntrenamientosCalendario() {
+  const navigate = useNavigate()
   const [entrenamientos, setEntrenamientos] = useState([])
   const [actividades, setActividades] = useState([])
   const [espacios, setEspacios] = useState([])
@@ -681,6 +682,7 @@ export default function EntrenamientosCalendario() {
         isOpen={modalEntrenamiento.visible}
         onClose={() => setModalEntrenamiento({ visible: false, entrenamiento: null })}
         title="Detalle del Entrenamiento"
+        maxWidth="max-w-xl"
       >
         {modalEntrenamiento.entrenamiento && (
           <div className="space-y-4">
@@ -739,36 +741,40 @@ export default function EntrenamientosCalendario() {
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              {modalEntrenamiento.entrenamiento.estado !== 'CANCELADO' && tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+            <div className="-mx-6 px-6 flex justify-end gap-3 pt-4 border-t border-gray-200">
+              {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
                 <Button
-                  variant="danger"
-                  onClick={() => {
-                    setModalCancelar({ visible: true, entrenamiento: modalEntrenamiento.entrenamiento })
-                    setModalEntrenamiento({ visible: false, entrenamiento: null })
-                  }}
+                  variant="success"
+                  className="w-[155px]"
+                  onClick={() => navigate(`/admin/deportes/asistencia/${modalEntrenamiento.entrenamiento.id}`)}
                 >
-                  <X className="w-4 h-4 mr-2" />
-                  Cancelar
+                  <ListChecks className="w-5 h-5 mr-2" />
+                  Asistencia
                 </Button>
               )}
               {modalEntrenamiento.entrenamiento.estado !== 'CANCELADO' && tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
                 <Button
                   variant="secondary"
+                  className="w-[155px]"
                   onClick={() => handleNotificarEntrenamiento(modalEntrenamiento.entrenamiento.id)}
                   disabled={notificando}
                 >
-                  <Bell className="w-4 h-4 mr-2" />
+                  <Bell className="w-5 h-5 mr-2" />
                   {notificando ? 'Enviando...' : 'Notificar'}
                 </Button>
               )}
-              {tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
-                <Link to={`/admin/deportes/asistencia/${modalEntrenamiento.entrenamiento.id}`}>
-                  <Button>
-                    <Users className="w-4 h-4 mr-2" />
-                    Asistencia
-                  </Button>
-                </Link>
+              {modalEntrenamiento.entrenamiento.estado !== 'CANCELADO' && tienePermiso(PERMISOS.DEPORTES_ENTRENAMIENTOS) && (
+                <Button
+                  variant="danger"
+                  className="w-[155px]"
+                  onClick={() => {
+                    setModalCancelar({ visible: true, entrenamiento: modalEntrenamiento.entrenamiento })
+                    setModalEntrenamiento({ visible: false, entrenamiento: null })
+                  }}
+                >
+                  <X className="w-5 h-5 mr-2" />
+                  Cancelar
+                </Button>
               )}
             </div>
           </div>

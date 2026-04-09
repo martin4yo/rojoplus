@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Building2, UserCheck, Briefcase } from 'lucide-react'
+import { ArrowLeft, Save, Building2, UserCheck, Briefcase, Upload, User } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
@@ -66,6 +66,7 @@ export default function EntidadForm({ tipo }) {
     legajo: '',
     cargo: '',
     sueldoBasico: '',
+    foto: '',
     activo: true
   })
 
@@ -98,6 +99,7 @@ export default function EntidadForm({ tipo }) {
         legajo: entidad.legajo || '',
         cargo: entidad.cargo || '',
         sueldoBasico: entidad.sueldoBasico ? String(entidad.sueldoBasico) : '',
+        foto: entidad.foto || '',
         activo: entidad.activo
       })
     } catch (err) {
@@ -125,6 +127,14 @@ export default function EntidadForm({ tipo }) {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
+  }
+
+  function handleFotoChange(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onloadend = () => setForm(prev => ({ ...prev, foto: reader.result }))
+    reader.readAsDataURL(file)
   }
 
   async function handleSubmit(e) {
@@ -383,6 +393,34 @@ export default function EntidadForm({ tipo }) {
         {tipo === 'PERSONAL' && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Datos Laborales</h2>
+
+            {/* Foto */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-20 h-20 bg-gray-100 rounded-full overflow-hidden flex items-center justify-center border border-gray-200 flex-shrink-0">
+                {form.foto ? (
+                  <img src={form.foto} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-10 h-10 text-gray-400" />
+                )}
+              </div>
+              <div>
+                <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-700">
+                  <Upload className="w-4 h-4" />
+                  {form.foto ? 'Cambiar foto' : 'Subir foto'}
+                  <input type="file" accept="image/*" onChange={handleFotoChange} className="hidden" />
+                </label>
+                {form.foto && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, foto: '' }))}
+                    className="ml-2 text-sm text-red-500 hover:text-red-700"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

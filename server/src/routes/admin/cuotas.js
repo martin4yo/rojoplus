@@ -1259,6 +1259,7 @@ router.get('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
   const medios = await req.db.medioPago.findMany({
     where,
     orderBy: { orden: 'asc' },
+    include: { cajaDefault: { select: { id: true, nombre: true } } },
   })
   res.json({ success: true, data: medios })
 }))
@@ -1275,7 +1276,7 @@ router.get('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/medios-pago - Crear medio de pago
 router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway, conceptoTesoreriaId } = req.body
+  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway, conceptoTesoreriaId, cajaDefaultId } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
@@ -1301,8 +1302,9 @@ router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
       paraKiosco: paraKiosco !== false,
       paraTakeaway: paraTakeaway !== false,
       ...(conceptoTesoreriaId && { conceptoTesoreriaId: parseInt(conceptoTesoreriaId) }),
+      ...(cajaDefaultId && { cajaDefaultId: parseInt(cajaDefaultId) }),
     },
-    include: { conceptoTesoreria: { select: { id: true, nombre: true } } }
+    include: { conceptoTesoreria: { select: { id: true, nombre: true } }, cajaDefault: { select: { id: true, nombre: true } } }
   })
 
   res.status(201).json({ success: true, data: medio })
@@ -1311,7 +1313,7 @@ router.post('/medios-pago', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/medios-pago/:id - Actualizar medio de pago
 router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway, conceptoTesoreriaId } = req.body
+  const { codigo, nombre, tipo, requiereDatosBanco, comisionPct, orden, activo, paraCaja, paraBuffet, paraKiosco, paraTakeaway, conceptoTesoreriaId, cajaDefaultId } = req.body
 
   const existente = await req.db.medioPago.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Medio de pago no encontrado', 404, 'NOT_FOUND')
@@ -1338,9 +1340,10 @@ router.put('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
       ...(paraBuffet !== undefined && { paraBuffet }),
       ...(paraKiosco !== undefined && { paraKiosco }),
       ...(paraTakeaway !== undefined && { paraTakeaway }),
-      ...(conceptoTesoreriaId !== undefined && { conceptoTesoreriaId: parseInt(conceptoTesoreriaId) }),
+      ...(conceptoTesoreriaId !== undefined && { conceptoTesoreriaId: conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null }),
+      ...(cajaDefaultId !== undefined && { cajaDefaultId: cajaDefaultId ? parseInt(cajaDefaultId) : null }),
     },
-    include: { conceptoTesoreria: { select: { id: true, nombre: true } } }
+    include: { conceptoTesoreria: { select: { id: true, nombre: true } }, cajaDefault: { select: { id: true, nombre: true } } }
   })
 
   res.json({ success: true, data: medio })

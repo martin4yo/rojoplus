@@ -40,6 +40,20 @@ body {
            inline-flex items-center justify-center;
   }
 
+  .btn-danger {
+    @apply bg-red-600 text-white px-6 py-3 rounded-lg font-semibold
+           hover:bg-red-700 transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed
+           inline-flex items-center justify-center;
+  }
+
+  .btn-success {
+    @apply bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold
+           hover:bg-emerald-700 transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed
+           inline-flex items-center justify-center;
+  }
+
   .btn-text {
     @apply text-primary font-semibold hover:text-primary-dark hover:underline;
   }

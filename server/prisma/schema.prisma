@@ -662,6 +662,7 @@ model Cargo {
   motivoBonificacion   String?             @map("motivo_bonificacion")
   incluidoEnDebitoId   Int?                @map("incluido_en_debito_id")
   observaciones        String?
+  loteId               String?             @map("lote_id")
   createdAt            DateTime            @default(now()) @map("created_at")
   updatedAt            DateTime            @updatedAt @map("updated_at")
   categoria            String              @default("CUOTA_SOCIAL")
@@ -687,6 +688,7 @@ model Cargo {
   @@index([fechaVencimiento])
   @@index([cargoOrigenId])
   @@index([centroCostoId])
+  @@index([loteId])
   @@index([tenantId])
   @@map("cargos")
 }
@@ -706,15 +708,18 @@ model MedioPago {
   paraTakeaway        Boolean         @default(true) @map("para_takeaway")
   cuentaContableId    Int?            @map("cuenta_contable_id")
   conceptoTesoreriaId Int?            @map("concepto_tesoreria_id")
+  cajaDefaultId       Int?            @map("caja_default_id")
   pagos               Pago[]
   pagoMedios          PagoMedioPago[]
   movimientosCaja     MovimientoCaja[]
   cuentaContable      CuentaContable?    @relation(fields: [cuentaContableId], references: [id])
   conceptoTesoreria   ConceptoTesoreria? @relation(fields: [conceptoTesoreriaId], references: [id])
+  cajaDefault         Caja?              @relation("MedioPagoCajaDefault", fields: [cajaDefaultId], references: [id])
 
   tenantId    Int      @map("tenant_id")
   @@index([cuentaContableId])
   @@index([conceptoTesoreriaId])
+  @@index([cajaDefaultId])
   @@index([tenantId])
   @@unique([tenantId, codigo])
   @@map("medios_pago")
@@ -994,6 +999,7 @@ model Caja {
   transferenciasDestino  TransferenciaCaja[]  @relation("CajaDestino")
   roles                  CajaRol[]
   comprobantes           ComprobanteElectronico[]
+  mediosPagoDefault      MedioPago[]              @relation("MedioPagoCajaDefault")
 
   tenantId    Int      @map("tenant_id")
   @@unique([tenantId, codigo])
@@ -1656,6 +1662,7 @@ model Entidad {
   legajo               String?
   fechaIngreso         DateTime?            @map("fecha_ingreso")
   sueldoBasico         Decimal?             @map("sueldo_basico") @db.Decimal(12, 2)
+  foto                 String?
   observaciones        String?
   activo               Boolean              @default(true)
   createdAt            DateTime             @default(now()) @map("created_at")

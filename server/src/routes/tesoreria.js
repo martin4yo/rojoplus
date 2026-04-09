@@ -36,6 +36,9 @@ router.get('/cajas', asyncHandler(async (req, res) => {
   if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
     const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
     where.id = { in: cajasPermitidas }
+  } else if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length === 0) {
+    // Rol sin cajas asignadas: no puede ver ninguna
+    where.id = { in: [] }
   }
 
   const cajas = await req.db.caja.findMany({

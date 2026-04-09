@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { randomUUID } from 'crypto'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
 
@@ -360,7 +361,9 @@ router.post('/cargos/masivo', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Crear cargos en batch
+  const loteId = randomUUID()
   let creados = 0
+  let importeTotal = 0
   const errores = []
 
   for (const socio of socios) {
@@ -384,10 +387,13 @@ router.post('/cargos/masivo', authAdmin, asyncHandler(async (req, res) => {
             montoTotal: monto,
             fechaVencimiento: new Date(concepto.fechaVencimiento),
             origen: 'MASIVO',
-            estado: 'PENDIENTE'
+            estado: 'PENDIENTE',
+            observaciones: concepto.observaciones || null,
+            loteId
           }
         })
         creados++
+        importeTotal += monto
       } catch (err) {
         errores.push({ socioId: socio.id, error: err.message })
       }
@@ -396,9 +402,44 @@ router.post('/cargos/masivo', authAdmin, asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    data: { creados, errores, totalSocios: socios.length },
+    data: { creados, errores, totalSocios: socios.length, importeTotal, loteId },
     message: `Se generaron ${creados} cargos para ${socios.length} socios`
   })
+}))
+
+// GET /api/admin/cargos/lote/:loteId - Cargos de un lote
+router.get('/cargos/lote/:loteId', authAdmin, asyncHandler(async (req, res) => {
+  const { loteId } = req.params
+
+  const cargos = await req.db.cargo.findMany({
+    where: { loteId },
+    include: {
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+      conceptoTesoreria: { select: { nombre: true } },
+    },
+    orderBy: [{ socio: { apellidoNombre: 'asc' } }, { createdAt: 'asc' }],
+  })
+
+  const resumen = {
+    total: cargos.length,
+    pendientes: cargos.filter(c => c.estado === 'PENDIENTE').length,
+    pagados: cargos.filter(c => c.estado === 'PAGADO').length,
+    importeTotal: cargos.reduce((acc, c) => acc + Number(c.montoTotal), 0),
+    importePendiente: cargos.filter(c => c.estado === 'PENDIENTE').reduce((acc, c) => acc + Number(c.montoTotal), 0),
+  }
+
+  res.json({ success: true, data: { cargos, resumen } })
+}))
+
+// DELETE /api/admin/cargos/lote/:loteId - Elimina cargos PENDIENTES de un lote
+router.delete('/cargos/lote/:loteId', authAdmin, asyncHandler(async (req, res) => {
+  const { loteId } = req.params
+
+  const { count } = await req.db.cargo.deleteMany({
+    where: { loteId, estado: 'PENDIENTE' },
+  })
+
+  res.json({ success: true, data: { eliminados: count } })
 }))
 
 // ============================================

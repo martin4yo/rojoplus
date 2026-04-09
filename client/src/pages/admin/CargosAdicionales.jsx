@@ -1,149 +1,127 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Search, Zap, Users, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Search, Zap, Users, AlertCircle, CheckCircle, Loader2, Package } from 'lucide-react'
 import { Button } from '../../components/Button'
-import { Alert } from '../../components/Alert'
 import Modal from '../../components/Modal'
 import ConceptoTesoreriaModal from '../../components/ConceptoTesoreriaModal'
 import api from '../../services/api'
 
 function ConceptoRow({ row, index, conceptos, categoriasCargo, onChange, onRemove, onNuevoConcepto }) {
   return (
-    <div className="grid grid-cols-12 gap-2 items-end border border-gray-200 rounded-lg p-3 bg-gray-50">
-      {/* Concepto */}
-      <div className="col-span-4">
-        <label className="block text-xs text-gray-500 mb-1">Concepto</label>
-        <div className="flex gap-1">
+    <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+      <div className="grid grid-cols-12 gap-2 items-end">
+        {/* Concepto */}
+        <div className="col-span-4">
+          <label className="block text-xs text-gray-500 mb-1">Concepto</label>
+          <div className="flex gap-1">
+            <select
+              value={row.conceptoTesoreriaId}
+              onChange={e => onChange(index, 'conceptoTesoreriaId', e.target.value)}
+              className="flex-1 border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Seleccionar...</option>
+              {conceptos.map(c => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onNuevoConcepto}
+              className="text-xs text-primary hover:underline whitespace-nowrap px-1"
+              title="Nuevo concepto"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Categoría */}
+        <div className="col-span-3">
+          <label className="block text-xs text-gray-500 mb-1">Categoría</label>
           <select
-            value={row.conceptoTesoreriaId}
-            onChange={e => onChange(index, 'conceptoTesoreriaId', e.target.value)}
-            className="flex-1 border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+            value={row.categoria}
+            onChange={e => onChange(index, 'categoria', e.target.value)}
+            className="w-full border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="">Seleccionar...</option>
-            {conceptos.map(c => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
+            {categoriasCargo.map(c => (
+              <option key={c.codigo} value={c.codigo}>{c.nombre}</option>
             ))}
           </select>
+        </div>
+
+        {/* Monto */}
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Monto $</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={row.montoOriginal}
+            onChange={e => onChange(index, 'montoOriginal', e.target.value)}
+            placeholder="0.00"
+            className="w-full border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+
+        {/* Fecha Vencimiento */}
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Vencimiento</label>
+          <input
+            type="date"
+            value={row.fechaVencimiento}
+            onChange={e => onChange(index, 'fechaVencimiento', e.target.value)}
+            className="w-full border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+
+        {/* Eliminar */}
+        <div className="col-span-1 flex justify-center">
           <button
             type="button"
-            onClick={onNuevoConcepto}
-            className="text-xs text-primary hover:underline whitespace-nowrap px-1"
-            title="Nuevo concepto"
+            onClick={() => onRemove(index)}
+            className="text-red-400 hover:text-red-600"
           >
-            <Plus className="w-4 h-4" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Categoría */}
-      <div className="col-span-3">
-        <label className="block text-xs text-gray-500 mb-1">Categoría</label>
-        <select
-          value={row.categoria}
-          onChange={e => onChange(index, 'categoria', e.target.value)}
-          className="w-full border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          {categoriasCargo.map(c => (
-            <option key={c.codigo} value={c.codigo}>{c.nombre}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Monto */}
-      <div className="col-span-2">
-        <label className="block text-xs text-gray-500 mb-1">Monto $</label>
+      {/* Observaciones */}
+      <div>
         <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={row.montoOriginal}
-          onChange={e => onChange(index, 'montoOriginal', e.target.value)}
-          placeholder="0.00"
+          type="text"
+          value={row.observaciones}
+          onChange={e => onChange(index, 'observaciones', e.target.value)}
+          placeholder="Observaciones (opcional)"
           className="w-full border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
         />
-      </div>
-
-      {/* Fecha Vencimiento */}
-      <div className="col-span-2">
-        <label className="block text-xs text-gray-500 mb-1">Vencimiento</label>
-        <input
-          type="date"
-          value={row.fechaVencimiento}
-          onChange={e => onChange(index, 'fechaVencimiento', e.target.value)}
-          className="w-full border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-      </div>
-
-      {/* Eliminar */}
-      <div className="col-span-1 flex justify-center">
-        <button
-          type="button"
-          onClick={() => onRemove(index)}
-          className="text-red-400 hover:text-red-600"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
       </div>
     </div>
   )
 }
 
-export default function CargosAdicionales() {
-  const [conceptosDB, setConceptosDB] = useState([])
-  const [actividades, setActividades] = useState([])
-  const [categoriasActividad, setCategoriasActividad] = useState([])
-  const [categoriasCargo, setCategoriasCargo] = useState([])
-  const [estadosSocio, setEstadosSocio] = useState([])
-
-  // Filas de conceptos a generar
+// ── Tab Generar ──────────────────────────────────────────────────────────────
+function TabGenerar({ conceptosDB, actividades, categoriasActividad, categoriasCargo, estadosSocio, onLoteGenerado }) {
   const [filas, setFilas] = useState([
-    { conceptoTesoreriaId: '', categoria: 'CUOTA_ACTIVIDAD', montoOriginal: '', fechaVencimiento: '' }
+    { conceptoTesoreriaId: '', categoria: 'CUOTA_ACTIVIDAD', montoOriginal: '', fechaVencimiento: '', observaciones: '' }
   ])
-
-  // Filtros — estado vacío = todos (se completa cuando carguen los estados)
-  const [filtros, setFiltros] = useState({
-    estado: [],
-    actividadId: '',
-    categoriaActividadId: '',
-  })
-
-  // Preview
+  const [filtros, setFiltros] = useState({ estado: [], actividadId: '', categoriaActividadId: '' })
   const [preview, setPreview] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
-
-  // Generación
   const [generando, setGenerando] = useState(false)
   const [resultado, setResultado] = useState(null)
   const [error, setError] = useState(null)
-
-  // Modal nuevo concepto
   const [showNuevoConcepto, setShowNuevoConcepto] = useState(false)
+  const [conceptosLocal, setConceptosLocal] = useState(conceptosDB)
 
-  useEffect(() => {
-    api.getFull('/admin/conceptos-tesoreria?limit=200').then(r => setConceptosDB(r?.data || r || []))
-    api.getFull('/admin/actividades?limit=100').then(r => setActividades(r?.data || r || []))
-    api.get('/admin/categorias-cargo').then(r => setCategoriasCargo(r || []))
-    api.get('/admin/estados-socio?activo=true').then(estados => {
-      setEstadosSocio(estados || [])
-    })
-  }, [])
-
-  // Cuando cambia actividad filtro, cargar sus categorías
-  useEffect(() => {
-    if (filtros.actividadId) {
-      api.getFull(`/admin/categorias-actividad?actividadId=${filtros.actividadId}&limit=100`)
-        .then(r => setCategoriasActividad(r?.data || r || []))
-    } else {
-      setCategoriasActividad([])
-      setFiltros(prev => ({ ...prev, categoriaActividadId: '' }))
-    }
-  }, [filtros.actividadId])
+  useEffect(() => { setConceptosLocal(conceptosDB) }, [conceptosDB])
 
   function cambiarFila(index, campo, valor) {
     setFilas(prev => prev.map((f, i) => i === index ? { ...f, [campo]: valor } : f))
   }
 
   function agregarFila() {
-    setFilas(prev => [...prev, { conceptoTesoreriaId: '', categoria: 'CUOTA_ACTIVIDAD', montoOriginal: '', fechaVencimiento: '' }])
+    setFilas(prev => [...prev, { conceptoTesoreriaId: '', categoria: 'CUOTA_ACTIVIDAD', montoOriginal: '', fechaVencimiento: '', observaciones: '' }])
   }
 
   function eliminarFila(index) {
@@ -152,16 +130,25 @@ export default function CargosAdicionales() {
   }
 
   function handleConceptoCreado(nuevo) {
-    setConceptosDB(prev => [...prev, nuevo])
+    setConceptosLocal(prev => [...prev, nuevo])
     setShowNuevoConcepto(false)
-    // Asignar al último row vacío
     setFilas(prev => {
       const idx = prev.findIndex(f => !f.conceptoTesoreriaId)
-      if (idx >= 0) {
-        return prev.map((f, i) => i === idx ? { ...f, conceptoTesoreriaId: String(nuevo.id) } : f)
-      }
+      if (idx >= 0) return prev.map((f, i) => i === idx ? { ...f, conceptoTesoreriaId: String(nuevo.id) } : f)
       return prev
     })
+  }
+
+  function buildFiltros() {
+    const f = {}
+    if (filtros.estado.length > 0) f.estado = filtros.estado
+    if (filtros.actividadId) f.actividadId = filtros.actividadId
+    if (filtros.categoriaActividadId) f.categoriaActividadId = filtros.categoriaActividadId
+    return f
+  }
+
+  function validarFilas() {
+    return filas.every(f => f.conceptoTesoreriaId && f.montoOriginal && f.fechaVencimiento)
   }
 
   async function handlePreview() {
@@ -177,21 +164,6 @@ export default function CargosAdicionales() {
     }
   }
 
-  function buildFiltros() {
-    const f = {}
-    if (filtros.estado.length > 0) f.estado = filtros.estado
-    if (filtros.actividadId) f.actividadId = filtros.actividadId
-    if (filtros.categoriaActividadId) f.categoriaActividadId = filtros.categoriaActividadId
-    return f
-  }
-
-  function validarFilas() {
-    for (const f of filas) {
-      if (!f.conceptoTesoreriaId || !f.montoOriginal || !f.fechaVencimiento) return false
-    }
-    return true
-  }
-
   async function handleGenerar() {
     if (!validarFilas()) {
       setError('Completá todos los campos de cada concepto (concepto, monto, vencimiento)')
@@ -201,7 +173,6 @@ export default function CargosAdicionales() {
       setError('Primero hacé una vista previa para confirmar los socios afectados')
       return
     }
-
     setGenerando(true)
     setError(null)
     setResultado(null)
@@ -211,21 +182,24 @@ export default function CargosAdicionales() {
           conceptoTesoreriaId: parseInt(f.conceptoTesoreriaId),
           categoria: f.categoria,
           montoOriginal: parseFloat(f.montoOriginal),
-          fechaVencimiento: f.fechaVencimiento
+          fechaVencimiento: f.fechaVencimiento,
+          observaciones: f.observaciones || null
         })),
         filtros: buildFiltros()
       })
-      setResultado(res?.data || res)
+      const data = res?.data || res
+      setResultado(data)
       setPreview(null)
+      if (data?.loteId) onLoteGenerado(data.loteId)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Error al generar los cargos')
     } finally {
       setGenerando(false)
     }
   }
 
   function resetear() {
-    setFilas([{ conceptoTesoreriaId: '', categoria: 'CUOTA_ACTIVIDAD', montoOriginal: '', fechaVencimiento: '' }])
+    setFilas([{ conceptoTesoreriaId: '', categoria: 'CUOTA_ACTIVIDAD', montoOriginal: '', fechaVencimiento: '', observaciones: '' }])
     setFiltros({ estado: [], actividadId: '', categoriaActividadId: '' })
     setPreview(null)
     setResultado(null)
@@ -235,35 +209,14 @@ export default function CargosAdicionales() {
   function toggleEstado(est) {
     setFiltros(prev => ({
       ...prev,
-      estado: prev.estado.includes(est)
-        ? prev.estado.filter(e => e !== est)
-        : [...prev.estado, est]
+      estado: prev.estado.includes(est) ? prev.estado.filter(e => e !== est) : [...prev.estado, est]
     }))
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-          <Zap className="w-7 h-7 text-primary" />
-          Cargos Adicionales Masivos
-        </h1>
-        <p className="text-gray-600 mt-1">Generá seguros, carnets, inscripciones y otros cargos para un grupo de socios</p>
-      </div>
-
-      {error && <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />}
-
-      {resultado && (
-        <Alert
-          type="success"
-          message={`Se generaron ${resultado.creados} cargos para ${resultado.totalSocios} socios${resultado.errores?.length > 0 ? ` (${resultado.errores.length} errores)` : ''}`}
-          className="mb-4"
-        />
-      )}
-
+    <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna izquierda: Conceptos + Filtros */}
+        {/* Columna izquierda */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Conceptos */}
@@ -277,14 +230,13 @@ export default function CargosAdicionales() {
                 <Plus className="w-4 h-4" /> Agregar concepto
               </button>
             </div>
-
             <div className="space-y-2">
               {filas.map((fila, idx) => (
                 <ConceptoRow
                   key={idx}
                   row={fila}
                   index={idx}
-                  conceptos={conceptosDB}
+                  conceptos={conceptosLocal}
                   categoriasCargo={categoriasCargo}
                   onChange={cambiarFila}
                   onRemove={eliminarFila}
@@ -298,7 +250,6 @@ export default function CargosAdicionales() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-800 mb-4">Filtros de destinatarios</h2>
 
-            {/* Estado */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Estado del socio</label>
               <div className="flex flex-wrap gap-2">
@@ -318,7 +269,6 @@ export default function CargosAdicionales() {
               </div>
             </div>
 
-            {/* Actividad */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Actividad (opcional)</label>
@@ -333,7 +283,6 @@ export default function CargosAdicionales() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Categoría (opcional)</label>
                 <select
@@ -352,20 +301,16 @@ export default function CargosAdicionales() {
           </div>
         </div>
 
-        {/* Columna derecha: Preview y acción */}
+        {/* Columna derecha */}
         <div className="space-y-4">
-          {/* Vista previa */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-800 mb-3">Vista previa</h2>
-
             <button
               onClick={handlePreview}
               disabled={loadingPreview}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
             >
-              {loadingPreview
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Search className="w-4 h-4" />}
+              {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
               Ver socios afectados
             </button>
 
@@ -405,7 +350,6 @@ export default function CargosAdicionales() {
             )}
           </div>
 
-          {/* Resumen y generación */}
           {preview && preview.length > 0 && (
             <div className="bg-primary/5 border border-primary/20 rounded-xl p-5">
               <h3 className="font-semibold text-gray-800 mb-2">Resumen</h3>
@@ -414,7 +358,6 @@ export default function CargosAdicionales() {
                 <li>• {filas.length} concepto{filas.length !== 1 ? 's' : ''}</li>
                 <li className="font-medium text-gray-800">→ {preview.length * filas.length} cargos a crear</li>
               </ul>
-
               <Button
                 onClick={handleGenerar}
                 disabled={generando}
@@ -427,22 +370,36 @@ export default function CargosAdicionales() {
             </div>
           )}
 
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                <span className="text-sm text-red-700">{error}</span>
+              </div>
+            </div>
+          )}
+
           {resultado && (
             <div className="bg-green-50 border border-green-200 rounded-xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <CheckCircle className="w-5 h-5 text-green-600" />
                 <span className="font-semibold text-green-800">Completado</span>
               </div>
-              <p className="text-sm text-green-700 mb-3">
+              <p className="text-sm text-green-700">
                 Se crearon <strong>{resultado.creados}</strong> cargos para <strong>{resultado.totalSocios}</strong> socios.
               </p>
-              {resultado.errores?.length > 0 && (
-                <p className="text-xs text-amber-600">{resultado.errores.length} registro(s) con error</p>
+              {resultado.importeTotal != null && (
+                <p className="text-sm text-green-700">
+                  Importe total: <strong>${resultado.importeTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong>
+                </p>
               )}
-              <button
-                onClick={resetear}
-                className="text-sm text-green-700 hover:underline mt-2"
-              >
+              {resultado.loteId && (
+                <p className="text-xs text-green-600 mt-1 font-mono break-all">Lote: {resultado.loteId}</p>
+              )}
+              {resultado.errores?.length > 0 && (
+                <p className="text-xs text-amber-600 mt-1">{resultado.errores.length} registro(s) con error</p>
+              )}
+              <button onClick={resetear} className="text-sm text-green-700 hover:underline mt-3 block">
                 Generar otra tanda
               </button>
             </div>
@@ -450,12 +407,300 @@ export default function CargosAdicionales() {
         </div>
       </div>
 
-      {/* Modal nuevo concepto */}
       <ConceptoTesoreriaModal
         isOpen={showNuevoConcepto}
         onClose={() => setShowNuevoConcepto(false)}
         onCreated={handleConceptoCreado}
       />
+    </>
+  )
+}
+
+// ── Tab Consultar ────────────────────────────────────────────────────────────
+function TabConsultar({ loteInicial }) {
+  const [loteInput, setLoteInput] = useState(loteInicial || '')
+  const [buscando, setBuscando] = useState(false)
+  const [lote, setLote] = useState(null)
+  const [error, setError] = useState(null)
+  const [eliminando, setEliminando] = useState(false)
+  const [confirmEliminar, setConfirmEliminar] = useState(false)
+
+  useEffect(() => {
+    if (loteInicial) {
+      setLoteInput(loteInicial)
+      buscarLote(loteInicial)
+    }
+  }, [loteInicial])
+
+  async function buscarLote(id) {
+    const loteId = id || loteInput.trim()
+    if (!loteId) return
+    setBuscando(true)
+    setError(null)
+    setLote(null)
+    try {
+      const res = await api.get(`/admin/cargos/lote/${loteId}`)
+      setLote({ id: loteId, ...res })
+    } catch (err) {
+      setError(err.message || 'Lote no encontrado')
+    } finally {
+      setBuscando(false)
+    }
+  }
+
+  async function handleEliminar() {
+    setEliminando(true)
+    setError(null)
+    try {
+      await api.delete(`/admin/cargos/lote/${lote.id}`)
+      setConfirmEliminar(false)
+      // Recargar el lote para reflejar el estado actualizado
+      await buscarLote(lote.id)
+    } catch (err) {
+      setError(err.message || 'Error al eliminar')
+    } finally {
+      setEliminando(false)
+    }
+  }
+
+  const estadoColor = {
+    PENDIENTE: 'bg-yellow-100 text-yellow-700',
+    PAGADO: 'bg-green-100 text-green-700',
+    ANULADO: 'bg-red-100 text-red-700',
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Buscador */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="font-semibold text-gray-800 mb-3">Buscar por lote</h2>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={loteInput}
+            onChange={e => setLoteInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && buscarLote()}
+            placeholder="Pegá el ID del lote..."
+            className="flex-1 border border-gray-300 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+          />
+          <button
+            onClick={() => buscarLote()}
+            disabled={buscando || !loteInput.trim()}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 disabled:opacity-60"
+          >
+            {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Buscar
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <span className="text-sm text-red-700">{error}</span>
+        </div>
+      )}
+
+      {lote && (
+        <>
+          {/* Resumen del lote */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-semibold text-gray-800">Lote encontrado</h2>
+                <p className="text-xs text-gray-400 font-mono mt-0.5">{lote.id}</p>
+              </div>
+              {lote.resumen.pendientes > 0 && (
+                <button
+                  onClick={() => setConfirmEliminar(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar pendientes
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-gray-800">{lote.resumen.total}</p>
+                <p className="text-xs text-gray-500">Total cargos</p>
+              </div>
+              <div className="bg-yellow-50 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-yellow-700">{lote.resumen.pendientes}</p>
+                <p className="text-xs text-yellow-600">Pendientes</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-green-700">{lote.resumen.pagados}</p>
+                <p className="text-xs text-green-600">Pagados</p>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3 text-center">
+                <p className="text-lg font-bold text-blue-700">
+                  ${lote.resumen.importePendiente.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-blue-600">Saldo pendiente</p>
+              </div>
+            </div>
+
+            {/* Tabla de cargos */}
+            <div className="overflow-x-auto border border-gray-100 rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                  <tr>
+                    <th className="text-left px-3 py-2">Socio</th>
+                    <th className="text-left px-3 py-2">Concepto</th>
+                    <th className="text-right px-3 py-2">Monto</th>
+                    <th className="text-left px-3 py-2">Vencimiento</th>
+                    <th className="text-left px-3 py-2">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {lote.cargos.map(c => (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <span className="font-medium text-gray-800">{c.socio?.apellidoNombre}</span>
+                        <span className="text-gray-400 ml-1 text-xs">#{c.socio?.nroSocio}</span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">{c.conceptoTesoreria?.nombre || c.descripcion}</td>
+                      <td className="px-3 py-2 text-right font-medium text-gray-800">
+                        ${Number(c.montoTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-3 py-2 text-gray-500">
+                        {c.fechaVencimiento ? new Date(c.fechaVencimiento).toLocaleDateString('es-AR') : '-'}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[c.estado] || 'bg-gray-100 text-gray-600'}`}>
+                          {c.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal confirmación eliminar */}
+      <Modal
+        isOpen={confirmEliminar}
+        onClose={() => setConfirmEliminar(false)}
+        title="Eliminar cargos pendientes"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-700">
+            Se van a eliminar <strong>{lote?.resumen.pendientes}</strong> cargo{lote?.resumen.pendientes !== 1 ? 's' : ''} pendiente{lote?.resumen.pendientes !== 1 ? 's' : ''} de este lote.
+            Los cargos ya pagados no se tocan.
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setConfirmEliminar(false)}
+              className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleEliminar}
+              disabled={eliminando}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60"
+            >
+              {eliminando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Eliminar
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
+// ── Página principal ─────────────────────────────────────────────────────────
+export default function CargosAdicionales() {
+  const [tab, setTab] = useState('generar')
+  const [loteGenerado, setLoteGenerado] = useState(null)
+
+  const [conceptosDB, setConceptosDB] = useState([])
+  const [actividades, setActividades] = useState([])
+  const [categoriasActividad, setCategoriasActividad] = useState([])
+  const [categoriasCargo, setCategoriasCargo] = useState([])
+  const [estadosSocio, setEstadosSocio] = useState([])
+  const [filtroActividadId, setFiltroActividadId] = useState('')
+
+  useEffect(() => {
+    api.getFull('/admin/conceptos-tesoreria?limit=200').then(r => setConceptosDB(r?.data || r || []))
+    api.getFull('/admin/actividades?limit=100').then(r => setActividades(r?.data || r || []))
+    api.get('/admin/categorias-cargo').then(r => setCategoriasCargo(r || [])).catch(() => {})
+    api.get('/admin/estados-socio?activo=true').then(r => setEstadosSocio(r || []))
+  }, [])
+
+  useEffect(() => {
+    if (filtroActividadId) {
+      api.getFull(`/admin/categorias-actividad?actividadId=${filtroActividadId}&limit=100`)
+        .then(r => setCategoriasActividad(r?.data || r || []))
+    } else {
+      setCategoriasActividad([])
+    }
+  }, [filtroActividadId])
+
+  function handleLoteGenerado(loteId) {
+    setLoteGenerado(loteId)
+  }
+
+  const tabs = [
+    { id: 'generar', label: 'Generar', icon: Zap },
+    { id: 'consultar', label: 'Consultar lote', icon: Package },
+  ]
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+          <Zap className="w-7 h-7 text-primary" />
+          Cargos Adicionales Masivos
+        </h1>
+        <p className="text-gray-600 mt-1">Generá seguros, carnets, inscripciones y otros cargos para un grupo de socios</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {tabs.map(t => {
+          const Icon = t.icon
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                tab === t.id
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {t.label}
+              {t.id === 'consultar' && loteGenerado && (
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {tab === 'generar' && (
+        <TabGenerar
+          conceptosDB={conceptosDB}
+          actividades={actividades}
+          categoriasActividad={categoriasActividad}
+          categoriasCargo={categoriasCargo}
+          estadosSocio={estadosSocio}
+          onLoteGenerado={handleLoteGenerado}
+        />
+      )}
+
+      {tab === 'consultar' && (
+        <TabConsultar loteInicial={loteGenerado} />
+      )}
     </div>
   )
 }

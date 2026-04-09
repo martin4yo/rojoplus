@@ -9,6 +9,8 @@ export function Button({
   const baseClasses = {
     primary: 'btn-primary',
     secondary: 'btn-secondary',
+    danger: 'btn-danger',
+    success: 'btn-success',
     text: 'btn-text',
   }
 

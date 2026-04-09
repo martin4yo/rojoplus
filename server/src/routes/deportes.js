@@ -2,7 +2,7 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
-import { notificarNuevoEntrenamiento } from '../services/notificacionService.js'
+import { notificarNuevoEntrenamiento, notificarCancelacionEntrenamiento } from '../services/notificacionService.js'
 
 const router = Router()
 
@@ -766,6 +766,11 @@ router.post('/entrenamientos/:id/cancelar', asyncHandler(async (req, res) => {
       espacio: true
     }
   })
+
+  // Notificar a inscriptos (email + WhatsApp si tienen activado)
+  notificarCancelacionEntrenamiento(parseInt(id), req.db).catch(err =>
+    console.error('Error enviando notificaciones de cancelación:', err.message)
+  )
 
   res.json({ success: true, data: updated })
 }))
