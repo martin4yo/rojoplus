@@ -2411,6 +2411,7 @@ model ActaReunion {
   contenido     String?   // cuerpo del acta
   resoluciones  String?
   adjuntoUrl    String?   @map("adjunto_url")
+  adjuntoNombre String?   @map("adjunto_nombre")
   estado        String    @default("BORRADOR") // BORRADOR | FIRMADA | ARCHIVADA
   creadoPor     Int?      @map("creado_por")
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -2462,13 +2463,14 @@ model DocumentoClub {
   nombre      String
   descripcion String?
   categoria   String   @default("GENERAL") // ESTATUTO | REGLAMENTO | ACTA | CONTRATO | GENERAL
-  url         String
-  mimeType    String?  @map("mime_type")
-  tamano      Int?     // bytes
-  publico     Boolean  @default(false)
-  creadoPor   Int?     @map("creado_por")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  url            String?
+  nombreOriginal String?  @map("nombre_original")
+  mimeType       String?  @map("mime_type")
+  tamano         Int?     // bytes
+  publico        Boolean  @default(false)
+  creadoPor      Int?     @map("creado_por")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   tenantId  Int  @map("tenant_id")
   @@index([tenantId])

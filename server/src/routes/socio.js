@@ -7,6 +7,7 @@ import { crearPreferenciaPago } from '../services/mercadopago.js'
 import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.js'
 import { generatePDF } from '../services/pdfGenerator.js'
 import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
+import { getVapidPublicKey, enviarNotificacionPush } from '../services/webPush.js'
 
 const router = Router()
 
@@ -2861,6 +2862,119 @@ router.put('/:token/convocatorias/:partidoId', asyncHandler(async (req, res) => 
     message: confirmado ? 'Confirmaste tu asistencia al partido' : 'Rechazaste la convocatoria',
     data: convocatoriaActualizada
   })
+}))
+
+// =============================================================================
+// PUSH NOTIFICATIONS
+// =============================================================================
+
+// GET /api/socio/:token/push/vapid-key
+router.get('/:token/push/vapid-key', asyncHandler(async (req, res) => {
+  const vapidPublicKey = getVapidPublicKey()
+  if (!vapidPublicKey) throw new AppError('Push notifications no configuradas', 503)
+  res.json({ success: true, data: { vapidPublicKey } })
+}))
+
+// GET /api/socio/:token/push/status
+router.get('/:token/push/status', asyncHandler(async (req, res) => {
+  const socio = await req.db.socio.findFirst({
+    where: { tokenPortal: req.params.token },
+    select: { id: true, notificarPush: true }
+  })
+  if (!socio) throw new AppError('Token inválido', 401)
+
+  const suscripciones = await req.db.pushSubscription.findMany({
+    where: { socioId: socio.id, activa: true },
+    select: { id: true, userAgent: true, createdAt: true }
+  })
+
+  res.json({
+    success: true,
+    data: {
+      habilitado: socio.notificarPush,
+      suscripciones: suscripciones.length,
+      dispositivos: suscripciones,
+    }
+  })
+}))
+
+// POST /api/socio/:token/push/subscribe
+router.post('/:token/push/subscribe', asyncHandler(async (req, res) => {
+  const { endpoint, keys } = req.body
+  if (!endpoint || !keys?.p256dh || !keys?.auth) throw new AppError('Datos de suscripción inválidos', 400)
+
+  const socio = await req.db.socio.findFirst({
+    where: { tokenPortal: req.params.token },
+    select: { id: true }
+  })
+  if (!socio) throw new AppError('Token inválido', 401)
+
+  // Upsert por endpoint para evitar duplicados
+  const existing = await req.db.pushSubscription.findFirst({
+    where: { socioId: socio.id, endpoint }
+  })
+
+  let sub
+  if (existing) {
+    sub = await req.db.pushSubscription.update({
+      where: { id: existing.id },
+      data: { p256dh: keys.p256dh, auth: keys.auth, activa: true, userAgent: req.headers['user-agent'] || null }
+    })
+  } else {
+    sub = await req.db.pushSubscription.create({
+      data: {
+        socioId: socio.id,
+        tenantId: req.tenantId,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        userAgent: req.headers['user-agent'] || null,
+        activa: true,
+      }
+    })
+  }
+
+  res.json({ success: true, data: { subscriptionId: sub.id } })
+}))
+
+// DELETE /api/socio/:token/push/unsubscribe
+router.delete('/:token/push/unsubscribe', asyncHandler(async (req, res) => {
+  const { endpoint } = req.body
+  const socio = await req.db.socio.findFirst({
+    where: { tokenPortal: req.params.token },
+    select: { id: true }
+  })
+  if (!socio) throw new AppError('Token inválido', 401)
+
+  if (endpoint) {
+    await req.db.pushSubscription.updateMany({
+      where: { socioId: socio.id, endpoint },
+      data: { activa: false }
+    })
+  } else {
+    // Desactivar todas
+    await req.db.pushSubscription.updateMany({
+      where: { socioId: socio.id },
+      data: { activa: false }
+    })
+  }
+  res.json({ success: true })
+}))
+
+// PUT /api/socio/:token/push/toggle
+router.put('/:token/push/toggle', asyncHandler(async (req, res) => {
+  const { habilitado } = req.body
+  const socio = await req.db.socio.findFirst({
+    where: { tokenPortal: req.params.token },
+    select: { id: true }
+  })
+  if (!socio) throw new AppError('Token inválido', 401)
+
+  await req.db.socio.update({
+    where: { id: socio.id },
+    data: { notificarPush: !!habilitado }
+  })
+  res.json({ success: true })
 }))
 
 export default router

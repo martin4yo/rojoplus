@@ -95,7 +95,8 @@ export default defineConfig({
       },
       devOptions: {
         enabled: false // Deshabilitado en desarrollo para evitar problemas de cache
-      }
+      },
+      injectRegister: 'auto'
     })
   ],
   build: {

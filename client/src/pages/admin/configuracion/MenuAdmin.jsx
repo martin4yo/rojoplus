@@ -528,15 +528,13 @@ export default function MenuAdmin() {
           </div>
         </div>
         <div className="flex gap-2">
-          {menuItems.length === 0 && (
-            <button
-              onClick={handleSeedMenu}
-              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Crear Menú Inicial
-            </button>
-          )}
+          <button
+            onClick={handleSeedMenu}
+            className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+          >
+            <RefreshCw className="w-4 h-4" />
+            {menuItems.length === 0 ? 'Crear Menú Inicial' : 'Actualizar Menú'}
+          </button>
           <button
             onClick={cargarDatos}
             className="flex items-center gap-2 px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"

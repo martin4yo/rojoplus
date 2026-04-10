@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Receipt, TrendingUp, DollarSign, ChevronDown, ChevronRight, Users, AlertCircle, Clock, Percent, PieChart as PieChartIcon, ArrowLeftCircle } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import { ArrowLeft, Receipt, TrendingUp, DollarSign, ChevronDown, ChevronRight, Users, AlertCircle, Clock, Percent, PieChart as PieChartIcon, ArrowLeftCircle, Download } from 'lucide-react'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
@@ -321,6 +322,45 @@ export default function ReporteCuotas() {
     }
   }
 
+  function exportarExcel() {
+    if (!reporte) return
+    const periodoLabel = periodos.find(p => p.id?.toString() === periodoId)?.nombre || 'Todos'
+
+    // Hoja resumen
+    const resumen = [
+      ['Reporte de Cobranza', periodoLabel],
+      [],
+      ['Concepto', 'Valor'],
+      ['Total Generado', Number(reporte.totalGenerado) || 0],
+      ['Total Cobrado', Number(reporte.totalCobrado) || 0],
+      ['Total Pendiente', Number(reporte.totalPendiente) || 0],
+      ['% Cobranza', `${reporte.porcentajeCobranza || 0}%`],
+    ]
+
+    // Hoja por categoría
+    const porCat = (reporte.porCategoria || []).map(c => ({
+      'Categoría': c.categoria,
+      'Generado': Number(c.generado) || 0,
+      'Cobrado': Number(c.cobrado) || 0,
+      'Pendiente': Number(c.pendiente) || 0,
+      '% Cobranza': `${c.porcentaje || 0}%`,
+    }))
+
+    const wb = XLSX.utils.book_new()
+    const wsResumen = XLSX.utils.aoa_to_sheet(resumen)
+    wsResumen['!cols'] = [{ wch: 25 }, { wch: 18 }]
+    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen')
+
+    if (porCat.length) {
+      const wsCat = XLSX.utils.json_to_sheet(porCat)
+      wsCat['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }]
+      XLSX.utils.book_append_sheet(wb, wsCat, 'Por Categoría')
+    }
+
+    const fecha = new Date().toISOString().split('T')[0]
+    XLSX.writeFile(wb, `cobranza_${periodoLabel.replace(/\s/g, '_')}_${fecha}.xlsx`)
+  }
+
   async function verMorosos(filtro) {
     setMorososFiltro(filtro)
     setLoadingMorosos(true)
@@ -381,8 +421,8 @@ export default function ReporteCuotas() {
           </div>
         </div>
 
-        {/* Filtro de período */}
-        <div className="flex items-center gap-2">
+        {/* Filtro de período + Export */}
+        <div className="flex items-center gap-2 flex-wrap">
           <label className="text-sm text-gray-600">Período:</label>
           <select
             value={periodoId || ''}
@@ -394,6 +434,15 @@ export default function ReporteCuotas() {
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
+          {reporte && (
+            <button
+              onClick={exportarExcel}
+              className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition"
+            >
+              <Download className="w-4 h-4" />
+              Exportar Excel
+            </button>
+          )}
         </div>
       </div>
 

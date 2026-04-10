@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import ScrollToTop from './components/ScrollToTop'
 import ErrorBoundary from './components/ErrorBoundary'
 import TenantStyles from './components/TenantStyles'
+import SWUpdateNotifier from './components/SWUpdateNotifier'
 import { TenantProvider } from './contexts/TenantContext'
 import { TicketProvider } from './contexts/TicketContext'
 import { NotificacionBuffetProvider } from './contexts/NotificacionBuffetContext'
@@ -275,6 +276,7 @@ function App() {
           <NotificacionBuffetProvider>
             <ScrollToTop />
             <Toaster position="top-right" />
+            <SWUpdateNotifier />
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* Sitio web público del club */}

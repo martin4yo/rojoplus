@@ -44,9 +44,10 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
     if (qs) url += `?${qs}`
   }
 
+  const isFormData = restOptions.body instanceof FormData
   const config = {
     headers: {
-      'Content-Type': 'application/json',
+      ...(!isFormData && { 'Content-Type': 'application/json' }),
       ...restOptions.headers,
     },
     ...restOptions,
@@ -109,10 +110,10 @@ const api = {
   // Devuelve la respuesta completa (con pagination, etc.)
   getFull: (endpoint) => request(endpoint, { method: 'GET' }, true),
 
-  post: (endpoint, body) => request(endpoint, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  }),
+  post: (endpoint, body) => {
+    const isFormData = body instanceof FormData
+    return request(endpoint, { method: 'POST', body: isFormData ? body : JSON.stringify(body) })
+  },
 
   // Devuelve la respuesta completa del POST
   postFull: (endpoint, body) => request(endpoint, {
@@ -125,10 +126,10 @@ const api = {
     body: JSON.stringify(body),
   }),
 
-  put: (endpoint, body) => request(endpoint, {
-    method: 'PUT',
-    body: JSON.stringify(body),
-  }),
+  put: (endpoint, body) => {
+    const isFormData = body instanceof FormData
+    return request(endpoint, { method: 'PUT', body: isFormData ? body : JSON.stringify(body) })
+  },
 
   delete: (endpoint) => request(endpoint, { method: 'DELETE' }),
 

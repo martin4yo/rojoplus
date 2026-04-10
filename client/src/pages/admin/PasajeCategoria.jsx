@@ -197,22 +197,25 @@ export default function PasajeCategoria() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div>
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Pasaje de Categorías</h1>
-            <p className="text-gray-500 text-sm">Gestión automática de cambios de categoría por edad</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <ArrowUpCircle className="w-6 h-6 text-primary" />
           </div>
-          <button
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Pasaje de Categorías</h1>
+            <p className="text-sm text-gray-500">Gestión de pasajes de categoría</p>
+          </div>
+        </div>
+        <button
             onClick={cargarDatos}
             className="flex items-center gap-2 px-4 py-2 bg-white border rounded-lg hover:bg-gray-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Actualizar
           </button>
-        </div>
       </div>
 
       {/* Tabs */}

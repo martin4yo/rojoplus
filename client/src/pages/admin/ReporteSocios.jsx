@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Users, UserCheck, UserX, UserPlus, TrendingUp, TrendingDown, Dumbbell, AlertCircle, Clock, Calendar } from 'lucide-react'
+import { ArrowLeft, Users, UserCheck, UserX, UserPlus, TrendingUp, TrendingDown, Dumbbell, AlertCircle, Clock, Calendar, Download } from 'lucide-react'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -211,6 +211,26 @@ export default function ReporteSocios() {
     return 'bg-gray-500'
   }
 
+  const exportarExcel = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
+      const hostname = window.location.hostname
+      const match = hostname.match(/^([^.]+)\.localhost/)
+      if (match) headers['X-Tenant-Slug'] = match[1]
+      const params = estadoFiltro ? `?estado=${estadoFiltro}` : ''
+      const response = await fetch(`/api/admin/socios/exportar${params}`, { headers })
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `socios_${new Date().toISOString().split('T')[0]}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error al exportar:', err)
+    }
+  }
+
   if (loading) {
     return (
       <LoadingSpinner />
@@ -224,17 +244,23 @@ export default function ReporteSocios() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <button
-          onClick={() => navigate('/admin/reportes')}
-          className="p-2 hover:bg-gray-100 rounded-lg"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Reporte de Socios</h1>
-          <p className="text-gray-500 text-sm">Estadísticas de membresía</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/admin/reportes')} className="p-2 hover:bg-gray-100 rounded-lg">
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Reporte de Socios</h1>
+            <p className="text-gray-500 text-sm">Estadísticas de membresía</p>
+          </div>
         </div>
+        <button
+          onClick={exportarExcel}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition"
+        >
+          <Download className="w-4 h-4" />
+          Exportar Excel
+        </button>
       </div>
 
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}

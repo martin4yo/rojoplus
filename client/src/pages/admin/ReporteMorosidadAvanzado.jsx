@@ -201,14 +201,29 @@ export default function ReporteMorosidadAvanzado() {
     }
   }, [activeTab, filtros, page])
 
-  const exportarExcel = () => {
-    const token = localStorage.getItem('adminToken')
-    const params = new URLSearchParams()
-    if (filtros.categoria) params.append('categoria', filtros.categoria)
-    if (filtros.actividadId) params.append('actividadId', filtros.actividadId)
-    if (filtros.diasMinimo) params.append('diasMinimo', filtros.diasMinimo)
+  const exportarExcel = async () => {
+    try {
+      const params = new URLSearchParams()
+      if (filtros.categoria) params.append('categoria', filtros.categoria)
+      if (filtros.actividadId) params.append('actividadId', filtros.actividadId)
+      if (filtros.diasMinimo) params.append('diasMinimo', filtros.diasMinimo)
 
-    window.open(`/api/admin/reportes/morosidad/exportar?${params}&token=${token}`, '_blank')
+      const headers = { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
+      const hostname = window.location.hostname
+      const match = hostname.match(/^([^.]+)\.localhost/)
+      if (match) headers['X-Tenant-Slug'] = match[1]
+
+      const response = await fetch(`/api/admin/reportes/morosidad/exportar?${params}`, { headers })
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `morosidad_${new Date().toISOString().split('T')[0]}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error al exportar:', err)
+    }
   }
 
   if (loading) {

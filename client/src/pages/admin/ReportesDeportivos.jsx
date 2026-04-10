@@ -18,6 +18,7 @@ import {
   Activity,
   User,
   FileText,
+  BarChart3,
 } from 'lucide-react'
 import {
   BarChart,
@@ -555,15 +556,19 @@ export default function ReportesDeportivos() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div>
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Reportes Deportivos</h1>
-            <p className="text-gray-500 text-sm">Estadísticas y análisis de actividades deportivas</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <BarChart3 className="w-6 h-6 text-primary" />
           </div>
-          <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Reportes Deportivos</h1>
+            <p className="text-sm text-gray-500">Estadísticas y reportes deportivos</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
             <button
               onClick={exportarExcel}
               disabled={loading || !hayDatosParaExportar()}
@@ -590,7 +595,6 @@ export default function ReportesDeportivos() {
               <span className="hidden sm:inline">Actualizar</span>
             </button>
           </div>
-        </div>
       </div>
 
       {/* Tabs */}

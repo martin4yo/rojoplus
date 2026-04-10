@@ -1657,4 +1657,69 @@ router.delete('/socios/:id/lesiones/:lesionId', authAdmin, asyncHandler(async (r
   res.json({ success: true })
 }))
 
+// GET /api/admin/socios/exportar — Exportar padrón de socios a Excel
+router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
+  const { estado, tipo, categoria, buscar } = req.query
+
+  const where = {}
+  if (estado) where.estado = estado
+  if (buscar) {
+    where.OR = [
+      { nombre: { contains: buscar, mode: 'insensitive' } },
+      { apellido: { contains: buscar, mode: 'insensitive' } },
+      { nroSocio: { contains: buscar, mode: 'insensitive' } },
+      { dni: { contains: buscar, mode: 'insensitive' } },
+    ]
+  }
+
+  const socios = await req.db.socio.findMany({
+    where,
+    orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
+    select: {
+      nroSocio: true, apellido: true, nombre: true, dni: true,
+      estado: true, email: true, celular: true, telefono: true,
+      fechaNacimiento: true, fechaAlta: true, fechaBaja: true,
+      direccion: true, localidad: true,
+      tipoSocioRel: { select: { nombre: true } },
+      categoriaSocio: { select: { nombre: true } },
+    },
+  })
+
+  const rows = socios.map(s => ({
+    'Nro. Socio': s.nroSocio || '',
+    'Apellido': s.apellido || '',
+    'Nombre': s.nombre || '',
+    'DNI': s.dni || '',
+    'Estado': s.estado || '',
+    'Tipo': s.tipoSocioRel?.nombre || '',
+    'Categoría': s.categoriaSocio?.nombre || '',
+    'Email': s.email || '',
+    'Celular': s.celular || '',
+    'Teléfono': s.telefono || '',
+    'Dirección': s.direccion || '',
+    'Localidad': s.localidad || '',
+    'Fecha Nacimiento': s.fechaNacimiento ? new Date(s.fechaNacimiento).toLocaleDateString('es-AR') : '',
+    'Fecha Alta': s.fechaAlta ? new Date(s.fechaAlta).toLocaleDateString('es-AR') : '',
+    'Fecha Baja': s.fechaBaja ? new Date(s.fechaBaja).toLocaleDateString('es-AR') : '',
+  }))
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(rows)
+
+  // Ancho de columnas
+  ws['!cols'] = [
+    { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+    { wch: 15 }, { wch: 15 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
+    { wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 12 },
+  ]
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Socios')
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+
+  const fecha = new Date().toISOString().split('T')[0]
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  res.setHeader('Content-Disposition', `attachment; filename="socios_${fecha}.xlsx"`)
+  res.send(buffer)
+}))
+
 export default router

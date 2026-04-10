@@ -61,12 +61,17 @@ export default function EquiposLista() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Equipos</h1>
-          <p className="text-sm text-gray-500 mt-1">Planteles permanentes por categoría</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Users className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Equipos</h1>
+            <p className="text-sm text-gray-500">Equipos permanentes y planteles</p>
+          </div>
         </div>
         {tienePermiso(PERMISOS.DEPORTES_EDITAR) && (
           <button
@@ -84,7 +89,7 @@ export default function EquiposLista() {
       )}
 
       {/* Filtros */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex items-center gap-3 flex-wrap">
         <select
           value={filtroCategoria}
           onChange={e => setFiltroCategoria(e.target.value)}

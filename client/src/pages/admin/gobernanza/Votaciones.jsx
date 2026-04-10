@@ -59,11 +59,16 @@ export default function Votaciones() {
   const removeOpcion = (i) => setForm(f => ({ ...f, opciones: f.opciones.filter((_, idx) => idx !== i) }))
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <Vote className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-bold text-gray-900">Votaciones</h1>
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Vote className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Votaciones</h1>
+            <p className="text-sm text-gray-500">Gestión de votaciones y padrón</p>
+          </div>
         </div>
         {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
           <button
@@ -77,7 +82,7 @@ export default function Votaciones() {
       </div>
 
       {/* Filtro estado */}
-      <div className="flex gap-2 mb-5">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex gap-2">
         {['', 'ABIERTA', 'CERRADA', 'BORRADOR'].map(e => (
           <button
             key={e}

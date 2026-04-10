@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import prisma from '../lib/prisma.js'
+import * as XLSX from 'xlsx'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { generarAsientoMovimientoCaja, crearAsientoTransferencia } from '../services/asientosContables.js'
@@ -1471,6 +1472,63 @@ router.post('/pendientes-conciliar/transferir', asyncHandler(async (req, res) =>
       montoTotal
     }
   })
+}))
+
+// GET /api/admin/movimientos-caja/exportar — Exportar movimientos a Excel
+router.get('/movimientos-caja/exportar', authAdmin, asyncHandler(async (req, res) => {
+  const { cajaId, tipo, desde, hasta, medioPago } = req.query
+
+  const where = {}
+  if (cajaId) where.cajaId = parseInt(cajaId)
+  if (tipo) where.tipo = tipo
+  if (desde || hasta) {
+    where.fecha = {}
+    if (desde) where.fecha.gte = new Date(desde)
+    if (hasta) where.fecha.lte = new Date(hasta + 'T23:59:59.999Z')
+  }
+  if (medioPago) where.medioPago = medioPago === 'SIN_ESPECIFICAR' ? null : medioPago
+
+  const movimientos = await req.db.movimientoCaja.findMany({
+    where,
+    orderBy: { fecha: 'desc' },
+    take: 10000,
+    include: {
+      caja: { select: { codigo: true, nombre: true } },
+      pago: { select: { socio: { select: { nroSocio: true, apellidoNombre: true } } } },
+    },
+  })
+
+  const fmt = (n) => Number(n) || 0
+  const rows = movimientos.map(m => ({
+    'Fecha': new Date(m.fecha).toLocaleDateString('es-AR'),
+    'Número': m.numero || '',
+    'Caja': m.caja?.nombre || '',
+    'Tipo': m.tipo || '',
+    'Concepto': m.concepto || '',
+    'Descripción': m.descripcion || '',
+    'Medio de Pago': m.medioPago || '',
+    'Ingreso': m.tipo === 'INGRESO' ? fmt(m.monto) : '',
+    'Egreso': m.tipo === 'EGRESO' ? fmt(m.monto) : '',
+    'Monto': fmt(m.monto),
+    'Socio': m.pago?.socio?.apellidoNombre || '',
+    'Nro. Socio': m.pago?.socio?.nroSocio || '',
+  }))
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(rows)
+  ws['!cols'] = [
+    { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 30 },
+    { wch: 30 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+    { wch: 25 }, { wch: 10 },
+  ]
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Movimientos')
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+
+  const fecha = new Date().toISOString().split('T')[0]
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  res.setHeader('Content-Disposition', `attachment; filename="movimientos_caja_${fecha}.xlsx"`)
+  res.send(buffer)
 }))
 
 export default router

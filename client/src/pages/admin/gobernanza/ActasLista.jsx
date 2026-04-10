@@ -54,11 +54,16 @@ export default function ActasLista() {
   for (let y = new Date().getFullYear(); y >= 2020; y--) anios.push(y)
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <FileText className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-bold text-gray-900">Actas de reunión</h1>
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <FileText className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Actas de Reunión</h1>
+            <p className="text-sm text-gray-500">Historial de reuniones y resoluciones</p>
+          </div>
         </div>
         {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
           <button
@@ -72,28 +77,30 @@ export default function ActasLista() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={buscar}
-            onChange={e => setBuscar(e.target.value)}
-            placeholder="Buscar por título..."
-            className="input-field pl-9 w-full"
-          />
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-48">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={buscar}
+              onChange={e => setBuscar(e.target.value)}
+              placeholder="Buscar por título..."
+              className="input-field pl-9 w-full"
+            />
+          </div>
+          <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="input-field">
+            <option value="">Todos los tipos</option>
+            {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="input-field">
+            <option value="">Todos los estados</option>
+            {ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
+          <select value={anio} onChange={e => setAnio(e.target.value)} className="input-field">
+            {anios.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
         </div>
-        <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="input-field">
-          <option value="">Todos los tipos</option>
-          {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="input-field">
-          <option value="">Todos los estados</option>
-          {ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
-        </select>
-        <select value={anio} onChange={e => setAnio(e.target.value)} className="input-field">
-          {anios.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
       </div>
 
       {loading ? <LoadingSpinner /> : (

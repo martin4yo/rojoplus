@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { FolderOpen, Plus, Trash2, ExternalLink, Edit2, Save, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { FolderOpen, Plus, Trash2, Download, Edit2, Save, X, Paperclip } from 'lucide-react'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -13,18 +13,20 @@ const CAT_COLOR = {
   CONTRATO: 'bg-orange-100 text-orange-700',
 }
 
-const docVacio = () => ({ nombre: '', descripcion: '', categoria: 'GENERAL', url: '', publico: false })
+const formVacio = () => ({ nombre: '', descripcion: '', categoria: 'GENERAL', publico: false })
 
 export default function DocumentosClub() {
   const [documentos, setDocumentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(docVacio())
+  const [form, setForm] = useState(formVacio())
+  const [archivo, setArchivo] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const fileRef = useRef(null)
 
   useEffect(() => { cargar() }, [filtroCategoria])
 
@@ -47,21 +49,27 @@ export default function DocumentosClub() {
   }
 
   const handleGuardar = async () => {
-    if (!form.nombre || !form.url) return setError('Nombre y URL son requeridos')
+    if (!form.nombre) return setError('El nombre es requerido')
+    if (!editingId && !archivo) return setError('Debe seleccionar un archivo')
     setGuardando(true)
     setError(null)
     try {
+      const fd = new FormData()
+      fd.append('nombre', form.nombre)
+      fd.append('descripcion', form.descripcion || '')
+      fd.append('categoria', form.categoria)
+      fd.append('publico', form.publico ? 'true' : 'false')
+      if (archivo) fd.append('archivo', archivo)
+
       if (editingId) {
-        await api.put(`/admin/gobernanza/documentos-club/${editingId}`, form)
+        await api.put(`/admin/gobernanza/documentos-club/${editingId}`, fd)
         mostrarExito('Documento actualizado')
       } else {
-        await api.post('/admin/gobernanza/documentos-club', form)
+        await api.post('/admin/gobernanza/documentos-club', fd)
         mostrarExito('Documento agregado')
       }
       await cargar()
-      setShowForm(false)
-      setEditingId(null)
-      setForm(docVacio())
+      cerrarForm()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -69,9 +77,18 @@ export default function DocumentosClub() {
     }
   }
 
+  const cerrarForm = () => {
+    setShowForm(false)
+    setEditingId(null)
+    setForm(formVacio())
+    setArchivo(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
   const handleEditar = (doc) => {
-    setForm({ nombre: doc.nombre, descripcion: doc.descripcion || '', categoria: doc.categoria, url: doc.url, publico: doc.publico })
+    setForm({ nombre: doc.nombre, descripcion: doc.descripcion || '', categoria: doc.categoria, publico: doc.publico })
     setEditingId(doc.id)
+    setArchivo(null)
     setShowForm(true)
   }
 
@@ -80,6 +97,25 @@ export default function DocumentosClub() {
     try {
       await api.delete(`/admin/gobernanza/documentos-club/${docId}`)
       setDocumentos(documentos.filter(d => d.id !== docId))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleDescargar = async (docId, nombreOriginal) => {
+    try {
+      const headers = { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
+      const hostname = window.location.hostname
+      const match = hostname.match(/^([^.]+)\.localhost/)
+      if (match) headers['X-Tenant-Slug'] = match[1]
+      const response = await fetch(`/api/admin/gobernanza/documentos-club/${docId}/descargar`, { headers })
+      const blob = await response.blob()
+      const cd = response.headers.get('content-disposition')
+      const filename = cd?.split('filename=')[1]?.replace(/"/g, '') || nombreOriginal || 'documento'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename; a.click()
+      URL.revokeObjectURL(url)
     } catch (err) {
       setError(err.message)
     }
@@ -96,15 +132,20 @@ export default function DocumentosClub() {
   }, {})
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <FolderOpen className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-bold text-gray-900">Documentos del club</h1>
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <FolderOpen className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Documentos del Club</h1>
+            <p className="text-sm text-gray-500">Repositorio de documentos institucionales</p>
+          </div>
         </div>
         {canEdit && (
           <button
-            onClick={() => { setShowForm(true); setEditingId(null); setForm(docVacio()) }}
+            onClick={() => { setShowForm(true); setEditingId(null); setForm(formVacio()); setArchivo(null) }}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition"
           >
             <Plus className="w-4 h-4" />
@@ -114,7 +155,7 @@ export default function DocumentosClub() {
       </div>
 
       {/* Filtro categoría */}
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-wrap gap-2">
         {['', ...CATEGORIAS].map(cat => (
           <button
             key={cat}
@@ -151,8 +192,17 @@ export default function DocumentosClub() {
               </label>
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-semibold text-gray-600 mb-1">URL del documento *</label>
-              <input type="url" value={form.url} onChange={e => set('url', e.target.value)} className="input-field w-full" placeholder="https://..." />
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Archivo {editingId ? '(dejar vacío para mantener el actual)' : '*'}
+              </label>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                onChange={e => setArchivo(e.target.files[0] || null)}
+                className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-200 file:text-sm file:text-gray-600 file:bg-white hover:file:bg-gray-50"
+              />
+              <p className="text-xs text-gray-400 mt-1">PDF, imagen, Word o Excel — máx. 20 MB</p>
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-semibold text-gray-600 mb-1">Descripción</label>
@@ -160,7 +210,7 @@ export default function DocumentosClub() {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => { setShowForm(false); setEditingId(null) }} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+            <button onClick={cerrarForm} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
             <button onClick={handleGuardar} disabled={guardando} className="flex items-center gap-1 px-4 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-50">
               <Save className="w-3.5 h-3.5" />
               {guardando ? 'Guardando...' : 'Guardar'}
@@ -189,11 +239,19 @@ export default function DocumentosClub() {
                         </div>
                         <p className="font-semibold text-gray-800">{doc.nombre}</p>
                         {doc.descripcion && <p className="text-sm text-gray-500">{doc.descripcion}</p>}
+                        {doc.nombreOriginal && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Paperclip className="w-3 h-3 text-gray-400" />
+                            <span className="text-xs text-gray-400">{doc.nombreOriginal}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <a href={doc.url} target="_blank" rel="noreferrer" className="p-1.5 text-gray-400 hover:text-primary hover:bg-blue-50 rounded transition">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        {doc.url && (
+                          <button onClick={() => handleDescargar(doc.id, doc.nombreOriginal)} className="p-1.5 text-gray-400 hover:text-primary hover:bg-blue-50 rounded transition" title="Descargar">
+                            <Download className="w-4 h-4" />
+                          </button>
+                        )}
                         {canEdit && (
                           <>
                             <button onClick={() => handleEditar(doc)} className="p-1.5 text-gray-400 hover:text-primary hover:bg-blue-50 rounded transition">

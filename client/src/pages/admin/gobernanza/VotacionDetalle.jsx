@@ -120,15 +120,19 @@ export default function VotacionDetalle() {
   const maxVotos = votacion.resultados ? Math.max(...votacion.resultados.map(r => r.votos), 1) : 1
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/admin/gobernanza/votaciones')} className="p-2 hover:bg-gray-100 rounded-lg transition">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
-        <Vote className="w-6 h-6 text-primary" />
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-gray-900">{votacion.titulo}</h1>
-          <p className="text-sm text-gray-500">{totalVotos} votos · {votacion.estado}</p>
+    <div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/admin/gobernanza/votaciones')} className="p-2 hover:bg-gray-100 rounded-lg transition">
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Vote className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{votacion.titulo}</h1>
+            <p className="text-sm text-gray-500">{totalVotos} votos · {votacion.estado}</p>
+          </div>
         </div>
         {canEdit && (
           <div className="flex items-center gap-2">

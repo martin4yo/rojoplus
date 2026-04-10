@@ -64,11 +64,17 @@ export default function CampeonatosLista() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Campeonatos</h1>
-          <p className="text-sm text-gray-500 mt-1">Torneos, ligas y copas con tabla de posiciones</p>
+    <div>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Trophy className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Campeonatos</h1>
+            <p className="text-sm text-gray-500">Campeonatos y tablas de posiciones</p>
+          </div>
         </div>
         {tienePermiso(PERMISOS.DEPORTES_EDITAR) && (
           <button
@@ -84,7 +90,7 @@ export default function CampeonatosLista() {
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
 
       {/* Filtro estado */}
-      <div className="flex gap-2 mb-5">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex gap-2">
         {['ACTIVO', 'FINALIZADO', ''].map(e => (
           <button
             key={e}

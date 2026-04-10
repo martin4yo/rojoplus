@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban } from 'lucide-react'
+import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban, Download } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Table from '../../../components/Table'
 import api from '../../../services/api'
@@ -73,6 +73,32 @@ export default function MovimientosCajaLista() {
   function handleFiltroChange(campo, valor) {
     setFiltros(prev => ({ ...prev, [campo]: valor }))
     reset() // Resetear a página 1
+  }
+
+  async function exportarExcel() {
+    try {
+      const params = new URLSearchParams()
+      if (filtros.cajaId) params.set('cajaId', filtros.cajaId)
+      if (filtros.tipo) params.set('tipo', filtros.tipo)
+      if (filtros.desde) params.set('desde', filtros.desde)
+      if (filtros.hasta) params.set('hasta', filtros.hasta)
+
+      const headers = { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
+      const hostname = window.location.hostname
+      const match = hostname.match(/^([^.]+)\.localhost/)
+      if (match) headers['X-Tenant-Slug'] = match[1]
+
+      const response = await fetch(`/api/admin/movimientos-caja/exportar?${params}`, { headers })
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `movimientos_caja_${new Date().toISOString().split('T')[0]}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error al exportar:', err)
+    }
   }
 
   async function handleAnular(id) {
@@ -208,12 +234,21 @@ export default function MovimientosCajaLista() {
             <p className="text-gray-500 text-sm">{pagination?.total || 0} movimientos</p>
           </div>
         </div>
-{tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
-          <Button onClick={() => navigate('/admin/tesoreria/movimientos/nuevo')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Movimiento
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportarExcel}
+            className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition"
+          >
+            <Download className="w-4 h-4" />
+            Exportar Excel
+          </button>
+          {tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
+            <Button onClick={() => navigate('/admin/tesoreria/movimientos/nuevo')}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Movimiento
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}
