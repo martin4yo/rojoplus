@@ -67,6 +67,7 @@ import { initSocket } from './services/socketService.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { extractTenant, extractTenantOptional, requireSuperAdmin } from './middleware/extractTenant.js'
 import { createTenantPrisma } from './lib/tenantPrisma.js'
+import rateLimit from 'express-rate-limit'
 
 const app = express()
 const httpServer = createServer(app)
@@ -115,8 +116,25 @@ app.use('/api/admin/*', (req, res, next) => {
   })
 })
 
+// Rate limiters
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10,
+  message: { success: false, message: 'Demasiados intentos de login. Intentá de nuevo en 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const registerRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 5,
+  message: { success: false, message: 'Demasiados intentos de registro. Intentá de nuevo en 1 hora.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // Login endpoint - mounted WITHIN the /api/admin middleware chain but bypassed above
-app.use('/api/admin/login', authRoutes)
+app.use('/api/admin/login', loginRateLimit, authRoutes)
 app.use('/api/socio/*', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()
@@ -139,6 +157,7 @@ app.use('/api/public/*', extractTenantOptional, (req, res, next) => {
 })
 
 // Rutas super-admin (sin tenant scope)
+app.use('/api/super-admin/tenants/register', registerRateLimit)
 app.use('/api/super-admin/*', requireSuperAdmin)
 
 // Endpoint de tenant actual (necesario para frontend)
