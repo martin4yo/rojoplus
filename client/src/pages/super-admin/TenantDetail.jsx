@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Users, Settings, FileText, Bot, MessageCircle, Cpu, Key, Eye, EyeOff, Save, BarChart2, ScanLine } from 'lucide-react'
+import { ArrowLeft, Edit, Users, Settings, FileText, Bot, MessageCircle, Cpu, Key, Eye, EyeOff, Save, BarChart2, ScanLine, BrainCircuit } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -102,7 +102,7 @@ export default function TenantDetail() {
         'WA_AGENT_ENABLED', 'CHAT_AGENT_ENABLED',
         'WA_AGENT_HORARIO_INICIO', 'WA_AGENT_HORARIO_FIN', 'WA_AGENT_MSG_FUERA_HORARIO',
         'WA_AGENT_WHITELIST', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA', 'WA_AGENT_SYSTEM_PROMPT',
-        'AI_PROVIDER', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_MODEL_OVERRIDE'
+        'AI_PROVIDER', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_MODEL_OVERRIDE', 'AI_ANALISIS_PROVIDER'
       ]
       const results = await Promise.all(
         claves.map(c => api.getFull(`/super-admin/tenants/${id}/configuracion/${c}`).catch(() => ({ valor: null })))
@@ -122,6 +122,7 @@ export default function TenantDetail() {
         tier: cfg.AI_MODEL_TIER || 'rapido',
         apiKey: cfg.AI_API_KEY || '',
         modelOverride: cfg.AI_MODEL_OVERRIDE || '',
+        analisisProvider: cfg.AI_ANALISIS_PROVIDER || 'local',
       })
     } catch (err) {
       console.error('Error cargando config IA:', err)
@@ -145,6 +146,7 @@ export default function TenantDetail() {
         { clave: 'AI_MODEL_TIER', valor: configIA.tier, descripcion: 'Tier de modelo IA', modulo: 'IA' },
         { clave: 'AI_API_KEY', valor: configIA.apiKey, descripcion: 'API key del proveedor de IA', modulo: 'IA' },
         { clave: 'AI_MODEL_OVERRIDE', valor: configIA.modelOverride, descripcion: 'Modelo exacto (override del tier)', modulo: 'IA' },
+        { clave: 'AI_ANALISIS_PROVIDER', valor: configIA.analisisProvider, descripcion: 'Motor para análisis de datos del club', modulo: 'IA' },
       ]
       await Promise.all(campos.map(({ clave, valor, descripcion, modulo }) =>
         api.postFull(`/super-admin/tenants/${id}/configuracion`, { clave, valor, tipo: 'STRING', modulo, descripcion })
@@ -593,6 +595,33 @@ export default function TenantDetail() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Modelo exacto (opcional)</label>
                   <input type="text" value={configIA.modelOverride} onChange={e => setConfigIA({ ...configIA, modelOverride: e.target.value })} placeholder="Dejar vacío para usar el nivel seleccionado" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                   <p className="text-xs text-gray-500 mt-1">Ej: <span className="font-mono">claude-haiku-4-5-20251001</span></p>
+                </div>
+              </div>
+
+              {/* Motor de análisis de datos */}
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <BrainCircuit className="w-5 h-5 text-indigo-500 shrink-0" />
+                  <div>
+                    <p className="font-medium">Motor de análisis de datos</p>
+                    <p className="text-sm text-gray-500">Define qué IA usa el panel de análisis del club (resumen mensual, socios en riesgo, actividades).</p>
+                  </div>
+                </div>
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setConfigIA({ ...configIA, analisisProvider: 'local' })}
+                    className={`px-4 py-2 transition-colors ${configIA.analisisProvider === 'local' ? 'bg-indigo-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    Local (Ollama) — gratis, datos privados
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfigIA({ ...configIA, analisisProvider: 'cloud' })}
+                    className={`px-4 py-2 transition-colors border-l border-gray-300 ${configIA.analisisProvider === 'cloud' ? 'bg-indigo-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    Cloud (Claude) — mayor calidad, consume créditos
+                  </button>
                 </div>
               </div>
 

@@ -4,6 +4,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import AIAssistantService from '../services/aiAssistant.js'
 import ActionExecutor from '../services/actionExecutor.js'
 import { ROLES } from '../services/aiAssistant.js'
+import { enviarFeedbackML } from '../services/axioMLService.js'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
@@ -289,5 +290,27 @@ router.post(
     })
   })
 )
+
+// ==============================================================================
+// FEEDBACK — 👍/👎 sobre respuestas del ML service
+// ==============================================================================
+
+/**
+ * POST /api/chat/feedback
+ * Envía feedback al AXIO ML Hub para ajustar el pattern learning
+ *
+ * Body: { hashInput: string, positive: boolean, correctedResponse?: string }
+ */
+router.post('/feedback', asyncHandler(async (req, res) => {
+  const { hashInput, positive, correctedResponse } = req.body
+
+  if (!hashInput || positive === undefined) {
+    throw new AppError('hashInput y positive son requeridos', 400, 'MISSING_PARAMS')
+  }
+
+  await enviarFeedbackML(hashInput, positive, correctedResponse || null)
+
+  return res.json({ success: true })
+}))
 
 export default router

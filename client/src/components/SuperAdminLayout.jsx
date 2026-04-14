@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, LogOut, Menu, X, Settings, Building2, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, LogOut, Menu, X, Settings, Building2, BarChart2, BrainCircuit } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import api from '../services/api'
 

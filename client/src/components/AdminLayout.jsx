@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
   UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User,
-  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone, Ticket, Shield, AlertCircle, UserX, Target
+  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone, Ticket, Shield, AlertCircle, UserX, Target, BrainCircuit
 } from 'lucide-react'
 import api from '../services/api'
 import { cargarPermisos, limpiarPermisos, getPermisos, esAdmin } from '../services/permisos'
@@ -430,6 +430,19 @@ export default function AdminLayout() {
                 {sidebarCollapsed && (
                   <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
                     <span className="text-sm text-white">Dashboard de Uso</span>
+                  </div>
+                )}
+              </a>
+              <a
+                href="/admin/ia-metricas"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${sidebarCollapsed ? 'md:justify-center' : ''} text-yellow-400 hover:bg-gray-700 hover:text-yellow-300 relative group`}
+                title={sidebarCollapsed ? 'Métricas IA' : ''}
+              >
+                <BrainCircuit className="w-5 h-5 flex-shrink-0" />
+                <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>Métricas IA</span>
+                {sidebarCollapsed && (
+                  <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
+                    <span className="text-sm text-white">Métricas IA</span>
                   </div>
                 )}
               </a>

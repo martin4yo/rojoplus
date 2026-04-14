@@ -98,7 +98,8 @@ export default function ChatWidget({
         content: response.message,
         timestamp: new Date(),
         isUser: false,
-        data: response.data
+        data: response.data,
+        hashInput: response.hashInput || null,
       }
 
       setMessages((prev) => [...prev, assistantMessage])

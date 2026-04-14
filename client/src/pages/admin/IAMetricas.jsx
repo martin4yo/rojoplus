@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Bot, MessageSquare, Zap, DollarSign, RefreshCw, TrendingUp } from 'lucide-react'
+import { Bot, MessageSquare, Zap, DollarSign, RefreshCw, TrendingUp, BrainCircuit, AlertTriangle, BarChart2, Wifi, WifiOff } from 'lucide-react'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
@@ -18,6 +18,136 @@ function fmtFecha(s) {
   return new Date(s).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
 }
 
+// ─── Sección: Análisis IA Local (AXIO ML Hub) ───────────────────────────────
+
+const ANALISIS = [
+  {
+    id: 'resumen-mensual',
+    label: 'Resumen del mes',
+    desc: 'Resumen ejecutivo con indicadores clave y sugerencias de mejora',
+    icon: TrendingUp,
+    color: 'text-green-600 bg-green-50 border-green-200',
+  },
+  {
+    id: 'socios-en-riesgo',
+    label: 'Socios en riesgo',
+    desc: 'Socios con cuotas vencidas o sin actividad — estrategias de retención',
+    icon: AlertTriangle,
+    color: 'text-orange-600 bg-orange-50 border-orange-200',
+  },
+  {
+    id: 'actividades',
+    label: 'Análisis de actividades',
+    desc: 'Participación por actividad e identificación de oportunidades',
+    icon: BarChart2,
+    color: 'text-blue-600 bg-blue-50 border-blue-200',
+  },
+]
+
+function AnalisisIA() {
+  const [disponible, setDisponible] = useState(null)
+  const [activo, setActivo] = useState(null)
+  const [resultados, setResultados] = useState({})
+  const [errores, setErrores] = useState({})
+  // provider viene de la respuesta del backend (lo configura el super-admin)
+  const [providerActivo, setProviderActivo] = useState(null)
+
+  useEffect(() => {
+    api.get('/admin/ai/disponible')
+      .then(d => setDisponible(d.disponible))
+      .catch(() => setDisponible(false))
+  }, [])
+
+  async function ejecutar(id) {
+    setActivo(id)
+    setErrores(prev => ({ ...prev, [id]: null }))
+    try {
+      const res = await api.post(`/admin/ai/${id}`, {})
+      setResultados(prev => ({ ...prev, [id]: res }))
+      if (res.provider) setProviderActivo(res.provider)
+    } catch (e) {
+      setErrores(prev => ({ ...prev, [id]: e.message || 'Error al consultar la IA' }))
+    } finally {
+      setActivo(null)
+    }
+  }
+
+  const providerLabel = providerActivo === 'cloud' ? 'Cloud (Claude)' : providerActivo === 'local' ? 'Local (Ollama)' : null
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <BrainCircuit className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-sm font-semibold text-gray-700">Análisis con IA</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          {providerLabel && (
+            <span className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-full">
+              {providerLabel}
+            </span>
+          )}
+          {disponible === true && (
+            <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-full">
+              <Wifi className="w-3 h-3" /> Hub local disponible
+            </span>
+          )}
+          {disponible === false && (
+            <span className="flex items-center gap-1 text-xs text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded-full">
+              <WifiOff className="w-3 h-3" /> Hub local no disponible
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {ANALISIS.map(({ id, label, desc, icon: Icon, color }) => (
+          <div key={id} className={`rounded-xl border p-4 ${color}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <Icon className="w-5 h-5 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">{label}</p>
+                  <p className="text-xs opacity-75 mt-0.5">{desc}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => ejecutar(id)}
+                disabled={!!activo}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-current rounded-lg hover:opacity-80 disabled:opacity-40 transition-opacity"
+              >
+                {activo === id
+                  ? <><RefreshCw className="w-3 h-3 animate-spin" /> Analizando...</>
+                  : 'Analizar'}
+              </button>
+            </div>
+
+            {/* Resultado */}
+            {resultados[id] && (
+              <div className="mt-3 pt-3 border-t border-current/20">
+                <p className="text-xs font-medium opacity-60 mb-1">
+                  Respuesta · {(resultados[id].time_ms / 1000).toFixed(1)}s · {resultados[id].model}
+                </p>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{resultados[id].answer}</p>
+              </div>
+            )}
+
+            {/* Error */}
+            {errores[id] && (
+              <p className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {errores[id]}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export default function IAMetricas() {
   const [datos, setDatos] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -34,7 +164,7 @@ export default function IAMetricas() {
     try {
       setLoading(true)
       setError(null)
-      const res = await api.getFull(`/admin/ia/metricas?desde=${desde}&hasta=${hasta}`)
+      const res = await api.getFull(`/admin/ai/metricas?desde=${desde}&hasta=${hasta}`)
       setDatos(res)
     } catch (e) {
       setError(e.message)
@@ -180,6 +310,9 @@ export default function IAMetricas() {
           )}
         </>
       )}
+
+      {/* Análisis IA */}
+      <AnalisisIA />
     </div>
   )
 }

@@ -71,6 +71,25 @@ class ChatService {
   }
 
   /**
+   * Enviar feedback 👍/👎 sobre una respuesta del ML service
+   * @param {string} hashInput - Hash que viene en la respuesta (message.hashInput)
+   * @param {boolean} positive - true = 👍, false = 👎
+   */
+  async sendFeedback(hashInput, positive) {
+    try {
+      const response = await fetch(`${API_URL}/chat/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hashInput, positive })
+      })
+      if (!response.ok) throw new Error('Error enviando feedback')
+      return response.json()
+    } catch (error) {
+      console.error('❌ Error en chatService.sendFeedback:', error)
+    }
+  }
+
+  /**
    * Subir documento (comprobante, etc.)
    * @param {File} file
    * @param {string} tokenPortal

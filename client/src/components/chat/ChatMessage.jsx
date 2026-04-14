@@ -1,11 +1,21 @@
-import React from 'react'
+import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { ThumbsUp, ThumbsDown } from 'lucide-react'
+import chatService from '../../services/chatService'
 
 /**
  * ChatMessage Component
  * Muestra un mensaje del chat (usuario o asistente)
  */
 export default function ChatMessage({ message, isUser }) {
+  const [feedback, setFeedback] = useState(null) // null | 'up' | 'down'
+
+  const handleFeedback = async (positive) => {
+    if (feedback || !message.hashInput) return
+    setFeedback(positive ? 'up' : 'down')
+    await chatService.sendFeedback(message.hashInput, positive)
+  }
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div
@@ -66,16 +76,48 @@ export default function ChatMessage({ message, isUser }) {
           )}
         </div>
 
-        {/* Timestamp */}
-        <div
-          className={`text-xs mt-1 ${
-            isUser ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
-          }`}
-        >
-          {new Date(message.timestamp).toLocaleTimeString('es-AR', {
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
+        {/* Timestamp + feedback */}
+        <div className={`flex items-center justify-between mt-1 gap-2`}>
+          <div
+            className={`text-xs ${
+              isUser ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            {new Date(message.timestamp).toLocaleTimeString('es-AR', {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </div>
+
+          {/* Feedback — solo para respuestas del ML service */}
+          {!isUser && message.hashInput && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleFeedback(true)}
+                disabled={!!feedback}
+                className={`p-1 rounded transition-colors ${
+                  feedback === 'up'
+                    ? 'text-green-500'
+                    : 'text-gray-400 hover:text-green-500 disabled:opacity-40'
+                }`}
+                title="Buena respuesta"
+              >
+                <ThumbsUp className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => handleFeedback(false)}
+                disabled={!!feedback}
+                className={`p-1 rounded transition-colors ${
+                  feedback === 'down'
+                    ? 'text-red-500'
+                    : 'text-gray-400 hover:text-red-500 disabled:opacity-40'
+                }`}
+                title="Mala respuesta"
+              >
+                <ThumbsDown className="w-3 h-3" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
