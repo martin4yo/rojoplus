@@ -96,6 +96,12 @@ async function inicializarLectorUSB() {
     return
   }
 
+  if (config.lectorUSB.modoTeclado) {
+    logger.info('✓ Lector USB en modo TECLADO — las lecturas llegan por el navegador (/api/lectura-teclado)')
+    estadoConexion.usb = true
+    return
+  }
+
   try {
     const HID = (await import('node-hid')).default
     const dispositivosConectados = HID.devices()
@@ -747,6 +753,16 @@ app.post('/api/sync', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
+})
+
+// Lectura desde el navegador (modo teclado)
+app.post('/api/lectura-teclado', (req, res) => {
+  const { valorLeido } = req.body || {}
+  if (!valorLeido || typeof valorLeido !== 'string') {
+    return res.status(400).json({ success: false, error: 'valorLeido requerido' })
+  }
+  handleUSBData(valorLeido.trim())
+  res.json({ success: true })
 })
 
 // Abrir molinete manualmente

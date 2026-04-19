@@ -12,11 +12,13 @@
 
   "lectorUSB": {
     "habilitado": true,
+    "modoTeclado": true,
+    "descripcion": "modoTeclado=true: las lecturas se capturan en el navegador (requiere monitor web abierto y con foco). Si es false, se usa node-hid para abrir /dev/hidrawX directamente",
     "dispositivos": [
       {
         "vendorId": "0x05FE",
         "productId": "0x1010",
-        "descripcion": "Lector de código de barras USB"
+        "descripcion": "Lector de código de barras USB (solo usado si modoTeclado=false)"
       }
     ]
   },

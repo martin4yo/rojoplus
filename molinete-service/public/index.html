@@ -584,6 +584,58 @@
     // Actualizar estado cada 10 segundos
     setInterval(cargarEstadoInicial, 10000)
 
+    // ===================================================
+    // CAPTURA DE LECTORES USB EN MODO TECLADO
+    // ===================================================
+    // Los lectores de código de barras / QR tipean el código + Enter.
+    // Acumulamos teclas en un buffer y lo enviamos al backend al recibir Enter.
+    // Un timeout entre teclas descarta escritura humana (muy lenta).
+    const TECLADO_TIMEOUT_MS = 80   // tiempo máx entre teclas (humano ~150-300ms, lector <20ms)
+    const TECLADO_MIN_LARGO = 4     // largo mínimo para considerar lectura válida
+    let tecladoBuffer = ''
+    let tecladoUltimaTecla = 0
+
+    async function enviarLecturaTeclado(valorLeido) {
+      try {
+        await fetch('/api/lectura-teclado', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ valorLeido })
+        })
+      } catch (error) {
+        console.error('Error enviando lectura:', error)
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      // Ignorar si hay un input/textarea enfocado
+      const tag = (e.target?.tagName || '').toUpperCase()
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+
+      const ahora = Date.now()
+      const delta = ahora - tecladoUltimaTecla
+      tecladoUltimaTecla = ahora
+
+      // Si pasó demasiado tiempo desde la última tecla, reiniciar buffer
+      if (delta > TECLADO_TIMEOUT_MS && tecladoBuffer.length > 0) {
+        tecladoBuffer = ''
+      }
+
+      if (e.key === 'Enter') {
+        const valor = tecladoBuffer
+        tecladoBuffer = ''
+        if (valor.length >= TECLADO_MIN_LARGO) {
+          enviarLecturaTeclado(valor)
+        }
+        return
+      }
+
+      // Acumular solo caracteres imprimibles (length 1 filtra Shift, Ctrl, F-keys, etc)
+      if (e.key.length === 1) {
+        tecladoBuffer += e.key
+      }
+    })
+
     // Render inicial de iconos + iniciar
     renderIcons()
     conectarWebSocket()
