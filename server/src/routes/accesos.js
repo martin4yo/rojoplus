@@ -1,8 +1,20 @@
 import express from 'express'
-import prisma from '../lib/prisma.js'
+import crypto from 'crypto'
 import { authAdmin, checkPermiso } from '../middleware/auth.js'
+import { authDispositivo } from '../middleware/authDispositivo.js'
+import { extractTenant } from '../middleware/extractTenant.js'
+import { createTenantPrisma } from '../lib/tenantPrisma.js'
 
 const router = express.Router()
+
+// Middleware para rutas admin del panel: extrae tenant por subdomain + instancia req.db
+const tenantForAdmin = (req, res, next) => {
+  extractTenant(req, res, (err) => {
+    if (err) return next(err)
+    req.db = createTenantPrisma(req.tenantId)
+    next()
+  })
+}
 
 // ============================================
 // VALIDACIÓN DE ACCESO
@@ -15,7 +27,7 @@ const router = express.Router()
  * Body: { dispositivoId, tipoLectura, valorLeido }
  * Returns: { permitido, motivo, persona, mensaje }
  */
-router.post('/validar', async (req, res) => {
+router.post('/validar', authDispositivo, async (req, res) => {
   try {
     const { dispositivoId, tipoLectura, valorLeido } = req.body
 
@@ -54,7 +66,7 @@ router.post('/validar', async (req, res) => {
         tipo = 'SOCIO'
       } else {
         // Si no es un socio, buscar en entradas de eventos
-        entrada = await prisma.entrada.findUnique({
+        entrada = await req.db.entrada.findUnique({
           where: { codigo: valorLeido },
           include: {
             evento: true,
@@ -86,7 +98,7 @@ router.post('/validar', async (req, res) => {
         tipo = 'SOCIO'
       } else {
         // Buscar en Habilitaciones Temporales
-        const habilitacion = await prisma.habilitacionTemporal.findFirst({
+        const habilitacion = await req.db.habilitacionTemporal.findFirst({
           where: {
             documento: valorLeido,
             activo: true
@@ -271,7 +283,7 @@ router.post('/validar', async (req, res) => {
  *
  * Body: { dispositivoId, tipoLectura, valorLeido, resultado, motivo, socioId?, habilitacionTemporalId?, modoValidacion }
  */
-router.post('/registrar', async (req, res) => {
+router.post('/registrar', authDispositivo, async (req, res) => {
   try {
     const {
       dispositivoId,
@@ -285,7 +297,7 @@ router.post('/registrar', async (req, res) => {
     } = req.body
 
     // Crear registro de acceso
-    const registro = await prisma.registroAcceso.create({
+    const registro = await req.db.registroAcceso.create({
       data: {
         dispositivoId,
         socioId: socioId || null,
@@ -300,7 +312,7 @@ router.post('/registrar', async (req, res) => {
 
     // Si fue denegado por NO_ENCONTRADO y es DNI, crear intento denegado
     if (resultado === 'DENEGADO' && motivoRechazo === 'NO_ENCONTRADO' && tipoLectura === 'DNI') {
-      await prisma.intentoAccesoDenegado.create({
+      await req.db.intentoAccesoDenegado.create({
         data: {
           dispositivoId,
           tipoLectura,
@@ -312,7 +324,7 @@ router.post('/registrar', async (req, res) => {
 
     // Si fue permitido y es habilitación temporal, incrementar contador
     if (resultado === 'PERMITIDO' && habilitacionTemporalId) {
-      await prisma.habilitacionTemporal.update({
+      await req.db.habilitacionTemporal.update({
         where: { id: habilitacionTemporalId },
         data: {
           accesosUsados: { increment: 1 }
@@ -342,13 +354,13 @@ router.post('/registrar', async (req, res) => {
  * GET /api/accesos/cache-socios
  * Retorna datos para cache local del molinete
  */
-router.get('/cache-socios', async (req, res) => {
+router.get('/cache-socios', authDispositivo, async (req, res) => {
   try {
     const dispositivoId = req.query.dispositivoId
 
     // Actualizar último ping del dispositivo
     if (dispositivoId) {
-      await prisma.dispositivoAcceso.update({
+      await req.db.dispositivoAcceso.update({
         where: { id: parseInt(dispositivoId) },
         data: { ultimoPing: new Date() }
       }).catch(() => {}) // Ignorar si no existe
@@ -372,7 +384,7 @@ router.get('/cache-socios', async (req, res) => {
 
     // Obtener habilitaciones vigentes
     const ahora = new Date()
-    const habilitaciones = await prisma.habilitacionTemporal.findMany({
+    const habilitaciones = await req.db.habilitacionTemporal.findMany({
       where: {
         activo: true,
         fechaHasta: {
@@ -419,7 +431,7 @@ router.get('/cache-socios', async (req, res) => {
  * GET /api/accesos/habilitaciones
  * Lista todas las habilitaciones temporales
  */
-router.get('/habilitaciones', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.get('/habilitaciones', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const { activo, vencidas } = req.query
 
@@ -433,7 +445,7 @@ router.get('/habilitaciones', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), asyn
       where.fechaHasta = { lt: new Date() }
     }
 
-    const habilitaciones = await prisma.habilitacionTemporal.findMany({
+    const habilitaciones = await req.db.habilitacionTemporal.findMany({
       where,
       orderBy: { createdAt: 'desc' }
     })
@@ -456,7 +468,7 @@ router.get('/habilitaciones', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), asyn
  * POST /api/accesos/habilitaciones
  * Crea una nueva habilitación temporal
  */
-router.post('/habilitaciones', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.post('/habilitaciones', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const {
       documento,
@@ -475,7 +487,7 @@ router.post('/habilitaciones', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), asy
     const fechaHasta = new Date()
     fechaHasta.setDate(fechaHasta.getDate() + diasHabilitados)
 
-    const habilitacion = await prisma.habilitacionTemporal.create({
+    const habilitacion = await req.db.habilitacionTemporal.create({
       data: {
         documento,
         nombreCompleto,
@@ -510,7 +522,7 @@ router.post('/habilitaciones', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), asy
  * PUT /api/accesos/habilitaciones/:id
  * Actualiza una habilitación temporal
  */
-router.put('/habilitaciones/:id', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.put('/habilitaciones/:id', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const { id } = req.params
     const {
@@ -540,7 +552,7 @@ router.put('/habilitaciones/:id', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), 
       updateData.fechaHasta = fechaHasta
     }
 
-    const habilitacion = await prisma.habilitacionTemporal.update({
+    const habilitacion = await req.db.habilitacionTemporal.update({
       where: { id: parseInt(id) },
       data: updateData
     })
@@ -563,11 +575,11 @@ router.put('/habilitaciones/:id', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), 
  * DELETE /api/accesos/habilitaciones/:id
  * Elimina (desactiva) una habilitación temporal
  */
-router.delete('/habilitaciones/:id', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.delete('/habilitaciones/:id', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const { id } = req.params
 
-    const habilitacion = await prisma.habilitacionTemporal.update({
+    const habilitacion = await req.db.habilitacionTemporal.update({
       where: { id: parseInt(id) },
       data: { activo: false }
     })
@@ -594,7 +606,7 @@ router.delete('/habilitaciones/:id', authAdmin, checkPermiso('ACCESOS_GESTIONAR'
  * GET /api/accesos/intentos-denegados
  * Lista DNIs que intentaron acceder pero no están registrados
  */
-router.get('/intentos-denegados', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.get('/intentos-denegados', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const { resuelto } = req.query
 
@@ -603,7 +615,7 @@ router.get('/intentos-denegados', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), 
       where.resuelto = resuelto === 'true'
     }
 
-    const intentos = await prisma.intentoAccesoDenegado.findMany({
+    const intentos = await req.db.intentoAccesoDenegado.findMany({
       where,
       include: {
         dispositivo: {
@@ -668,7 +680,7 @@ router.get('/intentos-denegados', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), 
  * POST /api/accesos/intentos-denegados/:dni/habilitar
  * Crea habilitación para un DNI denegado y marca intentos como resueltos
  */
-router.post('/intentos-denegados/:dni/habilitar', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.post('/intentos-denegados/:dni/habilitar', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const { dni } = req.params
     const {
@@ -686,7 +698,7 @@ router.post('/intentos-denegados/:dni/habilitar', authAdmin, checkPermiso('ACCES
     fechaHasta.setDate(fechaHasta.getDate() + diasHabilitados)
 
     // Crear habilitación
-    const habilitacion = await prisma.habilitacionTemporal.create({
+    const habilitacion = await req.db.habilitacionTemporal.create({
       data: {
         documento: dni,
         nombreCompleto,
@@ -702,7 +714,7 @@ router.post('/intentos-denegados/:dni/habilitar', authAdmin, checkPermiso('ACCES
     })
 
     // Marcar intentos como resueltos
-    await prisma.intentoAccesoDenegado.updateMany({
+    await req.db.intentoAccesoDenegado.updateMany({
       where: {
         valorLeido: dni,
         resuelto: false
@@ -733,11 +745,11 @@ router.post('/intentos-denegados/:dni/habilitar', authAdmin, checkPermiso('ACCES
  * DELETE /api/accesos/intentos-denegados/:dni
  * Descarta intentos de un DNI sin crear habilitación
  */
-router.delete('/intentos-denegados/:dni', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.delete('/intentos-denegados/:dni', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const { dni } = req.params
 
-    await prisma.intentoAccesoDenegado.deleteMany({
+    await req.db.intentoAccesoDenegado.deleteMany({
       where: {
         valorLeido: dni
       }
@@ -765,7 +777,7 @@ router.delete('/intentos-denegados/:dni', authAdmin, checkPermiso('ACCESOS_GESTI
  * GET /api/accesos/registros
  * Obtiene el historial de accesos con filtros
  */
-router.get('/registros', authAdmin, checkPermiso('ACCESOS_VER'), async (req, res) => {
+router.get('/registros', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_VER'), async (req, res) => {
   try {
     const { dispositivoId, resultado, fechaDesde, fechaHasta, page = 1, limit = 50 } = req.query
 
@@ -781,7 +793,7 @@ router.get('/registros', authAdmin, checkPermiso('ACCESOS_VER'), async (req, res
     const skip = (parseInt(page) - 1) * parseInt(limit)
 
     const [registros, total] = await Promise.all([
-      prisma.registroAcceso.findMany({
+      req.db.registroAcceso.findMany({
         where,
         include: {
           dispositivo: {
@@ -808,7 +820,7 @@ router.get('/registros', authAdmin, checkPermiso('ACCESOS_VER'), async (req, res
         skip,
         take: parseInt(limit)
       }),
-      prisma.registroAcceso.count({ where })
+      req.db.registroAcceso.count({ where })
     ])
 
     res.json({
@@ -835,13 +847,13 @@ router.get('/registros', authAdmin, checkPermiso('ACCESOS_VER'), async (req, res
  * POST /api/accesos/abrir-molinete
  * Apertura manual del molinete desde PWA
  */
-router.post('/abrir-molinete', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.post('/abrir-molinete', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const { dispositivoId, valorLeido, socioId } = req.body
     const adminId = req.admin?.id || 1
 
     // Registrar acceso manual
-    await prisma.registroAcceso.create({
+    await req.db.registroAcceso.create({
       data: {
         dispositivoId,
         socioId: socioId || null,
@@ -874,13 +886,13 @@ router.post('/abrir-molinete', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), asy
  * POST /api/accesos/registrar-ingreso-entrada
  * Registra el ingreso de una entrada de evento
  */
-router.post('/registrar-ingreso-entrada', authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+router.post('/registrar-ingreso-entrada', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
   try {
     const { entradaId, dispositivoId, codigoEntrada } = req.body
     const adminId = req.admin?.id || 1
 
     // Obtener la entrada
-    const entrada = await prisma.entrada.findUnique({
+    const entrada = await req.db.entrada.findUnique({
       where: { id: entradaId },
       include: { evento: true }
     })
@@ -893,7 +905,7 @@ router.post('/registrar-ingreso-entrada', authAdmin, checkPermiso('ACCESOS_GESTI
     }
 
     // Verificar que no haya sido usada
-    const ingresoExistente = await prisma.ingresoEntrada.findUnique({
+    const ingresoExistente = await req.db.ingresoEntrada.findUnique({
       where: { entradaId }
     })
 
@@ -905,7 +917,7 @@ router.post('/registrar-ingreso-entrada', authAdmin, checkPermiso('ACCESOS_GESTI
     }
 
     // Registrar el ingreso
-    await prisma.ingresoEntrada.create({
+    await req.db.ingresoEntrada.create({
       data: {
         entradaId,
         eventoId: entrada.eventoId,
@@ -916,14 +928,14 @@ router.post('/registrar-ingreso-entrada', authAdmin, checkPermiso('ACCESOS_GESTI
     })
 
     // Actualizar estado de la entrada
-    await prisma.entrada.update({
+    await req.db.entrada.update({
       where: { id: entradaId },
       data: { estado: 'USADA' }
     })
 
     // Registrar en log de accesos (si existe la tabla)
     try {
-      await prisma.registroAcceso.create({
+      await req.db.registroAcceso.create({
         data: {
           dispositivoId: dispositivoId || null,
           socioId: entrada.socioId || null,
@@ -961,16 +973,19 @@ router.post('/registrar-ingreso-entrada', authAdmin, checkPermiso('ACCESOS_GESTI
  * GET /api/accesos/dispositivos
  * Lista todos los dispositivos de acceso
  */
-router.get('/dispositivos', authAdmin, checkPermiso('ACCESOS_VER'), async (req, res) => {
+router.get('/dispositivos', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_VER'), async (req, res) => {
   try {
-    const dispositivos = await prisma.dispositivoAcceso.findMany({
+    const dispositivos = await req.db.dispositivoAcceso.findMany({
       orderBy: { nombre: 'asc' }
     })
 
-    res.json({
-      success: true,
-      data: dispositivos
-    })
+    // Nunca exponer el token en el listado — solo indicar si existe
+    const safe = dispositivos.map(({ apiToken, ...d }) => ({
+      ...d,
+      tieneToken: !!apiToken
+    }))
+
+    res.json({ success: true, data: safe })
 
   } catch (error) {
     console.error('Error obteniendo dispositivos:', error)
@@ -978,6 +993,166 @@ router.get('/dispositivos', authAdmin, checkPermiso('ACCESOS_VER'), async (req, 
       success: false,
       error: 'Error obteniendo dispositivos'
     })
+  }
+})
+
+/**
+ * POST /api/accesos/dispositivos
+ * Crea un nuevo dispositivo de acceso
+ */
+router.post('/dispositivos', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+  try {
+    const {
+      codigo, nombre, ubicacion, ipLocal, puerto, puertoSerialRFID,
+      tipoRelay, pinRelay, tiempoApertura, modoOffline, intervaloSync, activo
+    } = req.body
+
+    if (!codigo || !nombre || !ubicacion) {
+      return res.status(400).json({ success: false, error: 'codigo, nombre y ubicacion son obligatorios' })
+    }
+
+    const dispositivo = await req.db.dispositivoAcceso.create({
+      data: {
+        codigo, nombre, ubicacion,
+        ipLocal: ipLocal || null,
+        puerto: puerto ?? 3002,
+        puertoSerialRFID: puertoSerialRFID || null,
+        tipoRelay: tipoRelay || 'GPIO',
+        pinRelay: pinRelay ?? null,
+        tiempoApertura: tiempoApertura ?? 3,
+        modoOffline: modoOffline ?? true,
+        intervaloSync: intervaloSync ?? 5,
+        activo: activo ?? true
+      }
+    })
+
+    const { apiToken, ...safe } = dispositivo
+    res.json({ success: true, data: { ...safe, tieneToken: false } })
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ success: false, error: 'Ya existe un dispositivo con ese código' })
+    }
+    console.error('Error creando dispositivo:', error)
+    res.status(500).json({ success: false, error: 'Error creando dispositivo' })
+  }
+})
+
+/**
+ * PUT /api/accesos/dispositivos/:id
+ * Actualiza un dispositivo
+ */
+router.put('/dispositivos/:id', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const {
+      codigo, nombre, ubicacion, ipLocal, puerto, puertoSerialRFID,
+      tipoRelay, pinRelay, tiempoApertura, modoOffline, intervaloSync, activo
+    } = req.body
+
+    const dispositivo = await req.db.dispositivoAcceso.update({
+      where: { id },
+      data: {
+        ...(codigo !== undefined && { codigo }),
+        ...(nombre !== undefined && { nombre }),
+        ...(ubicacion !== undefined && { ubicacion }),
+        ...(ipLocal !== undefined && { ipLocal: ipLocal || null }),
+        ...(puerto !== undefined && { puerto }),
+        ...(puertoSerialRFID !== undefined && { puertoSerialRFID: puertoSerialRFID || null }),
+        ...(tipoRelay !== undefined && { tipoRelay }),
+        ...(pinRelay !== undefined && { pinRelay }),
+        ...(tiempoApertura !== undefined && { tiempoApertura }),
+        ...(modoOffline !== undefined && { modoOffline }),
+        ...(intervaloSync !== undefined && { intervaloSync }),
+        ...(activo !== undefined && { activo })
+      }
+    })
+
+    const { apiToken, ...safe } = dispositivo
+    res.json({ success: true, data: { ...safe, tieneToken: !!apiToken } })
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Dispositivo no encontrado' })
+    }
+    if (error.code === 'P2002') {
+      return res.status(409).json({ success: false, error: 'Ya existe un dispositivo con ese código' })
+    }
+    console.error('Error actualizando dispositivo:', error)
+    res.status(500).json({ success: false, error: 'Error actualizando dispositivo' })
+  }
+})
+
+/**
+ * DELETE /api/accesos/dispositivos/:id
+ * Elimina un dispositivo
+ */
+router.delete('/dispositivos/:id', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    await req.db.dispositivoAcceso.delete({ where: { id } })
+    res.json({ success: true })
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Dispositivo no encontrado' })
+    }
+    if (error.code === 'P2003') {
+      return res.status(409).json({ success: false, error: 'No se puede eliminar: el dispositivo tiene registros de acceso' })
+    }
+    console.error('Error eliminando dispositivo:', error)
+    res.status(500).json({ success: false, error: 'Error eliminando dispositivo' })
+  }
+})
+
+/**
+ * POST /api/accesos/dispositivos/:id/regenerar-token
+ * Genera (o rota) el API token del dispositivo.
+ * Devuelve el token en claro UNA SOLA VEZ — el admin debe copiarlo ahora.
+ */
+router.post('/dispositivos/:id/regenerar-token', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const token = `tok_${crypto.randomBytes(24).toString('hex')}`
+
+    const dispositivo = await req.db.dispositivoAcceso.update({
+      where: { id },
+      data: { apiToken: token }
+    })
+
+    res.json({
+      success: true,
+      data: {
+        id: dispositivo.id,
+        codigo: dispositivo.codigo,
+        nombre: dispositivo.nombre,
+        apiToken: token
+      }
+    })
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Dispositivo no encontrado' })
+    }
+    console.error('Error regenerando token:', error)
+    res.status(500).json({ success: false, error: 'Error regenerando token' })
+  }
+})
+
+/**
+ * POST /api/accesos/dispositivos/:id/revocar-token
+ * Revoca el token actual del dispositivo (lo deja sin token).
+ */
+router.post('/dispositivos/:id/revocar-token', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    await req.db.dispositivoAcceso.update({
+      where: { id },
+      data: { apiToken: null }
+    })
+    res.json({ success: true })
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Dispositivo no encontrado' })
+    }
+    console.error('Error revocando token:', error)
+    res.status(500).json({ success: false, error: 'Error revocando token' })
   }
 })
 

@@ -27,6 +27,14 @@ const __dirname = path.dirname(__filename)
 // Cargar configuración
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'))
 
+// Axios: headers globales para autenticación del dispositivo en el cloud
+if (config.tenant?.slug) {
+  axios.defaults.headers.common['X-Tenant-Slug'] = config.tenant.slug
+}
+if (config.tenant?.apiToken) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${config.tenant.apiToken}`
+}
+
 // Configurar logger
 const logger = winston.createLogger({
   level: config.logging.nivel,
@@ -48,7 +56,7 @@ const logger = winston.createLogger({
 
 // Variables globales
 let lectorUSBDevices = []
-let lectorRFIDPort = null
+let lectorRFIDPorts = []
 let molinetePort = null
 let estadoConexion = {
   api: false,
@@ -140,43 +148,65 @@ async function inicializarLectorUSB() {
 }
 
 /**
- * Inicializar lector RFID serial
+ * Inicializar lectores RFID seriales — soporta múltiples dispositivos
  */
 async function inicializarLectorRFID() {
   if (!config.lectorRFID.habilitado) {
-    logger.info('Lector RFID deshabilitado en config')
+    logger.info('Lectores RFID deshabilitados en config')
     return
   }
 
+  // Compatibilidad con config vieja (objeto único) y nueva (array dispositivos)
+  const dispositivos = Array.isArray(config.lectorRFID.dispositivos)
+    ? config.lectorRFID.dispositivos
+    : [{
+        tipo: config.lectorRFID.tipo,
+        puerto: config.lectorRFID.puerto,
+        baudRate: config.lectorRFID.baudRate,
+        descripcion: config.lectorRFID.descripcion
+      }]
+
   try {
-    // Importación dinámica
     const { SerialPort } = await import('serialport')
     const { ReadlineParser } = await import('@serialport/parser-readline')
 
-    lectorRFIDPort = new SerialPort({
-      path: config.lectorRFID.puerto,
-      baudRate: config.lectorRFID.baudRate
-    })
+    let conectados = 0
 
-    const parser = lectorRFIDPort.pipe(new ReadlineParser({ delimiter: '\r\n' }))
+    for (const cfg of dispositivos) {
+      try {
+        const port = new SerialPort({
+          path: cfg.puerto,
+          baudRate: cfg.baudRate || 9600
+        })
 
-    parser.on('data', (data) => {
-      handleRFIDData(data.trim())
-    })
+        const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
 
-    lectorRFIDPort.on('error', (err) => {
-      logger.error(`Error en lector RFID: ${err.message}`)
-      estadoConexion.rfid = false
-    })
+        parser.on('data', (data) => {
+          handleRFIDData(data.trim(), cfg.descripcion || cfg.puerto)
+        })
 
-    lectorRFIDPort.on('open', () => {
-      logger.info(`✓ Lector RFID inicializado en ${config.lectorRFID.puerto}`)
-      estadoConexion.rfid = true
-    })
+        port.on('error', (err) => {
+          logger.error(`Error en lector RFID ${cfg.puerto}: ${err.message}`)
+          estadoConexion.rfid = lectorRFIDPorts.some(p => p.isOpen)
+        })
 
+        port.on('open', () => {
+          logger.info(`✓ Lector RFID inicializado en ${cfg.puerto} (${cfg.descripcion || 'sin descripción'})`)
+          estadoConexion.rfid = true
+          conectados++
+        })
+
+        lectorRFIDPorts.push(port)
+      } catch (err) {
+        logger.error(`Error abriendo lector RFID ${cfg.puerto}: ${err.message}`)
+      }
+    }
+
+    if (conectados === 0 && dispositivos.length > 0) {
+      logger.info('Ejecute: npm run detectar-rfid para encontrar el puerto')
+    }
   } catch (error) {
-    logger.error(`Error inicializando lector RFID: ${error.message}`)
-    logger.info('Ejecute: npm run detectar-rfid para encontrar el puerto')
+    logger.error(`Error inicializando lectores RFID: ${error.message}`)
     estadoConexion.rfid = false
   }
 }
@@ -260,8 +290,8 @@ function handleUSBData(valorLeido) {
 /**
  * Procesar datos del lector RFID
  */
-function handleRFIDData(data) {
-  logger.info(`📡 Lectura RFID: ${data}`)
+function handleRFIDData(data, origen = '') {
+  logger.info(`📡 Lectura RFID${origen ? ` [${origen}]` : ''}: ${data}`)
 
   // Parsear UID hexadecimal
   const valorLeido = data.replace(/\s/g, '').toUpperCase()
@@ -757,7 +787,7 @@ async function iniciar() {
 process.on('SIGINT', () => {
   logger.info('Cerrando servicio...')
   lectorUSBDevices.forEach(d => d.close())
-  if (lectorRFIDPort) lectorRFIDPort.close()
+  lectorRFIDPorts.forEach(p => { try { p.close() } catch {} })
   if (molinetePort) molinetePort.close()
   process.exit(0)
 })

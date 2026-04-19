@@ -433,10 +433,13 @@ export default function Cuotas() {
       const response = await fetch(`${apiUrl}/admin/pagos/${pagoId}/recibo-pdf`, { headers })
       if (!response.ok) throw new Error('Error al generar PDF')
       const blob = await response.blob()
+      const disposition = response.headers.get('Content-Disposition') || ''
+      const match = disposition.match(/filename="([^"]+)"/)
+      const filename = match ? match[1] : `recibo-${numeroRecibo || pagoId}.pdf`
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `recibo-${numeroRecibo || pagoId}.pdf`
+      a.download = filename
       a.click()
       window.URL.revokeObjectURL(url)
     } catch (err) {

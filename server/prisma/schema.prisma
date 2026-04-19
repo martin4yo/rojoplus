@@ -3452,7 +3452,7 @@ model MensajeEntrenador {
 
 model DispositivoAcceso {
   id                Int                     @id @default(autoincrement())
-  codigo            String                 
+  codigo            String
   nombre            String
   ubicacion         String
   ipLocal           String?                 @map("ip_local")
@@ -3464,6 +3464,7 @@ model DispositivoAcceso {
   modoOffline       Boolean                 @default(true) @map("modo_offline")
   intervaloSync     Int                     @default(5) @map("intervalo_sync")
   activo            Boolean                 @default(true)
+  apiToken          String?                 @unique @map("api_token")
   ultimoPing        DateTime?               @map("ultimo_ping")
   version           String?
   createdAt         DateTime                @default(now()) @map("created_at")

@@ -4,6 +4,12 @@
   "puerto": 3002,
   "puertoWebSocket": 3003,
 
+  "tenant": {
+    "slug": "sportivopilar",
+    "apiToken": "REEMPLAZAR_CON_TOKEN_DEL_DISPOSITIVO",
+    "descripcion": "Credenciales del dispositivo. El token se genera en el admin del club y se vincula al DispositivoAcceso."
+  },
+
   "lectorUSB": {
     "habilitado": true,
     "dispositivos": [
@@ -16,11 +22,15 @@
   },
 
   "lectorRFID": {
-    "tipo": "SERIAL",
-    "puerto": "COM3",
-    "baudRate": 9600,
     "habilitado": true,
-    "descripcion": "Lector RFID por puerto serial"
+    "dispositivos": [
+      {
+        "tipo": "SERIAL",
+        "puerto": "COM3",
+        "baudRate": 9600,
+        "descripcion": "Lector RFID por puerto serial"
+      }
+    ]
   },
 
   "molinete": {

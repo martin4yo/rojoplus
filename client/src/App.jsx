@@ -233,6 +233,7 @@ const MonitorAccesos = lazy(() => import('./pages/admin/accesos/MonitorAccesos')
 const IntentosDenegados = lazy(() => import('./pages/admin/accesos/IntentosDenegados'))
 const Habilitaciones = lazy(() => import('./pages/admin/accesos/Habilitaciones'))
 const ControlPWA = lazy(() => import('./pages/admin/accesos/ControlPWA'))
+const Dispositivos = lazy(() => import('./pages/admin/accesos/Dispositivos'))
 
 // Eventos
 const EventosLista = lazy(() => import('./pages/admin/eventos/EventosLista'))
@@ -526,6 +527,7 @@ function App() {
                   <Route path="accesos/intentos-denegados" element={<IntentosDenegados />} />
                   <Route path="accesos/habilitaciones" element={<Habilitaciones />} />
                   <Route path="accesos/control-pwa" element={<ControlPWA />} />
+                  <Route path="accesos/dispositivos" element={<Dispositivos />} />
 
                   {/* Eventos */}
                   <Route path="eventos" element={<EventosLista />} />

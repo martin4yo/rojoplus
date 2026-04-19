@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Edit, QrCode, Users, CreditCard, Activity,
   Phone, Mail, MapPin, Calendar, User, AlertCircle,
-  Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List, PlusCircle
+  Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List, PlusCircle, FileDown
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
@@ -53,6 +53,7 @@ export default function SocioDetalle() {
 
   // Actividades
   const [mostrarTodasActividades, setMostrarTodasActividades] = useState(false)
+  const [descargandoPdf, setDescargandoPdf] = useState(null) // pagoId en descarga
 
   // Familia
   const [busquedaTitular, setBusquedaTitular] = useState('')
@@ -114,6 +115,38 @@ export default function SocioDetalle() {
       cargarCuentaCorriente()
     }
   }, [mostrarCtaCte, incluirFamilia])
+
+  async function descargarReciboPdf(pagoId) {
+    setDescargandoPdf(pagoId)
+    try {
+      const token = localStorage.getItem('adminToken')
+      const apiUrl = import.meta.env.VITE_API_URL || '/api'
+      const headers = {}
+      if (token) headers.Authorization = `Bearer ${token}`
+      const hostname = window.location.hostname
+      const tenantMatch = hostname.match(/^([^.]+)\.localhost/) || (hostname.split('.').length > 2 ? [null, hostname.split('.')[0]] : null)
+      if (tenantMatch) headers['X-Tenant-Slug'] = tenantMatch[1]
+      const stored = localStorage.getItem('superadmin_tenant_slug')
+      if (!tenantMatch && stored) headers['X-Tenant-Slug'] = stored
+
+      const response = await fetch(`${apiUrl}/admin/pagos/${pagoId}/recibo-pdf`, { headers })
+      if (!response.ok) throw new Error('Error al obtener el PDF')
+      const blob = await response.blob()
+      const disposition = response.headers.get('Content-Disposition') || ''
+      const match = disposition.match(/filename="([^"]+)"/)
+      const filename = match ? match[1] : `recibo-${pagoId}.pdf`
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000)
+    } catch (err) {
+      toast.error('Error al descargar el recibo')
+    } finally {
+      setDescargandoPdf(null)
+    }
+  }
 
   function calcularEdad(fechaNacimiento) {
     if (!fechaNacimiento) return null
@@ -1200,6 +1233,7 @@ export default function SocioDetalle() {
                               <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Debe</th>
                               <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Haber</th>
                               <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Saldo</th>
+                              <th className="px-3 py-2 w-8"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
@@ -1219,6 +1253,21 @@ export default function SocioDetalle() {
                                 <td className={`px-3 py-2 text-right font-medium ${mov.saldo > 0 ? 'text-red-600' : mov.saldo < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                                   {formatMonto(Math.abs(mov.saldo))}
                                   {mov.saldo < 0 && ' (F)'}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  {mov.tipo === 'PAGO' && mov.pagoId && (
+                                    <button
+                                      onClick={() => descargarReciboPdf(mov.pagoId)}
+                                      disabled={descargandoPdf === mov.pagoId}
+                                      title="Ver recibo PDF"
+                                      className="p-1 rounded hover:bg-green-100 text-green-600 disabled:opacity-40 transition-colors"
+                                    >
+                                      {descargandoPdf === mov.pagoId
+                                        ? <span className="inline-block w-3.5 h-3.5 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                                        : <FileDown className="w-3.5 h-3.5" />
+                                      }
+                                    </button>
+                                  )}
                                 </td>
                               </tr>
                             ))}

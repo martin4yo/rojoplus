@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monitor Molinete - RojoPlus</title>
+  <script src="lucide.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -19,8 +20,7 @@
     }
 
     .container {
-      max-width: 1400px;
-      margin: 0 auto;
+      width: 100%;
     }
 
     header {
@@ -40,6 +40,22 @@
       gap: 10px;
     }
 
+    h1 svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h2 svg {
+      width: 20px;
+      height: 20px;
+    }
+
     .status-badges {
       display: flex;
       gap: 10px;
@@ -52,7 +68,12 @@
       font-weight: bold;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
+    }
+
+    .badge svg {
+      width: 10px;
+      height: 10px;
     }
 
     .badge.online { background: #10b981; }
@@ -103,8 +124,23 @@
     }
 
     #pantalla-molinete .icono {
-      font-size: 80px;
       margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #pantalla-molinete .icono svg {
+      width: 80px;
+      height: 80px;
+    }
+
+    #pantalla-molinete .icono.spin svg {
+      animation: spin 1.5s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     #pantalla-molinete .titulo {
@@ -151,6 +187,23 @@
     .acceso-nombre {
       font-weight: bold;
       margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .acceso-nombre svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .acceso-item.permitido .acceso-nombre svg {
+      color: #10b981;
+    }
+
+    .acceso-item.denegado .acceso-nombre svg {
+      color: #ef4444;
     }
 
     .acceso-detalle {
@@ -196,6 +249,14 @@
       font-weight: bold;
       cursor: pointer;
       transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn svg {
+      width: 18px;
+      height: 18px;
     }
 
     .btn-primary {
@@ -245,20 +306,21 @@
   <div class="container">
     <header>
       <h1>
-        🚪 Monitor Molinete
+        <i data-lucide="door-open"></i>
+        Monitor Molinete
       </h1>
       <div class="status-badges">
         <div class="badge offline" id="badge-api">
-          <span>●</span> API
+          <i data-lucide="circle" fill="currentColor"></i> API
         </div>
         <div class="badge offline" id="badge-usb">
-          <span>●</span> USB
+          <i data-lucide="circle" fill="currentColor"></i> USB
         </div>
         <div class="badge offline" id="badge-rfid">
-          <span>●</span> RFID
+          <i data-lucide="circle" fill="currentColor"></i> RFID
         </div>
         <div class="badge offline" id="badge-molinete">
-          <span>●</span> Molinete
+          <i data-lucide="circle" fill="currentColor"></i> Molinete
         </div>
       </div>
     </header>
@@ -266,21 +328,25 @@
     <div class="grid">
       <!-- Pantalla del molinete -->
       <div class="card">
-        <h2>📺 Pantalla Molinete</h2>
+        <h2><i data-lucide="monitor"></i> Pantalla Molinete</h2>
         <div id="pantalla-molinete">
-          <div class="icono">⏳</div>
+          <div class="icono spin"><i data-lucide="loader"></i></div>
           <div class="titulo">Sistema Iniciando...</div>
           <div class="mensaje">Esperando conexión</div>
         </div>
         <div class="actions">
-          <button class="btn btn-success" onclick="abrirMolinete()">🚪 Abrir Molinete</button>
-          <button class="btn btn-primary" onclick="sincronizar()">🔄 Sincronizar</button>
+          <button class="btn btn-success" onclick="abrirMolinete()">
+            <i data-lucide="door-open"></i> Abrir Molinete
+          </button>
+          <button class="btn btn-primary" onclick="sincronizar()">
+            <i data-lucide="refresh-cw"></i> Sincronizar
+          </button>
         </div>
       </div>
 
       <!-- Estadísticas -->
       <div class="card">
-        <h2>📊 Estadísticas del Sistema</h2>
+        <h2><i data-lucide="bar-chart-3"></i> Estadísticas del Sistema</h2>
         <div class="stats">
           <div class="stat-card">
             <div class="stat-value" id="stat-socios">-</div>
@@ -308,7 +374,7 @@
 
     <!-- Stream de accesos -->
     <div class="card">
-      <h2>📋 Últimos Accesos</h2>
+      <h2><i data-lucide="list"></i> Últimos Accesos</h2>
       <div id="stream-accesos">
         <div style="text-align: center; opacity: 0.5; padding: 40px;">
           Esperando eventos...
@@ -321,18 +387,43 @@
     let ws = null
     const accesos = []
 
+    // Helper: escapa texto para inserción en HTML
+    function escapeHtml(str) {
+      if (str == null) return ''
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+
+    // Helper: inicializa iconos Lucide de manera segura
+    function renderIcons() {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons()
+      }
+    }
+
+    // Mapea estado de pantalla a icono Lucide
+    function iconoParaEstado(estado) {
+      if (estado === 'PERMITIDO') return { nombre: 'check-circle-2', spin: false }
+      if (estado === 'INHABILITADO') return { nombre: 'x-circle', spin: false }
+      return { nombre: 'loader', spin: true }
+    }
+
     // Conectar WebSocket
     function conectarWebSocket() {
       ws = new WebSocket('ws://localhost:3002/ws')
 
       ws.onopen = () => {
-        console.log('✓ WebSocket conectado')
+        console.log('WebSocket conectado')
         cargarEstadoInicial()
       }
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data)
-        console.log('📨 Mensaje recibido:', data)
+        console.log('Mensaje recibido:', data)
 
         if (data.tipo === 'ACCESO') {
           agregarAcceso(data.data)
@@ -342,11 +433,11 @@
       }
 
       ws.onerror = (error) => {
-        console.error('❌ Error WebSocket:', error)
+        console.error('Error WebSocket:', error)
       }
 
       ws.onclose = () => {
-        console.log('⚠️ WebSocket desconectado, reconectando...')
+        console.log('WebSocket desconectado, reconectando...')
         setTimeout(conectarWebSocket, 3000)
       }
     }
@@ -405,16 +496,17 @@
       stream.innerHTML = accesos.map(a => {
         const fecha = new Date(a.fecha)
         const clase = a.resultado === 'PERMITIDO' ? 'permitido' : 'denegado'
-        const icono = a.resultado === 'PERMITIDO' ? '✅' : '❌'
+        const iconoNombre = a.resultado === 'PERMITIDO' ? 'user-check' : 'user-x'
 
         return `
           <div class="acceso-item ${clase}">
             <div class="acceso-info">
               <div class="acceso-nombre">
-                ${icono} ${a.persona?.nombre || 'Sin nombre'}
+                <i data-lucide="${iconoNombre}"></i>
+                <span>${escapeHtml(a.persona?.nombre || 'Sin nombre')}</span>
               </div>
               <div class="acceso-detalle">
-                ${a.tipoLectura} • ${a.motivo} • ${a.mensaje}
+                ${escapeHtml(a.tipoLectura)} • ${escapeHtml(a.motivo)} • ${escapeHtml(a.mensaje)}
               </div>
             </div>
             <div class="acceso-hora">
@@ -423,6 +515,7 @@
           </div>
         `
       }).join('')
+      renderIcons()
     }
 
     // Mostrar en pantalla del molinete
@@ -439,21 +532,25 @@
         pantalla.classList.add('denegado')
       }
 
-      // Actualizar contenido
+      const icono = iconoParaEstado(data.estado)
+
+      // Actualizar contenido (ignora data.icono emoji del backend; usa Lucide por estado)
       pantalla.innerHTML = `
-        <div class="icono">${data.icono}</div>
-        <div class="titulo">${data.titulo}</div>
-        <div class="mensaje">${data.mensaje}</div>
+        <div class="icono${icono.spin ? ' spin' : ''}"><i data-lucide="${icono.nombre}"></i></div>
+        <div class="titulo">${escapeHtml(data.titulo)}</div>
+        <div class="mensaje">${escapeHtml(data.mensaje)}</div>
       `
+      renderIcons()
 
       // Volver a estado normal después de la duración
       setTimeout(() => {
         pantalla.className = ''
         pantalla.innerHTML = `
-          <div class="icono">⏳</div>
+          <div class="icono spin"><i data-lucide="loader"></i></div>
           <div class="titulo">Esperando...</div>
           <div class="mensaje">Acerque su credencial</div>
         `
+        renderIcons()
       }, data.duracion || 3000)
     }
 
@@ -463,10 +560,10 @@
         const response = await fetch('/api/abrir', { method: 'POST' })
         const data = await response.json()
         if (data.success) {
-          alert('✅ Molinete abierto')
+          alert('Molinete abierto')
         }
       } catch (error) {
-        alert('❌ Error abriendo molinete: ' + error.message)
+        alert('Error abriendo molinete: ' + error.message)
       }
     }
 
@@ -476,18 +573,19 @@
         const response = await fetch('/api/sync', { method: 'POST' })
         const data = await response.json()
         if (data.success) {
-          alert('✅ Sincronización iniciada')
+          alert('Sincronización iniciada')
           setTimeout(cargarEstadoInicial, 2000)
         }
       } catch (error) {
-        alert('❌ Error sincronizando: ' + error.message)
+        alert('Error sincronizando: ' + error.message)
       }
     }
 
     // Actualizar estado cada 10 segundos
     setInterval(cargarEstadoInicial, 10000)
 
-    // Iniciar
+    // Render inicial de iconos + iniciar
+    renderIcons()
     conectarWebSocket()
   </script>
 </body>

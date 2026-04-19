@@ -507,6 +507,7 @@ router.post('/seed', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
         { titulo: 'DNIs Denegados', icono: 'AlertTriangle', url: '/admin/accesos/intentos-denegados', orden: 2 },
         { titulo: 'Habilitaciones', icono: 'UserPlus', url: '/admin/accesos/habilitaciones', orden: 3 },
         { titulo: 'Control Móvil', icono: 'Smartphone', url: '/admin/accesos/control-pwa', orden: 4 },
+        { titulo: 'Dispositivos', icono: 'DoorOpen', url: '/admin/accesos/dispositivos', orden: 5 },
       ]
     },
     {

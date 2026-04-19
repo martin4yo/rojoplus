@@ -896,9 +896,16 @@ router.get('/pagos/:id/recibo-pdf', authAdmin, asyncHandler(async (req, res) => 
     where: { id: parseInt(id) },
     include: {
       socio: {
-        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true }
+        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true, domicilio: true, ciudad: true, calle: true, codigoPostal: true, estado: true }
       },
       medioPago: { select: { id: true, nombre: true } },
+      caja: { select: { nombre: true } },
+      mediosPago: {
+        include: {
+          medioPago: { select: { nombre: true } },
+          caja: { select: { nombre: true } }
+        }
+      },
       cargos: {
         include: {
           conceptoTesoreria: { select: { id: true, nombre: true } },
@@ -913,10 +920,33 @@ router.get('/pagos/:id/recibo-pdf', authAdmin, asyncHandler(async (req, res) => 
 
   if (!pago) throw new AppError('Pago no encontrado', 404, 'NOT_FOUND')
 
-  const pdfBuffer = await generarReciboPagoPDF(pago)
+  const admin = await req.db.admin.findUnique({
+    where: { id: pago.registradoPor },
+    select: { nombre: true }
+  }).catch(() => null)
+
+  const config = await req.db.configuracion.findMany({
+    where: { clave: { in: ['CLUB_NOMBRE', 'CLUB_DIRECCION', 'CLUB_TELEFONO'] } },
+    select: { clave: true, valor: true }
+  }).catch(() => [])
+
+  const configMap = Object.fromEntries(config.map(c => [c.clave, c.valor]))
+
+  // El logo viene del Tenant (req.tenant.logoUrl) — path relativo a /uploads/
+  if (req.tenant?.logoUrl) {
+    configMap.CLUB_LOGO_URL = req.tenant.logoUrl
+  }
+
+  const pdfBuffer = await generarReciboPagoPDF(pago, admin?.nombre || '', configMap)
+
+  const nombreSocio = (pago.socio?.apellidoNombre || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // quitar acentos
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .trim().replace(/\s+/g, '_')
+  const filename = `recibo-${pago.numero}-${nombreSocio}.pdf`
 
   res.setHeader('Content-Type', 'application/pdf')
-  res.setHeader('Content-Disposition', `attachment; filename="recibo-${pago.numero}.pdf"`)
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
   res.send(pdfBuffer)
 }))
 

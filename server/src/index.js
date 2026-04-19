@@ -77,11 +77,22 @@ const PORT = process.env.PORT || 3000
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }))
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:5173', 'http://localhost:3000']
+
 app.use(cors({
-  origin: process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:5173', 'http://localhost:3000'],
-  credentials: true
+  origin: (origin, callback) => {
+    // Permitir requests sin origin (Postman, curl, etc.)
+    if (!origin) return callback(null, true)
+    // Permitir cualquier subdomain de localhost
+    if (/^https?:\/\/[^/]*\.localhost(:\d+)?$/.test(origin)) return callback(null, true)
+    // Permitir origins configurados
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    callback(new Error(`CORS: origin no permitido: ${origin}`))
+  },
+  credentials: true,
+  exposedHeaders: ['Content-Disposition']
 }))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ limit: '10mb', extended: true }))
@@ -271,28 +282,33 @@ app.use(errorHandler)
 // Inicializar Socket.io
 const io = initSocket(httpServer)
 
-// Iniciar servidor
-httpServer.listen(PORT, 'localhost', async () => {
-  console.log(`
+// Exportar app para testing con Supertest
+export { app }
+
+// Solo iniciar servidor si no estamos en modo test
+if (process.env.NODE_ENV !== 'test') {
+  httpServer.listen(PORT, 'localhost', async () => {
+    console.log(`
 🚀 Servidor Clubix iniciado
 📍 Puerto: ${PORT}
 🔗 API: http://localhost:${PORT}/api
 🔌 Socket.io: Activo
-  `)
+    `)
 
-  // Verificar conexión SMTP
-  await verificarConexionSMTP()
+    // Verificar conexión SMTP
+    await verificarConexionSMTP()
 
-  // Iniciar sistema de notificaciones automáticas
-  iniciarCronJobs()
-})
+    // Iniciar sistema de notificaciones automáticas
+    iniciarCronJobs()
+  })
 
-// Cerrar conexión de Prisma al salir
-process.on('SIGINT', async () => {
-  console.log('\n👋 Cerrando servidor...')
-  detenerCronJobs()
-  await prisma.$disconnect()
-  console.log('✅ Servidor cerrado correctamente\n')
-  process.exit()
-})
+  // Cerrar conexión de Prisma al salir
+  process.on('SIGINT', async () => {
+    console.log('\n👋 Cerrando servidor...')
+    detenerCronJobs()
+    await prisma.$disconnect()
+    console.log('✅ Servidor cerrado correctamente\n')
+    process.exit()
+  })
+}
 
