@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch-path=index.js --watch-path=db/cache.js index.js",
+    "dev": "node --watch-path=index.js --watch-path=db/cache.js --watch-path=config.json index.js",
     "detectar-usb": "node scripts/detectar-lector-usb.js",
     "detectar-rfid": "node scripts/detectar-rfid.js"
   },

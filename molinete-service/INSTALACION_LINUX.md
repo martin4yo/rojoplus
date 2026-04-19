@@ -146,15 +146,18 @@ sudo apt install -y build-essential python3
 
 ### Permisos de dispositivos
 
-Sin esto el servicio no puede acceder a los puertos seriales ni a los dispositivos HID sin ejecutarse como root.
+Sin esto el servicio no puede acceder a los puertos seriales:
 
 ```bash
 # Acceso a puertos seriales (lector RFID y relay del molinete)
 sudo usermod -aG dialout $USER
-
-# Acceso a dispositivos HID (lector USB de código de barras / QR)
-sudo usermod -aG plugdev $USER
 ```
+
+> Solo si vas a usar el lector USB en **modo hidraw** (ver sección 3), además hacer:
+> ```bash
+> sudo usermod -aG plugdev $USER
+> ```
+> En **modo teclado** (por defecto) no hace falta porque los lectores se leen por el navegador — sin acceso directo a `/dev/hidrawX`.
 
 **Importante:** los cambios de grupo aplican al cerrar sesión y volver a entrar. Para aplicarlos en la sesión actual sin reiniciar:
 
@@ -166,7 +169,7 @@ Verificar que los grupos quedaron asignados:
 
 ```bash
 groups $USER
-# Debe mostrar: ... dialout plugdev ...
+# Debe mostrar: ... dialout (y plugdev si vas a usar modo hidraw)
 ```
 
 ### Git (opcional)
@@ -193,7 +196,51 @@ npm install
 
 ---
 
-## 3. Detectar el lector USB
+## 3. Modos de operación del lector USB
+
+El servicio soporta dos formas de leer los códigos escaneados. Se elige con el flag `lectorUSB.modoTeclado` en `config.json`.
+
+### Modo TECLADO (recomendado, por defecto)
+
+```json
+"lectorUSB": {
+  "habilitado": true,
+  "modoTeclado": true
+}
+```
+
+Los lectores USB son teclados HID — escriben el código + Enter como si fueran teclas. En este modo:
+
+- El **navegador** con el monitor web abierto (`http://localhost:3002`) captura las teclas.
+- Lo manda al servicio por `POST /api/lectura-teclado`, entra al mismo flujo de validación que cualquier otra lectura.
+- **No requiere** permisos hidraw, reglas udev, ni VID/PID. Funciona con cualquier lector que actúe como teclado HID.
+- Soporta **varios lectores simultáneos** sin configuración extra — todos los lectores tipean al navegador.
+
+**Requisito:** la PC tiene que estar en modo kiosco con el navegador mostrando el monitor web en pantalla completa y con foco. Ver sección 8 (Modo kiosco).
+
+**Cuándo NO sirve este modo:**
+- Si la PC tiene escritorio y el usuario puede cambiar de ventana — las lecturas se "tipean" en la app que tenga foco.
+- Si el servicio corre sin display (headless). En ese caso → modo hidraw.
+
+### Modo HIDRAW (alternativo)
+
+```json
+"lectorUSB": {
+  "habilitado": true,
+  "modoTeclado": false,
+  "dispositivos": [
+    { "vendorId": "0x0C2E", "productId": "0x0200", "descripcion": "Lector entrada" }
+  ]
+}
+```
+
+El servicio abre `/dev/hidrawX` directamente con `node-hid`. Requiere identificar cada lector por VID/PID (y opcionalmente `path` si son iguales) y configurar permisos. Si vas a usar este modo, continuar con la sección 4. Si usás modo teclado, saltar a sección 5.
+
+---
+
+## 4. Detectar el lector USB (solo modo hidraw)
+
+> Esta sección solo es necesaria si `lectorUSB.modoTeclado = false`.
 
 El lector de código de barras / QR se conecta por USB y es reconocido como dispositivo HID.
 
@@ -262,13 +309,44 @@ done
 
 ### Si hay dos lectores del mismo modelo (mismo VID/PID)
 
-Cuando dos lectores son idénticos (mismo fabricante y modelo), tienen el mismo `vendorId` y `productId`. En ese caso, usar el `Path` para diferenciarlos:
+Cuando dos lectores son idénticos (mismo fabricante y modelo), tienen el mismo `vendorId` y `productId`. Hay que **especificar el campo `path`** en cada entrada del config para que el servicio abra ambos dispositivos en vez de intentar abrir dos veces el mismo:
 
-- El `path` en Linux es estable mientras el dispositivo esté conectado al mismo puerto USB físico.
-- Si se desconecta y reconecta en el mismo puerto, suele mantener el mismo path.
-- Si se cambia de puerto USB, el path puede cambiar.
+```json
+"dispositivos": [
+  {
+    "vendorId": "0x0C2E",
+    "productId": "0x0200",
+    "path": "/dev/hidraw2",
+    "descripcion": "Lector entrada"
+  },
+  {
+    "vendorId": "0x0C2E",
+    "productId": "0x0200",
+    "path": "/dev/hidraw4",
+    "descripcion": "Lector salida"
+  }
+]
+```
 
-Para que el path sea siempre el mismo independientemente del puerto, crear una regla udev basada en el número de serie del dispositivo (ver sección de Troubleshooting).
+El campo `path` es opcional — si no está, el servicio usa solo VID/PID y deduplica. Si está, matchea exactamente ese dispositivo.
+
+**Cuidado:** `/dev/hidrawX` puede cambiar al reconectar o reiniciar. Para un path estable, crear symlinks udev basados en el puerto USB físico:
+
+```bash
+# Ver el puerto USB de cada lector
+udevadm info -a -n /dev/hidraw2 | grep KERNELS | head -3
+udevadm info -a -n /dev/hidraw4 | grep KERNELS | head -3
+# Devuelve algo como KERNELS=="1-1.2" y KERNELS=="1-1.3"
+
+# Crear regla con symlinks fijos
+sudo tee /etc/udev/rules.d/99-molinete-lectores.rules <<'EOF'
+SUBSYSTEM=="hidraw", KERNELS=="1-1.2", MODE="0666", SYMLINK+="lector_entrada"
+SUBSYSTEM=="hidraw", KERNELS=="1-1.3", MODE="0666", SYMLINK+="lector_salida"
+EOF
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+Luego en config: `"path": "/dev/lector_entrada"` y `"path": "/dev/lector_salida"`. Así el path es estable sin importar el orden de arranque.
 
 ### Qué anotar
 
@@ -318,7 +396,7 @@ Desconectar y reconectar el lector para que aplique la regla.
 
 ---
 
-## 4. Detectar el lector RFID
+## 5. Detectar el lector RFID
 
 El lector RFID se conecta por USB pero expone un puerto serial.
 
@@ -366,9 +444,9 @@ Si hay varios dispositivos conectados, el número puede ser `ttyUSB1`, `ttyUSB2`
 
 ---
 
-## 5. Configurar config.json
+## 6. Configurar config.json
 
-Editar `config.json` con los valores obtenidos en los pasos anteriores:
+### Config recomendada (modo teclado)
 
 ```json
 {
@@ -378,19 +456,19 @@ Editar `config.json` con los valores obtenidos en los pasos anteriores:
 
   "lectorUSB": {
     "habilitado": true,
-    "dispositivos": [
-      {
-        "vendorId": "0x0C2E",
-        "productId": "0x0200",
-        "descripcion": "Lector código de barras entrada"
-      }
-    ]
+    "modoTeclado": true
   },
 
   "lectorRFID": {
-    "puerto": "/dev/ttyUSB0",
-    "baudRate": 9600,
-    "habilitado": true
+    "habilitado": true,
+    "dispositivos": [
+      {
+        "tipo": "SERIAL",
+        "puerto": "/dev/ttyUSB0",
+        "baudRate": 9600,
+        "descripcion": "Lector RFID"
+      }
+    ]
   },
 
   "molinete": {
@@ -413,21 +491,41 @@ Editar `config.json` con los valores obtenidos en los pasos anteriores:
 }
 ```
 
+### Config alternativa (modo hidraw)
+
+Si no podés usar el kiosco web, reemplazar el bloque `lectorUSB` por:
+
+```json
+"lectorUSB": {
+  "habilitado": true,
+  "modoTeclado": false,
+  "dispositivos": [
+    {
+      "vendorId": "0x0C2E",
+      "productId": "0x0200",
+      "descripcion": "Lector código de barras entrada"
+    }
+  ]
+}
+```
+
 **Referencia de campos:**
 
 | Campo | Descripción |
 |-------|-------------|
 | `apiUrl` | URL del servidor RojoPlus. Misma PC: `http://localhost:3001/api`. Otra máquina: `http://192.168.1.100:3001/api` |
 | `dispositivoId` | ID del dispositivo configurado en el panel de administración |
-| `lectorUSB.vendorId` / `productId` | Obtenidos en el paso 3. Formato: `"0x0C2E"` |
-| `lectorRFID.puerto` | Path del puerto serial. Ej: `"/dev/ttyUSB0"` |
+| `lectorUSB.modoTeclado` | `true` (recomendado): captura por navegador. `false`: usa node-hid (requiere VID/PID y permisos) |
+| `lectorUSB.dispositivos[].vendorId` / `productId` | Solo para modo hidraw. Obtenidos con `npm run detectar-usb`. Formato: `"0x0C2E"` |
+| `lectorUSB.dispositivos[].path` | Opcional. Solo necesario si hay varios lectores con el mismo VID/PID |
+| `lectorRFID.dispositivos[].puerto` | Path del puerto serial. Ej: `"/dev/ttyUSB0"` |
 | `molinete.puerto` | Path del puerto serial del relay. Ej: `"/dev/ttyUSB1"` |
 | `molinete.comandoON` | Bytes hex para abrir el relay. El relay CH340 usa `"A0:01:01"` |
 | `molinete.comandoOFF` | Bytes hex para cerrar el relay. El relay CH340 usa `"A0:01:00"` |
 
 ---
 
-## 6. Ejecutar el servicio
+## 7. Ejecutar el servicio
 
 ### Modo desarrollo (con auto-reload)
 
@@ -445,9 +543,102 @@ Una vez iniciado, abrir el monitor web en: **http://localhost:3002**
 
 Muestra el estado de todas las conexiones, los últimos accesos en tiempo real y permite abrir el molinete manualmente.
 
+> **Si usás modo teclado:** el monitor web **tiene que estar abierto y con foco** para que los escaneos lleguen. Ver sección 8.
+
 ---
 
-## 7. Registrar como servicio del sistema
+## 8. Modo kiosco — pantalla completa al arrancar
+
+Requerido si usás `modoTeclado: true`. La idea es que al encender la PC, arranque directamente el navegador en pantalla completa mostrando el monitor web, sin escritorio ni nada que pueda robar el foco.
+
+### Opción A — Chromium en modo kiosco con autologin
+
+Funciona en Ubuntu/Debian con GNOME, XFCE, LXDE, etc.
+
+**1. Instalar Chromium:**
+```bash
+sudo apt install -y chromium-browser
+# o si preferís Chrome: descargar desde google.com/chrome
+```
+
+**2. Configurar autologin** (para que no pida contraseña al arrancar).
+
+En Ubuntu con GDM, editar `/etc/gdm3/custom.conf`:
+```ini
+[daemon]
+AutomaticLoginEnable=true
+AutomaticLogin=usuario
+```
+
+En LightDM (`/etc/lightdm/lightdm.conf`):
+```ini
+[Seat:*]
+autologin-user=usuario
+autologin-user-timeout=0
+```
+
+**3. Lanzar Chromium en kiosco al iniciar sesión.**
+
+Crear `~/.config/autostart/molinete-kiosco.desktop`:
+```ini
+[Desktop Entry]
+Type=Application
+Name=Molinete Kiosco
+Exec=/bin/bash -c "sleep 5 && chromium-browser --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble --disable-translate --autoplay-policy=no-user-gesture-required http://localhost:3002"
+X-GNOME-Autostart-enabled=true
+```
+
+Flags importantes:
+- `--kiosk`: pantalla completa sin chrome ni atajos para salir.
+- `--noerrdialogs` + `--disable-session-crashed-bubble`: evita modales al reiniciar.
+- `sleep 5`: espera a que el servicio haya levantado antes de abrir la página.
+
+**4. Deshabilitar el bloqueo de pantalla / salvapantallas:**
+```bash
+# GNOME
+gsettings set org.gnome.desktop.screensaver lock-enabled false
+gsettings set org.gnome.desktop.session idle-delay 0
+
+# XFCE: Settings → Power Manager → desactivar DPMS y salvapantallas
+```
+
+### Opción B — Openbox minimalista (más liviano)
+
+Instalar un entorno mínimo que solo corre Chromium, sin escritorio:
+
+```bash
+sudo apt install -y xorg openbox chromium-browser
+```
+
+Crear `~/.config/openbox/autostart`:
+```bash
+# Desactivar ahorro de energía
+xset s off
+xset -dpms
+xset s noblank
+
+# Lanzar Chromium en kiosco
+sleep 5 && chromium-browser --kiosk --noerrdialogs --disable-infobars \
+  --no-first-run --disable-session-crashed-bubble \
+  http://localhost:3002 &
+```
+
+Y configurar autologin con `startx` automático en `~/.bash_profile`:
+```bash
+if [[ -z $DISPLAY && $(tty) == /dev/tty1 ]]; then
+  startx
+fi
+```
+
+### Salir del modo kiosco
+
+Para mantenimiento, desde otra máquina por SSH o:
+- **Ctrl + Alt + F2/F3**: cambia a una TTY de texto, podés ejecutar `sudo systemctl stop molinete` o matar Chromium.
+- **Ctrl + Alt + F7** (o F1, según distro): volver a la sesión gráfica.
+
+---
+
+## 9. Registrar como servicio del sistema
 
 Para que el servicio arranque automáticamente al encender la PC, sin necesidad de abrir una terminal.
 
@@ -540,7 +731,15 @@ sudo journalctl -u molinete -n 100  # Ver últimas 100 líneas de log
 
 ---
 
-## 8. Troubleshooting
+## 10. Troubleshooting
+
+### Los escaneos no llegan (modo teclado)
+
+1. Verificar que el navegador tenga foco — hacer click en cualquier parte del monitor web.
+2. Abrir la consola del navegador (F12 en desarrollo, o tocar pantalla con patrón específico en kiosco) y escanear — tiene que aparecer el POST a `/api/lectura-teclado` en la pestaña Network.
+3. Si hay un campo `input` o `textarea` con foco, las teclas se tipean ahí en vez de ir al capturador. Hacer click fuera.
+4. Si las lecturas son muy lentas, revisar `TECLADO_TIMEOUT_MS` en `public/index.html` (valor por defecto: 80ms entre teclas).
+5. Verificar que el navegador es la ventana activa — si hay notificaciones o menús abiertos, roban el foco.
 
 ### "Permission denied" en /dev/ttyUSB0 o /dev/hidraw
 
@@ -611,7 +810,7 @@ sudo journalctl -u molinete -n 50 --no-pager
 
 ---
 
-## 9. Espiar señales de una aplicación existente
+## 11. Espiar señales de una aplicación existente
 
 Si hay una aplicación que ya controla el molinete y los lectores, estas herramientas permiten capturar los bytes exactos que envía y recibe para replicar ese comportamiento en `config.json`.
 
