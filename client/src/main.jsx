@@ -19,27 +19,25 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </React.StrictMode>,
 )
 
-// Registro del Service Worker para PWA
+// Limpieza de SW legacy.
+// vite-plugin-pwa (con injectRegister: 'auto') se encarga de registrar /sw.js automáticamente.
+// Este bloque solo desregistra el /service-worker.js viejo que quedaba de versiones previas y
+// convivía con /sw.js causando loops de reload.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
-    // En desarrollo, desregistrar service workers para evitar problemas de cache
-    if (import.meta.env.DEV) {
+    try {
       const registrations = await navigator.serviceWorker.getRegistrations()
-      for (let registration of registrations) {
-        await registration.unregister()
+      for (const reg of registrations) {
+        const url = reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || ''
+        if (url.endsWith('/service-worker.js')) {
+          await reg.unregister()
+        }
       }
-      return
-    }
-
-    // En producción, registrar y actualizar service worker
-    navigator.serviceWorker
-      .register('/service-worker.js')
-      .then((registration) => {
-        // Forzar actualización del service worker si hay una nueva versión
-        registration.update()
-      })
-      .catch((error) => {
-        // Error registrando service worker
-      })
+      if (import.meta.env.DEV) {
+        for (const reg of await navigator.serviceWorker.getRegistrations()) {
+          await reg.unregister()
+        }
+      }
+    } catch (_) {}
   })
 }

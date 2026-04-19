@@ -1,88 +1,16 @@
-// Service Worker para PWA de Control de Accesos
-const CACHE_NAME = 'rojoplus-accesos-v3'
-const urlsToCache = [
-  '/admin/accesos/control-pwa',
-  '/manifest.json',
-  '/images/icon-192.png',
-  '/images/icon-512.png'
-]
+// Kill-switch del SW legacy.
+// Este archivo existía en versiones previas y convivía con /sw.js (vite-plugin-pwa),
+// causando loops de reload. Ahora solo se desregistra y limpia sus caches.
+// No borrar el archivo — si se devuelve 404, los navegadores con el SW viejo
+// registrado no reciben actualización y siguen rotos.
+self.addEventListener('install', () => self.skipWaiting())
 
-// Instalación del service worker
-self.addEventListener('install', (event) => {
-  // console.log('[Service Worker] Instalando...')
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        // console.log('[Service Worker] Cacheando recursos')
-        return cache.addAll(urlsToCache)
-      })
-      .catch((error) => {
-        // console.error('[Service Worker] Error cacheando:', error)
-      })
-  )
-  self.skipWaiting()
-})
-
-// Activación del service worker
 self.addEventListener('activate', (event) => {
-  // console.log('[Service Worker] Activando...')
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            // console.log('[Service Worker] Eliminando cache antiguo:', cacheName)
-            return caches.delete(cacheName)
-          }
-        })
-      )
-    })
-  )
-  self.clients.claim()
-})
-
-// Estrategia: Network First, fallback to Cache
-self.addEventListener('fetch', (event) => {
-  // Solo cachear requests GET
-  if (event.request.method !== 'GET') {
-    return
-  }
-
-  // No cachear requests a la API
-  if (event.request.url.includes('/api/')) {
-    return
-  }
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Si la respuesta es válida, clonarla y guardarla en cache
-        if (response && response.status === 200) {
-          const responseClone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone)
-          })
-        }
-        return response
-      })
-      .catch(() => {
-        // Si falla el fetch, intentar obtener del cache
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            // Solo logear en producción o para debugging específico
-            // console.log('[Service Worker] Sirviendo desde cache:', event.request.url)
-            return cachedResponse
-          }
-          // Si tampoco está en cache, mostrar página offline
-          return caches.match('/admin/accesos/control-pwa')
-        })
-      })
-  )
-})
-
-// Manejo de mensajes
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting()
-  }
+  event.waitUntil((async () => {
+    const keys = await caches.keys()
+    await Promise.all(keys.map(k => caches.delete(k)))
+    await self.registration.unregister()
+    const clients = await self.clients.matchAll({ type: 'window' })
+    for (const c of clients) c.navigate(c.url)
+  })())
 })
