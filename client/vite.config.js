@@ -74,8 +74,9 @@ export default defineConfig({
             options: {
               cacheName: 'api-socio-cache',
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 1 day
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24, // 1 day
+                purgeOnQuotaError: true
               },
               networkTimeoutSeconds: 10
             }
@@ -86,8 +87,9 @@ export default defineConfig({
             options: {
               cacheName: 'uploads-cache',
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                maxEntries: 40,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 días (antes 30)
+                purgeOnQuotaError: true
               }
             }
           }
