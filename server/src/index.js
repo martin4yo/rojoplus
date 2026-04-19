@@ -87,6 +87,8 @@ app.use(cors({
     if (!origin) return callback(null, true)
     // Permitir cualquier subdomain de localhost
     if (/^https?:\/\/[^/]*\.localhost(:\d+)?$/.test(origin)) return callback(null, true)
+    // Permitir cualquier subdomain de clubix.com.ar (multi-tenant)
+    if (/^https:\/\/[^/]*\.clubix\.com\.ar$/.test(origin)) return callback(null, true)
     // Permitir origins configurados
     if (allowedOrigins.includes(origin)) return callback(null, true)
     callback(new Error(`CORS: origin no permitido: ${origin}`))
