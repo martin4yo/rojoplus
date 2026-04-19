@@ -73,6 +73,9 @@ const app = express()
 const httpServer = createServer(app)
 const PORT = process.env.PORT || 3000
 
+// Confiar en el primer proxy (nginx/cloudflare) para que req.ip y X-Forwarded-For funcionen bien con express-rate-limit
+app.set('trust proxy', 1)
+
 // Middlewares globales
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
