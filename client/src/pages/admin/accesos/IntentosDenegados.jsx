@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, CheckCircle, XCircle, Clock, MapPin, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle, Clock, MapPin, Trash2, UserCheck } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
 import toast from 'react-hot-toast'
@@ -178,6 +178,9 @@ export default function IntentosDenegados() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">DNI</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 hidden sm:table-cell">
+                    Nombre
+                  </th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 hidden md:table-cell">
                     Primer Intento
                   </th>
@@ -202,6 +205,11 @@ export default function IntentosDenegados() {
                     <td className="px-4 py-3">
                       <span className="font-mono text-lg font-bold text-gray-800">
                         {intento.dni}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span className="text-sm text-gray-700">
+                        {intento.nombreCompleto || <span className="italic text-gray-400">Sin dato</span>}
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
@@ -251,10 +259,10 @@ export default function IntentosDenegados() {
                           <>
                             <button
                               onClick={() => abrirModalHabilitacion(intento)}
-                              className="px-3 py-1.5 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors"
+                              className="p-2 text-primary hover:text-white hover:bg-primary rounded transition-colors"
                               title="Habilitar acceso temporal"
                             >
-                              ✅ Habilitar
+                              <UserCheck className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDescartar(intento.dni)}
@@ -281,15 +289,15 @@ export default function IntentosDenegados() {
       </div>
 
       {/* Modal de Habilitación */}
-      {modalHabilitacion && (
-        <ModalHabilitacion
-          dni={modalHabilitacion.dni}
-          intentos={modalHabilitacion.intentos}
-          onClose={() => setModalHabilitacion(null)}
-          onSubmit={handleHabilitar}
-          loading={loading}
-        />
-      )}
+      <ModalHabilitacion
+        isOpen={!!modalHabilitacion}
+        dni={modalHabilitacion?.dni}
+        nombreSugerido={modalHabilitacion?.nombreCompleto || ''}
+        intentos={modalHabilitacion?.intentos || []}
+        onClose={() => setModalHabilitacion(null)}
+        onSubmit={handleHabilitar}
+        loading={loading}
+      />
 
       <ConfirmDialog />
     </div>
@@ -297,7 +305,7 @@ export default function IntentosDenegados() {
 }
 
 // Componente Modal para crear habilitación
-function ModalHabilitacion({ dni, intentos, onClose, onSubmit, loading }) {
+function ModalHabilitacion({ isOpen, dni, nombreSugerido, intentos, onClose, onSubmit, loading }) {
   const [formData, setFormData] = useState({
     nombreCompleto: '',
     motivo: '',
@@ -306,6 +314,14 @@ function ModalHabilitacion({ dni, intentos, onClose, onSubmit, loading }) {
     accesosPermitidos: '',
     observaciones: ''
   })
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(f => ({ ...f, nombreCompleto: nombreSugerido || '' }))
+    }
+  }, [isOpen, nombreSugerido])
+
+  if (!isOpen) return null
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -332,7 +348,7 @@ function ModalHabilitacion({ dni, intentos, onClose, onSubmit, loading }) {
   ]
 
   return (
-    <Modal onClose={onClose} title="Habilitar Acceso Temporal">
+    <Modal isOpen={isOpen} onClose={onClose} title="Habilitar Acceso Temporal" maxWidth="max-w-2xl">
       <form onSubmit={handleSubmit}>
         {/* Información del DNI */}
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
@@ -459,16 +475,16 @@ function ModalHabilitacion({ dni, intentos, onClose, onSubmit, loading }) {
             variant="secondary"
             onClick={onClose}
             disabled={loading}
-            className="flex-1"
+            className="flex-1 whitespace-nowrap"
           >
             Cancelar
           </Button>
           <Button
             type="submit"
             disabled={loading}
-            className="flex-1"
+            className="flex-1 inline-flex items-center justify-center gap-2 whitespace-nowrap"
           >
-            {loading ? 'Creando...' : '✅ Crear Habilitación'}
+            {loading ? 'Creando...' : (<><CheckCircle className="w-4 h-4" />Crear Habilitación</>)}
           </Button>
         </div>
       </form>

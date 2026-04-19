@@ -287,6 +287,7 @@ function handleUSBData(valorLeido) {
 
   // Distinguir entre QR y DNI por patrón
   let tipoLectura = 'DNI'
+  let nombreCompleto = null
 
   // QR del portal suele ser UUID (36 chars con guiones)
   if (valorLeido.length === 36 && valorLeido.includes('-')) {
@@ -300,12 +301,25 @@ function handleUSBData(valorLeido) {
   else if (valorLeido.includes('@') || valorLeido.length > 20) {
     tipoLectura = 'DNI'
     // Formato PDF417 DNI argentino: APELLIDO@NOMBRE@NOMBRE2@DNI@D@FECHA@SEXO@NACION@TRAMITE
+    // (NOMBRE2 solo aparece si la persona tiene segundo nombre — puede no estar)
     const partes = valorLeido.split('@')
     if (partes.length >= 4) {
-      // El DNI siempre está en el índice 3
-      const dniExtraido = partes[3].replace(/\D/g, '')
-      if (/^\d{7,8}$/.test(dniExtraido)) {
-        valorLeido = dniExtraido
+      // Buscar el índice del DNI (primer grupo de 7-8 dígitos)
+      let dniIndex = -1
+      for (let i = 0; i < partes.length; i++) {
+        const limpio = partes[i].replace(/\D/g, '')
+        if (/^\d{7,8}$/.test(limpio)) {
+          dniIndex = i
+          break
+        }
+      }
+      if (dniIndex > 0) {
+        const apellido = (partes[0] || '').trim()
+        const nombres = partes.slice(1, dniIndex).map(p => p.trim()).filter(Boolean).join(' ')
+        if (apellido || nombres) {
+          nombreCompleto = `${apellido}${apellido && nombres ? ', ' : ''}${nombres}`.trim()
+        }
+        valorLeido = partes[dniIndex].replace(/\D/g, '')
       }
     } else {
       // Fallback: primer grupo de 7-8 dígitos
@@ -314,7 +328,7 @@ function handleUSBData(valorLeido) {
     }
   }
 
-  procesarLectura(valorLeido, tipoLectura)
+  procesarLectura(valorLeido, tipoLectura, { nombreCompleto })
 }
 
 /**
@@ -332,8 +346,8 @@ function handleRFIDData(data, origen = '') {
 /**
  * FUNCIÓN PRINCIPAL - Procesar lectura y determinar acceso
  */
-async function procesarLectura(valorLeido, tipoLectura) {
-  logger.info(`🔍 Procesando: ${tipoLectura} = ${valorLeido}`)
+async function procesarLectura(valorLeido, tipoLectura, metadata = {}) {
+  logger.info(`🔍 Procesando: ${tipoLectura} = ${valorLeido}${metadata.nombreCompleto ? ` (${metadata.nombreCompleto})` : ''}`)
 
   let resultado
 
@@ -388,7 +402,7 @@ async function procesarLectura(valorLeido, tipoLectura) {
   }
 
   // Registro en background (si falla guarda en cache offline igual)
-  registrar(resultado, valorLeido, tipoLectura).catch(err =>
+  registrar(resultado, valorLeido, tipoLectura, metadata).catch(err =>
     logger.error(`Error registrando acceso: ${err.message}`)
   )
 }
@@ -526,13 +540,14 @@ async function validarOffline(valorLeido, tipoLectura) {
 /**
  * Registrar acceso en el sistema
  */
-async function registrar(resultado, valorLeido, tipoLectura) {
+async function registrar(resultado, valorLeido, tipoLectura, metadata = {}) {
   const registro = {
     dispositivoId: config.dispositivoId,
     socioId: resultado.persona?.id || null,
     habilitacionTemporalId: null, // Se asignaría si es habilitación
     tipoLectura,
     valorLeido,
+    nombreCompleto: metadata.nombreCompleto || null,
     resultado: resultado.permitido ? 'PERMITIDO' : 'DENEGADO',
     motivoRechazo: resultado.permitido ? null : resultado.motivo,
     modoValidacion: estadoConexion.api ? 'ONLINE' : 'OFFLINE',

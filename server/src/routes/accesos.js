@@ -288,6 +288,7 @@ router.post('/registrar', authDispositivo, async (req, res) => {
     const {
       tipoLectura,
       valorLeido,
+      nombreCompleto,
       resultado,
       motivoRechazo,
       socioId,
@@ -320,6 +321,7 @@ router.post('/registrar', authDispositivo, async (req, res) => {
           dispositivoId,
           tipoLectura,
           valorLeido,
+          nombreCompleto: nombreCompleto || null,
           motivoRechazo
         }
       })
@@ -643,6 +645,7 @@ router.get('/intentos-denegados', tenantForAdmin, authAdmin, checkPermiso('ACCES
       if (!acc[key]) {
         acc[key] = {
           dni: intento.valorLeido,
+          nombreCompleto: intento.nombreCompleto || null,
           primerIntento: intento.fecha,
           ultimoIntento: intento.fecha,
           cantidad: 0,
@@ -651,6 +654,10 @@ router.get('/intentos-denegados', tenantForAdmin, authAdmin, checkPermiso('ACCES
           habilitacion: intento.habilitacion,
           intentos: []
         }
+      }
+      // Si el grupo aún no tiene nombre pero este intento sí, heredarlo
+      if (!acc[key].nombreCompleto && intento.nombreCompleto) {
+        acc[key].nombreCompleto = intento.nombreCompleto
       }
       acc[key].cantidad++
       acc[key].intentos.push(intento)

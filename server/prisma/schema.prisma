@@ -3539,6 +3539,7 @@ model IntentoAccesoDenegado {
   dispositivoId   Int                   @map("dispositivo_id")
   tipoLectura     String                @map("tipo_lectura")
   valorLeido      String                @map("valor_leido")
+  nombreCompleto  String?               @map("nombre_completo")
   motivoRechazo   String                @map("motivo_rechazo")
   fecha           DateTime              @default(now())
   resuelto        Boolean               @default(false)
