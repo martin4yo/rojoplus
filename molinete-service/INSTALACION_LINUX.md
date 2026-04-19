@@ -7,13 +7,15 @@
 0. [Copiar los archivos a Linux](#0-copiar-los-archivos-a-linux)
 1. [Requisitos previos](#1-requisitos-previos)
 2. [Instalar el servicio](#2-instalar-el-servicio)
-3. [Detectar el lector USB](#3-detectar-el-lector-usb)
-4. [Detectar el lector RFID](#4-detectar-el-lector-rfid)
-5. [Configurar config.json](#5-configurar-configjson)
-6. [Ejecutar el servicio](#6-ejecutar-el-servicio)
-7. [Registrar como servicio del sistema](#7-registrar-como-servicio-del-sistema)
-8. [Troubleshooting](#8-troubleshooting)
-9. [Espiar señales de una aplicación existente](#9-espiar-señales-de-una-aplicación-existente)
+3. [Modos de operación del lector USB](#3-modos-de-operación-del-lector-usb)
+4. [Detectar el lector USB (solo modo hidraw)](#4-detectar-el-lector-usb-solo-modo-hidraw)
+5. [Detectar el lector RFID](#5-detectar-el-lector-rfid)
+6. [Configurar config.json](#6-configurar-configjson)
+7. [Ejecutar el servicio](#7-ejecutar-el-servicio)
+8. [Modo kiosco — pantalla completa al arrancar](#8-modo-kiosco--pantalla-completa-al-arrancar)
+9. [Registrar como servicio del sistema](#9-registrar-como-servicio-del-sistema)
+10. [Troubleshooting](#10-troubleshooting)
+11. [Espiar señales de una aplicación existente](#11-espiar-señales-de-una-aplicación-existente)
 
 ---
 
