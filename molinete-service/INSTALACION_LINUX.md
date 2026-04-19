@@ -398,13 +398,18 @@ Desconectar y reconectar el lector para que aplique la regla.
 
 ## 5. Detectar el lector RFID
 
-El lector RFID se conecta por USB pero expone un puerto serial.
+El lector RFID puede venir de dos formas según el hardware:
+
+- **USB con chip serial adentro** (más común) — aparece como `/dev/ttyUSB0` o `/dev/ttyACM0`. Se conecta por USB pero internamente un chip CH340/CP210x/FTDI lo convierte a serial.
+- **RS232 puro** (DB9) — aparece como `/dev/ttyS0`, `/dev/ttyS1`, etc. Requiere que la PC tenga puerto serie físico (DB9 macho atrás del gabinete, placa PCIe, o adaptador USB-serial externo).
+
+### Caso A — USB-serial (ttyUSB/ttyACM)
 
 ```bash
 npm run detectar-rfid
 ```
 
-En Linux los dispositivos seriales aparecen como `/dev/ttyUSB0`, `/dev/ttyACM0`, etc.
+En Linux los dispositivos aparecen como `/dev/ttyUSB0`, `/dev/ttyACM0`, etc.
 
 Ejemplo de salida:
 
@@ -441,6 +446,192 @@ El script también tiene una opción interactiva: ingresá el número del puerto
 | Arduino / ACM | `/dev/ttyACM0` |
 
 Si hay varios dispositivos conectados, el número puede ser `ttyUSB1`, `ttyUSB2`, etc. Para que el puerto siempre tenga el mismo nombre sin importar el orden de conexión, ver la sección de reglas udev en Troubleshooting.
+
+### Caso B — RS232 puro (ttyS)
+
+Si el lector no aparece en `/dev/ttyUSB*` ni `/dev/ttyACM*` al enchufarlo, probablemente tenés un lector **RS232 nativo** conectado a un puerto serie físico de la PC. Aparecen como `/dev/ttyS0`, `/dev/ttyS1`, etc.
+
+**1. Listar puertos físicos de la PC:**
+
+```bash
+ls /dev/ttyS*
+dmesg | grep ttyS | head
+```
+
+Ejemplo:
+```
+[    1.234567] 00:03: ttyS0 at I/O 0x3f8 (irq = 4) is a 16550A
+[    1.234568] 00:04: ttyS1 at I/O 0x2f8 (irq = 3) is a 16550A
+```
+
+Los que aparecen con `16550A` (o similar) son puertos reales. El kernel expone muchos `ttyS*` pero la mayoría son placeholders sin hardware detrás.
+
+**2. Confirmar cuáles son reales:**
+
+```bash
+sudo apt install -y setserial
+sudo setserial -g /dev/ttyS[0-7]
+```
+
+Resultado ejemplo:
+- `/dev/ttyS0, UART: 16550A, Port: 0x03f8, IRQ: 4` → **puerto real, usable**.
+- `/dev/ttyS2, UART: unknown, Port: 0x0000, IRQ: 0` → no existe físicamente.
+
+**3. Verificar el hardware físico:**
+
+| Hardware | Dónde está |
+|----------|------------|
+| DB9 macho atrás del gabinete | Placa madre con puerto serial. Típicamente es `/dev/ttyS0`. |
+| Cable con DB9 que sale por ranura PCI/PCIe | Placa PCIe de puertos serie. Puede ser `/dev/ttyS4`, `/dev/ttyS5`, etc. |
+| Sin DB9 pero con cable serial → USB | Hay un conversor RS232-USB en el cable (chip FTDI/CH340). Caé en el **Caso A** (`/dev/ttyUSB0`). |
+
+**4. Permisos:**
+
+Mismos que para `ttyUSB` — grupo `dialout`:
+```bash
+ls -la /dev/ttyS0
+# Resultado esperado: crw-rw---- 1 root dialout ...
+
+groups $USER
+# Tiene que aparecer "dialout"
+```
+
+**5. Probar comunicación cruda:**
+
+```bash
+# Capturar datos al pasar una tarjeta
+sudo cat /dev/ttyS0
+# Tienen que aparecer bytes al pasar tarjeta. Ctrl+C para cortar.
+
+# Si no aparece nada o aparecen caracteres raros, probar otros baudRate
+sudo apt install -y minicom
+sudo minicom -D /dev/ttyS0 -b 9600
+# Si se ve basura: probar 4800, 19200, 115200
+# Ctrl+A → X para salir
+```
+
+**6. Actualizar config.json:**
+
+```json
+"lectorRFID": {
+  "habilitado": true,
+  "dispositivos": [
+    {
+      "tipo": "SERIAL",
+      "puerto": "/dev/ttyS0",
+      "baudRate": 9600,
+      "descripcion": "Lector RFID RS232"
+    }
+  ]
+}
+```
+
+#### Sub-caso B.1 — Placa PCI/PCIe con varios puertos DB9
+
+Si la PC tiene una placa PCI/PCIe agregada que expone 2 o más DB9, cada uno es un puerto serie independiente. El procedimiento es el mismo que el del Caso B, con algunos pasos extra para identificar qué `ttyS*` corresponde a qué DB9 físico.
+
+**1. Verificar que Linux reconoce la placa:**
+
+```bash
+lspci | grep -i serial
+# Ejemplo:
+# 02:00.0 Serial controller: Oxford Semiconductor Ltd OXPCIe952 (rev 01)
+# 02:00.1 Serial controller: Oxford Semiconductor Ltd OXPCIe952 (rev 01)
+```
+
+Si no aparece, la placa no está detectada — driver faltante, mal encastrada, o no compatible.
+
+**2. Identificar los ttyS de la placa:**
+
+```bash
+sudo setserial -g /dev/ttyS[0-15] 2>/dev/null | grep -v "unknown"
+```
+
+Ejemplo con placa PCI de 2 puertos:
+```
+/dev/ttyS0, UART: 16550A, Port: 0x03f8, IRQ: 4    ← puerto del mother (si existe)
+/dev/ttyS4, UART: 16950, Port: 0xe000, IRQ: 16   ← puerto 1 de la placa PCI
+/dev/ttyS5, UART: 16950, Port: 0xe008, IRQ: 16   ← puerto 2 de la placa PCI
+```
+
+Los puertos de la placa suelen tener chip **16950** o **16C950** (Oxford/MosChip) mientras que los integrados a la motherboard son **16550A**. También se puede confirmar con `dmesg | grep -E "ttyS|serial"`.
+
+**3. Saber cuál DB9 físico corresponde a cada ttyS:**
+
+Los DB9 de la placa son físicamente distintos (arriba/abajo o izquierda/derecha). Para saber el mapeo, conectar el lector a uno y ver si recibe datos:
+
+```bash
+# Conectar el lector al DB9 #1 de la placa
+sudo cat /dev/ttyS4
+# Pasar una tarjeta. Si aparecen bytes, ese DB9 es ttyS4.
+# Si no aparece nada, Ctrl+C y probar con ttyS5.
+
+sudo cat /dev/ttyS5
+# Pasar tarjeta de nuevo.
+```
+
+Alternativamente con minicom (más legible):
+```bash
+sudo apt install -y minicom
+sudo minicom -D /dev/ttyS4 -b 9600
+# Pasar tarjeta. Si aparecen caracteres → ese es el puerto.
+# Ctrl+A → X para salir, probar con ttyS5.
+```
+
+**4. Permisos (igual que el Caso B):**
+
+```bash
+ls -la /dev/ttyS4 /dev/ttyS5
+groups $USER  # debe incluir dialout
+```
+
+**5. Config con lector + molinete en la misma placa:**
+
+Si el lector RFID está en un DB9 y el relay del molinete en el otro DB9 de la misma placa:
+
+```json
+"lectorRFID": {
+  "habilitado": true,
+  "dispositivos": [
+    {
+      "tipo": "SERIAL",
+      "puerto": "/dev/ttyS4",
+      "baudRate": 9600,
+      "descripcion": "Lector RFID (DB9 superior)"
+    }
+  ]
+},
+
+"molinete": {
+  "tipo": "USB_RELAY",
+  "puerto": "/dev/ttyS5",
+  "baudRate": 9600,
+  "comandoON": "A0:01:01",
+  "comandoOFF": "A0:01:00",
+  "tiempoApertura": 3000,
+  "descripcion": "Relay del molinete (DB9 inferior)"
+}
+```
+
+> **Importante:** `ttyS4`/`ttyS5` son ejemplos. Usar los números reales que obtuviste con `setserial`.
+
+### Caso C — El molinete completo (lector + relay) en un mismo cable serial
+
+Algunos controladores integrados (Sebury, ZKTeco, ESSL, etc.) incluyen el lector RFID y la electrónica para abrir la traba en una sola placa, con un único cable serial (USB o RS232) hacia la PC. En ese caso el mismo puerto recibe las lecturas y también recibe los comandos de apertura.
+
+La configuración actual del servicio asume **dos puertos distintos** (`lectorRFID.dispositivos[].puerto` y `molinete.puerto`). Apuntar ambos al mismo path **no funciona** — `SerialPort` no permite abrir el mismo puerto dos veces.
+
+Si tenés este hardware, pasame la marca/modelo y el protocolo (bytes que envía al leer una tarjeta, bytes que espera para abrir) para refactorizar el servicio y que comparta un único puerto. Mientras tanto podés capturar el protocolo con:
+
+```bash
+npm run detectar-rfid
+# Elegir el puerto del molinete
+# Pasar varias tarjetas — anotar los bytes recibidos en hex
+
+# Si ya existe otra app que abre el molinete, espiarla:
+ps aux | grep <nombre_app>
+sudo strace -p <PID> -e trace=read,write -s 256 2>&1 | grep tty
+```
 
 ---
 

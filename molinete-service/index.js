@@ -210,6 +210,11 @@ async function inicializarLectorRFID() {
           handleRFIDData(data.trim(), cfg.descripcion || cfg.puerto)
         })
 
+        // Debug: loguear bytes crudos para diagnosticar problemas de parser
+        port.on('data', (data) => {
+          logger.info(`[RFID raw ${cfg.puerto}] hex=${data.toString('hex')} ascii="${data.toString('ascii').replace(/[^\x20-\x7e]/g, '.')}"`)
+        })
+
         port.on('error', (err) => {
           logger.error(`Error en lector RFID ${cfg.puerto}: ${err.message}`)
           estadoConexion.rfid = lectorRFIDPorts.some(p => p.isOpen)
