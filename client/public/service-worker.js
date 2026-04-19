@@ -1,10 +1,10 @@
 // Service Worker para PWA de Control de Accesos
-const CACHE_NAME = 'rojoplus-accesos-v2'
+const CACHE_NAME = 'rojoplus-accesos-v3'
 const urlsToCache = [
   '/admin/accesos/control-pwa',
   '/manifest.json',
-  '/logo192.png',
-  '/logo512.png'
+  '/images/icon-192.png',
+  '/images/icon-512.png'
 ]
 
 // Instalación del service worker
