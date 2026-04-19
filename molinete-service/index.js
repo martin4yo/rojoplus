@@ -100,21 +100,40 @@ async function inicializarLectorUSB() {
     const HID = (await import('node-hid')).default
     const dispositivosConectados = HID.devices()
     let conectados = 0
+    const pathsAbiertos = new Set()
 
     for (const cfg of config.lectorUSB.dispositivos) {
-      const vendorId = parseInt(cfg.vendorId)
-      const productId = parseInt(cfg.productId)
+      let device = null
 
-      const device = dispositivosConectados.find(d => d.vendorId === vendorId && d.productId === productId)
+      if (cfg.path) {
+        device = dispositivosConectados.find(d => d.path === cfg.path)
+        if (!device) {
+          logger.warn(`Lector USB no encontrado por path: ${cfg.descripcion || ''} (path: ${cfg.path})`)
+          continue
+        }
+      } else {
+        const vendorId = parseInt(cfg.vendorId)
+        const productId = parseInt(cfg.productId)
+        device = dispositivosConectados.find(d =>
+          d.vendorId === vendorId &&
+          d.productId === productId &&
+          !pathsAbiertos.has(d.path)
+        )
+        if (!device) {
+          logger.warn(`Lector USB no encontrado: ${cfg.descripcion || ''} (VID: ${cfg.vendorId}, PID: ${cfg.productId})`)
+          logger.info('Si tenés varios lectores iguales, especificá "path" en cada entrada. Ejecute: npm run detectar-usb')
+          continue
+        }
+      }
 
-      if (!device) {
-        logger.warn(`Lector USB no encontrado: ${cfg.descripcion || ''} (VID: ${cfg.vendorId}, PID: ${cfg.productId})`)
-        logger.info('Ejecute: npm run detectar-usb para encontrar el dispositivo')
+      if (pathsAbiertos.has(device.path)) {
+        logger.warn(`Lector USB ya abierto (${device.path}), omitiendo: ${cfg.descripcion || ''}`)
         continue
       }
 
       const hidDevice = new HID.HID(device.path)
       lectorUSBDevices.push(hidDevice)
+      pathsAbiertos.add(device.path)
 
       let buffer = ''
       hidDevice.on('data', (data) => {
@@ -135,7 +154,7 @@ async function inicializarLectorUSB() {
         if (lectorUSBDevices.every(d => d._closed)) estadoConexion.usb = false
       })
 
-      logger.info(`✓ Lector USB inicializado: ${device.product || cfg.descripcion || 'Desconocido'}`)
+      logger.info(`✓ Lector USB inicializado: ${cfg.descripcion || device.product || 'Desconocido'} (${device.path})`)
       conectados++
     }
 
