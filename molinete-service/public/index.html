@@ -610,22 +610,33 @@
     document.addEventListener('keydown', (e) => {
       // Ignorar si hay un input/textarea enfocado
       const tag = (e.target?.tagName || '').toUpperCase()
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (tag === 'INPUT' || tag === 'TEXTAREA') {
+        console.log('[lector] keydown ignorado (foco en', tag, ')')
+        return
+      }
 
       const ahora = Date.now()
       const delta = ahora - tecladoUltimaTecla
       tecladoUltimaTecla = ahora
 
+      console.log('[lector] keydown:', { key: e.key, code: e.code, delta, bufferActual: tecladoBuffer })
+
       // Si pasó demasiado tiempo desde la última tecla, reiniciar buffer
       if (delta > TECLADO_TIMEOUT_MS && tecladoBuffer.length > 0) {
+        console.log('[lector] buffer reseteado por timeout (delta=' + delta + 'ms)')
         tecladoBuffer = ''
       }
 
-      if (e.key === 'Enter') {
+      // Fin de lectura: Enter o Tab
+      if (e.key === 'Enter' || e.key === 'Tab') {
         const valor = tecladoBuffer
         tecladoBuffer = ''
+        console.log('[lector] fin de lectura. Valor="' + valor + '" largo=' + valor.length)
         if (valor.length >= TECLADO_MIN_LARGO) {
+          console.log('[lector] ENVIANDO al backend:', valor)
           enviarLecturaTeclado(valor)
+        } else {
+          console.log('[lector] DESCARTADO (muy corto, min=' + TECLADO_MIN_LARGO + ')')
         }
         return
       }
@@ -635,6 +646,7 @@
         tecladoBuffer += e.key
       }
     })
+    console.log('[lector] capturador de teclado activo. Escaneá un código para probar.')
 
     // Render inicial de iconos + iniciar
     renderIcons()

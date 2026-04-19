@@ -354,18 +354,7 @@ async function procesarLectura(valorLeido, tipoLectura) {
     }
   }
 
-  // Registrar el acceso
-  await registrar(resultado, valorLeido, tipoLectura)
-
-  // Señalizar resultado
-  if (resultado.permitido) {
-    await abrirMolinete()
-    await senalizarPermitido(resultado.persona?.nombre)
-  } else {
-    await senalizarInhabilitado(resultado.motivo, resultado.persona?.nombre, valorLeido)
-  }
-
-  // Broadcast por WebSocket
+  // Broadcast INMEDIATO — el frontend muestra el evento sin esperar molinete/registro
   broadcast({
     tipo: 'ACCESO',
     data: {
@@ -378,6 +367,25 @@ async function procesarLectura(valorLeido, tipoLectura) {
       fecha: new Date().toISOString()
     }
   })
+
+  // Señalización (pantalla + beep) en paralelo, sin bloquear
+  if (resultado.permitido) {
+    senalizarPermitido(resultado.persona?.nombre).catch(err =>
+      logger.error(`Error señalizando permitido: ${err.message}`)
+    )
+    abrirMolinete().catch(err =>
+      logger.error(`Error abriendo molinete: ${err.message}`)
+    )
+  } else {
+    senalizarInhabilitado(resultado.motivo, resultado.persona?.nombre, valorLeido).catch(err =>
+      logger.error(`Error señalizando inhabilitado: ${err.message}`)
+    )
+  }
+
+  // Registro en background (si falla guarda en cache offline igual)
+  registrar(resultado, valorLeido, tipoLectura).catch(err =>
+    logger.error(`Error registrando acceso: ${err.message}`)
+  )
 }
 
 /**
