@@ -59,6 +59,7 @@ export default function AdminLogin() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="admin@sportivo.com.ar"
+            autoComplete="username"
             required
           />
 
@@ -68,6 +69,7 @@ export default function AdminLogin() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
+            autoComplete="current-password"
             required
           />
 
