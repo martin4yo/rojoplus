@@ -243,6 +243,7 @@ export default function Dispositivos() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600 w-10"></th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 w-16">ID</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Código</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Nombre</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 hidden md:table-cell">Ubicación</th>
@@ -263,6 +264,7 @@ export default function Dispositivos() {
                       <td className="px-4 py-3 text-center">
                         <CircleDot className={`w-4 h-4 inline ${dotClass}`} />
                       </td>
+                      <td className="px-4 py-3 font-mono text-sm text-gray-500">{d.id}</td>
                       <td className="px-4 py-3 font-mono text-sm">{d.codigo}</td>
                       <td className="px-4 py-3 font-medium text-gray-800">{d.nombre}</td>
                       <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{d.ubicacion}</td>

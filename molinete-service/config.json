@@ -1,12 +1,12 @@
 {
-  "apiUrl": "http://localhost:3001/api",
-  "dispositivoId": 1,
+  "apiUrl": "https://sportivotest.clubix.com.ar/api",
+  "dispositivoId": 2,
   "puerto": 3002,
   "puertoWebSocket": 3003,
 
   "tenant": {
-    "slug": "sportivopilar",
-    "apiToken": "REEMPLAZAR_CON_TOKEN_DEL_DISPOSITIVO",
+    "slug": "sportivotest",
+    "apiToken": "tok_f00dd108773ea02d281b6189db67b577c5687f46209397a3",
     "descripcion": "Credenciales del dispositivo. El token se genera en el admin del club y se vincula al DispositivoAcceso."
   },
 
@@ -24,24 +24,14 @@
   },
 
   "lectorRFID": {
-    "habilitado": true,
-    "dispositivos": [
-      {
-        "tipo": "SERIAL",
-        "puerto": "COM3",
-        "baudRate": 9600,
-        "descripcion": "Lector RFID por puerto serial"
-      }
-    ]
+    "habilitado": false,
+    "dispositivos": []
   },
 
   "molinete": {
-    "tipo": "USB_RELAY",
-    "puerto": "COM4",
-    "baudRate": 9600,
-    "comandoON": "A0:01:01",
-    "comandoOFF": "A0:01:00",
-    "tiempoApertura": 3000,
+    "tipo": "NONE",
+    "puerto": "",
+    "tiempoApertura": 0,
     "descripcion": "Relay USB para control de molinete"
   },
 
@@ -84,6 +74,7 @@
     "nivel": "info",
     "archivo": "logs/molinete.log",
     "maxSize": "10m",
-    "maxFiles": 5
+    "maxFiles": 5,
+    "puerto": 3002
   }
 }

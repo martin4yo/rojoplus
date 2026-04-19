@@ -286,7 +286,6 @@ router.post('/validar', authDispositivo, async (req, res) => {
 router.post('/registrar', authDispositivo, async (req, res) => {
   try {
     const {
-      dispositivoId,
       tipoLectura,
       valorLeido,
       resultado,
@@ -295,6 +294,10 @@ router.post('/registrar', authDispositivo, async (req, res) => {
       habilitacionTemporalId,
       modoValidacion
     } = req.body
+
+    // El dispositivoId lo tomamos del middleware (token autenticado), no del body,
+    // para evitar que un dispositivo registre accesos como si fuera otro.
+    const dispositivoId = req.dispositivo.id
 
     // Crear registro de acceso
     const registro = await req.db.registroAcceso.create({
