@@ -14,7 +14,7 @@ export default function QrScanner({ isOpen, onClose, onScan }) {
     const scannedUrl = result[0].rawValue
 
     // Extraer el token del URL escaneado
-    // Formato esperado: https://sportivo.axiomacloud.com/s/{tokenSocio}
+    // Formato esperado: https://<subdomain>.clubix.com.ar/s/{tokenSocio}
     // o http://localhost:5173/s/{tokenSocio}
     const match = scannedUrl.match(/\/s\/([a-f0-9-]+)$/i)
 
