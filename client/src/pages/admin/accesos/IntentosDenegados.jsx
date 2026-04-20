@@ -1,16 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { AlertTriangle, CheckCircle, XCircle, Clock, MapPin, Trash2, UserCheck } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Modal from '../../../components/Modal'
+import Pagination from '../../../components/Pagination'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../../hooks/useConfirm'
+
+const PAGE_SIZE = 20
 
 export default function IntentosDenegados() {
   const [intentos, setIntentos] = useState([])
   const [loading, setLoading] = useState(false)
   const [mostrarResueltos, setMostrarResueltos] = useState(false)
   const [modalHabilitacion, setModalHabilitacion] = useState(null)
+  const [page, setPage] = useState(1)
   const { confirm, ConfirmDialog } = useConfirm()
+
+  const paginated = useMemo(() => {
+    const total = intentos.length
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+    const safePage = Math.min(page, totalPages)
+    const from = total === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
+    const to = Math.min(safePage * PAGE_SIZE, total)
+    return {
+      data: intentos.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+      pagination: { page: safePage, totalPages, total, limit: PAGE_SIZE, from, to }
+    }
+  }, [intentos, page])
+
+  useEffect(() => { setPage(1) }, [mostrarResueltos])
 
   useEffect(() => {
     cargarIntentos()
@@ -200,7 +218,7 @@ export default function IntentosDenegados() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {intentos.map((intento) => (
+                {paginated.data.map((intento) => (
                   <tr key={intento.dni} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <span className="font-mono text-lg font-bold text-gray-800">
@@ -284,6 +302,13 @@ export default function IntentosDenegados() {
                 ))}
               </tbody>
             </table>
+            <div className="px-4 border-t border-gray-200">
+              <Pagination
+                pagination={paginated.pagination}
+                page={paginated.pagination.page}
+                onPageChange={setPage}
+              />
+            </div>
           </div>
         )}
       </div>

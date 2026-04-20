@@ -3487,6 +3487,7 @@ model RegistroAcceso {
   habilitacionTemporalId Int?                  @map("habilitacion_temporal_id")
   tipoLectura            String                @map("tipo_lectura")
   valorLeido             String                @map("valor_leido")
+  nombreCompleto         String?               @map("nombre_completo")
   resultado              String
   motivoRechazo          String?               @map("motivo_rechazo")
   modoValidacion         String                @map("modo_validacion")

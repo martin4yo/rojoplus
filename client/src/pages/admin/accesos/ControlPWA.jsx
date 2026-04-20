@@ -35,13 +35,45 @@ export default function ControlPWA() {
     setScanning(false)
   }
 
-  const handleScan = (result) => {
-    if (result && result.length > 0) {
-      const qrCode = result[0].rawValue
-      if (qrCode) {
-        procesarQR(qrCode)
+  // Parser de PDF417 de DNI argentino.
+  // Formato: APELLIDO@NOMBRE@NOMBRE2?@DNI@SEXO@FECHA@...
+  // Devuelve { dni, nombreCompleto } o null si no reconoce el formato.
+  const parsePDF417DNI = (raw) => {
+    if (!raw || !raw.includes('@')) return null
+    const partes = raw.split('@')
+    let dniIndex = -1
+    for (let i = 0; i < partes.length; i++) {
+      const limpio = partes[i].replace(/\D/g, '')
+      if (/^\d{7,8}$/.test(limpio)) {
+        dniIndex = i
+        break
       }
     }
+    if (dniIndex < 1) return null
+    const apellido = (partes[0] || '').trim()
+    const nombres = partes.slice(1, dniIndex).map(p => p.trim()).filter(Boolean).join(' ')
+    const nombreCompleto = `${apellido}${apellido && nombres ? ', ' : ''}${nombres}`.trim() || null
+    return { dni: partes[dniIndex].replace(/\D/g, ''), nombreCompleto }
+  }
+
+  const handleScan = (result) => {
+    if (!result || result.length === 0) return
+    const raw = result[0].rawValue
+    const format = result[0].format || ''
+    if (!raw) return
+
+    // Detección: por formato reportado por el scanner, o por patrón (contiene @ con varios campos)
+    const esPDF417 = format === 'pdf417' || (raw.includes('@') && raw.split('@').length >= 4)
+
+    if (esPDF417) {
+      const parsed = parsePDF417DNI(raw)
+      if (parsed) {
+        procesarDNI(parsed.dni, parsed.nombreCompleto)
+        return
+      }
+      // Si no pudo parsear, caer al path de QR por las dudas
+    }
+    procesarQR(raw)
   }
 
   const handleError = (error) => {
@@ -49,6 +81,62 @@ export default function ControlPWA() {
     if (error?.name === 'NotAllowedError') {
       toast.error('Permiso de cámara denegado. Por favor, habilite el acceso a la cámara.')
       detenerCamara()
+    }
+  }
+
+  const procesarDNI = async (dni, nombreCompleto) => {
+    if (loading) return
+    setLoading(true)
+    detenerCamara()
+
+    try {
+      const responseValidar = await fetch('/api/accesos/validar', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ dispositivoId, tipoLectura: 'DNI', valorLeido: dni })
+      })
+      const dataValidar = await responseValidar.json()
+      if (!dataValidar.success) throw new Error(dataValidar.error || 'Error validando DNI')
+
+      const validacion = dataValidar.data
+
+      // Registrar el acceso (permitido o denegado) — incluye nombreCompleto para intentos denegados
+      await fetch('/api/accesos/registrar', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          tipoLectura: 'DNI',
+          valorLeido: dni,
+          nombreCompleto,
+          resultado: validacion.permitido ? 'PERMITIDO' : 'DENEGADO',
+          motivoRechazo: validacion.permitido ? null : validacion.motivo,
+          socioId: validacion.persona?.id || null,
+          modoValidacion: 'ONLINE'
+        })
+      }).catch(err => console.warn('Error registrando acceso:', err))
+
+      if (validacion.permitido && navigator.vibrate) navigator.vibrate([100, 50, 100])
+      else if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200])
+
+      setResultado({
+        tipo: validacion.permitido ? 'PERMITIDO' : 'DENEGADO',
+        mensaje: validacion.mensaje,
+        submensaje: nombreCompleto || (validacion.persona?.apellidoNombre),
+        persona: validacion.persona
+      })
+      setTimeout(() => setResultado(null), 3000)
+    } catch (error) {
+      console.error('Error procesando DNI:', error)
+      toast.error(error.message || 'Error procesando DNI')
+      setResultado(null)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -355,6 +443,7 @@ export default function ControlPWA() {
               <Scanner
                 onScan={handleScan}
                 onError={handleError}
+                formats={['qr_code', 'pdf417']}
                 constraints={{
                   facingMode: 'environment'
                 }}
@@ -374,8 +463,9 @@ export default function ControlPWA() {
               Cancelar
             </button>
 
-            <p className="text-xs text-center text-gray-400">
-              📷 Apunte la cámara al código QR
+            <p className="text-xs text-center text-gray-400 flex items-center justify-center gap-1">
+              <Camera className="w-3 h-3" />
+              Apunte al QR del socio o al código de barras (PDF417) del DNI
             </p>
           </div>
         )}

@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { UserPlus, Search, Clock, CheckCircle, XCircle, Edit, Eye } from 'lucide-react'
 import { Button } from '../../../components/Button'
-import { usePagination } from '../../../hooks/usePagination'
 import Pagination from '../../../components/Pagination'
 import Modal from '../../../components/Modal'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../../hooks/useConfirm'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+
+const PAGE_SIZE = 20
 
 export default function Habilitaciones() {
   const [habilitaciones, setHabilitaciones] = useState([])
@@ -15,13 +16,26 @@ export default function Habilitaciones() {
   const [filtroEstado, setFiltroEstado] = useState('activas') // activas, vencidas, todas
   const [modalFormulario, setModalFormulario] = useState(false)
   const [habilitacionEditar, setHabilitacionEditar] = useState(null)
+  const [page, setPage] = useState(1)
   const { confirm, ConfirmDialog } = useConfirm()
 
-  const { page, limit, pagination, setPagination, goToPage } = usePagination(1, 20)
+  const paginated = useMemo(() => {
+    const total = habilitaciones.length
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+    const safePage = Math.min(page, totalPages)
+    const from = total === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
+    const to = Math.min(safePage * PAGE_SIZE, total)
+    return {
+      data: habilitaciones.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+      pagination: { page: safePage, totalPages, total, limit: PAGE_SIZE, from, to }
+    }
+  }, [habilitaciones, page])
+
+  useEffect(() => { setPage(1) }, [filtroEstado, busqueda])
 
   useEffect(() => {
     cargarHabilitaciones()
-  }, [page, filtroEstado])
+  }, [filtroEstado, busqueda])
 
   const cargarHabilitaciones = async () => {
     setLoading(true)
@@ -218,7 +232,7 @@ export default function Habilitaciones() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {habilitaciones.map((hab) => {
+                {paginated.data.map((hab) => {
                   const vencida = estaVencida(hab.fechaHasta)
                   const dias = diasRestantes(hab.fechaHasta)
 
@@ -308,25 +322,31 @@ export default function Habilitaciones() {
                 })}
               </tbody>
             </table>
+            <div className="px-4 border-t border-gray-200">
+              <Pagination
+                pagination={paginated.pagination}
+                page={paginated.pagination.page}
+                onPageChange={setPage}
+              />
+            </div>
           </div>
         )}
       </div>
 
       {/* Modal Formulario */}
-      {modalFormulario && (
-        <FormularioHabilitacion
-          habilitacion={habilitacionEditar}
-          onClose={() => {
-            setModalFormulario(false)
-            setHabilitacionEditar(null)
-          }}
-          onSuccess={() => {
-            setModalFormulario(false)
-            setHabilitacionEditar(null)
-            cargarHabilitaciones()
-          }}
-        />
-      )}
+      <FormularioHabilitacion
+        isOpen={modalFormulario}
+        habilitacion={habilitacionEditar}
+        onClose={() => {
+          setModalFormulario(false)
+          setHabilitacionEditar(null)
+        }}
+        onSuccess={() => {
+          setModalFormulario(false)
+          setHabilitacionEditar(null)
+          cargarHabilitaciones()
+        }}
+      />
 
       <ConfirmDialog />
     </div>
@@ -334,18 +354,33 @@ export default function Habilitaciones() {
 }
 
 // Componente Formulario
-function FormularioHabilitacion({ habilitacion, onClose, onSuccess }) {
+function FormularioHabilitacion({ isOpen, habilitacion, onClose, onSuccess }) {
   const esEdicion = !!habilitacion
 
   const [formData, setFormData] = useState({
-    documento: habilitacion?.documento || '',
-    nombreCompleto: habilitacion?.nombreCompleto || '',
-    motivo: habilitacion?.motivo || '',
-    diasHabilitados: habilitacion?.diasHabilitados || 7,
-    accesosPermitidos: habilitacion?.accesosPermitidos || '',
-    observaciones: habilitacion?.observaciones || ''
+    documento: '',
+    nombreCompleto: '',
+    motivo: '',
+    diasHabilitados: 7,
+    accesosPermitidos: '',
+    observaciones: ''
   })
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        documento: habilitacion?.documento || '',
+        nombreCompleto: habilitacion?.nombreCompleto || '',
+        motivo: habilitacion?.motivo || '',
+        diasHabilitados: habilitacion?.diasHabilitados || 7,
+        accesosPermitidos: habilitacion?.accesosPermitidos || '',
+        observaciones: habilitacion?.observaciones || ''
+      })
+    }
+  }, [isOpen, habilitacion])
+
+  if (!isOpen) return null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -389,8 +424,10 @@ function FormularioHabilitacion({ habilitacion, onClose, onSuccess }) {
 
   return (
     <Modal
+      isOpen={isOpen}
       onClose={onClose}
       title={esEdicion ? 'Editar Habilitación' : 'Nueva Habilitación'}
+      maxWidth="max-w-2xl"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -478,11 +515,11 @@ function FormularioHabilitacion({ habilitacion, onClose, onSuccess }) {
             variant="secondary"
             onClick={onClose}
             disabled={loading}
-            className="flex-1"
+            className="flex-1 whitespace-nowrap"
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={loading} className="flex-1">
+          <Button type="submit" disabled={loading} className="flex-1 whitespace-nowrap">
             {loading ? 'Guardando...' : esEdicion ? 'Actualizar' : 'Crear'}
           </Button>
         </div>

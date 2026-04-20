@@ -308,6 +308,7 @@ router.post('/registrar', authDispositivo, async (req, res) => {
         habilitacionTemporalId: habilitacionTemporalId || null,
         tipoLectura,
         valorLeido,
+        nombreCompleto: nombreCompleto || null,
         resultado,
         motivoRechazo: motivoRechazo || null,
         modoValidacion: modoValidacion || 'ONLINE'
