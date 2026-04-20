@@ -3,6 +3,7 @@ import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { notificarNuevoEntrenamiento, notificarCancelacionEntrenamiento } from '../services/notificacionService.js'
+import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 
 const router = Router()
 
@@ -1664,7 +1665,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
               <p><strong>Lugar:</strong> ${lugar}</p>
               <br>
               <p>Confirmá tu asistencia desde el portal del socio:</p>
-              <a href="${process.env.FRONTEND_URL || 'https://sportivo.axiomacloud.com'}/s/${socio.tokenPortal}"
+              <a href="${getTenantFrontendUrl(req.tenant)}/s/${socio.tokenPortal}"
                  style="display: inline-block; padding: 12px 24px; background-color: #DC2626; color: white; text-decoration: none; border-radius: 8px;">
                 Ir al Portal
               </a>

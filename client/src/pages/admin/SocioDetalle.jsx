@@ -165,7 +165,7 @@ export default function SocioDetalle() {
   }
 
   function getQrUrl() {
-    return `https://sportivo.axiomacloud.com/s/${socio?.tokenPortal}`
+    return `${window.location.origin}/s/${socio?.tokenPortal}`
   }
 
   async function regenerarToken() {

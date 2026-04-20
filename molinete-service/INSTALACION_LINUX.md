@@ -16,6 +16,7 @@
 9. [Registrar como servicio del sistema](#9-registrar-como-servicio-del-sistema)
 10. [Troubleshooting](#10-troubleshooting)
 11. [Espiar señales de una aplicación existente](#11-espiar-señales-de-una-aplicación-existente)
+12. [Checklist de pruebas con hardware real](#12-checklist-de-pruebas-con-hardware-real)
 
 ---
 
@@ -736,6 +737,8 @@ Muestra el estado de todas las conexiones, los últimos accesos en tiempo real y
 
 > **Si usás modo teclado:** el monitor web **tiene que estar abierto y con foco** para que los escaneos lleguen. Ver sección 8.
 
+> **Primera puesta en marcha:** después de arrancar por primera vez con el hardware conectado, seguir el [Checklist de pruebas](#12-checklist-de-pruebas-con-hardware-real) de la sección 12 para validar cada componente por separado (relay, RFID, USB, flujo completo).
+
 ---
 
 ## 8. Modo kiosco — pantalla completa al arrancar
@@ -1141,3 +1144,183 @@ pip3 install evdev
 ls /dev/input/by-id/ | grep -i barcode
 python3 leer_lector.py /dev/input/by-id/usb-Honeywell_Scanner-event-kbd
 ```
+
+---
+
+## 12. Checklist de pruebas con hardware real
+
+Cuando todo el hardware está conectado en la PC del club (lectores + relay + molinete físico), seguir este checklist para validar cada componente antes de dar por operativo el sistema. Hacer las pruebas en orden — si alguna falla, es inútil seguir con la siguiente.
+
+### 12.1 Arranque del servicio
+
+```bash
+cd ~/molinete-service
+npm run dev
+```
+
+**Log esperado en las primeras 15 líneas:**
+
+```
+🚀 Iniciando servicio de molinete...
+   Dispositivo ID: N
+   API: https://<tenant>.clubix.com.ar/api
+✓ Base de datos SQLite inicializada
+🔄 Iniciando sincronización...
+✓ Cache actualizado: NNNN socios, N habilitaciones
+✓ Sincronización completada
+✓ Lector USB en modo TECLADO — las lecturas llegan por el navegador
+✓ Lector RFID inicializado en /dev/ttyS4 (Lector RFID RS232)
+✓ Relay molinete inicializado en /dev/ttyS5
+✓ Sincronización automática cada 5 minutos
+✓ Servidor HTTP escuchando en puerto 3002
+```
+
+**Si falta alguna línea `✓`** → ver [Troubleshooting](#10-troubleshooting) para ese componente. No seguir con las pruebas.
+
+### 12.2 Test del relay aislado (sin escanear nada)
+
+El servicio expone `POST /api/abrir` que dispara el relay y lo cierra después del `tiempoApertura`. Usar esto **primero** para validar comandos y cableado sin involucrar lectores.
+
+```bash
+curl -X POST http://localhost:3002/api/abrir
+```
+
+**Resultado esperado:**
+- Click audible del relay al activar.
+- Click audible del relay al cerrar (3 segundos después, o lo que indique `tiempoApertura`).
+- El molinete físico libera el giro por ese intervalo (si está cableado correctamente).
+- Log del servicio:
+  ```
+  🚪 Molinete ABIERTO
+  🚪 Molinete CERRADO
+  ```
+
+**Si no click del relay:**
+1. Verificar el path serial (`/dev/ttyS5` o el que corresponda) está bien en `config.json`.
+2. Verificar permisos (`groups $USER` tiene que incluir `dialout`).
+3. Probar otros comandos hex. El relay CH340 "LCUS-1" usa `A0:01:01` / `A0:01:00`. Otros modelos:
+   - `FF:01:01` / `FF:01:00`
+   - `A0:FF:01` / `A0:FF:00`
+4. Si tenés una app vieja que abre el molinete, espiarla con `strace`/`socat` (ver sección 11) para capturar los bytes reales.
+5. Probar directamente desde terminal:
+   ```bash
+   printf '\xa0\x01\x01' > /dev/ttyS5  # Click on
+   sleep 3
+   printf '\xa0\x01\x00' > /dev/ttyS5  # Click off
+   ```
+
+**Si click pero molinete no abre físicamente:**
+- Revisar cableado entre los bornes del relay (NO/COM/NC) y la entrada del molinete.
+- Verificar polaridad y voltaje de alimentación del molinete.
+
+### 12.3 Test de lectura RFID raw
+
+Con el servicio corriendo, **pasar una tarjeta RFID** al lector. El log debería mostrar los bytes crudos gracias al logging de debug que ya está en el servicio:
+
+```
+[RFID raw /dev/ttyS4] hex=34353030463241420d0a ascii="4500F2AB.."
+📡 Lectura RFID [Lector RFID RS232]: 4500F2AB
+🔍 Procesando: RFID = 4500F2AB
+```
+
+**Si no aparece absolutamente nada al pasar la tarjeta:**
+1. Verificar el puerto con `sudo cat /dev/ttyS4` — pasar tarjeta, deberían aparecer bytes.
+2. Si tampoco con `cat` → el puerto serial no está recibiendo datos. Revisar conexión física, alimentación del lector, baudRate.
+3. Probar otros baudRates: `4800`, `19200`, `57600`, `115200`.
+
+**Si aparece la línea `[RFID raw ...]` con bytes pero NO aparece `📡 Lectura RFID`:**
+- El delimitador no es `\r\n`. El `ReadlineParser` no dispara.
+- Mirar la columna hex: ¿termina en `0d 0a` (`\r\n`), solo `0a` (`\n`), solo `0d` (`\r`), o `03` (ETX)?
+- Comentar el tipo de terminador y ajustamos el parser en `index.js`.
+
+### 12.4 Test del flujo completo — RFID
+
+**Prerrequisito:** cargar el `rfidUid` de una tarjeta real en un socio de prueba. En el admin: `/admin/socios/<id>` → Editar → completar el campo `rfidUid` con el UID que el lector devolvió en el paso 12.3.
+
+Pasar esa tarjeta. Log esperado:
+
+```
+📡 Lectura RFID: <UID>
+🔍 Procesando: RFID = <UID>
+✓ Validación ONLINE exitosa
+🟢 ACCESO PERMITIDO: <Apellido Nombre>
+🚪 Molinete ABIERTO
+(3 segundos)
+🚪 Molinete CERRADO
+✓ Acceso registrado online
+```
+
+En paralelo, en `/admin/accesos/monitor` (navegador) el evento aparece en tiempo real al tope del stream.
+
+**Probar también el flujo denegado:** pasar una tarjeta con UID desconocido. Log esperado `🔴 ACCESO DENEGADO: NO_ENCONTRADO`, relay NO se activa.
+
+### 12.5 Test del flujo completo — USB (modo teclado)
+
+Con el **monitor web** (`http://localhost:3002`) abierto y **con foco**, pasar un DNI, QR, o código de barras por el lector USB. El listener de teclado captura las teclas, envía al backend, que repite el mismo flujo que RFID pero con `tipoLectura: 'DNI'` o `'QR'`.
+
+**Log esperado (DNI de socio existente):**
+```
+📖 Lectura USB: 12345678
+🔍 Procesando: DNI = 12345678
+✓ Validación ONLINE exitosa
+🟢 ACCESO PERMITIDO: <Apellido Nombre>
+🚪 Molinete ABIERTO
+```
+
+**PDF417 del DNI argentino** (carnet verde/tarjeta):
+```
+📖 Lectura USB: PEREZ@JUAN CARLOS@@12345678@M@15/06/1985@...
+🔍 Procesando: DNI = 12345678 (PEREZ, JUAN CARLOS)
+```
+
+**Si escaneás y no pasa nada:**
+- Hacer click en el fondo del monitor web para asegurar que tenga foco.
+- Abrir DevTools (F12) → Console → debería aparecer `[lector] keydown: ...` por cada tecla.
+- Si DevTools muestra los keydown pero no llega al backend → mirar Network → debe haber POST a `/api/lectura-teclado`.
+
+### 12.6 Test del modo offline
+
+Simular pérdida de conexión para validar el fallback:
+
+1. Desconectar internet (o apagar momentáneamente el backend de `sportivotest`).
+2. Pasar una tarjeta de socio válido.
+3. Log esperado:
+   ```
+   🔍 Procesando: RFID = <UID>
+   ⚠️ Error validación online: ...
+   ✓ Validación OFFLINE aplicada
+   🟢 ACCESO PERMITIDO: <Nombre>
+   🚪 Molinete ABIERTO
+   ⚠️ Acceso guardado en cache (offline)
+   ```
+4. Reconectar internet.
+5. En la siguiente sincronización (hasta 5 min, o forzar con `curl -X POST http://localhost:3002/api/sync`) los accesos pendientes se envían al cloud.
+6. Verificar en `/admin/accesos/monitor` que aparecen los accesos que se hicieron offline (con badge `Offline` en ámbar).
+
+### 12.7 Test en servicio systemd
+
+Una vez validado con `npm run dev`, replicar con el servicio systemd:
+
+```bash
+sudo systemctl restart molinete
+sudo systemctl status molinete              # debe estar Active: active (running)
+sudo journalctl -u molinete -f              # ver log en vivo mientras se prueba
+```
+
+Repetir 12.2 (relay) y 12.4 (RFID) con el servicio systemd corriendo. Todo tiene que comportarse igual.
+
+### 12.8 Resumen de validación
+
+| Componente | Test | OK? |
+|------------|------|-----|
+| Servicio arranca | Log muestra todos los `✓` de sección 12.1 | ☐ |
+| Relay responde | `curl POST /api/abrir` → click audible | ☐ |
+| RFID recibe bytes | Log `[RFID raw]` al pasar tarjeta | ☐ |
+| RFID parsea UID | Log `📡 Lectura RFID: ...` | ☐ |
+| RFID flujo completo | Acceso permitido abre molinete + aparece en monitor | ☐ |
+| USB modo teclado | DNI/QR escaneado se procesa con el monitor web en foco | ☐ |
+| PDF417 del DNI | Extrae `nombreCompleto` y `DNI` correctamente | ☐ |
+| Modo offline | Fallback a cache local + sincroniza al reconectar | ☐ |
+| Systemd | Servicio arranca solo al bootear, sobrevive reboot | ☐ |
+
+Cuando los 9 puntos estén en verde, el sistema está operativo para producción.

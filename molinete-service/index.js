@@ -462,6 +462,7 @@ async function validarOffline(valorLeido, tipoLectura) {
       permitido: false,
       motivo: 'NO_ENCONTRADO',
       mensaje: 'DNI no registrado - Diríjase a Recepción',
+      tipo: null,
       persona: null
     }
   }
@@ -473,6 +474,7 @@ async function validarOffline(valorLeido, tipoLectura) {
         permitido: true,
         motivo: 'SOCIO_VIGENTE',
         mensaje: `Bienvenido/a ${persona.apellidoNombre}`,
+        tipo: 'SOCIO',
         persona: {
           id: persona.id,
           nombre: persona.apellidoNombre,
@@ -485,6 +487,7 @@ async function validarOffline(valorLeido, tipoLectura) {
         permitido: false,
         motivo: 'NO_VIGENTE',
         mensaje: `Socio ${persona.estado} - Diríjase a Secretaría`,
+        tipo: 'SOCIO',
         persona: {
           id: persona.id,
           nombre: persona.apellidoNombre,
@@ -502,6 +505,7 @@ async function validarOffline(valorLeido, tipoLectura) {
         permitido: false,
         motivo: 'VENCIDO',
         mensaje: 'Habilitación vencida - Diríjase a Recepción',
+        tipo: 'HABILITACION',
         persona: {
           id: persona.id,
           nombre: persona.nombreCompleto,
@@ -516,6 +520,7 @@ async function validarOffline(valorLeido, tipoLectura) {
         permitido: false,
         motivo: 'LIMITE_ALCANZADO',
         mensaje: 'Límite de accesos alcanzado',
+        tipo: 'HABILITACION',
         persona: {
           id: persona.id,
           nombre: persona.nombreCompleto,
@@ -528,6 +533,7 @@ async function validarOffline(valorLeido, tipoLectura) {
       permitido: true,
       motivo: 'HABILITACION_VIGENTE',
       mensaje: `Bienvenido/a ${persona.nombreCompleto}`,
+      tipo: 'HABILITACION',
       persona: {
         id: persona.id,
         nombre: persona.nombreCompleto,
@@ -541,10 +547,15 @@ async function validarOffline(valorLeido, tipoLectura) {
  * Registrar acceso en el sistema
  */
 async function registrar(resultado, valorLeido, tipoLectura, metadata = {}) {
+  // Rutear el id de la persona al campo correcto según el tipo de match.
+  // Antes se asumía siempre SOCIO — si era HABILITACION, el id de la habilitación
+  // terminaba en socioId y el monitor mostraba un socio ajeno con el mismo id.
+  const tipoMatch = resultado.tipo
+  const personaId = resultado.persona?.id || null
   const registro = {
     dispositivoId: config.dispositivoId,
-    socioId: resultado.persona?.id || null,
-    habilitacionTemporalId: null, // Se asignaría si es habilitación
+    socioId: tipoMatch === 'SOCIO' ? personaId : null,
+    habilitacionTemporalId: tipoMatch === 'HABILITACION' ? personaId : null,
     tipoLectura,
     valorLeido,
     nombreCompleto: metadata.nombreCompleto || null,

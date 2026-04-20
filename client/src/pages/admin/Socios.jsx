@@ -181,7 +181,7 @@ export default function AdminSocios() {
   const hayFiltrosActivos = estado || categoria || tipoSocio || zona || esMenor || terminoBusqueda
 
   function getQrUrl(tokenPortal) {
-    return `https://sportivo.axiomacloud.com/s/${tokenPortal}`
+    return `${window.location.origin}/s/${tokenPortal}`
   }
 
   async function regenerarToken(socio) {
