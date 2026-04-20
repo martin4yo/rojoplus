@@ -14,7 +14,16 @@ console.log(`Presioná Ctrl+C para salir\n`)
 let port
 
 try {
-  port = new SerialPort({ path: PUERTO, baudRate: BAUD_RATE })
+  port = new SerialPort({
+    path: PUERTO,
+    baudRate: BAUD_RATE,
+    dataBits: 8,
+    stopBits: 1,
+    parity: 'none',
+    rtscts: false,
+    xon: false,
+    xoff: false
+  })
 } catch (err) {
   console.error(`Error abriendo puerto: ${err.message}`)
   console.error(`\nPuertos disponibles:`)
@@ -29,7 +38,12 @@ try {
 }
 
 port.on('open', () => {
-  console.log(`✓ Puerto abierto\n`)
+  console.log(`✓ Puerto abierto`)
+  // Activar DTR y RTS — muchas placas RS232 no transmiten sin estas señales
+  port.set({ dtr: true, rts: true }, (err) => {
+    if (err) console.warn(`Advertencia DTR/RTS: ${err.message}`)
+    else console.log(`✓ DTR/RTS activados\n`)
+  })
 })
 
 let buffer = Buffer.alloc(0)
