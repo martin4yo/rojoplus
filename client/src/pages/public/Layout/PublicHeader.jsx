@@ -101,16 +101,16 @@ export default function PublicHeader() {
               {socioMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-gray-200 rounded-lg shadow-lg border border-gray-300 py-2 z-50">
                   <Link
-                    to="/mi-qr"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary"
-                  >
-                    Mi QR de Socio
-                  </Link>
-                  <Link
                     to="/login-socio"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary"
                   >
                     Portal del Socio
+                  </Link>
+                  <Link
+                    to="/mi-qr"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary"
+                  >
+                    QR para Beneficios
                   </Link>
                 </div>
               )}
@@ -176,18 +176,18 @@ export default function PublicHeader() {
               <div className="border-t border-gray-100 my-2 pt-2">
                 <p className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Soy Socio</p>
                 <Link
-                  to="/mi-qr"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
-                >
-                  Mi QR de Socio
-                </Link>
-                <Link
                   to="/login-socio"
                   onClick={() => setMobileMenuOpen(false)}
                   className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
                 >
                   Portal del Socio
+                </Link>
+                <Link
+                  to="/mi-qr"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  QR para Beneficios
                 </Link>
               </div>
 

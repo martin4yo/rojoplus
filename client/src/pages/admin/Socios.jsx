@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  Upload, QrCode, ExternalLink, RefreshCw, X, Copy, Check,
+  Upload, Store, ExternalLink, RefreshCw, X, Copy, Check,
   Plus, Eye, Edit, Users, CreditCard, Search, Filter, ChevronDown, DollarSign,
-  UserCheck, ChevronRight
+  UserCheck, ChevronRight, Send
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
@@ -211,6 +211,16 @@ export default function AdminSocios() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function enviarPortalWhatsApp(socio, e) {
+    e.stopPropagation()
+    try {
+      await api.post(`/admin/socios/${socio.id}/enviar-portal-whatsapp`)
+      toast.success('Link del portal enviado por WhatsApp')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'No se pudo enviar por WhatsApp')
+    }
+  }
+
   function calcularEdad(fechaNacimiento) {
     if (!fechaNacimiento) return null
     const hoy = new Date()
@@ -350,14 +360,21 @@ export default function AdminSocios() {
             </button>
           )}
           <button
+            onClick={(e) => enviarPortalWhatsApp(socio, e)}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
+            title="Enviar acceso al Portal por WhatsApp"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+          <button
             onClick={(e) => {
               e.stopPropagation()
               setQrModal(socio)
             }}
             className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
-            title="Ver QR del socio"
+            title="Ver QR de beneficios en comercios"
           >
-            <QrCode className="w-5 h-5" />
+            <Store className="w-5 h-5" />
           </button>
         </div>
       )

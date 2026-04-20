@@ -684,6 +684,37 @@ router.post('/socios/:id/regenerar-token', authAdmin, asyncHandler(async (req, r
   })
 }))
 
+// POST /api/admin/socios/:id/enviar-portal-whatsapp - Enviar link del portal por WhatsApp
+router.post('/socios/:id/enviar-portal-whatsapp', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const socio = await req.db.socio.findUnique({
+    where: { id: parseInt(id) },
+    select: { id: true, apellidoNombre: true, celular: true, tokenPortal: true, estado: true },
+  })
+
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
+  if (!socio.celular) throw new AppError('El socio no tiene celular registrado', 400, 'NO_CELULAR')
+  if (!socio.tokenPortal) throw new AppError('El socio no tiene token de portal', 400, 'NO_TOKEN')
+
+  const { getTenantFrontendUrl } = await import('../../lib/tenantUrl.js')
+  const portalUrl = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${socio.tokenPortal}`
+
+  const { enviarWhatsApp } = await import('../../services/whatsappService.js')
+  const resultado = await enviarWhatsApp({
+    db: req.db,
+    telefono: socio.celular,
+    texto: `Hola ${socio.apellidoNombre.split(',')[0].trim()}! Aqui esta tu link de acceso al portal del socio:\n\n${portalUrl}\n\nGuardalo para acceder a tus datos, pagos y beneficios.`,
+    ignorarHorario: true,
+  })
+
+  if (!resultado.enviado) {
+    throw new AppError(resultado.motivo || 'No se pudo enviar por WhatsApp', 503, 'WA_NOT_AVAILABLE')
+  }
+
+  res.json({ success: true, data: { mensaje: 'Link enviado por WhatsApp correctamente' } })
+}))
+
 // PUT /api/admin/socios/:id/familia - Actualizar titular de familia
 router.put('/socios/:id/familia', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
