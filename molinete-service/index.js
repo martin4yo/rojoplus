@@ -769,6 +769,27 @@ async function enviarRegistrosPendientes() {
 // API HTTP LOCAL
 // ============================================
 
+// Info del tenant (nombre + logo) para el header del monitor web
+let tenantInfoCache = null
+async function obtenerTenantInfo() {
+  if (tenantInfoCache) return tenantInfoCache
+  try {
+    const response = await axios.get(`${config.apiUrl}/accesos/tenant-info`, { timeout: 5000 })
+    if (response.data?.success) {
+      tenantInfoCache = response.data.data
+      return tenantInfoCache
+    }
+  } catch (err) {
+    logger.warn(`No se pudo obtener tenant-info: ${err.message}`)
+  }
+  return null
+}
+
+app.get('/api/tenant-info', async (req, res) => {
+  const info = await obtenerTenantInfo()
+  res.json({ success: true, data: info || { nombre: null, logoUrl: null } })
+})
+
 // Estado del sistema
 app.get('/api/status', (req, res) => {
   const stats = obtenerEstadisticas()

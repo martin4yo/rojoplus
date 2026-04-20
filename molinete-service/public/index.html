@@ -12,15 +12,25 @@
       box-sizing: border-box;
     }
 
+    html, body {
+      height: 100%;
+    }
+
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #1a1a1a;
       color: #fff;
       padding: 20px;
+      display: flex;
+      flex-direction: column;
     }
 
     .container {
       width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
 
     header {
@@ -31,6 +41,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-shrink: 0;
     }
 
     h1 {
@@ -80,17 +91,35 @@
     .badge.offline { background: #ef4444; }
     .badge.warning { background: #f59e0b; }
 
-    .grid {
+    .main-layout {
+      flex: 1;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
-      margin-bottom: 20px;
+      min-height: 0;
+    }
+
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-height: 0;
     }
 
     .card {
       background: #2d2d2d;
       border-radius: 10px;
       padding: 20px;
+    }
+
+    .card.stream-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    @media (max-width: 900px) {
+      .main-layout { grid-template-columns: 1fr; }
     }
 
     .card h2 {
@@ -156,8 +185,9 @@
 
     /* Stream de accesos */
     #stream-accesos {
-      height: 400px;
+      flex: 1;
       overflow-y: auto;
+      min-height: 0;
     }
 
     .acceso-item {
@@ -306,8 +336,10 @@
   <div class="container">
     <header>
       <h1>
-        <i data-lucide="door-open"></i>
-        Monitor Molinete
+        <img id="tenant-logo" src="" alt="" style="height: 36px; display: none;" />
+        <i data-lucide="door-open" id="title-icon"></i>
+        <span>Monitor Molinete</span>
+        <span id="tenant-nombre" style="opacity: 0.7; font-weight: normal; margin-left: 8px;"></span>
       </h1>
       <div class="status-badges">
         <div class="badge offline" id="badge-api">
@@ -325,59 +357,60 @@
       </div>
     </header>
 
-    <div class="grid">
-      <!-- Pantalla del molinete -->
-      <div class="card">
-        <h2><i data-lucide="monitor"></i> Pantalla Molinete</h2>
-        <div id="pantalla-molinete">
-          <div class="icono spin"><i data-lucide="loader"></i></div>
-          <div class="titulo">Sistema Iniciando...</div>
-          <div class="mensaje">Esperando conexión</div>
+    <div class="main-layout">
+      <!-- Columna izquierda: pantalla arriba, stats abajo -->
+      <div class="left-column">
+        <div class="card">
+          <h2><i data-lucide="monitor"></i> Pantalla Molinete</h2>
+          <div id="pantalla-molinete">
+            <div class="icono spin"><i data-lucide="loader"></i></div>
+            <div class="titulo">Sistema Iniciando...</div>
+            <div class="mensaje">Esperando conexión</div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-success" onclick="abrirMolinete()">
+              <i data-lucide="door-open"></i> Abrir Molinete
+            </button>
+            <button class="btn btn-primary" onclick="sincronizar()">
+              <i data-lucide="refresh-cw"></i> Sincronizar
+            </button>
+          </div>
         </div>
-        <div class="actions">
-          <button class="btn btn-success" onclick="abrirMolinete()">
-            <i data-lucide="door-open"></i> Abrir Molinete
-          </button>
-          <button class="btn btn-primary" onclick="sincronizar()">
-            <i data-lucide="refresh-cw"></i> Sincronizar
-          </button>
+
+        <div class="card">
+          <h2><i data-lucide="bar-chart-3"></i> Estadísticas del Sistema</h2>
+          <div class="stats">
+            <div class="stat-card">
+              <div class="stat-value" id="stat-socios">-</div>
+              <div class="stat-label">Socios en Cache</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="stat-habilitaciones">-</div>
+              <div class="stat-label">Habilitaciones</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="stat-pendientes">-</div>
+              <div class="stat-label">Registros Pendientes</div>
+            </div>
+          </div>
+          <div style="margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 6px;">
+            <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">ÚLTIMA SINCRONIZACIÓN</div>
+            <div style="font-size: 16px;" id="stat-ultimo-sync">Nunca</div>
+          </div>
+          <div style="margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 6px;">
+            <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">UPTIME</div>
+            <div style="font-size: 16px;" id="stat-uptime">-</div>
+          </div>
         </div>
       </div>
 
-      <!-- Estadísticas -->
-      <div class="card">
-        <h2><i data-lucide="bar-chart-3"></i> Estadísticas del Sistema</h2>
-        <div class="stats">
-          <div class="stat-card">
-            <div class="stat-value" id="stat-socios">-</div>
-            <div class="stat-label">Socios en Cache</div>
+      <!-- Columna derecha: stream ocupando todo el alto -->
+      <div class="card stream-card">
+        <h2><i data-lucide="list"></i> Últimos Accesos</h2>
+        <div id="stream-accesos">
+          <div style="text-align: center; opacity: 0.5; padding: 40px;">
+            Esperando eventos...
           </div>
-          <div class="stat-card">
-            <div class="stat-value" id="stat-habilitaciones">-</div>
-            <div class="stat-label">Habilitaciones</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="stat-pendientes">-</div>
-            <div class="stat-label">Registros Pendientes</div>
-          </div>
-        </div>
-        <div style="margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 6px;">
-          <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">ÚLTIMA SINCRONIZACIÓN</div>
-          <div style="font-size: 16px;" id="stat-ultimo-sync">Nunca</div>
-        </div>
-        <div style="margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 6px;">
-          <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">UPTIME</div>
-          <div style="font-size: 16px;" id="stat-uptime">-</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Stream de accesos -->
-    <div class="card">
-      <h2><i data-lucide="list"></i> Últimos Accesos</h2>
-      <div id="stream-accesos">
-        <div style="text-align: center; opacity: 0.5; padding: 40px;">
-          Esperando eventos...
         </div>
       </div>
     </div>
@@ -648,8 +681,30 @@
     })
     console.log('[lector] capturador de teclado activo. Escaneá un código para probar.')
 
+    // Cargar info del tenant (logo + nombre)
+    async function cargarTenantInfo() {
+      try {
+        const res = await fetch('/api/tenant-info')
+        const data = await res.json()
+        if (!data.success || !data.data) return
+        const { nombre, logoUrl } = data.data
+        if (nombre) {
+          document.getElementById('tenant-nombre').textContent = `· ${nombre}`
+          document.title = `Monitor Molinete · ${nombre}`
+        }
+        if (logoUrl) {
+          const img = document.getElementById('tenant-logo')
+          img.src = logoUrl
+          img.alt = nombre || 'Logo'
+          img.style.display = 'block'
+          document.getElementById('title-icon').style.display = 'none'
+        }
+      } catch (_) {}
+    }
+
     // Render inicial de iconos + iniciar
     renderIcons()
+    cargarTenantInfo()
     conectarWebSocket()
   </script>
 </body>

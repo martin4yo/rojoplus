@@ -352,6 +352,22 @@ router.post('/registrar', authDispositivo, async (req, res) => {
   }
 })
 
+/**
+ * GET /api/accesos/tenant-info
+ * Devuelve nombre y logo del tenant autenticado (para que el monitor del molinete
+ * los muestre en su header). Usa el token del dispositivo.
+ */
+router.get('/tenant-info', authDispositivo, async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      nombre: req.tenant.nombre,
+      subdomain: req.tenant.subdomain,
+      logoUrl: req.tenant.logoUrl || null
+    }
+  })
+})
+
 // ============================================
 // CACHE PARA MODO OFFLINE
 // ============================================
