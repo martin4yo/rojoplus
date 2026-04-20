@@ -5,6 +5,7 @@ import { EventEmitter } from 'events'
 const POLL_A     = Buffer.from([0x02, 0x64, 0x81, 0x81, 0x03, 0x65])
 const POLL_B     = Buffer.from([0x02, 0x65, 0x81, 0x81, 0x03, 0x64])
 const CMD_ABRIR  = Buffer.from([0x02, 0x64, 0x89, 0x83, 0x32, 0x03, 0x5d])
+const CMD_ACK    = Buffer.from([0x02, 0x64, 0x80, 0x80, 0x03, 0x65])  // limpia buffer de la placa
 
 const CARD_START = 0x3b  // ';'
 const CARD_END   = 0x3f  // '?'
@@ -27,7 +28,10 @@ export class GSDProtocol extends EventEmitter {
     this.pollToggle = false
     this.pollTimer = null
     this.pendienteApertura = false
+    this.pendienteAck = false
     this.conectado = false
+    this.ultimoUID = null
+    this.ultimaLectura = 0
   }
 
   async iniciar() {
@@ -50,6 +54,9 @@ export class GSDProtocol extends EventEmitter {
     this.port.set({ dtr: true, rts: false })
     this.logger.info(`✓ GSD RS232 inicializado en ${puerto} @ ${baudRate}`)
 
+    // Limpiar buffer de la placa al arrancar
+    this.port.write(CMD_ACK)
+
     this.port.on('data', data => this._onData(data))
     this.port.on('error', err => {
       this.logger.error(`Error GSD RS232: ${err.message}`)
@@ -71,8 +78,12 @@ export class GSDProtocol extends EventEmitter {
 
     if (this.pendienteApertura) {
       this.pendienteApertura = false
+      this.pendienteAck = false
       this.logger.info('→ GSD: Enviando comando ABRIR relay')
       this.port.write(CMD_ABRIR)
+    } else if (this.pendienteAck) {
+      this.pendienteAck = false
+      this.port.write(CMD_ACK)
     } else {
       const frame = this.pollToggle ? POLL_B : POLL_A
       this.pollToggle = !this.pollToggle
@@ -91,8 +102,13 @@ export class GSDProtocol extends EventEmitter {
       if (endIdx < 0) break  // trama incompleta, esperar más bytes
 
       const uid = this.rxBuffer.slice(startIdx + 1, endIdx).toString('ascii').toUpperCase()
-      if (uid.length > 0) {
+      const cooldown = this.config.cooldownMs || 3000
+      const ahora = Date.now()
+      if (uid.length > 0 && (uid !== this.ultimoUID || ahora - this.ultimaLectura > cooldown)) {
+        this.ultimoUID = uid
+        this.ultimaLectura = ahora
         this.logger.info(`📡 GSD RFID: tarjeta detectada — UID: ${uid}`)
+        this.pendienteAck = true  // limpiar buffer placa después de procesar
         this.emit('tarjeta', uid)
       }
 
