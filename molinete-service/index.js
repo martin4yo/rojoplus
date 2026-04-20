@@ -6,6 +6,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import winston from 'winston'
+import { GSDProtocol } from './gsd-protocol.js'
 
 // Importar cache SQLite
 import {
@@ -58,6 +59,7 @@ const logger = winston.createLogger({
 let lectorUSBDevices = []
 let lectorRFIDPorts = []
 let molinetePort = null
+let gsdProtocol = null
 let estadoConexion = {
   api: false,
   usb: false,
@@ -169,6 +171,39 @@ async function inicializarLectorUSB() {
   } catch (error) {
     logger.error(`Error inicializando lectores USB: ${error.message}`)
     estadoConexion.usb = false
+  }
+}
+
+/**
+ * Inicializar placa GSD RS232 (lector RFID + relay en un solo puerto)
+ */
+async function inicializarGSD() {
+  if (config.lectorRFID?.tipo !== 'GSD_RS232' && config.molinete?.tipo !== 'GSD_RS232') return
+
+  const cfg = config.lectorRFID?.tipo === 'GSD_RS232'
+    ? config.lectorRFID
+    : config.molinete
+
+  gsdProtocol = new GSDProtocol(cfg, logger)
+
+  gsdProtocol.on('tarjeta', (uid) => {
+    handleRFIDData(uid, cfg.descripcion || cfg.puerto)
+  })
+
+  gsdProtocol.on('conectado', () => {
+    estadoConexion.rfid = true
+    estadoConexion.molinete = true
+  })
+
+  gsdProtocol.on('error', () => {
+    estadoConexion.rfid = false
+    estadoConexion.molinete = false
+  })
+
+  try {
+    await gsdProtocol.iniciar()
+  } catch (err) {
+    logger.error(`Error inicializando GSD RS232: ${err.message}`)
   }
 }
 
@@ -584,6 +619,11 @@ async function registrar(resultado, valorLeido, tipoLectura, metadata = {}) {
  * Abrir molinete (activar relay)
  */
 async function abrirMolinete() {
+  if (gsdProtocol) {
+    gsdProtocol.abrirRelay()
+    return
+  }
+
   if (!molinetePort) {
     logger.warn('Molinete no inicializado - simulando apertura')
     return
@@ -866,6 +906,7 @@ async function iniciar() {
 
   // Inicializar hardware
   await inicializarLectorUSB()
+  await inicializarGSD()
   await inicializarLectorRFID()
   await inicializarMolinete()
 
@@ -892,6 +933,7 @@ process.on('SIGINT', () => {
   lectorUSBDevices.forEach(d => d.close())
   lectorRFIDPorts.forEach(p => { try { p.close() } catch {} })
   if (molinetePort) molinetePort.close()
+  if (gsdProtocol) gsdProtocol.cerrar()
   process.exit(0)
 })
 

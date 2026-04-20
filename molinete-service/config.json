@@ -24,15 +24,20 @@
   },
 
   "lectorRFID": {
-    "habilitado": false,
-    "dispositivos": []
+    "habilitado": true,
+    "tipo": "GSD_RS232",
+    "puerto": "/dev/ttyS4",
+    "baudRate": 19200,
+    "intervaloPolling": 64,
+    "descripcion": "Placa GSD unidireccional RS232 — RFID + relay en mismo cable"
   },
 
   "molinete": {
-    "tipo": "NONE",
-    "puerto": "",
-    "tiempoApertura": 0,
-    "descripcion": "Relay USB para control de molinete"
+    "tipo": "GSD_RS232",
+    "puerto": "/dev/ttyS4",
+    "baudRate": 19200,
+    "tiempoApertura": 2000,
+    "descripcion": "Relay integrado en placa GSD — mismo puerto que RFID"
   },
 
   "señalizacion": {
