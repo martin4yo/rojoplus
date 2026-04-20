@@ -216,6 +216,11 @@ async function inicializarLectorRFID() {
     return
   }
 
+  if (config.lectorRFID.tipo === 'GSD_RS232') {
+    logger.info('RFID manejado por GSD RS232 — lectorRFID estándar omitido')
+    return
+  }
+
   // Compatibilidad con config vieja (objeto único) y nueva (array dispositivos)
   const dispositivos = Array.isArray(config.lectorRFID.dispositivos)
     ? config.lectorRFID.dispositivos

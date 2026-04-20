@@ -83,57 +83,26 @@ export class GSDProtocol extends EventEmitter {
   _onData(data) {
     this.rxBuffer = Buffer.concat([this.rxBuffer, data])
 
-    // Buscar frame completo: 02 [addr] ... 03 [checksum]
-    while (this.rxBuffer.length >= 2) {
-      const stxIdx = this.rxBuffer.indexOf(0x02)
+    // Buscar patrón de tarjeta: ';' (0x3b) ... '?' (0x3f)
+    // Los bytes de polling/ACK no contienen estos caracteres
+    let startIdx = this.rxBuffer.indexOf(CARD_START)
+    while (startIdx >= 0) {
+      const endIdx = this.rxBuffer.indexOf(CARD_END, startIdx + 1)
+      if (endIdx < 0) break  // trama incompleta, esperar más bytes
 
-      if (stxIdx < 0) {
-        this.rxBuffer = Buffer.alloc(0)
-        break
+      const uid = this.rxBuffer.slice(startIdx + 1, endIdx).toString('ascii').toUpperCase()
+      if (uid.length > 0) {
+        this.logger.info(`📡 GSD RFID: tarjeta detectada — UID: ${uid}`)
+        this.emit('tarjeta', uid)
       }
 
-      if (stxIdx > 0) {
-        this.rxBuffer = this.rxBuffer.slice(stxIdx)
-        continue
-      }
-
-      const etxIdx = this.rxBuffer.indexOf(0x03, 1)
-      if (etxIdx < 0) break  // Frame incompleto, esperar más datos
-
-      const frame = this.rxBuffer.slice(0, etxIdx + 2)  // incluye checksum tras ETX
-      this.rxBuffer = this.rxBuffer.slice(etxIdx + 2)
-
-      this._procesarFrame(frame)
-    }
-  }
-
-  _procesarFrame(frame) {
-    // Frame mínimo: 02 [addr] 03 [chk] = 4 bytes
-    if (frame.length < 4) return
-
-    // Verificar checksum XOR
-    let xor = 0
-    for (let i = 0; i < frame.length - 1; i++) xor ^= frame[i]
-    if (xor !== frame[frame.length - 1]) {
-      this.logger.warn(`GSD: frame con checksum inválido — ${frame.toString('hex')}`)
-      return
+      this.rxBuffer = this.rxBuffer.slice(endIdx + 1)
+      startIdx = this.rxBuffer.indexOf(CARD_START)
     }
 
-    const payload = frame.slice(2, frame.length - 2)  // entre addr y ETX
-
-    // Frame sin datos = sin tarjeta
-    if (payload.length === 0) return
-
-    // Buscar UID entre ';' y '?'
-    const startIdx = payload.indexOf(CARD_START)
-    const endIdx   = payload.indexOf(CARD_END)
-
-    if (startIdx < 0 || endIdx < 0 || endIdx <= startIdx) return
-
-    const uid = payload.slice(startIdx + 1, endIdx).toString('ascii').toUpperCase()
-    if (uid.length > 0) {
-      this.logger.info(`📡 GSD RFID: tarjeta detectada — UID: ${uid}`)
-      this.emit('tarjeta', uid)
+    // Evitar que el buffer crezca indefinidamente con bytes de polling
+    if (this.rxBuffer.length > 64) {
+      this.rxBuffer = this.rxBuffer.slice(this.rxBuffer.length - 32)
     }
   }
 
