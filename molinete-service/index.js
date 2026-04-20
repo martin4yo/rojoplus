@@ -776,7 +776,15 @@ async function obtenerTenantInfo() {
   try {
     const response = await axios.get(`${config.apiUrl}/accesos/tenant-info`, { timeout: 5000 })
     if (response.data?.success) {
-      tenantInfoCache = response.data.data
+      const info = response.data.data
+      // Si logoUrl es relativo (ej "/uploads/logo.png"), absolutizarlo contra el host del cloud
+      if (info.logoUrl && info.logoUrl.startsWith('/')) {
+        try {
+          const apiOrigin = new URL(config.apiUrl).origin
+          info.logoUrl = apiOrigin + info.logoUrl
+        } catch (_) {}
+      }
+      tenantInfoCache = info
       return tenantInfoCache
     }
   } catch (err) {

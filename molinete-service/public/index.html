@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monitor Molinete - RojoPlus</title>
+  <title>Monitor de Accesos</title>
   <script src="lucide.min.js"></script>
   <style>
     * {
@@ -210,6 +210,30 @@
       border-color: #ef4444;
     }
 
+    /* Repetido: misma persona escaneada en < 3 minutos */
+    .acceso-item.repetido {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: #f59e0b;
+    }
+
+    .badge-repetido {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: #f59e0b;
+      color: #1a1a1a;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+
+    .badge-repetido svg {
+      width: 12px;
+      height: 12px;
+    }
+
     .acceso-info {
       flex: 1;
     }
@@ -336,10 +360,10 @@
   <div class="container">
     <header>
       <h1>
-        <img id="tenant-logo" src="" alt="" style="height: 36px; display: none;" />
+        <img id="tenant-logo" alt="" style="height: 36px; display: none; border-radius: 4px;"
+             onerror="this.style.display='none'; document.getElementById('title-icon').style.display='';" />
         <i data-lucide="door-open" id="title-icon"></i>
-        <span>Monitor Molinete</span>
-        <span id="tenant-nombre" style="opacity: 0.7; font-weight: normal; margin-left: 8px;"></span>
+        <span id="tenant-titulo">Monitor de Accesos</span>
       </h1>
       <div class="status-badges">
         <div class="badge offline" id="badge-api">
@@ -520,15 +544,40 @@
       }
     }
 
+    const REPEAT_WINDOW_MS = 3 * 60 * 1000 // 3 minutos
+
+    // Calcula qué accesos son "repetidos": misma persona escaneada en < 3 min
+    // El primer scan del burst queda limpio; el 2° y siguientes se marcan.
+    function marcarRepetidos(lista) {
+      const keyOf = (a) => a.persona?.id || a.valorLeido
+      const sorted = [...lista].sort((x, y) => new Date(x.fecha) - new Date(y.fecha))
+      const lastSeen = new Map()
+      const repetidos = new Set()
+      for (const a of sorted) {
+        const k = keyOf(a)
+        if (!k) continue
+        const ts = new Date(a.fecha).getTime()
+        const prev = lastSeen.get(k)
+        if (prev !== undefined && ts - prev <= REPEAT_WINDOW_MS) {
+          repetidos.add(a.fecha + '|' + a.valorLeido)
+        }
+        lastSeen.set(k, ts)
+      }
+      return repetidos
+    }
+
     // Agregar acceso al stream
     function agregarAcceso(acceso) {
       accesos.unshift(acceso)
       if (accesos.length > 50) accesos.pop()
 
+      const repetidosSet = marcarRepetidos(accesos)
       const stream = document.getElementById('stream-accesos')
       stream.innerHTML = accesos.map(a => {
         const fecha = new Date(a.fecha)
-        const clase = a.resultado === 'PERMITIDO' ? 'permitido' : 'denegado'
+        const esRepetido = repetidosSet.has(a.fecha + '|' + a.valorLeido)
+        const claseBase = a.resultado === 'PERMITIDO' ? 'permitido' : 'denegado'
+        const clase = esRepetido ? `${claseBase} repetido` : claseBase
         const iconoNombre = a.resultado === 'PERMITIDO' ? 'user-check' : 'user-x'
 
         return `
@@ -537,6 +586,7 @@
               <div class="acceso-nombre">
                 <i data-lucide="${iconoNombre}"></i>
                 <span>${escapeHtml(a.persona?.nombre || 'Sin nombre')}</span>
+                ${esRepetido ? '<span class="badge-repetido"><i data-lucide="alert-triangle"></i>Repetido</span>' : ''}
               </div>
               <div class="acceso-detalle">
                 ${escapeHtml(a.tipoLectura)} • ${escapeHtml(a.motivo)} • ${escapeHtml(a.mensaje)}
@@ -688,16 +738,26 @@
         const data = await res.json()
         if (!data.success || !data.data) return
         const { nombre, logoUrl } = data.data
+
+        // Título: siempre "Monitor de Accesos", con el nombre del tenant al lado si existe
+        const tituloEl = document.getElementById('tenant-titulo')
         if (nombre) {
-          document.getElementById('tenant-nombre').textContent = `· ${nombre}`
-          document.title = `Monitor Molinete · ${nombre}`
+          tituloEl.innerHTML = `Monitor de Accesos <span style="opacity: 0.7; font-weight: normal;">· ${nombre}</span>`
+          document.title = `Monitor de Accesos · ${nombre}`
+        } else {
+          tituloEl.textContent = 'Monitor de Accesos'
+          document.title = 'Monitor de Accesos'
         }
+
         if (logoUrl) {
           const img = document.getElementById('tenant-logo')
+          const icon = document.getElementById('title-icon')
+          img.onload = () => {
+            img.style.display = 'block'
+            if (icon) icon.style.display = 'none'
+          }
+          img.alt = ''  // sin alt para que no aparezca texto cuando carga
           img.src = logoUrl
-          img.alt = nombre || 'Logo'
-          img.style.display = 'block'
-          document.getElementById('title-icon').style.display = 'none'
         }
       } catch (_) {}
     }
