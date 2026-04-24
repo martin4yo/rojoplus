@@ -152,7 +152,15 @@ export default function AdminLayout() {
     const RUTAS_COMPANION = {
       '/admin/periodos': ['/admin/cuotas'],
       '/admin/socios':   ['/admin/socios/nuevo'],
-      '/admin/reportes/centros-costo': ['/admin/reportes/centros-costo/movimientos'],
+      '/admin/reportes/centros-costo': [
+        '/admin/reportes/centros-costo/movimientos',
+        '/admin/reportes/centros-costo/matriz',
+        '/admin/reportes/centros-costo/dashboard',
+        '/admin/reportes/centros-costo/evolucion',
+        '/admin/reportes/centros-costo/rentabilidad',
+        '/admin/reportes/centros-costo/presupuesto',
+      ],
+      '/admin/accesos/control-pwa': ['/admin/accesos/venta-ventanilla'],
     }
 
     // Construir lista de URLs permitidas desde el menú

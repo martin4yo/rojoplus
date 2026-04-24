@@ -125,6 +125,17 @@ export default function AdminSociosCargar() {
               </div>
             </div>
 
+            {preview.avisosPin && preview.avisosPin.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                <p className="text-sm font-semibold text-amber-800 mb-2">
+                  ⚠️ Avisos sobre PIN/RFID ({preview.avisosPin.length})
+                </p>
+                <ul className="text-xs text-amber-700 space-y-1 max-h-32 overflow-y-auto">
+                  {preview.avisosPin.map((aviso, i) => <li key={i}>• {aviso}</li>)}
+                </ul>
+              </div>
+            )}
+
             <div className="flex gap-4">
               <Button
                 onClick={handleConfirmar}

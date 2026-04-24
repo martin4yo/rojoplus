@@ -627,7 +627,10 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
       celularComprador,
       cajaId,
       medioPagoId,
-      pagosParciales
+      pagosParciales,
+      ingresoDirecto = false, // Ventanilla: marca entradas USADA + registra ingreso
+      canalVenta = 'ADMIN',   // ADMIN por default; VENTANILLA cuando es venta en puerta
+      dispositivoId           // Opcional: para trazar el punto de control de ventanilla
     } = req.body
 
     // Validaciones
@@ -929,7 +932,8 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
               celularComprador,
               precio,
               esSocio,
-              canalVenta: 'ADMIN',
+              estado: ingresoDirecto ? 'USADA' : 'VALIDA',
+              canalVenta,
               vendidoPor: req.admin.id,
               movimientoCajaId: movimientoCaja.id
             },
@@ -941,6 +945,20 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
               }
             }
           })
+
+          // Si es venta en ventanilla, registrar ingreso directo
+          if (ingresoDirecto) {
+            await tx.ingresoEntrada.create({
+              data: {
+                entradaId: entrada.id,
+                eventoId: parseInt(id),
+                dispositivoId: dispositivoId || null,
+                validadoPor: req.admin.id,
+                modoValidacion: 'VENTANILLA'
+              }
+            })
+          }
+
           todasLasEntradas.push(entrada)
         }
 
@@ -951,10 +969,13 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
         })
       }
 
-      // 4. Actualizar contador del evento
+      // 4. Actualizar contadores del evento
       await tx.evento.update({
         where: { id: parseInt(id) },
-        data: { entradasVendidas: { increment: cantidadTotal } }
+        data: {
+          entradasVendidas: { increment: cantidadTotal },
+          ...(ingresoDirecto && { entradasIngresadas: { increment: cantidadTotal } }),
+        }
       })
 
       return { entradas: todasLasEntradas, movimientoCaja, asiento }

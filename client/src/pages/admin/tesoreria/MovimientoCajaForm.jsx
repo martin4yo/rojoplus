@@ -1,15 +1,29 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, ChevronDown, ChevronRight, Search, X } from 'lucide-react'
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
+import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, ChevronDown, ChevronRight, Search, X, FileText, Ban } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import ConceptoTesoreriaModal from '../../../components/ConceptoTesoreriaModal'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import { formatCurrency, formatDate } from '../../../utils/formatters'
+
+const RUTA_MOVIMIENTO_CONTABLE = {
+  FACTURA_VENTA: (id) => `/admin/ingresos/facturas/${id}`,
+  NOTA_CREDITO_CLIENTE: (id) => `/admin/ingresos/facturas/${id}`,
+  NOTA_DEBITO_CLIENTE: (id) => `/admin/ingresos/facturas/${id}`,
+  RECIBO_COBRO: (id) => `/admin/ingresos/recibos/${id}`,
+  FACTURA_COMPRA: (id) => `/admin/egresos/facturas/${id}`,
+  NOTA_CREDITO_PROVEEDOR: (id) => `/admin/egresos/facturas/${id}`,
+  NOTA_DEBITO_PROVEEDOR: (id) => `/admin/egresos/facturas/${id}`,
+  ORDEN_PAGO: (id) => `/admin/egresos/ordenes-pago/${id}`,
+}
 
 export default function MovimientoCajaForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { id: movimientoId } = useParams()
+  const isReadOnly = !!movimientoId
   const cajaIdParam = searchParams.get('cajaId')
   const tipoParam = searchParams.get('tipo')
 
@@ -36,6 +50,7 @@ export default function MovimientoCajaForm() {
     socioId: null,
     entidadId: null,
   })
+  const [movimiento, setMovimiento] = useState(null)
 
   // Selector Socio/Entidad
   const [busquedaPersona, setBusquedaPersona] = useState('')
@@ -73,6 +88,53 @@ export default function MovimientoCajaForm() {
             centroCostoId: caja.centroCostoId || prev.centroCostoId
           }))
         }
+      }
+
+      // Modo solo lectura: cargar movimiento existente
+      if (movimientoId) {
+        const movRes = await api.getFull(`/admin/movimientos-caja/${movimientoId}`)
+        const mov = movRes.data
+        setMovimiento(mov)
+
+        // Inyectar caja/medio de pago si estan inactivos y no aparecen en la lista activa
+        if (mov.caja && !cajasData.find(c => c.id === mov.caja.id)) {
+          setCajas([...cajasData, mov.caja])
+        }
+        if (mov.medioPagoRel) {
+          setMediosPago(prev => prev.find(m => m.id === mov.medioPagoRel.id) ? prev : [...prev, mov.medioPagoRel])
+        }
+        if (mov.cuentaContable) {
+          setCuentasContables(prev => prev.find(c => c.id === mov.cuentaContable.id) ? prev : [...prev, mov.cuentaContable])
+        }
+
+        const personaLabel = mov.socio
+          ? `${mov.socio.apellidoNombre} — Socio #${mov.socio.nroSocio}`
+          : mov.entidad
+            ? `${mov.entidad.razonSocial} — ${mov.entidad.tipo || 'Entidad'}`
+            : null
+        if (personaLabel) {
+          setPersonaSeleccionada({
+            tipo: mov.socio ? 'socio' : 'entidad',
+            id: mov.socio?.id || mov.entidad?.id,
+            label: personaLabel,
+          })
+        }
+
+        setForm({
+          cajaId: mov.cajaId ? String(mov.cajaId) : '',
+          tipo: mov.tipo || 'INGRESO',
+          fecha: mov.fecha ? new Date(mov.fecha).toISOString().split('T')[0] : '',
+          monto: mov.monto != null ? String(mov.monto) : '',
+          conceptoId: '',
+          cuentaContableId: mov.cuentaContableId ? String(mov.cuentaContableId) : '',
+          centroCostoId: mov.centroCostoId || null,
+          concepto: mov.concepto || '',
+          descripcion: mov.descripcion || '',
+          medioPagoId: mov.medioPagoId ? String(mov.medioPagoId) : '',
+          socioId: mov.socioId || null,
+          entidadId: mov.entidadId || null,
+        })
+        setDatosContablesOpen(true)
       }
     } catch (err) {
       console.error('Error cargando datos:', err)
@@ -256,10 +318,35 @@ export default function MovimientoCajaForm() {
               <TrendingDown className="w-6 h-6 text-red-600" />
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            Nuevo {form.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {isReadOnly
+                ? `${form.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'} ${movimiento?.numero || ''}`
+                : `Nuevo ${form.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}`}
+            </h1>
+            {isReadOnly && movimiento && (
+              <p className="text-sm text-gray-500">
+                {formatDate(movimiento.fecha)} · {movimiento.caja?.nombre}
+                {movimiento.anulado && (
+                  <span className="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                    <Ban className="w-3 h-3" /> Anulado
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
         </div>
+        {isReadOnly && movimiento?.movimientoContable && RUTA_MOVIMIENTO_CONTABLE[movimiento.movimientoContable.tipo] && (
+          <div className="ml-auto">
+            <Button
+              variant="secondary"
+              onClick={() => navigate(RUTA_MOVIMIENTO_CONTABLE[movimiento.movimientoContable.tipo](movimiento.movimientoContable.id))}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Ver Movimiento Contable
+            </Button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -274,24 +361,26 @@ export default function MovimientoCajaForm() {
           <div className="flex gap-4 mb-6">
             <button
               type="button"
-              onClick={() => setForm(prev => ({ ...prev, tipo: 'INGRESO' }))}
+              onClick={() => !isReadOnly && setForm(prev => ({ ...prev, tipo: 'INGRESO' }))}
+              disabled={isReadOnly}
               className={`flex-1 py-3 rounded-lg border-2 font-medium transition ${
                 form.tipo === 'INGRESO'
                   ? 'border-green-500 bg-green-50 text-green-700'
                   : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}
+              } ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
             >
               <TrendingUp className="w-5 h-5 mx-auto mb-1" />
               Ingreso
             </button>
             <button
               type="button"
-              onClick={() => setForm(prev => ({ ...prev, tipo: 'EGRESO' }))}
+              onClick={() => !isReadOnly && setForm(prev => ({ ...prev, tipo: 'EGRESO' }))}
+              disabled={isReadOnly}
               className={`flex-1 py-3 rounded-lg border-2 font-medium transition ${
                 form.tipo === 'EGRESO'
                   ? 'border-red-500 bg-red-50 text-red-700'
                   : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}
+              } ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
             >
               <TrendingDown className="w-5 h-5 mx-auto mb-1" />
               Egreso
@@ -304,10 +393,14 @@ export default function MovimientoCajaForm() {
             {personaSeleccionada ? (
               <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
                 <span className="flex-1 text-sm text-blue-800">{personaSeleccionada.label}</span>
-                <button type="button" onClick={limpiarPersona} className="p-1 hover:bg-blue-100 rounded text-blue-600">
-                  <X className="w-4 h-4" />
-                </button>
+                {!isReadOnly && (
+                  <button type="button" onClick={limpiarPersona} className="p-1 hover:bg-blue-100 rounded text-blue-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
+            ) : isReadOnly ? (
+              <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500">-</div>
             ) : (
               <div className="relative">
                 <div className="relative">
@@ -349,7 +442,8 @@ export default function MovimientoCajaForm() {
                 name="cajaId"
                 value={form.cajaId}
                 onChange={handleChange}
-                className="input-field w-full"
+                disabled={isReadOnly}
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
                 required
               >
                 <option value="">Seleccionar caja...</option>
@@ -368,7 +462,8 @@ export default function MovimientoCajaForm() {
                 name="medioPagoId"
                 value={form.medioPagoId}
                 onChange={handleChange}
-                className="input-field w-full"
+                disabled={isReadOnly}
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
                 required
               >
                 <option value="">Seleccionar...</option>
@@ -389,39 +484,50 @@ export default function MovimientoCajaForm() {
                 name="fecha"
                 value={form.fecha}
                 onChange={handleChange}
-                className="input-field w-full"
+                readOnly={isReadOnly}
+                disabled={isReadOnly}
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
               />
             </div>
 
             {/* Concepto */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Concepto *</label>
-              <div className="flex gap-2">
-                <select
-                  name="conceptoId"
-                  value={form.conceptoId}
-                  onChange={handleChange}
-                  className="input-field flex-1"
-                  required
-                >
-                  <option value="">Seleccionar concepto...</option>
-                  {conceptos
-                    .filter(c => c.tipo === form.tipo || c.tipo === 'AMBOS')
-                    .map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.codigo} - {c.nombre}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setShowConceptoModal(true)}
-                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600"
-                  title="Crear nuevo concepto"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
+              {isReadOnly ? (
+                <input
+                  type="text"
+                  value={form.concepto}
+                  readOnly
+                  className="input-field w-full bg-gray-50 text-gray-700"
+                />
+              ) : (
+                <div className="flex gap-2">
+                  <select
+                    name="conceptoId"
+                    value={form.conceptoId}
+                    onChange={handleChange}
+                    className="input-field flex-1"
+                    required
+                  >
+                    <option value="">Seleccionar concepto...</option>
+                    {conceptos
+                      .filter(c => c.tipo === form.tipo || c.tipo === 'AMBOS')
+                      .map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.codigo} - {c.nombre}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowConceptoModal(true)}
+                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600"
+                    title="Crear nuevo concepto"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Monto */}
@@ -432,7 +538,9 @@ export default function MovimientoCajaForm() {
                 name="monto"
                 value={form.monto}
                 onChange={handleChange}
-                className="input-field w-full text-lg"
+                readOnly={isReadOnly}
+                disabled={isReadOnly}
+                className="input-field w-full text-lg disabled:bg-gray-50 disabled:text-gray-700"
                 step="0.01"
                 min="0.01"
                 placeholder="0.00"
@@ -448,7 +556,9 @@ export default function MovimientoCajaForm() {
               name="descripcion"
               value={form.descripcion}
               onChange={handleChange}
-              className="input-field w-full"
+              readOnly={isReadOnly}
+              disabled={isReadOnly}
+              className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
               rows={2}
               placeholder="Detalle obligatorio del movimiento..."
               required
@@ -456,7 +566,7 @@ export default function MovimientoCajaForm() {
           </div>
 
           {/* Preview */}
-          {form.cajaId && form.monto && (
+          {!isReadOnly && form.cajaId && form.monto && (
             <div className={`mt-4 p-4 rounded-lg ${form.tipo === 'INGRESO' ? 'bg-green-50' : 'bg-red-50'}`}>
               <p className="text-sm text-gray-600 mb-1">
                 {form.tipo === 'INGRESO' ? 'Se sumará' : 'Se restará'} de <strong>{cajaSeleccionada?.nombre}</strong>:
@@ -508,7 +618,8 @@ export default function MovimientoCajaForm() {
                   name="cuentaContableId"
                   value={form.cuentaContableId}
                   onChange={handleChange}
-                  className="input-field w-full"
+                  disabled={isReadOnly}
+                  className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
                   required
                 >
                   <option value="">Seleccionar cuenta...</option>
@@ -528,6 +639,7 @@ export default function MovimientoCajaForm() {
                 <CentroCostoSelector
                   value={form.centroCostoId}
                   onChange={(id) => setForm(prev => ({ ...prev, centroCostoId: id }))}
+                  disabled={isReadOnly}
                   required
                 />
               </div>
@@ -538,12 +650,14 @@ export default function MovimientoCajaForm() {
         {/* Botones */}
         <div className="flex justify-end gap-4">
           <Button type="button" variant="secondary" onClick={() => navigate(-1)}>
-            Cancelar
+            {isReadOnly ? 'Volver' : 'Cancelar'}
           </Button>
-          <Button type="submit" loading={saving}>
-            <Save className="w-4 h-4 mr-2" />
-            Registrar {form.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}
-          </Button>
+          {!isReadOnly && (
+            <Button type="submit" loading={saving}>
+              <Save className="w-4 h-4 mr-2" />
+              Registrar {form.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}
+            </Button>
+          )}
         </div>
       </form>
 

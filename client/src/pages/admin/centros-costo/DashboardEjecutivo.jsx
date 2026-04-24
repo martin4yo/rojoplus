@@ -25,7 +25,7 @@ export default function DashboardEjecutivo() {
     try {
       setLoading(true)
       const response = await api.get(`/admin/centros-costo-dashboard-ejecutivo?mes=${mes}&anio=${anio}`)
-      setData(response.data)
+      setData(response)
     } catch (err) {
       console.error('Error:', err)
     } finally {
@@ -88,7 +88,11 @@ export default function DashboardEjecutivo() {
         </div>
       </div>
 
-      {data && (
+      {data && (() => {
+        const centrosConMov = (data.centros || []).filter(c => (c.transacciones || 0) > 0)
+        const topIngresos = (data.topIngresos || []).filter(c => (c.transacciones || 0) > 0)
+        const topEgresos = (data.topEgresos || []).filter(c => (c.transacciones || 0) > 0)
+        return (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -164,7 +168,7 @@ export default function DashboardEjecutivo() {
             <div className="bg-white shadow-sm rounded-lg p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Top 5 Ingresos</h2>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={data.topIngresos}>
+                <BarChart data={topIngresos}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="nombre" angle={-45} textAnchor="end" height={100} />
                   <YAxis />
@@ -177,7 +181,7 @@ export default function DashboardEjecutivo() {
             <div className="bg-white shadow-sm rounded-lg p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Top 5 Egresos</h2>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={data.topEgresos}>
+                <BarChart data={topEgresos}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="nombre" angle={-45} textAnchor="end" height={100} />
                   <YAxis />
@@ -205,7 +209,7 @@ export default function DashboardEjecutivo() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {data.centros.map((centro) => (
+                  {centrosConMov.map((centro) => (
                     <tr key={centro.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{centro.nombre}</div>
@@ -232,7 +236,8 @@ export default function DashboardEjecutivo() {
             </div>
           </div>
         </>
-      )}
+        )
+      })()}
     </div>
   )
 }

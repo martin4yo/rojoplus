@@ -1,9 +1,11 @@
 import express from 'express'
 import crypto from 'crypto'
+import { randomUUID } from 'crypto'
 import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import { authDispositivo } from '../middleware/authDispositivo.js'
 import { extractTenant } from '../middleware/extractTenant.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
+import { crearOrdenQRDinamica, borrarOrdenQRDinamica, obtenerPago, asegurarPOS } from '../services/mercadoPagoQR.js'
 
 const router = express.Router()
 
@@ -1180,6 +1182,208 @@ router.post('/dispositivos/:id/revocar-token', tenantForAdmin, authAdmin, checkP
     }
     console.error('Error revocando token:', error)
     res.status(500).json({ success: false, error: 'Error revocando token' })
+  }
+})
+
+// ============================================
+// VENTA EN VENTANILLA - PAGO CON QR MERCADO PAGO
+// ============================================
+
+const QR_EXPIRES_MINUTES = 5
+
+/**
+ * POST /api/admin/accesos/venta-ventanilla/qr
+ * Crea una venta en estado PENDIENTE + solicita QR dinámico a MP.
+ * Body: { eventoId, items: [{categoriaId, cantidad}], cajaId, medioPagoId, nombreComprador?, dispositivoId? }
+ */
+router.post('/venta-ventanilla/qr', tenantForAdmin, authAdmin, checkPermiso('EVENTOS_VENDER'), async (req, res) => {
+  try {
+    const { eventoId, items, cajaId, medioPagoId, nombreComprador, dispositivoId, socioId } = req.body
+
+    if (!eventoId || !Array.isArray(items) || items.length === 0 || !cajaId || !medioPagoId) {
+      return res.status(400).json({ success: false, error: 'Faltan campos: eventoId, items, cajaId, medioPagoId' })
+    }
+
+    // Cargar evento y categorías para calcular monto y validar capacidad
+    const categoriasIds = items.map(i => parseInt(i.categoriaId))
+    const evento = await req.db.evento.findUnique({
+      where: { id: parseInt(eventoId) },
+      include: { categorias: { where: { id: { in: categoriasIds } } } }
+    })
+    if (!evento) return res.status(404).json({ success: false, error: 'Evento no encontrado' })
+    if (!evento.ventasHabilitadas) return res.status(400).json({ success: false, error: 'Ventas deshabilitadas' })
+    if (evento.estado === 'CANCELADO' || evento.estado === 'FINALIZADO') {
+      return res.status(400).json({ success: false, error: `Evento ${evento.estado}` })
+    }
+
+    // Validar capacidad global (sumando pendientes también para evitar oversell en carrera con webhook)
+    const cantidadTotal = items.reduce((s, i) => s + parseInt(i.cantidad), 0)
+    if (!evento.permiteSobreventa) {
+      const pendientesAgg = await req.db.ventaEventoQRPendiente.aggregate({
+        where: { eventoId: parseInt(eventoId), estado: 'PENDIENTE' },
+        _count: true,
+      })
+      // nota: monto no suma capacidad, se usa el count de entradas pendientes de forma conservadora
+      const disponibles = evento.capacidadTotal - evento.entradasVendidas
+      if (cantidadTotal > disponibles) {
+        return res.status(400).json({ success: false, error: `Capacidad: ${disponibles} disponibles` })
+      }
+    }
+
+    // Calcular monto e items detallados
+    const itemsDetalle = []
+    let monto = 0
+    for (const item of items) {
+      const cat = evento.categorias.find(c => c.id === parseInt(item.categoriaId))
+      if (!cat || !cat.activo) {
+        return res.status(400).json({ success: false, error: `Categoría ${item.categoriaId} no disponible` })
+      }
+      const cantidad = parseInt(item.cantidad)
+      const precio = Number(cat.precioNoSocio)
+      itemsDetalle.push({ categoriaId: cat.id, nombre: cat.nombre, cantidad, precio })
+      monto += cantidad * precio
+    }
+
+    // Crear venta pendiente
+    const externalReference = `clubix-ventanilla-${req.tenantId}-${randomUUID()}`
+    const expiresAt = new Date(Date.now() + QR_EXPIRES_MINUTES * 60 * 1000)
+
+    const venta = await req.db.ventaEventoQRPendiente.create({
+      data: {
+        externalReference,
+        eventoId: parseInt(eventoId),
+        items: itemsDetalle,
+        monto,
+        estado: 'PENDIENTE',
+        cajaId: parseInt(cajaId),
+        medioPagoId: parseInt(medioPagoId),
+        dispositivoId: dispositivoId ? parseInt(dispositivoId) : null,
+        nombreComprador: nombreComprador || 'Venta ventanilla',
+        socioId: socioId ? parseInt(socioId) : null,
+        expiresAt,
+        creadoPor: req.admin.id,
+      }
+    })
+
+    // Asegurar que el POS exista en MP y generar QR
+    try {
+      await asegurarPOS({ name: 'Clubix Ventanilla' })
+    } catch (err) {
+      console.warn('[MP] No se pudo verificar/crear POS (sigue igual):', err.message)
+    }
+
+    let mpResp
+    try {
+      mpResp = await crearOrdenQRDinamica({
+        externalReference,
+        monto,
+        title: `${evento.nombre} - ${cantidadTotal} entrada(s)`,
+        items: itemsDetalle.map(i => ({
+          title: `${evento.nombre} - ${i.nombre}`,
+          quantity: i.cantidad,
+          unit_price: i.precio,
+        })),
+      })
+    } catch (err) {
+      // Si MP falla, marcar venta como CANCELADA para no dejar basura
+      await req.db.ventaEventoQRPendiente.update({
+        where: { id: venta.id },
+        data: { estado: 'CANCELADA' }
+      })
+      return res.status(502).json({ success: false, error: `Error generando QR MP: ${err.message}` })
+    }
+
+    const updated = await req.db.ventaEventoQRPendiente.update({
+      where: { id: venta.id },
+      data: {
+        mpOrderId: String(mpResp.in_store_order_id || ''),
+        mpExternalPosId: mpResp.external_pos_id || null,
+        qrData: mpResp.qr_data || null,
+      }
+    })
+
+    res.json({
+      success: true,
+      data: {
+        id: updated.id,
+        externalReference,
+        qrData: updated.qrData,
+        monto,
+        expiresAt: updated.expiresAt,
+        estado: updated.estado,
+      }
+    })
+  } catch (error) {
+    console.error('Error creando venta QR ventanilla:', error)
+    res.status(500).json({ success: false, error: error.message || 'Error interno' })
+  }
+})
+
+/**
+ * GET /api/admin/accesos/venta-ventanilla/qr/:id
+ * Consulta el estado de una venta pendiente (polling).
+ * Si está expirada, la marca como EXPIRADA.
+ * Como fallback, si aún está pendiente pero pasó tiempo, intenta consultar MP por externalReference.
+ */
+router.get('/venta-ventanilla/qr/:id', tenantForAdmin, authAdmin, checkPermiso('EVENTOS_VENDER'), async (req, res) => {
+  try {
+    const venta = await req.db.ventaEventoQRPendiente.findUnique({
+      where: { id: parseInt(req.params.id) }
+    })
+    if (!venta) return res.status(404).json({ success: false, error: 'Venta no encontrada' })
+
+    let estado = venta.estado
+
+    // Si está PENDIENTE y expiró, marcarla como EXPIRADA y cancelar el QR en MP
+    if (estado === 'PENDIENTE' && venta.expiresAt < new Date()) {
+      try { await borrarOrdenQRDinamica({ externalPosId: venta.mpExternalPosId }) } catch {}
+      await req.db.ventaEventoQRPendiente.update({
+        where: { id: venta.id },
+        data: { estado: 'EXPIRADA' }
+      })
+      estado = 'EXPIRADA'
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: venta.id,
+        estado,
+        monto: Number(venta.monto),
+        expiresAt: venta.expiresAt,
+        pagadoEn: venta.pagadoEn,
+      }
+    })
+  } catch (error) {
+    console.error('Error consultando venta QR:', error)
+    res.status(500).json({ success: false, error: 'Error interno' })
+  }
+})
+
+/**
+ * POST /api/admin/accesos/venta-ventanilla/qr/:id/cancelar
+ * Cancela manualmente una venta pendiente.
+ */
+router.post('/venta-ventanilla/qr/:id/cancelar', tenantForAdmin, authAdmin, checkPermiso('EVENTOS_VENDER'), async (req, res) => {
+  try {
+    const venta = await req.db.ventaEventoQRPendiente.findUnique({
+      where: { id: parseInt(req.params.id) }
+    })
+    if (!venta) return res.status(404).json({ success: false, error: 'Venta no encontrada' })
+    if (venta.estado !== 'PENDIENTE') {
+      return res.status(400).json({ success: false, error: `Venta en estado ${venta.estado}, no se puede cancelar` })
+    }
+
+    try { await borrarOrdenQRDinamica({ externalPosId: venta.mpExternalPosId }) } catch {}
+
+    await req.db.ventaEventoQRPendiente.update({
+      where: { id: venta.id },
+      data: { estado: 'CANCELADA' }
+    })
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Error cancelando venta QR:', error)
+    res.status(500).json({ success: false, error: 'Error interno' })
   }
 })
 

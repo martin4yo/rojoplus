@@ -39,7 +39,7 @@ export default function EvolucionTemporal() {
         agrupacion: filters.agrupacion,
       })
       const response = await api.get(`/admin/centros-costo-evolucion-temporal?${params}`)
-      setData(response.data)
+      setData(response)
     } catch (err) {
       console.error('Error:', err)
     } finally {

@@ -111,6 +111,23 @@ async function main() {
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const allData = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
+  // Detectar dinámicamente la columna de PIN/RFID mirando la fila de headers reales.
+  // El archivo tiene "SOCIOS ORDENADOS" como único header en fila 1,
+  // y la fila 2 contiene los nombres reales de las columnas.
+  const headersRow = allData[0] || {}
+  let columnaPin = null
+  for (const [key, value] of Object.entries(headersRow)) {
+    const nombre = String(value || '').trim().toUpperCase()
+    if (['PIN', 'RFID', 'TARJETA', 'CARNET', 'UID'].includes(nombre)) {
+      columnaPin = key
+      console.log(`🔑 Columna PIN/RFID detectada en "${key}" (header: "${value}")`)
+      break
+    }
+  }
+  if (!columnaPin) {
+    console.warn('⚠️  No se detectó columna PIN/RFID en los headers. Los socios se importarán sin rfidUid.')
+  }
+
   // La primera fila contiene los headers, empezar desde la segunda
   const data = allData.slice(1)
 
@@ -177,6 +194,26 @@ async function main() {
       // Observaciones
       const observaciones = String(row['__EMPTY_39'] || '').trim() || null // Observacion
 
+      // PIN / RFID UID del carnet que lee el molinete
+      let rfidUid = null
+      if (columnaPin) {
+        const raw = row[columnaPin]
+        const val = String(raw ?? '').trim()
+        // Ignorar vacíos, 0 o guiones
+        if (val && val !== '0' && val !== '-' && val.toLowerCase() !== 'null') {
+          rfidUid = val
+          // Verificar que no esté asignado a otro socio distinto
+          const conflictivo = await prisma.socio.findFirst({
+            where: { rfidUid, NOT: { nroSocio } },
+            select: { nroSocio: true }
+          })
+          if (conflictivo) {
+            console.warn(`   ⚠️  PIN "${rfidUid}" de socio ${nroSocio} ya está asignado al socio ${conflictivo.nroSocio}. Se importa socio sin PIN.`)
+            rfidUid = null
+          }
+        }
+      }
+
       // Validaciones básicas
       if (!nombre || !apellido) {
         errores++
@@ -197,7 +234,7 @@ async function main() {
       const apellidoNombreCompleto = apellido ? `${apellido}${nombre ? ', ' + nombre : ''}` : nombre
 
       if (socioExistente) {
-        // Actualizar
+        // Actualizar (solo se pisa el rfidUid si viene un valor; si no, se conserva el existente)
         await prisma.socio.update({
           where: { nroSocio },
           data: {
@@ -231,6 +268,7 @@ async function main() {
             grupoSanguineo,
             factorRh,
             observaciones,
+            ...(rfidUid && { rfidUid }),
           }
         })
         actualizados++
@@ -269,6 +307,7 @@ async function main() {
             grupoSanguineo,
             factorRh,
             observaciones,
+            rfidUid,
           }
         })
         importados++

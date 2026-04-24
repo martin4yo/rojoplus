@@ -419,7 +419,7 @@ export default function ReporteCentrosCosto() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {data.centros.map((centro) => (
+                  {data.centros.filter(c => (c.transacciones || 0) > 0).map((centro) => (
                     <tr key={centro.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>

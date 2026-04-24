@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Camera, QrCode, CheckCircle, XCircle, Smartphone, Wifi, WifiOff } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Camera, QrCode, CheckCircle, XCircle, Smartphone, Wifi, WifiOff, Ticket } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function ControlPWA() {
+  const navigate = useNavigate()
   const [scanning, setScanning] = useState(false)
   const [resultado, setResultado] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -403,6 +405,19 @@ export default function ControlPWA() {
             >
               <Camera className="w-6 h-6 inline-block mr-2" />
               Escanear QR
+            </button>
+
+            <button
+              onClick={() => navigate(`/admin/accesos/venta-ventanilla${dispositivoId ? `?dispositivoId=${dispositivoId}` : ''}`)}
+              disabled={!online}
+              className={`w-full py-4 rounded-xl font-semibold transition-all border-2 ${
+                online
+                  ? 'border-primary/50 text-primary hover:bg-primary/10'
+                  : 'border-gray-700 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              <Ticket className="w-5 h-5 inline-block mr-2" />
+              Vender entrada
             </button>
 
             {/* Input manual (para testing) */}

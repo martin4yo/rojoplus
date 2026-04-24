@@ -1087,6 +1087,21 @@ router.post('/socios/upload', authAdmin, upload.single('file'), asyncHandler(asy
 
   const sociosParaCrear = []
   const sociosParaActualizar = []
+  const avisosPin = [] // acumula warnings por PINs duplicados/conflictivos
+
+  // Pre-pasada: detectar PINs duplicados dentro del mismo archivo
+  const pinSeenInFile = new Map() // pin → nroSocio
+  for (const row of rows) {
+    const nroSocioTmp = String(row['Nro.Socio'] || row['NroSocio'] || row['nro_socio'] || '').trim()
+    const pinRaw = row['PIN'] ?? row['Pin'] ?? row['pin'] ?? row['RFID'] ?? row['Tarjeta']
+    const pin = String(pinRaw ?? '').trim()
+    if (!nroSocioTmp || !pin || pin === '0' || pin === '-' || pin.toLowerCase() === 'null') continue
+    if (pinSeenInFile.has(pin)) {
+      avisosPin.push(`PIN "${pin}" repetido en el archivo: socios ${pinSeenInFile.get(pin)} y ${nroSocioTmp}. Se importa sin PIN para el segundo.`)
+    } else {
+      pinSeenInFile.set(pin, nroSocioTmp)
+    }
+  }
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
@@ -1099,6 +1114,26 @@ router.post('/socios/upload', authAdmin, upload.single('file'), asyncHandler(asy
     // Separar apellido y nombre
     const apellidoNombreCompleto = row['ApellidoNombre'] || row['Nombre'] || ''
     const { apellido, nombre } = separarApellidoNombre(apellidoNombreCompleto)
+
+    // PIN / RFID del carnet — lo lee el molinete para validar acceso
+    let rfidUid = null
+    const pinRaw = row['PIN'] ?? row['Pin'] ?? row['pin'] ?? row['RFID'] ?? row['Tarjeta']
+    const pinStr = String(pinRaw ?? '').trim()
+    if (pinStr && pinStr !== '0' && pinStr !== '-' && pinStr.toLowerCase() !== 'null') {
+      // Si en el archivo el PIN está duplicado, solo lo asigna al primer socio
+      if (pinSeenInFile.get(pinStr) === nroSocio) {
+        // Verificar contra DB: ningún OTRO socio (distinto nroSocio) puede tenerlo
+        const conflictivo = await req.db.socio.findFirst({
+          where: { rfidUid: pinStr, NOT: { nroSocio } },
+          select: { nroSocio: true }
+        })
+        if (conflictivo) {
+          avisosPin.push(`PIN "${pinStr}" del socio ${nroSocio} ya está asignado al socio ${conflictivo.nroSocio}. Se importa sin PIN.`)
+        } else {
+          rfidUid = pinStr
+        }
+      }
+    }
 
     // Mapear forma de pago
     let formaPagoPref = null
@@ -1173,6 +1208,8 @@ router.post('/socios/upload', authAdmin, upload.single('file'), asyncHandler(asy
       fotoUrl: cleanString(row['Foto']) ? `/uploads/fotos/${row['Foto']}` : null,
       // Observaciones
       observaciones: cleanString(row['Observacion']),
+      // Carnet RFID (molinete). null si viene vacío — no pisa el existente en updates.
+      rfidUid,
       // Grupo familiar (guardar referencia para procesar después)
       _grupoFamiliar: cleanString(row['Grupo Fliar']),
       _esTitular: cleanString(row['Titular'])?.toUpperCase() === 'SI',
@@ -1213,6 +1250,7 @@ router.post('/socios/upload', authAdmin, upload.single('file'), asyncHandler(asy
       nuevos: sociosParaCrear.length,
       actualizar: sociosParaActualizar.length,
       uploadId,
+      avisosPin,
     },
   })
 }))
@@ -1396,6 +1434,8 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
         tipoSocioRelId: datosLimpios.tipoSocioRelId,
         categoriaSocioId: datosLimpios.categoriaSocioId,
         estadoSocioId: datosLimpios.estadoSocioId,
+        // PIN / RFID del carnet — solo pisa si el Excel trae valor
+        ...(datosLimpios.rfidUid && { rfidUid: datosLimpios.rfidUid }),
       },
     })
   }

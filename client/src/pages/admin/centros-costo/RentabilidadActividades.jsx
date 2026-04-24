@@ -37,7 +37,7 @@ export default function RentabilidadActividades() {
         fechaHasta: filters.fechaHasta,
       })
       const response = await api.get(`/admin/centros-costo-rentabilidad-actividades?${params}`)
-      setData(response.data)
+      setData(response)
     } catch (err) {
       console.error('Error:', err)
     } finally {

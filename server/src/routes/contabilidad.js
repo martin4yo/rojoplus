@@ -417,7 +417,8 @@ router.post('/entidades', asyncHandler(async (req, res) => {
   const {
     codigo, tipo, razonSocial, nombreFantasia, tipoDocumento, documento,
     email, telefono, direccion, ciudad, provincia, codigoPostal, condicionIva,
-    banco, cbu, alias, legajo, cargoPersonalId, sueldoBasico, fechaIngreso, observaciones, foto
+    banco, cbu, alias, legajo, cargoPersonalId, sueldoBasico, fechaIngreso, observaciones, foto,
+    centroCostoId
   } = req.body
 
   if (!codigo || !tipo || !razonSocial) {
@@ -456,6 +457,7 @@ router.post('/entidades', asyncHandler(async (req, res) => {
       sueldoBasico: tipo === 'PERSONAL' && sueldoBasico ? parseFloat(sueldoBasico) : null,
       fechaIngreso: tipo === 'PERSONAL' && fechaIngreso ? new Date(fechaIngreso) : null,
       foto: tipo === 'PERSONAL' ? (foto || null) : null,
+      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       observaciones
     }
   })
@@ -469,7 +471,8 @@ router.put('/entidades/:id', asyncHandler(async (req, res) => {
   const {
     codigo, razonSocial, nombreFantasia, tipoDocumento, documento,
     email, telefono, direccion, ciudad, provincia, codigoPostal, condicionIva,
-    banco, cbu, alias, legajo, cargoPersonalId, sueldoBasico, fechaIngreso, observaciones, activo, foto
+    banco, cbu, alias, legajo, cargoPersonalId, sueldoBasico, fechaIngreso, observaciones, activo, foto,
+    centroCostoId
   } = req.body
 
   const existente = await req.db.entidad.findUnique({ where: { id: parseInt(id) } })
@@ -516,6 +519,9 @@ router.put('/entidades/:id', asyncHandler(async (req, res) => {
       observaciones: observaciones !== undefined ? observaciones : existente.observaciones,
       activo: activo !== undefined ? activo : existente.activo,
       foto: existente.tipo === 'PERSONAL' && foto !== undefined ? (foto || null) : existente.foto,
+      centroCostoId: centroCostoId !== undefined
+        ? (centroCostoId ? parseInt(centroCostoId) : null)
+        : existente.centroCostoId,
     }
   })
 

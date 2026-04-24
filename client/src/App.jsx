@@ -94,6 +94,7 @@ const EvolucionTemporalCentros = lazy(() => import('./pages/admin/centros-costo/
 const RentabilidadActividades = lazy(() => import('./pages/admin/centros-costo/RentabilidadActividades'))
 const PresupuestoVsReal = lazy(() => import('./pages/admin/centros-costo/PresupuestoVsReal'))
 const MovimientosCentroCosto = lazy(() => import('./pages/admin/centros-costo/MovimientosCentroCosto'))
+const ReporteMatrizCentros = lazy(() => import('./pages/admin/centros-costo/ReporteMatriz'))
 const AdminReporteMorosidad = lazy(() => import('./pages/admin/ReporteMorosidadAvanzado'))
 const AdminEntrenadoresLista = lazy(() => import('./pages/admin/EntrenadoresLista'))
 const AdminEntrenadorForm = lazy(() => import('./pages/admin/EntrenadorForm'))
@@ -233,6 +234,7 @@ const MonitorAccesos = lazy(() => import('./pages/admin/accesos/MonitorAccesos')
 const IntentosDenegados = lazy(() => import('./pages/admin/accesos/IntentosDenegados'))
 const Habilitaciones = lazy(() => import('./pages/admin/accesos/Habilitaciones'))
 const ControlPWA = lazy(() => import('./pages/admin/accesos/ControlPWA'))
+const VentaVentanilla = lazy(() => import('./pages/admin/accesos/VentaVentanilla'))
 const Dispositivos = lazy(() => import('./pages/admin/accesos/Dispositivos'))
 
 // Eventos
@@ -364,6 +366,7 @@ function App() {
                   <Route path="reportes/centros-costo/rentabilidad" element={<RentabilidadActividades />} />
                   <Route path="reportes/centros-costo/presupuesto" element={<PresupuestoVsReal />} />
                   <Route path="reportes/centros-costo/movimientos" element={<MovimientosCentroCosto />} />
+                  <Route path="reportes/centros-costo/matriz" element={<ReporteMatrizCentros />} />
                   <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
                   <Route path="configuracion" element={<AdminTablasAuxiliares />} />
                   <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
@@ -442,6 +445,7 @@ function App() {
                   <Route path="tesoreria/cajas/:id/editar" element={<CajaForm />} />
                   <Route path="tesoreria/movimientos" element={<MovimientosCajaLista />} />
                   <Route path="tesoreria/movimientos/nuevo" element={<MovimientoCajaForm />} />
+                  <Route path="tesoreria/movimientos/:id" element={<MovimientoCajaForm />} />
                   <Route path="tesoreria/transferencias" element={<TransferenciasLista />} />
                   <Route path="tesoreria/transferencias/nueva" element={<TransferenciaForm />} />
                   <Route path="tesoreria/pendientes-conciliar" element={<PendientesConciliar />} />
@@ -527,6 +531,7 @@ function App() {
                   <Route path="accesos/intentos-denegados" element={<IntentosDenegados />} />
                   <Route path="accesos/habilitaciones" element={<Habilitaciones />} />
                   <Route path="accesos/control-pwa" element={<ControlPWA />} />
+                  <Route path="accesos/venta-ventanilla" element={<VentaVentanilla />} />
                   <Route path="accesos/dispositivos" element={<Dispositivos />} />
 
                   {/* Eventos */}

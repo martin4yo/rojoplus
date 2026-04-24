@@ -33,7 +33,7 @@ export default function PresupuestoVsReal() {
         ...(centroCostoId && { centroCostoId }),
       })
       const response = await api.get(`/admin/centros-costo-presupuesto-vs-real?${params}`)
-      setData(response.data)
+      setData(response)
     } catch (err) {
       console.error('Error:', err)
       toast.error(err.response?.data?.message || 'No se encontró presupuesto aprobado para el año')

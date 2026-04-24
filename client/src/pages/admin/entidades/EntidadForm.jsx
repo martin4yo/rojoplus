@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, Building2, UserCheck, Briefcase, Upload, User } from 'lucide-react'
 import { Button } from '../../../components/Button'
+import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
@@ -66,6 +67,7 @@ export default function EntidadForm({ tipo }) {
     legajo: '',
     cargo: '',
     sueldoBasico: '',
+    centroCostoId: null,
     foto: '',
     activo: true
   })
@@ -99,6 +101,7 @@ export default function EntidadForm({ tipo }) {
         legajo: entidad.legajo || '',
         cargo: entidad.cargo || '',
         sueldoBasico: entidad.sueldoBasico ? String(entidad.sueldoBasico) : '',
+        centroCostoId: entidad.centroCostoId || null,
         foto: entidad.foto || '',
         activo: entidad.activo
       })
@@ -151,7 +154,8 @@ export default function EntidadForm({ tipo }) {
       const payload = {
         ...form,
         tipo,
-        sueldoBasico: form.sueldoBasico ? parseFloat(form.sueldoBasico) : null
+        sueldoBasico: form.sueldoBasico ? parseFloat(form.sueldoBasico) : null,
+        centroCostoId: form.centroCostoId ? parseInt(form.centroCostoId) : null
       }
 
       if (isEditing) {
@@ -459,6 +463,18 @@ export default function EntidadForm({ tipo }) {
                   step="0.01"
                   min="0"
                 />
+              </div>
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Centro de Costo
+                </label>
+                <CentroCostoSelector
+                  value={form.centroCostoId}
+                  onChange={(id) => setForm(prev => ({ ...prev, centroCostoId: id }))}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Se usa para imputar la provisión de sueldo al centro de costo correspondiente.
+                </p>
               </div>
             </div>
           </div>

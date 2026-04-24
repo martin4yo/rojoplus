@@ -489,6 +489,9 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
 
     const cajaPago = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
 
+    // Imputar al CC de la entidad (empleado); si no tiene, caer al CC de la caja
+    const ccPago = item.entidad.centroCostoId ?? cajaPago?.centroCostoId ?? null
+
     const ordenPago = await prisma.$transaction(async (tx) => {
       // Crear la orden de pago
       const op = await tx.movimientoContable.create({
@@ -505,7 +508,7 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
           nroOperacion,
           observaciones: observaciones || `Pago sueldo ${item.liquidacion.periodo} - ${item.entidad.razonSocial}`,
           estado: 'PAGADO',
-          centroCostoId: cajaPago?.centroCostoId ?? null,
+          centroCostoId: ccPago,
           registradoPor: req.admin.id
         }
       })
@@ -543,7 +546,7 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
           concepto: `Pago sueldo ${item.liquidacion.periodo}`,
           descripcion: item.entidad.razonSocial,
           movimientoContableId: op.id,
-          centroCostoId: cajaPago?.centroCostoId ?? null,
+          centroCostoId: ccPago,
           registradoPor: req.admin.id
         }
       })
@@ -655,6 +658,9 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
         })
         const opNumero = `OP-${year}-${(opCount + 1).toString().padStart(5, '0')}`
 
+        // Imputar al CC de la entidad (empleado); si no tiene, caer al CC de la caja
+        const ccPagoItem = item.entidad.centroCostoId ?? cajaBatch?.centroCostoId ?? null
+
         const op = await tx.movimientoContable.create({
           data: {
             numero: opNumero,
@@ -669,7 +675,7 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
             nroOperacion,
             observaciones: `Pago sueldo ${liquidacion.periodo} - ${item.entidad.razonSocial}`,
             estado: 'PAGADO',
-            centroCostoId: cajaBatch?.centroCostoId ?? null,
+            centroCostoId: ccPagoItem,
             registradoPor: req.admin.id
           }
         })
@@ -699,7 +705,7 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
             concepto: `Pago sueldo ${liquidacion.periodo}`,
             descripcion: item.entidad.razonSocial,
             movimientoContableId: op.id,
-            centroCostoId: cajaBatch?.centroCostoId ?? null,
+            centroCostoId: ccPagoItem,
             registradoPor: req.admin.id
           }
         })

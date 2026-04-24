@@ -57,6 +57,7 @@ import superAdminRoutes from './routes/super-admin/index.js'
 import brandingRoutes from './routes/admin/branding.js'
 import authRoutes from './routes/admin/auth.js'
 import whatsappRoutes from './routes/whatsapp/webhook.js'
+import webhooksMpRoutes from './routes/webhooksMercadoPago.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -271,6 +272,9 @@ app.use('/api/super-admin', superAdminRoutes)
 // WhatsApp webhook (sin autenticación — Evolution API llama directamente)
 // Las rutas admin de WhatsApp usan extractTenant
 app.use('/api/whatsapp', whatsappRoutes)
+
+// Webhooks públicos de Mercado Pago (sin auth — MP llama directo)
+app.use('/api/webhooks', webhooksMpRoutes)
 app.use('/api/admin/whatsapp', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()

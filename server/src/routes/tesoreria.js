@@ -332,6 +332,9 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
       include: {
         caja: { select: { id: true, codigo: true, nombre: true } },
         cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+        centroCosto: { select: { id: true, codigo: true, nombre: true } },
+        medioPagoRel: { select: { id: true, nombre: true } },
+        movimientoContable: { select: { id: true, tipo: true, numero: true } },
         pago: {
           select: {
             id: true,
@@ -369,6 +372,11 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
     include: {
       caja: true,
       cuentaContable: true,
+      centroCosto: true,
+      medioPagoRel: true,
+      movimientoContable: { select: { id: true, tipo: true, numero: true } },
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+      entidad: { select: { id: true, razonSocial: true, tipo: true } },
       pago: {
         include: {
           socio: { select: { id: true, nroSocio: true, apellidoNombre: true } }

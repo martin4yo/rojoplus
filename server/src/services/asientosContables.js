@@ -616,7 +616,8 @@ async function generarAsientoPagoSueldo(prisma, datos) {
     const monto = Number(itemLiquidacion.netoAPagar)
     const nombreEmpleado = entidad?.razonSocial || 'Personal'
 
-    const ccCaja = caja.centroCostoId || null
+    // CC del empleado (prioridad); fallback al CC de la caja
+    const ccImputacion = entidad?.centroCostoId ?? caja?.centroCostoId ?? null
     const asiento = await crearAsiento(prisma, {
       concepto: `Pago sueldo ${liquidacion.periodo} - ${nombreEmpleado}`,
       fecha: ordenPago.fecha,
@@ -625,8 +626,8 @@ async function generarAsientoPagoSueldo(prisma, datos) {
       registradoPor,
       centroCostoId: null, // CC definido por línea
       lineas: [
-        { cuentaCodigo: CUENTAS.GASTOS_PERSONAL, debe: monto, haber: 0, descripcion: `Liquidación ${liquidacion.numero}`, centroCostoId: ccCaja },
-        { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto, descripcion: `OP ${ordenPago.numero}`, centroCostoId: ccCaja },
+        { cuentaCodigo: CUENTAS.GASTOS_PERSONAL, debe: monto, haber: 0, descripcion: `Liquidación ${liquidacion.numero}`, centroCostoId: ccImputacion },
+        { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto, descripcion: `OP ${ordenPago.numero}`, centroCostoId: ccImputacion },
       ],
     })
 

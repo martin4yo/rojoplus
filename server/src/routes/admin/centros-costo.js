@@ -223,21 +223,18 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
     throw new AppError('Centro de costo no encontrado', 404, 'NOT_FOUND')
   }
 
-  // Construir where para filtros de fecha
+  // Fuente unica de verdad: MovimientoCaja (evita doble conteo con MovimientoContable
+  // ya que por cada venta buffet se crean MovCaja + FACTURA_VENTA + RECIBO_COBRO)
   const whereMovCaja = { centroCostoId: parseInt(id), anulado: false }
-  const whereMovContable = { centroCostoId: parseInt(id), estado: { not: 'ANULADO' } }
 
   if (fechaDesde) {
     whereMovCaja.fecha = { ...whereMovCaja.fecha, gte: new Date(fechaDesde) }
-    whereMovContable.fecha = { ...whereMovContable.fecha, gte: new Date(fechaDesde) }
   }
   if (fechaHasta) {
     whereMovCaja.fecha = { ...whereMovCaja.fecha, lte: new Date(fechaHasta) }
-    whereMovContable.fecha = { ...whereMovContable.fecha, lte: new Date(fechaHasta) }
   }
 
-  // Obtener movimientos de caja por tipo
-  const [ingresosCaja, egresosCaja] = await Promise.all([
+  const [ingresosCaja, egresosCaja, detalles] = await Promise.all([
     req.db.movimientoCaja.aggregate({
       where: { ...whereMovCaja, tipo: 'INGRESO' },
       _sum: { monto: true },
@@ -248,35 +245,37 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
       _sum: { monto: true },
       _count: true,
     }),
+    req.db.movimientoCaja.findMany({
+      where: whereMovCaja,
+      orderBy: { fecha: 'desc' },
+      include: {
+        caja: { select: { nombre: true } },
+        cuentaContable: { select: { codigo: true, nombre: true } },
+        socio: { select: { nroSocio: true, apellidoNombre: true } },
+        entidad: { select: { razonSocial: true } },
+      },
+    }),
   ])
 
-  // Obtener movimientos contables
-  const movimientosContables = await req.prisma.movimientoContable.findMany({
-    where: whereMovContable,
-    include: {
-      concepto: true,
-      entidad: true,
-      socio: { select: { nroSocio: true, apellidoNombre: true } },
-    },
-  })
-
-  // Clasificar movimientos contables por tipo
-  const ingresosContables = movimientosContables.filter(m =>
-    ['FACTURA_VENTA', 'RECIBO_COBRO', 'NOTA_CREDITO_CLIENTE'].includes(m.tipo)
-  )
-  const egresosContables = movimientosContables.filter(m =>
-    ['FACTURA_COMPRA', 'ORDEN_PAGO', 'PAGO', 'NOTA_CREDITO_PROVEEDOR'].includes(m.tipo)
-  )
-
-  const totalIngresosCaja = parseFloat(ingresosCaja._sum.monto || 0)
-  const totalEgresosCaja = parseFloat(egresosCaja._sum.monto || 0)
-
-  const totalIngresosContables = ingresosContables.reduce((sum, m) => sum + parseFloat(m.montoTotal), 0)
-  const totalEgresosContables = egresosContables.reduce((sum, m) => sum + parseFloat(m.montoTotal), 0)
-
-  const totalIngresos = totalIngresosCaja + totalIngresosContables
-  const totalEgresos = totalEgresosCaja + totalEgresosContables
+  const totalIngresos = parseFloat(ingresosCaja._sum.monto || 0)
+  const totalEgresos = parseFloat(egresosCaja._sum.monto || 0)
   const resultado = totalIngresos - totalEgresos
+
+  const mapDetalle = (m) => ({
+    id: m.id,
+    numero: m.numero,
+    tipo: m.tipo,
+    fecha: m.fecha,
+    monto: parseFloat(m.monto),
+    concepto: m.concepto,
+    cuenta: m.cuentaContable ? `${m.cuentaContable.codigo} - ${m.cuentaContable.nombre}` : null,
+    caja: m.caja?.nombre,
+    referencia: m.entidadId
+      ? m.entidad?.razonSocial
+      : m.socioId
+      ? `Socio ${m.socio?.nroSocio} - ${m.socio?.apellidoNombre}`
+      : null,
+  })
 
   res.json({
     success: true,
@@ -288,16 +287,12 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
       },
       resumen: {
         ingresos: {
-          caja: totalIngresosCaja,
-          contables: totalIngresosContables,
           total: totalIngresos,
-          cantidad: ingresosCaja._count + ingresosContables.length,
+          cantidad: ingresosCaja._count,
         },
         egresos: {
-          caja: totalEgresosCaja,
-          contables: totalEgresosContables,
           total: totalEgresos,
-          cantidad: egresosCaja._count + egresosContables.length,
+          cantidad: egresosCaja._count,
         },
         resultado: {
           monto: resultado,
@@ -305,32 +300,8 @@ router.get('/centros-costo/:id/reporte', authAdmin, asyncHandler(async (req, res
         },
       },
       detalles: {
-        ingresosContables: ingresosContables.map(m => ({
-          id: m.id,
-          numero: m.numero,
-          tipo: m.tipo,
-          fecha: m.fecha,
-          monto: m.montoTotal,
-          concepto: m.concepto?.nombre,
-          referencia: m.entidadId
-            ? `${m.entidad?.razonSocial}`
-            : m.socioId
-            ? `Socio ${m.socio?.nroSocio} - ${m.socio?.apellidoNombre}`
-            : null,
-        })),
-        egresosContables: egresosContables.map(m => ({
-          id: m.id,
-          numero: m.numero,
-          tipo: m.tipo,
-          fecha: m.fecha,
-          monto: m.montoTotal,
-          concepto: m.concepto?.nombre,
-          referencia: m.entidadId
-            ? `${m.entidad?.razonSocial}`
-            : m.socioId
-            ? `Socio ${m.socio?.nroSocio} - ${m.socio?.apellidoNombre}`
-            : null,
-        })),
+        ingresos: detalles.filter(m => m.tipo === 'INGRESO').map(mapDetalle),
+        egresos: detalles.filter(m => m.tipo === 'EGRESO').map(mapDetalle),
       },
     },
   })
@@ -346,55 +317,36 @@ router.get('/centros-costo-reporte-comparativo', authAdmin, asyncHandler(async (
   })
 
   // Construir where para filtros de fecha
+  // Fuente unica: MovimientoCaja (ver /centros-costo/:id/reporte para justificacion)
   let whereMovCaja = { anulado: false }
-  let whereMovContable = { estado: { not: 'ANULADO' } }
 
   if (fechaDesde) {
     whereMovCaja = { ...whereMovCaja, fecha: { gte: new Date(fechaDesde) } }
-    whereMovContable = { ...whereMovContable, fecha: { gte: new Date(fechaDesde) } }
   }
   if (fechaHasta) {
     whereMovCaja = {
       ...whereMovCaja,
       fecha: { ...whereMovCaja.fecha, lte: new Date(fechaHasta + 'T23:59:59') },
     }
-    whereMovContable = {
-      ...whereMovContable,
-      fecha: { ...whereMovContable.fecha, lte: new Date(fechaHasta + 'T23:59:59') },
-    }
   }
 
-  // Obtener datos para cada centro
   const dataCentros = await Promise.all(
     centros.map(async centro => {
-      // Movimientos de caja
       const [ingresosCaja, egresosCaja] = await Promise.all([
         req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'INGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
+          _count: true,
         }),
         req.db.movimientoCaja.aggregate({
           where: { ...whereMovCaja, tipo: 'EGRESO', centroCostoId: centro.id },
           _sum: { monto: true },
+          _count: true,
         }),
       ])
 
-      // Movimientos contables
-      const movContables = await req.db.movimientoContable.findMany({
-        where: { ...whereMovContable, centroCostoId: centro.id },
-        select: { tipo: true, montoTotal: true },
-      })
-
-      const ingresosContables = movContables
-        .filter(m => ['FACTURA_VENTA', 'RECIBO_COBRO'].includes(m.tipo))
-        .reduce((sum, m) => sum + parseFloat(m.montoTotal), 0)
-
-      const egresosContables = movContables
-        .filter(m => ['FACTURA_COMPRA', 'ORDEN_PAGO', 'PAGO'].includes(m.tipo))
-        .reduce((sum, m) => sum + parseFloat(m.montoTotal), 0)
-
-      const totalIngresos = parseFloat(ingresosCaja._sum.monto || 0) + ingresosContables
-      const totalEgresos = parseFloat(egresosCaja._sum.monto || 0) + egresosContables
+      const totalIngresos = parseFloat(ingresosCaja._sum.monto || 0)
+      const totalEgresos = parseFloat(egresosCaja._sum.monto || 0)
       const resultado = totalIngresos - totalEgresos
 
       return {
@@ -405,8 +357,9 @@ router.get('/centros-costo-reporte-comparativo', authAdmin, asyncHandler(async (
         ingresos: totalIngresos,
         egresos: totalEgresos,
         resultado,
-        porcentajeIngresos: 0, // Se calculará después
-        porcentajeEgresos: 0, // Se calculará después
+        transacciones: (ingresosCaja._count || 0) + (egresosCaja._count || 0),
+        porcentajeIngresos: 0,
+        porcentajeEgresos: 0,
       }
     })
   )
@@ -458,47 +411,30 @@ router.get('/centros-costo-evolucion-temporal', authAdmin, asyncHandler(async (r
     throw new AppError('Agrupación debe ser "mensual" o "anual"', 400, 'VALIDATION_ERROR')
   }
 
-  // Construir where
+  // Fuente unica: MovimientoCaja
   const whereMovCaja = { anulado: false }
-  const whereMovContable = { estado: { not: 'ANULADO' } }
 
   if (centroCostoId) {
     whereMovCaja.centroCostoId = parseInt(centroCostoId)
-    whereMovContable.centroCostoId = parseInt(centroCostoId)
   }
 
   if (fechaDesde) {
     whereMovCaja.fecha = { gte: new Date(fechaDesde) }
-    whereMovContable.fecha = { gte: new Date(fechaDesde) }
   }
   if (fechaHasta) {
     whereMovCaja.fecha = { ...whereMovCaja.fecha, lte: new Date(fechaHasta) }
-    whereMovContable.fecha = { ...whereMovContable.fecha, lte: new Date(fechaHasta) }
   }
 
-  // Obtener todos los movimientos
-  const [movimientosCaja, movimientosContables] = await Promise.all([
-    req.db.movimientoCaja.findMany({
-      where: whereMovCaja,
-      select: {
-        fecha: true,
-        tipo: true,
-        monto: true,
-        centroCostoId: true,
-        centroCosto: { select: { id: true, codigo: true, nombre: true } },
-      },
-    }),
-    req.prisma.movimientoContable.findMany({
-      where: whereMovContable,
-      select: {
-        fecha: true,
-        tipo: true,
-        montoTotal: true,
-        centroCostoId: true,
-        centroCosto: { select: { id: true, codigo: true, nombre: true } },
-      },
-    }),
-  ])
+  const movimientosCaja = await req.db.movimientoCaja.findMany({
+    where: whereMovCaja,
+    select: {
+      fecha: true,
+      tipo: true,
+      monto: true,
+      centroCostoId: true,
+      centroCosto: { select: { id: true, codigo: true, nombre: true } },
+    },
+  })
 
   // Función para agrupar por período
   const getPeriodo = (fecha) => {
@@ -529,26 +465,6 @@ router.get('/centros-costo-evolucion-temporal', authAdmin, asyncHandler(async (r
       datosPorPeriodo[periodo][centroKey].ingresos += parseFloat(m.monto)
     } else {
       datosPorPeriodo[periodo][centroKey].egresos += parseFloat(m.monto)
-    }
-  })
-
-  movimientosContables.forEach(m => {
-    const periodo = getPeriodo(m.fecha)
-    const centroKey = m.centroCostoId || 'sin_centro'
-
-    if (!datosPorPeriodo[periodo]) datosPorPeriodo[periodo] = {}
-    if (!datosPorPeriodo[periodo][centroKey]) {
-      datosPorPeriodo[periodo][centroKey] = {
-        centro: m.centroCosto || { id: null, nombre: 'Sin Centro' },
-        ingresos: 0,
-        egresos: 0,
-      }
-    }
-
-    if (['FACTURA_VENTA', 'RECIBO_COBRO'].includes(m.tipo)) {
-      datosPorPeriodo[periodo][centroKey].ingresos += parseFloat(m.montoTotal)
-    } else if (['FACTURA_COMPRA', 'ORDEN_PAGO', 'PAGO'].includes(m.tipo)) {
-      datosPorPeriodo[periodo][centroKey].egresos += parseFloat(m.montoTotal)
     }
   })
 
@@ -724,43 +640,27 @@ router.get('/centros-costo-presupuesto-vs-real', authAdmin, asyncHandler(async (
   const fechaDesde = new Date(`${anio}-01-01`)
   const fechaHasta = new Date(`${anio}-12-31`)
 
-  const [movimientosCaja, movimientosContables] = await Promise.all([
-    req.db.movimientoCaja.findMany({
-      where: {
-        fecha: { gte: fechaDesde, lte: fechaHasta },
-        anulado: false,
-        ...(centroCostoId && { centroCostoId: parseInt(centroCostoId) }),
-      },
-      select: {
-        fecha: true,
-        tipo: true,
-        monto: true,
-        centroCostoId: true,
-        centroCosto: { select: { id: true, nombre: true } },
-      },
-    }),
-    req.prisma.movimientoContable.findMany({
-      where: {
-        fecha: { gte: fechaDesde, lte: fechaHasta },
-        estado: { not: 'ANULADO' },
-        ...(centroCostoId && { centroCostoId: parseInt(centroCostoId) }),
-      },
-      select: {
-        fecha: true,
-        tipo: true,
-        montoTotal: true,
-        centroCostoId: true,
-        centroCosto: { select: { id: true, nombre: true } },
-      },
-    }),
-  ])
+  // Fuente unica: MovimientoCaja
+  const movimientosCaja = await req.db.movimientoCaja.findMany({
+    where: {
+      fecha: { gte: fechaDesde, lte: fechaHasta },
+      anulado: false,
+      ...(centroCostoId && { centroCostoId: parseInt(centroCostoId) }),
+    },
+    select: {
+      fecha: true,
+      tipo: true,
+      monto: true,
+      centroCostoId: true,
+      centroCosto: { select: { id: true, nombre: true } },
+    },
+  })
 
   // Agregar datos reales
-  const todosMovimientos = [...movimientosCaja, ...movimientosContables]
-  todosMovimientos.forEach(mov => {
+  movimientosCaja.forEach(mov => {
     const mes = new Date(mov.fecha).getMonth() + 1
     const centroKey = mov.centroCostoId || 'sin_centro'
-    const monto = parseFloat(mov.monto || mov.montoTotal || 0)
+    const monto = parseFloat(mov.monto || 0)
 
     if (!presupuestoPorCentro[centroKey]) {
       presupuestoPorCentro[centroKey] = {
@@ -774,7 +674,7 @@ router.get('/centros-costo-presupuesto-vs-real', authAdmin, asyncHandler(async (
       presupuestoPorCentro[centroKey].meses[mes] = { presupuestado: 0, real: 0 }
     }
 
-    const esEgreso = mov.tipo === 'EGRESO' || ['FACTURA_COMPRA', 'ORDEN_PAGO', 'PAGO'].includes(mov.tipo)
+    const esEgreso = mov.tipo === 'EGRESO'
     presupuestoPorCentro[centroKey].meses[mes].real += esEgreso ? monto : -monto // Egresos positivos
   })
 
@@ -838,7 +738,7 @@ router.get('/centros-costo-dashboard-ejecutivo', authAdmin, asyncHandler(async (
   const fechaDesde = new Date(anioActual, mesActual - 1, 1)
   const fechaHasta = new Date(anioActual, mesActual, 0, 23, 59, 59)
 
-  // Obtener datos del período actual
+  // Fuente unica: MovimientoCaja (evita doble conteo; ver /centros-costo/:id/reporte)
   const centros = await req.db.centroCosto.findMany({
     where: { activo: true },
     include: {
@@ -848,34 +748,18 @@ router.get('/centros-costo-dashboard-ejecutivo', authAdmin, asyncHandler(async (
           anulado: false,
         },
       },
-      movimientosContables: {
-        where: {
-          fecha: { gte: fechaDesde, lte: fechaHasta },
-          estado: { not: 'ANULADO' },
-        },
-      },
     },
   })
 
   const datosCentros = centros.map(centro => {
-    const ingresosCaja = centro.movimientosCaja
+    const totalIngresos = centro.movimientosCaja
       .filter(m => m.tipo === 'INGRESO')
       .reduce((sum, m) => sum + parseFloat(m.monto), 0)
 
-    const egresosCaja = centro.movimientosCaja
+    const totalEgresos = centro.movimientosCaja
       .filter(m => m.tipo === 'EGRESO')
       .reduce((sum, m) => sum + parseFloat(m.monto), 0)
 
-    const ingresosContables = centro.movimientosContables
-      .filter(m => ['FACTURA_VENTA', 'RECIBO_COBRO'].includes(m.tipo))
-      .reduce((sum, m) => sum + parseFloat(m.montoTotal), 0)
-
-    const egresosContables = centro.movimientosContables
-      .filter(m => ['FACTURA_COMPRA', 'ORDEN_PAGO', 'PAGO'].includes(m.tipo))
-      .reduce((sum, m) => sum + parseFloat(m.montoTotal), 0)
-
-    const totalIngresos = ingresosCaja + ingresosContables
-    const totalEgresos = egresosCaja + egresosContables
     const resultado = totalIngresos - totalEgresos
 
     return {
@@ -886,7 +770,7 @@ router.get('/centros-costo-dashboard-ejecutivo', authAdmin, asyncHandler(async (
       ingresos: totalIngresos,
       egresos: totalEgresos,
       resultado,
-      transacciones: centro.movimientosCaja.length + centro.movimientosContables.length,
+      transacciones: centro.movimientosCaja.length,
     }
   })
 
@@ -1438,6 +1322,246 @@ router.get('/centros-costo/:id/movimientos', authAdmin, asyncHandler(async (req,
       movimientos,
       totales: { ingresos: totalIngresos, egresos: totalEgresos },
       pagination: { page: parseInt(page), limit, total, pages: Math.ceil(total / limit) },
+    },
+  })
+}))
+
+// ============================================================================
+// REPORTE MATRIZ DEVENGADO/COBRADO/PENDIENTE POR CC
+// ============================================================================
+// GET /api/admin/centros-costo-reporte-matriz?fechaDesde=&fechaHasta=
+//
+// Por cada centro de costo, devuelve:
+//   - ingresos: { devengado, cobrado, pendiente }
+//   - egresos:  { devengado, pagado,  pendiente }
+//
+// Devengado = obligacion generada en el periodo (cargos, facturas, liquidaciones, mov. caja directos)
+// Cobrado/Pagado = lo que paso por caja en el periodo (MovimientoCaja)
+// Pendiente = saldo al "hasta" (cuotas/facturas/liquidaciones sin pagar)
+router.get('/centros-costo-reporte-matriz', authAdmin, asyncHandler(async (req, res) => {
+  const { fechaDesde, fechaHasta } = req.query
+
+  const desde = fechaDesde ? new Date(fechaDesde) : null
+  const hasta = fechaHasta ? new Date(fechaHasta + 'T23:59:59') : null
+
+  const rangoFecha = {}
+  if (desde) rangoFecha.gte = desde
+  if (hasta) rangoFecha.lte = hasta
+  const hasRango = Object.keys(rangoFecha).length > 0
+
+  const hastaFiltro = hasta ? { lte: hasta } : {}
+
+  const centros = await req.db.centroCosto.findMany({
+    where: { activo: true },
+    orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+    select: { id: true, codigo: true, nombre: true, tipo: true },
+  })
+
+  // Helpers: todos los filtros quedan acotados al CC en iteraciones posteriores
+  const baseMovCaja = { anulado: false }
+  if (hasRango) baseMovCaja.fecha = rangoFecha
+
+  const baseMovContable = { estado: { not: 'ANULADO' } }
+  if (hasRango) baseMovContable.fecha = rangoFecha
+
+  const baseCargos = { estado: { not: 'ANULADO' } }
+  if (hasRango) baseCargos.fechaGeneracion = rangoFecha
+
+  // Liquidaciones del periodo (una sola query, luego agrupamos por CC de entidad)
+  const itemsLiquidacionPeriodo = await req.db.itemLiquidacion.findMany({
+    where: {
+      liquidacion: hasRango ? { fechaGeneracion: rangoFecha } : {},
+    },
+    select: {
+      netoAPagar: true,
+      entidad: { select: { centroCostoId: true } },
+    },
+  })
+
+  const itemsLiquidacionPendientes = await req.db.itemLiquidacion.findMany({
+    where: {
+      estado: { notIn: ['PAGADO', 'ANULADO'] },
+      liquidacion: hasta ? { fechaGeneracion: { lte: hasta } } : {},
+    },
+    select: {
+      netoAPagar: true,
+      entidad: { select: { centroCostoId: true } },
+    },
+  })
+
+  const sueldosDevPorCc = {}
+  for (const it of itemsLiquidacionPeriodo) {
+    const cc = it.entidad?.centroCostoId
+    if (!cc) continue
+    sueldosDevPorCc[cc] = (sueldosDevPorCc[cc] || 0) + parseFloat(it.netoAPagar || 0)
+  }
+
+  const sueldosPendPorCc = {}
+  for (const it of itemsLiquidacionPendientes) {
+    const cc = it.entidad?.centroCostoId
+    if (!cc) continue
+    sueldosPendPorCc[cc] = (sueldosPendPorCc[cc] || 0) + parseFloat(it.netoAPagar || 0)
+  }
+
+  const filas = await Promise.all(centros.map(async (cc) => {
+    const [
+      cargosDev,
+      facturasVentaDev,
+      movCajaIngresoDirecto,
+      movCajaIngresoTotal,
+      cargosPend,
+      facturasVentaPend,
+      facturasCompraDev,
+      movCajaEgresoDirecto,
+      movCajaEgresoTotal,
+      facturasCompraPend,
+    ] = await Promise.all([
+      // INGRESOS DEVENGADO
+      req.db.cargo.aggregate({
+        where: { ...baseCargos, centroCostoId: cc.id },
+        _sum: { montoTotal: true },
+      }),
+      req.db.movimientoContable.aggregate({
+        where: { ...baseMovContable, centroCostoId: cc.id, tipo: 'FACTURA_VENTA' },
+        _sum: { montoTotal: true },
+      }),
+      req.db.movimientoCaja.aggregate({
+        where: {
+          ...baseMovCaja,
+          centroCostoId: cc.id,
+          tipo: 'INGRESO',
+          pagoId: null,
+          movimientoContableId: null,
+        },
+        _sum: { monto: true },
+      }),
+
+      // INGRESOS COBRADO
+      req.db.movimientoCaja.aggregate({
+        where: { ...baseMovCaja, centroCostoId: cc.id, tipo: 'INGRESO' },
+        _sum: { monto: true },
+      }),
+
+      // INGRESOS PENDIENTE (al hasta)
+      req.db.cargo.aggregate({
+        where: {
+          centroCostoId: cc.id,
+          estado: { notIn: ['PAGADO', 'ANULADO'] },
+          ...(hasta ? { fechaGeneracion: { lte: hasta } } : {}),
+        },
+        _sum: { montoTotal: true },
+      }),
+      req.db.movimientoContable.aggregate({
+        where: {
+          centroCostoId: cc.id,
+          tipo: 'FACTURA_VENTA',
+          estado: { not: 'ANULADO' },
+          saldoPendiente: { gt: 0 },
+          ...(hasta ? { fecha: { lte: hasta } } : {}),
+        },
+        _sum: { saldoPendiente: true },
+      }),
+
+      // EGRESOS DEVENGADO
+      req.db.movimientoContable.aggregate({
+        where: { ...baseMovContable, centroCostoId: cc.id, tipo: 'FACTURA_COMPRA' },
+        _sum: { montoTotal: true },
+      }),
+      req.db.movimientoCaja.aggregate({
+        where: {
+          ...baseMovCaja,
+          centroCostoId: cc.id,
+          tipo: 'EGRESO',
+          pagoId: null,
+          movimientoContableId: null,
+        },
+        _sum: { monto: true },
+      }),
+
+      // EGRESOS PAGADO
+      req.db.movimientoCaja.aggregate({
+        where: { ...baseMovCaja, centroCostoId: cc.id, tipo: 'EGRESO' },
+        _sum: { monto: true },
+      }),
+
+      // EGRESOS PENDIENTE (al hasta)
+      req.db.movimientoContable.aggregate({
+        where: {
+          centroCostoId: cc.id,
+          tipo: 'FACTURA_COMPRA',
+          estado: { not: 'ANULADO' },
+          saldoPendiente: { gt: 0 },
+          ...(hasta ? { fecha: { lte: hasta } } : {}),
+        },
+        _sum: { saldoPendiente: true },
+      }),
+    ])
+
+    const sueldoDev = sueldosDevPorCc[cc.id] || 0
+    const sueldoPend = sueldosPendPorCc[cc.id] || 0
+
+    const ingresosDevengado =
+      parseFloat(cargosDev._sum.montoTotal || 0) +
+      parseFloat(facturasVentaDev._sum.montoTotal || 0) +
+      parseFloat(movCajaIngresoDirecto._sum.monto || 0)
+
+    const ingresosCobrado = parseFloat(movCajaIngresoTotal._sum.monto || 0)
+
+    const ingresosPendiente =
+      parseFloat(cargosPend._sum.montoTotal || 0) +
+      parseFloat(facturasVentaPend._sum.saldoPendiente || 0)
+
+    const egresosDevengado =
+      parseFloat(facturasCompraDev._sum.montoTotal || 0) +
+      parseFloat(movCajaEgresoDirecto._sum.monto || 0) +
+      sueldoDev
+
+    const egresosPagado = parseFloat(movCajaEgresoTotal._sum.monto || 0)
+
+    const egresosPendiente =
+      parseFloat(facturasCompraPend._sum.saldoPendiente || 0) +
+      sueldoPend
+
+    return {
+      id: cc.id,
+      codigo: cc.codigo,
+      nombre: cc.nombre,
+      tipo: cc.tipo,
+      ingresos: {
+        devengado: ingresosDevengado,
+        cobrado: ingresosCobrado,
+        pendiente: ingresosPendiente,
+      },
+      egresos: {
+        devengado: egresosDevengado,
+        pagado: egresosPagado,
+        pendiente: egresosPendiente,
+      },
+    }
+  }))
+
+  const totales = filas.reduce((acc, f) => ({
+    ingresos: {
+      devengado: acc.ingresos.devengado + f.ingresos.devengado,
+      cobrado: acc.ingresos.cobrado + f.ingresos.cobrado,
+      pendiente: acc.ingresos.pendiente + f.ingresos.pendiente,
+    },
+    egresos: {
+      devengado: acc.egresos.devengado + f.egresos.devengado,
+      pagado: acc.egresos.pagado + f.egresos.pagado,
+      pendiente: acc.egresos.pendiente + f.egresos.pendiente,
+    },
+  }), {
+    ingresos: { devengado: 0, cobrado: 0, pendiente: 0 },
+    egresos: { devengado: 0, pagado: 0, pendiente: 0 },
+  })
+
+  res.json({
+    success: true,
+    data: {
+      periodo: { desde: fechaDesde || null, hasta: fechaHasta || null },
+      centros: filas,
+      totales,
     },
   })
 }))

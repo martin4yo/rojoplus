@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban, Download } from 'lucide-react'
+import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban, Download, Eye, FileText } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Table from '../../../components/Table'
 import api from '../../../services/api'
@@ -115,6 +115,17 @@ export default function MovimientosCajaLista() {
 
   const cajaSeleccionada = cajas.find(c => c.id === parseInt(filtros.cajaId))
 
+  const RUTA_MC = {
+    FACTURA_VENTA: (id) => `/admin/ingresos/facturas/${id}`,
+    NOTA_CREDITO_CLIENTE: (id) => `/admin/ingresos/facturas/${id}`,
+    NOTA_DEBITO_CLIENTE: (id) => `/admin/ingresos/facturas/${id}`,
+    RECIBO_COBRO: (id) => `/admin/ingresos/recibos/${id}`,
+    FACTURA_COMPRA: (id) => `/admin/egresos/facturas/${id}`,
+    NOTA_CREDITO_PROVEEDOR: (id) => `/admin/egresos/facturas/${id}`,
+    NOTA_DEBITO_PROVEEDOR: (id) => `/admin/egresos/facturas/${id}`,
+    ORDEN_PAGO: (id) => `/admin/egresos/ordenes-pago/${id}`,
+  }
+
   // Definición de columnas para la tabla
   const columns = [
     {
@@ -205,17 +216,42 @@ export default function MovimientosCajaLista() {
       key: 'acciones',
       label: 'Acciones',
       sortable: false,
-      render: (mov) => (
-        !mov.anulado && !mov.pagoId && tienePermiso(PERMISOS.CAJA_ANULAR) && (
-          <button
-            onClick={() => handleAnular(mov.id)}
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-            title="Anular movimiento"
-          >
-            <XCircle className="w-4 h-4" />
-          </button>
+      render: (mov) => {
+        const rutaMC = mov.movimientoContable && RUTA_MC[mov.movimientoContable.tipo]
+          ? RUTA_MC[mov.movimientoContable.tipo](mov.movimientoContable.id)
+          : null
+        return (
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={() => navigate(`/admin/tesoreria/movimientos/${mov.id}`)}
+              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+              title="Ver detalle"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            {rutaMC ? (
+              <button
+                onClick={() => navigate(rutaMC)}
+                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                title={`Ver ${mov.movimientoContable.tipo.replace(/_/g, ' ').toLowerCase()} ${mov.movimientoContable.numero}`}
+              >
+                <FileText className="w-4 h-4" />
+              </button>
+            ) : (
+              <span className="w-7" />
+            )}
+            {!mov.anulado && !mov.pagoId && tienePermiso(PERMISOS.CAJA_ANULAR) && (
+              <button
+                onClick={() => handleAnular(mov.id)}
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                title="Anular movimiento"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         )
-      ),
+      },
       className: 'text-right',
       cellClassName: 'text-right'
     }
