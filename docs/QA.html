@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QA — Clubix / RojoPlus</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto; }
+  .sev-critical { background: #fee2e2; color: #991b1b; }
+  .sev-important { background: #fef3c7; color: #92400e; }
+  .sev-cosmetic { background: #dbeafe; color: #1e40af; }
+  .status-pending { color: #9ca3af; }
+  .status-passed { color: #16a34a; }
+  .status-failed { color: #dc2626; }
+  .item-passed { background: #f0fdf4; border-color: #bbf7d0; }
+  .item-failed { background: #fef2f2; border-color: #fecaca; }
+  .item-blocked { background: #fefce8; border-color: #fde68a; }
+  .group-btn:hover { background: #eef2ff; }
+  .group-btn.active { background: #4f46e5; color: white; }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  .progress-fill { transition: width 0.3s ease; }
+  @media print {
+    aside, .no-print { display: none !important; }
+    main { width: 100% !important; }
+    .item-row { break-inside: avoid; }
+  }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<div id="app" class="min-h-screen">
+  <!-- Top bar -->
+  <header class="bg-white shadow-sm sticky top-0 z-30 no-print">
+    <div class="px-4 py-3 flex items-center gap-4 flex-wrap">
+      <h1 class="text-lg font-bold text-indigo-700 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+        QA — Clubix
+      </h1>
+      <div class="text-xs text-slate-500" id="lastSavedLabel">Sin cambios</div>
+      <div class="flex-1"></div>
+      <input type="text" id="searchInput" placeholder="Buscar item..." class="border border-slate-300 rounded-md px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <div class="flex items-center gap-1 text-xs">
+        <button data-filter="all" class="filter-btn px-2 py-1 rounded border bg-indigo-600 text-white border-indigo-600">Todos</button>
+        <button data-filter="pending" class="filter-btn px-2 py-1 rounded border bg-white border-slate-300 text-slate-700">Pendientes</button>
+        <button data-filter="passed" class="filter-btn px-2 py-1 rounded border bg-white border-slate-300 text-slate-700">Aprobados</button>
+        <button data-filter="failed" class="filter-btn px-2 py-1 rounded border bg-white border-slate-300 text-slate-700">Fallados</button>
+        <button data-filter="blocked" class="filter-btn px-2 py-1 rounded border bg-white border-slate-300 text-slate-700">Bloqueados</button>
+      </div>
+      <div class="flex items-center gap-1 text-xs ml-2">
+        <button data-sev-filter="all" class="sev-filter-btn px-2 py-1 rounded border bg-slate-700 text-white border-slate-700">Todas</button>
+        <button data-sev-filter="critical" class="sev-filter-btn px-2 py-1 rounded border bg-white border-red-200 text-red-700">🔴</button>
+        <button data-sev-filter="important" class="sev-filter-btn px-2 py-1 rounded border bg-white border-amber-200 text-amber-700">🟡</button>
+        <button data-sev-filter="cosmetic" class="sev-filter-btn px-2 py-1 rounded border bg-white border-blue-200 text-blue-700">🔵</button>
+      </div>
+      <div class="flex items-center gap-1 ml-2">
+        <button id="exportBtn" class="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700">Exportar reporte</button>
+        <button id="printBtn" class="px-3 py-1.5 rounded bg-slate-100 text-slate-700 text-sm hover:bg-slate-200">Imprimir</button>
+        <button id="resetBtn" class="px-3 py-1.5 rounded bg-rose-100 text-rose-700 text-sm hover:bg-rose-200">Reset</button>
+      </div>
+    </div>
+    <!-- Overall progress -->
+    <div class="px-4 pb-2">
+      <div class="flex items-center gap-3 text-xs text-slate-600">
+        <span id="overallStats" class="font-medium">0 / 0 completados</span>
+        <div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
+          <div id="overallProgress" class="progress-fill bg-emerald-500 h-2" style="width: 0%"></div>
+        </div>
+        <span id="overallPercent" class="font-medium tabular-nums">0%</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Layout -->
+  <div class="flex">
+    <!-- Sidebar -->
+    <aside class="w-72 bg-white border-r border-slate-200 sticky top-[97px] self-start max-h-[calc(100vh-97px)] overflow-y-auto no-print">
+      <nav id="sidebar" class="p-2 text-sm"></nav>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 p-6 max-w-5xl">
+      <div id="moduleContainer"></div>
+
+      <!-- Defectos -->
+      <section class="mt-12 bg-white border border-rose-200 rounded-xl p-5 shadow-sm">
+        <h2 class="text-lg font-bold text-rose-700 flex items-center gap-2 mb-3">
+          <span>🐞</span> Defectos detectados
+        </h2>
+        <div id="defectsList" class="space-y-3 mb-4 text-sm text-slate-600"></div>
+        <details class="border border-slate-200 rounded-lg p-3">
+          <summary class="font-medium text-slate-700">+ Agregar defecto manual</summary>
+          <div class="mt-3 space-y-2">
+            <input id="defectTitle" type="text" placeholder="Título del defecto" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" />
+            <textarea id="defectDesc" placeholder="Descripción / pasos para reproducir / resultado esperado vs actual..." rows="3" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"></textarea>
+            <div class="flex items-center gap-2">
+              <select id="defectSev" class="border border-slate-300 rounded px-2 py-1 text-sm">
+                <option value="critical">🔴 Crítico</option>
+                <option value="important" selected>🟡 Importante</option>
+                <option value="cosmetic">🔵 Cosmético</option>
+              </select>
+              <button id="addDefectBtn" class="px-3 py-1 rounded bg-rose-600 text-white text-sm hover:bg-rose-700">Agregar</button>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <!-- Footer -->
+      <footer class="mt-8 text-center text-xs text-slate-400">
+        QA Clubix — los datos se guardan en localStorage de este navegador. Para reportar al equipo usá "Exportar reporte".
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+// ─── DATOS DEL QA ─────────────────────────────────────────────────────────────
+// Estructura: secciones → módulos → items
+// severity: critical | important | cosmetic
+const QA_DATA = [
+  {
+    section: "Setup", modules: [
+      { id: "login", name: "Login y Sesión", severity: "critical", items: [
+        "Login con credenciales correctas → redirige a /admin",
+        "Login con email inválido → mensaje de error claro",
+        "Login con contraseña incorrecta → mensaje de error claro",
+        "Logout → vuelve a /admin/login y limpia localStorage",
+        "Reload con sesión activa → mantiene sesión y carga el menú",
+        "Sesión expirada (token inválido) → redirige a login sin loop",
+        "Acceso a /admin/... sin token → redirige a login",
+      ]},
+      { id: "multitenant", name: "Multi-tenant y Aislamiento", severity: "critical", items: [
+        "Login en clubA muestra solo socios de A",
+        "Login en clubB muestra solo socios de B",
+        "Endpoints API responden con X-Tenant-Slug correcto",
+        "Header X-Tenant-Slug forjado a tenant ajeno → respuesta 403/401",
+        "Logo, colores y nombre del club cambian según tenant",
+        "Listados clave (socios, cuotas, movimientos, productos, CC) NO filtran datos cruzados",
+        "Super-admin accede a /admin/tenants desde localhost sin subdomain",
+        "Admin de tenant NO ve items 'Gestión de Tenants' / 'Dashboard de Uso' / 'Métricas IA'",
+      ]},
+      { id: "permisos", name: "Permisos y Roles", severity: "critical", items: [
+        "Crear rol nuevo con permisos limitados",
+        "Asignar rol a usuario nuevo",
+        "Login con ese usuario muestra solo items autorizados",
+        "Acceso a /admin/socios sin SOCIOS_VER → bloqueo",
+        "Botones de acción se ocultan según tienePermiso",
+        "Editar rol no afecta sesiones activas hasta próximo login",
+      ]},
+    ]
+  },
+  {
+    section: "Socios y Cuotas", modules: [
+      { id: "socios", name: "Socios — CRUD", severity: "critical", items: [
+        "Listar socios → tabla muestra nombre, doc, estado, último pago",
+        "Filtros por estado, categoría, fecha → resultados consistentes",
+        "Buscar por nombre/documento → resultados correctos",
+        "Crear socio nuevo con datos completos",
+        "Editar socio → cambios persisten",
+        "Subir foto de perfil → renderiza en detalle",
+        "Cambiar estado a Inactivo → no aparece en filtros activos",
+        "Detalle muestra cuenta corriente, familiares, actividades",
+      ]},
+      { id: "import", name: "Socios — Importación masiva", severity: "critical", items: [
+        "Descargar template Excel válido",
+        "Importar 5 socios válidos → todos creados",
+        "Importar archivo con error (doc duplicado) → reporta error específico, no aborta",
+        "Columna RFID/PIN → persiste en Socio.rfidUid",
+        "Re-importar mismo archivo → no duplica (actualiza)",
+      ]},
+      { id: "familias", name: "Grupos Familiares", severity: "important", items: [
+        "Crear titular y asignarle 2 familiares",
+        "Familiar aparece en lista del titular",
+        "Cuenta corriente del titular muestra cargos de familiares con incluirFamilia=true",
+        "Cobrar cuota del titular cancela las del grupo si está configurado",
+        "Eliminar titular pide confirmación",
+      ]},
+      { id: "solicitudes", name: "Solicitudes de Inscripción", severity: "important", items: [
+        "Inscripción pública /inscripcion-socio llega a /admin/solicitudes",
+        "Ver detalle de solicitud",
+        "Aprobar → crea socio",
+        "Rechazar → marca rechazada con motivo",
+        "Familiares pre-cargados llegan asociados",
+      ]},
+      { id: "cuotas", name: "Cuotas y Cobranza", severity: "critical", items: [
+        "Listar cuotas pendientes",
+        "Filtrar por período, estado",
+        "Generar cuotas masivamente → 1 por socio activo",
+        "Cobrar con efectivo → PAGADA + asiento contable",
+        "Cobrar con descuento anticipado → aplica si está dentro del período",
+        "Cobrar con tarjeta → registra medio correcto",
+        "Cobrar con múltiples medios → suma OK",
+        "Recibo se genera y puede imprimirse/descargarse",
+        "Anular pago → revierte asiento",
+        "Pagos informados llegan al contador del menú",
+      ]},
+      { id: "cargos", name: "Cargos Adicionales / Masivos", severity: "important", items: [
+        "Crear cargo individual a un socio",
+        "Crear cargo masivo para socios activos",
+        "Filtros del masivo afectan socios elegidos",
+        "Lote queda en historial y se puede revertir",
+        "Cargo masivo respeta caja por rol",
+      ]},
+      { id: "cierres", name: "Cierres de Caja", severity: "important", items: [
+        "Listar cierres con fecha, caja, total",
+        "Cerrar caja del día → suma todos los movimientos",
+        "Imprimir cierre",
+        "No permite cerrar dos veces la misma caja del mismo día",
+      ]},
+    ]
+  },
+  {
+    section: "Tesorería y Contabilidad", modules: [
+      { id: "cajas", name: "Cajas y Movimientos", severity: "critical", items: [
+        "Crear caja efectivo y caja banco",
+        "Asignar centro de costo a una caja",
+        "Editar caja, cambiar moneda",
+        "Registrar Ingreso simple → asiento OK",
+        "Registrar Egreso simple → asiento OK",
+        "Movimiento con varios items (multiconcepto) → balance OK, asiento N líneas",
+        "Movimiento con varios medios de pago → balance valida total",
+        "Centro de costo OBLIGATORIO en cada item",
+        "Cuenta contable se autocompleta del concepto, no se muestra al usuario",
+        "Concepto sin cuenta contable → error claro al guardar",
+        "Adjuntar archivo → sube y descarga",
+        "Buscar socio o entidad sin loop de 'Buscando...'",
+        "Editar movimiento existente",
+        "Anular movimiento → revierte asiento",
+      ]},
+      { id: "transferencias", name: "Transferencias entre Cajas", severity: "important", items: [
+        "Crear transferencia A → B → ambas cajas reflejan",
+        "Asiento con monto correcto en ambas cajas",
+        "No permite transferir entre la misma caja",
+        "Listado muestra origen, destino, fecha, monto",
+      ]},
+      { id: "conciliacion", name: "Conciliación Bancaria", severity: "important", items: [
+        "Ver Pendientes de Conciliar",
+        "Importar extracto CSV → matching sugerido",
+        "Importar extracto XLSX → matching",
+        "Confirmar match → quedan conciliados",
+        "Crear movimiento desde línea no matcheada",
+        "Detalle muestra todos los matches",
+      ]},
+      { id: "plan", name: "Plan de Cuentas", severity: "critical", items: [
+        "Lista jerárquica (4 niveles)",
+        "Saldo D/H se calcula correctamente",
+        "Crear cuenta con código y naturaleza",
+        "No permite eliminar cuentas con movimientos",
+        "Cuentas agrupadoras suman las hijas",
+      ]},
+      { id: "asientos", name: "Asientos Contables", severity: "critical", items: [
+        "Asientos automáticos generados por: pagos, movimientos, facturas, OP, recibos, liquidaciones",
+        "Cada asiento balanceado (Debe = Haber)",
+        "Numeración secuencial sin huecos",
+        "Crear asiento manual con N líneas → no permite desbalanceado",
+        "Editar asiento manual → recalcula",
+        "Eliminar asiento solo si no es automático",
+      ]},
+      { id: "mayor", name: "Libro Mayor", severity: "important", items: [
+        "Seleccionar cuenta → todos los movimientos",
+        "Saldo acumulado línea por línea",
+        "Filtro por fecha",
+        "Exportar a Excel/PDF",
+      ]},
+      { id: "presupuestos", name: "Presupuestos", severity: "important", items: [
+        "Crear presupuesto anual con N cuentas",
+        "Editor cargar montos por mes y cuenta",
+        "Marcar como vigente → solo uno vigente",
+        "Ejecución muestra presupuesto vs real",
+        "Pre-cargar año anterior + porcentaje",
+      ]},
+    ]
+  },
+  {
+    section: "Ingresos", modules: [
+      { id: "clientes", name: "Clientes (Entidades)", severity: "important", items: [
+        "Listar clientes con cuenta corriente",
+        "Crear cliente → código CLI-XXX automático",
+        "Datos fiscales (CUIT/DNI, condicionIva)",
+        "Asignar centro de costo",
+        "Buscar por nombre o documento",
+      ]},
+      { id: "pedidos", name: "Pedidos", severity: "cosmetic", items: [
+        "Crear pedido con items",
+        "Detalle muestra el pedido",
+        "Editar pedido en estado pendiente",
+      ]},
+      { id: "factVenta", name: "Facturas de Venta", severity: "critical", items: [
+        "Crear factura a cliente con items",
+        "Items con stock se descuentan al confirmar",
+        "Centro de costo OBLIGATORIO",
+        "Total con IVA discriminado por alícuota",
+        "Facturación electrónica → genera CAE",
+        "Detalle muestra factura con QR fiscal",
+        "Listado con totales (subtotal, IVA, total)",
+        "Filtro por estado funciona (pendiente/pagada/anulada)",
+        "Filtro 'Pagada' usa estado PAGADO (no CONFIRMADO)",
+        "Anular factura → reversa stock y asiento",
+      ]},
+      { id: "recibos", name: "Recibos de Cobro", severity: "important", items: [
+        "Crear recibo aplicando a 1+ facturas",
+        "Multimedio de pago",
+        "Detalle muestra cta corriente actualizada",
+        "Anular recibo → revierte aplicación",
+      ]},
+    ]
+  },
+  {
+    section: "Egresos", modules: [
+      { id: "proveedores", name: "Proveedores y Personal", severity: "important", items: [
+        "Crear proveedor → código PROV-XXX automático",
+        "Crear personal → código PERS-XXX automático",
+        "Asignar centro de costo",
+        "Cuenta corriente del proveedor",
+      ]},
+      { id: "ordenesCompra", name: "Órdenes de Compra", severity: "important", items: [
+        "Crear OC con items y proveedor",
+        "Estados pendiente/parcial/recibida",
+        "Recibir mercadería → ingreso de stock",
+        "OC vinculada a factura del proveedor",
+      ]},
+      { id: "factCompra", name: "Facturas de Compra", severity: "critical", items: [
+        "Crear factura a proveedor con items",
+        "Centro de costo OBLIGATORIO",
+        "IVA crédito fiscal discriminado",
+        "Asiento: Debe items + IVA / Haber proveedor",
+        "Pagar desde detalle → genera OP y asiento",
+        "Estado PAGADO al cancelar 100%",
+        "Filtro 'Pagado' muestra estas facturas",
+        "Total al pie suma registros visibles",
+        "Adjuntar PDF → sube y descarga",
+        "Edit factura no rompe (req.db correcto, no prisma global)",
+      ]},
+      { id: "ordenesPago", name: "Órdenes de Pago", severity: "important", items: [
+        "Crear OP aplicando a facturas pendientes",
+        "Multimedio de pago",
+        "Asiento de pago correcto",
+        "Anular → revierte aplicación y asiento",
+      ]},
+      { id: "liquidaciones", name: "Liquidaciones de Sueldos", severity: "important", items: [
+        "Listar por período",
+        "Crear con conceptos remunerativos y no remunerativos",
+        "Total neto = bruto - descuentos",
+        "Recibo de sueldo descargable",
+        "Asiento: 1 línea por entidad para distinguir CC",
+        "Conceptos de liquidación CRUD",
+      ]},
+    ]
+  },
+  {
+    section: "Centro de Costos", modules: [
+      { id: "ccReporte", name: "Reporte por Centro de Costo", severity: "critical", items: [
+        "Lista todos los CC con balance (ingresos - egresos)",
+        "Centros con 0 movimientos NO aparecen",
+        "Click en CC abre detalle de movimientos",
+        "Filtro por fecha",
+        "Exportar a Excel sin CCs vacíos",
+        "Total coincide con dashboard del módulo (ej: buffet)",
+        "CC BUFFET muestra todas las ventas del buffet",
+      ]},
+      { id: "ccDashboard", name: "Dashboard Ejecutivo CC", severity: "important", items: [
+        "Carga sin error",
+        "KPIs por CC (ingresos, egresos, margen)",
+        "Gráfico comparativo entre CCs",
+      ]},
+      { id: "ccVistas", name: "Matriz / Evolución / Rentabilidad / Ppto vs Real", severity: "important", items: [
+        "Matriz CC × período (devengado/cobrado/pendiente)",
+        "Evolución temporal mensual por CC",
+        "Rentabilidad: margen por actividad",
+        "Presupuesto vs Real con variación",
+      ]},
+    ]
+  },
+  {
+    section: "Stock", modules: [
+      { id: "productos", name: "Productos y Categorías", severity: "important", items: [
+        "Crear categoría",
+        "Crear producto con imagen, precio, stock inicial, categoría",
+        "Asignar tiposVenta (BUFFET, KIOSCO)",
+        "Lista con stock actual",
+      ]},
+      { id: "movStock", name: "Movimientos de Stock", severity: "important", items: [
+        "Listado muestra ingresos y egresos",
+        "Ajuste manual con motivo",
+        "Movimiento tras venta de buffet/kiosco",
+      ]},
+      { id: "alertas", name: "Alertas de Stock", severity: "cosmetic", items: [
+        "Productos bajo stock mínimo aparecen en /admin/stock/alertas",
+        "Menú muestra contador",
+      ]},
+    ]
+  },
+  {
+    section: "Buffet", modules: [
+      { id: "buffetConfig", name: "Configuración Buffet", severity: "critical", items: [
+        "Categorías con orden y color",
+        "Productos con tiposVenta y opciones",
+        "Mesas con zonas y estados",
+        "Precios por categoría/horario",
+      ]},
+      { id: "buffetMesas", name: "Buffet — Mesas (POS)", severity: "critical", items: [
+        "Ver mesas en planta",
+        "Click en mesa libre → abre GestionPedido",
+        "Agregar productos → suman al total",
+        "Modificar cantidad / sacar item",
+        "Productos con opciones suman extras al precio",
+        "Enviar a cocina → comanda se imprime",
+        "Pre-cuenta → ticket impreso",
+        "Cobrar con factura fiscal → CAE + ticket fiscal con QR",
+        "Cobrar sin factura → ticket no fiscal",
+        "Mesa pasa a libre tras cobrar",
+        "Calculadora de vuelto OK",
+        "Selector de cliente busca en socios y entidades CLIENTE",
+      ]},
+      { id: "buffetKiosco", name: "Buffet — Kiosco", severity: "critical", items: [
+        "Solo productos con tiposVenta KIOSCO",
+        "Mobile: botón flotante + drawer",
+        "Desktop: panel lateral siempre visible",
+        "Ticket con impresora BUFFET_IMPRESORA_KIOSCO",
+        "Movimiento de caja con CC del kiosco",
+        "Sin error productoBuffet.conceptoVenta (usar producto.conceptoVenta)",
+      ]},
+      { id: "buffetTakeAway", name: "Buffet — TakeAway", severity: "important", items: [
+        "Mismo flujo que mesa",
+        "Cliente registrado por nombre/teléfono",
+        "Comanda con formato TakeAway",
+        "Cobrar con impresora BUFFET_IMPRESORA_TAKEAWAY",
+      ]},
+      { id: "buffetKDS", name: "Buffet — Cocina/Barra (KDS)", severity: "important", items: [
+        "/admin/buffet/cocina muestra comandas en tiempo real",
+        "/admin/buffet/kds/COCINA filtra solo cocina",
+        "/admin/buffet/kds/BARRA filtra solo barra",
+        "Marcar item listo → desaparece",
+        "Comanda completa → se cierra",
+        "Notificación sonora de nueva comanda",
+      ]},
+      { id: "buffetImpresoras", name: "Buffet — Impresoras y Tickets", severity: "critical", items: [
+        "3 claves configuradas: TICKETS, KIOSCO, TAKEAWAY",
+        "Test de impresión",
+        "Ticket fiscal con QR de AFIP",
+        "Ticket no fiscal sin CAE",
+        "Comanda con *** SECTOR *** y observaciones >>",
+      ]},
+      { id: "menuPublico", name: "Menú Público", severity: "cosmetic", items: [
+        "/menu-buffet muestra productos BUFFET",
+        "Imágenes de Unsplash cargan",
+        "Sin error si tenant no tiene productos",
+      ]},
+    ]
+  },
+  {
+    section: "Control de Accesos", modules: [
+      { id: "monitor", name: "Monitor y Intentos Denegados", severity: "important", items: [
+        "Monitor muestra accesos en tiempo real",
+        "Intentos denegados con motivo",
+      ]},
+      { id: "habilitaciones", name: "Habilitaciones", severity: "important", items: [
+        "Listar socios habilitados / no",
+        "Habilitar manual",
+        "Sincronización con cuotas pagadas",
+      ]},
+      { id: "controlPwa", name: "Control PWA", severity: "important", items: [
+        "PWA molinete se conecta y aparece en monitor",
+        "Validar QR del socio → permite/deniega",
+        "Apertura remota vía Socket.io (pendiente)",
+      ]},
+      { id: "ventanilla", name: "Venta Ventanilla", severity: "important", items: [
+        "Cards de tipos de ticket",
+        "Carrito + cobrar",
+        "Cobrar efectivo → registra movimiento",
+        "Cobrar MP QR → genera QR escaneable",
+        "Ticket emitido al cobrar",
+      ]},
+      { id: "dispositivos", name: "Dispositivos", severity: "important", items: [
+        "Listar molinetes/lectores",
+        "CRUD dispositivo",
+        "Estado online/offline",
+      ]},
+    ]
+  },
+  {
+    section: "Eventos y Reservas", modules: [
+      { id: "eventos", name: "Eventos — CRUD y Venta", severity: "important", items: [
+        "Crear evento (fecha, capacidad, precio)",
+        "Lista de eventos",
+        "Detalle muestra entradas vendidas",
+        "Vender entrada → comprobante con QR",
+        "QR permite ingreso por molinete",
+      ]},
+      { id: "reservas", name: "Reservas — Calendario", severity: "important", items: [
+        "Configurar tipos y horarios",
+        "Calendario con reservas del mes",
+        "Crear reserva manual",
+        "Reservas desde portal aparecen acá",
+        "Confirmar/cancelar reserva",
+      ]},
+    ]
+  },
+  {
+    section: "Deportes", modules: [
+      { id: "espacios", name: "Espacios y Tipos", severity: "important", items: [
+        "Tipos de espacio configurados",
+        "CRUD de espacios",
+      ]},
+      { id: "agenda", name: "Agenda (Horarios)", severity: "important", items: [
+        "Crear horario recurrente con espacio",
+        "Espacio OBLIGATORIO",
+        "Conflicto con otro horario → alerta",
+      ]},
+      { id: "asistencia", name: "Entrenamientos y Asistencia", severity: "important", items: [
+        "Lista de entrenamientos generados",
+        "Marcar asistencia: presente/ausente/justificado",
+        "Histórico por socio",
+        "Alerta automática de baja asistencia",
+      ]},
+      { id: "equipos", name: "Equipos y Plantel", severity: "important", items: [
+        "Crear equipo con plantel",
+        "Detalle con número, posición",
+        "Editar plantel",
+      ]},
+      { id: "campeonatos", name: "Campeonatos y Tabla", severity: "important", items: [
+        "Crear campeonato, asignar equipos",
+        "Cargar partidos con resultado",
+        "Tabla calcula PJ/PG/PE/PP/PTS/GF/GC/DG",
+        "Campeonato sin partidos → tabla vacía sin error",
+        "Próxima fecha y resultados anteriores",
+      ]},
+      { id: "planillas", name: "Planillas de Entrenamiento", severity: "important", items: [
+        "Crear planilla con ejercicios",
+        "Asignar a entrenamiento",
+        "Imprimir/exportar",
+      ]},
+      { id: "medico", name: "Seguimiento Médico", severity: "important", items: [
+        "Ficha médica: alergias, antecedentes, contacto",
+        "Aptitud física con vencimiento",
+        "Alerta de aptitud por vencer",
+        "Lesiones: registrar con días estimados",
+      ]},
+      { id: "pasaje", name: "Pasaje de Categoría", severity: "important", items: [
+        "Lista próximos a cambiar (por edad)",
+        "Pasaje masivo a categoría siguiente",
+        "Histórico",
+      ]},
+      { id: "rptDeportivo", name: "Reportes Deportivos", severity: "cosmetic", items: [
+        "Asistencia por actividad",
+        "Partidos jugados/ganados por equipo",
+      ]},
+    ]
+  },
+  {
+    section: "Comunicaciones", modules: [
+      { id: "campanas", name: "Campañas", severity: "important", items: [
+        "Crear con segmento (ej: morosos)",
+        "Templates email/WhatsApp",
+        "Programar envío",
+        "Detalle: enviados, leídos, errores",
+        "Sin duplicados en jobs",
+      ]},
+      { id: "chat", name: "Chat Entrenadores", severity: "important", items: [
+        "Lista por actividad",
+        "Mensajes en tiempo real",
+        "Adjuntos",
+        "Badge de no leídos",
+      ]},
+      { id: "templates", name: "Templates Email/PDF", severity: "important", items: [
+        "Editor con placeholders",
+        "Vista previa",
+        "Asignar a evento",
+      ]},
+      { id: "recupero", name: "Recupero", severity: "important", items: [
+        "Lista de cuentas a recuperar",
+        "Acciones con fecha y motivo",
+        "Campañas con plan de acciones",
+      ]},
+      { id: "cobranzas", name: "Cobranzas", severity: "important", items: [
+        "Gestión con prioridades",
+        "Detalle por socio",
+        "Histórico de gestiones",
+      ]},
+    ]
+  },
+  {
+    section: "Débito Automático", modules: [
+      { id: "adhesion", name: "Adhesión y CBU", severity: "important", items: [
+        "Solicitud admin con CBU",
+        "Solicitud portal socio (sin CVV)",
+        "Validación CBU 22 dígitos",
+      ]},
+      { id: "procesamiento", name: "Procesamiento (PRISMA / Payway / Bancos)", severity: "important", items: [
+        "Generar archivo PRISMA",
+        "Procesar respuesta PRISMA",
+        "Payway: lote → enviar → webhook",
+        "Distinguir rechazo recuperable de final",
+        "Sin permiso DEBITO_AUTOMATICO → no ve botones",
+      ]},
+      { id: "recibosDA", name: "Recibos por Email + WhatsApp", severity: "important", items: [
+        "Cobro exitoso → email con PDF",
+        "WhatsApp con link al recibo",
+        "Si email falla → intenta WhatsApp",
+      ]},
+    ]
+  },
+  {
+    section: "Gobernanza", modules: [
+      { id: "actas", name: "Actas de Reunión", severity: "important", items: [
+        "Lista de actas",
+        "Crear acta (título, fecha, asistentes, contenido)",
+        "Detalle con acta completa",
+      ]},
+      { id: "votaciones", name: "Votaciones", severity: "important", items: [
+        "Crear votación con opciones",
+        "Socios votan desde portal (1 vez)",
+        "Resultado en tiempo real",
+        "Cerrar votación → no acepta más",
+      ]},
+      { id: "documentos", name: "Documentos del Club", severity: "important", items: [
+        "Lista agrupada por categoría",
+        "Crear con URL",
+        "Flag visible público → aparece en sitio",
+        "Filtros y CRUD funcionando",
+      ]},
+    ]
+  },
+  {
+    section: "Reportes", modules: [
+      { id: "rptCuotas", name: "Reporte de Cuotas", severity: "important", items: [
+        "Filtros por período, estado, categoría",
+        "Totales en pie",
+        "Exportar Excel",
+      ]},
+      { id: "rptSocios", name: "Reporte de Socios", severity: "important", items: [
+        "Filtros por categoría, estado, antigüedad",
+        "Totales por categoría",
+        "Exportar",
+      ]},
+      { id: "rptComercios", name: "Reporte de Comercios", severity: "cosmetic", items: [
+        "Lista de adheridos",
+        "Estado de pago",
+      ]},
+      { id: "rptMorosidad", name: "Reporte de Morosidad", severity: "important", items: [
+        "Socios con N+ cuotas vencidas",
+        "Antigüedad de la deuda",
+        "Total adeudado",
+      ]},
+      { id: "rptDesigner", name: "Reportes — Designer Custom", severity: "cosmetic", items: [
+        "Crear plantilla custom (SQL)",
+        "Vista previa",
+        "Ejecutar y descargar",
+      ]},
+      { id: "rptRun", name: "Reportes — Run", severity: "cosmetic", items: [
+        "Lista de reportes ejecutables",
+        "Acceso rápido con preset",
+      ]},
+    ]
+  },
+  {
+    section: "Configuración", modules: [
+      { id: "tablas", name: "Tablas Auxiliares", severity: "important", items: [
+        "CRUD de cada tabla auxiliar",
+        "No eliminar registros con uso",
+      ]},
+      { id: "branding", name: "Branding y Personalización Visual", severity: "important", items: [
+        "Logo claro/oscuro/favicon → admin y portal",
+        "Color primario → CSS variables",
+        "Slogan en topbar admin",
+      ]},
+      { id: "fiscal", name: "Configuración Fiscal", severity: "important", items: [
+        "CUIT, condición IVA, punto de venta",
+        "Certificados AFIP cargados",
+        "Test de conexión AFIP",
+      ]},
+      { id: "pagos", name: "Configuración de Pagos", severity: "important", items: [
+        "MP Access Token por tenant",
+        "Test de generación de preferencia",
+        "Webhook configurado",
+      ]},
+      { id: "menu", name: "Menú Admin", severity: "important", items: [
+        "Lista con jerarquía",
+        "Crear item con permiso requerido",
+        "Restaurar menú por defecto no duplica (idempotente)",
+      ]},
+      { id: "usuarios", name: "Usuarios y Roles", severity: "critical", items: [
+        "CRUD de usuarios admin",
+        "Asignar rol",
+        "Cambiar contraseña",
+        "CRUD de roles con matriz",
+        "Permisos backend (checkPermiso) y frontend (tienePermiso) coinciden",
+      ]},
+      { id: "ccConfig", name: "Centros de Costo (config)", severity: "important", items: [
+        "CRUD de centros de costo",
+        "No eliminar CCs con movimientos",
+      ]},
+      { id: "autoridades", name: "Autoridades", severity: "cosmetic", items: [
+        "CRUD de autoridades",
+        "Aparecen en sitio público",
+      ]},
+    ]
+  },
+  {
+    section: "Portal Socio (PWA)", modules: [
+      { id: "loginSocio", name: "Login Portal", severity: "critical", items: [
+        "Login email + código",
+        "Login WhatsApp en celular/celularSecundario/telefonoFijo",
+        "Login magic link",
+        "Sesión persistente",
+      ]},
+      { id: "ctaCorriente", name: "Cuenta Corriente Socio", severity: "important", items: [
+        "Endpoint cuenta-corriente muestra cuotas y cargos",
+        "Coincide con vista admin",
+        "Filtro por familia",
+      ]},
+      { id: "pagoMP", name: "Pagos Online (MP)", severity: "important", items: [
+        "Generar preferencia → redirige a MP",
+        "Pago aprobado → webhook actualiza cuota",
+        "Pago rechazado → no impacta",
+        "Mostrar comprobante en portal",
+      ]},
+      { id: "reservasPortal", name: "Reservas desde Portal", severity: "important", items: [
+        "Ver disponibilidad",
+        "Crear reserva → confirma",
+        "Cancelar reserva propia",
+      ]},
+      { id: "notifChat", name: "Notificaciones y Chat", severity: "important", items: [
+        "Push notifications PWA",
+        "Chat con admin en tiempo real",
+      ]},
+      { id: "qr", name: "Acceso QR", severity: "critical", items: [
+        "Portal genera QR único del socio",
+        "QR escaneable en molinete permite ingreso",
+        "QR rota o se invalida si baja",
+      ]},
+    ]
+  },
+  {
+    section: "Comercio y Sitio Público", modules: [
+      { id: "portalComercio", name: "Portal del Comerciante", severity: "important", items: [
+        "Acceso /comercio/:token o /c/:token",
+        "Ver y editar datos",
+        "Token inválido → /acceso-invalido",
+      ]},
+      { id: "comerciosPub", name: "Listado público de Comercios", severity: "cosmetic", items: [
+        "/comercios muestra activos",
+        "Filtros por rubro",
+        "Click abre detalle",
+      ]},
+      { id: "sitioHome", name: "Home y páginas estáticas", severity: "cosmetic", items: [
+        "Home / con bloques (hero, noticias, autoridades)",
+        "Páginas: Historia, Misión, Autoridades, Instalaciones, Contacto",
+        "Mobile responsive",
+      ]},
+      { id: "sitioAct", name: "Actividades públicas", severity: "important", items: [
+        "/actividades lista activas",
+        "Detalle con horarios y precio",
+        "Filtros por categoría",
+      ]},
+      { id: "sitioNot", name: "Noticias", severity: "important", items: [
+        "/noticias lista publicadas",
+        "Detalle con slug",
+        "CRUD admin → publicar/despublicar",
+      ]},
+      { id: "sitioCal", name: "Calendario y Cronograma", severity: "cosmetic", items: [
+        "Calendario público de eventos",
+        "Cronograma de actividades",
+      ]},
+      { id: "sitioInsc", name: "Inscripción Pública", severity: "critical", items: [
+        "/inscripcion-socio formulario completo",
+        "Agregar familiares",
+        "reCAPTCHA funciona",
+        "Llega a admin como Solicitud",
+        "Email/WhatsApp de confirmación",
+      ]},
+    ]
+  },
+  {
+    section: "Atajos del Admin", modules: [
+      { id: "atajos", name: "Atajos / Favoritos", severity: "important", items: [
+        "Botón estrella en header abre modal 'Nuevo atajo'",
+        "Modal pre-llena URL actual",
+        "Crear con nombre, descripción, color, ícono, carpeta, nueva pestaña",
+        "Aparece en /admin/accesos-rapidos",
+        "Sidebar muestra 'Atajos' como item fijo arriba",
+        "Tarjeta tipo mini: ícono centrado, barra de color, sin URL",
+        "Hover muestra descripción como tooltip",
+        "Switch 'Edición' muestra drag handle, lápiz, tachito",
+        "Editar atajo → modal precargado",
+        "Eliminar → modal personalizado de confirmación",
+        "Crear carpeta con presets (5 colores)",
+        "Carpeta col-span-2 e items adentro grid-cols-2",
+        "Items dentro de carpeta tienen mismo tamaño que en raíz",
+        "Cambiar color de carpeta clickeando swatches",
+        "Renombrar carpeta in-place",
+        "Eliminar carpeta → ítems vuelven a raíz",
+        "Botón + en carpeta solo en modo edición",
+        "Drag & drop ítem entre carpetas/raíz",
+        "Drag & drop reordenar dentro de carpeta",
+        "Drag & drop reordenar carpetas (handle del header)",
+        "Cambios persisten tras recargar",
+        "Cada admin ve solo sus propios atajos",
+        "Multi-tenant: clubA no ve atajos de clubB",
+      ]},
+    ]
+  },
+  {
+    section: "Super Admin", modules: [
+      { id: "tenants", name: "Gestión de Tenants", severity: "critical", items: [
+        "Solo super-admin ve /admin/tenants",
+        "Crear tenant nuevo (slug, nombre, dominio)",
+        "Detalle con módulos habilitados",
+        "Editar funcionalidades",
+        "Estado activo/inactivo",
+        "Aislamiento: usa prisma global, no req.db",
+      ]},
+      { id: "uso", name: "Dashboard de Uso", severity: "important", items: [
+        "Uso por tenant (storage, requests)",
+        "Gráficos por mes",
+        "Filtro por tenant",
+      ]},
+      { id: "iaMetricas", name: "Métricas IA", severity: "important", items: [
+        "Consumo de tokens/requests por tenant",
+        "Costo estimado",
+      ]},
+      { id: "registroClub", name: "Registro Público de Club", severity: "important", items: [
+        "/registro-club permite alta self-service",
+        "Crea tenant + admin inicial",
+        "Email de bienvenida",
+        "Primer login redirige a config inicial",
+      ]},
+    ]
+  },
+  {
+    section: "Cross-cutting / Operativos", modules: [
+      { id: "errores", name: "Errores de conexión y resiliencia", severity: "critical", items: [
+        "Server caído → ConnectionError con logo del tenant",
+        "Reintentar tras levantar → vuelve a la página",
+        "DB caída → mismo overlay",
+        "Toast de error por encima del modal (z-index)",
+        "Errores de validación con react-hot-toast",
+      ]},
+      { id: "sockets", name: "Sockets en tiempo real", severity: "important", items: [
+        "Comanda nueva → llega a cocina sin recargar",
+        "Mensaje de chat → instantáneo al receptor",
+        "Acceso por molinete → aparece en monitor",
+        "Salas: user:{id}, destino:COCINA, destino:BARRA, buffet",
+      ]},
+      { id: "adjuntos", name: "Adjuntos / Archivos", severity: "important", items: [
+        "Subir archivo desde factura compra/venta",
+        "Subir archivo desde movimiento de caja",
+        "Descargar archivo → mismo contenido",
+        "postFormData / downloadFile / upload envían X-Tenant-Slug",
+        "Archivo de un tenant no se descarga desde otro",
+      ]},
+    ]
+  },
+];
+
+// ─── ESTADO ──────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'qa-clubix-state-v1';
+const DEFECTS_KEY = 'qa-clubix-defects-v1';
+
+let state = loadState();
+let defects = loadDefects();
+let activeModuleId = null;
+let activeFilter = 'all';
+let activeSevFilter = 'all';
+let searchQuery = '';
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  document.getElementById('lastSavedLabel').textContent = `Guardado ${new Date().toLocaleTimeString()}`;
+}
+function loadDefects() {
+  try { return JSON.parse(localStorage.getItem(DEFECTS_KEY)) || []; }
+  catch { return []; }
+}
+function saveDefects() {
+  localStorage.setItem(DEFECTS_KEY, JSON.stringify(defects));
+}
+
+// Asegurar IDs estables item.id = mod.id + '-' + idx
+function itemId(modId, idx) { return `${modId}--${idx}`; }
+
+// Conjunto plano de todos los items
+function allItems() {
+  const out = [];
+  for (const sec of QA_DATA) {
+    for (const mod of sec.modules) {
+      mod.items.forEach((text, idx) => {
+        out.push({
+          id: itemId(mod.id, idx),
+          text,
+          modId: mod.id,
+          modName: mod.name,
+          section: sec.section,
+          severity: mod.severity,
+        });
+      });
+    }
+  }
+  return out;
+}
+
+function moduleProgress(mod) {
+  let done = 0, failed = 0, blocked = 0, total = mod.items.length;
+  mod.items.forEach((_, idx) => {
+    const s = state[itemId(mod.id, idx)]?.status || 'pending';
+    if (s === 'passed') done++;
+    else if (s === 'failed') failed++;
+    else if (s === 'blocked') blocked++;
+  });
+  return { done, failed, blocked, total };
+}
+
+function overallProgress() {
+  const all = allItems();
+  let done = 0, failed = 0;
+  for (const it of all) {
+    const s = state[it.id]?.status || 'pending';
+    if (s === 'passed') done++;
+    else if (s === 'failed') failed++;
+  }
+  return { done, failed, total: all.length };
+}
+
+// ─── RENDER SIDEBAR ──────────────────────────────────────────────────────────
+function renderSidebar() {
+  const root = document.getElementById('sidebar');
+  let html = '';
+  for (const sec of QA_DATA) {
+    html += `<details open class="mb-1">
+      <summary class="px-2 py-1 font-semibold text-slate-600 text-xs uppercase tracking-wide flex items-center justify-between">
+        <span>${sec.section}</span>
+      </summary>
+      <div class="ml-1">`;
+    for (const mod of sec.modules) {
+      const p = moduleProgress(mod);
+      const pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
+      const sevDot = mod.severity === 'critical' ? '🔴' : mod.severity === 'important' ? '🟡' : '🔵';
+      const failedTag = p.failed ? `<span class="ml-1 text-rose-500 font-bold" title="${p.failed} fallados">!</span>` : '';
+      const isActive = activeModuleId === mod.id;
+      html += `<button class="group-btn w-full text-left px-2 py-1.5 rounded mb-0.5 ${isActive ? 'active' : ''}" data-mod="${mod.id}">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs">${sevDot}</span>
+          <span class="text-sm flex-1 truncate">${mod.name}</span>
+          <span class="text-[10px] tabular-nums text-slate-400 group-btn-active:text-white">${p.done}/${p.total}</span>
+          ${failedTag}
+        </div>
+        <div class="mt-1 h-1 bg-slate-200 rounded-full overflow-hidden">
+          <div class="bg-emerald-500 h-1" style="width:${pct}%"></div>
+        </div>
+      </button>`;
+    }
+    html += `</div></details>`;
+  }
+  root.innerHTML = html;
+
+  root.querySelectorAll('.group-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeModuleId = btn.dataset.mod;
+      renderSidebar();
+      renderModule();
+    });
+  });
+}
+
+// ─── RENDER MODULE ───────────────────────────────────────────────────────────
+function findModule(id) {
+  for (const sec of QA_DATA) {
+    for (const mod of sec.modules) if (mod.id === id) return { sec, mod };
+  }
+  return null;
+}
+
+function statusIcon(s) {
+  if (s === 'passed') return '<span class="status-passed text-lg">✓</span>';
+  if (s === 'failed') return '<span class="status-failed text-lg">✗</span>';
+  if (s === 'blocked') return '<span class="text-amber-500 text-lg">⊘</span>';
+  return '<span class="status-pending text-lg">○</span>';
+}
+
+function passesFilter(item) {
+  if (activeSevFilter !== 'all' && item.severity !== activeSevFilter) return false;
+  const s = state[item.id]?.status || 'pending';
+  if (activeFilter !== 'all' && s !== activeFilter) return false;
+  if (searchQuery && !item.text.toLowerCase().includes(searchQuery.toLowerCase()) && !item.modName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+  return true;
+}
+
+function renderModule() {
+  const root = document.getElementById('moduleContainer');
+  if (!activeModuleId) {
+    // Modo búsqueda: si hay query o filtros, mostrar todos los matches; si no, instrucciones
+    if (searchQuery || activeFilter !== 'all' || activeSevFilter !== 'all') {
+      const matches = allItems().filter(passesFilter);
+      root.innerHTML = renderItemsAsList(matches, 'Resultados', `${matches.length} ítem(s) coinciden`);
+      bindItemEvents();
+      return;
+    }
+    root.innerHTML = `
+      <div class="bg-white border border-slate-200 rounded-xl p-12 text-center">
+        <div class="text-5xl mb-4">📋</div>
+        <h2 class="text-xl font-bold text-slate-800 mb-2">QA Funcional Clubix</h2>
+        <p class="text-sm text-slate-500 max-w-md mx-auto">
+          Seleccioná un módulo de la barra lateral o usá el buscador.
+          Cada item tiene 4 estados: pendiente, aprobado, fallado, bloqueado.
+          Los datos quedan en este navegador (localStorage).
+        </p>
+      </div>`;
+    return;
+  }
+
+  const found = findModule(activeModuleId);
+  if (!found) { root.innerHTML = '<div>Módulo no encontrado</div>'; return; }
+  const { sec, mod } = found;
+  const items = mod.items.map((text, idx) => ({
+    id: itemId(mod.id, idx),
+    text, modId: mod.id, modName: mod.name, section: sec.section, severity: mod.severity,
+  })).filter(passesFilter);
+
+  const p = moduleProgress(mod);
+  const pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
+  const sevBadge = `<span class="px-2 py-0.5 rounded text-xs font-medium sev-${mod.severity}">${mod.severity === 'critical' ? '🔴 Crítico' : mod.severity === 'important' ? '🟡 Importante' : '🔵 Cosmético'}</span>`;
+
+  root.innerHTML = `
+    <div class="mb-4">
+      <div class="text-xs uppercase tracking-wide text-indigo-600 font-semibold">${sec.section}</div>
+      <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-3 mt-1">
+        ${mod.name} ${sevBadge}
+      </h2>
+      <div class="mt-2 flex items-center gap-3 text-sm text-slate-600">
+        <span><span class="text-emerald-600 font-semibold">${p.done}</span> aprobados</span>
+        <span><span class="text-rose-600 font-semibold">${p.failed}</span> fallados</span>
+        <span><span class="text-amber-600 font-semibold">${p.blocked}</span> bloqueados</span>
+        <span><span class="text-slate-500 font-semibold">${p.total - p.done - p.failed - p.blocked}</span> pendientes</span>
+        <div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden ml-2">
+          <div class="bg-emerald-500 h-2" style="width:${pct}%"></div>
+        </div>
+        <span class="font-semibold tabular-nums">${pct}%</span>
+      </div>
+    </div>
+    <div class="space-y-2">
+      ${items.map(renderItem).join('') || '<div class="text-slate-400 italic text-sm py-8 text-center">No hay items que coincidan con los filtros.</div>'}
+    </div>
+  `;
+  bindItemEvents();
+}
+
+function renderItemsAsList(items, title, subtitle) {
+  const grouped = {};
+  for (const it of items) {
+    const key = `${it.section} → ${it.modName}`;
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(it);
+  }
+  let html = `<h2 class="text-2xl font-bold text-slate-900 mb-1">${title}</h2><p class="text-sm text-slate-500 mb-4">${subtitle}</p>`;
+  for (const [k, arr] of Object.entries(grouped)) {
+    html += `<div class="mb-4">
+      <h3 class="text-xs uppercase tracking-wide font-semibold text-indigo-600 mb-2">${k}</h3>
+      <div class="space-y-2">${arr.map(renderItem).join('')}</div>
+    </div>`;
+  }
+  return html;
+}
+
+function renderItem(item) {
+  const entry = state[item.id] || { status: 'pending', notes: '' };
+  const cls = entry.status === 'passed' ? 'item-passed' : entry.status === 'failed' ? 'item-failed' : entry.status === 'blocked' ? 'item-blocked' : 'bg-white border-slate-200';
+  const sev = item.severity === 'critical' ? '🔴' : item.severity === 'important' ? '🟡' : '🔵';
+  return `
+    <div class="item-row border rounded-lg p-3 ${cls} flex items-start gap-3" data-id="${item.id}">
+      <button class="status-cycle flex-shrink-0 mt-0.5" data-id="${item.id}" title="Click para ciclar estado">
+        ${statusIcon(entry.status || 'pending')}
+      </button>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start gap-2">
+          <div class="flex-1 text-sm text-slate-800">${item.text}</div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <span class="text-xs">${sev}</span>
+            <button class="status-set text-xs px-1.5 py-0.5 rounded ${entry.status === 'passed' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}" data-id="${item.id}" data-status="passed" title="Aprobado">✓</button>
+            <button class="status-set text-xs px-1.5 py-0.5 rounded ${entry.status === 'failed' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}" data-id="${item.id}" data-status="failed" title="Fallado">✗</button>
+            <button class="status-set text-xs px-1.5 py-0.5 rounded ${entry.status === 'blocked' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}" data-id="${item.id}" data-status="blocked" title="Bloqueado">⊘</button>
+            <button class="toggle-notes text-xs px-1.5 py-0.5 rounded bg-slate-50 text-slate-600 hover:bg-slate-100" data-id="${item.id}" title="Notas">📝${entry.notes ? '·' : ''}</button>
+          </div>
+        </div>
+        <textarea class="notes-area w-full mt-2 border border-slate-200 rounded p-2 text-xs ${entry.notes ? '' : 'hidden'}" data-id="${item.id}" placeholder="Notas, capturas, pasos para reproducir...">${entry.notes || ''}</textarea>
+      </div>
+    </div>`;
+}
+
+function bindItemEvents() {
+  document.querySelectorAll('.status-cycle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const cur = state[id]?.status || 'pending';
+      const next = cur === 'pending' ? 'passed' : cur === 'passed' ? 'failed' : cur === 'failed' ? 'blocked' : 'pending';
+      setStatus(id, next);
+    });
+  });
+  document.querySelectorAll('.status-set').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const newStatus = btn.dataset.status;
+      const cur = state[id]?.status || 'pending';
+      setStatus(id, cur === newStatus ? 'pending' : newStatus);
+    });
+  });
+  document.querySelectorAll('.toggle-notes').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const ta = document.querySelector(`.notes-area[data-id="${id}"]`);
+      if (ta) {
+        ta.classList.toggle('hidden');
+        if (!ta.classList.contains('hidden')) ta.focus();
+      }
+    });
+  });
+  document.querySelectorAll('.notes-area').forEach(ta => {
+    ta.addEventListener('input', () => {
+      const id = ta.dataset.id;
+      state[id] = state[id] || { status: 'pending', notes: '' };
+      state[id].notes = ta.value;
+      saveState();
+    });
+  });
+}
+
+function setStatus(id, status) {
+  state[id] = state[id] || { notes: '' };
+  state[id].status = status;
+  saveState();
+  renderSidebar();
+  renderModule();
+  renderOverall();
+  renderDefects();
+}
+
+// ─── OVERALL / FILTROS / DEFECTOS ────────────────────────────────────────────
+function renderOverall() {
+  const o = overallProgress();
+  const pct = o.total ? Math.round((o.done / o.total) * 100) : 0;
+  document.getElementById('overallStats').textContent = `${o.done} aprobados · ${o.failed} fallados · ${o.total} totales`;
+  document.getElementById('overallProgress').style.width = pct + '%';
+  document.getElementById('overallPercent').textContent = pct + '%';
+}
+
+function renderDefects() {
+  const failedItems = allItems().filter(it => state[it.id]?.status === 'failed');
+  const root = document.getElementById('defectsList');
+  let html = '';
+  if (failedItems.length === 0 && defects.length === 0) {
+    html = '<div class="text-slate-400 italic">Sin defectos registrados.</div>';
+  } else {
+    if (failedItems.length > 0) {
+      html += `<div class="text-xs uppercase font-semibold text-slate-500 mb-1">Items marcados como fallados</div>`;
+      for (const it of failedItems) {
+        const sev = it.severity === 'critical' ? '🔴' : it.severity === 'important' ? '🟡' : '🔵';
+        const notes = state[it.id]?.notes || '';
+        html += `<div class="border border-rose-200 bg-rose-50 rounded p-2 text-sm">
+          <div class="font-medium text-rose-800 flex items-center gap-2">${sev} ${it.modName}</div>
+          <div class="text-slate-700">${it.text}</div>
+          ${notes ? `<div class="text-xs text-slate-600 italic mt-1 whitespace-pre-wrap">${escapeHtml(notes)}</div>` : ''}
+        </div>`;
+      }
+    }
+    if (defects.length > 0) {
+      html += `<div class="text-xs uppercase font-semibold text-slate-500 mb-1 mt-3">Defectos manuales</div>`;
+      defects.forEach((d, i) => {
+        const sev = d.severity === 'critical' ? '🔴' : d.severity === 'important' ? '🟡' : '🔵';
+        html += `<div class="border border-rose-200 bg-rose-50 rounded p-2 text-sm flex items-start gap-2">
+          <div class="flex-1">
+            <div class="font-medium text-rose-800">${sev} ${escapeHtml(d.title)}</div>
+            <div class="text-slate-700 whitespace-pre-wrap text-xs mt-1">${escapeHtml(d.description)}</div>
+          </div>
+          <button class="del-defect text-rose-500 hover:text-rose-700 text-xs" data-idx="${i}">Eliminar</button>
+        </div>`;
+      });
+    }
+  }
+  root.innerHTML = html;
+  root.querySelectorAll('.del-defect').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      defects.splice(idx, 1);
+      saveDefects();
+      renderDefects();
+    });
+  });
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// ─── EXPORTAR ────────────────────────────────────────────────────────────────
+function exportReport() {
+  const o = overallProgress();
+  const date = new Date().toLocaleString();
+  let md = `# Reporte QA — Clubix\n\n_Generado: ${date}_\n\n`;
+  md += `## Resumen\n\n`;
+  md += `- Total: **${o.total}** ítems\n- Aprobados: **${o.done}**\n- Fallados: **${o.failed}**\n- Pendientes: **${o.total - o.done - o.failed}**\n- Porcentaje aprobado: **${Math.round((o.done / o.total) * 100)}%**\n\n`;
+
+  for (const sec of QA_DATA) {
+    md += `\n## ${sec.section}\n`;
+    for (const mod of sec.modules) {
+      const p = moduleProgress(mod);
+      md += `\n### ${mod.name} (${p.done}/${p.total})\n\n`;
+      mod.items.forEach((text, idx) => {
+        const id = itemId(mod.id, idx);
+        const e = state[id] || { status: 'pending', notes: '' };
+        const mark = e.status === 'passed' ? '✅' : e.status === 'failed' ? '❌' : e.status === 'blocked' ? '⊘' : '⬜';
+        md += `- ${mark} ${text}`;
+        if (e.notes) md += `\n  > ${e.notes.replace(/\n/g, '\n  > ')}`;
+        md += '\n';
+      });
+    }
+  }
+
+  const failed = allItems().filter(it => state[it.id]?.status === 'failed');
+  if (failed.length || defects.length) {
+    md += `\n## Defectos detectados\n\n`;
+    failed.forEach(it => {
+      const sev = it.severity === 'critical' ? 'CRÍTICO' : it.severity === 'important' ? 'IMPORTANTE' : 'COSMÉTICO';
+      md += `### [${sev}] ${it.modName} — ${it.text}\n`;
+      if (state[it.id]?.notes) md += `${state[it.id].notes}\n\n`; else md += '\n';
+    });
+    defects.forEach(d => {
+      md += `### [${d.severity.toUpperCase()}] ${d.title}\n${d.description}\n\n`;
+    });
+  }
+
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `qa-clubix-${new Date().toISOString().slice(0, 10)}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── EVENTOS GLOBALES ────────────────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  if (searchQuery) activeModuleId = null;
+  renderModule();
+});
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeFilter = btn.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+      b.classList.add('bg-white', 'border-slate-300', 'text-slate-700');
+    });
+    btn.classList.remove('bg-white', 'border-slate-300', 'text-slate-700');
+    btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+    if (activeFilter !== 'all') activeModuleId = null;
+    renderModule();
+  });
+});
+document.querySelectorAll('.sev-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeSevFilter = btn.dataset.sevFilter;
+    document.querySelectorAll('.sev-filter-btn').forEach(b => {
+      b.classList.remove('bg-slate-700', 'text-white', 'border-slate-700');
+    });
+    btn.classList.add('bg-slate-700', 'text-white', 'border-slate-700');
+    if (activeSevFilter !== 'all') activeModuleId = null;
+    renderModule();
+  });
+});
+document.getElementById('exportBtn').addEventListener('click', exportReport);
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (confirm('¿Seguro que querés borrar TODOS los estados y defectos? Esta acción no se puede deshacer.')) {
+    state = {};
+    defects = [];
+    saveState();
+    saveDefects();
+    renderSidebar();
+    renderModule();
+    renderOverall();
+    renderDefects();
+  }
+});
+document.getElementById('addDefectBtn').addEventListener('click', () => {
+  const title = document.getElementById('defectTitle').value.trim();
+  const desc = document.getElementById('defectDesc').value.trim();
+  const sev = document.getElementById('defectSev').value;
+  if (!title) { alert('Ingresá un título'); return; }
+  defects.push({ title, description: desc, severity: sev, date: new Date().toISOString() });
+  saveDefects();
+  document.getElementById('defectTitle').value = '';
+  document.getElementById('defectDesc').value = '';
+  renderDefects();
+});
+
+// Init
+renderSidebar();
+renderModule();
+renderOverall();
+renderDefects();
+</script>
+
+</body>
+</html>
