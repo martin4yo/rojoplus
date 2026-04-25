@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Pencil, Trash2, ExternalLink, Star, FolderOpen, FolderPlus,
-  Folder, Check, X, GripVertical,
+  Check, X, GripVertical,
 } from 'lucide-react'
 import {
   DndContext,
@@ -411,10 +411,12 @@ export default function AccesosRapidos() {
           onDragOver={onDragOver}
           onDragEnd={onDragEnd}
         >
-          <div className="space-y-5">
-            {/* Carpetas (sortables entre sí cuando se arrastran por el handle) */}
+          <RootZone>
             <SortableContext
-              items={carpetas.map(c => `carpeta-${c.id}`)}
+              items={[
+                ...carpetas.map(c => `carpeta-${c.id}`),
+                ...raiz.map(f => f.id),
+              ]}
               strategy={rectSortingStrategy}
             >
               {carpetas.map(carpeta => (
@@ -432,37 +434,18 @@ export default function AccesosRapidos() {
                   onCarpetaUpdated={cargarCarpetas}
                 />
               ))}
+              {raiz.map(fav => (
+                <SortableFavoritoCard
+                  key={fav.id}
+                  fav={fav}
+                  editMode={editMode}
+                  onOpen={() => handleAbrir(fav)}
+                  onEdit={() => handleEditar(fav)}
+                  onDelete={() => handleEliminar(fav)}
+                />
+              ))}
             </SortableContext>
-
-            {/* Raíz */}
-            <RootZone>
-              {carpetas.length > 0 && (
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">
-                  Sin carpeta
-                </h2>
-              )}
-              <SortableContext items={raiz.map(f => f.id)} strategy={rectSortingStrategy}>
-                {raiz.length === 0 ? (
-                  <div className="text-sm text-gray-400 italic min-h-16 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center">
-                    Soltá un acceso aquí o tocá <Plus className="w-3 h-3 inline-block mx-1" /> Nuevo
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 items-start">
-                    {raiz.map(fav => (
-                      <SortableFavoritoCard
-                        key={fav.id}
-                        fav={fav}
-                        editMode={editMode}
-                        onOpen={() => handleAbrir(fav)}
-                        onEdit={() => handleEditar(fav)}
-                        onDelete={() => handleEliminar(fav)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </SortableContext>
-            </RootZone>
-          </div>
+          </RootZone>
 
           <DragOverlay dropAnimation={null}>
             {activeFav && <FavoritoCardPreview fav={activeFav} />}
@@ -492,7 +475,9 @@ function RootZone({ children }) {
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-xl transition-colors ${isOver ? 'bg-blue-50/40 ring-2 ring-blue-200 ring-inset p-2' : ''}`}
+      className={`grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 items-start grid-flow-row-dense rounded-xl transition-colors ${
+        isOver ? 'bg-blue-50/40 ring-2 ring-blue-200 ring-inset p-2' : 'p-0'
+      }`}
     >
       {children}
     </div>
@@ -626,7 +611,6 @@ function SortableCarpetaCard({ carpeta, items, editMode, isOver, onAddItem, onEd
   const preset = getFolderPreset(carpeta.color)
   const [editandoNombre, setEditandoNombre] = useState(false)
   const [nombreDraft, setNombreDraft] = useState(carpeta.nombre)
-  const [eligiendoColor, setEligiendoColor] = useState(false)
 
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
@@ -658,9 +642,9 @@ function SortableCarpetaCard({ carpeta, items, editMode, isOver, onAddItem, onEd
   }
 
   async function cambiarColor(colorId) {
+    if (colorId === carpeta.color) return
     try {
       await api.put(`/admin/favoritos-carpetas/${carpeta.id}`, { color: colorId })
-      setEligiendoColor(false)
       onCarpetaUpdated?.()
     } catch (err) {
       toast.error('Error al cambiar color')
@@ -675,7 +659,7 @@ function SortableCarpetaCard({ carpeta, items, editMode, isOver, onAddItem, onEd
         backgroundColor: preset.bg,
         borderColor: highlight ? '#60a5fa' : preset.border,
       }}
-      className={`rounded-xl border-2 overflow-hidden transition-colors ${highlight ? 'scale-[1.005]' : ''}`}
+      className={`col-span-2 rounded-xl border-2 overflow-hidden transition-colors ${highlight ? 'scale-[1.005]' : ''}`}
     >
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3">
@@ -723,20 +707,13 @@ function SortableCarpetaCard({ carpeta, items, editMode, isOver, onAddItem, onEd
         )}
         {editMode && (
           <button
-            onClick={() => setEligiendoColor(v => !v)}
+            onClick={onAddItem}
             className="p-1 rounded hover:bg-white/60 text-gray-500"
-            title="Cambiar color"
+            title="Agregar acceso a esta carpeta"
           >
-            <Folder className="w-3.5 h-3.5" style={{ color: preset.icon }} />
+            <Plus className="w-4 h-4" />
           </button>
         )}
-        <button
-          onClick={onAddItem}
-          className="p-1 rounded hover:bg-white/60 text-gray-500"
-          title="Agregar acceso a esta carpeta"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
         {editMode && (
           <button
             onClick={onDeleteCarpeta}
@@ -748,27 +725,21 @@ function SortableCarpetaCard({ carpeta, items, editMode, isOver, onAddItem, onEd
         )}
       </div>
 
-      {/* Selector de color */}
-      {editMode && eligiendoColor && (
-        <div className="px-4 pb-2 flex items-center gap-2">
-          <span className="text-xs text-gray-500">Color:</span>
+      {/* Swatches de color (siempre visibles en modo edición) */}
+      {editMode && (
+        <div className="flex items-center gap-1.5 px-4 pb-2">
           {FOLDER_PRESETS.map(p => (
             <button
               key={p.id}
+              type="button"
               onClick={() => cambiarColor(p.id)}
-              className={`w-5 h-5 rounded-full border-2 transition-all ${
-                carpeta.color === p.id ? 'border-gray-700 scale-110' : 'border-white'
+              className={`w-4 h-4 rounded-full border-2 transition-all ${
+                carpeta.color === p.id ? 'border-gray-600 scale-125' : 'border-transparent'
               }`}
               style={{ backgroundColor: p.icon }}
               title={p.nombre}
             />
           ))}
-          <button
-            onClick={() => setEligiendoColor(false)}
-            className="ml-auto p-0.5 rounded hover:bg-white/60 text-gray-400"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
         </div>
       )}
 
@@ -784,13 +755,12 @@ function SortableCarpetaCard({ carpeta, items, editMode, isOver, onAddItem, onEd
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 items-start">
+            <div className="grid grid-cols-2 gap-3 items-start">
               {items.map(fav => (
                 <SortableFavoritoCard
                   key={fav.id}
                   fav={fav}
                   editMode={editMode}
-                  compact
                   onOpen={() => onOpenItem(fav)}
                   onEdit={() => onEditItem(fav)}
                   onDelete={() => onDeleteItem(fav)}

@@ -296,7 +296,11 @@ function App() {
         <TicketProvider>
           <NotificacionBuffetProvider>
             <ScrollToTop />
-            <Toaster position="top-right" />
+            <Toaster
+              position="top-right"
+              containerStyle={{ zIndex: 100000 }}
+              toastOptions={{ style: { zIndex: 100000 } }}
+            />
             <SWUpdateNotifier />
             <Suspense fallback={<PageLoader />}>
               <Routes>
