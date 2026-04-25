@@ -524,7 +524,7 @@ router.post('/archivos/generar', authAdmin, asyncHandler(async (req, res) => {
   const nombreArchivoFinal = `${nombreBase}.txt`
 
   // Crear archivo en transacción
-  const archivo = await prisma.$transaction(async (tx) => {
+  const archivo = await req.db.$transaction(async (tx) => {
     // Crear archivo
     const nuevoArchivo = await tx.archivoDebito.create({
       data: {
@@ -764,7 +764,7 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
   const numeroImportacion = `IMP-${new Date().getFullYear()}-${String(secuencia).padStart(4, '0')}`
 
   // Procesar en transacción
-  const resultado = await prisma.$transaction(async (tx) => {
+  const resultado = await req.db.$transaction(async (tx) => {
     // Crear registro de importación
     const importacion = await tx.importacionCobranza.create({
       data: {
@@ -1065,7 +1065,7 @@ router.post('/archivos/:id/reintentar-rechazados', authAdmin, asyncHandler(async
   })
 
   // Crear nuevo archivo de reintento
-  const nuevoArchivo = await prisma.$transaction(async (tx) => {
+  const nuevoArchivo = await req.db.$transaction(async (tx) => {
     // Marcar detalles originales como reintentados
     await tx.detalleDebito.updateMany({
       where: {

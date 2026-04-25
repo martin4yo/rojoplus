@@ -1,21 +1,42 @@
 import { WifiOff, RefreshCw, AlertTriangle } from 'lucide-react'
 import { Button } from './Button'
+import TenantLogo from './TenantLogo'
+import { useTenant } from '../contexts/TenantContext'
 
 export function ConnectionError({ onRetry, error }) {
   const isServerDown = error?.code === 'ERR_NETWORK' || error?.code === 'ECONNREFUSED'
+  const isDatabaseDown = error?.code === 'DATABASE_UNAVAILABLE' || error?.status === 503
+  const { tenant } = useTenant?.() || { tenant: null }
+
+  const titulo = isServerDown
+    ? '¡Ups! Sin conexión'
+    : isDatabaseDown
+    ? 'Servicio momentáneamente no disponible'
+    : 'Algo salió mal'
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-        {/* Icono */}
+        {/* Logo del tenant */}
+        <div className="flex justify-center mb-6">
+          <TenantLogo className="h-14" />
+        </div>
+
+        {/* Icono usando paleta del tenant */}
         <div className="mb-6 flex justify-center">
           <div className="relative">
-            <div className="absolute inset-0 bg-red-100 rounded-full animate-ping opacity-75"></div>
-            <div className="relative bg-red-50 rounded-full p-6">
+            <div
+              className="absolute inset-0 rounded-full animate-ping opacity-40"
+              style={{ background: 'var(--color-primary, #ef4444)' }}
+            ></div>
+            <div
+              className="relative rounded-full p-5"
+              style={{ background: 'var(--color-primary, #ef4444)' }}
+            >
               {isServerDown ? (
-                <WifiOff className="w-12 h-12 text-red-500" />
+                <WifiOff className="w-12 h-12 text-white" />
               ) : (
-                <AlertTriangle className="w-12 h-12 text-amber-500" />
+                <AlertTriangle className="w-12 h-12 text-white" />
               )}
             </div>
           </div>
@@ -23,22 +44,28 @@ export function ConnectionError({ onRetry, error }) {
 
         {/* Título */}
         <h1 className="text-2xl font-bold text-gray-900 mb-3">
-          {isServerDown ? '¡Ups! Sin conexión' : 'Algo salió mal'}
+          {titulo}
         </h1>
 
         {/* Descripción */}
         <p className="text-gray-600 mb-6 leading-relaxed">
           {isServerDown ? (
             <>
-              No pudimos conectarnos con el servidor.
+              No pudimos conectarnos con el servidor de {tenant?.nombre || 'Clubix'}.
               <br />
-              Por favor, verifica tu conexión a internet o inténtalo nuevamente en unos momentos.
+              Verificá tu conexión a internet o intentá nuevamente en unos momentos.
+            </>
+          ) : isDatabaseDown ? (
+            <>
+              Estamos experimentando dificultades técnicas temporales.
+              <br />
+              Nuestro equipo está trabajando para resolverlo. Reintentá en unos momentos.
             </>
           ) : (
             <>
               Ocurrió un problema inesperado.
               <br />
-              Por favor, intenta recargar la página.
+              Por favor, intentá recargar la página.
             </>
           )}
         </p>

@@ -23,7 +23,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const adminId = req.admin.id
 
   // Obtener el admin con su rol desde la BD (el JWT solo tiene id y email)
-  const admin = await req.prisma.admin.findUnique({
+  const admin = await req.db.admin.findUnique({
     where: { id: adminId },
     select: {
       id: true,
@@ -164,7 +164,7 @@ router.get('/admin', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req
  * Lista todos los roles disponibles
  */
 router.get('/roles', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(async (req, res) => {
-  const roles = await req.prisma.rol.findMany({
+  const roles = await req.db.rol.findMany({
     where: { activo: true },
     select: {
       id: true,
@@ -314,7 +314,7 @@ router.patch('/:id/roles', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(asyn
 
   // Validar que los roles existan
   if (rolesIds.length > 0) {
-    const rolesCount = await req.prisma.rol.count({
+    const rolesCount = await req.db.rol.count({
       where: { id: { in: rolesIds.map(r => parseInt(r)) } }
     })
     if (rolesCount !== rolesIds.length) {
@@ -323,7 +323,7 @@ router.patch('/:id/roles', checkPermiso('USUARIOS_GESTIONAR'), asyncHandler(asyn
   }
 
   // Eliminar roles actuales y agregar los nuevos
-  await req.prisma.$transaction([
+  await req.db.$transaction([
     req.db.menuItemRol.deleteMany({
       where: { menuItemId: parseInt(id) }
     }),

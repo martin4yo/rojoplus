@@ -169,7 +169,7 @@ router.post('/presupuestos/:id/set-principal', authAdmin, asyncHandler(async (re
   }
 
   // Quitar principal de otras versiones del mismo año y establecer esta
-  await prisma.$transaction([
+  await req.db.$transaction([
     req.db.presupuesto.updateMany({
       where: { anio: presupuesto.anio },
       data: { esPrincipal: false }
@@ -295,7 +295,7 @@ router.post('/presupuestos/:id/lineas/bulk', authAdmin, asyncHandler(async (req,
   }
 
   // Procesar cada linea
-  const resultado = await prisma.$transaction(async (tx) => {
+  const resultado = await req.db.$transaction(async (tx) => {
     const procesadas = []
 
     for (const linea of lineas) {

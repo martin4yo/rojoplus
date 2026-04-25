@@ -29,7 +29,7 @@ router.post('/encuestas-baja', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Faltan datos obligatorios', 400, 'VALIDATION_ERROR')
   }
 
-  const encuesta = await req.prisma.encuestaBaja.create({
+  const encuesta = await req.db.encuestaBaja.create({
     data: {
       socioId: parseInt(socioId),
       motivoPrincipal,
@@ -102,7 +102,7 @@ router.get('/encuestas-baja', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [encuestas, total] = await Promise.all([
-    req.prisma.encuestaBaja.findMany({
+    req.db.encuestaBaja.findMany({
       where,
       skip,
       take: parseInt(limit),
@@ -120,7 +120,7 @@ router.get('/encuestas-baja', authAdmin, asyncHandler(async (req, res) => {
       },
       orderBy: { fechaEncuesta: 'desc' }
     }),
-    req.prisma.encuestaBaja.count({ where })
+    req.db.encuestaBaja.count({ where })
   ])
 
   res.json({
@@ -144,19 +144,19 @@ router.get('/encuestas-baja/estadisticas', authAdmin, asyncHandler(async (req, r
     promedioSatisfaccion,
     volverianPorcentaje
   ] = await Promise.all([
-    req.prisma.encuestaBaja.count(),
-    req.prisma.encuestaBaja.groupBy({
+    req.db.encuestaBaja.count(),
+    req.db.encuestaBaja.groupBy({
       by: ['motivoPrincipal'],
       _count: true,
       orderBy: { _count: { motivoPrincipal: 'desc' } }
     }),
-    req.prisma.encuestaBaja.count({
+    req.db.encuestaBaja.count({
       where: { aceptaContacto: true }
     }),
-    req.prisma.encuestaBaja.aggregate({
+    req.db.encuestaBaja.aggregate({
       _avg: { satisfaccion: true }
     }),
-    req.prisma.encuestaBaja.count({
+    req.db.encuestaBaja.count({
       where: { volveria: true }
     })
   ])
@@ -177,7 +177,7 @@ router.get('/encuestas-baja/estadisticas', authAdmin, asyncHandler(async (req, r
 router.get('/encuestas-baja/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const encuesta = await req.prisma.encuestaBaja.findUnique({
+  const encuesta = await req.db.encuestaBaja.findUnique({
     where: { id: parseInt(id) },
     include: {
       socio: {
@@ -225,7 +225,7 @@ router.get('/campanas', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [campanas, total] = await Promise.all([
-    req.prisma.campanaRecupero.findMany({
+    req.db.campanaRecupero.findMany({
       where,
       skip,
       take: parseInt(limit),
@@ -240,7 +240,7 @@ router.get('/campanas', authAdmin, asyncHandler(async (req, res) => {
       },
       orderBy: { createdAt: 'desc' }
     }),
-    req.prisma.campanaRecupero.count({ where })
+    req.db.campanaRecupero.count({ where })
   ])
 
   res.json({
@@ -276,7 +276,7 @@ router.post('/campanas', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Faltan datos obligatorios', 400, 'VALIDATION_ERROR')
   }
 
-  const campana = await req.prisma.campanaRecupero.create({
+  const campana = await req.db.campanaRecupero.create({
     data: {
       nombre,
       descripcion: descripcion || null,
@@ -318,7 +318,7 @@ router.post('/campanas', authAdmin, asyncHandler(async (req, res) => {
 router.get('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const campana = await req.prisma.campanaRecupero.findUnique({
+  const campana = await req.db.campanaRecupero.findUnique({
     where: { id: parseInt(id) },
     include: {
       admin: {
@@ -356,7 +356,7 @@ router.put('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
     mesesDescuento
   } = req.body
 
-  const updated = await req.prisma.campanaRecupero.update({
+  const updated = await req.db.campanaRecupero.update({
     where: { id: parseInt(id) },
     data: {
       nombre: nombre || undefined,
@@ -390,7 +390,7 @@ router.put('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  await req.prisma.campanaRecupero.delete({
+  await req.db.campanaRecupero.delete({
     where: { id: parseInt(id) }
   })
 
@@ -436,7 +436,7 @@ router.get('/acciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   const [acciones, total] = await Promise.all([
-    req.prisma.accionRecupero.findMany({
+    req.db.accionRecupero.findMany({
       where,
       skip,
       take: parseInt(limit),
@@ -466,7 +466,7 @@ router.get('/acciones', authAdmin, asyncHandler(async (req, res) => {
       },
       orderBy: { fecha: 'desc' }
     }),
-    req.prisma.accionRecupero.count({ where })
+    req.db.accionRecupero.count({ where })
   ])
 
   res.json({
@@ -502,7 +502,7 @@ router.post('/acciones', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Faltan datos obligatorios', 400, 'VALIDATION_ERROR')
   }
 
-  const accion = await req.prisma.accionRecupero.create({
+  const accion = await req.db.accionRecupero.create({
     data: {
       socioId: parseInt(socioId),
       campanaId: campanaId ? parseInt(campanaId) : null,
@@ -555,7 +555,7 @@ router.post('/acciones', authAdmin, asyncHandler(async (req, res) => {
       updateData.recuperados = { increment: 1 }
     }
 
-    await req.prisma.campanaRecupero.update({
+    await req.db.campanaRecupero.update({
       where: { id: parseInt(campanaId) },
       data: updateData
     })
@@ -605,7 +605,7 @@ router.get('/candidatos', authAdmin, asyncHandler(async (req, res) => {
     if (motivoBaja) encuestaWhere.motivoPrincipal = motivoBaja
     if (aceptaContacto !== undefined) encuestaWhere.aceptaContacto = aceptaContacto === 'true'
 
-    const encuestas = await req.prisma.encuestaBaja.findMany({
+    const encuestas = await req.db.encuestaBaja.findMany({
       where: encuestaWhere,
       select: { socioId: true }
     })

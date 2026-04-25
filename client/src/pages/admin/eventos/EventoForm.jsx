@@ -119,6 +119,12 @@ export default function EventoForm({ eventoId, onClose, isModal = false }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
+
+    if (!form.centroCostoId) {
+      alert('El Centro de Costo es obligatorio')
+      return
+    }
+
     setSaving(true)
 
     try {
@@ -447,24 +453,22 @@ export default function EventoForm({ eventoId, onClose, isModal = false }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Centro de Costos
+                Centro de Costos *
               </label>
               <select
                 name="centroCostoId"
                 value={form.centroCostoId}
                 onChange={handleChange}
+                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
               >
-                <option value="">Seleccionar centro...</option>
+                <option value="">-- Seleccionar --</option>
                 {centrosCosto.map(centro => (
                   <option key={centro.id} value={centro.id}>
                     {centro.codigo} - {centro.nombre}
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Asigna los ingresos a un centro de costos específico
-              </p>
             </div>
           </div>
         </div>

@@ -318,7 +318,7 @@ router.get('/reportes/cobranza/morosos', authAdmin, asyncHandler(async (req, res
 
   // Si se filtra por actividad, buscar todas las categorías de esa actividad
   if (actividadId && !categoriaActividadId) {
-    const categoriasActividad = await req.prisma.categoriaActividad.findMany({
+    const categoriasActividad = await req.db.categoriaActividad.findMany({
       where: { actividadId: parseInt(actividadId) },
       select: { id: true },
     })
@@ -413,7 +413,7 @@ router.get('/reportes/cobranza/evolucion', authAdmin, asyncHandler(async (req, r
   const fechaDesde = desde ? new Date(desde) : new Date(fechaHasta.getFullYear(), fechaHasta.getMonth() - 5, 1)
 
   // Obtener todos los periodos en el rango
-  const periodos = await req.prisma.periodo.findMany({
+  const periodos = await req.db.periodo.findMany({
     where: {
       estado: 'GENERADO',
       OR: [
@@ -447,7 +447,7 @@ router.get('/reportes/cobranza/evolucion', authAdmin, asyncHandler(async (req, r
     filtroAdicional.categoriaActividadId = parseInt(categoriaActividadId)
   } else if (actividadId) {
     // Si hay actividadId pero no categoriaActividadId, buscar todas las categorías de esa actividad
-    const categoriasAct = await req.prisma.categoriaActividad.findMany({
+    const categoriasAct = await req.db.categoriaActividad.findMany({
       where: { actividadId: parseInt(actividadId) },
       select: { id: true },
     })

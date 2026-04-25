@@ -6,10 +6,12 @@ import {
   UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User,
   UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone, Ticket, Shield, AlertCircle, UserX, Target, BrainCircuit
 } from 'lucide-react'
+import { Star, StarOff } from 'lucide-react'
 import api from '../services/api'
 import { cargarPermisos, limpiarPermisos, getPermisos, esAdmin } from '../services/permisos'
 import TenantLogo from './TenantLogo'
 import { useTenant } from '../contexts/TenantContext'
+import FavoritoModal from './FavoritoModal'
 
 // Mapeo de nombres de iconos a componentes
 const ICONOS = {
@@ -33,6 +35,22 @@ export default function AdminLayout() {
   const [permisosLoaded, setPermisosLoaded] = useState(false)
   const [menuItems, setMenuItems] = useState([])
   const [menuLoading, setMenuLoading] = useState(true)
+  const [favoritoModalOpen, setFavoritoModalOpen] = useState(false)
+  const [favoritoCarpetas, setFavoritoCarpetas] = useState([])
+
+  async function cargarCarpetasFavoritos() {
+    try {
+      const data = await api.get('/admin/favoritos-carpetas')
+      setFavoritoCarpetas(data || [])
+    } catch (err) {
+      setFavoritoCarpetas([])
+    }
+  }
+
+  function abrirFavoritoModal() {
+    cargarCarpetasFavoritos()
+    setFavoritoModalOpen(true)
+  }
 
   // Cargar sesión y permisos
   useEffect(() => {
@@ -144,7 +162,7 @@ export default function AdminLayout() {
     const path = location.pathname
 
     // Rutas que siempre están permitidas
-    const rutasPermitidas = ['/admin/login', '/admin/mi-perfil']
+    const rutasPermitidas = ['/admin/login', '/admin/mi-perfil', '/admin/accesos-rapidos']
     if (rutasPermitidas.some(r => path.startsWith(r))) return
 
     // Rutas companion: páginas de detalle que no están en el menú pero
@@ -308,6 +326,25 @@ export default function AdminLayout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 pb-20">
+          {/* Acceso fijo: Atajos (siempre visible, sin permisos) */}
+          <Link
+            to="/admin/accesos-rapidos"
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${sidebarCollapsed ? 'md:justify-center' : ''} ${
+              isActive('/admin/accesos-rapidos')
+                ? 'bg-primary text-white'
+                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+            } relative group`}
+            title={sidebarCollapsed ? 'Atajos' : ''}
+          >
+            <Star className="w-5 h-5 flex-shrink-0" />
+            <span className={`${sidebarCollapsed ? 'md:hidden' : ''}`}>Atajos</span>
+            {sidebarCollapsed && (
+              <div className="hidden md:group-hover:block absolute left-full ml-2 px-3 py-2 bg-gray-800 rounded-lg shadow-lg whitespace-nowrap z-50">
+                <span className="text-sm text-white">Atajos</span>
+              </div>
+            )}
+          </Link>
+
           {menuLoading ? (
             <div className="text-gray-400 text-center py-8">Cargando menú...</div>
           ) : menuItems.length === 0 ? (
@@ -548,6 +585,13 @@ export default function AdminLayout() {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
+              onClick={abrirFavoritoModal}
+              className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              title="Guardar atajo"
+            >
+              <Star className="w-5 h-5" />
+            </button>
+            <button
               onClick={() => setMenuOpen(true)}
               className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
             >
@@ -555,6 +599,13 @@ export default function AdminLayout() {
             </button>
           </div>
           <div className="hidden md:flex items-center gap-4">
+            <button
+              onClick={abrirFavoritoModal}
+              className="flex items-center justify-center w-9 h-9 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
+              title="Guardar esta página como atajo"
+            >
+              <Star className="w-5 h-5" />
+            </button>
             <Link
               to="/admin/mi-perfil"
               className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
@@ -610,6 +661,13 @@ export default function AdminLayout() {
           )}
         </main>
       </div>
+
+      <FavoritoModal
+        isOpen={favoritoModalOpen}
+        onClose={() => setFavoritoModalOpen(false)}
+        carpetas={favoritoCarpetas}
+        onCarpetasChange={cargarCarpetasFavoritos}
+      />
     </div>
   )
 }

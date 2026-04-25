@@ -41,7 +41,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   const sociosSinActividad = Math.max(0, sociosActivos - cantSociosConActividad)
 
   // Periodo actual (más reciente con estado GENERADO)
-  const periodoActual = await req.prisma.periodo.findFirst({
+  const periodoActual = await req.db.periodo.findFirst({
     where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
   })
@@ -96,7 +96,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   const saldoTotalCajas = cajas.reduce((sum, c) => sum + Number(c.saldoActual), 0)
 
   // Comercios pendientes de aprobación
-  const comerciosPendientes = await req.prisma.comercio.count({ where: { estado: 'PENDIENTE' } })
+  const comerciosPendientes = await req.db.comercio.count({ where: { estado: 'PENDIENTE' } })
 
   // Saldo Clientes/Proveedores
   let saldoClientes = 0
@@ -104,9 +104,9 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   let sueldosPorPagar = 0
 
   try {
-    if (req.prisma.movimientoContable) {
+    if (req.db.movimientoContable) {
       const [saldoClientesResult, saldoProveedoresResult] = await Promise.all([
-        req.prisma.movimientoContable.aggregate({
+        req.db.movimientoContable.aggregate({
           where: {
             tipo: 'FACTURA_VENTA',
             estado: { not: 'ANULADO' },
@@ -114,7 +114,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
           },
           _sum: { saldoPendiente: true },
         }),
-        req.prisma.movimientoContable.aggregate({
+        req.db.movimientoContable.aggregate({
           where: {
             tipo: 'FACTURA_COMPRA',
             estado: { not: 'ANULADO' },
@@ -132,8 +132,8 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
 
   // Sueldos por pagar
   try {
-    if (req.prisma.liquidacionSueldo) {
-      const sueldosPorPagarResult = await req.prisma.liquidacionSueldo.aggregate({
+    if (req.db.liquidacionSueldo) {
+      const sueldosPorPagarResult = await req.db.liquidacionSueldo.aggregate({
         where: { estado: 'PENDIENTE' },
         _sum: { totalNeto: true },
       })
@@ -195,9 +195,9 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   let echequesRecibidos = []
   let echequesEmitidos = []
   try {
-    if (req.prisma.eCheq) {
+    if (req.db.eCheq) {
       [echequesRecibidos, echequesEmitidos] = await Promise.all([
-        req.prisma.eCheq.findMany({
+        req.db.eCheq.findMany({
           where: {
             tipo: 'RECIBIDO',
             estado: { in: ['CARTERA', 'DEPOSITADO'] },
@@ -212,7 +212,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
           },
           orderBy: { fechaVencimiento: 'asc' },
         }),
-        req.prisma.eCheq.findMany({
+        req.db.eCheq.findMany({
           where: {
             tipo: 'EMITIDO',
             estado: 'PENDIENTE',
@@ -300,7 +300,7 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Cobranza de cuotas de los últimos 6 periodos
-  const periodosHistoricos = await req.prisma.periodo.findMany({
+  const periodosHistoricos = await req.db.periodo.findMany({
     where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
     take: 6,

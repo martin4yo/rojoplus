@@ -14,6 +14,7 @@ import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { PrismaClient } from '@prisma/client'
 import { obtenerPago } from '../services/mercadoPagoQR.js'
+import { generarNumeroMovimientoCaja } from './buffet/helpers.js'
 
 const router = express.Router()
 const globalPrisma = new PrismaClient()
@@ -143,8 +144,7 @@ async function ejecutarVenta(venta, pago) {
     const centroCostoId = evento.centroCostoId || caja.centroCostoId || null
 
     // Generar número de movimiento
-    const ultimo = await tx.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
-    const nuevoNumero = `MOV-${String((ultimo?.id || 0) + 1).padStart(8, '0')}`
+    const nuevoNumero = await generarNumeroMovimientoCaja(tx)
 
     // Crear MovimientoCaja
     const movCaja = await tx.movimientoCaja.create({

@@ -16,6 +16,7 @@ import {
 import {
   generarNumeroPedido,
   generarNumeroMC,
+  generarNumeroMovimientoCaja,
   recalcularTotalesPedido
 } from './helpers.js'
 import { enviarImpresion } from './impresoras.js'
@@ -962,8 +963,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           return res.status(400).json({ success: false, error: `Caja ${pago.cajaId || cajaId} no encontrada` })
         }
 
-        const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
-        const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
+        const nuevoNumero = await generarNumeroMovimientoCaja(req.db)
 
         const movimiento = await req.db.movimientoCaja.create({
           data: {
@@ -1037,8 +1037,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         return res.status(400).json({ success: false, error: 'Caja no encontrada' })
       }
 
-      const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
-      const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
+      const nuevoNumero = await generarNumeroMovimientoCaja(req.db)
 
       const movimiento = await req.db.movimientoCaja.create({
         data: {

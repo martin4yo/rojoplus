@@ -200,9 +200,14 @@ export default function Inscripciones() {
       return
     }
 
+    if (!formNueva.centroCostoId) {
+      setError('El Centro de Costo es obligatorio')
+      return
+    }
+
     const payload = {
       ...formNueva,
-      centroCostoId: formNueva.centroCostoId ? parseInt(formNueva.centroCostoId) : null
+      centroCostoId: parseInt(formNueva.centroCostoId)
     }
 
     try {
@@ -220,9 +225,14 @@ export default function Inscripciones() {
     e.preventDefault()
     setError(null)
 
+    if (!formEditar.centroCostoId) {
+      setError('El Centro de Costo es obligatorio')
+      return
+    }
+
     const payload = {
       ...formEditar,
-      centroCostoId: formEditar.centroCostoId ? parseInt(formEditar.centroCostoId) : null
+      centroCostoId: parseInt(formEditar.centroCostoId)
     }
 
     try {
@@ -679,9 +689,11 @@ export default function Inscripciones() {
           {/* Centro de Costo */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Centro de Costo
+              Centro de Costo *
             </label>
             <SelectCentroCosto
+              required
+              emptyLabel="-- Seleccionar --"
               value={formNueva.centroCostoId}
               onChange={(val) => setFormNueva(prev => ({ ...prev, centroCostoId: val }))}
               className="w-full"
@@ -769,9 +781,11 @@ export default function Inscripciones() {
             {/* Centro de Costo */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Centro de Costo
+                Centro de Costo *
               </label>
               <SelectCentroCosto
+                required
+                emptyLabel="-- Seleccionar --"
                 value={formEditar.centroCostoId}
                 onChange={(val) => setFormEditar(prev => ({ ...prev, centroCostoId: val }))}
                 className="w-full"

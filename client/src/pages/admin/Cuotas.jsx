@@ -171,6 +171,12 @@ export default function Cuotas() {
 
   async function guardarCargo(e) {
     e.preventDefault()
+
+    if (!formCargo.centroCostoId) {
+      setError('El Centro de Costo es obligatorio')
+      return
+    }
+
     setGuardandoCargo(true)
     setError(null)
 
@@ -223,6 +229,12 @@ export default function Cuotas() {
 
   async function crearCargo(e) {
     e.preventDefault()
+
+    if (!formCargo.centroCostoId) {
+      setError('El Centro de Costo es obligatorio')
+      return
+    }
+
     setGuardandoCargo(true)
     setError(null)
 
@@ -1414,10 +1426,12 @@ export default function Cuotas() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo *</label>
                 <SelectCentroCosto
                   value={formCargo.centroCostoId}
                   onChange={(val) => setFormCargo({ ...formCargo, centroCostoId: val })}
+                  required
+                  emptyLabel="-- Seleccionar --"
                   className="w-full"
                 />
               </div>
@@ -1679,10 +1693,12 @@ export default function Cuotas() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo *</label>
                 <SelectCentroCosto
                   value={formCargo.centroCostoId}
                   onChange={(val) => setFormCargo({ ...formCargo, centroCostoId: val })}
+                  required
+                  emptyLabel="-- Seleccionar --"
                   className="w-full"
                 />
               </div>

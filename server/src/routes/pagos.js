@@ -116,7 +116,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
       }
 
       // Buscar el LinkPago
-      const linkPago = await req.prisma.linkPago.findUnique({
+      const linkPago = await req.db.linkPago.findUnique({
         where: { id: linkPagoId },
       })
 
@@ -139,7 +139,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
       const nuevoEstado = estadosMap[payment.status] || 'PENDIENTE'
 
       // Actualizar LinkPago
-      await req.prisma.linkPago.update({
+      await req.db.linkPago.update({
         where: { id: linkPagoId },
         data: {
           estado: nuevoEstado,
@@ -157,7 +157,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
         if (datosCompra.tipo === 'ENTRADAS') {
           console.log('[MercadoPago] Procesando compra de entradas:', datosCompra)
 
-          await req.prisma.$transaction(async (tx) => {
+          await req.db.$transaction(async (tx) => {
             // Obtener evento y categoría
             const evento = await tx.evento.findUnique({
               where: { id: datosCompra.eventoId },
@@ -401,7 +401,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
 
             // Aplicar pago a cada cargo
             for (const cargo of cargos) {
-              await req.prisma.aplicacionPago.create({
+              await req.db.aplicacionPago.create({
                 data: {
                   pagoId: pago.id,
                   cargoId: cargo.id,

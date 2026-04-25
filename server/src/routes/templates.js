@@ -12,7 +12,7 @@ const router = express.Router()
 
 // GET /api/admin/templates/email - Listar todos los templates de email
 router.get('/email', authAdmin, asyncHandler(async (req, res) => {
-  const templates = await req.prisma.emailTemplate.findMany({
+  const templates = await req.db.emailTemplate.findMany({
     orderBy: { eventType: 'asc' }
   })
 
@@ -26,7 +26,7 @@ router.get('/email', authAdmin, asyncHandler(async (req, res) => {
 router.get('/email/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const template = await req.prisma.emailTemplate.findUnique({
+  const template = await req.db.emailTemplate.findUnique({
     where: { id }
   })
 
@@ -48,7 +48,7 @@ router.put('/email/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { nombre, descripcion, subject, bodyHtml, bodyText, variables, isActive } = req.body
 
-  const updated = await req.prisma.emailTemplate.update({
+  const updated = await req.db.emailTemplate.update({
     where: { id },
     data: {
       nombre,
@@ -81,7 +81,7 @@ router.post('/email/:id/test', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Obtener el template
-  const template = await req.prisma.emailTemplate.findUnique({
+  const template = await req.db.emailTemplate.findUnique({
     where: { id }
   })
 
@@ -108,7 +108,7 @@ router.post('/email/:id/test', authAdmin, asyncHandler(async (req, res) => {
 
 // GET /api/admin/templates/pdf - Listar todos los templates de PDF
 router.get('/pdf', authAdmin, asyncHandler(async (req, res) => {
-  const templates = await req.prisma.pdfTemplate.findMany({
+  const templates = await req.db.pdfTemplate.findMany({
     orderBy: { tipo: 'asc' }
   })
 
@@ -122,7 +122,7 @@ router.get('/pdf', authAdmin, asyncHandler(async (req, res) => {
 router.get('/pdf/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const template = await req.prisma.pdfTemplate.findUnique({
+  const template = await req.db.pdfTemplate.findUnique({
     where: { id }
   })
 
@@ -144,7 +144,7 @@ router.put('/pdf/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { nombre, descripcion, htmlContent, cssContent, variables, pageFormat, orientation, isActive } = req.body
 
-  const updated = await req.prisma.pdfTemplate.update({
+  const updated = await req.db.pdfTemplate.update({
     where: { id },
     data: {
       nombre,
@@ -170,7 +170,7 @@ router.post('/pdf/:id/test', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
   // Obtener el template
-  const template = await req.prisma.pdfTemplate.findUnique({
+  const template = await req.db.pdfTemplate.findUnique({
     where: { id }
   })
 
@@ -196,7 +196,7 @@ router.post('/pdf/:id/preview', authAdmin, asyncHandler(async (req, res) => {
   const { data } = req.body
 
   // Obtener el template
-  const template = await req.prisma.pdfTemplate.findUnique({
+  const template = await req.db.pdfTemplate.findUnique({
     where: { id }
   })
 

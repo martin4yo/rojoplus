@@ -47,16 +47,9 @@ export default function SelectCentroCosto({
   }
 
   const handleChange = (e) => {
+    if (!onChange) return
     const val = e.target.value
-    if (onChange) {
-      // Si es onChange estándar (e), pasar el evento
-      if (typeof onChange === 'function' && onChange.length === 1) {
-        onChange(e)
-      } else {
-        // Si espera solo el valor
-        onChange(val ? parseInt(val) : null)
-      }
-    }
+    onChange(val ? parseInt(val) : null)
   }
 
   if (error) {

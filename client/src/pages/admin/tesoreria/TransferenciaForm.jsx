@@ -144,6 +144,11 @@ export default function TransferenciaForm() {
       return
     }
 
+    if (!form.centroCostoId) {
+      setError('El Centro de Costo es obligatorio')
+      return
+    }
+
     if (!form.descripcion?.trim()) {
       setError('La descripción es obligatoria')
       return
@@ -459,10 +464,11 @@ export default function TransferenciaForm() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Costo *</label>
                 <CentroCostoSelector
                   value={form.centroCostoId}
                   onChange={(id) => setForm(prev => ({ ...prev, centroCostoId: id }))}
+                  required
                 />
               </div>
             </div>

@@ -177,7 +177,7 @@ router.post('/grupos-opciones/:grupoId/opciones/bulk', authAdmin, checkPermiso('
       return res.status(400).json({ success: false, error: 'Debe enviar un array de opciones' })
     }
 
-    const creadas = await prisma.$transaction(
+    const creadas = await req.db.$transaction(
       opciones.map((op, index) =>
         prisma.opcionProducto.create({
           data: {

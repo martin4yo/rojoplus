@@ -78,7 +78,7 @@ export default function EntidadForm({ tipo }) {
     } else {
       obtenerProximoCodigo()
     }
-  }, [id])
+  }, [id, tipo])
 
   async function cargarEntidad() {
     setLoading(true)
@@ -115,9 +115,11 @@ export default function EntidadForm({ tipo }) {
 
   async function obtenerProximoCodigo() {
     try {
-      const data = await api.get('/admin/proximo-numero/ENT')
+      const data = await api.get(`/admin/proximo-numero/ENT?subtipo=${tipo}`)
       if (data?.numero) {
         setForm(prev => ({ ...prev, codigo: data.numero }))
+      } else {
+        console.warn('Próximo código no recibido:', data)
       }
     } catch (err) {
       console.error('Error obteniendo proximo codigo:', err)

@@ -173,6 +173,11 @@ export default function OrdenCompraForm() {
       return
     }
 
+    if (!form.centroCostoId) {
+      showModal({ type: 'warning', message: 'Debe seleccionar un Centro de Costo' })
+      return
+    }
+
     for (const item of form.items) {
       if (!item.descripcion && !item.productoVarianteId) {
         showModal({ type: 'warning', message: 'Cada item debe tener una descripcion o un producto seleccionado' })
@@ -307,14 +312,15 @@ export default function OrdenCompraForm() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Centro de Costo
+                Centro de Costo *
               </label>
               <SelectCentroCosto
                 value={form.centroCostoId}
                 onChange={(val) => setForm(prev => ({ ...prev, centroCostoId: val }))}
+                required
+                emptyLabel="-- Seleccionar --"
                 className="w-full"
               />
-              <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
             </div>
           </div>
         </div>

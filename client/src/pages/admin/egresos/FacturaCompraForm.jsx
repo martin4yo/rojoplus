@@ -481,6 +481,11 @@ export default function FacturaCompraForm() {
       return
     }
 
+    if (!form.centroCostoId) {
+      showModal({ type: 'warning', message: 'Debe seleccionar un Centro de Costo' })
+      return
+    }
+
     if (form.items.length === 0) {
       showModal({ type: 'warning', message: 'Debe agregar al menos un item' })
       return
@@ -823,14 +828,15 @@ export default function FacturaCompraForm() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Centro de Costo
+                Centro de Costo *
               </label>
               <SelectCentroCosto
                 value={form.centroCostoId}
                 onChange={(val) => setForm(prev => ({ ...prev, centroCostoId: val }))}
+                required
+                emptyLabel="-- Seleccionar --"
                 className="w-full"
               />
-              <p className="text-xs text-gray-500 mt-1">Opcional - para reportes contables</p>
             </div>
           </div>
         </div>

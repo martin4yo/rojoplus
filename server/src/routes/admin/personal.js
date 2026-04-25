@@ -208,7 +208,7 @@ router.post('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Crear en transaccion: Entidad PERSONAL + Entrenador
-  const entrenador = await req.prisma.$transaction(async (tx) => {
+  const entrenador = await req.db.$transaction(async (tx) => {
     // 1. Crear Entidad tipo PERSONAL
     const codigoEntidad = await generarCodigoEntidadPersonal(tx)
     const razonSocial = apellido ? `${apellido}, ${nombre}` : nombre
@@ -284,7 +284,7 @@ router.put('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
   if (!existente) throw new AppError('Entrenador no encontrado', 404, 'NOT_FOUND')
 
   // Actualizar en transaccion
-  const entrenador = await req.prisma.$transaction(async (tx) => {
+  const entrenador = await req.db.$transaction(async (tx) => {
     // 1. Actualizar o crear Entidad PERSONAL
     const nombreFinal = nombre ?? existente.nombre
     const apellidoFinal = apellido !== undefined ? apellido : existente.apellido
@@ -458,7 +458,7 @@ router.post('/entrenadores/:id/categorias', authAdmin, asyncHandler(async (req, 
   const entrenador = await req.db.entrenador.findUnique({ where: { id: parseInt(id) } })
   if (!entrenador) throw new AppError('Entrenador no encontrado', 404, 'NOT_FOUND')
 
-  const categoria = await req.prisma.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
+  const categoria = await req.db.categoriaActividad.findUnique({ where: { id: parseInt(categoriaActividadId) } })
   if (!categoria) throw new AppError('Categoría no encontrada', 404, 'NOT_FOUND')
 
   // Verificar si ya existe la asignación

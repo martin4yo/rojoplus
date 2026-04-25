@@ -86,6 +86,7 @@ router.put('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
     montoRecargo,
     montoBonificacion,
     fechaVencimiento,
+    centroCostoId,
     estado
   } = req.body
 
@@ -127,6 +128,7 @@ router.put('/cargos/:id', authAdmin, asyncHandler(async (req, res) => {
       montoTotal,
       ...(fechaVencimiento && { fechaVencimiento: new Date(fechaVencimiento) }),
       ...(estado && { estado }),
+      ...(centroCostoId && { centroCostoId: parseInt(centroCostoId) }),
     },
     include: {
       socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
@@ -145,6 +147,7 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
     periodoId,
     categoriaActividadId,
     conceptoTesoreriaId,
+    centroCostoId,
     descripcion,
     montoOriginal,
     montoRecargo = 0,
@@ -155,6 +158,10 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
 
   if (!socioId || !montoOriginal) {
     throw new AppError('socioId y montoOriginal son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  if (!centroCostoId) {
+    throw new AppError('El Centro de Costo es obligatorio', 400, 'CC_REQUIRED')
   }
 
   // Si no viene categoría, derivarla del concepto o usar CUOTA_ACTIVIDAD por defecto
@@ -196,6 +203,7 @@ router.post('/cargos', authAdmin, asyncHandler(async (req, res) => {
       periodoId: periodoId ? parseInt(periodoId) : null,
       categoriaActividadId: categoriaActividadId ? parseInt(categoriaActividadId) : null,
       conceptoTesoreriaId: conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null,
+      centroCostoId: parseInt(centroCostoId),
       descripcion: descripcionFinal,
       montoOriginal: parseFloat(montoOriginal),
       montoRecargo: parseFloat(montoRecargo),
@@ -571,7 +579,7 @@ router.post('/planes-pago', authAdmin, asyncHandler(async (req, res) => {
   const descripcionPlan = `Financiación: ${cuotasDesc}`
 
   // Todo dentro de una transacción
-  const resultado = await req.prisma.$transaction(async (tx) => {
+  const resultado = await req.db.$transaction(async (tx) => {
     // 1. Marcar cuotas originales como FINANCIADA
     await tx.cargo.updateMany({
       where: { id: { in: cuotaIds.map(id => parseInt(id)) } },

@@ -12,7 +12,7 @@ import {
   generarAsientoReciboCobro,
   resolverCuentaCashId
 } from '../../services/asientosContables.js'
-import { generarNumeroMC } from './helpers.js'
+import { generarNumeroMC, generarNumeroMovimientoCaja } from './helpers.js'
 import { enviarImpresion } from './impresoras.js'
 import { descontarStockVentaBuffet } from '../../services/buffetStockService.js'
 
@@ -119,7 +119,10 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
     const productosVenta = []
 
     for (const item of items) {
-      const producto = await req.db.productoBuffet.findUnique({ where: { id: item.productoBuffetId }, include: { conceptoVenta: true } })
+      const producto = await req.db.productoBuffet.findUnique({
+        where: { id: item.productoBuffetId },
+        include: { producto: { include: { conceptoVenta: true } } }
+      })
       if (!producto) continue
 
       const cantidad = item.cantidad || 1
@@ -186,7 +189,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
 
     // Centro de costo fallback: primer producto con concepto de venta que tenga CC
     const ccItemsFallback = productosVenta
-      .map(p => p.productoBuffet?.conceptoVenta?.centroCostoId)
+      .map(p => p.productoBuffet?.producto?.conceptoVenta?.centroCostoId)
       .find(cc => cc != null) ?? null
 
     const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0
@@ -216,8 +219,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           return res.status(400).json({ success: false, error: `Caja ${pago.cajaId || cajaId} no encontrada` })
         }
 
-        const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
-        const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
+        const nuevoNumero = await generarNumeroMovimientoCaja(req.db)
 
         const movimiento = await req.db.movimientoCaja.create({
           data: {
@@ -274,8 +276,7 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
         return res.status(400).json({ success: false, error: 'Caja no encontrada' })
       }
 
-      const ultimoMov = await req.db.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
-      const nuevoNumero = `MOV-${String((ultimoMov?.id || 0) + 1).padStart(8, '0')}`
+      const nuevoNumero = await generarNumeroMovimientoCaja(req.db)
 
       const movimiento = await req.db.movimientoCaja.create({
         data: {

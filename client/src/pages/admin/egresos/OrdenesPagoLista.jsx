@@ -312,6 +312,17 @@ export default function OrdenesPagoLista() {
               onRowClick={(orden) => navigate(`/admin/egresos/ordenes-pago/${orden.id}`)}
             />
 
+            {/* Totales (sobre el listado mostrado en pantalla) */}
+            {ordenes.length > 0 && (() => {
+              const total = ordenes.reduce((s, o) => s + Number(o.montoTotal || 0), 0)
+              return (
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-between text-sm">
+                  <span><span className="text-gray-500">Órdenes:</span> <strong className="text-gray-800">{ordenes.length}</strong></span>
+                  <span><span className="text-gray-500">Total:</span> <strong className="text-gray-800">{formatCurrency(total)}</strong></span>
+                </div>
+              )
+            })()}
+
             {/* Paginacion */}
             <div className="border-t border-gray-200 px-4">
               <Pagination

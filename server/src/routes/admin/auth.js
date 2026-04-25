@@ -16,7 +16,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     throw new AppError('Email y contraseña son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const admin = await req.prisma.admin.findUnique({
+  const admin = await req.db.admin.findUnique({
     where: { email },
     include: { rol: { select: { esSuperAdmin: true } } }
   })
@@ -31,7 +31,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   // Actualizar último login
-  await req.prisma.admin.update({
+  await req.db.admin.update({
     where: { id: admin.id },
     data: { lastLogin: new Date() },
   })

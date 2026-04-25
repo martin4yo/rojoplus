@@ -97,7 +97,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // ============ SECCIÓN FINANCIERA ============
 
   // Periodo actual
-  const periodoActual = await req.prisma.periodo.findFirst({
+  const periodoActual = await req.db.periodo.findFirst({
     where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
   })
@@ -158,7 +158,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   morosidadTotal.cantSocios = sociosMorosos.length
 
   // Evolución de cobranza (últimos 6 periodos)
-  const periodosHistoricos = await req.prisma.periodo.findMany({
+  const periodosHistoricos = await req.db.periodo.findMany({
     where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
     take: 6,
@@ -207,7 +207,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // Obtener nombres de actividades
   const categoriasIds = inscripcionesPorActividad.map(i => i.categoriaActividadId)
-  const categoriasInfo = await req.prisma.categoriaActividad.findMany({
+  const categoriasInfo = await req.db.categoriaActividad.findMany({
     where: { id: { in: categoriasIds } },
     include: { actividad: { select: { nombre: true } } },
   })
@@ -243,7 +243,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     : (inscripcionesNuevas30Dias > 0 ? 100 : 0)
 
   // Ocupación por actividad (comparar inscriptos vs cupo)
-  const actividadesConCupo = await req.prisma.categoriaActividad.findMany({
+  const actividadesConCupo = await req.db.categoriaActividad.findMany({
     where: { activo: true, cupoMaximo: { gt: 0 } },
     include: {
       actividad: { select: { nombre: true } },
@@ -392,7 +392,7 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
     _count: true,
   })
 
-  const categoriasInfo = await req.prisma.categoriaSocio.findMany({
+  const categoriasInfo = await req.db.categoriaSocio.findMany({
     select: { id: true, nombre: true },
   })
   const categoriasMap = {}
@@ -404,14 +404,14 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
     _count: true,
   })
 
-  const tiposInfo = await req.prisma.tipoSocio.findMany({
+  const tiposInfo = await req.db.tipoSocio.findMany({
     select: { id: true, nombre: true },
   })
   const tiposMap = {}
   tiposInfo.forEach(t => { tiposMap[t.id] = t.nombre })
 
   // Grupos familiares
-  const gruposFamiliares = await req.prisma.grupoFamiliar.count()
+  const gruposFamiliares = await req.db.grupoFamiliar.count()
   const sociosEnFamilia = await req.db.socio.count({
     where: { grupoFamiliarId: { not: null } },
   })

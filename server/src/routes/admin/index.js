@@ -24,6 +24,7 @@ import reportTemplatesRoutes from './report-templates.js'
 import reportPresetsRoutes from './report-presets.js'
 import gobernanzaRoutes from './gobernanza.js'
 import aiAnalisisRoutes from './ai-analisis.js'
+import favoritosRoutes from './favoritos.js'
 
 const router = Router()
 
@@ -51,5 +52,6 @@ router.use(reportTemplatesRoutes)
 router.use(reportPresetsRoutes)
 router.use('/gobernanza', gobernanzaRoutes)
 router.use('/ai', aiAnalisisRoutes)
+router.use(favoritosRoutes)
 
 export default router

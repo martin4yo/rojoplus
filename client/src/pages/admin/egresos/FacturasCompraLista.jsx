@@ -347,6 +347,33 @@ export default function FacturasCompraLista() {
               onRowClick={(factura) => navigate(`/admin/egresos/facturas/${factura.id}`)}
             />
 
+            {/* Totales (sobre el listado mostrado en pantalla) */}
+            {facturas.length > 0 && (() => {
+              const totalMonto = facturas.reduce((s, f) => s + Number(f.montoTotal || 0), 0)
+              const totalPagado = facturas.reduce((s, f) => s + Number(f.montoPagado || 0), 0)
+              const totalSaldo = facturas.reduce((s, f) => s + Number(f.saldoPendiente || 0), 0)
+              return (
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Facturas:</span>{' '}
+                    <strong className="text-gray-800">{facturas.length}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-500">Total:</span>{' '}
+                    <strong className="text-gray-800">{formatCurrency(totalMonto)}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-500">Pagado:</span>{' '}
+                    <strong className="text-green-600">{formatCurrency(totalPagado)}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-500">Saldo:</span>{' '}
+                    <strong className="text-red-600">{formatCurrency(totalSaldo)}</strong>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Paginacion */}
             <Pagination
               pagination={pagination}

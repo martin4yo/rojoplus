@@ -1,3 +1,5 @@
+import { errorStore } from '../stores/errorStore'
+
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 // Función para manejar token inválido
@@ -68,12 +70,19 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
   try {
     const response = await fetch(url, config)
 
+    // Limpiar el error de conexión cuando hay respuesta válida
+    errorStore.setConnectionError(false)
+
     // Verificar si la respuesta es JSON
     const contentType = response.headers.get('content-type')
     if (!contentType || !contentType.includes('application/json')) {
       console.error('La respuesta no es JSON:', url, 'Content-Type:', contentType)
       const text = await response.text()
       console.error('Contenido recibido:', text.substring(0, 200))
+      // Probable bad gateway / nginx error / backend caído pero accesible
+      if (response.status === 502 || response.status === 503 || response.status === 504) {
+        errorStore.setConnectionError(true, { code: 'SERVER_DOWN', status: response.status })
+      }
       throw new Error('El servidor no devolvió JSON. Verifique que el backend esté corriendo correctamente.')
     }
 
@@ -83,6 +92,14 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
       // Si el token es inválido o expiró, redirigir al login
       if (response.status === 401) {
         handleInvalidToken()
+      }
+      // Base de datos no disponible (503 o flag específico)
+      if (
+        response.status === 503 ||
+        data?.error === 'DATABASE_UNAVAILABLE' ||
+        data?.code === 'DATABASE_UNAVAILABLE'
+      ) {
+        errorStore.setConnectionError(true, { code: 'DATABASE_UNAVAILABLE', status: response.status })
       }
       // Manejar error como string o como objeto con message
       const errorMessage = typeof data.error === 'string'
@@ -97,6 +114,7 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
       const networkError = new Error('No se pudo conectar con el servidor. Verifica tu conexión a internet.')
       networkError.code = 'ERR_NETWORK'
+      errorStore.setConnectionError(true, { code: 'ERR_NETWORK' })
       throw networkError
     }
     // Re-lanzar otros errores
@@ -137,12 +155,14 @@ const api = {
   downloadFile: async (endpoint, body) => {
     const url = `${API_URL}${endpoint}`
     const token = localStorage.getItem('adminToken')
+    const tenantSlug = getCurrentTenantSlug()
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` })
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...(tenantSlug && { 'X-Tenant-Slug': tenantSlug }),
       },
       body: JSON.stringify(body)
     })
@@ -173,6 +193,10 @@ const api = {
       const headers = {}
       if (token) {
         headers.Authorization = `Bearer ${token}`
+      }
+      const tenantSlug = getCurrentTenantSlug()
+      if (tenantSlug) {
+        headers['X-Tenant-Slug'] = tenantSlug
       }
 
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -209,6 +233,10 @@ const api = {
       const headers = {}
       if (token) {
         headers.Authorization = `Bearer ${token}`
+      }
+      const tenantSlug = getCurrentTenantSlug()
+      if (tenantSlug) {
+        headers['X-Tenant-Slug'] = tenantSlug
       }
 
       const response = await fetch(`${API_URL}${endpoint}`, {

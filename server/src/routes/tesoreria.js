@@ -3,7 +3,8 @@ import prisma from '../lib/prisma.js'
 import * as XLSX from 'xlsx'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
-import { generarAsientoMovimientoCaja, crearAsientoTransferencia } from '../services/asientosContables.js'
+import { generarAsientoMovimientoCaja, crearAsientoTransferencia, resolverCuentaCashId } from '../services/asientosContables.js'
+import { generarAsientoAutomatico } from './asientos.js'
 
 const router = Router()
 
@@ -137,6 +138,10 @@ router.post('/cajas', asyncHandler(async (req, res) => {
 
   if (!codigo || !nombre || !tipo) {
     throw new AppError('Codigo, nombre y tipo son requeridos', 400)
+  }
+
+  if (!centroCostoId) {
+    throw new AppError('El Centro de Costo es obligatorio', 400, 'CC_REQUIRED')
   }
 
   if (!['EFECTIVO', 'BANCO', 'MERCADOPAGO', 'VALORES_PENDIENTES', 'OTRO'].includes(tipo)) {
@@ -377,6 +382,20 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
       movimientoContable: { select: { id: true, tipo: true, numero: true } },
       socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
       entidad: { select: { id: true, razonSocial: true, tipo: true } },
+      items: {
+        orderBy: { orden: 'asc' },
+        include: {
+          conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
+          cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+          centroCosto: { select: { id: true, codigo: true, nombre: true } },
+        }
+      },
+      mediosPago: {
+        orderBy: { orden: 'asc' },
+        include: {
+          medioPago: { select: { id: true, codigo: true, nombre: true, tipo: true } },
+        }
+      },
       pago: {
         include: {
           socio: { select: { id: true, nroSocio: true, apellidoNombre: true } }
@@ -414,22 +433,115 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
   })
 }))
 
-// POST /api/admin/movimientos-caja - Crear movimiento manual
+// POST /api/admin/movimientos-caja - Crear movimiento manual.
+// Soporta dos modos:
+//  - "Single": un único concepto/cuenta/CC (campos planos: monto, cuentaContableId, centroCostoId, concepto)
+//  - "Multi-item": items: [{ conceptoTesoreriaId, cuentaContableId, centroCostoId, monto, descripcion }]
+//    En este modo, monto = suma de items y se generan asientos por línea.
 router.post('/movimientos-caja', asyncHandler(async (req, res) => {
-  const { cajaId, tipo, monto, cuentaContableId, concepto, descripcion, centroCostoId, medioPago, medioPagoId: medioPagoIdBody, fecha, socioId, entidadId } = req.body
+  const {
+    cajaId, tipo,
+    monto: montoBody, cuentaContableId, concepto, descripcion, centroCostoId,
+    medioPago, medioPagoId: medioPagoIdBody, fecha, socioId, entidadId,
+    items: itemsBody,
+    mediosPago: mediosPagoBody,
+  } = req.body
 
-  if (!cajaId || !tipo || !monto || !cuentaContableId) {
-    throw new AppError('Caja, tipo, monto y cuenta contable son requeridos', 400)
+  if (!cajaId || !tipo) {
+    throw new AppError('Caja y tipo son requeridos', 400)
   }
-  if (!medioPago && !medioPagoIdBody) {
+
+  // Verificar si vienen medios múltiples
+  const usaMediosMultiples = Array.isArray(mediosPagoBody) && mediosPagoBody.length > 0
+
+  if (!usaMediosMultiples && !medioPago && !medioPagoIdBody) {
     throw new AppError('El medio de pago es requerido', 400)
-  }
-  if (!centroCostoId) {
-    throw new AppError('El centro de costo es requerido. Verificá que el concepto seleccionado tenga un centro de costo asignado.', 400)
   }
 
   if (!['INGRESO', 'EGRESO'].includes(tipo)) {
     throw new AppError('Tipo debe ser INGRESO o EGRESO', 400)
+  }
+
+  // Normalizar a items: si vienen, se usan; si no, armar uno solo desde campos planos
+  const usaItems = Array.isArray(itemsBody) && itemsBody.length > 0
+  let itemsNorm = []
+  let montoTotal = 0
+  let conceptoRoot = concepto
+  let cuentaContableRootId = cuentaContableId ? parseInt(cuentaContableId) : null
+  let centroCostoRootId = centroCostoId ? parseInt(centroCostoId) : null
+
+  if (usaItems) {
+    for (const it of itemsBody) {
+      const m = parseFloat(it.monto)
+      if (!it.cuentaContableId) {
+        throw new AppError('Cada ítem debe tener cuenta contable', 400)
+      }
+      if (!it.centroCostoId) {
+        throw new AppError('Cada ítem debe tener centro de costo', 400)
+      }
+      if (!m || m <= 0) {
+        throw new AppError('Cada ítem debe tener monto mayor a 0', 400)
+      }
+      itemsNorm.push({
+        conceptoTesoreriaId: it.conceptoTesoreriaId ? parseInt(it.conceptoTesoreriaId) : null,
+        cuentaContableId: parseInt(it.cuentaContableId),
+        centroCostoId: parseInt(it.centroCostoId),
+        monto: m,
+        descripcion: it.descripcion || null,
+      })
+      montoTotal += m
+    }
+    // Datos del root: tomar del primer item para retrocompatibilidad de reportes
+    cuentaContableRootId = itemsNorm[0].cuentaContableId
+    centroCostoRootId = itemsNorm[0].centroCostoId
+    if (!conceptoRoot) {
+      conceptoRoot = itemsNorm.length === 1
+        ? (itemsNorm[0].descripcion || 'Movimiento')
+        : `Múltiple (${itemsNorm.length} conceptos)`
+    }
+  } else {
+    if (!montoBody || !cuentaContableRootId) {
+      throw new AppError('Monto y cuenta contable son requeridos', 400)
+    }
+    if (!centroCostoRootId) {
+      throw new AppError('El centro de costo es requerido. Verificá que el concepto seleccionado tenga un centro de costo asignado.', 400)
+    }
+    montoTotal = parseFloat(montoBody)
+    itemsNorm.push({
+      conceptoTesoreriaId: null,
+      cuentaContableId: cuentaContableRootId,
+      centroCostoId: centroCostoRootId,
+      monto: montoTotal,
+      descripcion: descripcion || null,
+    })
+  }
+
+  // Normalizar medios de pago (multi o single)
+  let mediosNorm = []
+  if (usaMediosMultiples) {
+    let totalMedios = 0
+    for (const mp of mediosPagoBody) {
+      const m = parseFloat(mp.monto)
+      if (!mp.medioPagoId) {
+        throw new AppError('Cada medio de pago debe tener un medioPagoId', 400)
+      }
+      if (!m || m <= 0) {
+        throw new AppError('Cada medio de pago debe tener monto mayor a 0', 400)
+      }
+      mediosNorm.push({
+        medioPagoId: parseInt(mp.medioPagoId),
+        monto: m,
+        nroOperacion: mp.nroOperacion || null,
+        descripcion: mp.descripcion || null,
+      })
+      totalMedios += m
+    }
+    if (Math.abs(totalMedios - montoTotal) > 0.01) {
+      throw new AppError(
+        `Los medios de pago suman $${totalMedios.toLocaleString('es-AR')} pero el total de conceptos es $${montoTotal.toLocaleString('es-AR')}. Deben coincidir.`,
+        400
+      )
+    }
   }
 
   const caja = await req.db.caja.findUnique({
@@ -463,9 +575,9 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     }
   }
 
-  // Cargar cuenta contable del movimiento
+  // Cargar cuenta contable principal (la del root del movimiento)
   const cuentaContable = await req.db.cuentaContable.findUnique({
-    where: { id: parseInt(cuentaContableId) }
+    where: { id: cuentaContableRootId }
   })
   if (!cuentaContable) {
     throw new AppError('Cuenta contable no encontrada', 404)
@@ -481,29 +593,55 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     }
   }
 
-  // Resolver medio de pago: acepta ID directo o código string (backward compat)
+  // Resolver medio(s) de pago.
+  // - Si vienen mediosPago[] múltiples: cargar todos los registros.
+  // - Si viene 1 solo (modo single): cargar uno y armar mediosNorm con [único].
   const _mpInclude = { include: { conceptoTesoreria: true } }
-  let medioPagoRecord = null
-  if (medioPagoIdBody) {
-    medioPagoRecord = await req.db.medioPago.findUnique({ where: { id: parseInt(medioPagoIdBody) }, ..._mpInclude })
-  } else if (medioPago) {
-    medioPagoRecord = await req.db.medioPago.findFirst({ where: { codigo: medioPago }, ..._mpInclude })
-  }
-  if (!medioPagoRecord) {
-    throw new AppError(`Medio de pago '${medioPago || medioPagoIdBody}' no encontrado. Verificá la configuración de medios de pago.`, 400)
+  let medioPagoRecord = null  // Para retrocompat del root: el primer medio
+  let mediosPagoRecords = []  // Lista de registros completos paralelo a mediosNorm
+
+  if (usaMediosMultiples) {
+    for (const mp of mediosNorm) {
+      const rec = await req.db.medioPago.findUnique({ where: { id: mp.medioPagoId }, ..._mpInclude })
+      if (!rec) {
+        throw new AppError(`Medio de pago id=${mp.medioPagoId} no encontrado.`, 400)
+      }
+      mediosPagoRecords.push(rec)
+    }
+    medioPagoRecord = mediosPagoRecords[0]
+  } else {
+    if (medioPagoIdBody) {
+      medioPagoRecord = await req.db.medioPago.findUnique({ where: { id: parseInt(medioPagoIdBody) }, ..._mpInclude })
+    } else if (medioPago) {
+      medioPagoRecord = await req.db.medioPago.findFirst({ where: { codigo: medioPago }, ..._mpInclude })
+    }
+    if (!medioPagoRecord) {
+      throw new AppError(`Medio de pago '${medioPago || medioPagoIdBody}' no encontrado. Verificá la configuración de medios de pago.`, 400)
+    }
+    // Armar el equivalente single-medio en mediosNorm para uniformar el flow posterior
+    mediosNorm.push({
+      medioPagoId: medioPagoRecord.id,
+      monto: montoTotal,
+      nroOperacion: null,
+      descripcion: null,
+    })
+    mediosPagoRecords.push(medioPagoRecord)
   }
 
-  // Verificar saldo suficiente para egresos — filtrado por medio de pago
-  const montoNum = parseFloat(monto)
+  // Verificar saldo suficiente para egresos — chequea por cada medio de pago
+  const montoNum = montoTotal
   if (tipo === 'EGRESO') {
-    const whereBase = { cajaId: parseInt(cajaId), anulado: false, medioPagoId: medioPagoRecord.id }
-    const [ingresosAgg, egresosAgg] = await Promise.all([
-      req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'INGRESO' }, _sum: { monto: true } }),
-      req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
-    ])
-    const saldoMedio = (Number(ingresosAgg._sum.monto) || 0) - (Number(egresosAgg._sum.monto) || 0)
-    if (saldoMedio < montoNum) {
-      throw new AppError(`Saldo insuficiente en ${caja.nombre} para ${medioPagoRecord.nombre}. Disponible: $${saldoMedio.toLocaleString('es-AR')}`, 400)
+    for (const mp of mediosNorm) {
+      const whereBase = { cajaId: parseInt(cajaId), anulado: false, medioPagoId: mp.medioPagoId }
+      const [ingresosAgg, egresosAgg] = await Promise.all([
+        req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'INGRESO' }, _sum: { monto: true } }),
+        req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
+      ])
+      const saldoMedio = (Number(ingresosAgg._sum.monto) || 0) - (Number(egresosAgg._sum.monto) || 0)
+      if (saldoMedio < mp.monto) {
+        const rec = mediosPagoRecords.find(r => r.id === mp.medioPagoId)
+        throw new AppError(`Saldo insuficiente en ${caja.nombre} para ${rec?.nombre || 'medio'}. Disponible: $${saldoMedio.toLocaleString('es-AR')}, requerido: $${mp.monto.toLocaleString('es-AR')}`, 400)
+      }
     }
   }
 
@@ -517,9 +655,9 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
       fecha: fecha ? new Date(fecha + 'T12:00:00') : new Date(),
       tipo,
       monto: montoNum,
-      cuentaContableId: parseInt(cuentaContableId),
-      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
-      concepto: concepto || cuentaContable.nombre,
+      cuentaContableId: cuentaContableRootId,
+      centroCostoId: centroCostoRootId,
+      concepto: conceptoRoot || cuentaContable.nombre,
       descripcion: descripcion || null,
       medioPagoId: medioPagoRecord.id,
       registradoPor: req.admin.id,
@@ -540,16 +678,74 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
     data: { saldoActual: { increment: incremento } }
   })
 
+  // Persistir items del movimiento
+  await req.db.itemMovimientoCaja.createMany({
+    data: itemsNorm.map((it, idx) => ({
+      movimientoCajaId: resultado.id,
+      conceptoTesoreriaId: it.conceptoTesoreriaId,
+      cuentaContableId: it.cuentaContableId,
+      centroCostoId: it.centroCostoId,
+      monto: it.monto,
+      descripcion: it.descripcion,
+      orden: idx,
+    }))
+  })
+
+  // Persistir medios de pago (siempre — modo single arma 1 medio en mediosNorm)
+  await req.db.medioPagoMovimientoCaja.createMany({
+    data: mediosNorm.map((mp, idx) => ({
+      movimientoCajaId: resultado.id,
+      medioPagoId: mp.medioPagoId,
+      monto: mp.monto,
+      nroOperacion: mp.nroOperacion,
+      descripcion: mp.descripcion,
+      orden: idx,
+    }))
+  })
+
   // Generar asiento contable — obligatorio, si falla se revierte el movimiento
   try {
-    await generarAsientoMovimientoCaja(req.db, {
-      movimiento: resultado,
-      caja,
-      medioPago: medioPagoRecord,
-      registradoPor: req.admin.id,
-    })
+    if (usaItems || usaMediosMultiples) {
+      // Asiento con N líneas:
+      //   - 1 línea de cash por cada medio de pago (cuenta cash propia)
+      //   - 1 línea de concepto por cada item (cuenta y CC propios)
+      const ccCajaDefault = caja.centroCostoId || itemsNorm[0].centroCostoId
+      const lineasCash = mediosNorm.map((mp, idx) => {
+        const rec = mediosPagoRecords[idx]
+        const cuentaCashId = resolverCuentaCashId(rec, caja)
+        if (!cuentaCashId) {
+          throw new Error(`No se pudo determinar la cuenta de cash para ${rec?.nombre || 'medio'}`)
+        }
+        const desc = `${rec?.nombre || ''}${mp.nroOperacion ? ` op. ${mp.nroOperacion}` : ''}`
+        return tipo === 'INGRESO'
+          ? { cuentaContableId: cuentaCashId, debe: mp.monto, haber: 0, descripcion: desc, centroCostoId: ccCajaDefault }
+          : { cuentaContableId: cuentaCashId, debe: 0, haber: mp.monto, descripcion: desc, centroCostoId: ccCajaDefault }
+      })
+      const lineasItems = itemsNorm.map(it => (
+        tipo === 'INGRESO'
+          ? { cuentaContableId: it.cuentaContableId, debe: 0, haber: it.monto, descripcion: it.descripcion || conceptoRoot, centroCostoId: it.centroCostoId }
+          : { cuentaContableId: it.cuentaContableId, debe: it.monto, haber: 0, descripcion: it.descripcion || conceptoRoot, centroCostoId: it.centroCostoId }
+      ))
+      await generarAsientoAutomatico(req.db, {
+        fecha: resultado.fecha,
+        concepto: `${tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}: ${conceptoRoot}`,
+        tipoOrigen: 'MOV_CAJA',
+        origenId: resultado.id,
+        registradoPor: req.admin.id,
+        lineas: [...lineasCash, ...lineasItems],
+      })
+    } else {
+      await generarAsientoMovimientoCaja(req.db, {
+        movimiento: resultado,
+        caja,
+        medioPago: medioPagoRecord,
+        registradoPor: req.admin.id,
+      })
+    }
   } catch (err) {
     // Revertir: eliminar el movimiento y restaurar el saldo
+    await req.db.itemMovimientoCaja.deleteMany({ where: { movimientoCajaId: resultado.id } })
+    await req.db.medioPagoMovimientoCaja.deleteMany({ where: { movimientoCajaId: resultado.id } })
     await req.db.movimientoCaja.update({ where: { id: resultado.id }, data: { anulado: true } })
     await req.db.caja.update({
       where: { id: parseInt(cajaId) },
@@ -683,7 +879,7 @@ router.get('/transferencias', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [transferencias, total] = await Promise.all([
-    prisma.transferenciaCaja.findMany({
+    req.db.transferenciaCaja.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -693,7 +889,7 @@ router.get('/transferencias', asyncHandler(async (req, res) => {
         cajaDestino: { select: { id: true, codigo: true, nombre: true } }
       }
     }),
-    prisma.transferenciaCaja.count({ where })
+    req.db.transferenciaCaja.count({ where })
   ])
 
   const transferenciasFormateadas = transferencias.map(t => ({
@@ -717,7 +913,7 @@ router.get('/transferencias', asyncHandler(async (req, res) => {
 router.get('/transferencias/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const transferencia = await prisma.transferenciaCaja.findUnique({
+  const transferencia = await req.db.transferenciaCaja.findUnique({
     where: { id: parseInt(id) },
     include: {
       cajaOrigen: true,
@@ -769,6 +965,9 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
   }
   if (!conceptoId) {
     throw new AppError('El concepto es obligatorio', 400)
+  }
+  if (!centroCostoId) {
+    throw new AppError('El Centro de Costo es obligatorio', 400, 'CC_REQUIRED')
   }
   if (!descripcion?.trim()) {
     throw new AppError('La descripción es obligatoria', 400)
@@ -960,7 +1159,7 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
 router.post('/transferencias/:id/anular', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const transferencia = await prisma.transferenciaCaja.findUnique({
+  const transferencia = await req.db.transferenciaCaja.findUnique({
     where: { id: parseInt(id) },
     include: {
       cajaOrigen: true,

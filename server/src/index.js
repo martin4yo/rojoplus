@@ -255,7 +255,10 @@ app.use('/api/admin/staff-tecnico', staffTecnicoRoutes)
 app.use('/api/admin/noticias-deportivas', noticiasDeportivasRoutes)
 app.use('/api/admin/reglamento', reglamentoRoutes)
 app.use('/api/accesos', accesosRoutes)
-app.use('/api/eventos', eventosRoutes)
+app.use('/api/eventos', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+}, eventosRoutes)
 app.use('/api/reservas', reservasRoutes)
 app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
 app.use('/api/importacion', importacionRoutes)

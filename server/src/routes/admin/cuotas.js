@@ -95,7 +95,7 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
   const where = {}
   if (anio) where.anio = parseInt(anio)
 
-  const periodos = await req.prisma.periodo.findMany({
+  const periodos = await req.db.periodo.findMany({
     where,
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
     include: {
@@ -152,7 +152,7 @@ router.get('/periodos', authAdmin, asyncHandler(async (req, res) => {
 router.get('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const periodo = await req.prisma.periodo.findUnique({
+  const periodo = await req.db.periodo.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -250,7 +250,7 @@ router.post('/periodos', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const periodo = await req.prisma.periodo.findUnique({
+  const periodo = await req.db.periodo.findUnique({
     where: { id: parseInt(id) },
   })
 
@@ -276,7 +276,7 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Eliminar el periodo
-  await req.prisma.periodo.delete({
+  await req.db.periodo.delete({
     where: { id: periodo.id },
   })
 

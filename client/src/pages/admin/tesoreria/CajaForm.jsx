@@ -130,6 +130,11 @@ export default function CajaForm() {
       return
     }
 
+    if (!form.centroCostoId) {
+      setError('El Centro de Costo es obligatorio')
+      return
+    }
+
     setSaving(true)
     try {
       const payload = {
@@ -270,15 +275,16 @@ export default function CajaForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Centro de Costo
+                Centro de Costo *
               </label>
               <select
                 name="centroCostoId"
                 value={form.centroCostoId}
                 onChange={handleChange}
+                required
                 className="input-field w-full"
               >
-                <option value="">-- Sin centro de costo --</option>
+                <option value="">-- Seleccionar --</option>
                 {centrosCosto.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.codigo} - {c.nombre}

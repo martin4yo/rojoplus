@@ -141,7 +141,7 @@ router.get('/antiguedad', authAdmin, asyncHandler(async (req, res) => {
 
   if (categoria) where.categoria = categoria
   if (actividadId) {
-    const categorias = await req.prisma.categoriaActividad.findMany({
+    const categorias = await req.db.categoriaActividad.findMany({
       where: { actividadId: parseInt(actividadId) },
       select: { id: true },
     })
@@ -340,7 +340,7 @@ router.get('/detalle', authAdmin, asyncHandler(async (req, res) => {
 
   if (categoria) where.categoria = categoria
   if (actividadId) {
-    const categorias = await req.prisma.categoriaActividad.findMany({
+    const categorias = await req.db.categoriaActividad.findMany({
       where: { actividadId: parseInt(actividadId) },
       select: { id: true },
     })
@@ -482,7 +482,7 @@ router.get('/exportar', authAdmin, asyncHandler(async (req, res) => {
 
   if (categoria) where.categoria = categoria
   if (actividadId) {
-    const categorias = await req.prisma.categoriaActividad.findMany({
+    const categorias = await req.db.categoriaActividad.findMany({
       where: { actividadId: parseInt(actividadId) },
       select: { id: true },
     })

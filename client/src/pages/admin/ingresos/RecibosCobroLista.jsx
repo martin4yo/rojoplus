@@ -300,6 +300,17 @@ export default function RecibosCobroLista() {
               onRowClick={(recibo) => navigate(`/admin/ingresos/recibos/${recibo.id}`)}
             />
 
+            {/* Totales (sobre el listado mostrado en pantalla) */}
+            {recibos.length > 0 && (() => {
+              const total = recibos.reduce((s, r) => s + Number(r.montoTotal || 0), 0)
+              return (
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-between text-sm">
+                  <span><span className="text-gray-500">Recibos:</span> <strong className="text-gray-800">{recibos.length}</strong></span>
+                  <span><span className="text-gray-500">Total:</span> <strong className="text-gray-800">{formatCurrency(total)}</strong></span>
+                </div>
+              )
+            })()}
+
             {/* Paginacion */}
             <div className="px-4 border-t border-gray-200">
               <Pagination

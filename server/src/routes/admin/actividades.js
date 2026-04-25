@@ -137,7 +137,7 @@ router.put('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const categoriasCount = await req.prisma.categoriaActividad.count({
+  const categoriasCount = await req.db.categoriaActividad.count({
     where: { actividadId: parseInt(id) },
   })
 
@@ -158,7 +158,7 @@ router.get('/categorias-actividad', authAdmin, asyncHandler(async (req, res) => 
   if (actividadId) where.actividadId = parseInt(actividadId)
   if (activo !== undefined) where.activo = activo === 'true'
 
-  const categorias = await req.prisma.categoriaActividad.findMany({
+  const categorias = await req.db.categoriaActividad.findMany({
     where,
     include: {
       actividad: { select: { id: true, codigo: true, nombre: true, cuotaMensual: true } },
@@ -181,7 +181,7 @@ router.get('/categorias-actividad', authAdmin, asyncHandler(async (req, res) => 
 
 // GET /api/admin/categorias-actividad/:id - Detalle de categoría
 router.get('/categorias-actividad/:id', authAdmin, asyncHandler(async (req, res) => {
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(req.params.id) },
     include: {
       actividad: { select: { id: true, codigo: true, nombre: true, cuotaMensual: true } },
@@ -218,13 +218,13 @@ router.post('/categorias-actividad', authAdmin, asyncHandler(async (req, res) =>
     throw new AppError('Actividad, código y nombre son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const existente = await req.prisma.categoriaActividad.findFirst({ where: { codigo } })
+  const existente = await req.db.categoriaActividad.findFirst({ where: { codigo } })
   if (existente) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
 
   const actividad = await req.db.actividad.findUnique({ where: { id: parseInt(actividadId) } })
   if (!actividad) throw new AppError('Actividad no encontrada', 404, 'NOT_FOUND')
 
-  const categoria = await req.prisma.categoriaActividad.create({
+  const categoria = await req.db.categoriaActividad.create({
     data: {
       actividadId: parseInt(actividadId),
       codigo,
@@ -263,15 +263,15 @@ router.put('/categorias-actividad/:id', authAdmin, asyncHandler(async (req, res)
     cupoMaximo, orden, activo
   } = req.body
 
-  const existente = await req.prisma.categoriaActividad.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.categoriaActividad.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Categoría no encontrada', 404, 'NOT_FOUND')
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await req.prisma.categoriaActividad.findFirst({ where: { codigo } })
+    const duplicado = await req.db.categoriaActividad.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe una categoría con ese código', 400, 'DUPLICATE')
   }
 
-  const categoria = await req.prisma.categoriaActividad.update({
+  const categoria = await req.db.categoriaActividad.update({
     where: { id: parseInt(id) },
     data: {
       actividadId: actividadId ? parseInt(actividadId) : existente.actividadId,
@@ -315,7 +315,7 @@ router.delete('/categorias-actividad/:id', authAdmin, asyncHandler(async (req, r
     throw new AppError(`No se puede eliminar, tiene ${inscripcionesCount} inscripción(es)`, 400, 'HAS_RELATIONS')
   }
 
-  await req.prisma.categoriaActividad.delete({ where: { id: parseInt(id) } })
+  await req.db.categoriaActividad.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, data: { mensaje: 'Categoría eliminada' } })
 }))
 

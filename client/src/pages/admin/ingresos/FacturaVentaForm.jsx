@@ -5,6 +5,7 @@ import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
 import { SearchInputWithDropdown } from '../../../components/SearchInput'
+import SelectCentroCosto from '../../../components/SelectCentroCosto'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import {
   CONDICIONES_IVA_OPTIONS,
@@ -42,6 +43,7 @@ export default function FacturaVentaForm() {
   const [puntoVenta, setPuntoVenta] = useState('')
   const [numeroComprobante, setNumeroComprobante] = useState('')
   const [conceptoId, setConceptoId] = useState('')
+  const [centroCostoId, setCentroCostoId] = useState(null)
   const [observaciones, setObservaciones] = useState('')
   const [items, setItems] = useState([])
 
@@ -69,6 +71,9 @@ export default function FacturaVentaForm() {
   const [busquedaSocio, setBusquedaSocio] = useState('')
   const [resultadosSocio, setResultadosSocio] = useState([])
   const [buscandoSocio, setBuscandoSocio] = useState(false)
+  const [busquedaCliente, setBusquedaCliente] = useState('')
+  const [resultadosCliente, setResultadosCliente] = useState([])
+  const [buscandoCliente, setBuscandoCliente] = useState(false)
 
   useEffect(() => {
     cargarDatosIniciales()
@@ -212,6 +217,32 @@ export default function FacturaVentaForm() {
     setItems([])
   }
 
+  async function buscarClientes(query) {
+    if (!query || query.length < 2) {
+      setResultadosCliente([])
+      return
+    }
+    setBuscandoCliente(true)
+    try {
+      const response = await api.getFull(`/admin/entidades?tipo=CLIENTE&activo=true&busqueda=${encodeURIComponent(query)}&limit=10`)
+      setResultadosCliente(response?.data || [])
+    } catch (err) {
+      console.error('Error buscando clientes:', err)
+      setResultadosCliente([])
+    } finally {
+      setBuscandoCliente(false)
+    }
+  }
+
+  function handleSelectCliente(cliente) {
+    setEntidadId(cliente.id)
+    setBusquedaCliente(`${cliente.codigo} - ${cliente.razonSocial}`)
+    setResultadosCliente([])
+    setPedidoId('')
+    setPedidoSeleccionado(null)
+    setItems([])
+  }
+
   function handleSelectPedido(e) {
     const id = e.target.value
     setPedidoId(id)
@@ -316,6 +347,11 @@ export default function FacturaVentaForm() {
       return
     }
 
+    if (!centroCostoId) {
+      showModal({ type: 'error', message: 'Debe seleccionar un Centro de Costo' })
+      return
+    }
+
     setSaving(true)
     try {
       const totales = calcularTotales()
@@ -331,6 +367,7 @@ export default function FacturaVentaForm() {
         puntoVenta: puntoVenta || null,
         numeroComprobante: numeroComprobante || null,
         conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
         observaciones: observaciones || null,
         subtotal: totales.subtotal,
         iva21: discriminaIVA ? totales.iva21 : 0,
@@ -445,6 +482,8 @@ export default function FacturaVentaForm() {
                       onChange={(e) => {
                         setTipoCliente(e.target.value)
                         setEntidadId('')
+                        setBusquedaCliente('')
+                        setResultadosCliente([])
                         setPedidoId('')
                         setPedidoSeleccionado(null)
                         setItems([])
@@ -505,26 +544,35 @@ export default function FacturaVentaForm() {
                 ) : (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cliente *
+                      Buscar Cliente *
                     </label>
-                    <select
-                      value={entidadId}
-                      onChange={(e) => {
-                        setEntidadId(e.target.value)
-                        setPedidoId('')
-                        setPedidoSeleccionado(null)
-                        setItems([])
+                    <SearchInputWithDropdown
+                      value={busquedaCliente}
+                      onChange={(value) => {
+                        setBusquedaCliente(value)
+                        buscarClientes(value)
                       }}
-                      className="input-field w-full"
-                      required
-                    >
-                      <option value="">Seleccionar cliente...</option>
-                      {clientes.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.codigo} - {c.razonSocial}
-                        </option>
-                      ))}
-                    </select>
+                      results={resultadosCliente}
+                      loading={buscandoCliente}
+                      onSelectResult={handleSelectCliente}
+                      renderResult={(cliente) => (
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-gray-400" />
+                          <div>
+                            <span className="font-medium">{cliente.razonSocial}</span>
+                            {cliente.documento && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                {cliente.tipoDocumento || 'CUIT'}: {cliente.documento}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      placeholder="Buscar por nombre, razón social, CUIT..."
+                      minChars={2}
+                      debounceMs={300}
+                      emptyMessage="No se encontraron clientes"
+                    />
                   </div>
                 )}
 
@@ -632,6 +680,19 @@ export default function FacturaVentaForm() {
                       <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Centro de Costo *
+                  </label>
+                  <SelectCentroCosto
+                    value={centroCostoId}
+                    onChange={setCentroCostoId}
+                    required
+                    emptyLabel="-- Seleccionar --"
+                    className="w-full"
+                  />
                 </div>
 
                 <div>

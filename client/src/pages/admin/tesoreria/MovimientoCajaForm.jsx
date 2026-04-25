@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, ChevronDown, ChevronRight, Search, X, FileText, Ban } from 'lucide-react'
+import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, ChevronDown, ChevronRight, Search, X, FileText, Ban, Trash2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import ConceptoTesoreriaModal from '../../../components/ConceptoTesoreriaModal'
+import { SearchInputWithDropdown } from '../../../components/SearchInput'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
@@ -51,12 +53,23 @@ export default function MovimientoCajaForm() {
     entidadId: null,
   })
   const [movimiento, setMovimiento] = useState(null)
+  // Items del movimiento (pueden ser múltiples conceptos en una sola operación)
+  const [items, setItems] = useState([])
+  const itemsTotal = items.reduce((s, it) => s + (parseFloat(it.monto) || 0), 0)
+  // Medios de pago (pueden ser múltiples — efectivo + transferencia, etc.)
+  const [mediosPagoLista, setMediosPagoLista] = useState([])
+  const mediosTotal = mediosPagoLista.reduce((s, mp) => s + (parseFloat(mp.monto) || 0), 0)
+  const balanceaTotal = items.length > 0 && Math.abs(itemsTotal - mediosTotal) < 0.01
 
-  // Selector Socio/Entidad
-  const [busquedaPersona, setBusquedaPersona] = useState('')
-  const [resultadosPersona, setResultadosPersona] = useState([])
+  // Selector Socio/Entidad estilo FacturaVentaForm: radios + search box
+  const [tipoPersona, setTipoPersona] = useState('SOCIO') // 'SOCIO' | 'ENTIDAD' | 'NINGUNO'
   const [personaSeleccionada, setPersonaSeleccionada] = useState(null)
-  const [buscandoPersona, setBuscandoPersona] = useState(false)
+  const [busquedaSocio, setBusquedaSocio] = useState('')
+  const [resultadosSocio, setResultadosSocio] = useState([])
+  const [buscandoSocio, setBuscandoSocio] = useState(false)
+  const [busquedaEntidad, setBusquedaEntidad] = useState('')
+  const [resultadosEntidad, setResultadosEntidad] = useState([])
+  const [buscandoEntidad, setBuscandoEntidad] = useState(false)
 
   useEffect(() => {
     cargarDatos()
@@ -134,6 +147,37 @@ export default function MovimientoCajaForm() {
           socioId: mov.socioId || null,
           entidadId: mov.entidadId || null,
         })
+        // Si el movimiento tiene items persistidos, cargarlos
+        if (Array.isArray(mov.items) && mov.items.length > 0) {
+          setItems(mov.items.map(it => ({
+            conceptoId: it.conceptoTesoreriaId ? String(it.conceptoTesoreriaId) : '',
+            conceptoNombre: it.conceptoTesoreria?.nombre || '',
+            cuentaContableId: String(it.cuentaContableId),
+            cuentaContableLabel: it.cuentaContable ? `${it.cuentaContable.codigo} - ${it.cuentaContable.nombre}` : '',
+            centroCostoId: it.centroCostoId || null,
+            centroCostoLabel: it.centroCosto ? `${it.centroCosto.codigo} - ${it.centroCosto.nombre}` : '',
+            monto: String(it.monto),
+            descripcion: it.descripcion || '',
+          })))
+        }
+        // Cargar medios de pago
+        if (Array.isArray(mov.mediosPago) && mov.mediosPago.length > 0) {
+          setMediosPagoLista(mov.mediosPago.map(mp => ({
+            medioPagoId: String(mp.medioPagoId),
+            medioPagoLabel: mp.medioPago?.nombre || '',
+            monto: String(mp.monto),
+            nroOperacion: mp.nroOperacion || '',
+            descripcion: mp.descripcion || '',
+          })))
+        } else if (mov.medioPagoId) {
+          setMediosPagoLista([{
+            medioPagoId: String(mov.medioPagoId),
+            medioPagoLabel: mov.medioPagoRel?.nombre || '',
+            monto: String(mov.monto),
+            nroOperacion: '',
+            descripcion: '',
+          }])
+        }
         setDatosContablesOpen(true)
       }
     } catch (err) {
@@ -199,67 +243,188 @@ export default function MovimientoCajaForm() {
     setDatosContablesOpen(true)
   }
 
-  async function buscarPersona(q) {
-    if (q.length < 2) { setResultadosPersona([]); return }
-    setBuscandoPersona(true)
+  async function buscarSocios(q) {
+    if (!q || q.length < 2) { setResultadosSocio([]); return }
+    setBuscandoSocio(true)
     try {
-      const [sociosRes, entidadesRes] = await Promise.all([
-        api.getFull(`/admin/socios?q=${encodeURIComponent(q)}&limit=5`),
-        api.getFull(`/admin/entidades?busqueda=${encodeURIComponent(q)}&limit=5`).catch(() => ({ data: [] })),
-      ])
-      const socios = (sociosRes.data || []).map(s => ({ tipo: 'socio', id: s.id, label: `${s.apellido}, ${s.nombre} — Socio #${s.numeroSocio}` }))
-      const entidades = (entidadesRes.data || []).map(e => ({ tipo: 'entidad', id: e.id, label: `${e.razonSocial || e.nombre} — ${e.tipo || 'Entidad'}` }))
-      setResultadosPersona([...socios, ...entidades])
+      const response = await api.getFull(`/admin/socios?q=${encodeURIComponent(q)}&limit=10`)
+      setResultadosSocio(response?.data?.socios || [])
+    } catch (err) {
+      console.error('Error buscando socios:', err)
+      setResultadosSocio([])
     } finally {
-      setBuscandoPersona(false)
+      setBuscandoSocio(false)
     }
   }
 
-  function seleccionarPersona(p) {
-    setPersonaSeleccionada(p)
-    setBusquedaPersona('')
-    setResultadosPersona([])
-    setForm(prev => ({
-      ...prev,
-      socioId: p.tipo === 'socio' ? p.id : null,
-      entidadId: p.tipo === 'entidad' ? p.id : null,
-    }))
+  async function buscarEntidades(q) {
+    if (!q || q.length < 2) { setResultadosEntidad([]); return }
+    setBuscandoEntidad(true)
+    try {
+      const response = await api.getFull(`/admin/entidades?busqueda=${encodeURIComponent(q)}&activo=true&limit=10`)
+      setResultadosEntidad(response?.data || [])
+    } catch (err) {
+      console.error('Error buscando entidades:', err)
+      setResultadosEntidad([])
+    } finally {
+      setBuscandoEntidad(false)
+    }
+  }
+
+  function handleSelectSocio(s) {
+    setPersonaSeleccionada({ tipo: 'socio', id: s.id, label: `#${s.nroSocio} — ${s.apellidoNombre}` })
+    setBusquedaSocio(`#${s.nroSocio} — ${s.apellidoNombre}`)
+    setResultadosSocio([])
+    setForm(prev => ({ ...prev, socioId: s.id, entidadId: null }))
+  }
+
+  function handleSelectEntidad(e) {
+    setPersonaSeleccionada({ tipo: 'entidad', id: e.id, label: `${e.codigo} — ${e.razonSocial} (${e.tipo})` })
+    setBusquedaEntidad(`${e.codigo} — ${e.razonSocial}`)
+    setResultadosEntidad([])
+    setForm(prev => ({ ...prev, entidadId: e.id, socioId: null }))
   }
 
   function limpiarPersona() {
     setPersonaSeleccionada(null)
-    setBusquedaPersona('')
-    setResultadosPersona([])
+    setBusquedaSocio('')
+    setBusquedaEntidad('')
+    setResultadosSocio([])
+    setResultadosEntidad([])
     setForm(prev => ({ ...prev, socioId: null, entidadId: null }))
+  }
+
+  function agregarItem() {
+    // Por defecto el item nuevo hereda CC de la caja seleccionada (si tiene)
+    const cajaActual = cajas.find(c => c.id === parseInt(form.cajaId))
+    setItems(prev => [...prev, {
+      conceptoId: '',
+      cuentaContableId: '',
+      centroCostoId: cajaActual?.centroCostoId || null,
+      monto: '',
+      descripcion: '',
+    }])
+  }
+
+  function eliminarItem(idx) {
+    setItems(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function agregarMedioPago() {
+    // Auto-completar el monto con la diferencia faltante para llegar al total de items
+    const restante = itemsTotal - mediosTotal
+    setMediosPagoLista(prev => [...prev, {
+      medioPagoId: '',
+      monto: restante > 0 ? restante.toFixed(2) : '',
+      nroOperacion: '',
+      descripcion: '',
+    }])
+  }
+
+  function eliminarMedioPago(idx) {
+    setMediosPagoLista(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function handleMedioPagoChange(idx, field, value) {
+    setMediosPagoLista(prev => prev.map((mp, i) => i === idx ? { ...mp, [field]: value } : mp))
+  }
+
+  function autocompletarMonto(idx) {
+    // Llenar el monto del medio idx con la diferencia faltante
+    const restante = itemsTotal - mediosTotal + (parseFloat(mediosPagoLista[idx]?.monto) || 0)
+    handleMedioPagoChange(idx, 'monto', restante > 0 ? restante.toFixed(2) : '0.00')
+  }
+
+  function handleItemChange(idx, field, value) {
+    setItems(prev => prev.map((it, i) => {
+      if (i !== idx) return it
+      const updated = { ...it, [field]: value }
+      // Si cambia el concepto, traer cuenta contable y CC desde el concepto
+      if (field === 'conceptoId') {
+        if (!value) {
+          updated.cuentaContableId = ''
+          updated.cuentaContableLabel = ''
+          return updated
+        }
+        const concepto = conceptos.find(c => c.id === parseInt(value))
+        if (concepto) {
+          const ccId = concepto.cuentaContableId || concepto.cuentaContable?.id
+          if (ccId) {
+            updated.cuentaContableId = String(ccId)
+            const ccObj = concepto.cuentaContable || cuentasContables.find(c => c.id === ccId)
+            updated.cuentaContableLabel = ccObj ? `${ccObj.codigo} - ${ccObj.nombre}` : ''
+          } else {
+            // Sin cuenta contable: limpiar y mostrar advertencia al guardar
+            updated.cuentaContableId = ''
+            updated.cuentaContableLabel = ''
+          }
+          if (concepto.centroCostoId) {
+            updated.centroCostoId = concepto.centroCostoId
+          }
+          if (!updated.descripcion) {
+            updated.descripcion = concepto.nombre
+          }
+        }
+      }
+      return updated
+    }))
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
 
-    if (!form.cajaId || !form.monto || !form.conceptoId || !form.cuentaContableId) {
-      setError('Caja, monto, concepto y cuenta contable son requeridos')
+    if (!form.cajaId) {
+      setError('Caja es requerida')
       return
     }
 
-    if (!form.medioPagoId) {
-      setError('El medio de pago es obligatorio')
+    if (items.length === 0) {
+      setError('Agregá al menos un concepto')
       return
     }
 
-    if (!form.descripcion?.trim()) {
-      setError('La observación es obligatoria')
+    for (const [idx, it] of items.entries()) {
+      if (!it.conceptoId) {
+        setError(`Item ${idx + 1}: seleccioná un concepto`)
+        return
+      }
+      if (!it.cuentaContableId) {
+        const concepto = conceptos.find(c => c.id === parseInt(it.conceptoId))
+        setError(`Item ${idx + 1}: el concepto "${concepto?.nombre || it.conceptoId}" no tiene cuenta contable asignada. Configurala en Tablas Auxiliares → Conceptos de Tesorería.`)
+        return
+      }
+      if (!it.centroCostoId) {
+        setError(`Item ${idx + 1}: el centro de costo es obligatorio`)
+        return
+      }
+      const m = parseFloat(it.monto)
+      if (!m || m <= 0) {
+        setError(`Item ${idx + 1}: el monto debe ser mayor a cero`)
+        return
+      }
+    }
+
+    if (mediosPagoLista.length === 0) {
+      setError('Agregá al menos un medio de pago')
       return
     }
 
-    if (!form.centroCostoId) {
-      setError('El centro de costo es requerido. Verificá que la caja o el concepto tengan un centro de costo asignado.')
-      return
+    for (const [idx, mp] of mediosPagoLista.entries()) {
+      if (!mp.medioPagoId) {
+        setError(`Medio de pago ${idx + 1}: seleccioná el medio`)
+        return
+      }
+      const m = parseFloat(mp.monto)
+      if (!m || m <= 0) {
+        setError(`Medio de pago ${idx + 1}: el monto debe ser mayor a cero`)
+        return
+      }
     }
 
-    const montoNum = parseFloat(form.monto)
-    if (montoNum <= 0) {
-      setError('El monto debe ser mayor a cero')
+    if (!balanceaTotal) {
+      const diff = (itemsTotal - mediosTotal).toFixed(2)
+      setError(`Los conceptos suman $${itemsTotal.toFixed(2)} y los medios de pago $${mediosTotal.toFixed(2)}. Diferencia: $${diff}. Deben coincidir.`)
       return
     }
 
@@ -269,14 +434,22 @@ export default function MovimientoCajaForm() {
         cajaId: parseInt(form.cajaId),
         tipo: form.tipo,
         fecha: form.fecha || undefined,
-        monto: montoNum,
-        cuentaContableId: parseInt(form.cuentaContableId),
-        centroCostoId: form.centroCostoId || null,
-        concepto: form.concepto || null,
         descripcion: form.descripcion || null,
-        medioPagoId: parseInt(form.medioPagoId),
         socioId: form.socioId || null,
         entidadId: form.entidadId || null,
+        items: items.map(it => ({
+          conceptoTesoreriaId: it.conceptoId ? parseInt(it.conceptoId) : null,
+          cuentaContableId: parseInt(it.cuentaContableId),
+          centroCostoId: parseInt(it.centroCostoId),
+          monto: parseFloat(it.monto),
+          descripcion: it.descripcion || null,
+        })),
+        mediosPago: mediosPagoLista.map(mp => ({
+          medioPagoId: parseInt(mp.medioPagoId),
+          monto: parseFloat(mp.monto),
+          nroOperacion: mp.nroOperacion || null,
+          descripcion: mp.descripcion || null,
+        })),
       })
 
       if (cajaIdParam) {
@@ -357,85 +530,88 @@ export default function MovimientoCajaForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          {/* Tipo de movimiento */}
-          <div className="flex gap-4 mb-6">
-            <button
-              type="button"
-              onClick={() => !isReadOnly && setForm(prev => ({ ...prev, tipo: 'INGRESO' }))}
-              disabled={isReadOnly}
-              className={`flex-1 py-3 rounded-lg border-2 font-medium transition ${
-                form.tipo === 'INGRESO'
-                  ? 'border-green-500 bg-green-50 text-green-700'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              } ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
-            >
-              <TrendingUp className="w-5 h-5 mx-auto mb-1" />
-              Ingreso
-            </button>
-            <button
-              type="button"
-              onClick={() => !isReadOnly && setForm(prev => ({ ...prev, tipo: 'EGRESO' }))}
-              disabled={isReadOnly}
-              className={`flex-1 py-3 rounded-lg border-2 font-medium transition ${
-                form.tipo === 'EGRESO'
-                  ? 'border-red-500 bg-red-50 text-red-700'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              } ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
-            >
-              <TrendingDown className="w-5 h-5 mx-auto mb-1" />
-              Egreso
-            </button>
-          </div>
-
-          {/* Socio / Entidad (opcional) */}
+          {/* Fila: Buscador socio/entidad */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Socio / Entidad <span className="text-gray-400 font-normal">(opcional)</span></label>
-            {personaSeleccionada ? (
-              <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                <span className="flex-1 text-sm text-blue-800">{personaSeleccionada.label}</span>
-                {!isReadOnly && (
-                  <button type="button" onClick={limpiarPersona} className="p-1 hover:bg-blue-100 rounded text-blue-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ) : isReadOnly ? (
-              <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500">-</div>
-            ) : (
-              <div className="relative">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={busquedaPersona}
-                    onChange={(e) => { setBusquedaPersona(e.target.value); buscarPersona(e.target.value) }}
-                    className="input-field w-full pl-9"
-                    placeholder="Buscar socio o entidad..."
-                  />
-                  {buscandoPersona && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>}
+            <div className="flex-1 min-w-0">
+              {personaSeleccionada ? (
+                <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <span className="flex-1 text-sm text-blue-800 truncate">{personaSeleccionada.label}</span>
+                  {!isReadOnly && (
+                    <button type="button" onClick={limpiarPersona} className="p-1 hover:bg-blue-100 rounded text-blue-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
-                {resultadosPersona.length > 0 && (
-                  <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-auto">
-                    {resultadosPersona.map((p, i) => (
-                      <li key={i}>
-                        <button
-                          type="button"
-                          onClick={() => seleccionarPersona(p)}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                        >
-                          {p.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
+              ) : isReadOnly ? (
+                <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500">Sin socio/entidad</div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                      <input
+                        type="radio"
+                        name="tipoPersona"
+                        value="SOCIO"
+                        checked={tipoPersona === 'SOCIO'}
+                        onChange={() => { setTipoPersona('SOCIO'); setBusquedaEntidad(''); setResultadosEntidad([]) }}
+                        className="text-primary focus:ring-primary"
+                      />
+                      Socio
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                      <input
+                        type="radio"
+                        name="tipoPersona"
+                        value="ENTIDAD"
+                        checked={tipoPersona === 'ENTIDAD'}
+                        onChange={() => { setTipoPersona('ENTIDAD'); setBusquedaSocio(''); setResultadosSocio([]) }}
+                        className="text-primary focus:ring-primary"
+                      />
+                      Entidad (Cliente / Proveedor / Personal)
+                    </label>
+                  </div>
+
+                  {tipoPersona === 'SOCIO' ? (
+                    <SearchInputWithDropdown
+                      value={busquedaSocio}
+                      onChange={(value) => { setBusquedaSocio(value); buscarSocios(value) }}
+                      results={resultadosSocio}
+                      loading={buscandoSocio}
+                      onSelectResult={handleSelectSocio}
+                      renderResult={(s) => <span>#{s.nroSocio} — {s.apellidoNombre}</span>}
+                      placeholder="Buscar socio (opcional)..."
+                      minChars={2}
+                      debounceMs={300}
+                      emptyMessage="No se encontraron socios"
+                    />
+                  ) : (
+                    <SearchInputWithDropdown
+                      value={busquedaEntidad}
+                      onChange={(value) => { setBusquedaEntidad(value); buscarEntidades(value) }}
+                      results={resultadosEntidad}
+                      loading={buscandoEntidad}
+                      onSelectResult={handleSelectEntidad}
+                      renderResult={(e) => (
+                        <div>
+                          <span className="font-medium">{e.razonSocial}</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {e.tipo}{e.documento ? ` · ${e.tipoDocumento || 'CUIT'}: ${e.documento}` : ''}
+                          </span>
+                        </div>
+                      )}
+                      placeholder="Buscar entidad (opcional)..."
+                      minChars={2}
+                      debounceMs={300}
+                      emptyMessage="No se encontraron entidades"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Fila 1: Caja + Medio de Pago */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Caja */}
+          {/* Fila: Caja + Fecha + Observación */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_1.5fr] gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Caja *</label>
               <select
@@ -454,29 +630,6 @@ export default function MovimientoCajaForm() {
                 ))}
               </select>
             </div>
-
-            {/* Medio de Pago */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Medio de Pago *</label>
-              <select
-                name="medioPagoId"
-                value={form.medioPagoId}
-                onChange={handleChange}
-                disabled={isReadOnly}
-                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
-                required
-              >
-                <option value="">Seleccionar...</option>
-                {mediosPago.map(mp => (
-                  <option key={mp.id} value={mp.id}>{mp.nombre}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Fila 2: Fecha + Concepto + Monto */}
-          <div className="grid grid-cols-1 md:grid-cols-[160px_1fr_180px] gap-4 mt-4">
-            {/* Fecha */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
               <input
@@ -489,163 +642,335 @@ export default function MovimientoCajaForm() {
                 className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
               />
             </div>
-
-            {/* Concepto */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Concepto *</label>
-              {isReadOnly ? (
-                <input
-                  type="text"
-                  value={form.concepto}
-                  readOnly
-                  className="input-field w-full bg-gray-50 text-gray-700"
-                />
-              ) : (
-                <div className="flex gap-2">
-                  <select
-                    name="conceptoId"
-                    value={form.conceptoId}
-                    onChange={handleChange}
-                    className="input-field flex-1"
-                    required
-                  >
-                    <option value="">Seleccionar concepto...</option>
-                    {conceptos
-                      .filter(c => c.tipo === form.tipo || c.tipo === 'AMBOS')
-                      .map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.codigo} - {c.nombre}
-                        </option>
-                      ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setShowConceptoModal(true)}
-                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600"
-                    title="Crear nuevo concepto"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Monto */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Observación</label>
               <input
-                type="number"
-                name="monto"
-                value={form.monto}
+                type="text"
+                name="descripcion"
+                value={form.descripcion}
                 onChange={handleChange}
                 readOnly={isReadOnly}
                 disabled={isReadOnly}
-                className="input-field w-full text-lg disabled:bg-gray-50 disabled:text-gray-700"
-                step="0.01"
-                min="0.01"
-                placeholder="0.00"
-                required
+                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
+                placeholder="Observación general (opcional)"
               />
             </div>
           </div>
+        </div>
 
-          {/* Observación */}
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Observación *</label>
-            <textarea
-              name="descripcion"
-              value={form.descripcion}
-              onChange={handleChange}
-              readOnly={isReadOnly}
-              disabled={isReadOnly}
-              className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
-              rows={2}
-              placeholder="Detalle obligatorio del movimiento..."
-              required
-            />
+        {/* Items: lista de conceptos del movimiento */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-800">Conceptos</h2>
+              <p className="text-xs text-gray-500">
+                Podés ingresar varios conceptos en el mismo movimiento (ej: cuota social + carnet + actividad).
+              </p>
+            </div>
+            {!isReadOnly && (
+              <Button type="button" variant="secondary" onClick={agregarItem}>
+                <Plus className="w-4 h-4 mr-1" />
+                Agregar concepto
+              </Button>
+            )}
           </div>
 
-          {/* Preview */}
-          {!isReadOnly && form.cajaId && form.monto && (
-            <div className={`mt-4 p-4 rounded-lg ${form.tipo === 'INGRESO' ? 'bg-green-50' : 'bg-red-50'}`}>
-              <p className="text-sm text-gray-600 mb-1">
-                {form.tipo === 'INGRESO' ? 'Se sumará' : 'Se restará'} de <strong>{cajaSeleccionada?.nombre}</strong>:
+          {items.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+              <p className="text-sm">Sin conceptos agregados</p>
+              {!isReadOnly && (
+                <button type="button" onClick={agregarItem} className="text-primary text-sm mt-2 hover:underline">
+                  Agregar el primero
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Concepto *</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Centro de Costo *</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Detalle</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-600 w-[140px]">Monto *</th>
+                    {!isReadOnly && <th className="w-10"></th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {items.map((item, idx) => {
+                    const conceptosFiltrados = conceptos.filter(c => c.tipo === form.tipo || c.tipo === 'AMBOS')
+                    const conceptoSel = item.conceptoId ? conceptos.find(c => c.id === parseInt(item.conceptoId)) : null
+                    const conceptoSinCuenta = conceptoSel && !(conceptoSel.cuentaContableId || conceptoSel.cuentaContable?.id)
+                    return (
+                      <tr key={idx}>
+                        <td className="px-3 py-2 align-top">
+                          {isReadOnly ? (
+                            <div>
+                              <div className="text-sm">{item.conceptoNombre || '-'}</div>
+                              {item.cuentaContableLabel && (
+                                <div className="text-xs text-gray-500 mt-0.5">{item.cuentaContableLabel}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <select
+                                value={item.conceptoId}
+                                onChange={(e) => handleItemChange(idx, 'conceptoId', e.target.value)}
+                                className="input-field w-full text-sm"
+                                required
+                              >
+                                <option value="">Seleccionar...</option>
+                                {conceptosFiltrados.map(c => (
+                                  <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                                ))}
+                              </select>
+                              {item.cuentaContableLabel && (
+                                <div className="text-[11px] text-gray-500 mt-1 truncate" title={item.cuentaContableLabel}>
+                                  Cta: {item.cuentaContableLabel}
+                                </div>
+                              )}
+                              {conceptoSinCuenta && (
+                                <div className="text-[11px] text-red-600 mt-1">
+                                  ⚠ El concepto no tiene cuenta contable asignada
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          {isReadOnly ? (
+                            <span className="text-xs">{item.centroCostoLabel || '-'}</span>
+                          ) : (
+                            <CentroCostoSelector
+                              value={item.centroCostoId}
+                              onChange={(id) => handleItemChange(idx, 'centroCostoId', id)}
+                              required
+                              className="text-sm"
+                            />
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={item.descripcion}
+                            onChange={(e) => handleItemChange(idx, 'descripcion', e.target.value)}
+                            readOnly={isReadOnly}
+                            disabled={isReadOnly}
+                            className="input-field w-full text-sm disabled:bg-gray-50 disabled:text-gray-700"
+                            placeholder="Detalle"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            value={item.monto}
+                            onChange={(e) => handleItemChange(idx, 'monto', e.target.value)}
+                            readOnly={isReadOnly}
+                            disabled={isReadOnly}
+                            className="input-field w-full text-sm text-right disabled:bg-gray-50 disabled:text-gray-700"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="0.00"
+                            required
+                          />
+                        </td>
+                        {!isReadOnly && (
+                          <td className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={() => eliminarItem(idx)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 border-t-2 border-gray-300">
+                    <td colSpan={4} className="px-3 py-3 text-right text-sm text-gray-600">
+                      Total ({items.length} concepto{items.length !== 1 ? 's' : ''}):
+                    </td>
+                    <td className={`px-3 py-3 text-right font-bold text-lg ${form.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
+                      {form.tipo === 'INGRESO' ? '+' : '-'}${itemsTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </td>
+                    {!isReadOnly && <td></td>}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {/* Preview saldo caja */}
+          {!isReadOnly && form.cajaId && itemsTotal > 0 && cajaSeleccionada && form.tipo === 'EGRESO' && itemsTotal > cajaSeleccionada.saldoActual && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+              El total excede el saldo disponible de {cajaSeleccionada.nombre} (${cajaSeleccionada.saldoActual.toLocaleString()})
+            </div>
+          )}
+        </div>
+
+        {/* Medios de Pago */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-800">Medios de Pago</h2>
+              <p className="text-xs text-gray-500">
+                Podés combinar varios medios (ej: $5000 efectivo + $3000 transferencia).
               </p>
-              <p className={`text-2xl font-bold ${form.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
-                {form.tipo === 'INGRESO' ? '+' : '-'}${parseFloat(form.monto || 0).toLocaleString()}
-              </p>
-              {cajaSeleccionada && form.tipo === 'EGRESO' && parseFloat(form.monto) > cajaSeleccionada.saldoActual && (
-                <p className="text-sm text-red-600 mt-2">
-                  El monto excede el saldo disponible (${cajaSeleccionada.saldoActual.toLocaleString()})
-                </p>
+            </div>
+            {!isReadOnly && (
+              <Button type="button" variant="secondary" onClick={agregarMedioPago}>
+                <Plus className="w-4 h-4 mr-1" />
+                Agregar medio
+              </Button>
+            )}
+          </div>
+
+          {mediosPagoLista.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+              <p className="text-sm">Sin medios de pago agregados</p>
+              {!isReadOnly && (
+                <button type="button" onClick={agregarMedioPago} className="text-primary text-sm mt-2 hover:underline">
+                  Agregar el primero
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Medio *</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Nro. Operación</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Detalle</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-600 w-[160px]">Monto *</th>
+                    {!isReadOnly && <th className="w-10"></th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {mediosPagoLista.map((mp, idx) => (
+                    <tr key={idx}>
+                      <td className="px-3 py-2">
+                        {isReadOnly ? (
+                          <span>{mp.medioPagoLabel || '-'}</span>
+                        ) : (
+                          <select
+                            value={mp.medioPagoId}
+                            onChange={(e) => handleMedioPagoChange(idx, 'medioPagoId', e.target.value)}
+                            className="input-field w-full text-sm"
+                            required
+                          >
+                            <option value="">Seleccionar...</option>
+                            {mediosPago.map(m => (
+                              <option key={m.id} value={m.id}>{m.nombre}</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          value={mp.nroOperacion}
+                          onChange={(e) => handleMedioPagoChange(idx, 'nroOperacion', e.target.value)}
+                          readOnly={isReadOnly}
+                          disabled={isReadOnly}
+                          className="input-field w-full text-sm disabled:bg-gray-50 disabled:text-gray-700"
+                          placeholder="Opcional"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          value={mp.descripcion}
+                          onChange={(e) => handleMedioPagoChange(idx, 'descripcion', e.target.value)}
+                          readOnly={isReadOnly}
+                          disabled={isReadOnly}
+                          className="input-field w-full text-sm disabled:bg-gray-50 disabled:text-gray-700"
+                          placeholder="Detalle"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={mp.monto}
+                            onChange={(e) => handleMedioPagoChange(idx, 'monto', e.target.value)}
+                            readOnly={isReadOnly}
+                            disabled={isReadOnly}
+                            className="input-field flex-1 text-sm text-right disabled:bg-gray-50 disabled:text-gray-700"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="0.00"
+                            required
+                          />
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              onClick={() => autocompletarMonto(idx)}
+                              className="p-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded"
+                              title="Autocompletar con la diferencia"
+                            >
+                              =
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      {!isReadOnly && (
+                        <td className="px-2 py-2">
+                          <button
+                            type="button"
+                            onClick={() => eliminarMedioPago(idx)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 border-t-2 border-gray-300">
+                    <td colSpan={3} className="px-3 py-3 text-right text-sm text-gray-600">
+                      Total medios:
+                    </td>
+                    <td className={`px-3 py-3 text-right font-bold text-lg ${balanceaTotal ? 'text-green-600' : 'text-amber-600'}`}>
+                      ${mediosTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </td>
+                    {!isReadOnly && <td></td>}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {/* Indicador de balance */}
+          {!isReadOnly && items.length > 0 && (
+            <div className={`mt-4 p-3 rounded-lg border text-sm ${
+              balanceaTotal
+                ? 'bg-green-50 border-green-200 text-green-700'
+                : 'bg-amber-50 border-amber-200 text-amber-700'
+            }`}>
+              {balanceaTotal ? (
+                <>✓ Balanceado: conceptos ${itemsTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })} = medios ${mediosTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</>
+              ) : (
+                <>⚠ Diferencia ${(itemsTotal - mediosTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}: conceptos ${itemsTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })} vs medios ${mediosTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</>
               )}
             </div>
           )}
         </div>
 
-        {/* Acordeón: Datos Contables */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setDatosContablesOpen(o => !o)}
-            className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition"
-          >
-            <div className="flex items-center gap-2">
-              {datosContablesOpen
-                ? <ChevronDown className="w-4 h-4 text-gray-500" />
-                : <ChevronRight className="w-4 h-4 text-gray-500" />
-              }
-              <span className="text-sm font-medium text-gray-700">Datos contables</span>
-              {!datosContablesOpen && (form.cuentaContableId || form.centroCostoId) && (
-                <span className="text-xs text-gray-400 ml-2">
-                  {[
-                    cuentaSeleccionada ? `${cuentaSeleccionada.codigo} ${cuentaSeleccionada.nombre}` : null,
-                    form.centroCostoId ? `CC asignado` : null
-                  ].filter(Boolean).join(' · ')}
-                </span>
-              )}
-              {!datosContablesOpen && !form.cuentaContableId && !form.centroCostoId && (
-                <span className="text-xs text-amber-500 ml-2">Se completan automáticamente desde la caja o el concepto</span>
-              )}
-            </div>
-          </button>
-
-          {datosContablesOpen && (
-            <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Contable *</label>
-                <select
-                  name="cuentaContableId"
-                  value={form.cuentaContableId}
-                  onChange={handleChange}
-                  disabled={isReadOnly}
-                  className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
-                  required
-                >
-                  <option value="">Seleccionar cuenta...</option>
-                  {(() => {
-                    const conceptoActual = form.conceptoId ? conceptos.find(c => c.id === parseInt(form.conceptoId)) : null
-                    const cuentaConcepto = conceptoActual?.cuentaContable
-                    const lista = [...cuentasContables]
-                    if (cuentaConcepto && !lista.find(c => c.id === cuentaConcepto.id)) lista.push(cuentaConcepto)
-                    return lista.map(c => <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>)
-                  })()}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Centro de Costo *
-                </label>
-                <CentroCostoSelector
-                  value={form.centroCostoId}
-                  onChange={(id) => setForm(prev => ({ ...prev, centroCostoId: id }))}
-                  disabled={isReadOnly}
-                  required
-                />
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Adjuntos: solo disponibles cuando el movimiento ya fue guardado */}
+        {isReadOnly && movimiento?.id && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <AdjuntosComprobante tipo="movimientoCaja" comprobanteId={movimiento.id} />
+          </div>
+        )}
 
         {/* Botones */}
         <div className="flex justify-end gap-4">
@@ -653,7 +978,11 @@ export default function MovimientoCajaForm() {
             {isReadOnly ? 'Volver' : 'Cancelar'}
           </Button>
           {!isReadOnly && (
-            <Button type="submit" loading={saving}>
+            <Button
+              type="submit"
+              loading={saving}
+              disabled={items.length === 0 || mediosPagoLista.length === 0 || !balanceaTotal}
+            >
               <Save className="w-4 h-4 mr-2" />
               Registrar {form.tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}
             </Button>

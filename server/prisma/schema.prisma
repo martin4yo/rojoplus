@@ -148,6 +148,7 @@ model ConceptoTesoreria {
   tiposSocio           TipoSocio[]          @relation("TipoSocioConcepto")
   mediosPago           MedioPago[]
   cargos               Cargo[]
+  itemsMovimientoCaja  ItemMovimientoCaja[]
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
@@ -724,6 +725,7 @@ model MedioPago {
   conceptoTesoreria   ConceptoTesoreria? @relation(fields: [conceptoTesoreriaId], references: [id])
   cajaDefault         Caja?              @relation("MedioPagoCajaDefault", fields: [cajaDefaultId], references: [id])
   ventasQRPendientes  VentaEventoQRPendiente[]
+  movimientosCajaUso  MedioPagoMovimientoCaja[]
 
   tenantId    Int      @map("tenant_id")
   @@index([cuentaContableId])
@@ -1082,6 +1084,7 @@ model CuentaContable {
   movimientos        MovimientoCaja[]
   mediosPago         MedioPago[]
   productosBuffet    ProductoBuffet[]
+  itemsMovimientoCaja ItemMovimientoCaja[]
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])
@@ -1188,6 +1191,8 @@ model MovimientoCaja {
   registrador             Admin                @relation(fields: [registradoPor], references: [id])
   entradas                Entrada[]
   ventasQRPendientes      VentaEventoQRPendiente[]
+  items                   ItemMovimientoCaja[]
+  mediosPago              MedioPagoMovimientoCaja[]
 
   tenantId    Int      @map("tenant_id")
   @@index([cajaId])
@@ -1203,6 +1208,57 @@ model MovimientoCaja {
   @@index([tenantId])
   @@unique([tenantId, numero])
   @@map("movimientos_caja")
+}
+
+// Items de un MovimientoCaja: permite registrar varios conceptos en un solo
+// movimiento (ej: cuota social + carnet + actividad en un mismo cobro).
+// Si el movimiento tiene 1 solo item, los datos del padre y del item coinciden.
+model ItemMovimientoCaja {
+  id                  Int                @id @default(autoincrement())
+  movimientoCajaId    Int                @map("movimiento_caja_id")
+  conceptoTesoreriaId Int?               @map("concepto_tesoreria_id")
+  cuentaContableId    Int                @map("cuenta_contable_id")
+  centroCostoId       Int?               @map("centro_costo_id")
+  monto               Decimal            @db.Decimal(12, 2)
+  descripcion         String?
+  orden               Int                @default(0)
+  createdAt           DateTime           @default(now()) @map("created_at")
+
+  movimientoCaja      MovimientoCaja     @relation(fields: [movimientoCajaId], references: [id], onDelete: Cascade)
+  conceptoTesoreria   ConceptoTesoreria? @relation(fields: [conceptoTesoreriaId], references: [id])
+  cuentaContable      CuentaContable     @relation(fields: [cuentaContableId], references: [id])
+  centroCosto         CentroCosto?       @relation(fields: [centroCostoId], references: [id])
+
+  tenantId    Int      @map("tenant_id")
+  @@index([movimientoCajaId])
+  @@index([conceptoTesoreriaId])
+  @@index([cuentaContableId])
+  @@index([centroCostoId])
+  @@index([tenantId])
+  @@map("items_movimiento_caja")
+}
+
+// Medios de pago de un MovimientoCaja: permite que un mismo cobro/pago use
+// múltiples formas de pago (ej: parte efectivo + parte transferencia).
+// La suma de los montos debe coincidir con la suma de los items (conceptos).
+model MedioPagoMovimientoCaja {
+  id                Int            @id @default(autoincrement())
+  movimientoCajaId  Int            @map("movimiento_caja_id")
+  medioPagoId       Int            @map("medio_pago_id")
+  monto             Decimal        @db.Decimal(12, 2)
+  nroOperacion      String?        @map("nro_operacion")
+  descripcion       String?
+  orden             Int            @default(0)
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  movimientoCaja    MovimientoCaja @relation(fields: [movimientoCajaId], references: [id], onDelete: Cascade)
+  medioPago         MedioPago      @relation(fields: [medioPagoId], references: [id])
+
+  tenantId    Int      @map("tenant_id")
+  @@index([movimientoCajaId])
+  @@index([medioPagoId])
+  @@index([tenantId])
+  @@map("medios_pago_movimiento_caja")
 }
 
 model FormatoExtracto {
@@ -1425,8 +1481,56 @@ model Admin {
   campanasRecuperoCreadas CampanaRecupero[]    @relation("CampanasRecupero")
   campanasComunicacionCreadas CampanaComunicacion[] @relation("CampanasComunicacion")
   tenantUsuarios          TenantUsuario[]
+  favoritosAcceso         FavoritoAcceso[]
+  favoritosCarpetas       FavoritoCarpeta[]
 
   @@map("admins")
+}
+
+// Accesos rápidos personalizados por usuario y tenant.
+// Cada admin puede armar su propio panel de "Accesos Rápidos" con links
+// a páginas internas o URLs externas.
+model FavoritoAcceso {
+  id                   Int      @id @default(autoincrement())
+  adminId              Int      @map("admin_id")
+  carpetaId            Int?     @map("carpeta_id")
+  nombre               String
+  descripcion          String?
+  icono                String   @default("Star") // nombre del ícono Lucide React
+  iconoColor           String?  @map("icono_color") // hex color opcional, ej: #3b82f6
+  url                  String
+  abreEnNuevaPestana   Boolean  @default(false) @map("abre_en_nueva_pestana")
+  orden                Int      @default(0)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  admin                Admin            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  carpeta              FavoritoCarpeta? @relation(fields: [carpetaId], references: [id], onDelete: SetNull)
+
+  tenantId    Int      @map("tenant_id")
+  @@index([adminId, tenantId])
+  @@index([carpetaId])
+  @@index([tenantId])
+  @@map("favoritos_acceso")
+}
+
+// Carpetas para agrupar accesos rápidos por usuario.
+model FavoritoCarpeta {
+  id          Int      @id @default(autoincrement())
+  adminId     Int      @map("admin_id")
+  nombre      String
+  color       String   @default("blue") // preset: blue|green|purple|orange|slate
+  orden       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  admin       Admin            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  favoritos   FavoritoAcceso[]
+
+  tenantId    Int      @map("tenant_id")
+  @@index([adminId, tenantId])
+  @@index([tenantId])
+  @@map("favoritos_carpetas")
 }
 
 model Rol {
@@ -2559,6 +2663,7 @@ model CentroCosto {
   lineasPresupuesto    LineaPresupuesto[]
   conceptosTesoreria   ConceptoTesoreria[]  @relation("ConceptoTesoreriaCentroCosto")
   entidades            Entidad[]
+  itemsMovimientoCaja  ItemMovimientoCaja[]
 
   tenantId    Int      @map("tenant_id")
   @@index([tenantId])

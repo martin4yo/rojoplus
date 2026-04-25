@@ -46,7 +46,7 @@ router.get('/solicitudes', asyncHandler(async (req, res) => {
   const take = parseInt(limite)
 
   const [solicitudes, total] = await Promise.all([
-    req.prisma.solicitudSocio.findMany({
+    req.db.solicitudSocio.findMany({
       where,
       include: {
         respondidoPorAdmin: {
@@ -60,7 +60,7 @@ router.get('/solicitudes', asyncHandler(async (req, res) => {
       skip,
       take
     }),
-    req.prisma.solicitudSocio.count({ where })
+    req.db.solicitudSocio.count({ where })
   ])
 
   res.json({
@@ -82,7 +82,7 @@ router.get('/solicitudes', asyncHandler(async (req, res) => {
 router.get('/solicitudes/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const solicitud = await req.prisma.solicitudSocio.findUnique({
+  const solicitud = await req.db.solicitudSocio.findUnique({
     where: { id: parseInt(id) },
     include: {
       respondidoPorAdmin: {
@@ -112,7 +112,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   const { id } = req.params
   const { tipoSocioId, categoriaSocioId, observacionesInternas } = req.body
 
-  const solicitud = await req.prisma.solicitudSocio.findUnique({
+  const solicitud = await req.db.solicitudSocio.findUnique({
     where: { id: parseInt(id) },
     include: {
       familiares: true
@@ -255,7 +255,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     proximoNumero++
 
     // Actualizar el registro de FamiliarSolicitud con el socio creado
-    await req.prisma.familiarSolicitud.update({
+    await req.db.familiarSolicitud.update({
       where: { id: familiar.id },
       data: { socioCreado: socioFamiliar.id }
     })
@@ -275,7 +275,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   const anioActual = hoy.getFullYear()
 
   // Buscar el periodo actual
-  const periodoActual = await req.prisma.periodo.findFirst({
+  const periodoActual = await req.db.periodo.findFirst({
     where: {
       mes: mesActual,
       anio: anioActual
@@ -285,7 +285,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   const cuotasGeneradas = []
 
   if (periodoActual) {
-    const tipoSocio = await req.prisma.tipoSocio.findUnique({
+    const tipoSocio = await req.db.tipoSocio.findUnique({
       where: { id: parseInt(tipoSocioId) }
     })
 
@@ -357,7 +357,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   if (cuotasGeneradas.length > 0) {
     const montoTotal = cuotasGeneradas.reduce((sum, cargo) => sum + parseFloat(cargo.montoTotal), 0)
 
-    linkPago = await req.prisma.linkPago.create({
+    linkPago = await req.db.linkPago.create({
       data: {
         socio: { connect: { id: nuevoSocio.id } },
         concepto: 'Primera cuota - Alta de socio',
@@ -372,7 +372,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
   }
 
   // PASO 6: Actualizar la solicitud
-  const solicitudActualizada = await req.prisma.solicitudSocio.update({
+  const solicitudActualizada = await req.db.solicitudSocio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'APROBADA',
@@ -431,7 +431,7 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
     throw new AppError('Debe especificar el motivo del rechazo', 400)
   }
 
-  const solicitud = await req.prisma.solicitudSocio.findUnique({
+  const solicitud = await req.db.solicitudSocio.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -444,7 +444,7 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
   }
 
   // Actualizar la solicitud
-  const solicitudActualizada = await req.prisma.solicitudSocio.update({
+  const solicitudActualizada = await req.db.solicitudSocio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'RECHAZADA',
@@ -483,10 +483,10 @@ router.put('/solicitudes/:id/rechazar', authAdmin, asyncHandler(async (req, res)
  */
 router.get('/solicitudes-stats', asyncHandler(async (req, res) => {
   const [pendientes, aprobadas, rechazadas, totalMes] = await Promise.all([
-    req.prisma.solicitudSocio.count({ where: { estado: 'PENDIENTE' } }),
-    req.prisma.solicitudSocio.count({ where: { estado: 'APROBADA' } }),
-    req.prisma.solicitudSocio.count({ where: { estado: 'RECHAZADA' } }),
-    req.prisma.solicitudSocio.count({
+    req.db.solicitudSocio.count({ where: { estado: 'PENDIENTE' } }),
+    req.db.solicitudSocio.count({ where: { estado: 'APROBADA' } }),
+    req.db.solicitudSocio.count({ where: { estado: 'RECHAZADA' } }),
+    req.db.solicitudSocio.count({
       where: {
         fechaSolicitud: {
           gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)

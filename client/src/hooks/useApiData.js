@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../services/api'
 
 /**
@@ -80,6 +80,12 @@ export function useApiData(endpoint, options = {}) {
   const [loading, setLoading] = useState(!lazy)
   const [error, setError] = useState(null)
 
+  // Guardar callbacks en refs para no crear nueva referencia de fetch en cada
+  // render del componente padre (lo que causaba loop infinito cuando se pasaban
+  // arrow functions inline como onError o transform).
+  const callbacksRef = useRef({ onSuccess, onError, transform, initialData })
+  callbacksRef.current = { onSuccess, onError, transform, initialData }
+
   /**
    * Función para hacer el fetch
    * @param {Object} runtimeParams - Parámetros adicionales en tiempo de ejecución
@@ -106,18 +112,19 @@ export function useApiData(endpoint, options = {}) {
       const response = await api.getFull(finalEndpoint, { params: allParams })
 
       // Transformar datos si hay función de transformación
-      let result = transform ? transform(response) : (response?.data || response)
+      const { transform: transformCb, onSuccess: onSuccessCb, initialData: initialDataCb } = callbacksRef.current
+      let result = transformCb ? transformCb(response) : (response?.data || response)
 
       // Si result es undefined/null, usar initialData
       if (result === undefined || result === null) {
-        result = initialData
+        result = initialDataCb
       }
 
       setData(result)
 
       // Callback de éxito
-      if (onSuccess) {
-        onSuccess(result)
+      if (onSuccessCb) {
+        onSuccessCb(result)
       }
 
       return result
@@ -126,15 +133,16 @@ export function useApiData(endpoint, options = {}) {
       setError(errorMessage)
 
       // Callback de error
-      if (onError) {
-        onError(errorMessage)
+      const { onError: onErrorCb } = callbacksRef.current
+      if (onErrorCb) {
+        onErrorCb(errorMessage)
       }
 
       throw err
     } finally {
       setLoading(false)
     }
-  }, [endpoint, JSON.stringify(params), transform, onSuccess, onError])
+  }, [endpoint, JSON.stringify(params)])
 
   /**
    * Efecto para fetch automático

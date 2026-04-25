@@ -8,10 +8,11 @@ const router = Router()
 // UTILIDADES
 // ============================================================
 
-// Generar número de asiento único
-async function generarNumeroAsiento(prisma) {
+// Generar número de asiento único.
+// Recibe el cliente DB (tx tenant-scoped o req.db) como parámetro.
+async function generarNumeroAsiento(db) {
   const anio = new Date().getFullYear()
-  const ultimo = await prisma.asiento.findFirst({
+  const ultimo = await db.asiento.findFirst({
     where: { numero: { startsWith: `AST-${anio}` } },
     orderBy: { numero: 'desc' }
   })
@@ -421,7 +422,7 @@ router.post('/', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Crear asiento
-  const numero = await generarNumeroAsiento(req.prisma)
+  const numero = await generarNumeroAsiento(req.db)
 
   const asiento = await req.db.asiento.create({
     data: {
@@ -481,7 +482,7 @@ router.put('/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Actualizar asiento
-  const asientoActualizado = await req.prisma.$transaction(async (tx) => {
+  const asientoActualizado = await req.db.$transaction(async (tx) => {
     // Si hay líneas nuevas, eliminar las anteriores y crear las nuevas
     if (lineas) {
       await tx.asientoLinea.deleteMany({
@@ -587,8 +588,9 @@ router.delete('/:id', authAdmin, asyncHandler(async (req, res) => {
 // GENERADOR DE ASIENTOS AUTOMÁTICOS
 // ============================================================
 
-// Esta función puede ser llamada desde otros módulos para generar asientos
-export async function generarAsientoAutomatico(prisma, {
+// Esta función puede ser llamada desde otros módulos para generar asientos.
+// Recibe el cliente DB (tx tenant-scoped o req.db) como primer parámetro.
+export async function generarAsientoAutomatico(db, {
   fecha,
   concepto,
   tipoOrigen,
@@ -599,10 +601,10 @@ export async function generarAsientoAutomatico(prisma, {
   // Validar balance
   validarAsientoBalanceado(lineas)
 
-  const numero = await generarNumeroAsiento(prisma)
+  const numero = await generarNumeroAsiento(db)
 
   // Crear asiento sin líneas anidadas para que el tenant extension inyecte tenantId en ambas tablas
-  const asiento = await prisma.asiento.create({
+  const asiento = await db.asiento.create({
     data: {
       numero,
       fecha: fecha || new Date(),
@@ -614,7 +616,7 @@ export async function generarAsientoAutomatico(prisma, {
     }
   })
 
-  await prisma.asientoLinea.createMany({
+  await db.asientoLinea.createMany({
     data: lineas.map((l, idx) => ({
       asientoId: asiento.id,
       cuentaContableId: l.cuentaContableId,

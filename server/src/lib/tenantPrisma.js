@@ -28,6 +28,17 @@ function expandCompoundSelectors(where) {
 }
 
 /**
+ * Si el caller usa `select`, garantiza que tenantId esté incluido para poder
+ * validar la pertenencia tras el query. Si no usa select, todos los campos
+ * vienen por default y tenantId está disponible.
+ */
+function ensureTenantIdSelected(args) {
+  if (!args || !args.select) return args
+  if (args.select.tenantId) return args
+  return { ...args, select: { ...args.select, tenantId: true } }
+}
+
+/**
  * Modelos del sistema multi-tenant que NO deben ser filtrados por tenantId.
  * Son modelos globales compartidos entre todos los tenants.
  */
@@ -69,26 +80,23 @@ export function createTenantPrisma(tenantId) {
 
         async findUnique({ model, args, query }) {
           if (!GLOBAL_MODELS.has(model)) {
-            // findUnique no admite filtros extra en where (requiere constraint único),
-            // por eso se redirige a findFirst que sí acepta tenantId arbitrario.
-            // Los selectores compuestos (e.g. tenantId_clave) se expanden a campos individuales.
-            const modelName = model.charAt(0).toLowerCase() + model.slice(1);
-            return prisma[modelName].findFirst({
-              ...args,
-              where: { ...expandCompoundSelectors(args.where), tenantId },
-            });
+            // Ejecutar el findUnique original (respeta el contexto tx/extended)
+            // y luego filtrar por tenantId post-query.
+            // Si el caller usa select, garantizamos que tenantId esté incluido.
+            const argsConTenantId = ensureTenantIdSelected(args);
+            const result = await query(argsConTenantId);
+            if (!result) return null;
+            if (result.tenantId !== undefined && result.tenantId !== tenantId) return null;
+            return result;
           }
           return query(args);
         },
 
         async findUniqueOrThrow({ model, args, query }) {
           if (!GLOBAL_MODELS.has(model)) {
-            const modelName = model.charAt(0).toLowerCase() + model.slice(1);
-            const result = await prisma[modelName].findFirst({
-              ...args,
-              where: { ...expandCompoundSelectors(args.where), tenantId },
-            });
-            if (!result) {
+            const argsConTenantId = ensureTenantIdSelected(args);
+            const result = await query(argsConTenantId);
+            if (!result || (result.tenantId !== undefined && result.tenantId !== tenantId)) {
               const err = new Error(`No ${model} record found`);
               err.code = 'P2025';
               throw err;

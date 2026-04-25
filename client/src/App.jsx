@@ -3,6 +3,8 @@ import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import ScrollToTop from './components/ScrollToTop'
 import ErrorBoundary from './components/ErrorBoundary'
+import ConnectionError from './components/ConnectionError'
+import { errorStore, useConnectionError } from './stores/errorStore'
 import TenantStyles from './components/TenantStyles'
 import SWUpdateNotifier from './components/SWUpdateNotifier'
 import { TenantProvider } from './contexts/TenantContext'
@@ -104,6 +106,7 @@ const AdminCargosAdicionales = lazy(() => import('./pages/admin/CargosAdicionale
 const PlaceholderPage = lazy(() => import('./pages/admin/PlaceholderPage'))
 const Branding = lazy(() => import('./pages/admin/Branding'))
 const MiPerfil = lazy(() => import('./pages/admin/MiPerfil'))
+const AccesosRapidos = lazy(() => import('./pages/admin/AccesosRapidos'))
 const IAMetricas = lazy(() => import('./pages/admin/IAMetricas'))
 
 // Usuarios y Roles
@@ -270,11 +273,26 @@ function PageLoader() {
   )
 }
 
+function ConnectionErrorOverlay() {
+  const { hasConnectionError, detail } = useConnectionError()
+  if (!hasConnectionError) return null
+  return (
+    <ConnectionError
+      error={detail}
+      onRetry={() => {
+        errorStore.setConnectionError(false)
+        window.location.reload()
+      }}
+    />
+  )
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <TenantProvider>
         <TenantStyles />
+        <ConnectionErrorOverlay />
         <TicketProvider>
           <NotificacionBuffetProvider>
             <ScrollToTop />
@@ -333,6 +351,7 @@ function App() {
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminDashboard />} />
                   <Route path="mi-perfil" element={<MiPerfil />} />
+                  <Route path="accesos-rapidos" element={<AccesosRapidos />} />
                   <Route path="dashboard-ejecutivo" element={<AdminDashboardEjecutivo />} />
                   <Route path="comercios" element={<AdminComercios />} />
                   <Route path="comercios/:id" element={<AdminComercioDetalle />} />

@@ -279,10 +279,22 @@ export default function MovimientosCajaLista() {
             Exportar Excel
           </button>
           {tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
-            <Button onClick={() => navigate('/admin/tesoreria/movimientos/nuevo')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Movimiento
-            </Button>
+            <>
+              <button
+                onClick={() => navigate('/admin/tesoreria/movimientos/nuevo?tipo=INGRESO')}
+                className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Nuevo Ingreso
+              </button>
+              <button
+                onClick={() => navigate('/admin/tesoreria/movimientos/nuevo?tipo=EGRESO')}
+                className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition"
+              >
+                <TrendingDown className="w-4 h-4" />
+                Nuevo Egreso
+              </button>
+            </>
           )}
         </div>
       </div>

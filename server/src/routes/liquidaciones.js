@@ -25,7 +25,7 @@ router.get('/conceptos-liquidacion', authenticateAdmin, async (req, res) => {
       where.tipo = tipo
     }
 
-    const conceptos = await prisma.conceptoLiquidacion.findMany({
+    const conceptos = await req.db.conceptoLiquidacion.findMany({
       where,
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }]
     })
@@ -41,7 +41,7 @@ router.get('/conceptos-liquidacion', authenticateAdmin, async (req, res) => {
 router.get('/conceptos-liquidacion/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
-    const concepto = await prisma.conceptoLiquidacion.findUnique({
+    const concepto = await req.db.conceptoLiquidacion.findUnique({
       where: { id: parseInt(id) }
     })
 
@@ -69,7 +69,7 @@ router.post('/conceptos-liquidacion', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Tipo debe ser HABER o DEDUCCION' })
     }
 
-    const concepto = await prisma.conceptoLiquidacion.create({
+    const concepto = await req.db.conceptoLiquidacion.create({
       data: {
         codigo: codigo.toUpperCase(),
         nombre,
@@ -98,7 +98,7 @@ router.put('/conceptos-liquidacion/:id', authenticateAdmin, async (req, res) => 
     const { id } = req.params
     const { codigo, nombre, tipo, descripcion, esFijo, porcentaje, montoFijo, orden, activo } = req.body
 
-    const concepto = await prisma.conceptoLiquidacion.update({
+    const concepto = await req.db.conceptoLiquidacion.update({
       where: { id: parseInt(id) },
       data: {
         codigo: codigo?.toUpperCase(),
@@ -147,7 +147,7 @@ router.get('/liquidaciones', authenticateAdmin, async (req, res) => {
     }
 
     const [liquidaciones, total] = await Promise.all([
-      prisma.liquidacionSueldo.findMany({
+      req.db.liquidacionSueldo.findMany({
         where,
         include: {
           _count: {
@@ -158,7 +158,7 @@ router.get('/liquidaciones', authenticateAdmin, async (req, res) => {
         take: parseInt(limit),
         skip: parseInt(offset)
       }),
-      prisma.liquidacionSueldo.count({ where })
+      req.db.liquidacionSueldo.count({ where })
     ])
 
     res.json({
@@ -178,7 +178,7 @@ router.get('/liquidaciones/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
-    const liquidacion = await prisma.liquidacionSueldo.findUnique({
+    const liquidacion = await req.db.liquidacionSueldo.findUnique({
       where: { id: parseInt(id) },
       include: {
         items: {
@@ -215,7 +215,7 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
     }
 
     // Verificar que no exista liquidacion para ese periodo
-    const existente = await prisma.liquidacionSueldo.findUnique({
+    const existente = await req.db.liquidacionSueldo.findUnique({
       where: { mes_anio: { mes: parseInt(mes), anio: parseInt(anio) } }
     })
 
@@ -224,7 +224,7 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
     }
 
     // Obtener personal activo con sueldo
-    const personal = await prisma.entidad.findMany({
+    const personal = await req.db.entidad.findMany({
       where: {
         tipo: 'PERSONAL',
         activo: true,
@@ -241,7 +241,7 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
     }
 
     // Obtener conceptos fijos activos
-    const conceptosFijos = await prisma.conceptoLiquidacion.findMany({
+    const conceptosFijos = await req.db.conceptoLiquidacion.findMany({
       where: {
         activo: true,
         esFijo: true
@@ -317,7 +317,7 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
       }
     })
 
-    const liquidacion = await prisma.liquidacionSueldo.create({
+    const liquidacion = await req.db.liquidacionSueldo.create({
       data: {
         numero,
         periodo,
@@ -358,7 +358,7 @@ router.put('/liquidaciones/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params
     const { observaciones, items } = req.body
 
-    const liquidacion = await prisma.liquidacionSueldo.findUnique({
+    const liquidacion = await req.db.liquidacionSueldo.findUnique({
       where: { id: parseInt(id) }
     })
 
@@ -393,7 +393,7 @@ router.put('/liquidaciones/:id', authenticateAdmin, async (req, res) => {
 
         const netoAPagar = haberes - deducciones
 
-        await prisma.itemLiquidacion.update({
+        await req.db.itemLiquidacion.update({
           where: { id: item.id },
           data: {
             totalHaberes: haberes,
@@ -410,7 +410,7 @@ router.put('/liquidaciones/:id', authenticateAdmin, async (req, res) => {
       }
 
       // Actualizar totales de la liquidacion
-      await prisma.liquidacionSueldo.update({
+      await req.db.liquidacionSueldo.update({
         where: { id: parseInt(id) },
         data: {
           totalBruto,
@@ -420,14 +420,14 @@ router.put('/liquidaciones/:id', authenticateAdmin, async (req, res) => {
         }
       })
     } else if (observaciones !== undefined) {
-      await prisma.liquidacionSueldo.update({
+      await req.db.liquidacionSueldo.update({
         where: { id: parseInt(id) },
         data: { observaciones }
       })
     }
 
     // Retornar liquidacion actualizada
-    const updated = await prisma.liquidacionSueldo.findUnique({
+    const updated = await req.db.liquidacionSueldo.findUnique({
       where: { id: parseInt(id) },
       include: {
         items: {
@@ -460,7 +460,7 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'itemId, cajaId y medioPago son requeridos' })
     }
 
-    const item = await prisma.itemLiquidacion.findUnique({
+    const item = await req.db.itemLiquidacion.findUnique({
       where: { id: parseInt(itemId) },
       include: {
         entidad: true,
@@ -482,17 +482,17 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
 
     // Crear Orden de Pago
     const year = new Date().getFullYear()
-    const count = await prisma.movimientoContable.count({
+    const count = await req.db.movimientoContable.count({
       where: { tipo: 'ORDEN_PAGO' }
     })
     const numero = `OP-${year}-${(count + 1).toString().padStart(5, '0')}`
 
-    const cajaPago = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+    const cajaPago = await req.db.caja.findUnique({ where: { id: parseInt(cajaId) } })
 
     // Imputar al CC de la entidad (empleado); si no tiene, caer al CC de la caja
     const ccPago = item.entidad.centroCostoId ?? cajaPago?.centroCostoId ?? null
 
-    const ordenPago = await prisma.$transaction(async (tx) => {
+    const ordenPago = await req.db.$transaction(async (tx) => {
       // Crear la orden de pago
       const op = await tx.movimientoContable.create({
         data: {
@@ -581,7 +581,7 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
     }
 
     // Verificar si todos los items estan pagados
-    const itemsPendientes = await prisma.itemLiquidacion.count({
+    const itemsPendientes = await req.db.itemLiquidacion.count({
       where: {
         liquidacionId: parseInt(id),
         estado: 'PENDIENTE'
@@ -590,7 +590,7 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
 
     // Actualizar estado de liquidacion
     const nuevoEstado = itemsPendientes === 0 ? 'PAGADO' : 'PARCIAL'
-    await prisma.liquidacionSueldo.update({
+    await req.db.liquidacionSueldo.update({
       where: { id: parseInt(id) },
       data: {
         estado: nuevoEstado,
@@ -618,7 +618,7 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
       return res.status(400).json({ error: 'cajaId y medioPago son requeridos' })
     }
 
-    const liquidacion = await prisma.liquidacionSueldo.findUnique({
+    const liquidacion = await req.db.liquidacionSueldo.findUnique({
       where: { id: parseInt(id) },
       include: {
         items: {
@@ -644,11 +644,11 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
       return res.status(400).json({ error: 'No hay cuentas contables configuradas' })
     }
 
-    const cajaBatch = await prisma.caja.findUnique({ where: { id: parseInt(cajaId) } })
+    const cajaBatch = await req.db.caja.findUnique({ where: { id: parseInt(cajaId) } })
 
     const year = new Date().getFullYear()
 
-    await prisma.$transaction(async (tx) => {
+    await req.db.$transaction(async (tx) => {
       let montoTotalPagado = 0
 
       for (const item of liquidacion.items) {
@@ -743,7 +743,7 @@ router.delete('/liquidaciones/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
-    const liquidacion = await prisma.liquidacionSueldo.findUnique({
+    const liquidacion = await req.db.liquidacionSueldo.findUnique({
       where: { id: parseInt(id) },
       include: {
         items: {
@@ -762,7 +762,7 @@ router.delete('/liquidaciones/:id', authenticateAdmin, async (req, res) => {
       })
     }
 
-    await prisma.liquidacionSueldo.update({
+    await req.db.liquidacionSueldo.update({
       where: { id: parseInt(id) },
       data: { estado: 'ANULADO' }
     })

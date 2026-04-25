@@ -55,6 +55,11 @@ const SearchInput = forwardRef(function SearchInput({
   const inputRef = useRef(null)
   const timerRef = useRef(null)
 
+  // Guardar onChange en ref para no disparar el debounce cuando el padre
+  // pasa una arrow inline que cambia de referencia en cada render.
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
   // Exponer método focus al componente padre
   useImperativeHandle(ref, () => ({
     focus: () => {
@@ -85,13 +90,13 @@ const SearchInput = forwardRef(function SearchInput({
 
     // Si está vacío o no alcanza el mínimo, ejecutar inmediatamente
     if (localValue.length === 0 || localValue.length < minChars) {
-      onChange(localValue)
+      onChangeRef.current(localValue)
       return
     }
 
     // Crear nuevo timer
     timerRef.current = setTimeout(() => {
-      onChange(localValue)
+      onChangeRef.current(localValue)
     }, debounceMs)
 
     // Cleanup
@@ -100,7 +105,7 @@ const SearchInput = forwardRef(function SearchInput({
         clearTimeout(timerRef.current)
       }
     }
-  }, [localValue, debounceMs, minChars, onChange])
+  }, [localValue, debounceMs, minChars])
 
   const handleChange = (e) => {
     const newValue = e.target.value

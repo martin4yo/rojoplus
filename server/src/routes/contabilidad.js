@@ -1415,11 +1415,29 @@ router.get('/proximo-numero/:tipo', asyncHandler(async (req, res) => {
     })
     ultimoNumero = ultimo?.numero
   } else if (tipo === 'ENT') {
+    // Subtipo opcional para diferenciar prefijos: PROVEEDOR/CLIENTE/PERSONAL
+    const subtipo = (req.query.subtipo || '').toUpperCase()
+    const prefijosPorSubtipo = { PROVEEDOR: 'PROV', CLIENTE: 'CLI', PERSONAL: 'PERS' }
+    const prefijoUsar = prefijosPorSubtipo[subtipo] || prefijo
     const ultimo = await req.db.entidad.findFirst({
-      where: { codigo: { startsWith: `${prefijo}-` } },
+      where: {
+        codigo: { startsWith: `${prefijoUsar}-` },
+        ...(subtipo && ['PROVEEDOR', 'CLIENTE', 'PERSONAL'].includes(subtipo) ? { tipo: subtipo } : {})
+      },
       orderBy: { codigo: 'desc' }
     })
     ultimoNumero = ultimo?.codigo
+
+    let siguiente = 1
+    if (ultimoNumero) {
+      const partes = ultimoNumero.split('-')
+      const ultimoSeq = parseInt(partes[partes.length - 1]) || 0
+      siguiente = ultimoSeq + 1
+    }
+    return res.json({
+      success: true,
+      data: { numero: `${prefijoUsar}-${anio}-${String(siguiente).padStart(5, '0')}` }
+    })
   }
 
   let siguiente = 1

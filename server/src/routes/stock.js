@@ -527,7 +527,7 @@ router.put('/producto-fotos/:id/principal', asyncHandler(async (req, res) => {
   }
 
   // Quitar principal de otras fotos del producto
-  await prisma.$transaction([
+  await req.db.$transaction([
     prisma.productoFoto.updateMany({
       where: { productoId: foto.productoId },
       data: { esPrincipal: false }
@@ -678,7 +678,7 @@ router.post('/movimientos-stock/ajuste', asyncHandler(async (req, res) => {
   }
 
   // Crear movimiento y actualizar stock
-  const resultado = await prisma.$transaction(async (tx) => {
+  const resultado = await req.db.$transaction(async (tx) => {
     const movimiento = await tx.movimientoStock.create({
       data: {
         productoVarianteId: parseInt(varianteId),

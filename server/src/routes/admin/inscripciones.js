@@ -123,6 +123,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   const {
     socioId,
     categoriaActividadId,
+    centroCostoId,
     exentoCuota = false,
     porcentajeCuota = 100,
     fechaInicio
@@ -131,6 +132,10 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   // Validaciones básicas
   if (!socioId || !categoriaActividadId) {
     throw new AppError('socioId y categoriaActividadId son requeridos', 400)
+  }
+
+  if (!centroCostoId) {
+    throw new AppError('El Centro de Costo es obligatorio', 400, 'CC_REQUIRED')
   }
 
   // Verificar que el socio existe y está activo
@@ -148,7 +153,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Verificar que la categoría existe y está activa
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(categoriaActividadId) },
     include: {
       actividad: true
@@ -215,6 +220,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     data: {
       socioId: parseInt(socioId),
       categoriaActividadId: parseInt(categoriaActividadId),
+      centroCostoId: parseInt(centroCostoId),
       fechaInicio: fechaInicio ? new Date(fechaInicio) : new Date(),
       estado: 'ACTIVA',
       exentoCuota: exentoCuota === true || exentoCuota === 'true',
@@ -250,7 +256,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
  */
 router.put('/inscripciones/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { exentoCuota, porcentajeCuota, observaciones } = req.body
+  const { exentoCuota, porcentajeCuota, observaciones, centroCostoId } = req.body
 
   const inscripcion = await req.db.inscripcion.findUnique({
     where: { id: parseInt(id) }
@@ -265,7 +271,8 @@ router.put('/inscripciones/:id', authAdmin, asyncHandler(async (req, res) => {
     data: {
       exentoCuota: exentoCuota !== undefined ? (exentoCuota === true || exentoCuota === 'true') : undefined,
       porcentajeCuota: porcentajeCuota !== undefined ? parseFloat(porcentajeCuota) : undefined,
-      observaciones: observaciones !== undefined ? observaciones : undefined
+      observaciones: observaciones !== undefined ? observaciones : undefined,
+      centroCostoId: centroCostoId !== undefined ? parseInt(centroCostoId) : undefined,
     },
     include: {
       socio: {
@@ -339,7 +346,7 @@ router.get('/categorias-actividad/:id/plantel', authAdmin, asyncHandler(async (r
   const { id } = req.params
   const { incluirInactivos = false } = req.query
 
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(id) },
     include: {
       actividad: true
@@ -433,7 +440,7 @@ router.get('/categorias-actividad/:id/plantel', authAdmin, asyncHandler(async (r
 router.get('/categorias-actividad/:id/plantel/excel', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(id) },
     include: {
       actividad: true

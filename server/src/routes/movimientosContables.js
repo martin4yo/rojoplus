@@ -18,12 +18,13 @@ router.use(authAdmin)
 // HELPERS
 // =============================================================================
 
-// Generar numero de movimiento contable
-async function generarNumeroMC() {
+// Generar numero de movimiento contable.
+// Recibe el cliente DB (tx tenant-scoped o req.db) como parámetro.
+async function generarNumeroMC(db) {
   const anio = new Date().getFullYear()
   const prefijo = `MC-${anio}-`
 
-  const ultimo = await prisma.movimientoContable.findFirst({
+  const ultimo = await db.movimientoContable.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -151,7 +152,7 @@ router.get('/movimientos-contables', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [movimientos, total] = await Promise.all([
-    prisma.movimientoContable.findMany({
+    req.db.movimientoContable.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -164,7 +165,7 @@ router.get('/movimientos-contables', asyncHandler(async (req, res) => {
         _count: { select: { items: true } }
       }
     }),
-    prisma.movimientoContable.count({ where })
+    req.db.movimientoContable.count({ where })
   ])
 
   const movimientosFormateados = movimientos.map(m => ({
@@ -194,7 +195,7 @@ router.get('/movimientos-contables', asyncHandler(async (req, res) => {
 router.get('/movimientos-contables/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const movimiento = await prisma.movimientoContable.findUnique({
+  const movimiento = await req.db.movimientoContable.findUnique({
     where: { id: parseInt(id) },
     include: {
       entidad: true,
@@ -251,7 +252,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
     tipoComprobante, puntoVenta, numeroComprobante,
     subtotal, iva21, iva105, otrosImpuestos, montoTotal,
     cajaId, medioPago, nroOperacion,
-    movimientoPadreId, conceptoId, observaciones,
+    movimientoPadreId, conceptoId, centroCostoId, observaciones,
     ordenCompraId, // Vinculo opcional con Orden de Compra
     pedidoId, // Vinculo opcional con Pedido (ventas)
     items
@@ -260,6 +261,16 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
   // Validaciones basicas
   if (!tipo || !montoTotal) {
     throw new AppError('Tipo y monto total son requeridos', 400)
+  }
+
+  // Centro de costo obligatorio para facturas y notas (ORDEN_PAGO/RECIBO_COBRO heredan de las facturas asociadas)
+  const tiposQueRequierenCC = [
+    'FACTURA_COMPRA', 'FACTURA_VENTA',
+    'NOTA_CREDITO_PROVEEDOR', 'NOTA_CREDITO_CLIENTE',
+    'NOTA_DEBITO_PROVEEDOR', 'NOTA_DEBITO_CLIENTE',
+  ]
+  if (tiposQueRequierenCC.includes(tipo) && !centroCostoId) {
+    throw new AppError('El Centro de Costo es obligatorio para este tipo de movimiento', 400, 'CC_REQUIRED')
   }
 
   const tiposValidos = [
@@ -286,7 +297,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
 
   // Validar entidad si se proporciona
   if (entidadId) {
-    const entidad = await prisma.entidad.findUnique({ where: { id: parseInt(entidadId) } })
+    const entidad = await req.db.entidad.findUnique({ where: { id: parseInt(entidadId) } })
     if (!entidad) {
       throw new AppError('Entidad no encontrada', 404)
     }
@@ -328,10 +339,11 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
   const saldoPendienteInicial = tiposConSaldo.includes(tipo) ? montoTotalNum : 0
 
   // Crear movimiento con items en transaccion
-  const resultado = await prisma.$transaction(async (tx) => {
-    const numero = await generarNumeroMC()
+  const resultado = await req.db.$transaction(async (tx) => {
+    const numero = await generarNumeroMC(tx)
 
-    const movimiento = await tx.movimientoContable.create({
+    // Crear movimiento sin items (nested create no recibe tenantId del extension)
+    const movimientoBase = await tx.movimientoContable.create({
       data: {
         numero,
         tipo,
@@ -356,21 +368,33 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
         nroOperacion,
         movimientoPadreId: movimientoPadreId ? parseInt(movimientoPadreId) : null,
         conceptoId: conceptoId ? parseInt(conceptoId) : null,
+        centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
         observaciones,
         estado: estadoInicial,
         registradoPor: req.admin.id,
-        items: items?.length ? {
-          create: items.map(item => ({
-            productoVarianteId: item.productoVarianteId ? parseInt(item.productoVarianteId) : null,
-            itemOrdenCompraId: item.itemOrdenCompraId ? parseInt(item.itemOrdenCompraId) : null,
-            itemPedidoId: item.itemPedidoId ? parseInt(item.itemPedidoId) : null,
-            descripcion: item.descripcion,
-            cantidad: parseFloat(item.cantidad),
-            precioUnitario: parseFloat(item.precioUnitario),
-            subtotal: parseFloat(item.cantidad) * parseFloat(item.precioUnitario)
-          }))
-        } : undefined
-      },
+      }
+    })
+
+    // Items aparte para que el extension inyecte tenantId
+    if (items?.length) {
+      await tx.itemMovimiento.createMany({
+        data: items.map(item => ({
+          movimientoContableId: movimientoBase.id,
+          productoVarianteId: item.productoVarianteId ? parseInt(item.productoVarianteId) : null,
+          itemOrdenCompraId: item.itemOrdenCompraId ? parseInt(item.itemOrdenCompraId) : null,
+          itemPedidoId: item.itemPedidoId ? parseInt(item.itemPedidoId) : null,
+          descripcion: item.descripcion,
+          cantidad: parseFloat(item.cantidad),
+          precioUnitario: parseFloat(item.precioUnitario),
+          subtotal: parseFloat(item.cantidad) * parseFloat(item.precioUnitario)
+        }))
+      })
+    }
+
+    // Re-leer con includes (findFirst en lugar de findUnique porque la
+    // extension de tenant redirige findUnique al prisma global y pierde el tx)
+    const movimiento = await tx.movimientoContable.findFirst({
+      where: { id: movimientoBase.id },
       include: {
         entidad: { select: { id: true, codigo: true, razonSocial: true } },
         socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
@@ -597,7 +621,7 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
 router.post('/movimientos-contables/:id/anular', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const movimiento = await prisma.movimientoContable.findUnique({
+  const movimiento = await req.db.movimientoContable.findUnique({
     where: { id: parseInt(id) },
     include: {
       items: true,
@@ -619,7 +643,7 @@ router.post('/movimientos-contables/:id/anular', asyncHandler(async (req, res) =
     throw new AppError('No se puede anular un movimiento con pagos/cobros asociados', 400)
   }
 
-  await prisma.$transaction(async (tx) => {
+  await req.db.$transaction(async (tx) => {
     // Revertir stock si tenia items con productos
     if (movimiento.items.length > 0) {
       for (const item of movimiento.items) {
@@ -739,7 +763,7 @@ router.get('/movimientos-contables/pendientes', asyncHandler(async (req, res) =>
     where.tipo = { in: ['FACTURA_COMPRA', 'FACTURA_VENTA', 'NOTA_DEBITO_PROVEEDOR', 'NOTA_DEBITO_CLIENTE'] }
   }
 
-  const movimientos = await prisma.movimientoContable.findMany({
+  const movimientos = await req.db.movimientoContable.findMany({
     where,
     orderBy: [{ fechaVencimiento: 'asc' }, { fecha: 'asc' }],
     include: {
@@ -779,7 +803,7 @@ router.get('/facturas-compra', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [movimientos, total] = await Promise.all([
-    prisma.movimientoContable.findMany({
+    req.db.movimientoContable.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -790,7 +814,7 @@ router.get('/facturas-compra', asyncHandler(async (req, res) => {
         _count: { select: { items: true, movimientosHijos: true } }
       }
     }),
-    prisma.movimientoContable.count({ where })
+    req.db.movimientoContable.count({ where })
   ])
 
   res.json({
@@ -830,7 +854,7 @@ router.get('/facturas-venta', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [movimientos, total] = await Promise.all([
-    prisma.movimientoContable.findMany({
+    req.db.movimientoContable.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -842,7 +866,7 @@ router.get('/facturas-venta', asyncHandler(async (req, res) => {
         _count: { select: { items: true, movimientosHijos: true } }
       }
     }),
-    prisma.movimientoContable.count({ where })
+    req.db.movimientoContable.count({ where })
   ])
 
   res.json({
@@ -878,7 +902,7 @@ router.get('/ordenes-pago', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [movimientos, total] = await Promise.all([
-    prisma.movimientoContable.findMany({
+    req.db.movimientoContable.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -889,7 +913,7 @@ router.get('/ordenes-pago', asyncHandler(async (req, res) => {
         movimientoPadre: { select: { id: true, numero: true } }
       }
     }),
-    prisma.movimientoContable.count({ where })
+    req.db.movimientoContable.count({ where })
   ])
 
   res.json({
@@ -961,7 +985,7 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
 
   // Verificar facturas
   for (const fc of facturasCanceladas) {
-    const factura = await prisma.movimientoContable.findUnique({
+    const factura = await req.db.movimientoContable.findUnique({
       where: { id: parseInt(fc.movimientoContableId) }
     })
     if (!factura) {
@@ -976,7 +1000,7 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
   }
 
   // Crear orden de pago en transacción
-  const resultado = await prisma.$transaction(async (tx) => {
+  const resultado = await req.db.$transaction(async (tx) => {
     // Generar número
     const anio = new Date().getFullYear()
     const prefijo = `OP-${anio}-`
@@ -1021,13 +1045,13 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
 
       const nuevoMontoPagado = Number(factura.montoPagado) + fc.montoPagado
       const nuevoSaldoPendiente = Number(factura.montoTotal) - nuevoMontoPagado
-      const nuevoEstado = nuevoSaldoPendiente <= 0 ? 'CONFIRMADO' : 'PENDIENTE'
+      const nuevoEstado = nuevoSaldoPendiente <= 0 ? 'PAGADO' : 'PENDIENTE'
 
       await tx.movimientoContable.update({
         where: { id: parseInt(fc.movimientoContableId) },
         data: {
           montoPagado: nuevoMontoPagado,
-          saldoPendiente: nuevoSaldoPendiente,
+          saldoPendiente: Math.max(0, nuevoSaldoPendiente),
           estado: nuevoEstado
         }
       })
@@ -1105,7 +1129,7 @@ router.get('/recibos-cobro', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [movimientos, total] = await Promise.all([
-    prisma.movimientoContable.findMany({
+    req.db.movimientoContable.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -1117,7 +1141,7 @@ router.get('/recibos-cobro', asyncHandler(async (req, res) => {
         movimientoPadre: { select: { id: true, numero: true } }
       }
     }),
-    prisma.movimientoContable.count({ where })
+    req.db.movimientoContable.count({ where })
   ])
 
   res.json({
@@ -1167,7 +1191,7 @@ router.post('/recibos-cobro', asyncHandler(async (req, res) => {
 
   // Verificar facturas
   for (const fc of facturasCobradas) {
-    const factura = await prisma.movimientoContable.findUnique({
+    const factura = await req.db.movimientoContable.findUnique({
       where: { id: parseInt(fc.movimientoContableId) }
     })
     if (!factura) {
@@ -1182,7 +1206,7 @@ router.post('/recibos-cobro', asyncHandler(async (req, res) => {
   }
 
   // Crear recibo de cobro en transacción
-  const resultado = await prisma.$transaction(async (tx) => {
+  const resultado = await req.db.$transaction(async (tx) => {
     // Generar número
     const anio = new Date().getFullYear()
     const prefijo = `RC-${anio}-`

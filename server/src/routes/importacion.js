@@ -449,7 +449,7 @@ function normalizarDatos(registro, mapaCategoriasMenu) {
  * Crear producto nuevo
  */
 async function crearProducto(datos) {
-  return await prisma.$transaction(async (tx) => {
+  return await req.db.$transaction(async (tx) => {
     // 1. Crear producto en tabla general
     const producto = await tx.producto.create({
       data: {
@@ -486,7 +486,7 @@ async function crearProducto(datos) {
  * Actualizar producto existente
  */
 async function actualizarProducto(productoExistente, datos) {
-  return await prisma.$transaction(async (tx) => {
+  return await req.db.$transaction(async (tx) => {
     // 1. Actualizar producto general
     await tx.producto.update({
       where: { id: productoExistente.id },

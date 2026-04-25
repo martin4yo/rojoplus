@@ -13,15 +13,15 @@ router.get('/comercios', authAdmin, asyncHandler(async (req, res) => {
   const where = estado ? { estado } : {}
 
   const [comercios, total, totalVentasGlobal] = await Promise.all([
-    req.prisma.comercio.findMany({
+    req.db.comercio.findMany({
       where,
       include: { rubro: true, _count: { select: { ventas: true } } },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: parseInt(limit),
     }),
-    req.prisma.comercio.count({ where }),
-    req.prisma.venta.count(),
+    req.db.comercio.count({ where }),
+    req.db.venta.count(),
   ])
 
   res.json({
@@ -52,7 +52,7 @@ router.get('/comercios', authAdmin, asyncHandler(async (req, res) => {
 router.get('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const comercio = await req.prisma.comercio.findUnique({
+  const comercio = await req.db.comercio.findUnique({
     where: { id: parseInt(id) },
     include: { rubro: true },
   })
@@ -62,7 +62,7 @@ router.get('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Stats
-  const stats = await req.prisma.venta.aggregate({
+  const stats = await req.db.venta.aggregate({
     where: { comercioId: comercio.id },
     _count: true,
     _sum: { importeFinal: true },
@@ -84,7 +84,7 @@ router.get('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
 router.post('/comercios/:id/aprobar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const comercio = await req.prisma.comercio.update({
+  const comercio = await req.db.comercio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'ACTIVO',
@@ -116,7 +116,7 @@ router.post('/comercios/:id/rechazar', authAdmin, asyncHandler(async (req, res) 
   const { id } = req.params
   const { motivo } = req.body
 
-  const comercio = await req.prisma.comercio.update({
+  const comercio = await req.db.comercio.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'RECHAZADO',
@@ -146,7 +146,7 @@ router.patch('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { descuentoPct, acumulacionActiva, acumComprasReq, acumPeriodoDias, acumDescuentoExtra } = req.body
 
-  const comercio = await req.prisma.comercio.update({
+  const comercio = await req.db.comercio.update({
     where: { id: parseInt(id) },
     data: {
       descuentoPct,
@@ -170,7 +170,7 @@ router.patch('/comercios/:id', authAdmin, asyncHandler(async (req, res) => {
 router.post('/comercios/:id/desactivar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  await req.prisma.comercio.update({
+  await req.db.comercio.update({
     where: { id: parseInt(id) },
     data: { estado: 'INACTIVO' },
   })
@@ -185,7 +185,7 @@ router.post('/comercios/:id/desactivar', authAdmin, asyncHandler(async (req, res
 router.post('/comercios/:id/reenviar-link', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const comercio = await req.prisma.comercio.findUnique({
+  const comercio = await req.db.comercio.findUnique({
     where: { id: parseInt(id) },
   })
 

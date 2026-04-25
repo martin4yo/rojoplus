@@ -60,6 +60,20 @@ export async function generarNumeroPedido(db) {
 }
 
 /**
+ * Genera número único de MovimientoCaja
+ * Formato: MOV-NNNNNNNN (8 dígitos zero-padded)
+ *
+ * NOTA: tiene race condition bajo concurrencia. Pasar `db` siempre que sea
+ * posible un cliente transaccional (tx) para reducir la ventana. Para
+ * eliminar el race definitivamente, migrar a una secuencia Postgres.
+ */
+export async function generarNumeroMovimientoCaja(db) {
+  const client = db || prisma
+  const ultimo = await client.movimientoCaja.findFirst({ orderBy: { id: 'desc' } })
+  return `MOV-${String((ultimo?.id || 0) + 1).padStart(8, '0')}`
+}
+
+/**
  * Genera número de movimiento contable
  * Formato: MC-YYYY-NNNNN
  */

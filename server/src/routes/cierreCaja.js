@@ -29,7 +29,7 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
   mañana.setDate(mañana.getDate() + 1)
 
   // Obtener el rol del usuario desde la BD (el JWT solo tiene id y email)
-  const admin = await req.prisma.admin.findUnique({
+  const admin = await req.db.admin.findUnique({
     where: { id: req.admin.id },
     select: { rolId: true, rol: { select: { esSuperAdmin: true } } }
   })
@@ -71,7 +71,7 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
   const cajasPendientes = []
 
   for (const caja of cajasEfectivo) {
-    const cierreHoy = await req.prisma.cierreCaja.findFirst({
+    const cierreHoy = await req.db.cierreCaja.findFirst({
       where: {
         cajaId: caja.id,
         fecha: {
@@ -104,7 +104,7 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
         .reduce((sum, m) => sum + Number(m.monto), 0)
 
       // Buscar el último cierre de esta caja para saber el saldo inicial del día
-      const ultimoCierre = await req.prisma.cierreCaja.findFirst({
+      const ultimoCierre = await req.db.cierreCaja.findFirst({
         where: {
           cajaId: caja.id
         },
@@ -164,7 +164,7 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 
   // Verificar que el usuario tiene acceso a esta caja
-  const admin = await req.prisma.admin.findUnique({
+  const admin = await req.db.admin.findUnique({
     where: { id: req.admin.id },
     select: { rolId: true, rol: { select: { esSuperAdmin: true } } }
   })
@@ -193,7 +193,7 @@ router.post('/', asyncHandler(async (req, res) => {
   mañana.setDate(mañana.getDate() + 1)
 
   // Verificar que no exista ya un cierre para esta caja en esta fecha
-  const cierreExistente = await req.prisma.cierreCaja.findFirst({
+  const cierreExistente = await req.db.cierreCaja.findFirst({
     where: {
       cajaId: parseInt(cajaId),
       fecha: {
@@ -230,7 +230,7 @@ router.post('/', asyncHandler(async (req, res) => {
     .reduce((sum, m) => sum + Number(m.monto), 0)
 
   // Buscar el último cierre de esta caja para saber el saldo inicial del día
-  const ultimoCierre = await req.prisma.cierreCaja.findFirst({
+  const ultimoCierre = await req.db.cierreCaja.findFirst({
     where: {
       cajaId: parseInt(cajaId),
       fecha: {
@@ -250,7 +250,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const diferencia = saldoRealDecimal - saldoSistema
 
   // Crear el cierre
-  const cierre = await req.prisma.cierreCaja.create({
+  const cierre = await req.db.cierreCaja.create({
     data: {
       cajaId: parseInt(cajaId),
       fecha: fechaCierre,
@@ -299,7 +299,7 @@ router.get('/', asyncHandler(async (req, res) => {
   } = req.query
 
   // Obtener el rol del usuario desde la BD
-  const admin = await req.prisma.admin.findUnique({
+  const admin = await req.db.admin.findUnique({
     where: { id: req.admin.id },
     select: { rolId: true, rol: { select: { esSuperAdmin: true } } }
   })
@@ -343,7 +343,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [cierres, total] = await Promise.all([
-    req.prisma.cierreCaja.findMany({
+    req.db.cierreCaja.findMany({
       where,
       include: {
         caja: true,
@@ -366,7 +366,7 @@ router.get('/', asyncHandler(async (req, res) => {
       skip,
       take: parseInt(limit)
     }),
-    req.prisma.cierreCaja.count({ where })
+    req.db.cierreCaja.count({ where })
   ])
 
   res.json({
@@ -386,7 +386,7 @@ router.get('/', asyncHandler(async (req, res) => {
 router.get('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cierre = await req.prisma.cierreCaja.findUnique({
+  const cierre = await req.db.cierreCaja.findUnique({
     where: { id: parseInt(id) },
     include: {
       caja: true,
@@ -585,7 +585,7 @@ router.get('/informe-previo/:cajaId', asyncHandler(async (req, res) => {
     .reduce((sum, m) => sum + Number(m.monto), 0)
 
   // Buscar el último cierre de esta caja para saber el saldo inicial
-  const ultimoCierre = await req.prisma.cierreCaja.findFirst({
+  const ultimoCierre = await req.db.cierreCaja.findFirst({
     where: {
       cajaId: parseInt(cajaId),
       fecha: {
@@ -701,7 +701,7 @@ router.get('/informe-previo/:cajaId', asyncHandler(async (req, res) => {
 router.get('/:id/pdf', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cierre = await req.prisma.cierreCaja.findUnique({
+  const cierre = await req.db.cierreCaja.findUnique({
     where: { id: parseInt(id) },
     include: {
       caja: true,
@@ -861,7 +861,7 @@ router.get('/:id/pdf', asyncHandler(async (req, res) => {
 router.post('/:id/firmar', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const cierre = await req.prisma.cierreCaja.findUnique({
+  const cierre = await req.db.cierreCaja.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -878,7 +878,7 @@ router.post('/:id/firmar', asyncHandler(async (req, res) => {
     throw new AppError('No puede firmar un cierre realizado por usted mismo', 400)
   }
 
-  const cierreActualizado = await req.prisma.cierreCaja.update({
+  const cierreActualizado = await req.db.cierreCaja.update({
     where: { id: parseInt(id) },
     data: {
       firmadoPor: req.admin.id,
@@ -931,7 +931,7 @@ router.get('/resumen/estadisticas', asyncHandler(async (req, res) => {
     }
   }
 
-  const cierres = await req.prisma.cierreCaja.findMany({
+  const cierres = await req.db.cierreCaja.findMany({
     where,
     select: {
       diferencia: true,

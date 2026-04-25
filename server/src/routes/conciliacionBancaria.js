@@ -14,7 +14,7 @@ router.use(authAdmin)
 
 // GET /api/admin/conciliacion/formatos - Listar formatos
 router.get('/formatos', asyncHandler(async (req, res) => {
-  const formatos = await prisma.formatoExtracto.findMany({
+  const formatos = await req.db.formatoExtracto.findMany({
     orderBy: { nombre: 'asc' }
   })
   res.json({ success: true, data: formatos })
@@ -22,7 +22,7 @@ router.get('/formatos', asyncHandler(async (req, res) => {
 
 // GET /api/admin/conciliacion/formatos/:id - Detalle formato
 router.get('/formatos/:id', asyncHandler(async (req, res) => {
-  const formato = await prisma.formatoExtracto.findUnique({
+  const formato = await req.db.formatoExtracto.findUnique({
     where: { id: parseInt(req.params.id) }
   })
   if (!formato) throw new AppError('Formato no encontrado', 404)
@@ -41,7 +41,7 @@ router.post('/formatos', asyncHandler(async (req, res) => {
     throw new AppError('Tipo de archivo inválido', 400)
   }
 
-  const formato = await prisma.formatoExtracto.create({
+  const formato = await req.db.formatoExtracto.create({
     data: {
       nombre,
       banco,
@@ -58,7 +58,7 @@ router.post('/formatos', asyncHandler(async (req, res) => {
 router.put('/formatos/:id', asyncHandler(async (req, res) => {
   const { nombre, banco, tipoArchivo, descripcion, configuracion, activo } = req.body
 
-  const formato = await prisma.formatoExtracto.update({
+  const formato = await req.db.formatoExtracto.update({
     where: { id: parseInt(req.params.id) },
     data: {
       nombre,
@@ -79,11 +79,11 @@ router.post('/formatos/presets-argentinos', asyncHandler(async (req, res) => {
   let existentes = 0
 
   for (const preset of PRESETS_BANCOS_AR) {
-    const existe = await prisma.formatoExtracto.findFirst({
+    const existe = await req.db.formatoExtracto.findFirst({
       where: { nombre: preset.nombre }
     })
     if (!existe) {
-      await prisma.formatoExtracto.create({ data: preset })
+      await req.db.formatoExtracto.create({ data: preset })
       creados++
     } else {
       existentes++
@@ -102,7 +102,7 @@ router.delete('/formatos/:id', asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id)
 
   // Verificar si tiene extractos asociados
-  const extractos = await prisma.extractoBancario.count({
+  const extractos = await req.db.extractoBancario.count({
     where: { formatoId: id }
   })
 
@@ -110,7 +110,7 @@ router.delete('/formatos/:id', asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar, tiene extractos asociados', 400)
   }
 
-  await prisma.formatoExtracto.delete({ where: { id } })
+  await req.db.formatoExtracto.delete({ where: { id } })
   res.json({ success: true, message: 'Formato eliminado' })
 }))
 
@@ -129,7 +129,7 @@ router.get('/extractos', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [extractos, total] = await Promise.all([
-    prisma.extractoBancario.findMany({
+    req.db.extractoBancario.findMany({
       where,
       orderBy: { fechaImportacion: 'desc' },
       skip,
@@ -140,7 +140,7 @@ router.get('/extractos', asyncHandler(async (req, res) => {
         _count: { select: { movimientos: true, conciliaciones: true } }
       }
     }),
-    prisma.extractoBancario.count({ where })
+    req.db.extractoBancario.count({ where })
   ])
 
   const extractosFormateados = extractos.map(e => ({
@@ -160,7 +160,7 @@ router.get('/extractos', asyncHandler(async (req, res) => {
 
 // GET /api/admin/conciliacion/extractos/:id - Detalle extracto
 router.get('/extractos/:id', asyncHandler(async (req, res) => {
-  const extracto = await prisma.extractoBancario.findUnique({
+  const extracto = await req.db.extractoBancario.findUnique({
     where: { id: parseInt(req.params.id) },
     include: {
       caja: true,
@@ -201,7 +201,7 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
     throw new AppError('Caja, formato y contenido son requeridos', 400)
   }
 
-  const formato = await prisma.formatoExtracto.findUnique({
+  const formato = await req.db.formatoExtracto.findUnique({
     where: { id: parseInt(formatoId) }
   })
   if (!formato) throw new AppError('Formato no encontrado', 404)
@@ -232,7 +232,7 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
   // Generar número de extracto
   const anio = new Date().getFullYear()
   const prefijo = `EXT-${anio}-`
-  const ultimo = await prisma.extractoBancario.findFirst({
+  const ultimo = await req.db.extractoBancario.findFirst({
     where: { numero: { startsWith: prefijo } },
     orderBy: { numero: 'desc' }
   })
@@ -248,7 +248,7 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
   const totalDebitos = movimientos.filter(m => m.tipo === 'DEBITO').reduce((sum, m) => sum + m.importe, 0)
 
   // Crear extracto con movimientos
-  const extracto = await prisma.extractoBancario.create({
+  const extracto = await req.db.extractoBancario.create({
     data: {
       cajaId: parseInt(cajaId),
       formatoId: parseInt(formatoId),
@@ -295,7 +295,7 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
 router.delete('/extractos/:id', asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id)
 
-  const extracto = await prisma.extractoBancario.findUnique({
+  const extracto = await req.db.extractoBancario.findUnique({
     where: { id },
     include: { conciliaciones: true }
   })
@@ -307,9 +307,9 @@ router.delete('/extractos/:id', asyncHandler(async (req, res) => {
   }
 
   // Eliminar movimientos y extracto
-  await prisma.$transaction([
-    prisma.movimientoExtracto.deleteMany({ where: { extractoId: id } }),
-    prisma.extractoBancario.delete({ where: { id } })
+  await req.db.$transaction([
+    req.db.movimientoExtracto.deleteMany({ where: { extractoId: id } }),
+    req.db.extractoBancario.delete({ where: { id } })
   ])
 
   res.json({ success: true, message: 'Extracto eliminado' })
@@ -335,7 +335,7 @@ router.get('/pendientes', asyncHandler(async (req, res) => {
     whereExtracto.extracto = { cajaId: parseInt(cajaId) }
   }
 
-  const movimientosExtracto = await prisma.movimientoExtracto.findMany({
+  const movimientosExtracto = await req.db.movimientoExtracto.findMany({
     where: whereExtracto,
     orderBy: { fecha: 'asc' },
     include: {
@@ -401,7 +401,7 @@ router.post('/conciliar', asyncHandler(async (req, res) => {
     throw new AppError('Debe especificar extracto y al menos un match', 400)
   }
 
-  const extracto = await prisma.extractoBancario.findUnique({
+  const extracto = await req.db.extractoBancario.findUnique({
     where: { id: parseInt(extractoId) }
   })
   if (!extracto) throw new AppError('Extracto no encontrado', 404)
@@ -417,7 +417,7 @@ router.post('/conciliar', asyncHandler(async (req, res) => {
   const movimientoCajaIds = matches.map(m => m.movimientoCajaId)
 
   // Verificar que existen y no están conciliados
-  const movsExtracto = await prisma.movimientoExtracto.findMany({
+  const movsExtracto = await req.db.movimientoExtracto.findMany({
     where: { id: { in: movimientoExtractoIds }, conciliado: false }
   })
   if (movsExtracto.length !== movimientoExtractoIds.length) {
@@ -435,7 +435,7 @@ router.post('/conciliar', asyncHandler(async (req, res) => {
   const montoConciliado = movsExtracto.reduce((sum, m) => sum + Number(m.importe), 0)
 
   // Crear conciliación y actualizar movimientos
-  const conciliacion = await prisma.$transaction(async (tx) => {
+  const conciliacion = await req.db.$transaction(async (tx) => {
     const conc = await tx.conciliacion.create({
       data: {
         extractoId: parseInt(extractoId),
@@ -507,7 +507,7 @@ router.get('/historial', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [conciliaciones, total] = await Promise.all([
-    prisma.conciliacion.findMany({
+    req.db.conciliacion.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -522,7 +522,7 @@ router.get('/historial', asyncHandler(async (req, res) => {
         }
       }
     }),
-    prisma.conciliacion.count({ where })
+    req.db.conciliacion.count({ where })
   ])
 
   res.json({
@@ -562,7 +562,7 @@ router.get('/trazabilidad/:movimientoCajaId', asyncHandler(async (req, res) => {
   if (!movimientoCaja) throw new AppError('Movimiento no encontrado', 404)
 
   // Buscar movimiento de extracto vinculado
-  const movimientoExtracto = await prisma.movimientoExtracto.findFirst({
+  const movimientoExtracto = await req.db.movimientoExtracto.findFirst({
     where: { movimientoCajaId },
     include: {
       extracto: { select: { numero: true, nombreArchivo: true, caja: { select: { nombre: true } } } }
@@ -591,7 +591,7 @@ router.get('/resumen', asyncHandler(async (req, res) => {
   const whereCaja = cajaId ? { cajaId: parseInt(cajaId) } : {}
 
   // Extractos por estado
-  const extractosPorEstado = await prisma.extractoBancario.groupBy({
+  const extractosPorEstado = await req.db.extractoBancario.groupBy({
     by: ['estado'],
     where: whereCaja,
     _count: true
@@ -615,7 +615,7 @@ router.get('/resumen', asyncHandler(async (req, res) => {
   const whereExtractoPendiente = { conciliado: false }
   if (cajaId) whereExtractoPendiente.extracto = { cajaId: parseInt(cajaId) }
 
-  const extractosPendientes = await prisma.movimientoExtracto.aggregate({
+  const extractosPendientes = await req.db.movimientoExtracto.aggregate({
     where: whereExtractoPendiente,
     _sum: { importe: true },
     _count: true

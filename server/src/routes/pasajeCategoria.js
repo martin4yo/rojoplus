@@ -230,7 +230,7 @@ router.post('/ejecutar', authAdmin, async (req, res) => {
     const fechaEfect = fechaEfectiva ? new Date(fechaEfectiva) : new Date()
     const resultados = []
 
-    await prisma.$transaction(async (tx) => {
+    await req.db.$transaction(async (tx) => {
       for (const pasaje of pasajes) {
         const { inscripcionId, categoriaDestinoId } = pasaje
 

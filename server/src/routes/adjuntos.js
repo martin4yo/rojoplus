@@ -77,7 +77,7 @@ const TIPOS_COMPROBANTE = {
 router.get('/descargar/:adjuntoId', authAdmin, asyncHandler(async (req, res) => {
   const { adjuntoId } = req.params
 
-  const adjunto = await req.prisma.adjuntoComprobante.findUnique({
+  const adjunto = await req.db.adjuntoComprobante.findUnique({
     where: { id: parseInt(adjuntoId) }
   })
 
@@ -122,7 +122,7 @@ router.post('/:tipo/:id', authAdmin, upload.single('archivo'), asyncHandler(asyn
   }
   const modelo = modelos[tipo]
 
-  const comprobante = await req.prisma[modelo].findUnique({
+  const comprobante = await req.db[modelo].findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -133,7 +133,7 @@ router.post('/:tipo/:id', authAdmin, upload.single('archivo'), asyncHandler(asyn
   }
 
   // Crear registro de adjunto
-  const adjunto = await req.prisma.adjuntoComprobante.create({
+  const adjunto = await req.db.adjuntoComprobante.create({
     data: {
       [campoId]: parseInt(id),
       nombreOriginal: req.file.originalname,
@@ -169,7 +169,7 @@ router.get('/:tipo/:id', authAdmin, asyncHandler(async (req, res) => {
 
   const campoId = TIPOS_COMPROBANTE[tipo]
 
-  const adjuntos = await req.prisma.adjuntoComprobante.findMany({
+  const adjuntos = await req.db.adjuntoComprobante.findMany({
     where: {
       [campoId]: parseInt(id)
     },
@@ -194,7 +194,7 @@ router.get('/:tipo/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/:adjuntoId', authAdmin, asyncHandler(async (req, res) => {
   const { adjuntoId } = req.params
 
-  const adjunto = await req.prisma.adjuntoComprobante.findUnique({
+  const adjunto = await req.db.adjuntoComprobante.findUnique({
     where: { id: parseInt(adjuntoId) }
   })
 
@@ -209,7 +209,7 @@ router.delete('/:adjuntoId', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Eliminar registro de BD
-  await req.prisma.adjuntoComprobante.delete({
+  await req.db.adjuntoComprobante.delete({
     where: { id: parseInt(adjuntoId) }
   })
 

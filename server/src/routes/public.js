@@ -49,7 +49,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
   }
 
   // Validar que no exista una solicitud pendiente con el mismo documento
-  const solicitudExistente = await req.prisma.solicitudSocio.findFirst({
+  const solicitudExistente = await req.db.solicitudSocio.findFirst({
     where: {
       documento,
       estado: 'PENDIENTE'
@@ -83,7 +83,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
   }
 
   // Crear la solicitud
-  const solicitud = await req.prisma.solicitudSocio.create({
+  const solicitud = await req.db.solicitudSocio.create({
     data: {
       apellidos,
       nombres,
@@ -128,7 +128,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
 
   // Notificar a los administradores
   try {
-    const emailsAdmin = await req.prisma.admin.findMany({
+    const emailsAdmin = await req.db.admin.findMany({
       where: { activo: true },
       select: { email: true }
     })
@@ -193,7 +193,7 @@ router.post('/solicitud-socio/:id/familiar', asyncHandler(async (req, res) => {
   }
 
   // Verificar que la solicitud existe y está PENDIENTE
-  const solicitud = await req.prisma.solicitudSocio.findUnique({
+  const solicitud = await req.db.solicitudSocio.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -206,7 +206,7 @@ router.post('/solicitud-socio/:id/familiar', asyncHandler(async (req, res) => {
   }
 
   // Verificar que no exista un familiar con el mismo documento en esta solicitud
-  const familiarExistente = await req.prisma.familiarSolicitud.findFirst({
+  const familiarExistente = await req.db.familiarSolicitud.findFirst({
     where: {
       solicitudSocioId: parseInt(id),
       documento
@@ -218,7 +218,7 @@ router.post('/solicitud-socio/:id/familiar', asyncHandler(async (req, res) => {
   }
 
   // Crear el familiar
-  const familiar = await req.prisma.familiarSolicitud.create({
+  const familiar = await req.db.familiarSolicitud.create({
     data: {
       solicitudSocioId: parseInt(id),
       apellidos,
@@ -247,7 +247,7 @@ router.post('/solicitud-socio/:id/familiar', asyncHandler(async (req, res) => {
 router.get('/solicitud-socio/:id/familiares', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const familiares = await req.prisma.familiarSolicitud.findMany({
+  const familiares = await req.db.familiarSolicitud.findMany({
     where: { solicitudSocioId: parseInt(id) },
     orderBy: { createdAt: 'asc' }
   })
@@ -272,7 +272,7 @@ router.delete('/solicitud-socio/:id/familiar/:familiarId', asyncHandler(async (r
   const { id, familiarId } = req.params
 
   // Verificar que la solicitud está PENDIENTE
-  const solicitud = await req.prisma.solicitudSocio.findUnique({
+  const solicitud = await req.db.solicitudSocio.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -285,7 +285,7 @@ router.delete('/solicitud-socio/:id/familiar/:familiarId', asyncHandler(async (r
   }
 
   // Verificar que el familiar pertenece a esta solicitud
-  const familiar = await req.prisma.familiarSolicitud.findFirst({
+  const familiar = await req.db.familiarSolicitud.findFirst({
     where: {
       id: parseInt(familiarId),
       solicitudSocioId: parseInt(id)
@@ -297,7 +297,7 @@ router.delete('/solicitud-socio/:id/familiar/:familiarId', asyncHandler(async (r
   }
 
   // Eliminar el familiar
-  await req.prisma.familiarSolicitud.delete({
+  await req.db.familiarSolicitud.delete({
     where: { id: parseInt(familiarId) }
   })
 
@@ -315,7 +315,7 @@ router.post('/solicitud-socio/:id/verificar', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { documento } = req.body
 
-  const solicitud = await req.prisma.solicitudSocio.findFirst({
+  const solicitud = await req.db.solicitudSocio.findFirst({
     where: {
       id: parseInt(id),
       documento
@@ -470,7 +470,7 @@ router.get('/calendario', asyncHandler(async (req, res) => {
   })
 
   // Obtener entrenamientos del mes
-  const entrenamientos = await req.prisma.entrenamiento.findMany({
+  const entrenamientos = await req.db.entrenamiento.findMany({
     where: {
       fecha: {
         gte: fechaInicio,
@@ -524,7 +524,7 @@ router.get('/galeria', asyncHandler(async (req, res) => {
   const fotos = []
 
   // Si en el futuro se implementa modelo Album/FotoGaleria:
-  // const albumes = await req.prisma.album.findMany({
+  // const albumes = await req.db.album.findMany({
   //   where: { activo: true, publico: true },
   //   include: { _count: { select: { fotos: true } } },
   //   orderBy: { fecha: 'desc' }
@@ -542,7 +542,7 @@ router.get('/galeria/album/:id', asyncHandler(async (req, res) => {
 
   // Por ahora retornamos array vacío
   // En el futuro cuando se implemente el modelo:
-  // const fotos = await req.prisma.fotoGaleria.findMany({
+  // const fotos = await req.db.fotoGaleria.findMany({
   //   where: { albumId: parseInt(id), activo: true },
   //   orderBy: { orden: 'asc' }
   // })
@@ -713,7 +713,7 @@ router.get('/cronograma', asyncHandler(async (req, res) => {
       whereEntrenamientos.categoriaActividadId = { in: categorias }
     }
 
-    let horarios = await req.prisma.horarioRecurrente.findMany({
+    let horarios = await req.db.horarioRecurrente.findMany({
       where: whereEntrenamientos,
       include: {
         categoriaActividad: {
@@ -834,7 +834,7 @@ router.get('/actividades/:id/staff', asyncHandler(async (req, res) => {
     whereCategoria.categoriaActividadId = parseInt(categoriaId)
   } else {
     // Obtener todas las categorías de esta actividad
-    const categorias = await req.prisma.categoriaActividad.findMany({
+    const categorias = await req.db.categoriaActividad.findMany({
       where: { actividadId: parseInt(id), activo: true },
       select: { id: true }
     })
@@ -1015,7 +1015,7 @@ router.get('/partidos/proximos', asyncHandler(async (req, res) => {
  * Obtener reglamento de convivencia
  */
 router.get('/reglamento', asyncHandler(async (req, res) => {
-  const articulos = await req.prisma.articuloReglamento.findMany({
+  const articulos = await req.db.articuloReglamento.findMany({
     where: { activo: true },
     orderBy: [
       { seccion: 'asc' },

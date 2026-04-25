@@ -24,7 +24,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     throw new AppError('Email y contraseña son requeridos', 400, 'VALIDATION_ERROR')
   }
 
-  const admin = await req.prisma.admin.findUnique({
+  const admin = await req.db.admin.findUnique({
     where: { email },
   })
 
@@ -38,7 +38,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   // Actualizar último login
-  await req.prisma.admin.update({
+  await req.db.admin.update({
     where: { id: admin.id },
     data: { lastLogin: new Date() },
   })
@@ -2608,9 +2608,10 @@ router.get('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
 }))
 
 // Helper: Generar codigo unico para Entidad PERSONAL
-async function generarCodigoEntidadPersonal(prisma) {
+// Recibe el cliente (tx tenant-scoped o req.db) como parámetro.
+async function generarCodigoEntidadPersonal(db) {
   const prefijo = 'PERS-'
-  const ultima = await prisma.entidad.findFirst({
+  const ultima = await db.entidad.findFirst({
     where: { codigo: { startsWith: prefijo } },
     orderBy: { codigo: 'desc' }
   })

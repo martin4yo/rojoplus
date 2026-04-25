@@ -702,7 +702,7 @@ router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res
   const categoriasInscriptas = inscripciones.map(i => i.categoriaActividadId)
 
   // Obtener categorías disponibles (no inscriptas, activas, con cupos)
-  const categoriasDisponibles = await req.prisma.categoriaActividad.findMany({
+  const categoriasDisponibles = await req.db.categoriaActividad.findMany({
     where: {
       activo: true,
       id: {
@@ -794,7 +794,7 @@ router.post('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
   }
 
   // Verificar que la categoría existe y está activa
-  const categoria = await req.prisma.categoriaActividad.findUnique({
+  const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(categoriaActividadId) },
     include: {
       _count: {
@@ -1209,7 +1209,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
   }
 
   // Crear registro de link de pago
-  const linkPago = await req.prisma.linkPago.create({
+  const linkPago = await req.db.linkPago.create({
     data: {
       socioId: socio.id,
       concepto: cargo.descripcion || cargo.categoria,
@@ -1254,7 +1254,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
   }
 
   // Actualizar link de pago con el init_point
-  await req.prisma.linkPago.update({
+  await req.db.linkPago.update({
     where: { id: linkPago.id },
     data: { initPoint },
   })
@@ -1312,7 +1312,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
   const montoTotal = cargos.reduce((sum, c) => sum + parseFloat(c.montoTotal), 0)
 
   // Crear registro de link de pago
-  const linkPago = await req.prisma.linkPago.create({
+  const linkPago = await req.db.linkPago.create({
     data: {
       socioId: socio.id,
       concepto: `Pago de ${cargos.length} cuota(s)`,
@@ -1359,7 +1359,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
   }
 
   // Actualizar link de pago con el init_point
-  await req.prisma.linkPago.update({
+  await req.db.linkPago.update({
     where: { id: linkPago.id },
     data: { initPoint },
   })
@@ -2115,7 +2115,7 @@ router.post('/:tokenPortal/debito-automatico/solicitar', asyncHandler(async (req
     ? { tipo, banco, cbuUltimos4: cbu.slice(-4) }
     : { tipo, marca: tarjetaMarca, tarjetaUltimos4: tarjetaNumero.slice(-4) }
 
-  await req.prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       tabla: 'socio',
       registroId: socio.id,
@@ -2157,7 +2157,7 @@ router.post('/:tokenPortal/debito-automatico/baja', asyncHandler(async (req, res
   })
 
   // Registrar en audit log
-  await req.prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       tabla: 'socio',
       registroId: socio.id,
