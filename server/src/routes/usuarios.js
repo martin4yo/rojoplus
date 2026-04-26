@@ -389,9 +389,25 @@ router.get('/usuarios', asyncHandler(async (req, res) => {
   res.json({ success: true, data: usuarios })
 }))
 
+// Helper: valida que el usuarioId pertenezca al tenant actual (excepto super-admin del request)
+async function assertUsuarioEnTenant(usuarioId, req) {
+  // Super-admin del request puede ver/editar cualquiera
+  if (req.admin?.esSuperAdmin) return
+  if (!req.tenantId) {
+    throw new AppError('Tenant no identificado', 400)
+  }
+  const tu = await prisma.tenantUsuario.findUnique({
+    where: { tenantId_adminId: { tenantId: req.tenantId, adminId: usuarioId } },
+  })
+  if (!tu) {
+    throw new AppError('Usuario no pertenece a este club', 404)
+  }
+}
+
 // GET /api/admin/usuarios/:id - Detalle de usuario
 router.get('/usuarios/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
+  await assertUsuarioEnTenant(parseInt(id), req)
 
   const usuario = await prisma.admin.findUnique({
     where: { id: parseInt(id) },
@@ -469,6 +485,8 @@ router.post('/usuarios', asyncHandler(async (req, res) => {
 router.put('/usuarios/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { email, password, nombre, apellido, telefono, rolId, activo } = req.body
+
+  await assertUsuarioEnTenant(parseInt(id), req)
 
   const existente = await prisma.admin.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
@@ -557,6 +575,118 @@ router.post('/usuarios/:id/cambiar-password', asyncHandler(async (req, res) => {
   })
 
   res.json({ success: true, message: 'Password actualizada correctamente' })
+}))
+
+// =============================================================================
+// TENANT-USUARIO (asignación de usuarios a tenants)
+// =============================================================================
+
+// GET /api/admin/tenants-disponibles - Tenants donde el admin actual puede asignar usuarios.
+// Super-admin: todos los activos. Resto: solo el tenant actual.
+router.get('/tenants-disponibles', asyncHandler(async (req, res) => {
+  if (req.admin?.esSuperAdmin) {
+    const all = await prisma.tenant.findMany({
+      where: { activo: true },
+      select: { id: true, slug: true, subdomain: true, nombre: true, logoUrl: true },
+      orderBy: { nombre: 'asc' },
+    })
+    return res.json({ success: true, data: all })
+  }
+  if (!req.tenantId) return res.json({ success: true, data: [] })
+  const t = await prisma.tenant.findUnique({
+    where: { id: req.tenantId },
+    select: { id: true, slug: true, subdomain: true, nombre: true, logoUrl: true },
+  })
+  res.json({ success: true, data: t ? [t] : [] })
+}))
+
+
+// GET /api/admin/usuarios/:id/tenants - Listar tenants donde el usuario tiene acceso
+// Cualquier admin puede ver las membresías de un usuario de SU mismo tenant.
+// Super-admin puede ver de cualquiera.
+router.get('/usuarios/:id/tenants', asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  await assertUsuarioEnTenant(id, req)
+
+  const tus = await prisma.tenantUsuario.findMany({
+    where: { adminId: id },
+    include: {
+      tenant: { select: { id: true, slug: true, subdomain: true, nombre: true, logoUrl: true, activo: true } },
+    },
+    orderBy: { tenant: { nombre: 'asc' } },
+  })
+
+  res.json({ success: true, data: tus })
+}))
+
+// POST /api/admin/usuarios/:id/tenants - Agregar usuario a un tenant
+// Body: { tenantId, rol?: 'ADMIN' }
+// - Admin normal: solo puede agregar a SU tenant actual.
+// - Super-admin: puede agregar a cualquier tenant.
+router.post('/usuarios/:id/tenants', asyncHandler(async (req, res) => {
+  const usuarioId = parseInt(req.params.id)
+  const { tenantId, rol = 'ADMIN' } = req.body
+
+  if (!tenantId) {
+    throw new AppError('tenantId requerido', 400)
+  }
+
+  // Validar que el usuario destino existe
+  const usuario = await prisma.admin.findUnique({ where: { id: usuarioId } })
+  if (!usuario) throw new AppError('Usuario no encontrado', 404)
+
+  // Si no es super-admin, solo puede agregar a su propio tenant
+  if (!req.admin?.esSuperAdmin) {
+    if (parseInt(tenantId) !== req.tenantId) {
+      throw new AppError('No podés agregar usuarios a otro club', 403)
+    }
+  }
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: parseInt(tenantId) } })
+  if (!tenant) throw new AppError('Tenant no encontrado', 404)
+
+  // Idempotente: si ya existe, lo retornamos
+  const existente = await prisma.tenantUsuario.findUnique({
+    where: { tenantId_adminId: { tenantId: parseInt(tenantId), adminId: usuarioId } },
+  })
+  if (existente) {
+    // Reactivar si estaba inactivo
+    if (!existente.activo || existente.rol !== rol) {
+      const actualizado = await prisma.tenantUsuario.update({
+        where: { id: existente.id },
+        data: { activo: true, rol },
+      })
+      return res.json({ success: true, data: actualizado, message: 'Asignación actualizada' })
+    }
+    return res.json({ success: true, data: existente, message: 'Ya tenía acceso' })
+  }
+
+  const tu = await prisma.tenantUsuario.create({
+    data: { tenantId: parseInt(tenantId), adminId: usuarioId, rol, activo: true },
+  })
+
+  res.status(201).json({ success: true, data: tu })
+}))
+
+// DELETE /api/admin/usuarios/:id/tenants/:tenantId - Quitar acceso a un tenant
+router.delete('/usuarios/:id/tenants/:tenantId', asyncHandler(async (req, res) => {
+  const usuarioId = parseInt(req.params.id)
+  const tenantId = parseInt(req.params.tenantId)
+
+  if (!req.admin?.esSuperAdmin && tenantId !== req.tenantId) {
+    throw new AppError('No podés quitar acceso a otro club', 403)
+  }
+
+  const existente = await prisma.tenantUsuario.findUnique({
+    where: { tenantId_adminId: { tenantId, adminId: usuarioId } },
+  })
+  if (!existente) {
+    throw new AppError('El usuario no tenía acceso a ese club', 404)
+  }
+
+  await prisma.tenantUsuario.delete({ where: { id: existente.id } })
+
+  res.json({ success: true })
 }))
 
 export default router

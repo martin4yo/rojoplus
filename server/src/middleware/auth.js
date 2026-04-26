@@ -46,7 +46,8 @@ async function getPermisosRol(rolId) {
   return permisos
 }
 
-// Middleware para autenticar admin con JWT
+// Middleware para autenticar admin con JWT.
+// Valida que el JWT pertenezca al tenant del request (excepto super-admin).
 export function authAdmin(req, res, next) {
   const authHeader = req.headers.authorization
 
@@ -58,9 +59,28 @@ export function authAdmin(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET)
+
+    // Rechazar tokens preliminares (los del paso 1 del login antes de elegir tenant)
+    if (decoded.tipo === 'temp') {
+      return next(new AppError('Token temporal: seleccioná un tenant primero', 401, 'TEMP_TOKEN'))
+    }
+
+    // Super-admin tiene acceso global, no se valida tenant
+    if (!decoded.esSuperAdmin) {
+      // Para admins normales, el tenant del JWT debe coincidir con el del request
+      const tenantIdRequest = req.tenant?.id ?? req.tenantId
+      if (!tenantIdRequest) {
+        return next(new AppError('Tenant no identificado en la request', 400, 'TENANT_REQUIRED'))
+      }
+      if (decoded.tenantId !== tenantIdRequest) {
+        return next(new AppError('Tu token no tiene acceso a este tenant', 403, 'TENANT_FORBIDDEN'))
+      }
+    }
+
     req.admin = decoded
     next()
   } catch (err) {
+    if (err instanceof AppError) return next(err)
     return next(new AppError('Token inválido', 401, 'AUTH_INVALID'))
   }
 }
@@ -158,11 +178,36 @@ export async function authComercio(req, res, next) {
   next()
 }
 
-// Generar token JWT para admin
-export function generateToken(admin) {
+// Generar token JWT final (con tenantId + esSuperAdmin)
+export function generateToken(admin, { tenantId, esSuperAdmin = false } = {}) {
   return jwt.sign(
-    { id: admin.id, email: admin.email },
+    {
+      id: admin.id,
+      email: admin.email,
+      tenantId: tenantId ?? null,
+      esSuperAdmin,
+      tipo: 'full',
+    },
     JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
   )
+}
+
+// Generar token preliminar (después de validar credenciales pero antes de elegir tenant).
+// Solo sirve para llamar a /select-tenant. Expiración corta.
+export function generateTempToken(admin) {
+  return jwt.sign(
+    { id: admin.id, email: admin.email, tipo: 'temp' },
+    JWT_SECRET,
+    { expiresIn: '5m' }
+  )
+}
+
+// Verificar un token preliminar (uso en /select-tenant)
+export function verifyTempToken(token) {
+  const decoded = jwt.verify(token, JWT_SECRET)
+  if (decoded.tipo !== 'temp') {
+    throw new AppError('Token preliminar inválido', 401, 'TEMP_TOKEN_INVALID')
+  }
+  return decoded
 }

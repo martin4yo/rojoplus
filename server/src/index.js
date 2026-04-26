@@ -123,7 +123,7 @@ app.use((req, res, next) => {
 // Rutas que requieren tenant context
 // BUT: login endpoint bypasses extractTenant
 // Routes that bypass tenant extraction (work without subdomain)
-const TENANT_FREE_ROUTES = ['/api/admin/login', '/api/admin/mis-permisos', '/api/admin/menu']
+const TENANT_FREE_ROUTES = ['/api/admin/login', '/api/admin/select-tenant']
 
 app.use('/api/admin/*', (req, res, next) => {
   // Skip extractTenant for routes that work without tenant context
@@ -155,8 +155,9 @@ const registerRateLimit = rateLimit({
   legacyHeaders: false,
 })
 
-// Login endpoint - mounted WITHIN the /api/admin middleware chain but bypassed above
-app.use('/api/admin/login', loginRateLimit, authRoutes)
+// Rate limit aplicado directamente al endpoint POST /api/admin/login.
+// (El montaje real de las rutas de auth se hace via adminRoutes más abajo.)
+app.post('/api/admin/login', loginRateLimit, (req, res, next) => next())
 app.use('/api/socio/*', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()
