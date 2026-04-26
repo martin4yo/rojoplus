@@ -283,27 +283,30 @@ export default function AgregarFamiliares() {
                 <div className="md:col-span-2">
                   <label className={labelCls}>Parentesco {required}</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { val: 'CONYUGE', label: 'Cónyuge', icon: Heart, color: 'rose' },
-                      { val: 'HIJO', label: 'Hijo/a', icon: Baby, color: 'amber' },
-                    ].map(({ val, label, icon: Icon, color }) => {
-                      const sel = formData.parentesco === val
-                      return (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, parentesco: val }))}
-                          className={`flex items-center gap-2 p-3 border-2 rounded-xl transition-all ${
-                            sel
-                              ? `border-${color}-500 bg-${color}-500 text-white shadow-md scale-[1.02]`
-                              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-                          }`}
-                        >
-                          <Icon className="w-5 h-5" />
-                          <span className="font-medium">{label}</span>
-                        </button>
-                      )
-                    })}
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, parentesco: 'CONYUGE' }))}
+                      className={`flex items-center gap-2 p-3 border-2 rounded-xl transition-all ${
+                        formData.parentesco === 'CONYUGE'
+                          ? 'border-rose-500 bg-rose-500 text-white shadow-md scale-[1.02]'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-rose-300 hover:bg-rose-50'
+                      }`}
+                    >
+                      <Heart className="w-5 h-5" />
+                      <span className="font-medium">Cónyuge</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, parentesco: 'HIJO' }))}
+                      className={`flex items-center gap-2 p-3 border-2 rounded-xl transition-all ${
+                        formData.parentesco === 'HIJO'
+                          ? 'border-amber-500 bg-amber-500 text-white shadow-md scale-[1.02]'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-amber-300 hover:bg-amber-50'
+                      }`}
+                    >
+                      <Baby className="w-5 h-5" />
+                      <span className="font-medium">Hijo/a</span>
+                    </button>
                   </div>
                 </div>
               </div>
