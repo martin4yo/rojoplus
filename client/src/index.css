@@ -140,6 +140,43 @@ body {
   animation: slideIn 0.3s ease-out forwards;
 }
 
+/* Fade in suave (para secciones que aparecen) */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+/* Float suave para íconos decorativos */
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float {
+  animation: floatY 3s ease-in-out infinite;
+}
+
+/* Pulse suave para el botón principal */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--color-primary-rgb, 220 38 38) / 0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(var(--color-primary-rgb, 220 38 38) / 0); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s ease-out infinite;
+}
+
 /* Ocultar scrollbar pero mantener funcionalidad de scroll */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE and Edge */
