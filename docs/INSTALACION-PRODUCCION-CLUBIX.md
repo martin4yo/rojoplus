@@ -668,6 +668,63 @@ sudo rm /etc/nginx/sites-enabled/clubix
 sudo nginx -t && sudo systemctl restart nginx
 ```
 
+### Cert correcto en IPv4 pero incorrecto vía dominio (conflicto IPv6)
+
+**Síntoma**: Chrome dice "La conexión no es privada" en `https://clubix.com.ar`. Al diagnosticar:
+
+```bash
+# Test contra la IP IPv4 directa → cert correcto
+echo | openssl s_client -servername clubix.com.ar -connect IPV4_DEL_VPS:443 2>/dev/null | openssl x509 -noout -subject
+# subject=CN = clubix.com.ar  ✅
+
+# Test contra el dominio → cert de OTRO sitio
+echo | openssl s_client -servername clubix.com.ar -connect clubix.com.ar:443 2>/dev/null | openssl x509 -noout -subject
+# subject=CN = mini.axiomacloud.com  ❌
+```
+
+**Causa**: el server tiene IPv6 activa, el dominio tiene record AAAA, pero el `server` block de Clubix solo escuchaba en IPv4 (`listen 443 ssl`). Como el config de otro sitio (ej `mini`) sí escuchaba en IPv6 (`listen [::]:443`), nginx servía el cert de ese otro sitio para todas las conexiones IPv6 que no matcheaban un server block IPv6 propio.
+
+**Verificación**:
+```bash
+# Ver records DNS
+dig clubix.com.ar A +short
+dig clubix.com.ar AAAA +short
+
+# Ver IPs del server
+ip -4 addr show | grep inet
+ip -6 addr show | grep -v fe80 | grep inet6
+
+# Test directo via IPv6 (poner la IPv6 entre [])
+echo | openssl s_client -servername clubix.com.ar -connect [IPV6_DEL_VPS]:443 2>/dev/null | openssl x509 -noout -subject
+```
+
+Si el test IPv6 directo da el cert equivocado, confirmado.
+
+**Fix**: agregar `listen [::]:443 ssl http2;` a TODOS los server blocks HTTPS de Clubix en `/etc/nginx/conf.d/00-clubix.conf`:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;     # ← agregar
+    server_name clubix.com.ar www.clubix.com.ar;
+    ...
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;     # ← agregar
+    server_name *.clubix.com.ar;
+    ...
+}
+```
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+**Regla general**: si el server tiene IPv6 activa, **TODOS** los server blocks tienen que escuchar en IPv4 e IPv6 (`listen 443 ssl;` + `listen [::]:443 ssl;`). Si uno escucha solo en IPv4 y otro en ambos, las conexiones IPv6 que no matchean nombre van al primero que sí escuche en IPv6 → cert cruzado. `certbot --nginx` agrega ambos automáticamente, pero los configs editados a mano pueden quedar incompletos.
+
 ### Tenant no encontrado (error 404)
 
 ```bash
