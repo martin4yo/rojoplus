@@ -8,7 +8,7 @@
 4. [Detectar el lector RFID](#4-detectar-el-lector-rfid)
 5. [Configurar config.json](#5-configurar-configjson)
 6. [Ejecutar el servicio](#6-ejecutar-el-servicio)
-7. [Registrar como servicio de Windows](#7-registrar-como-servicio-de-windows)
+7. [Arranque automático con Windows](#7-arranque-automático-con-windows)
 8. [Troubleshooting](#8-troubleshooting)
 9. [Espiar señales de una aplicación existente](#9-espiar-señales-de-una-aplicación-existente)
 
@@ -290,22 +290,175 @@ Muestra el estado de todas las conexiones, los últimos accesos en tiempo real y
 
 ---
 
-## 7. Registrar como servicio de Windows
+## 7. Arranque automático con Windows
 
-Para que el servicio arranque automáticamente con Windows sin abrir una terminal:
+El objetivo es que la PC del molinete sea autónoma: al encenderla, el servicio levanta solo y, cuando el operador inicia sesión, el panel de control se abre automáticamente en pantalla completa. Son dos cosas independientes que se combinan:
 
+- **A)** Registrar el backend (`node index.js`) como **servicio de Windows** — corre desde que arranca la PC, sin necesidad de loguearse y sin terminal abierta.
+- **B)** Configurar un **acceso directo en la carpeta de Inicio** del usuario que abra el navegador apuntando a `http://localhost:3002`.
+
+### 7.1. Registrar el backend como servicio con NSSM (recomendado)
+
+[NSSM](https://nssm.cc) (Non-Sucking Service Manager) es la forma más simple y robusta de correr una app Node.js como servicio de Windows. No requiere agregar código al proyecto y reinicia automáticamente el proceso si crashea.
+
+1. Descargar NSSM desde https://nssm.cc/download (versión 2.24).
+2. Descomprimir y copiar `nssm.exe` (carpeta `win64`) a `C:\Windows\System32` o cualquier ubicación del `PATH`.
+3. Abrir **CMD como Administrador** y ejecutar:
+   ```cmd
+   nssm install MolineteRojoPlus
+   ```
+4. En la GUI que aparece, completar la pestaña **Application:**
+   - **Path:** ruta completa a `node.exe` (verificar con `where node`, normalmente `C:\Program Files\nodejs\node.exe`).
+   - **Startup directory:** ruta absoluta a la carpeta `molinete-service` (ej: `C:\clubix\molinete-service`).
+   - **Arguments:** `index.js`.
+5. Pestaña **Details:**
+   - **Display name:** `Molinete RojoPlus`.
+   - **Description:** `Servicio de control de molinete y lectores`.
+   - **Startup type:** `Automatic`.
+6. Pestaña **I/O** (recomendado para diagnosticar):
+   - **Output (stdout):** ruta a `logs/stdout.log` (ej: `C:\clubix\molinete-service\logs\stdout.log`).
+   - **Error (stderr):** ruta a `logs/stderr.log`.
+7. Pestaña **Exit actions:** dejar valores por defecto — NSSM reinicia el proceso si termina inesperadamente.
+8. Clic en **Install service**.
+
+Iniciar el servicio:
 ```cmd
-:: Ejecutar como Administrador
-npm install -g node-windows
-node install-service.js
+nssm start MolineteRojoPlus
 ```
 
-Esto registra el proceso en el **Administrador de Servicios** (`services.msc`) bajo el nombre "Molinete RojoPlus".
+Verificación:
+- Abrir `services.msc` y confirmar que **Molinete RojoPlus** está en estado **En ejecución**.
+- Probar `http://localhost:3002` en el navegador.
 
-Para desinstalar:
+Comandos útiles:
+```cmd
+nssm stop MolineteRojoPlus       :: detener
+nssm restart MolineteRojoPlus    :: reiniciar (luego de tocar config.json)
+nssm edit MolineteRojoPlus       :: editar la configuración del servicio
+nssm remove MolineteRojoPlus     :: desinstalar (confirmar con "y")
+```
+
+> **Nota sobre permisos a dispositivos USB/COM:** NSSM corre el servicio por defecto como `LocalSystem`, que tiene acceso a puertos COM y dispositivos HID en la mayoría de los casos. Si el servicio no logra abrir el lector USB o el puerto del molinete cuando corre como servicio (pero sí desde la terminal), abrir `services.msc` → propiedades de Molinete RojoPlus → pestaña **Iniciar sesión** → marcar **Esta cuenta** y poner el usuario que sí tiene acceso (por ejemplo, el usuario que se loguea normalmente en la PC del molinete).
+
+### 7.2. Alternativa — node-windows (sin instalar NSSM)
+
+Si se prefiere una solución JS-only, [node-windows](https://github.com/coreybutler/node-windows) registra el servicio desde un script Node.
+
+1. Instalar globalmente (como Administrador):
+   ```cmd
+   cd molinete-service
+   npm install -g node-windows
+   npm link node-windows
+   ```
+
+2. Crear `install-service.js` en la raíz del proyecto:
+   ```javascript
+   import { Service } from 'node-windows'
+   import path from 'path'
+   import { fileURLToPath } from 'url'
+
+   const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+   const svc = new Service({
+     name: 'Molinete RojoPlus',
+     description: 'Servicio de control de molinete y lectores',
+     script: path.join(__dirname, 'index.js'),
+     workingDirectory: __dirname
+   })
+
+   svc.on('install', () => {
+     console.log('✓ Servicio instalado')
+     svc.start()
+   })
+
+   svc.install()
+   ```
+
+3. Crear `uninstall-service.js` en la raíz del proyecto:
+   ```javascript
+   import { Service } from 'node-windows'
+   import path from 'path'
+   import { fileURLToPath } from 'url'
+
+   const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+   const svc = new Service({
+     name: 'Molinete RojoPlus',
+     script: path.join(__dirname, 'index.js')
+   })
+
+   svc.on('uninstall', () => console.log('✓ Servicio desinstalado'))
+   svc.uninstall()
+   ```
+
+4. Ejecutar como Administrador:
+   ```cmd
+   node install-service.js
+   ```
+
+Para quitarlo:
 ```cmd
 node uninstall-service.js
 ```
+
+### 7.3. Mostrar el panel de control automáticamente al iniciar sesión
+
+El servicio corre en segundo plano y no tiene interfaz propia — el "panel de control" es la página web servida en `http://localhost:3002`. Para que se abra sola cuando el operador inicia sesión en Windows hay tres opciones según el escenario.
+
+#### Opción A — Modo kiosco (pantalla completa, recomendado para PC dedicada)
+
+1. Crear un acceso directo en el escritorio:
+   - Clic derecho → **Nuevo → Acceso directo**.
+   - Ubicación del elemento (ajustar la ruta del navegador instalado):
+     ```
+     "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --app=http://localhost:3002
+     ```
+     Si solo hay Edge:
+     ```
+     "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --kiosk http://localhost:3002
+     ```
+   - Nombre: `Panel Molinete`.
+
+2. Moverlo a la carpeta de Inicio del usuario:
+   - Tecla `Win + R` → escribir `shell:startup` → Enter.
+   - Pegar el acceso directo en la carpeta que se abre.
+
+3. Reiniciar la PC e iniciar sesión — el panel debe aparecer en pantalla completa.
+
+> Para salir del modo kiosco: `Alt + F4` o `Ctrl + Shift + W`.
+
+#### Opción B — Ventana normal del navegador
+
+Si la PC se usa también para otras tareas y no se quiere kiosco:
+
+1. Mismo procedimiento que en la Opción A, pero sin `--kiosk`:
+   ```
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --app=http://localhost:3002
+   ```
+   `--app=` abre la URL en una ventana sin barra de direcciones, aislada del resto del navegador.
+
+2. Pegar el acceso directo en `shell:startup`.
+
+#### Opción C — Tarea programada con retraso (si el navegador abre antes que el servicio)
+
+Si al loguearse aparece "No se puede acceder al sitio" porque el servicio todavía está terminando de levantar, conviene retrasar la apertura del navegador con el Programador de Tareas:
+
+1. Abrir **Programador de Tareas** (`taskschd.msc`).
+2. **Crear tarea básica** → nombre `Panel Molinete`.
+3. **Desencadenador:** *Al iniciar sesión*.
+4. **Acción:** *Iniciar un programa*.
+   - Programa o script: `chrome.exe` (o ruta completa al ejecutable).
+   - Agregar argumentos: `--kiosk --app=http://localhost:3002`.
+5. Finalizar y abrir las propiedades de la tarea recién creada → pestaña **Desencadenadores** → editar el desencadenador → tildar **Retrasar tarea durante** y poner `30 segundos`.
+
+### 7.4. Verificación end-to-end
+
+1. Reiniciar la PC.
+2. **Sin loguearse**, desde otra máquina en la red, abrir `http://IP_DE_LA_PC_DEL_MOLINETE:3002` — si responde, el servicio arrancó por sí solo.
+3. Iniciar sesión en la PC del molinete: el navegador debe abrir directamente el panel de control.
+4. Confirmar en `services.msc` que **Molinete RojoPlus** sigue en estado **En ejecución**.
+5. Probar desconectar y volver a conectar un lector — revisar `logs/molinete.log` para verificar que el servicio reconecta solo.
+6. Cortar y restablecer la red para confirmar que el modo offline (cache SQLite) sigue resolviendo accesos sin conexión al servidor.
 
 ---
 

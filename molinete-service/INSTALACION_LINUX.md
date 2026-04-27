@@ -923,6 +923,17 @@ sudo journalctl -u molinete -f      # Ver logs en tiempo real
 sudo journalctl -u molinete -n 100  # Ver últimas 100 líneas de log
 ```
 
+### Verificación end-to-end
+
+Para confirmar que la PC arranca completamente sola (servicio + panel en pantalla) sin intervención:
+
+1. Reiniciar la PC con `sudo reboot`.
+2. Antes de tocar nada, desde otra máquina en la red abrir `http://IP_DE_LA_PC_DEL_MOLINETE:3002` — si responde, el servicio levantó por sí solo gracias a systemd.
+3. La pantalla local debe mostrar el panel en kiosco apenas termina el autologin (sección 8).
+4. Confirmar `sudo systemctl is-active molinete` → `active`.
+5. Probar desconectar y reconectar un lector — `sudo journalctl -u molinete -f` debe mostrar la reconexión.
+6. Cortar la red durante un acceso para validar el modo offline (cache SQLite).
+
 ---
 
 ## 10. Troubleshooting
