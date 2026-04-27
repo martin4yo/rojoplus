@@ -1,13 +1,17 @@
 /**
- * Script para importar cuotas históricas desde Brio
+ * Script para importar cuotas históricas desde Brio.
  *
- * Uso: node scripts/importar-cuotas-historicas.js
+ * NOTA: para el flujo de migración Brio recomendado, usar `importar-cuotas.js` que es más
+ * completo. Este script existe para casos puntuales de carga histórica masiva.
+ *
+ * Uso: node scripts/importar-cuotas-historicas.js --tenant <slug>
  */
 
 import { PrismaClient } from '@prisma/client'
 import XLSX from 'xlsx'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -83,11 +87,16 @@ function parseActividadCategoria(descCuota) {
 async function main() {
   console.log('=== Importación de Cuotas Históricas ===\n')
 
-  // 0. Verificar si ya hay cargos en la BD
-  const cargosExistentes = await prisma.cargo.count()
+  // ── Tenant ────────────────────────────────────────────────────────────────
+  const tenant = await resolveTenant(prisma, 'importar-cuotas-historicas.js')
+  const tenantId = tenant.id
+
+  // 0. Verificar si ya hay cargos en la BD del tenant
+  const cargosExistentes = await prisma.cargo.count({ where: { tenantId } })
   if (cargosExistentes > 0) {
-    console.log(`⚠️  Ya existen ${cargosExistentes} cargos en la base de datos.`)
-    console.log('   Si deseas reimportar, primero ejecuta: DELETE FROM cargos;')
+    console.log(`⚠️  Ya existen ${cargosExistentes} cargos en este tenant.`)
+    console.log(`   Si deseas reimportar, primero ejecutá:`)
+    console.log(`     DELETE FROM cargos WHERE tenant_id = ${tenantId};`)
     console.log('   Abortando importación.\n')
     return
   }
@@ -105,9 +114,10 @@ async function main() {
 
   console.log(`Total de registros a procesar: ${rows.length}`)
 
-  // 2. Cargar socios existentes (con info de familia)
+  // 2. Cargar socios existentes (con info de familia) del tenant
   console.log('\nCargando socios...')
   const socios = await prisma.socio.findMany({
+    where: { tenantId },
     select: { id: true, nroSocio: true, titularFamiliaId: true },
   })
   // Crear mapa con nroSocio como string Y como número para coincidir con ambos formatos
@@ -120,9 +130,10 @@ async function main() {
   })
   console.log(`Socios cargados: ${socios.length}`)
 
-  // 3. Cargar actividades y categorías
+  // 3. Cargar actividades y categorías del tenant
   console.log('Cargando actividades y categorías...')
   const actividades = await prisma.actividad.findMany({
+    where: { tenantId },
     include: { categorias: true },
   })
 
@@ -299,6 +310,7 @@ async function main() {
 
       // Crear objeto cargo
       const cargo = {
+        tenantId,
         periodoId,
         socioId,
         grupoFamiliarId,

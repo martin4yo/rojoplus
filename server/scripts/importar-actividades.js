@@ -2,36 +2,29 @@
  * Importar actividades, categorías e inscripciones desde ActividadesStatus.xlsx
  *
  * Uso:
- *   node scripts/importar-actividades.js <tenant-slug> [--dry-run] [--reset]
+ *   node scripts/importar-actividades.js --tenant <slug> [--dry-run] [--reset]
  *
  *   --dry-run : muestra qué haría sin escribir nada
  *   --reset   : borra inscripciones, categorías y actividades del tenant antes de importar
  *               (si se omite, solo inserta/omite sin borrar nada)
  *
  * Ejemplo:
- *   node scripts/importar-actividades.js sportivopilar
- *   node scripts/importar-actividades.js sportivopilar --reset
+ *   node scripts/importar-actividades.js --tenant sportivopilar
+ *   node scripts/importar-actividades.js --tenant sportivopilar --reset
  */
 
 import XLSX from 'xlsx'
 import { PrismaClient } from '@prisma/client'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { flag, resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // ── Argumentos CLI ──────────────────────────────────────────────────────────
-const args = process.argv.slice(2)
-const TENANT_SLUG = args.find(a => !a.startsWith('--'))
-const DRY_RUN     = args.includes('--dry-run')
-const RESET       = args.includes('--reset')
-
-if (!TENANT_SLUG) {
-  console.error('ERROR: Debes pasar el tenant slug como primer argumento.')
-  console.error('  Uso: node scripts/importar-actividades.js <tenant-slug> [--dry-run] [--reset]')
-  process.exit(1)
-}
+const DRY_RUN = flag('dry-run')
+const RESET   = flag('reset')
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -66,13 +59,8 @@ const prisma = new PrismaClient()
 
 async function main() {
   // 1. Tenant
-  const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })
-  if (!tenant) {
-    console.error(`ERROR: Tenant "${TENANT_SLUG}" no encontrado.`)
-    process.exit(1)
-  }
+  const tenant = await resolveTenant(prisma, 'importar-actividades.js')
   const tenantId = tenant.id
-  console.log(`Tenant: ${tenant.nombre} (id=${tenantId})`)
   if (DRY_RUN) console.log('*** MODO DRY-RUN: no se escribirá nada ***\n')
 
   // 2. Leer Excel

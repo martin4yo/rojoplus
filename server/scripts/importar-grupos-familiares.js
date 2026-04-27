@@ -1,14 +1,14 @@
 /**
  * Script de importación de grupos familiares desde GruposFamiliares.xlsx (Brio)
  *
- * Ejecutar con: node scripts/importar-grupos-familiares.js <tenantId>
- * Ejemplo:      node scripts/importar-grupos-familiares.js 1
+ * Ejecutar con: node scripts/importar-grupos-familiares.js --tenant <slug>
  */
 
 import { PrismaClient } from '@prisma/client'
 import XLSX from 'xlsx'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -16,25 +16,10 @@ const __dirname = path.dirname(__filename)
 const prisma = new PrismaClient()
 
 async function main() {
-  // Leer slug desde argumento de línea de comandos
-  const slug = process.argv[2]
-  if (!slug) {
-    console.error('❌ Falta el slug. Uso: node scripts/importar-grupos-familiares.js <slug>')
-    console.error('   Ejemplo: node scripts/importar-grupos-familiares.js sportivopilar')
-    process.exit(1)
-  }
-
-  // Verificar que el tenant existe
-  const tenant = await prisma.tenant.findUnique({ where: { slug } })
-  if (!tenant) {
-    console.error(`❌ Tenant con slug "${slug}" no encontrado`)
-    process.exit(1)
-  }
-
+  const tenant = await resolveTenant(prisma, 'importar-grupos-familiares.js')
   const tenantId = tenant.id
 
-  console.log(`🚀 Iniciando importación de grupos familiares desde Brio...\n`)
-  console.log(`   Tenant: [${tenantId}] ${tenant.nombre}\n`)
+  console.log(`\n🚀 Iniciando importación de grupos familiares desde Brio...\n`)
 
   // 1. Leer el archivo Excel
   const filePath = path.join(__dirname, '..', '..', 'brio', 'GruposFamiliares.xlsx')

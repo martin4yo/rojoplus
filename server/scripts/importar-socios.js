@@ -1,13 +1,17 @@
 /**
- * Script de importación de socios desde Socios.xlsx (Brio)
+ * Script de importación de socios desde Socios.xlsx (Brio).
  *
- * Ejecutar con: node scripts/importar-socios.js
+ * NOTA: La importación recomendada es desde la UI (`/admin/socios` → Importar Excel).
+ * Este script existe como alternativa para procesos automatizados.
+ *
+ * Ejecutar con: node scripts/importar-socios.js --tenant <slug>
  */
 
 import { PrismaClient } from '@prisma/client'
 import XLSX from 'xlsx'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -101,7 +105,11 @@ function mapearCondicionIVA(condicion) {
 }
 
 async function main() {
-  console.log('🚀 Iniciando importación de socios desde Brio...\n')
+  // 0. Tenant
+  const tenant = await resolveTenant(prisma, 'importar-socios.js')
+  const tenantId = tenant.id
+
+  console.log('\n🚀 Iniciando importación de socios desde Brio...\n')
 
   // 1. Leer el archivo Excel
   const filePath = path.join(__dirname, '..', '..', 'brio', 'Socios.xlsx')
@@ -202,9 +210,9 @@ async function main() {
         // Ignorar vacíos, 0 o guiones
         if (val && val !== '0' && val !== '-' && val.toLowerCase() !== 'null') {
           rfidUid = val
-          // Verificar que no esté asignado a otro socio distinto
+          // Verificar que no esté asignado a otro socio distinto del MISMO tenant
           const conflictivo = await prisma.socio.findFirst({
-            where: { rfidUid, NOT: { nroSocio } },
+            where: { tenantId, rfidUid, NOT: { nroSocio } },
             select: { nroSocio: true }
           })
           if (conflictivo) {
@@ -225,9 +233,9 @@ async function main() {
         continue
       }
 
-      // Verificar si ya existe
+      // Verificar si ya existe en este tenant
       const socioExistente = await prisma.socio.findUnique({
-        where: { nroSocio }
+        where: { tenantId_nroSocio: { tenantId, nroSocio } }
       })
 
       // Crear apellidoNombre combinado (requerido por el schema)
@@ -236,7 +244,7 @@ async function main() {
       if (socioExistente) {
         // Actualizar (solo se pisa el rfidUid si viene un valor; si no, se conserva el existente)
         await prisma.socio.update({
-          where: { nroSocio },
+          where: { id: socioExistente.id },
           data: {
             apellidoNombre: apellidoNombreCompleto,
             nombre,
@@ -276,6 +284,7 @@ async function main() {
         // Crear nuevo
         await prisma.socio.create({
           data: {
+            tenantId,
             nroSocio,
             apellidoNombre: apellidoNombreCompleto,
             nombre,

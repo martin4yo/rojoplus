@@ -4,7 +4,7 @@
  * - Si Nro. Socio existe en tabla socios → movimiento de socio
  * - Si NO existe → movimiento de entidad (proveedor/empleado)
  *
- * Ejecutar con: node scripts/importar-movimientos.js
+ * Ejecutar con: node scripts/importar-movimientos.js --tenant <slug>
  * Prerequisito: Pasos 1 (socios) y 4 (proveedores) completados
  */
 
@@ -12,12 +12,12 @@ import XLSX from 'xlsx'
 import { PrismaClient } from '@prisma/client'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const prisma = new PrismaClient()
-const TENANT_SLUG = 'sportivopilar'
 
 function excelDateToJS(val) {
   if (!val) return new Date()
@@ -52,10 +52,8 @@ function inferirTipo(concepto, estadoCuota) {
 
 async function importarMovimientos() {
   try {
-    const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })
-    if (!tenant) throw new Error(`Tenant "${TENANT_SLUG}" no encontrado`)
+    const tenant = await resolveTenant(prisma, 'importar-movimientos.js')
     const tenantId = tenant.id
-    console.log(`Tenant: ${tenant.nombre} (id=${tenantId})`)
 
     // Leer Conceptos.xlsx
     const filePath = path.join(__dirname, '../../brio/Conceptos.xlsx')

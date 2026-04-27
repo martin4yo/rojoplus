@@ -2,7 +2,7 @@
  * Script para importar entidades (proveedores/empleados/servicios) desde Conceptos.xlsx
  * Importa como Entidad tipo PROVEEDOR todos los Nro. que NO existen en la tabla socios
  *
- * Ejecutar con: node scripts/importar-proveedores.js
+ * Ejecutar con: node scripts/importar-proveedores.js --tenant <slug>
  * Prerequisito: Paso 1 (socios) completado
  */
 
@@ -10,19 +10,17 @@ import XLSX from 'xlsx'
 import { PrismaClient } from '@prisma/client'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const prisma = new PrismaClient()
-const TENANT_SLUG = 'sportivopilar'
 
 async function importarProveedores() {
   try {
-    const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })
-    if (!tenant) throw new Error(`Tenant "${TENANT_SLUG}" no encontrado`)
+    const tenant = await resolveTenant(prisma, 'importar-proveedores.js')
     const tenantId = tenant.id
-    console.log(`Tenant: ${tenant.nombre} (id=${tenantId})`)
 
     // Leer Conceptos.xlsx
     const filePath = path.join(__dirname, '../../brio/Conceptos.xlsx')

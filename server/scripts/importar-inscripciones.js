@@ -1,19 +1,19 @@
 /**
  * Script para importar inscripciones de socios a actividades desde ActividadesStatus.xlsx
  * IMPORTANTE: Ejecutar DESPUÉS de importar-actividades.js
- * Ejecutar con: node scripts/importar-inscripciones.js
+ * Ejecutar con: node scripts/importar-inscripciones.js --tenant <slug>
  */
 
 import XLSX from 'xlsx'
 import { PrismaClient } from '@prisma/client'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const prisma = new PrismaClient()
-const TENANT_SLUG = 'sportivopilar'
 
 function excelDateToJS(val) {
   if (!val) return new Date()
@@ -24,10 +24,8 @@ function excelDateToJS(val) {
 
 async function importarInscripciones() {
   try {
-    const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })
-    if (!tenant) throw new Error(`Tenant "${TENANT_SLUG}" no encontrado`)
+    const tenant = await resolveTenant(prisma, 'importar-inscripciones.js')
     const tenantId = tenant.id
-    console.log(`Tenant: ${tenant.nombre} (id=${tenantId})`)
 
     // Limpiar inscripciones del tenant
     console.log('\nLimpiando inscripciones...')

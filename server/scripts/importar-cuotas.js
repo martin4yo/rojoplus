@@ -44,6 +44,7 @@ import XLSX from 'xlsx'
 import { PrismaClient } from '@prisma/client'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { arg, resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -51,12 +52,10 @@ const __dirname = path.dirname(__filename)
 const prisma = new PrismaClient()
 
 // ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
-const TENANT_SLUG = 'sportivotest'
-
-// Importar solo períodos POSTERIORES a este mes/año (exclusive)
-// Ej: 4/2026 → importa desde mayo 2026 en adelante
-const PERIODO_DESDE_ANIO = 2026
-const PERIODO_DESDE_MES  = 4
+// Tenant se pasa por --tenant <slug>
+// Periodos por --desde-anio <año> --desde-mes <mes> (default: año actual y mes 4)
+const PERIODO_DESDE_ANIO = parseInt(arg('desde-anio', String(new Date().getFullYear())))
+const PERIODO_DESDE_MES  = parseInt(arg('desde-mes',  '4'))
 // ─────────────────────────────────────────────────────────────────────────────
 
 function excelDateToJS(val) {
@@ -96,10 +95,9 @@ function mapCategoria(tipoCuota, descCuota) {
 async function importarCuotas() {
   try {
     // ── Tenant ────────────────────────────────────────────────────────────────
-    const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })
-    if (!tenant) throw new Error(`Tenant "${TENANT_SLUG}" no encontrado`)
+    const tenant = await resolveTenant(prisma, 'importar-cuotas.js')
     const tenantId = tenant.id
-    console.log(`Tenant: ${tenant.nombre} (id=${tenantId})`)
+    console.log(`Filtro de período: desde ${PERIODO_DESDE_MES}/${PERIODO_DESDE_ANIO} en adelante`)
 
     // ── Leer Excel ────────────────────────────────────────────────────────────
     const filePath = path.join(__dirname, '../../brio/Cuotas.xlsx')
