@@ -57,8 +57,9 @@ export default function PermitirAccesoManualModal({ isOpen, onClose, dispositivo
     debounceRef.current = setTimeout(async () => {
       setBuscando(true)
       try {
-        const res = await api.get(`/accesos/buscar-socio?q=${encodeURIComponent(query.trim())}`)
-        setResultados(res?.data || [])
+        // api.get devuelve data.data ya unwrapped → es directamente el array de socios
+        const data = await api.get(`/accesos/buscar-socio?q=${encodeURIComponent(query.trim())}`)
+        setResultados(Array.isArray(data) ? data : [])
       } catch (err) {
         setResultados([])
       } finally {
@@ -91,7 +92,8 @@ export default function PermitirAccesoManualModal({ isOpen, onClose, dispositivo
         motivo,
         observaciones: observaciones.trim() || null,
       }
-      const res = await api.post('/accesos/permitir-manual', body)
+      // api.post unwrappea: res es ya el data del backend
+      const res = await api.postFull('/accesos/permitir-manual', body)
       setMensajeOk(res?.message || 'Acceso permitido — olvido registrado')
       if (onPermitido) onPermitido(seleccionado, res?.data || null)
       // cerrar a los 1.5s

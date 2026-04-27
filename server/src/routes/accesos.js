@@ -932,15 +932,22 @@ router.get('/buscar-socio', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GES
       return res.json({ success: true, data: [] })
     }
     const term = q.trim()
+    // Limpiar el término por si el usuario escribe DNI con puntos/espacios/guiones
+    const termClean = term.replace(/[.\s-]/g, '')
 
-    const socios = await req.db.socio.findMany({
-      where: {
-        OR: [
-          { apellidoNombre: { contains: term, mode: 'insensitive' } },
-          { nroSocio: { contains: term } },
-          { documento: { contains: term } }
-        ]
-      },
+    const orConditions = [
+      { apellidoNombre: { contains: term, mode: 'insensitive' } },
+      { nroSocio: { contains: term } },
+      { documento: { contains: term } },
+    ]
+    // Si el término tiene caracteres no-alfanuméricos, agregar variante limpia
+    if (termClean !== term && termClean.length >= 2) {
+      orConditions.push({ documento: { contains: termClean } })
+      orConditions.push({ nroSocio: { contains: termClean } })
+    }
+
+    let socios = await req.db.socio.findMany({
+      where: { OR: orConditions },
       select: {
         id: true,
         nroSocio: true,
@@ -952,6 +959,25 @@ router.get('/buscar-socio', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GES
       take: 15,
       orderBy: { apellidoNombre: 'asc' }
     })
+
+    // Fallback: si no hubo resultados y el término parece numérico (DNI),
+    // intentar con SQL raw normalizando el documento en la DB (por si está cargado con puntos).
+    const pareceDni = /^[\d.\s-]+$/.test(term) && termClean.length >= 4
+    if (socios.length === 0 && pareceDni) {
+      socios = await req.db.$queryRaw`
+        SELECT id,
+               nro_socio        AS "nroSocio",
+               apellido_nombre  AS "apellidoNombre",
+               documento,
+               estado,
+               foto_url         AS "fotoUrl"
+        FROM socios
+        WHERE tenant_id = ${req.tenantId}
+          AND regexp_replace(coalesce(documento, ''), '[.\s-]', '', 'g') ILIKE ${'%' + termClean + '%'}
+        ORDER BY apellido_nombre ASC
+        LIMIT 15
+      `
+    }
 
     // Para cada socio, contar olvidos en los últimos 30 días
     const hace30Dias = new Date(Date.now() - 30 * 86400000)

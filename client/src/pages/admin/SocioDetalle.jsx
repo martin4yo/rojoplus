@@ -86,8 +86,9 @@ export default function SocioDetalle() {
     if (!id) return
     setLoadingOlvidos(true)
     try {
-      const res = await api.get(`/accesos/socios/${id}/olvidos`)
-      setOlvidos(res?.data || [])
+      // api.get devuelve data.data unwrapped
+      const data = await api.get(`/accesos/socios/${id}/olvidos`)
+      setOlvidos(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Error cargando olvidos:', err)
     } finally {
