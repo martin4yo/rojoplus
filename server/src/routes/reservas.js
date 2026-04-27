@@ -8,6 +8,7 @@ import {
   enviarCancelacionReserva,
 } from '../services/email.js'
 import { crearReembolso } from '../services/mercadopago.js'
+import { obtenerTelefonoSocio } from '../services/whatsappService.js'
 
 const router = Router()
 
@@ -499,7 +500,7 @@ router.post('/socio/:token', asyncHandler(async (req, res) => {
   req.body.nombre = req.body.nombre || socio.nombre
   req.body.apellido = req.body.apellido || socio.apellido
   req.body.email = req.body.email || socio.email
-  req.body.telefono = req.body.telefono || socio.celular
+  req.body.telefono = req.body.telefono || obtenerTelefonoSocio(socio) || ''
   req.body.dni = req.body.dni || socio.dni
 
   // Llamar el handler principal reutilizando el router interno
@@ -559,7 +560,7 @@ router.post('/socio/:token', asyncHandler(async (req, res) => {
           nombreReserva: socio.nombre,
           apellido: socio.apellido,
           email: socio.email,
-          telefono: socio.celular,
+          telefono: obtenerTelefonoSocio(socio) || '',
           dni: socio.dni,
           esSocio: true,
           precioTotal: precio,

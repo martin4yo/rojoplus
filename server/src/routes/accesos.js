@@ -920,6 +920,170 @@ router.post('/abrir-molinete', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_
 })
 
 /**
+ * GET /api/accesos/buscar-socio?q=xxx
+ * Busca socios por nombre, número de socio o documento — para el flujo de
+ * "permitir acceso manual sin documento". Devuelve estado al día y cantidad
+ * de olvidos de documento en los últimos 30 días.
+ */
+router.get('/buscar-socio', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+  try {
+    const { q } = req.query
+    if (!q || q.trim().length < 2) {
+      return res.json({ success: true, data: [] })
+    }
+    const term = q.trim()
+
+    const socios = await req.db.socio.findMany({
+      where: {
+        OR: [
+          { apellidoNombre: { contains: term, mode: 'insensitive' } },
+          { nroSocio: { contains: term } },
+          { documento: { contains: term } }
+        ]
+      },
+      select: {
+        id: true,
+        nroSocio: true,
+        apellidoNombre: true,
+        documento: true,
+        estado: true,
+        fotoUrl: true,
+      },
+      take: 15,
+      orderBy: { apellidoNombre: 'asc' }
+    })
+
+    // Para cada socio, contar olvidos en los últimos 30 días
+    const hace30Dias = new Date(Date.now() - 30 * 86400000)
+    const sociosConOlvidos = await Promise.all(socios.map(async (s) => {
+      const olvidosUltimos30 = await req.db.olvidoDocumento.count({
+        where: { socioId: s.id, fecha: { gte: hace30Dias } }
+      })
+      return { ...s, olvidosUltimos30 }
+    }))
+
+    res.json({ success: true, data: sociosConOlvidos })
+  } catch (error) {
+    console.error('Error buscando socios:', error)
+    res.status(500).json({ success: false, error: 'Error en la búsqueda' })
+  }
+})
+
+/**
+ * POST /api/accesos/permitir-manual
+ * Permite el acceso de un socio sin documento (lo registra como olvido).
+ * Bloquea si el socio NO está vigente (moroso, suspendido, etc).
+ * body: { socioId, dispositivoId, motivo (SIN_DNI|SIN_CARNET|OTRO), observaciones }
+ */
+router.post('/permitir-manual', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GESTIONAR'), async (req, res) => {
+  try {
+    const { socioId, dispositivoId, motivo, observaciones } = req.body
+    const adminId = req.admin?.id
+
+    if (!socioId) return res.status(400).json({ success: false, error: 'socioId es requerido' })
+    if (!motivo) return res.status(400).json({ success: false, error: 'motivo es requerido' })
+
+    const socio = await req.db.socio.findUnique({
+      where: { id: parseInt(socioId) },
+      select: { id: true, apellidoNombre: true, nroSocio: true, estado: true }
+    })
+    if (!socio) return res.status(404).json({ success: false, error: 'Socio no encontrado' })
+
+    // Bloqueo: socio NO vigente no puede pasar
+    const estadoUp = socio.estado?.toUpperCase() || ''
+    const esVigente = estadoUp.includes('VIGENT') || estadoUp.includes('ACTIV')
+    if (!esVigente) {
+      return res.status(403).json({
+        success: false,
+        error: `Socio ${socio.estado} — no se puede permitir el acceso. Debe pasar por Secretaría.`,
+        code: 'SOCIO_NO_VIGENTE'
+      })
+    }
+
+    // Crear olvido + registro de acceso en transacción
+    await req.db.$transaction(async (tx) => {
+      await tx.olvidoDocumento.create({
+        data: {
+          socioId: socio.id,
+          motivo,
+          observaciones: observaciones || null,
+          registradoPor: adminId
+        }
+      })
+
+      if (dispositivoId) {
+        await tx.registroAcceso.create({
+          data: {
+            dispositivoId: parseInt(dispositivoId),
+            socioId: socio.id,
+            tipoLectura: 'MANUAL',
+            valorLeido: socio.nroSocio || socio.id.toString(),
+            nombreCompleto: socio.apellidoNombre,
+            resultado: 'PERMITIDO',
+            motivoRechazo: null,
+            modoValidacion: 'MANUAL_SIN_DOC'
+          }
+        })
+      }
+    })
+
+    // Contar total de olvidos del socio para devolver al frontend
+    const totalOlvidos = await req.db.olvidoDocumento.count({ where: { socioId: socio.id } })
+    const hace30Dias = new Date(Date.now() - 30 * 86400000)
+    const ultimos30 = await req.db.olvidoDocumento.count({
+      where: { socioId: socio.id, fecha: { gte: hace30Dias } }
+    })
+
+    res.json({
+      success: true,
+      message: `Acceso permitido a ${socio.apellidoNombre}. Olvido registrado.`,
+      data: { totalOlvidos, ultimos30 }
+    })
+  } catch (error) {
+    console.error('Error permitiendo manual:', error)
+    res.status(500).json({ success: false, error: 'Error registrando el acceso manual' })
+  }
+})
+
+/**
+ * GET /api/accesos/socios/:id/olvidos
+ * Historial de olvidos de documento de un socio.
+ */
+router.get('/socios/:id/olvidos', tenantForAdmin, authAdmin, async (req, res) => {
+  try {
+    const socioId = parseInt(req.params.id)
+    const olvidos = await req.db.olvidoDocumento.findMany({
+      where: { socioId },
+      orderBy: { fecha: 'desc' }
+    })
+
+    // Resolver nombres de admins (consulta separada)
+    const adminIds = [...new Set(olvidos.map(o => o.registradoPor))]
+    const admins = adminIds.length
+      ? await req.db.admin.findMany({
+          where: { id: { in: adminIds } },
+          select: { id: true, nombre: true, apellido: true, email: true }
+        })
+      : []
+    const adminMap = new Map(admins.map(a => [a.id, a]))
+
+    const conAdmin = olvidos.map(o => ({
+      ...o,
+      registradoPorNombre: (() => {
+        const a = adminMap.get(o.registradoPor)
+        if (!a) return 'Sistema'
+        return `${a.nombre || ''} ${a.apellido || ''}`.trim() || a.email
+      })()
+    }))
+
+    res.json({ success: true, data: conAdmin })
+  } catch (error) {
+    console.error('Error obteniendo historial de olvidos:', error)
+    res.status(500).json({ success: false, error: 'Error obteniendo historial' })
+  }
+})
+
+/**
  * POST /api/accesos/registrar-ingreso-entrada
  * Registra el ingreso de una entrada de evento
  */

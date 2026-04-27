@@ -2,7 +2,7 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
-import { enviarLinkPortal } from '../services/whatsappService.js'
+import { enviarLinkPortal, obtenerTelefonoSocio } from '../services/whatsappService.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
 import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.js'
 import { generatePDF } from '../services/pdfGenerator.js'
@@ -337,7 +337,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   }
 
   if (metodo === 'whatsapp') {
-    const telefono = socio.celular || socio.celularSecundario || socio.telefonoFijo
+    const telefono = obtenerTelefonoSocio(socio)
     if (!telefono) {
       throw new AppError('Este socio no tiene teléfono registrado. Contactá al club.', 400, 'NO_PHONE')
     }
@@ -368,8 +368,8 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   const portalLink = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${token}`
 
   if (metodo === 'whatsapp') {
-    // Enviar solo por WhatsApp
-    const telefono = socio.celular || socio.celularSecundario || socio.telefonoFijo
+    // Enviar solo por WhatsApp (resolver teléfono con fallback)
+    const telefono = obtenerTelefonoSocio(socio)
     await enviarLinkPortal({ db: req.db, socio: { ...socio, celular: telefono }, link: portalLink })
     const telOculto = telefono.replace(/(\d{3})\d+(\d{3})/, '$1****$2')
     res.json({

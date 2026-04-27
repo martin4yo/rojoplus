@@ -364,6 +364,7 @@ model Socio {
   pedidosTakeAway              PedidoTakeAway[]
   pushSubscriptions            PushSubscription[]
   registrosAcceso              RegistroAcceso[]
+  olvidosDocumento             OlvidoDocumento[]
   saldosFavor                  SaldoFavor[]
   categoriaSocioRel            CategoriaSocio?          @relation(fields: [categoriaSocioId], references: [id])
   cobrador                     Cobrador?                @relation(fields: [cobradorId], references: [id])
@@ -3860,6 +3861,23 @@ model RegistroAcceso {
   @@index([resultado])
   @@index([tenantId])
   @@map("registros_acceso")
+}
+
+model OlvidoDocumento {
+  id            Int      @id @default(autoincrement())
+  socioId       Int      @map("socio_id")
+  fecha         DateTime @default(now())
+  motivo        String // SIN_DNI | SIN_CARNET | OTRO
+  observaciones String?
+  registradoPor Int      @map("registrado_por")
+  socio         Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
+
+  tenantId Int @map("tenant_id")
+
+  @@index([socioId])
+  @@index([fecha])
+  @@index([tenantId])
+  @@map("olvidos_documento")
 }
 
 model HabilitacionTemporal {

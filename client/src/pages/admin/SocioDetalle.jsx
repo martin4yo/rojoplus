@@ -39,6 +39,10 @@ export default function SocioDetalle() {
   // Modal de acciones del recibo (cuenta corriente)
   const [reciboModal, setReciboModal] = useState(null) // { pagoId, numeroRecibo }
 
+  // Historial de olvidos de documento
+  const [olvidos, setOlvidos] = useState([])
+  const [loadingOlvidos, setLoadingOlvidos] = useState(false)
+
   // Modal QR
   const [qrModal, setQrModal] = useState(false)
   const [regenerando, setRegenerando] = useState(false)
@@ -75,7 +79,21 @@ export default function SocioDetalle() {
 
   useEffect(() => {
     cargarSocio()
+    cargarOlvidos()
   }, [id])
+
+  async function cargarOlvidos() {
+    if (!id) return
+    setLoadingOlvidos(true)
+    try {
+      const res = await api.get(`/accesos/socios/${id}/olvidos`)
+      setOlvidos(res?.data || [])
+    } catch (err) {
+      console.error('Error cargando olvidos:', err)
+    } finally {
+      setLoadingOlvidos(false)
+    }
+  }
 
   useEffect(() => {
     if (activeTab === 'familia' && socio?.titularFamilia) {
@@ -1283,6 +1301,53 @@ export default function SocioDetalle() {
             )}
           </div>
         )}
+
+        {/* Historial de olvidos de documento */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Olvidos de documento</h2>
+              <p className="text-xs text-gray-500">Veces que se le permitió el acceso sin DNI/carnet</p>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+              olvidos.length === 0 ? 'bg-gray-100 text-gray-600' :
+              olvidos.length >= 5 ? 'bg-red-100 text-red-700' :
+              olvidos.length >= 3 ? 'bg-orange-100 text-orange-700' :
+              'bg-yellow-100 text-yellow-700'
+            }`}>
+              {olvidos.length} {olvidos.length === 1 ? 'registro' : 'registros'}
+            </span>
+          </div>
+
+          {loadingOlvidos ? (
+            <p className="text-sm text-gray-500 text-center py-4">Cargando...</p>
+          ) : olvidos.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">Este socio no tiene olvidos registrados.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Fecha</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Motivo</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Observaciones</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Registró</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {olvidos.map(o => (
+                    <tr key={o.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{new Date(o.fecha).toLocaleString('es-AR')}</td>
+                      <td className="px-3 py-2 text-gray-700">{o.motivo === 'SIN_DNI' ? 'Sin DNI' : o.motivo === 'SIN_CARNET' ? 'Sin carnet' : 'Otro'}</td>
+                      <td className="px-3 py-2 text-gray-600">{o.observaciones || '-'}</td>
+                      <td className="px-3 py-2 text-gray-600">{o.registradoPorNombre}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modal QR */}

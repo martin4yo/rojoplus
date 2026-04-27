@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Activity, CheckCircle, XCircle, Users, Clock, MapPin,
-  QrCode, CreditCard, Radio, WifiOff, AlertTriangle
+  QrCode, CreditCard, Radio, WifiOff, AlertTriangle, UserCheck
 } from 'lucide-react'
 import Pagination from '../../../components/Pagination'
+import { Button } from '../../../components/Button'
+import PermitirAccesoManualModal from '../../../components/PermitirAccesoManualModal'
 
 const PAGE_SIZE = 20
 const REPEAT_WINDOW_MS = 3 * 60 * 1000 // 3 minutos
@@ -17,6 +19,7 @@ export default function MonitorAccesos() {
   })
   const [dispositivosEstado, setDispositivosEstado] = useState([])
   const [page, setPage] = useState(1)
+  const [permitirManualOpen, setPermitirManualOpen] = useState(false)
 
   // Detecta accesos repetidos: misma persona escaneada dos o más veces en < 3 minutos.
   // Se marca a partir del segundo scan (el primero del burst no es "repetido" todavía).
@@ -169,15 +172,31 @@ export default function MonitorAccesos() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Activity className="w-6 h-6 text-primary" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Activity className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Monitor de Accesos</h1>
+            <p className="text-gray-500 text-sm">Visualización en tiempo real</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Monitor de Accesos</h1>
-          <p className="text-gray-500 text-sm">Visualización en tiempo real</p>
-        </div>
+        <Button onClick={() => setPermitirManualOpen(true)}>
+          <UserCheck className="w-4 h-4 mr-2" />
+          Permitir sin documento
+        </Button>
       </div>
+
+      <PermitirAccesoManualModal
+        isOpen={permitirManualOpen}
+        onClose={() => setPermitirManualOpen(false)}
+        dispositivos={dispositivosEstado}
+        onPermitido={() => {
+          cargarAccesosRecientes()
+          cargarEstadisticas()
+        }}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
