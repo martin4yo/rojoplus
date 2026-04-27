@@ -108,6 +108,8 @@ router.post('/enviar-link-whatsapp', asyncHandler(async (req, res) => {
       nroSocio: true,
       apellidoNombre: true,
       celular: true,
+      celularSecundario: true,
+      telefonoFijo: true,
       tokenPortal: true,
       estado: true,
     },
@@ -123,20 +125,21 @@ router.post('/enviar-link-whatsapp', asyncHandler(async (req, res) => {
     throw new AppError('Tu membresía no está activa. Regulariza tu situación en el club.', 403, 'SOCIO_INACTIVO')
   }
 
-  if (!socio.celular) {
-    throw new AppError('No tenés celular registrado. Contacta al club para actualizarlo.', 400, 'NO_CELULAR')
-  }
-
   if (!socio.tokenPortal) {
     throw new AppError('Error al obtener tu acceso. Contacta al club.', 500, 'NO_TOKEN')
   }
 
+  const { enviarWhatsApp, obtenerTelefonoSocio } = await import('../services/whatsappService.js')
+  const telefono = obtenerTelefonoSocio(socio)
+  if (!telefono) {
+    throw new AppError('No tenés teléfono registrado. Contacta al club para actualizarlo.', 400, 'NO_TELEFONO')
+  }
+
   const portalUrl = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${socio.tokenPortal}`
 
-  const { enviarWhatsApp } = await import('../services/whatsappService.js')
   const resultado = await enviarWhatsApp({
     db: req.db,
-    telefono: socio.celular,
+    telefono,
     texto: `Hola ${socio.apellidoNombre.split(',')[0].trim()}! Aquí está tu link de acceso al portal del socio:\n\n${portalUrl}\n\nGuardalo para acceder a tus datos, pagos y beneficios.`,
     ignorarHorario: true,
   })
@@ -179,6 +182,8 @@ router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
       nroSocio: true,
       apellidoNombre: true,
       celular: true,
+      celularSecundario: true,
+      telefonoFijo: true,
       tokenPortal: true,
       estado: true,
     },
@@ -194,12 +199,14 @@ router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
     throw new AppError('Tu membresía no está activa. Regularizá tu situación en el club.', 403, 'SOCIO_INACTIVO')
   }
 
-  if (!socio.celular) {
-    throw new AppError('No tenés celular registrado. Contactá al club para actualizarlo.', 400, 'NO_CELULAR')
-  }
-
   if (!socio.tokenPortal) {
     throw new AppError('Error al obtener tu QR. Contactá al club.', 500, 'NO_TOKEN')
+  }
+
+  const { obtenerTelefonoSocio } = await import('../services/whatsappService.js')
+  const telefonoEnvio = obtenerTelefonoSocio(socio)
+  if (!telefonoEnvio) {
+    throw new AppError('No tenés teléfono registrado. Contactá al club para actualizarlo.', 400, 'NO_TELEFONO')
   }
 
   const qrUrl = `${getTenantFrontendUrl(req.tenant)}/s/${socio.tokenPortal}`
@@ -256,7 +263,7 @@ router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
   const { enviarWhatsAppImagen } = await import('../services/whatsappService.js')
   const resultado = await enviarWhatsAppImagen({
     db: req.db,
-    telefono: socio.celular,
+    telefono: telefonoEnvio,
     imagenBase64,
     caption,
     ignorarHorario: true,

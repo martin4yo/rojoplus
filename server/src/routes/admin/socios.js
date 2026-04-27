@@ -690,20 +690,25 @@ router.post('/socios/:id/enviar-portal-whatsapp', authAdmin, asyncHandler(async 
 
   const socio = await req.db.socio.findUnique({
     where: { id: parseInt(id) },
-    select: { id: true, apellidoNombre: true, celular: true, tokenPortal: true, estado: true },
+    select: {
+      id: true, apellidoNombre: true, tokenPortal: true, estado: true,
+      celular: true, celularSecundario: true, telefonoFijo: true,
+    },
   })
 
   if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
-  if (!socio.celular) throw new AppError('El socio no tiene celular registrado', 400, 'NO_CELULAR')
   if (!socio.tokenPortal) throw new AppError('El socio no tiene token de portal', 400, 'NO_TOKEN')
+
+  const { obtenerTelefonoSocio, enviarWhatsApp } = await import('../../services/whatsappService.js')
+  const telefono = obtenerTelefonoSocio(socio)
+  if (!telefono) throw new AppError('El socio no tiene teléfono registrado (celular, celular secundario ni teléfono fijo)', 400, 'NO_TELEFONO')
 
   const { getTenantFrontendUrl } = await import('../../lib/tenantUrl.js')
   const portalUrl = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${socio.tokenPortal}`
 
-  const { enviarWhatsApp } = await import('../../services/whatsappService.js')
   const resultado = await enviarWhatsApp({
     db: req.db,
-    telefono: socio.celular,
+    telefono,
     texto: `Hola ${socio.apellidoNombre.split(',')[0].trim()}! Aqui esta tu link de acceso al portal del socio:\n\n${portalUrl}\n\nGuardalo para acceder a tus datos, pagos y beneficios.`,
     ignorarHorario: true,
   })
