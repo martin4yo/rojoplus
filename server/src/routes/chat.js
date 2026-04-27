@@ -117,7 +117,7 @@ router.post(
     // Determinar contexto según el token/auth
     if (tokenPortal) {
       // Es un socio
-      const socio = await req.db.socio.findUnique({
+      const socio = await req.db.socio.findFirst({
         where: { tokenPortal }
       })
 
@@ -261,7 +261,7 @@ router.post(
     }
 
     // Validar socio
-    const socio = await req.db.socio.findUnique({
+    const socio = await req.db.socio.findFirst({
       where: { tokenPortal },
       select: { id: true, nroSocio: true, apellidoNombre: true }
     })

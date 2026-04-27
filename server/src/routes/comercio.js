@@ -84,7 +84,7 @@ router.get('/:token/socios/buscar-qr', asyncHandler(authComercio), asyncHandler(
     throw new AppError('Token de socio requerido', 400, 'VALIDATION_ERROR')
   }
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: tokenSocio },
     select: {
       id: true,

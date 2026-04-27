@@ -17,6 +17,7 @@ import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { formatDate } from '../../utils/formatters'
 import StatusBadge from '../../components/StatusBadge'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import ReciboAccionesModal from '../../components/ReciboAccionesModal'
 
 export default function SocioDetalle() {
   const { id } = useParams()
@@ -34,6 +35,9 @@ export default function SocioDetalle() {
   const [cuentaCorriente, setCuentaCorriente] = useState(null)
   const [loadingCtaCte, setLoadingCtaCte] = useState(false)
   const [incluirFamilia, setIncluirFamilia] = useState(false)
+
+  // Modal de acciones del recibo (cuenta corriente)
+  const [reciboModal, setReciboModal] = useState(null) // { pagoId, numeroRecibo }
 
   // Modal QR
   const [qrModal, setQrModal] = useState(false)
@@ -1257,16 +1261,11 @@ export default function SocioDetalle() {
                                 <td className="px-3 py-2 text-center">
                                   {mov.tipo === 'PAGO' && mov.pagoId && (
                                     <button
-                                      onClick={() => descargarReciboPdf(mov.pagoId)}
-                                      disabled={descargandoPdf === mov.pagoId}
-                                      title="Ver recibo PDF"
-                                      className="p-1 rounded hover:bg-green-100 text-green-600 disabled:opacity-40 transition-colors"
+                                      onClick={() => setReciboModal({ pagoId: mov.pagoId, numeroRecibo: mov.numero })}
+                                      title="Acciones del recibo (PDF / Email / WhatsApp)"
+                                      className="p-1 rounded hover:bg-green-100 text-green-600 transition-colors"
                                     >
-                                      {descargandoPdf === mov.pagoId
-                                        ? <span className="inline-block w-3.5 h-3.5 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
-                                        : <FileDown className="w-3.5 h-3.5" />
-                                      }
-                                    </button>
+                                      <FileDown className="w-3.5 h-3.5" />
                                   )}
                                 </td>
                               </tr>
@@ -1463,6 +1462,15 @@ export default function SocioDetalle() {
           </Button>
         </div>
       </Modal>
+
+      {/* Modal de acciones del recibo (cuenta corriente) */}
+      <ReciboAccionesModal
+        isOpen={!!reciboModal}
+        onClose={() => setReciboModal(null)}
+        pagoId={reciboModal?.pagoId}
+        numeroRecibo={reciboModal?.numeroRecibo}
+        variante="simple"
+      />
 
       <ConfirmDialog />
     </div>

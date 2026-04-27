@@ -303,6 +303,19 @@ const cerrarReservasPasadasCron = cron.schedule('30 0 * * *', async () => {
 export function iniciarCronJobs() {
   console.log('\n🚀 Iniciando sistema de notificaciones automáticas...\n')
 
+  if (process.env.DISABLE_NOTIFICATIONS === 'true') {
+    console.log('🔕 Notificaciones DESACTIVADAS (DISABLE_NOTIFICATIONS=true)')
+    console.log('   Solo se ejecutan tareas de mantenimiento que no envían comunicaciones:')
+    console.log('  🔒 Cerrar reservas pasadas: Todos los días a las 00:30')
+    console.log('  🔄 Sugerir pasajes: 1 de diciembre a las 8:00 AM\n')
+
+    cerrarReservasPasadasCron.start()
+    sugerirPasajesCron.start()
+
+    console.log('✅ Tareas de mantenimiento iniciadas\n')
+    return
+  }
+
   console.log('📅 Cron jobs configurados:')
   console.log('  ⏱️  Procesar cola: Cada 10 minutos')
   console.log('  🔔 Cuotas próximas a vencer: Todos los días a las 9:00 AM')

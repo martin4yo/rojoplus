@@ -4,6 +4,7 @@ import { ArrowLeft, Edit, Building2, UserCheck, Briefcase, Mail, Phone, MapPin, 
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import ConceptosFijosEmpleado from '../../../components/ConceptosFijosEmpleado'
 
 const TIPO_CONFIG = {
   PROVEEDOR: {
@@ -143,10 +144,24 @@ export default function EntidadDetalle({ tipo }) {
           >
             Cuenta Corriente
           </button>
+          {tipo === 'PERSONAL' && (
+            <button
+              onClick={() => setTab('conceptos')}
+              className={`pb-3 px-1 border-b-2 font-medium text-sm transition ${
+                tab === 'conceptos'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Conceptos fijos
+            </button>
+          )}
         </div>
       </div>
 
-      {tab === 'datos' ? (
+      {tab === 'conceptos' && tipo === 'PERSONAL' ? (
+        <ConceptosFijosEmpleado entidadId={parseInt(id)} sueldoBasico={entidad.sueldoBasico} />
+      ) : tab === 'datos' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Datos basicos */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

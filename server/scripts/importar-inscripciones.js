@@ -150,7 +150,7 @@ async function importarInscripciones() {
     }
 
     const total = await prisma.inscripcion.count({ where: { tenantId, estado: 'ACTIVA' } })
-    console.log(`\nTotal inscripciones activas en BD (${TENANT_SLUG}): ${total}`)
+    console.log(`\nTotal inscripciones activas en BD (${tenant.slug}): ${total}`)
 
   } catch (error) {
     console.error('Error:', error)

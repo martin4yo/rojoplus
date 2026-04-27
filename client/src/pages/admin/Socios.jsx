@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   Upload, Store, ExternalLink, RefreshCw, X, Copy, Check,
   Plus, Eye, Edit, Users, CreditCard, Search, Filter, ChevronDown, DollarSign,
-  UserCheck, ChevronRight, Send
+  UserCheck, ChevronRight, Send, Link2
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
@@ -18,6 +18,7 @@ import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { usePagination } from '../../hooks/usePagination'
 import ChatWidget from '../../components/chat/ChatWidget'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import { useTenant } from '../../contexts/TenantContext'
 
 // Componente Avatar con fallback si la imagen no carga
 function AvatarSocio({ foto, nombre }) {
@@ -44,6 +45,7 @@ function AvatarSocio({ foto, nombre }) {
 
 export default function AdminSocios() {
   const navigate = useNavigate()
+  const { tenant } = useTenant()
   const { confirm, ConfirmDialog } = useConfirm()
   const [vista, setVista] = useState('socios') // 'socios' | 'grupos'
   const [socios, setSocios] = useState([])
@@ -181,7 +183,17 @@ export default function AdminSocios() {
   const hayFiltrosActivos = estado || categoria || tipoSocio || zona || esMenor || terminoBusqueda
 
   function getQrUrl(tokenPortal) {
-    return `${window.location.origin}/s/${tokenPortal}`
+    const subdomain = tenant?.subdomain
+    const origin = window.location.origin
+    // Si el origin actual ya tiene el subdomain del tenant, usarlo tal cual.
+    if (!subdomain || origin.includes(`//${subdomain}.`)) {
+      return `${origin}/s/${tokenPortal}`
+    }
+    // Si el admin accede sin subdomain (localhost o dominio raíz), insertar el subdomain del tenant.
+    const conSubdomain = origin.includes('localhost')
+      ? origin.replace('localhost', `${subdomain}.localhost`)
+      : origin.replace('://', `://${subdomain}.`)
+    return `${conSubdomain}/s/${tokenPortal}`
   }
 
   async function regenerarToken(socio) {
@@ -218,6 +230,28 @@ export default function AdminSocios() {
       toast.success('Link del portal enviado por WhatsApp')
     } catch (err) {
       toast.error(err?.response?.data?.message || err?.message || 'No se pudo enviar por WhatsApp')
+    }
+  }
+
+  async function copiarLinkRapido(socio, e) {
+    e.stopPropagation()
+    let token = socio.tokenPortal
+    // Si el socio aún no tiene token, generar uno regenerando desde el endpoint
+    if (!token) {
+      try {
+        const data = await api.post(`/admin/socios/${socio.id}/regenerar-token`)
+        token = data.tokenPortal
+        setSocios(socios.map(s => s.id === socio.id ? { ...s, tokenPortal: token } : s))
+      } catch (err) {
+        toast.error('No se pudo generar el link del portal')
+        return
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(getQrUrl(token))
+      toast.success('Link del portal copiado al portapapeles')
+    } catch {
+      toast.error('No se pudo copiar al portapapeles')
     }
   }
 
@@ -360,6 +394,13 @@ export default function AdminSocios() {
             </button>
           )}
           <button
+            onClick={(e) => copiarLinkRapido(socio, e)}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
+            title="Copiar link de acceso al Portal"
+          >
+            <Link2 className="w-5 h-5" />
+          </button>
+          <button
             onClick={(e) => enviarPortalWhatsApp(socio, e)}
             className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
             title="Enviar acceso al Portal por WhatsApp"
@@ -372,7 +413,7 @@ export default function AdminSocios() {
               setQrModal(socio)
             }}
             className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-primary transition"
-            title="Ver QR de beneficios en comercios"
+            title="Ver QR del Portal / Carnet del Socio"
           >
             <Store className="w-5 h-5" />
           </button>
@@ -763,7 +804,7 @@ export default function AdminSocios() {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
               <div>
-                <span className="font-semibold text-gray-800">QR del Socio</span>
+                <span className="font-semibold text-gray-800">QR del Portal / Carnet del Socio</span>
                 <span className="text-gray-500 text-sm ml-2">#{qrModal.nroSocio}</span>
               </div>
               <button

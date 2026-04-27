@@ -50,9 +50,17 @@ router.post('/validar', authDispositivo, async (req, res) => {
 
     // 1. Buscar según el tipo de lectura
     if (tipoLectura === 'QR') {
+      // Si el QR contiene una URL del portal (https://.../s/<token>), extraer el token.
+      // Esto permite reutilizar el mismo QR del carnet digital tanto para comercios
+      // (que escanean con el celular y abren la URL) como para el lector del molinete
+      // (que necesita el tokenPortal raw).
+      let tokenBuscado = valorLeido
+      const matchUrl = String(valorLeido).match(/\/s\/([a-f0-9-]{20,})/i)
+      if (matchUrl) tokenBuscado = matchUrl[1]
+
       // Primero buscar por tokenPortal (Socios)
-      persona = await req.db.socio.findUnique({
-        where: { tokenPortal: valorLeido },
+      persona = await req.db.socio.findFirst({
+        where: { tokenPortal: tokenBuscado },
         select: {
           id: true,
           nroSocio: true,
@@ -69,7 +77,7 @@ router.post('/validar', authDispositivo, async (req, res) => {
       } else {
         // Si no es un socio, buscar en entradas de eventos
         entrada = await req.db.entrada.findUnique({
-          where: { codigo: valorLeido },
+          where: { codigo: tokenBuscado },
           include: {
             evento: true,
             categoria: true,

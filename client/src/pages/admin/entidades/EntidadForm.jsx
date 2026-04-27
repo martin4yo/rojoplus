@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, Building2, UserCheck, Briefcase, Upload, User } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import CentroCostoSelector from '../../../components/CentroCostoSelector'
+import ConceptosFijosEmpleado from '../../../components/ConceptosFijosEmpleado'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
@@ -44,10 +45,12 @@ export default function EntidadForm({ tipo }) {
   const config = TIPO_CONFIG[tipo]
   const Icon = config.icon
   const isEditing = !!id
+  const usarTabs = tipo === 'PERSONAL'
 
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [tab, setTab] = useState('datos')
 
   const [form, setForm] = useState({
     codigo: '',
@@ -206,8 +209,37 @@ export default function EntidadForm({ tipo }) {
         </div>
       )}
 
+      {/* Tabs (solo para PERSONAL) */}
+      {usarTabs && (
+        <div className="border-b border-gray-200 mb-6">
+          <div className="flex flex-wrap gap-4">
+            {[
+              { id: 'datos', label: 'Datos Básicos' },
+              { id: 'contacto', label: 'Contacto' },
+              { id: 'bancarios', label: 'Bancarios' },
+              { id: 'laborales', label: 'Laborales' },
+              ...(isEditing ? [{ id: 'conceptos', label: 'Conceptos Fijos' }] : []),
+            ].map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`pb-3 px-1 border-b-2 font-medium text-sm transition ${
+                  tab === t.id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Datos basicos */}
+        {(!usarTabs || tab === 'datos') && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Datos Basicos</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -295,8 +327,10 @@ export default function EntidadForm({ tipo }) {
             </div>
           </div>
         </div>
+        )}
 
         {/* Contacto */}
+        {(!usarTabs || tab === 'contacto') && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Contacto</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -350,8 +384,10 @@ export default function EntidadForm({ tipo }) {
             </div>
           </div>
         </div>
+        )}
 
         {/* Datos bancarios */}
+        {(!usarTabs || tab === 'bancarios') && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Datos Bancarios</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -394,9 +430,10 @@ export default function EntidadForm({ tipo }) {
             </div>
           </div>
         </div>
+        )}
 
         {/* Datos de personal (solo para tipo PERSONAL) */}
-        {tipo === 'PERSONAL' && (
+        {tipo === 'PERSONAL' && (!usarTabs || tab === 'laborales') && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Datos Laborales</h2>
 
@@ -478,12 +515,26 @@ export default function EntidadForm({ tipo }) {
                   Se usa para imputar la provisión de sueldo al centro de costo correspondiente.
                 </p>
               </div>
+              {isEditing && (
+                <div className="md:col-span-3 pt-2 border-t border-gray-100">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="activo"
+                      checked={form.activo}
+                      onChange={handleChange}
+                      className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <span className="text-gray-700">Empleado activo</span>
+                  </label>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Estado */}
-        {isEditing && (
+        {/* Estado (solo si NO usa tabs — para CLIENTE/PROVEEDOR) */}
+        {!usarTabs && isEditing && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -498,20 +549,27 @@ export default function EntidadForm({ tipo }) {
           </div>
         )}
 
-        {/* Botones */}
-        <div className="flex justify-end gap-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => navigate(config.ruta)}
-          >
-            Cancelar
-          </Button>
-          <Button type="submit" loading={saving}>
-            <Save className="w-4 h-4 mr-2" />
-            {isEditing ? 'Guardar Cambios' : 'Crear ' + config.titulo}
-          </Button>
-        </div>
+        {/* Conceptos fijos del empleado (tab dedicado en PERSONAL) */}
+        {tipo === 'PERSONAL' && isEditing && tab === 'conceptos' && (
+          <ConceptosFijosEmpleado entidadId={parseInt(id)} sueldoBasico={form.sueldoBasico} />
+        )}
+
+        {/* Botones (ocultos en el tab de conceptos para no confundir — el form de conceptos guarda solo) */}
+        {(!usarTabs || tab !== 'conceptos') && (
+          <div className="flex justify-end gap-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate(config.ruta)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" loading={saving}>
+              <Save className="w-4 h-4 mr-2" />
+              {isEditing ? 'Guardar Cambios' : 'Crear ' + config.titulo}
+            </Button>
+          </div>
+        )}
       </form>
     </div>
   )

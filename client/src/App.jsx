@@ -190,6 +190,10 @@ const LiquidacionesLista = lazy(() => import('./pages/admin/liquidaciones/Liquid
 const LiquidacionForm = lazy(() => import('./pages/admin/liquidaciones/LiquidacionForm'))
 const LiquidacionDetalle = lazy(() => import('./pages/admin/liquidaciones/LiquidacionDetalle'))
 const ConceptosLiquidacion = lazy(() => import('./pages/admin/liquidaciones/ConceptosLiquidacion'))
+const NovedadesLiquidacion = lazy(() => import('./pages/admin/liquidaciones/NovedadesLiquidacion'))
+const MantenimientoLista = lazy(() => import('./pages/admin/mantenimiento/MantenimientoLista'))
+const OrdenTrabajoForm = lazy(() => import('./pages/admin/mantenimiento/OrdenTrabajoForm'))
+const OrdenTrabajoDetalle = lazy(() => import('./pages/admin/mantenimiento/OrdenTrabajoDetalle'))
 
 // Deportes
 const EspaciosLista = lazy(() => import('./pages/admin/deportes/EspaciosLista'))
@@ -503,6 +507,13 @@ function App() {
                   <Route path="liquidaciones/nueva" element={<LiquidacionForm />} />
                   <Route path="liquidaciones/:id" element={<LiquidacionDetalle />} />
                   <Route path="liquidaciones/conceptos" element={<ConceptosLiquidacion />} />
+                  <Route path="liquidaciones/novedades" element={<NovedadesLiquidacion />} />
+
+                  {/* Mantenimiento */}
+                  <Route path="mantenimiento" element={<MantenimientoLista />} />
+                  <Route path="mantenimiento/nueva" element={<OrdenTrabajoForm />} />
+                  <Route path="mantenimiento/:id" element={<OrdenTrabajoDetalle />} />
+                  <Route path="mantenimiento/:id/editar" element={<OrdenTrabajoForm />} />
 
                   {/* Deportes */}
                   <Route path="deportes/tipos-espacio" element={<TiposEspacioConfig />} />

@@ -39,7 +39,8 @@ const menuData = [
     children: [
       { titulo: 'Personal', icono: 'Briefcase', url: '/admin/egresos/personal', orden: 1 },
       { titulo: 'Liquidaciones', icono: 'FileText', url: '/admin/liquidaciones', orden: 2 },
-      { titulo: 'Conceptos', icono: 'Settings', url: '/admin/liquidaciones/conceptos', orden: 3 },
+      { titulo: 'Novedades', icono: 'CalendarPlus', url: '/admin/liquidaciones/novedades', orden: 3 },
+      { titulo: 'Conceptos', icono: 'Settings', url: '/admin/liquidaciones/conceptos', orden: 4 },
     ]
   },
   {
@@ -154,6 +155,12 @@ const menuData = [
       { titulo: 'Rentabilidad Actividades', icono: 'Target', url: '/admin/reportes/centros-costo/rentabilidad', orden: 3 },
       { titulo: 'Presupuesto vs Real', icono: 'PieChart', url: '/admin/reportes/centros-costo/presupuesto', orden: 4 },
       { titulo: 'Estado de Resultados', icono: 'FileText', url: '/admin/reportes/centros-costo', orden: 5 },
+    ]
+  },
+  {
+    titulo: 'Mantenimiento', icono: 'Wrench', orden: 19,
+    children: [
+      { titulo: 'Ordenes de Trabajo', icono: 'Wrench', url: '/admin/mantenimiento', orden: 1 },
     ]
   },
 ]

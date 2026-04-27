@@ -324,39 +324,33 @@ export default function Periodos() {
                     </div>
                   </div>
 
-                  {/* Indicadores de cobranza y mora */}
-                  {periodo.totalCuotas > 0 && (
-                    <div className="mb-3 flex gap-4">
-                      <div className="flex-1">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-gray-500">Cobranza</span>
-                          <span className="font-medium text-green-600">
-                            {Math.round((periodo.cuotasPagadas / periodo.totalCuotas) * 100)}%
-                          </span>
+                  {/* Indicadores de cobranza e impagas (sobre montos) */}
+                  {periodo.montoTotal > 0 && (() => {
+                    const pctCobranza = Math.min(100, (periodo.montoPagado / periodo.montoTotal) * 100)
+                    const pctImpagas = Math.min(100, (periodo.montoPendiente / periodo.montoTotal) * 100)
+                    return (
+                      <div className="mb-3 flex gap-4">
+                        <div className="flex-1">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-500">Cobranza</span>
+                            <span className="font-medium text-green-600">{Math.round(pctCobranza)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pctCobranza}%` }} />
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-green-500 h-2 rounded-full transition-all"
-                            style={{ width: `${(periodo.cuotasPagadas / periodo.totalCuotas) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-gray-500">Mora</span>
-                          <span className="font-medium text-red-600">
-                            {Math.round((periodo.cuotasVencidas / periodo.totalCuotas) * 100)}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-red-500 h-2 rounded-full transition-all"
-                            style={{ width: `${(periodo.cuotasVencidas / periodo.totalCuotas) * 100}%` }}
-                          />
+                        <div className="flex-1">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-500">Impagas</span>
+                            <span className="font-medium text-red-600">{Math.round(pctImpagas)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="bg-red-500 h-2 rounded-full transition-all" style={{ width: `${pctImpagas}%` }} />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Botones de acción - solo iconos */}
                   <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">

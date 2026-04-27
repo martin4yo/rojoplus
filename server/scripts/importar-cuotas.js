@@ -193,11 +193,64 @@ async function importarCuotas() {
     conceptoPorCategoria.set('FINANCIADO',   conceptoFinanciado.id)
     conceptoPorCategoria.set('NOTA_CREDITO', conceptoNotaCredito.id)
 
-    // ── Limpiar cargos de migración previos ───────────────────────────────────
+    // ── Limpiar pagos y cargos de migración previos ───────────────────────────
+    // Borrar primero los pagos (FK a cargo via cargo.pagoId) y MovimientosCaja asociados,
+    // después los cargos. Si hay otras dependencias, fallarán acá.
+    const deletedMovs = await prisma.movimientoCaja.deleteMany({
+      where: { tenantId, observaciones: { startsWith: 'Migración Brio:' } }
+    })
+    const deletedPagos = await prisma.pago.deleteMany({
+      where: { tenantId, origen: 'MIGRACION_BRIO' }
+    })
     const deleted = await prisma.cargo.deleteMany({
       where: { tenantId, origen: 'MIGRACION_BRIO' }
     })
-    console.log(`Cargos previos eliminados: ${deleted.count}`)
+    console.log(`MovimientosCaja previos eliminados: ${deletedMovs.count}`)
+    console.log(`Pagos previos eliminados:           ${deletedPagos.count}`)
+    console.log(`Cargos previos eliminados:          ${deleted.count}`)
+
+    // ── Setup para crear pagos históricos ─────────────────────────────────────
+    // MedioPago, Caja y Admin necesarios para vincular cada pago migrado.
+    let medioPagoMigracion = await prisma.medioPago.findFirst({
+      where: { tenantId, codigo: 'MIGRACION_BRIO' }
+    })
+    if (!medioPagoMigracion) {
+      medioPagoMigracion = await prisma.medioPago.create({
+        data: {
+          tenantId,
+          codigo: 'MIGRACION_BRIO',
+          nombre: 'Migración Brio (histórico)',
+          tipo: 'OTRO',
+          activo: false,
+          paraBuffet: false, paraCaja: false, paraKiosco: false, paraTakeaway: false,
+        }
+      })
+      console.log(`MedioPago creado: MIGRACION_BRIO (id=${medioPagoMigracion.id})`)
+    }
+
+    let cajaMigracion = await prisma.caja.findFirst({
+      where: { tenantId, codigo: 'MIGRACION_BRIO' }
+    })
+    if (!cajaMigracion) {
+      cajaMigracion = await prisma.caja.create({
+        data: {
+          tenantId,
+          codigo: 'MIGRACION_BRIO',
+          nombre: 'Migración Brio (histórico)',
+          tipo: 'CAJA_GENERAL',
+          activo: false,
+          paraBuffet: false, paraCaja: false, paraKiosco: false, paraTakeaway: false,
+        }
+      })
+      console.log(`Caja creada: MIGRACION_BRIO (id=${cajaMigracion.id})`)
+    }
+
+    // Admin para registradoPor — uso el primero disponible
+    const admin = await prisma.admin.findFirst({ select: { id: true } })
+    if (!admin) {
+      throw new Error('No hay Admins en la base. Crear al menos uno antes de importar.')
+    }
+    const adminId = admin.id
 
     // ── Cache de períodos ─────────────────────────────────────────────────────
     // NOTA: Periodo tiene unique([anio, mes]) sin tenantId → periodos compartidos entre tenants.
@@ -310,7 +363,7 @@ async function importarCuotas() {
       }
 
       try {
-        await prisma.cargo.create({
+        const cargoCreado = await prisma.cargo.create({
           data: {
             tenantId,
             socioId,
@@ -331,6 +384,35 @@ async function importarCuotas() {
             observaciones:    `Brio: ${row['Categ. Socio'] || ''} | Est: ${row['Estado'] || ''}`,
           }
         })
+
+        // Si está pagado y no es nota de crédito, crear el Pago histórico
+        // y vincularlo al cargo. Sin esto la cuenta corriente del socio
+        // mostraría todas las cuotas como saldo pendiente.
+        if (esPagado && !esNotaCredito && montoTotal > 0) {
+          const numeroPago = `MIG-${cargoCreado.id}`
+          const pago = await prisma.pago.create({
+            data: {
+              tenantId,
+              numero:         numeroPago,
+              fecha:          fechaCobro || fechaGen || new Date(),
+              socioId,
+              montoTotal,
+              montoRecibido:  montoTotal,
+              montoACuenta:   0,
+              medioPagoId:    medioPagoMigracion.id,
+              cajaId:         cajaMigracion.id,
+              estado:         'CONFIRMADO',
+              origen:         'MIGRACION_BRIO',
+              observaciones:  `Migración Brio: ${descCuota || tipoCuotaOrig || ''} ${periodoStr || ''}`.trim(),
+              registradoPor:  adminId,
+            }
+          })
+          await prisma.cargo.update({
+            where: { id: cargoCreado.id },
+            data:  { pagoId: pago.id }
+          })
+        }
+
         importados++
         if (importados % 500 === 0) process.stdout.write(`\r  Importados: ${importados}...`)
       } catch (err) {
@@ -354,12 +436,14 @@ async function importarCuotas() {
     }
 
     // Conteos finales
-    const [pagados, pendientes, actividad] = await Promise.all([
+    const [pagados, pendientes, actividad, pagosCreados] = await Promise.all([
       prisma.cargo.count({ where: { tenantId, origen: 'MIGRACION_BRIO', estado: 'PAGADO' } }),
       prisma.cargo.count({ where: { tenantId, origen: 'MIGRACION_BRIO', estado: 'PENDIENTE' } }),
       prisma.cargo.count({ where: { tenantId, origen: 'MIGRACION_BRIO', categoria: 'ACTIVIDAD' } }),
+      prisma.pago.count({ where: { tenantId, origen: 'MIGRACION_BRIO' } }),
     ])
     console.log(`\nEn BD — Pagados: ${pagados} | Pendientes: ${pendientes} | Tipo ACTIVIDAD: ${actividad}`)
+    console.log(`Pagos históricos creados: ${pagosCreados}`)
 
     // ── Actualizar cuotaMensual de TipoSocio y CategoriaActividad ─────────────
     // Calcula los valores máximos desde el Excel y los aplica al tenant.

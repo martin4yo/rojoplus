@@ -1508,9 +1508,59 @@ router.get('/configuracion/fiscal', authAdmin, asyncHandler(async (req, res) => 
 // POST /api/admin/sistema/smtp/test - Testear conexión SMTP del tenant
 router.post('/sistema/smtp/test', authAdmin, asyncHandler(async (req, res) => {
   const { getMailConfig } = await import('../../services/email.js')
-  const { transporter, from } = await getMailConfig(req.db)
-  await transporter.verify()
-  res.json({ success: true, message: 'Conexión SMTP exitosa', from })
+
+  // Verificar primero si el tenant tiene configuración propia cargada
+  const cfgItems = await req.db.configuracion.findMany({
+    where: { clave: { in: ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'] } }
+  })
+  const cfg = Object.fromEntries(cfgItems.map(c => [c.clave, c.valor]))
+  const usandoFallback = !cfg.SMTP_HOST || !cfg.SMTP_USER
+
+  let transporter, from
+  try {
+    const mc = await getMailConfig(req.db)
+    transporter = mc.transporter
+    from = mc.from
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      message: `No se pudo construir la configuración SMTP: ${err.message}`,
+      usandoFallback,
+    })
+  }
+
+  try {
+    await transporter.verify()
+    res.json({
+      success: true,
+      message: usandoFallback
+        ? 'Conexión SMTP exitosa (usando configuración global del servidor — el tenant no tiene SMTP propio cargado)'
+        : 'Conexión SMTP exitosa',
+      from,
+      usandoFallback,
+    })
+  } catch (err) {
+    // Diagnóstico amigable según el código de error de nodemailer
+    let diagnostico = ''
+    if (err.code === 'EAUTH') {
+      diagnostico = ' Credenciales rechazadas: revisá usuario y contraseña. Si es Gmail, generá una "App Password" desde myaccount.google.com/apppasswords (requiere 2FA habilitado).'
+    } else if (err.code === 'ECONNECTION' || err.code === 'ENOTFOUND') {
+      diagnostico = ' No se pudo conectar al servidor: revisá el host y que la red permita salida al puerto SMTP.'
+    } else if (err.code === 'ETIMEDOUT' || err.code === 'ESOCKET') {
+      diagnostico = ' Timeout o socket cerrado: el host no responde o el puerto está bloqueado por firewall.'
+    } else if (err.code === 'EENVELOPE') {
+      diagnostico = ' El servidor rechazó el remitente: revisá SMTP_FROM.'
+    } else if (/wrong version|ssl|tls/i.test(err.message)) {
+      diagnostico = ' Mismatch SSL/TLS: si el puerto es 465 marcá Secure=true, si es 587 marcá Secure=false.'
+    }
+
+    res.status(400).json({
+      success: false,
+      message: `Error SMTP (${err.code || 'desconocido'}): ${err.message}.${diagnostico}`,
+      code: err.code || null,
+      usandoFallback,
+    })
+  }
 }))
 
 export default router

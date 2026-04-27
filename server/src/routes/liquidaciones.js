@@ -223,7 +223,10 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: `Ya existe una liquidacion para ${mes}/${anio}` })
     }
 
-    // Obtener personal activo con sueldo
+    const mesNum = parseInt(mes)
+    const anioNum = parseInt(anio)
+
+    // Obtener personal activo con sueldo + sus conceptos fijos vigentes
     const personal = await req.db.entidad.findMany({
       where: {
         tipo: 'PERSONAL',
@@ -231,7 +234,11 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
         sueldoBasico: { not: null }
       },
       include: {
-        cargoPersonal: true
+        cargoPersonal: true,
+        conceptosFijos: {
+          where: { activo: true },
+          include: { concepto: true }
+        }
       },
       orderBy: { razonSocial: 'asc' }
     })
@@ -249,16 +256,38 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
       orderBy: { orden: 'asc' }
     })
 
+    // Obtener novedades del período no aplicadas
+    const novedadesPeriodo = await req.db.novedadLiquidacion.findMany({
+      where: {
+        mes: mesNum,
+        anio: anioNum,
+        aplicada: false
+      },
+      include: { concepto: true }
+    })
+
+    // Indexar novedades por entidad
+    const novedadesPorEntidad = new Map()
+    for (const nov of novedadesPeriodo) {
+      if (!novedadesPorEntidad.has(nov.entidadId)) novedadesPorEntidad.set(nov.entidadId, [])
+      novedadesPorEntidad.get(nov.entidadId).push(nov)
+    }
+
+    // Fecha de referencia para vigencia de conceptos fijos del empleado (último día del período)
+    const fechaPeriodo = new Date(anioNum, mesNum - 1, 1)
+    const finPeriodo = new Date(anioNum, mesNum, 0, 23, 59, 59)
+
     // Nombre del periodo
     const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-    const periodo = `${meses[parseInt(mes) - 1]} ${anio}`
-    const numero = await generarNumeroLiquidacion(parseInt(mes), parseInt(anio))
+    const periodo = `${meses[mesNum - 1]} ${anioNum}`
+    const numero = await generarNumeroLiquidacion(mesNum, anioNum)
 
     // Crear liquidacion con items
     let totalBruto = 0
     let totalDeducciones = 0
     let totalNeto = 0
+    const novedadIdsConsumidos = []
 
     const items = personal.map(emp => {
       const sueldoBasico = parseFloat(emp.sueldoBasico) || 0
@@ -271,10 +300,11 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
         conceptoNombre: 'Sueldo Basico',
         tipo: 'HABER',
         monto: sueldoBasico,
-        descripcion: null
+        descripcion: null,
+        origen: 'BASICO'
       }]
 
-      // Aplicar conceptos fijos
+      // Aplicar conceptos fijos GLOBALES
       for (const concepto of conceptosFijos) {
         let monto = 0
         if (concepto.porcentaje) {
@@ -289,15 +319,76 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
             conceptoNombre: concepto.nombre,
             tipo: concepto.tipo,
             monto: monto,
-            descripcion: concepto.porcentaje ? `${concepto.porcentaje}% del sueldo basico` : null
+            descripcion: concepto.porcentaje ? `${concepto.porcentaje}% del sueldo basico` : null,
+            origen: 'FIJO_GLOBAL'
           })
 
-          if (concepto.tipo === 'HABER') {
-            haberes += monto
-          } else {
-            deducciones += monto
-          }
+          if (concepto.tipo === 'HABER') haberes += monto
+          else deducciones += monto
         }
+      }
+
+      // Aplicar conceptos fijos DEL EMPLEADO (vigentes en el período)
+      for (const ce of (emp.conceptosFijos || [])) {
+        // Filtro de vigencia
+        if (ce.fechaInicio && new Date(ce.fechaInicio) > finPeriodo) continue
+        if (ce.fechaFin && new Date(ce.fechaFin) < fechaPeriodo) continue
+
+        let monto = 0
+        if (ce.valor !== null && ce.valor !== undefined) {
+          // Override del empleado
+          monto = ce.esPorcentaje
+            ? sueldoBasico * parseFloat(ce.valor) / 100
+            : parseFloat(ce.valor)
+        } else if (ce.concepto.porcentaje) {
+          monto = sueldoBasico * parseFloat(ce.concepto.porcentaje) / 100
+        } else if (ce.concepto.montoFijo) {
+          monto = parseFloat(ce.concepto.montoFijo)
+        }
+
+        if (monto > 0) {
+          let descripcion
+          if (ce.valor !== null && ce.valor !== undefined) {
+            descripcion = ce.esPorcentaje ? `${ce.valor}% (concepto fijo del empleado)` : 'Monto fijo del empleado'
+          } else {
+            descripcion = ce.concepto.porcentaje ? `${ce.concepto.porcentaje}% del sueldo basico` : null
+          }
+
+          detalleConceptos.push({
+            conceptoCodigo: ce.concepto.codigo,
+            conceptoNombre: ce.concepto.nombre,
+            tipo: ce.concepto.tipo,
+            monto: monto,
+            descripcion,
+            origen: 'FIJO_EMPLEADO',
+            conceptoEmpleadoId: ce.id
+          })
+
+          if (ce.concepto.tipo === 'HABER') haberes += monto
+          else deducciones += monto
+        }
+      }
+
+      // Aplicar NOVEDADES del período
+      const novedadesEmp = novedadesPorEntidad.get(emp.id) || []
+      for (const nov of novedadesEmp) {
+        const monto = parseFloat(nov.importe) || 0
+        if (monto === 0) continue
+
+        detalleConceptos.push({
+          conceptoCodigo: nov.concepto.codigo,
+          conceptoNombre: nov.concepto.nombre,
+          tipo: nov.concepto.tipo,
+          monto: monto,
+          descripcion: nov.observaciones || 'Novedad del periodo',
+          origen: 'NOVEDAD',
+          novedadId: nov.id
+        })
+
+        if (nov.concepto.tipo === 'HABER') haberes += monto
+        else deducciones += monto
+
+        novedadIdsConsumidos.push(nov.id)
       }
 
       const netoAPagar = haberes - deducciones
@@ -317,32 +408,42 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
       }
     })
 
-    const liquidacion = await req.db.liquidacionSueldo.create({
-      data: {
-        numero,
-        periodo,
-        mes: parseInt(mes),
-        anio: parseInt(anio),
-        totalBruto,
-        totalDeducciones,
-        totalNeto,
-        observaciones,
-        registradoPor: req.admin.id,
-        items: {
-          create: items
-        }
-      },
-      include: {
-        items: {
-          include: {
-            entidad: {
-              include: {
-                cargoPersonal: true
-              }
+    // Crear liquidación + marcar novedades como aplicadas en una transacción
+    const liquidacion = await req.db.$transaction(async (tx) => {
+      const liq = await tx.liquidacionSueldo.create({
+        data: {
+          numero,
+          periodo,
+          mes: mesNum,
+          anio: anioNum,
+          totalBruto,
+          totalDeducciones,
+          totalNeto,
+          observaciones,
+          registradoPor: req.admin.id,
+          items: { create: items }
+        },
+        include: {
+          items: {
+            include: {
+              entidad: { include: { cargoPersonal: true } }
             }
           }
         }
+      })
+
+      if (novedadIdsConsumidos.length > 0) {
+        await tx.novedadLiquidacion.updateMany({
+          where: { id: { in: novedadIdsConsumidos } },
+          data: {
+            aplicada: true,
+            liquidacionId: liq.id,
+            fechaAplicacion: new Date()
+          }
+        })
       }
+
+      return liq
     })
 
     res.status(201).json({ data: liquidacion })
@@ -762,14 +863,272 @@ router.delete('/liquidaciones/:id', authenticateAdmin, async (req, res) => {
       })
     }
 
-    await req.db.liquidacionSueldo.update({
-      where: { id: parseInt(id) },
-      data: { estado: 'ANULADO' }
+    await req.db.$transaction(async (tx) => {
+      await tx.liquidacionSueldo.update({
+        where: { id: parseInt(id) },
+        data: { estado: 'ANULADO' }
+      })
+
+      // Liberar novedades asociadas para que vuelvan a estar disponibles
+      await tx.novedadLiquidacion.updateMany({
+        where: { liquidacionId: parseInt(id) },
+        data: {
+          aplicada: false,
+          liquidacionId: null,
+          fechaAplicacion: null
+        }
+      })
     })
 
     res.json({ message: 'Liquidacion anulada correctamente' })
   } catch (error) {
     console.error('Error anulando liquidacion:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// ===============================================================
+// CONCEPTOS FIJOS DEL EMPLEADO
+// ===============================================================
+
+// GET /admin/entidades/:entidadId/conceptos-liquidacion
+router.get('/entidades/:entidadId/conceptos-liquidacion', authenticateAdmin, async (req, res) => {
+  try {
+    const entidadId = parseInt(req.params.entidadId)
+    const conceptos = await req.db.conceptoEmpleado.findMany({
+      where: { entidadId },
+      include: { concepto: true },
+      orderBy: [{ activo: 'desc' }, { id: 'asc' }]
+    })
+    res.json(conceptos)
+  } catch (error) {
+    console.error('Error obteniendo conceptos del empleado:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// POST /admin/entidades/:entidadId/conceptos-liquidacion
+router.post('/entidades/:entidadId/conceptos-liquidacion', authenticateAdmin, async (req, res) => {
+  try {
+    const entidadId = parseInt(req.params.entidadId)
+    const { conceptoId, valor, esPorcentaje, fechaInicio, fechaFin, activo, observaciones } = req.body
+
+    if (!conceptoId) return res.status(400).json({ error: 'conceptoId es requerido' })
+
+    const entidad = await req.db.entidad.findUnique({ where: { id: entidadId } })
+    if (!entidad) return res.status(404).json({ error: 'Empleado no encontrado' })
+    if (entidad.tipo !== 'PERSONAL') {
+      return res.status(400).json({ error: 'La entidad no es PERSONAL' })
+    }
+
+    const creado = await req.db.conceptoEmpleado.create({
+      data: {
+        entidadId,
+        conceptoId: parseInt(conceptoId),
+        valor: valor !== null && valor !== undefined && valor !== '' ? parseFloat(valor) : null,
+        esPorcentaje: !!esPorcentaje,
+        fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
+        fechaFin: fechaFin ? new Date(fechaFin) : null,
+        activo: activo !== undefined ? !!activo : true,
+        observaciones: observaciones || null
+      },
+      include: { concepto: true }
+    })
+
+    res.status(201).json(creado)
+  } catch (error) {
+    console.error('Error creando concepto del empleado:', error)
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'El empleado ya tiene este concepto asignado' })
+    }
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// PUT /admin/entidades/:entidadId/conceptos-liquidacion/:id
+router.put('/entidades/:entidadId/conceptos-liquidacion/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const entidadId = parseInt(req.params.entidadId)
+    const id = parseInt(req.params.id)
+    const { valor, esPorcentaje, fechaInicio, fechaFin, activo, observaciones } = req.body
+
+    const existente = await req.db.conceptoEmpleado.findUnique({ where: { id } })
+    if (!existente || existente.entidadId !== entidadId) {
+      return res.status(404).json({ error: 'Concepto no encontrado' })
+    }
+
+    const actualizado = await req.db.conceptoEmpleado.update({
+      where: { id },
+      data: {
+        valor: valor !== undefined ? (valor === null || valor === '' ? null : parseFloat(valor)) : undefined,
+        esPorcentaje: esPorcentaje !== undefined ? !!esPorcentaje : undefined,
+        fechaInicio: fechaInicio !== undefined ? (fechaInicio ? new Date(fechaInicio) : null) : undefined,
+        fechaFin: fechaFin !== undefined ? (fechaFin ? new Date(fechaFin) : null) : undefined,
+        activo: activo !== undefined ? !!activo : undefined,
+        observaciones: observaciones !== undefined ? (observaciones || null) : undefined
+      },
+      include: { concepto: true }
+    })
+
+    res.json(actualizado)
+  } catch (error) {
+    console.error('Error actualizando concepto del empleado:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// DELETE /admin/entidades/:entidadId/conceptos-liquidacion/:id
+router.delete('/entidades/:entidadId/conceptos-liquidacion/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const entidadId = parseInt(req.params.entidadId)
+    const id = parseInt(req.params.id)
+
+    const existente = await req.db.conceptoEmpleado.findUnique({ where: { id } })
+    if (!existente || existente.entidadId !== entidadId) {
+      return res.status(404).json({ error: 'Concepto no encontrado' })
+    }
+
+    await req.db.conceptoEmpleado.delete({ where: { id } })
+    res.json({ message: 'Concepto eliminado' })
+  } catch (error) {
+    console.error('Error eliminando concepto del empleado:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// ===============================================================
+// NOVEDADES DE LIQUIDACION (variables del periodo)
+// ===============================================================
+
+// GET /admin/novedades-liquidacion?mes=&anio=&entidadId=&aplicada=
+router.get('/novedades-liquidacion', authenticateAdmin, async (req, res) => {
+  try {
+    const { mes, anio, entidadId, aplicada } = req.query
+
+    const where = {}
+    if (mes) where.mes = parseInt(mes)
+    if (anio) where.anio = parseInt(anio)
+    if (entidadId) where.entidadId = parseInt(entidadId)
+    if (aplicada !== undefined) where.aplicada = aplicada === 'true'
+
+    const novedades = await req.db.novedadLiquidacion.findMany({
+      where,
+      include: {
+        concepto: true,
+        entidad: { select: { id: true, razonSocial: true, codigo: true, legajo: true } }
+      },
+      orderBy: [{ anio: 'desc' }, { mes: 'desc' }, { id: 'desc' }]
+    })
+
+    res.json(novedades)
+  } catch (error) {
+    console.error('Error obteniendo novedades:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// POST /admin/novedades-liquidacion
+router.post('/novedades-liquidacion', authenticateAdmin, async (req, res) => {
+  try {
+    const { entidadId, conceptoId, mes, anio, importe, observaciones } = req.body
+
+    if (!entidadId || !conceptoId || !mes || !anio || importe === undefined || importe === null) {
+      return res.status(400).json({ error: 'entidadId, conceptoId, mes, anio e importe son requeridos' })
+    }
+
+    const importeNum = parseFloat(importe)
+    if (isNaN(importeNum) || importeNum <= 0) {
+      return res.status(400).json({ error: 'El importe debe ser mayor a 0' })
+    }
+
+    // Validar que no exista ya una liquidación cerrada para ese período (no se pueden agregar novedades retroactivas)
+    const liqExistente = await req.db.liquidacionSueldo.findFirst({
+      where: { mes: parseInt(mes), anio: parseInt(anio), estado: { not: 'ANULADO' } }
+    })
+    if (liqExistente) {
+      return res.status(400).json({
+        error: `Ya existe una liquidación generada para ${mes}/${anio}. Anúlela primero o cargue las novedades en el período siguiente.`
+      })
+    }
+
+    const novedad = await req.db.novedadLiquidacion.create({
+      data: {
+        entidadId: parseInt(entidadId),
+        conceptoId: parseInt(conceptoId),
+        mes: parseInt(mes),
+        anio: parseInt(anio),
+        importe: importeNum,
+        observaciones: observaciones || null,
+        registradoPor: req.admin.id
+      },
+      include: {
+        concepto: true,
+        entidad: { select: { id: true, razonSocial: true, codigo: true, legajo: true } }
+      }
+    })
+
+    res.status(201).json(novedad)
+  } catch (error) {
+    console.error('Error creando novedad:', error)
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        error: 'El empleado ya tiene una novedad de ese concepto cargada para ese período'
+      })
+    }
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// PUT /admin/novedades-liquidacion/:id
+router.put('/novedades-liquidacion/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const { importe, observaciones } = req.body
+
+    const existente = await req.db.novedadLiquidacion.findUnique({ where: { id } })
+    if (!existente) return res.status(404).json({ error: 'Novedad no encontrada' })
+    if (existente.aplicada) {
+      return res.status(400).json({ error: 'No se puede modificar una novedad ya aplicada en una liquidación' })
+    }
+
+    const data = {}
+    if (importe !== undefined) {
+      const n = parseFloat(importe)
+      if (isNaN(n) || n <= 0) return res.status(400).json({ error: 'Importe inválido' })
+      data.importe = n
+    }
+    if (observaciones !== undefined) data.observaciones = observaciones || null
+
+    const actualizada = await req.db.novedadLiquidacion.update({
+      where: { id },
+      data,
+      include: {
+        concepto: true,
+        entidad: { select: { id: true, razonSocial: true, codigo: true, legajo: true } }
+      }
+    })
+
+    res.json(actualizada)
+  } catch (error) {
+    console.error('Error actualizando novedad:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// DELETE /admin/novedades-liquidacion/:id
+router.delete('/novedades-liquidacion/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const existente = await req.db.novedadLiquidacion.findUnique({ where: { id } })
+    if (!existente) return res.status(404).json({ error: 'Novedad no encontrada' })
+    if (existente.aplicada) {
+      return res.status(400).json({ error: 'No se puede eliminar una novedad ya aplicada. Anule la liquidación primero.' })
+    }
+
+    await req.db.novedadLiquidacion.delete({ where: { id } })
+    res.json({ message: 'Novedad eliminada' })
+  } catch (error) {
+    console.error('Error eliminando novedad:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
   }
 })

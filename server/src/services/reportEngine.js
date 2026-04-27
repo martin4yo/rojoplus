@@ -74,6 +74,10 @@ Handlebars.registerHelper('colorText', (value, color) =>
   new Handlebars.SafeString(`<span style="color:${color}">${value}</span>`)
 )
 
+// lower / upper: case helpers
+Handlebars.registerHelper('lower', (value) => String(value ?? '').toLowerCase())
+Handlebars.registerHelper('upper', (value) => String(value ?? '').toUpperCase())
+
 // ── PDF via child process ───────────────────────────────────────────────────
 
 const PDF_WORKER_PATH = path.join(__dirname, 'pdfWorker.js')
@@ -364,6 +368,183 @@ export function getDefaultTemplate(queryKey) {
 <div class="grand-total">Total inscripciones: {{data.summary.total}}</div>
 </body></html>`,
   }
+
+  templates.orden_trabajo = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #111; margin: 0; padding: 12mm; }
+  .ot { border: 2px solid #1d4ed8; border-radius: 8px; overflow: hidden; }
+  .ot-header { background: linear-gradient(90deg, #1e3a8a, #1d4ed8); color: #fff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .ot-header .left .club { font-size: 11pt; font-weight: bold; }
+  .ot-header .left .sub { font-size: 8pt; opacity: 0.9; margin-top: 2px; }
+  .ot-header .right { text-align: right; }
+  .ot-header .right .title { font-size: 14pt; font-weight: bold; letter-spacing: 1px; }
+  .ot-header .right .numero { font-size: 11pt; margin-top: 2px; font-family: 'Courier New', monospace; }
+  .ot-header .right .fecha { font-size: 8pt; opacity: 0.85; }
+  .ot-body { padding: 14px 18px; }
+  .titulo-ot { font-size: 13pt; font-weight: bold; color: #1e3a8a; margin-bottom: 4px; }
+  .badges { display: flex; gap: 8px; margin: 6px 0 14px; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 8pt; font-weight: bold; }
+  .b-pendiente   { background: #fef3c7; color: #92400e; }
+  .b-en_proceso  { background: #dbeafe; color: #1e40af; }
+  .b-resuelta    { background: #d1fae5; color: #065f46; }
+  .b-cancelada   { background: #f3f4f6; color: #4b5563; }
+  .b-baja      { background: #f3f4f6; color: #4b5563; }
+  .b-media     { background: #dbeafe; color: #1e40af; }
+  .b-alta      { background: #fed7aa; color: #9a3412; }
+  .b-urgente   { background: #fee2e2; color: #991b1b; }
+  .b-tipo      { background: #ede9fe; color: #5b21b6; }
+  .seccion { margin-bottom: 14px; }
+  .seccion h3 { font-size: 9pt; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 6px; padding-bottom: 3px; border-bottom: 1px solid #e5e7eb; }
+  .desc { background: #f9fafb; padding: 10px 12px; border-radius: 4px; font-size: 9.5pt; white-space: pre-wrap; line-height: 1.5; }
+  .resolucion { background: #ecfdf5; border-left: 3px solid #10b981; padding: 10px 12px; border-radius: 4px; font-size: 9.5pt; white-space: pre-wrap; line-height: 1.5; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; font-size: 9pt; }
+  .info-grid .k { color: #6b7280; }
+  .info-grid .v { color: #111; font-weight: 500; }
+  .costos { display: flex; gap: 12px; margin-top: 4px; }
+  .costos .box { flex: 1; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; }
+  .costos .box .label { font-size: 7.5pt; color: #6b7280; text-transform: uppercase; }
+  .costos .box .valor { font-size: 12pt; font-weight: bold; color: #111; }
+  .historial { margin-top: 6px; }
+  .h-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 8.5pt; }
+  .h-item:last-child { border-bottom: none; }
+  .h-item .h-fecha { width: 110px; color: #6b7280; flex-shrink: 0; font-size: 8pt; }
+  .h-item .h-cuerpo { flex: 1; }
+  .h-item .h-quien { font-weight: 600; color: #1f2937; }
+  .h-item .h-tipo { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 7pt; margin-left: 6px; }
+  .h-item .h-tipo.com { background: #f3f4f6; color: #6b7280; }
+  .h-item .h-tipo.est { background: #dbeafe; color: #1e40af; }
+  .h-item .h-tipo.asg { background: #ede9fe; color: #5b21b6; }
+  .h-item .h-texto { color: #374151; margin-top: 3px; white-space: pre-wrap; line-height: 1.4; }
+  .firmas { display: flex; gap: 24px; margin-top: 32px; }
+  .firma { flex: 1; text-align: center; }
+  .firma .linea { border-top: 1px solid #6b7280; margin: 0 12px 4px; height: 36px; }
+  .firma .label { font-size: 8pt; color: #6b7280; }
+</style></head><body>
+
+{{#with data.items.[0]}}
+<div class="ot">
+  <div class="ot-header">
+    <div class="left">
+      <div class="club">{{../summary.tenant.nombre}}</div>
+      {{#if ../summary.tenant.direccion}}<div class="sub">{{../summary.tenant.direccion}}</div>{{/if}}
+      {{#if ../summary.tenant.telefono}}<div class="sub">Tel: {{../summary.tenant.telefono}}</div>{{/if}}
+    </div>
+    <div class="right">
+      <div class="title">ORDEN DE TRABAJO</div>
+      <div class="numero">{{numero}}</div>
+      <div class="fecha">Apertura: {{formatDateTime fechaApertura}}</div>
+    </div>
+  </div>
+
+  <div class="ot-body">
+    <div class="titulo-ot">{{titulo}}</div>
+    <div class="badges">
+      <span class="badge b-{{lower estado}}">{{estado}}</span>
+      <span class="badge b-{{lower prioridad}}">Prioridad: {{prioridad}}</span>
+      <span class="badge b-tipo">{{tipo}}</span>
+    </div>
+
+    {{#if descripcion}}
+    <div class="seccion">
+      <h3>Descripción del problema</h3>
+      <div class="desc">{{descripcion}}</div>
+    </div>
+    {{/if}}
+
+    <div class="seccion">
+      <h3>Asignación y ubicación</h3>
+      <div class="info-grid">
+        <div><span class="k">Responsable:</span> <span class="v">{{#if responsable}}{{responsable}}{{#if responsableTipo}} ({{responsableTipo}}){{/if}}{{else}}Sin asignar{{/if}}</span></div>
+        <div><span class="k">Ubicación:</span> <span class="v">{{#if ubicacion}}{{ubicacion}}{{else}}—{{/if}}</span></div>
+        {{#if responsableTel}}<div><span class="k">Tel. responsable:</span> <span class="v">{{responsableTel}}</span></div>{{/if}}
+        {{#if centroCosto}}<div><span class="k">Centro de costo:</span> <span class="v">{{centroCosto}}</span></div>{{/if}}
+      </div>
+    </div>
+
+    <div class="seccion">
+      <h3>Fechas</h3>
+      <div class="info-grid">
+        <div><span class="k">Apertura:</span> <span class="v">{{formatDateTime fechaApertura}}</span></div>
+        <div><span class="k">Inicio:</span> <span class="v">{{#if fechaInicio}}{{formatDateTime fechaInicio}}{{else}}—{{/if}}</span></div>
+        <div><span class="k">Cierre:</span> <span class="v">{{#if fechaResolucion}}{{formatDateTime fechaResolucion}}{{else}}—{{/if}}</span></div>
+      </div>
+    </div>
+
+    {{#if costoEstimado}}{{else}}{{#if costoReal}}{{/if}}{{/if}}
+    {{#if costoEstimado}}
+    <div class="seccion">
+      <h3>Costos</h3>
+      <div class="costos">
+        <div class="box">
+          <div class="label">Estimado</div>
+          <div class="valor">$ {{formatCurrency costoEstimado}}</div>
+        </div>
+        {{#if costoReal}}
+        <div class="box">
+          <div class="label">Real</div>
+          <div class="valor">$ {{formatCurrency costoReal}}</div>
+        </div>
+        {{/if}}
+      </div>
+    </div>
+    {{else}}{{#if costoReal}}
+    <div class="seccion">
+      <h3>Costos</h3>
+      <div class="costos">
+        <div class="box">
+          <div class="label">Real</div>
+          <div class="valor">$ {{formatCurrency costoReal}}</div>
+        </div>
+      </div>
+    </div>
+    {{/if}}{{/if}}
+
+    {{#if resolucion}}
+    <div class="seccion">
+      <h3>Resolución</h3>
+      <div class="resolucion">{{resolucion}}</div>
+    </div>
+    {{/if}}
+
+    {{#if historial.length}}
+    <div class="seccion">
+      <h3>Historial ({{historial.length}} eventos)</h3>
+      <div class="historial">
+        {{#each historial}}
+        <div class="h-item">
+          <div class="h-fecha">{{formatDateTime fecha}}</div>
+          <div class="h-cuerpo">
+            <span class="h-quien">{{admin}}</span>
+            {{#if (eq tipo "COMENTARIO")}}<span class="h-tipo com">comentario</span>{{/if}}
+            {{#if (eq tipo "CAMBIO_ESTADO")}}<span class="h-tipo est">{{#if estadoAnterior}}{{estadoAnterior}} → {{/if}}{{estadoNuevo}}</span>{{/if}}
+            {{#if (eq tipo "ASIGNACION")}}<span class="h-tipo asg">asignación</span>{{/if}}
+            {{#if comentario}}<div class="h-texto">{{comentario}}</div>{{/if}}
+          </div>
+        </div>
+        {{/each}}
+      </div>
+    </div>
+    {{/if}}
+
+    <div class="firmas">
+      <div class="firma">
+        <div class="linea"></div>
+        <div class="label">Solicitante</div>
+      </div>
+      <div class="firma">
+        <div class="linea"></div>
+        <div class="label">Responsable / Ejecutó</div>
+      </div>
+      <div class="firma">
+        <div class="linea"></div>
+        <div class="label">Conformidad</div>
+      </div>
+    </div>
+  </div>
+</div>
+{{/with}}
+
+</body></html>`
 
   return templates[queryKey] || `${BASE_STYLES}
 <div class="header">

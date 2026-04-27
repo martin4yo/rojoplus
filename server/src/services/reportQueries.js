@@ -239,6 +239,88 @@ const QUERY_DEFINITIONS = [
       }
     },
   },
+  {
+    key: 'orden_trabajo',
+    label: 'Orden de Trabajo',
+    category: 'mantenimiento',
+    description: 'Imprime una orden de trabajo de mantenimiento con datos del responsable, ubicación, costos e historial de comentarios y cambios de estado',
+    defaultParams: [
+      { name: 'numero', label: 'Nro. de Orden (ej: OT-2026-0001)', type: 'text', required: true, defaultValue: '', visible: true },
+    ],
+    run: async (db, tenantId, params) => {
+      if (!params.numero) throw new Error('numero es requerido')
+
+      const orden = await db.ordenTrabajo.findFirst({
+        where: { numero: params.numero, tenantId },
+        include: {
+          responsable: { select: { razonSocial: true, tipo: true, telefono: true, email: true } },
+          espacio: { select: { nombre: true } },
+          centroCosto: { select: { nombre: true } },
+          historial: { orderBy: { fecha: 'asc' } },
+        },
+      })
+
+      if (!orden) throw new Error(`Orden "${params.numero}" no encontrada`)
+
+      // Resolver nombres de admins del historial
+      const adminIds = [...new Set(orden.historial.map(h => h.adminId))]
+      const admins = adminIds.length
+        ? await db.admin.findMany({
+            where: { id: { in: adminIds } },
+            select: { id: true, nombre: true, apellido: true, email: true },
+          })
+        : []
+      const adminMap = new Map(admins.map(a => [a.id, a]))
+
+      const historial = orden.historial.map(h => {
+        const a = adminMap.get(h.adminId)
+        return {
+          fecha: h.fecha,
+          tipo: h.tipo,
+          estadoAnterior: h.estadoAnterior,
+          estadoNuevo: h.estadoNuevo,
+          comentario: h.comentario,
+          admin: a ? `${a.nombre || ''} ${a.apellido || ''}`.trim() || a.email : 'Sistema',
+        }
+      })
+
+      const tenant = await db.tenant.findUnique({
+        where: { id: tenantId },
+        select: { nombre: true, logoUrl: true, direccion: true, telefono: true, email: true, cuit: true },
+      }).catch(() => null)
+
+      const items = [{
+        numero: orden.numero,
+        titulo: orden.titulo,
+        descripcion: orden.descripcion || '',
+        tipo: orden.tipo,
+        prioridad: orden.prioridad,
+        estado: orden.estado,
+        ubicacion: orden.espacio?.nombre || orden.ubicacion || '',
+        responsable: orden.responsable?.razonSocial || '',
+        responsableTipo: orden.responsable?.tipo || '',
+        responsableTel: orden.responsable?.telefono || '',
+        responsableEmail: orden.responsable?.email || '',
+        centroCosto: orden.centroCosto?.nombre || '',
+        fechaApertura: orden.fechaApertura,
+        fechaInicio: orden.fechaInicio,
+        fechaResolucion: orden.fechaResolucion,
+        costoEstimado: orden.costoEstimado != null ? Number(orden.costoEstimado) : null,
+        costoReal: orden.costoReal != null ? Number(orden.costoReal) : null,
+        resolucion: orden.resolucion || '',
+        historial,
+      }]
+
+      return {
+        items,
+        summary: {
+          numero: orden.numero,
+          estado: orden.estado,
+          tenant,
+        },
+      }
+    },
+  },
 ]
 
 export function listQueryDefinitions() {

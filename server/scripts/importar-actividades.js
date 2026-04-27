@@ -237,7 +237,7 @@ async function main() {
     const totalAct = await prisma.actividad.count({ where: { tenantId } })
     const totalCat = await prisma.categoriaActividad.count({ where: { tenantId } })
     const totalIns = await prisma.inscripcion.count({ where: { tenantId } })
-    console.log(`\nTotales en BD (${TENANT_SLUG}):`)
+    console.log(`\nTotales en BD (${tenant.slug}):`)
     console.log(`  Actividades:   ${totalAct}`)
     console.log(`  Categorías:    ${totalCat}`)
     console.log(`  Inscripciones: ${totalIns}`)

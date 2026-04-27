@@ -120,6 +120,9 @@ const permisos = [
   // Sueldos
   { codigo: 'SUELDOS_VER', nombre: 'Ver Sueldos', modulo: 'SUELDOS' },
   { codigo: 'SUELDOS_GESTIONAR', nombre: 'Gestionar Sueldos', modulo: 'SUELDOS' },
+  // Mantenimiento
+  { codigo: 'MANTENIMIENTO_VER', nombre: 'Ver Mantenimiento', modulo: 'MANTENIMIENTO' },
+  { codigo: 'MANTENIMIENTO_GESTIONAR', nombre: 'Gestionar Mantenimiento', modulo: 'MANTENIMIENTO' },
   // Reportes
   { codigo: 'REPORTES_VER', nombre: 'Ver Reportes', modulo: 'REPORTES' },
   { codigo: 'REPORTES_EXPORTAR', nombre: 'Exportar Reportes', modulo: 'REPORTES' },

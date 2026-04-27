@@ -2,6 +2,7 @@ import { Router } from 'express'
 import * as XLSX from 'xlsx'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
+import { resolverPeriodoAlta } from '../../lib/cuotasPeriodoAlta.js'
 
 const router = Router()
 
@@ -140,7 +141,8 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
 
   // Verificar que el socio existe y está activo
   const socio = await req.db.socio.findUnique({
-    where: { id: parseInt(socioId) }
+    where: { id: parseInt(socioId) },
+    include: { categoriaSocioRel: true }
   })
 
   if (!socio) {
@@ -156,7 +158,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   const categoria = await req.db.categoriaActividad.findUnique({
     where: { id: parseInt(categoriaActividadId) },
     include: {
-      actividad: true
+      actividad: { include: { conceptoTesoreria: true } }
     }
   })
 
@@ -243,10 +245,67 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     }
   })
 
+  // Generar cargo de la cuota de actividad para el período correspondiente
+  // según el día de corte configurado (mes corriente o siguiente).
+  let cargoGenerado = null
+  if (!inscripcion.exentoCuota) {
+    const periodo = await resolverPeriodoAlta(req.db)
+    const actividad = categoria.actividad
+
+    // Determinar monto: concepto de tesorería de la actividad → categoría → actividad
+    let montoBase = actividad.conceptoTesoreria?.cuotaMensual
+      ? Number(actividad.conceptoTesoreria.cuotaMensual)
+      : (categoria.cuotaMensual ? Number(categoria.cuotaMensual)
+      : (actividad.cuotaMensual ? Number(actividad.cuotaMensual) : 0))
+
+    if (montoBase > 0) {
+      const pctInsc = parseFloat(porcentajeCuota) || 100
+      if (pctInsc !== 100) montoBase = montoBase * (pctInsc / 100)
+
+      const descuentoPct = socio.categoriaSocioRel?.porcentajeDescuento
+        ? Number(socio.categoriaSocioRel.porcentajeDescuento)
+        : 0
+      const montoBonificacion = montoBase * (descuentoPct / 100)
+      const montoTotal = montoBase - montoBonificacion
+
+      // Verificar que no exista ya un cargo para esa categoría + período (anti-duplicado)
+      const yaExiste = await req.db.cargo.findFirst({
+        where: {
+          socioId: parseInt(socioId),
+          categoriaActividadId: parseInt(categoriaActividadId),
+          periodoId: periodo.id,
+        }
+      })
+
+      if (!yaExiste) {
+        cargoGenerado = await req.db.cargo.create({
+          data: {
+            socio: { connect: { id: parseInt(socioId) } },
+            periodo: { connect: { id: periodo.id } },
+            categoriaActividad: { connect: { id: parseInt(categoriaActividadId) } },
+            ...(actividad.conceptoTesoreriaId ? {
+              conceptoTesoreria: { connect: { id: actividad.conceptoTesoreriaId } }
+            } : {}),
+            categoria: 'CUOTA_ACTIVIDAD',
+            descripcion: `${actividad.nombre} - ${categoria.nombre} - ${periodo.nombre}`,
+            montoOriginal: montoBase,
+            montoBonificacion,
+            montoTotal,
+            estado: 'PENDIENTE',
+            fechaVencimiento: periodo.fechaVencimiento,
+            origen: 'ALTA_INSCRIPCION',
+            motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+          }
+        })
+      }
+    }
+  }
+
   res.status(201).json({
     success: true,
-    message: `${socio.apellidoNombre} inscripto en ${categoria.nombre}`,
-    data: inscripcion
+    message: `${socio.apellidoNombre} inscripto en ${categoria.nombre}${cargoGenerado ? ` — cuota ${cargoGenerado.descripcion} generada` : ''}`,
+    data: inscripcion,
+    cargoGenerado,
   })
 }))
 

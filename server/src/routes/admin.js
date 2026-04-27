@@ -9,6 +9,7 @@ import { authAdmin, generateToken } from '../middleware/auth.js'
 import { enviarEmailAprobacion, enviarEmailRechazo, enviarEmailLinkAcceso, enviarReciboPago } from '../services/email.js'
 import { enviarEmailConTemplate } from '../services/notificacionService.js'
 import { generarAsientoPagoCuota } from '../services/asientosContables.js'
+import { resolverPeriodoAlta } from '../lib/cuotasPeriodoAlta.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -7021,18 +7022,9 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     sociosCreados.push(socioFamiliar)
   }
 
-  // PASO 4: Generar cuotas del mes actual
-  const hoy = new Date()
-  const mesActual = hoy.getMonth() + 1
-  const anioActual = hoy.getFullYear()
-
-  // Buscar el periodo actual
-  const periodoActual = await req.db.periodo.findFirst({
-    where: {
-      mes: mesActual,
-      anio: anioActual
-    }
-  })
+  // PASO 4: Generar cuotas según día de corte configurado
+  // Si la fecha de alta es <= DIA_CORTE_CUOTAS → mes corriente, si no → mes siguiente.
+  const periodoActual = await resolverPeriodoAlta(req.db)
 
   const cuotasGeneradas = []
 

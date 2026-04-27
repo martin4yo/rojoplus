@@ -23,6 +23,7 @@ import stockRoutes from './routes/stock.js'
 import movimientosContablesRoutes from './routes/movimientosContables.js'
 import usuariosRoutes from './routes/usuarios.js'
 import liquidacionesRoutes from './routes/liquidaciones.js'
+import mantenimientoRoutes from './routes/mantenimiento.js'
 import asientosRoutes from './routes/asientos.js'
 import deportesRoutes from './routes/deportes.js'
 import presupuestoRoutes from './routes/presupuesto.js'
@@ -228,6 +229,7 @@ app.use('/api/admin', stockRoutes)
 app.use('/api/admin', movimientosContablesRoutes)
 app.use('/api/admin', usuariosRoutes)
 app.use('/api/admin', liquidacionesRoutes)
+app.use('/api/admin', mantenimientoRoutes)
 app.use('/api/admin/asientos', asientosRoutes)
 app.use('/api/admin', deportesRoutes)
 app.use('/api/admin', presupuestoRoutes)

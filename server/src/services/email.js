@@ -907,14 +907,20 @@ export async function enviarRecordatorioReserva(reserva, db) {
   }
 }
 
-// Verificar conexión SMTP al iniciar (usa config global)
+// Verificar conexión SMTP al iniciar (usa config global del .env)
+// Silencioso: si no hay SMTP global cargado, no loggea nada (cada tenant usa su SMTP propio).
+// Si hay y falla, solo warning — el server arranca igual.
 export async function verificarConexionSMTP() {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
+    // Sin SMTP global configurado — los tenants deben tener su propio SMTP cargado
+    return false
+  }
   try {
     await globalTransporter.verify()
-    console.log('📧 Conexión SMTP verificada')
+    console.log('📧 SMTP global del .env verificado')
     return true
   } catch (error) {
-    console.error('❌ Error conexión SMTP:', error.message)
+    console.warn(`⚠️  SMTP global del .env no responde (${error.code || 'error'}): los tenants sin SMTP propio no podrán enviar mail`)
     return false
   }
 }

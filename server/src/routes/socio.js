@@ -467,7 +467,7 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
     select: {
       id: true,
@@ -566,7 +566,7 @@ router.put('/:tokenPortal/perfil', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
   const { email, celular, domicilio, ciudad, provincia } = req.body
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -611,7 +611,7 @@ router.put('/:tokenPortal/perfil', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -680,7 +680,7 @@ router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -785,7 +785,7 @@ router.post('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
   const { categoriaActividadId } = req.body
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -858,7 +858,7 @@ router.post('/:tokenPortal/inscripciones/:id/baja', asyncHandler(async (req, res
   const { tokenPortal, id } = req.params
   const { motivo } = req.body
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -899,7 +899,7 @@ router.get('/:tokenPortal/historial-asistencia', asyncHandler(async (req, res) =
   const { tokenPortal } = req.params
   const dias = parseInt(req.query.dias || '90')
 
-  const socio = await req.db.socio.findUnique({ where: { tokenPortal } })
+  const socio = await req.db.socio.findFirst({ where: { tokenPortal } })
   if (!socio) throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
 
   const inscripciones = await req.db.inscripcion.findMany({
@@ -972,7 +972,7 @@ router.get('/:tokenPortal/historial-asistencia', asyncHandler(async (req, res) =
 router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -1024,7 +1024,7 @@ router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/proximos-eventos', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -1066,7 +1066,7 @@ router.get('/:tokenPortal/proximos-eventos', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/cuotas/pendientes', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -1125,7 +1125,7 @@ router.get('/:tokenPortal/cuotas/pendientes', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/pagos/historial', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -1183,7 +1183,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
   const { tokenPortal, cuotaId } = req.params
   const { metodoPago } = req.body // 'MERCADOPAGO' | 'MODO'
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -1273,7 +1273,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
   const { tokenPortal } = req.params
   const { cuotasIds, metodoPago } = req.body
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -1389,7 +1389,7 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
   const { token } = req.params
   const { incluirFamilia } = req.query
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token },
     select: {
       id: true,
@@ -1516,7 +1516,7 @@ router.get('/:token/config-pagos', asyncHandler(async (req, res) => {
   const { token } = req.params
 
   // Validar socio
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token },
     select: { id: true },
   })
@@ -1571,7 +1571,7 @@ router.post('/:token/informar-pago', asyncHandler(async (req, res) => {
   const { cuotasIds, monto, comprobante, comprobanteOriginal, observaciones } = req.body
 
   // Validar socio
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token },
     select: { id: true, nroSocio: true, apellidoNombre: true },
   })
@@ -1646,7 +1646,7 @@ router.post('/:token/parse-comprobante', asyncHandler(async (req, res) => {
   if (!imagen) throw new AppError('imagen requerida', 400)
 
   // Verificar socio
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token },
     select: { id: true },
   })
@@ -1706,7 +1706,7 @@ router.get('/:tokenPortal/pagos/:pagoId/pdf', asyncHandler(async (req, res) => {
   const { tokenPortal, pagoId } = req.params
 
   // Verificar socio
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -1791,7 +1791,7 @@ router.get('/:tokenPortal/cuenta-corriente', asyncHandler(async (req, res) => {
   const { desde, hasta, limite = 100 } = req.query
 
   // Verificar socio
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -1934,7 +1934,7 @@ router.get('/:tokenPortal/cuenta-corriente', asyncHandler(async (req, res) => {
 router.get('/:tokenPortal/debito-automatico', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
     select: {
       id: true,
@@ -2029,7 +2029,7 @@ router.post('/:tokenPortal/debito-automatico/solicitar', asyncHandler(async (req
     }
   }
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -2136,7 +2136,7 @@ router.post('/:tokenPortal/debito-automatico/baja', asyncHandler(async (req, res
   const { tokenPortal } = req.params
   const { motivo } = req.body
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
   })
 
@@ -2584,7 +2584,7 @@ router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => 
 router.get('/:token/preferencias-notificaciones', asyncHandler(async (req, res) => {
   const { token } = req.params
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token },
     select: {
       id: true,
@@ -2640,7 +2640,7 @@ router.put('/:token/preferencias-notificaciones', asyncHandler(async (req, res) 
   const { token } = req.params
   const { canales, cuotasYGeneral, deportivas } = req.body
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token },
     select: { id: true }
   })
@@ -2713,7 +2713,7 @@ router.get('/:token/convocatorias', asyncHandler(async (req, res) => {
   const { token } = req.params
   const { estado } = req.query // 'pendiente', 'confirmada', 'rechazada', 'todas'
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token },
     select: { id: true }
   })
@@ -2803,7 +2803,7 @@ router.put('/:token/convocatorias/:partidoId', asyncHandler(async (req, res) => 
     throw new AppError('El campo confirmado es requerido y debe ser booleano', 400)
   }
 
-  const socio = await req.db.socio.findUnique({
+  const socio = await req.db.socio.findFirst({
     where: { tokenPortal: token },
     select: { id: true, apellidoNombre: true, nroSocio: true }
   })

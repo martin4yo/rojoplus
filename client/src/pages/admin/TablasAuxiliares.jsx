@@ -67,6 +67,10 @@ export default function TablasAuxiliares() {
   const [recordatorioAnt, setRecordatorioAnt] = useState({ activo: false, dias: '3' })
   const [guardandoRecordatorioAnt, setGuardandoRecordatorioAnt] = useState(false)
 
+  // Día de corte para alta de cuotas (mes corriente vs siguiente)
+  const [diaCorte, setDiaCorte] = useState('20')
+  const [guardandoDiaCorte, setGuardandoDiaCorte] = useState(false)
+
   // Configuración fiscal
   const [configFiscal, setConfigFiscal] = useState({
     cuit: '',
@@ -138,6 +142,7 @@ export default function TablasAuxiliares() {
     cargarBajaAsistencia()
     cargarCumpleanios()
     cargarRecordatorioAnt()
+    cargarDiaCorte()
     cargarConfigFiscal()
     cargarConfigSmtp()
     cargarConfigWa()
@@ -413,6 +418,38 @@ export default function TablasAuxiliares() {
     }
   }
 
+  async function cargarDiaCorte() {
+    try {
+      const data = await api.get('/admin/sistema/configuracion/DIA_CORTE_CUOTAS').catch(() => null)
+      if (data?.valor) setDiaCorte(String(data.valor))
+    } catch (err) {
+      console.error('Error cargando día de corte:', err)
+    }
+  }
+
+  async function guardarDiaCorte() {
+    const dia = parseInt(diaCorte)
+    if (!dia || dia < 1 || dia > 31) {
+      setError('El día de corte debe ser un número entre 1 y 31')
+      return
+    }
+    setGuardandoDiaCorte(true)
+    setError(null)
+    try {
+      await api.put('/admin/sistema/configuracion/DIA_CORTE_CUOTAS', {
+        valor: String(dia),
+        tipo: 'STRING',
+        modulo: 'CUOTAS',
+        descripcion: 'Día del mes a partir del cual las altas/inscripciones generan la cuota del mes siguiente en lugar del corriente',
+      })
+      setSuccess('Día de corte actualizado')
+    } catch (err) {
+      setError(err.message || 'Error al guardar')
+    } finally {
+      setGuardandoDiaCorte(false)
+    }
+  }
+
   async function guardarRecargo() {
     setGuardandoRecargo(true)
     setError(null)
@@ -514,10 +551,10 @@ export default function TablasAuxiliares() {
     setTesteandoSmtp(true)
     setResultadoTestSmtp(null)
     try {
-      await api.post('/admin/sistema/smtp/test')
-      setResultadoTestSmtp('ok')
+      const r = await api.post('/admin/sistema/smtp/test')
+      setResultadoTestSmtp({ tipo: 'ok', mensaje: r?.message || 'Conexión SMTP exitosa' })
     } catch (err) {
-      setResultadoTestSmtp('error')
+      setResultadoTestSmtp({ tipo: 'error', mensaje: err?.message || 'Error al testear SMTP' })
     } finally {
       setTesteandoSmtp(false)
     }
@@ -1352,6 +1389,56 @@ export default function TablasAuxiliares() {
             )}
           </div>
 
+          {/* Día de Corte de Cuotas */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[500px] relative min-h-[180px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-purple-100">
+                <Calendar className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Día de Corte de Cuotas</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Determina si un alta o nueva inscripción genera la cuota del mes corriente o del siguiente
+                </p>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Día del mes</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={diaCorte}
+                      onChange={e => setDiaCorte(e.target.value)}
+                      className="input-field w-20"
+                      min="1" max="31"
+                    />
+                    <span className="text-sm text-gray-500">de cada mes</span>
+                  </div>
+                </div>
+
+                <div className="mt-3 p-2 bg-purple-50 rounded-lg">
+                  <p className="text-xs text-gray-600">
+                    Altas hasta el día <span className="font-semibold text-purple-700">{diaCorte}</span> generan cuota del <span className="font-semibold">mes corriente</span>.
+                    Después del día <span className="font-semibold text-purple-700">{diaCorte}</span>, generan cuota del <span className="font-semibold">mes siguiente</span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarDiaCorte}
+                disabled={guardandoDiaCorte}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoDiaCorte ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+
           {/* Modo Demo (Email) */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[500px] relative min-h-[180px]">
             <div className="flex items-start gap-4">
@@ -2048,10 +2135,20 @@ export default function TablasAuxiliares() {
                 </div>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {resultadoTestSmtp === 'ok' && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Conexión exitosa</span>}
-                {resultadoTestSmtp === 'error' && <span className="text-sm text-red-600 font-medium flex items-center gap-1"><XCircle className="w-4 h-4" /> Error de conexión</span>}
+            <div className="mt-4 pt-4 border-t flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                {resultadoTestSmtp?.tipo === 'ok' && (
+                  <div className="flex items-start gap-2 text-sm text-green-700">
+                    <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{resultadoTestSmtp.mensaje}</span>
+                  </div>
+                )}
+                {resultadoTestSmtp?.tipo === 'error' && (
+                  <div className="flex items-start gap-2 text-sm text-red-700">
+                    <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span className="break-words">{resultadoTestSmtp.mensaje}</span>
+                  </div>
+                )}
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={testearSmtp} disabled={testeandoSmtp || !configSmtp.host || !configSmtp.user} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Receipt, CheckCircle, DollarSign, X, Users, ChevronDown, ChevronUp, Edit2, Plus, Trash2, CreditCard, Download, Mail, MessageCircle, Loader2 } from 'lucide-react'
+import { Receipt, CheckCircle, DollarSign, X, Users, ChevronDown, ChevronUp, Edit2, Plus, Trash2, CreditCard } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import Modal from '../../components/Modal'
 import { SearchInputWithDropdown } from '../../components/SearchInput'
 import { PlanPagosModal } from '../../components/PlanPagosModal'
-import AdjuntosComprobante from '../../components/AdjuntosComprobante'
+import ReciboAccionesModal from '../../components/ReciboAccionesModal'
 import SelectCentroCosto from '../../components/SelectCentroCosto'
 import Pagination from '../../components/Pagination'
 import StatusBadge from '../../components/StatusBadge'
@@ -57,8 +57,6 @@ export default function Cuotas() {
   const [showPagoExitosoModal, setShowPagoExitosoModal] = useState(false)
   const [numeroRecibo, setNumeroRecibo] = useState(null)
   const [pagoId, setPagoId] = useState(null)
-  const [enviandoRecibo, setEnviandoRecibo] = useState({})
-  const [resultadoRecibo, setResultadoRecibo] = useState({})
 
   // Edicion de cargo
   const [showEditModal, setShowEditModal] = useState(false)
@@ -432,53 +430,10 @@ export default function Cuotas() {
     }
   }
 
-  async function descargarReciboPDF() {
-    if (!pagoId) return
-    try {
-      const token = localStorage.getItem('adminToken')
-      const apiUrl = import.meta.env.VITE_API_URL || '/api'
-      const tenantSlug = window.location.hostname.match(/^([^.]+)\.localhost/)?.[1] || null
-      const headers = {}
-      if (token) headers.Authorization = `Bearer ${token}`
-      if (tenantSlug) headers['X-Tenant-Slug'] = tenantSlug
-
-      const response = await fetch(`${apiUrl}/admin/pagos/${pagoId}/recibo-pdf`, { headers })
-      if (!response.ok) throw new Error('Error al generar PDF')
-      const blob = await response.blob()
-      const disposition = response.headers.get('Content-Disposition') || ''
-      const match = disposition.match(/filename="([^"]+)"/)
-      const filename = match ? match[1] : `recibo-${numeroRecibo || pagoId}.pdf`
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      window.URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Error descargando PDF:', err)
-    }
-  }
-
-  async function enviarReciboPorCanal(canal) {
-    if (!pagoId) return
-    setEnviandoRecibo(prev => ({ ...prev, [canal]: true }))
-    try {
-      const res = await api.postFull(`/admin/pagos/${pagoId}/enviar-recibo`, { canales: [canal] })
-      const resultado = res?.data?.[canal]
-      setResultadoRecibo(prev => ({ ...prev, [canal]: resultado }))
-    } catch (err) {
-      setResultadoRecibo(prev => ({ ...prev, [canal]: { ok: false, mensaje: 'Error al enviar' } }))
-    } finally {
-      setEnviandoRecibo(prev => ({ ...prev, [canal]: false }))
-    }
-  }
-
   function cerrarModalPagoExitoso() {
     setShowPagoExitosoModal(false)
     setNumeroRecibo(null)
     setPagoId(null)
-    setEnviandoRecibo({})
-    setResultadoRecibo({})
 
     // Si vino desde otra página (con cobrarSocioId), volver atrás
     const cobrarSocioId = searchParams.get('cobrarSocioId')
@@ -914,89 +869,13 @@ export default function Cuotas() {
         </Modal>
 
         {/* Modal de pago exitoso */}
-        <Modal
+        <ReciboAccionesModal
           isOpen={showPagoExitosoModal}
           onClose={cerrarModalPagoExitoso}
-          maxWidth="max-w-lg"
-        >
-          <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-              <CheckCircle className="h-10 w-10 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Cobranza Registrada!</h2>
-            <p className="text-gray-600 mb-4">
-              El pago se registró correctamente
-            </p>
-            {numeroRecibo && (
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <p className="text-sm text-gray-600 mb-1">Número de Recibo</p>
-                <p className="text-3xl font-bold text-primary">#{numeroRecibo}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Acciones del recibo */}
-          {pagoId && (
-            <div className="border-t pt-4 mt-4 space-y-3">
-              <p className="text-sm text-gray-500 text-center mb-2">Acciones del comprobante</p>
-
-              {/* Descargar PDF */}
-              <button
-                onClick={descargarReciboPDF}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium"
-              >
-                <Download className="w-4 h-4" />
-                Descargar PDF
-              </button>
-
-              {/* Enviar por email */}
-              <div>
-                <button
-                  onClick={() => enviarReciboPorCanal('email')}
-                  disabled={!!enviandoRecibo.email || resultadoRecibo.email?.ok}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-blue-300 rounded-lg text-blue-700 hover:bg-blue-50 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {enviandoRecibo.email
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Mail className="w-4 h-4" />}
-                  {resultadoRecibo.email?.ok ? 'Email enviado ✓' : 'Enviar por Email'}
-                </button>
-                {resultadoRecibo.email && !resultadoRecibo.email.ok && (
-                  <p className="text-xs text-red-500 mt-1 text-center">{resultadoRecibo.email.mensaje}</p>
-                )}
-              </div>
-
-              {/* Enviar por WhatsApp */}
-              <div>
-                <button
-                  onClick={() => enviarReciboPorCanal('whatsapp')}
-                  disabled={!!enviandoRecibo.whatsapp || resultadoRecibo.whatsapp?.ok}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-green-300 rounded-lg text-green-700 hover:bg-green-50 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {enviandoRecibo.whatsapp
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <MessageCircle className="w-4 h-4" />}
-                  {resultadoRecibo.whatsapp?.ok ? 'WhatsApp enviado ✓' : 'Enviar por WhatsApp'}
-                </button>
-                {resultadoRecibo.whatsapp && !resultadoRecibo.whatsapp.ok && (
-                  <p className="text-xs text-red-500 mt-1 text-center">{resultadoRecibo.whatsapp.mensaje}</p>
-                )}
-              </div>
-
-              {/* Adjuntos */}
-              <div className="border-t pt-3">
-                <AdjuntosComprobante tipo="pago" comprobanteId={pagoId} />
-              </div>
-            </div>
-          )}
-
-          <Button
-            onClick={cerrarModalPagoExitoso}
-            className="w-full flex items-center justify-center gap-2 mt-4"
-          >
-            Continuar
-          </Button>
-        </Modal>
+          pagoId={pagoId}
+          numeroRecibo={numeroRecibo}
+          variante="success"
+        />
 
         {/* Modal de plan de pagos */}
         <PlanPagosModal

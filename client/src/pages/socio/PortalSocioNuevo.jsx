@@ -14,6 +14,7 @@ import {
   TicketIcon,
   EllipsisHorizontalIcon,
   CalendarDaysIcon,
+  IdentificationIcon,
 } from '@heroicons/react/24/outline'
 import {
   HomeIcon as HomeIconSolid,
@@ -27,6 +28,7 @@ import {
   TicketIcon as TicketIconSolid,
   EllipsisHorizontalIcon as EllipsisHorizontalIconSolid,
   CalendarDaysIcon as CalendarDaysIconSolid,
+  IdentificationIcon as IdentificationIconSolid,
 } from '@heroicons/react/24/solid'
 import { useModal } from '../../components/Modal'
 import PushNotificationBanner from '../../components/PushNotificationBanner'
@@ -36,6 +38,7 @@ import ChatWidget from '../../components/chat/ChatWidget'
 // Componentes de secciones
 import DashboardSocio from './sections/DashboardSocio'
 import MiPerfilSocio from './sections/MiPerfilSocio'
+import CarnetDigitalSocio from './sections/CarnetDigitalSocio'
 import MisActividadesSocio from './sections/MisActividadesSocio'
 import MensajesSocio from './sections/MensajesSocio'
 import PagosSocio from './sections/PagosSocio'
@@ -142,17 +145,17 @@ export default function PortalSocioNuevo() {
       badge: null,
     },
     {
+      id: 'carnet',
+      label: 'Carnet',
+      icon: IdentificationIcon,
+      iconSolid: IdentificationIconSolid,
+      badge: null,
+    },
+    {
       id: 'actividades',
       label: 'Deportes',
       icon: TrophyIcon,
       iconSolid: TrophyIconSolid,
-      badge: null,
-    },
-    {
-      id: 'reservas',
-      label: 'Reservas',
-      icon: CalendarDaysIcon,
-      iconSolid: CalendarDaysIconSolid,
       badge: null,
     },
     {
@@ -166,6 +169,14 @@ export default function PortalSocioNuevo() {
 
   // Tabs secundarias (mostrar en menú "Más")
   const tabsSecundarias = [
+    {
+      id: 'reservas',
+      label: 'Reservas',
+      icon: CalendarDaysIcon,
+      iconSolid: CalendarDaysIconSolid,
+      badge: null,
+      descripcion: 'Reservar canchas y espacios',
+    },
     {
       id: 'eventos',
       label: 'Eventos',
@@ -256,6 +267,7 @@ export default function PortalSocioNuevo() {
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === 'inicio' && <DashboardSocio socio={socio} tokenPortal={tokenPortal} onNavigate={setActiveTab} mensajesNoLeidos={mensajesNoLeidos} />}
+        {activeTab === 'carnet' && <CarnetDigitalSocio socio={socio} tokenPortal={tokenPortal} branding={branding} />}
         {activeTab === 'eventos' && <EventosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'reservas' && <ReservasSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'beneficios' && <BeneficiosSocio socio={socio} tokenPortal={tokenPortal} />}
