@@ -1266,6 +1266,7 @@ export default function SocioDetalle() {
                                       className="p-1 rounded hover:bg-green-100 text-green-600 transition-colors"
                                     >
                                       <FileDown className="w-3.5 h-3.5" />
+                                    </button>
                                   )}
                                 </td>
                               </tr>
