@@ -219,8 +219,9 @@ Al terminar la importación de cargos, el script también actualiza `cuotaMensua
 ## Paso 6 — Movimientos Financieros (desde Conceptos)
 
 **Archivo:** `Conceptos.xlsx` (13.385 filas)
-**Script:** `node scripts/importar-movimientos.js --tenant <slug>`
+**Script:** `node scripts/importar-movimientos.js --tenant <slug> [--desde-anio YYYY] [--desde-mes M]`
 **Tabla destino:** `movimientos_caja`
+**Filtro de período:** sólo importa movimientos con `Fecha Movimiento >= 1/<mes>/<anio>` (default: 4/<año actual>).
 
 **Lógica de clasificación por fila:**
 
@@ -250,7 +251,7 @@ Al terminar la importación de cargos, el script también actualiza `cuotaMensua
 - **Ajustes:** DEVOLUCIONES, INCOBRABLES, DESCUENTOS CONCEDIDOS, AJUSTE EJERCICIOS ANTERIORES
 
 **Prerequisito:** Pasos 1 y 4 completados
-**Estado:** ✅ Listo — `node scripts/importar-movimientos.js --tenant <slug>`
+**Estado:** ✅ Listo — `node scripts/importar-movimientos.js --tenant <slug> [--desde-anio YYYY] [--desde-mes M]`
 
 ---
 
@@ -290,8 +291,8 @@ node scripts/importar-proveedores.js --tenant <slug>
 # 5. Cuotas — cargos + pagos. Ajustar período si necesario:
 node scripts/importar-cuotas.js --tenant <slug> --desde-anio 2026 --desde-mes 4
 
-# 6. Movimientos financieros (desde Conceptos.xlsx)
-node scripts/importar-movimientos.js --tenant <slug>
+# 6. Movimientos financieros (desde Conceptos.xlsx). Ajustar período si necesario:
+node scripts/importar-movimientos.js --tenant <slug> --desde-anio 2026 --desde-mes 4
 
 # 7. Pagos actividades — script pendiente de desarrollo
 ```

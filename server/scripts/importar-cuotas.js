@@ -197,7 +197,7 @@ async function importarCuotas() {
     // Borrar primero los pagos (FK a cargo via cargo.pagoId) y MovimientosCaja asociados,
     // después los cargos. Si hay otras dependencias, fallarán acá.
     const deletedMovs = await prisma.movimientoCaja.deleteMany({
-      where: { tenantId, observaciones: { startsWith: 'Migración Brio:' } }
+      where: { tenantId, pago: { origen: 'MIGRACION_BRIO' } }
     })
     const deletedPagos = await prisma.pago.deleteMany({
       where: { tenantId, origen: 'MIGRACION_BRIO' }

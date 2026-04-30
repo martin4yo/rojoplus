@@ -4,7 +4,7 @@
  * - Si Nro. Socio existe en tabla socios → movimiento de socio
  * - Si NO existe → movimiento de entidad (proveedor/empleado)
  *
- * Ejecutar con: node scripts/importar-movimientos.js --tenant <slug>
+ * Ejecutar con: node scripts/importar-movimientos.js --tenant <slug> [--desde-anio YYYY] [--desde-mes M]
  * Prerequisito: Pasos 1 (socios) y 4 (proveedores) completados
  */
 
@@ -12,12 +12,17 @@ import XLSX from 'xlsx'
 import { PrismaClient } from '@prisma/client'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { resolveTenant } from './_lib/cli.js'
+import { arg, resolveTenant } from './_lib/cli.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const prisma = new PrismaClient()
+
+// Filtro de período por fecha de movimiento (default: año actual y mes 4)
+const PERIODO_DESDE_ANIO = parseInt(arg('desde-anio', String(new Date().getFullYear())))
+const PERIODO_DESDE_MES  = parseInt(arg('desde-mes',  '4'))
+const FECHA_CORTE = new Date(PERIODO_DESDE_ANIO, PERIODO_DESDE_MES - 1, 1)
 
 function excelDateToJS(val) {
   if (!val) return new Date()
@@ -54,6 +59,7 @@ async function importarMovimientos() {
   try {
     const tenant = await resolveTenant(prisma, 'importar-movimientos.js')
     const tenantId = tenant.id
+    console.log(`Filtro de período: desde ${PERIODO_DESDE_MES}/${PERIODO_DESDE_ANIO} en adelante`)
 
     // Leer Conceptos.xlsx
     const filePath = path.join(__dirname, '../../brio/Conceptos.xlsx')
@@ -144,6 +150,7 @@ async function importarMovimientos() {
     // Importar movimientos
     let importados = 0
     let errores = 0
+    let omitidosPorFecha = 0
     let contador = 1
     const erroresDetalle = []
 
@@ -159,6 +166,7 @@ async function importarMovimientos() {
       const fecha = excelDateToJS(row['Fecha Movimiento'])
 
       if (!nro || importe === 0) continue
+      if (fecha < FECHA_CORTE) { omitidosPorFecha++; continue }
 
       const esSocio = nrosSocios.has(nro)
       const entidadId = !esSocio ? entidadesPorCodigo.get(`BRIO-${nro}`) : null
@@ -201,6 +209,7 @@ async function importarMovimientos() {
     console.log('\n' + '='.repeat(50))
     console.log('LISTO')
     console.log(`Movimientos importados: ${importados}`)
+    console.log(`Omitidos por fecha:    ${omitidosPorFecha}`)
     console.log(`Errores:               ${errores}`)
 
     if (erroresDetalle.length > 0) {
