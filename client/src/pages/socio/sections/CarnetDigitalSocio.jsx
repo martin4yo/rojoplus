@@ -32,8 +32,8 @@ export default function CarnetDigitalSocio({ socio, tokenPortal, branding }) {
   }, [tokenPortal])
 
   // El QR contiene la URL completa. El backend del molinete extrae el token automáticamente
-  // (ver server/src/routes/accesos.js — busca patrón /s/<token>).
-  const qrUrl = `${window.location.origin}/s/${tokenPortal}`
+  // (ver server/src/routes/accesos.js — busca patrón /(s|portal-socio)/<token>).
+  const qrUrl = `${window.location.origin}/portal-socio/${tokenPortal}`
   const colorPrimario = branding?.colores?.primario || '#dc2626'
   const colorSecundario = branding?.colores?.secundario || colorPrimario
 

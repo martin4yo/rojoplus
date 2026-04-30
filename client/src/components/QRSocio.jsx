@@ -17,7 +17,7 @@ export default function QRSocio({
   className = '',
 }) {
   const qrRef = useRef(null)
-  const qrUrl = `${window.location.origin}/s/${tokenPortal}`
+  const qrUrl = `${window.location.origin}/portal-socio/${tokenPortal}`
 
   const descargarQR = () => {
     const svg = qrRef.current?.querySelector('svg')

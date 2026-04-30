@@ -83,7 +83,10 @@ export default function InscripcionSocio() {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/public/solicitud-socio`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(tenant?.subdomain && { 'X-Tenant-Slug': tenant.subdomain }),
+        },
         body: JSON.stringify(formData),
       })
       const data = await response.json()

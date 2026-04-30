@@ -63,7 +63,7 @@ router.post('/enviar-qr', asyncHandler(async (req, res) => {
   // Generar URL del QR y portal
   const baseUrl = getTenantFrontendUrl(req.tenant)
   const portalUrl = `${baseUrl}/portal-socio/${socio.tokenPortal}`
-  const qrUrl = `${baseUrl}/s/${socio.tokenPortal}`
+  const qrUrl = `${baseUrl}/portal-socio/${socio.tokenPortal}`
 
   // Enviar email con QR
   const { enviarEmailQRSocio } = await import('../services/email.js')
@@ -209,7 +209,7 @@ router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
     throw new AppError('No tenés teléfono registrado. Contactá al club para actualizarlo.', 400, 'NO_TELEFONO')
   }
 
-  const qrUrl = `${getTenantFrontendUrl(req.tenant)}/s/${socio.tokenPortal}`
+  const qrUrl = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${socio.tokenPortal}`
 
   // Leer color primario del branding del tenant (fallback rojo)
   const tenant = await req.db.tenant.findUnique({
@@ -1249,9 +1249,9 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
         name: socio.apellidoNombre,
       },
       notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago`,
-      successUrl: `${baseUrl}/s/${tokenPortal}?pago=exito`,
-      failureUrl: `${baseUrl}/s/${tokenPortal}?pago=error`,
-      pendingUrl: `${baseUrl}/s/${tokenPortal}?pago=pendiente`,
+      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito`,
+      failureUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=error`,
+      pendingUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=pendiente`,
     })
 
     initPoint = preferencia.init_point
@@ -1353,9 +1353,9 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
         name: socio.apellidoNombre,
       },
       notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago`,
-      successUrl: `${baseUrl}/s/${tokenPortal}?pago=exito`,
-      failureUrl: `${baseUrl}/s/${tokenPortal}?pago=error`,
-      pendingUrl: `${baseUrl}/s/${tokenPortal}?pago=pendiente`,
+      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito`,
+      failureUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=error`,
+      pendingUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=pendiente`,
     })
 
     initPoint = preferencia.init_point

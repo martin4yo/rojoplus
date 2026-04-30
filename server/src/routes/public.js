@@ -8,6 +8,7 @@
 import express from 'express'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarEmailConTemplate } from '../services/notificacionService.js'
+import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 
 const router = express.Router()
 
@@ -141,6 +142,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
       ? actividadesSeleccionadas.join(', ')
       : 'Ninguna'
 
+    const baseUrl = getTenantFrontendUrl(req.tenant)
     for (const admin of emailsAdmin) {
       await enviarEmailConTemplate('NOTIF_NUEVA_SOLICITUD', admin.email, {
         nombreCompleto: `${nombres} ${apellidos}`,
@@ -149,7 +151,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
         telefono,
         actividadInscripcion: actividadesTexto,
         numeroSolicitud: solicitud.id,
-        urlGestion: `${process.env.FRONTEND_URL}/admin/solicitudes/${solicitud.id}`
+        urlGestion: `${baseUrl}/admin/solicitudes/${solicitud.id}`
       }, req.db)
     }
   } catch (emailError) {

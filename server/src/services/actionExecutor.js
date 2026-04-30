@@ -249,9 +249,9 @@ class ActionExecutor {
         name: socio.apellidoNombre
       },
       notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago`,
-      successUrl: `${baseUrl}/s/${socio.tokenPortal}?pago=exito`,
-      failureUrl: `${baseUrl}/s/${socio.tokenPortal}?pago=error`,
-      pendingUrl: `${baseUrl}/s/${socio.tokenPortal}?pago=pendiente`
+      successUrl: `${baseUrl}/portal-socio/${socio.tokenPortal}?pago=exito`,
+      failureUrl: `${baseUrl}/portal-socio/${socio.tokenPortal}?pago=error`,
+      pendingUrl: `${baseUrl}/portal-socio/${socio.tokenPortal}?pago=pendiente`
     })
 
     const initPoint = preferencia.init_point

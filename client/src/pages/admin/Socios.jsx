@@ -187,13 +187,13 @@ export default function AdminSocios() {
     const origin = window.location.origin
     // Si el origin actual ya tiene el subdomain del tenant, usarlo tal cual.
     if (!subdomain || origin.includes(`//${subdomain}.`)) {
-      return `${origin}/s/${tokenPortal}`
+      return `${origin}/portal-socio/${tokenPortal}`
     }
     // Si el admin accede sin subdomain (localhost o dominio raíz), insertar el subdomain del tenant.
     const conSubdomain = origin.includes('localhost')
       ? origin.replace('localhost', `${subdomain}.localhost`)
       : origin.replace('://', `://${subdomain}.`)
-    return `${conSubdomain}/s/${tokenPortal}`
+    return `${conSubdomain}/portal-socio/${tokenPortal}`
   }
 
   async function regenerarToken(socio) {

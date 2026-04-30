@@ -359,7 +359,7 @@ export async function notificarCuotaProximaVencer(cargo) {
       montoTotal: cargo.montoTotal.toString(),
       fechaVencimiento: fechaVencimiento.toLocaleDateString('es-AR'),
       diasRestantes: diasRestantes.toString(),
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
     }
 
     // Email
@@ -418,7 +418,7 @@ export async function notificarCuotaVencida(cargo) {
       cargoDescripcion: cargo.descripcion || 'Cuota mensual',
       montoTotal: cargo.montoTotal.toString(),
       fechaVencimiento: new Date(cargo.fechaVencimiento).toLocaleDateString('es-AR'),
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
     }
 
     // Email
@@ -492,7 +492,7 @@ export async function notificarMorosidad(socioId) {
       nroSocio: socio.nroSocio,
       cantidadCuotas: cuotasVencidas.length.toString(),
       totalAdeudado: totalAdeudado.toFixed(2),
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
       cuotas: cuotasVencidas.map((c) => ({
         descripcion: c.descripcion,
         monto: c.montoTotal.toString(),
@@ -564,7 +564,7 @@ export async function notificarInscripcionConfirmada(inscripcionId) {
       actividad: inscripcion.categoriaActividad.actividad.nombre,
       categoria: inscripcion.categoriaActividad.nombre,
       fechaInicio: new Date(inscripcion.fechaInicio).toLocaleDateString('es-AR'),
-      linkPortal: `${await getTenantUrl(inscripcion.socio.tenantId)}/s/${inscripcion.socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(inscripcion.socio.tenantId)}/portal-socio/${inscripcion.socio.tokenPortal}`,
     }
 
     await programarNotificacion({
@@ -606,7 +606,7 @@ export async function notificarBienvenida(socioId) {
       socioNombre: socio.apellidoNombre,
       nroSocio: socio.nroSocio,
       fechaAlta: socio.fechaAlta ? new Date(socio.fechaAlta).toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR'),
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
       linkMiQR: `${await getTenantUrl(socio.tenantId)}/mi-qr`,
     }
 
@@ -847,7 +847,7 @@ export async function notificarConvocatoriaPartido(partidoId, socioId) {
       hora: partido.hora || '',
       lugar: partido.lugar || '',
       esLocal: partido.esLocal ? 'LOCAL' : 'VISITANTE',
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/s/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
     }
 
     await programarNotificacion({

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin, generateToken } from '../../middleware/auth.js'
 import { enviarEmailConTemplate } from '../../services/notificacionService.js'
+import { getTenantFrontendUrl } from '../../lib/tenantUrl.js'
 
 const router = Router()
 
@@ -391,12 +392,13 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
       year: 'numeric'
     })
 
+    const baseUrl = getTenantFrontendUrl(req.tenant)
     await enviarEmailConTemplate('BIENVENIDA', nuevoSocio.email, {
       socioNombre: nuevoSocio.apellidoNombre,
       nroSocio: nuevoSocio.nroSocio,
       fechaAlta,
-      linkPortal: `${process.env.FRONTEND_URL}/mi-qr`,
-      linkMiQR: `${process.env.FRONTEND_URL}/mi-qr`
+      linkPortal: `${baseUrl}/mi-qr`,
+      linkMiQR: `${baseUrl}/mi-qr`
     }, req.db)
   } catch (emailError) {
     console.error('Error enviando email de bienvenida:', emailError)
@@ -412,7 +414,7 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
       cuotasGeneradas: cuotasGeneradas.length,
       linkPago: linkPago ? {
         codigo: linkPago.codigo,
-        url: `${process.env.FRONTEND_URL}/pagar/${linkPago.codigo}`,
+        url: `${getTenantFrontendUrl(req.tenant)}/pagar/${linkPago.codigo}`,
         montoTotal: linkPago.montoTotal
       } : null
     }

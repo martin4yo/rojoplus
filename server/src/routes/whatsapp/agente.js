@@ -209,7 +209,7 @@ async function ejecutarTool(name, input, { db, socio, tenantId, telefono }) {
         const baseUrl = tenant?.slug
           ? `https://${tenant.slug}.${appDomain}`
           : (process.env.FRONTEND_URL || `https://${appDomain}`)
-        const link = `${baseUrl}/s/${socio.tokenPortal}`
+        const link = `${baseUrl}/portal-socio/${socio.tokenPortal}`
 
         await enviarWhatsApp({
           db,

@@ -1340,9 +1340,9 @@ router.post('/socio/:token/eventos/:eventoId/comprar', asyncHandler(async (req, 
       name: socio.apellidoNombre
     },
     notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/pagos/webhook/mercadopago`,
-    successUrl: `${baseUrl}/s/${token}?pago=exito&seccion=eventos`,
-    failureUrl: `${baseUrl}/s/${token}?pago=error&seccion=eventos`,
-    pendingUrl: `${baseUrl}/s/${token}?pago=pendiente&seccion=eventos`
+    successUrl: `${baseUrl}/portal-socio/${token}?pago=exito&seccion=eventos`,
+    failureUrl: `${baseUrl}/portal-socio/${token}?pago=error&seccion=eventos`,
+    pendingUrl: `${baseUrl}/portal-socio/${token}?pago=pendiente&seccion=eventos`
   })
 
   // Actualizar LinkPago con datos de la preferencia

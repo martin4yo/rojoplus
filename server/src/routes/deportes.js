@@ -1621,7 +1621,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
             icon: '/images/icon-192.png',
             badge: '/images/icon-192.png',
             data: {
-              url: `/s/${socio.tokenPortal}`,
+              url: `/portal-socio/${socio.tokenPortal}`,
               tipo: 'convocatoria',
               partidoId: partido.id
             }
@@ -1665,7 +1665,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
               <p><strong>Lugar:</strong> ${lugar}</p>
               <br>
               <p>Confirmá tu asistencia desde el portal del socio:</p>
-              <a href="${getTenantFrontendUrl(req.tenant)}/s/${socio.tokenPortal}"
+              <a href="${getTenantFrontendUrl(req.tenant)}/portal-socio/${socio.tokenPortal}"
                  style="display: inline-block; padding: 12px 24px; background-color: #DC2626; color: white; text-decoration: none; border-radius: 8px;">
                 Ir al Portal
               </a>

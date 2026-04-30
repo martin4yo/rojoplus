@@ -16,7 +16,7 @@ export default function SocioPortal() {
   const [error, setError] = useState(null)
 
   // URL que contiene el QR
-  const qrUrl = `${window.location.origin}/s/${tokenPortal}`
+  const qrUrl = `${window.location.origin}/portal-socio/${tokenPortal}`
 
   useEffect(() => {
     async function cargarSocio() {

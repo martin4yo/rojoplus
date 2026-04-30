@@ -50,12 +50,11 @@ router.post('/validar', authDispositivo, async (req, res) => {
 
     // 1. Buscar según el tipo de lectura
     if (tipoLectura === 'QR') {
-      // Si el QR contiene una URL del portal (https://.../s/<token>), extraer el token.
-      // Esto permite reutilizar el mismo QR del carnet digital tanto para comercios
-      // (que escanean con el celular y abren la URL) como para el lector del molinete
-      // (que necesita el tokenPortal raw).
+      // Si el QR contiene una URL del portal (https://.../s/<token> o
+      // https://.../portal-socio/<token>), extraer el token. Aceptamos ambos
+      // prefijos por compatibilidad con QRs viejos ya impresos.
       let tokenBuscado = valorLeido
-      const matchUrl = String(valorLeido).match(/\/s\/([a-f0-9-]{20,})/i)
+      const matchUrl = String(valorLeido).match(/\/(?:s|portal-socio)\/([a-f0-9-]{20,})/i)
       if (matchUrl) tokenBuscado = matchUrl[1]
 
       // Primero buscar por tokenPortal (Socios)

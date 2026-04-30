@@ -188,7 +188,7 @@ export default function SocioDetalle() {
   }
 
   function getQrUrl() {
-    return `${window.location.origin}/s/${socio?.tokenPortal}`
+    return `${window.location.origin}/portal-socio/${socio?.tokenPortal}`
   }
 
   async function regenerarToken() {

@@ -593,9 +593,9 @@ router.post('/socio/:token', asyncHandler(async (req, res) => {
       externalReference: JSON.stringify({ tipo: 'RESERVA', reservaId: reservaPrincipal.id }),
       payer: { email: socio.email, name: `${socio.nombre} ${socio.apellido}` },
       notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/pagos/webhook/mercadopago`,
-      successUrl: `${baseUrl}/s/${req.params.token}/reservas?status=success&reserva=${reservaPrincipal.codigo}`,
-      failureUrl: `${baseUrl}/s/${req.params.token}/reservas?status=failure&reserva=${reservaPrincipal.codigo}`,
-      pendingUrl: `${baseUrl}/s/${req.params.token}/reservas?status=pending&reserva=${reservaPrincipal.codigo}`,
+      successUrl: `${baseUrl}/portal-socio/${req.params.token}?pago=exito&seccion=reservas&reserva=${reservaPrincipal.codigo}`,
+      failureUrl: `${baseUrl}/portal-socio/${req.params.token}?pago=error&seccion=reservas&reserva=${reservaPrincipal.codigo}`,
+      pendingUrl: `${baseUrl}/portal-socio/${req.params.token}?pago=pendiente&seccion=reservas&reserva=${reservaPrincipal.codigo}`,
     })
 
     return res.status(201).json({

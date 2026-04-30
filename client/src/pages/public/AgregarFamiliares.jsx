@@ -36,9 +36,13 @@ export default function AgregarFamiliares() {
 
   useEffect(() => { cargarDatos() }, [])
 
+  const tenantHeaders = tenant?.subdomain ? { 'X-Tenant-Slug': tenant.subdomain } : {}
+
   const cargarDatos = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/public/solicitud-socio/${solicitudId}/familiares`)
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/public/solicitud-socio/${solicitudId}/familiares`, {
+        headers: tenantHeaders,
+      })
       if (!res.ok) throw new Error('Error al cargar los datos')
       const data = await res.json()
       setFamiliares(data.data || [])
@@ -86,7 +90,7 @@ export default function AgregarFamiliares() {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/public/solicitud-socio/${solicitudId}/familiar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...tenantHeaders },
         body: JSON.stringify(formData),
       })
       const data = await response.json()
@@ -110,7 +114,10 @@ export default function AgregarFamiliares() {
     const confirmed = await confirm('¿Eliminar este familiar?', '¿Estás seguro de eliminar este familiar?')
     if (!confirmed) return
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/public/solicitud-socio/${solicitudId}/familiar/${familiarId}`, { method: 'DELETE' })
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/public/solicitud-socio/${solicitudId}/familiar/${familiarId}`, {
+        method: 'DELETE',
+        headers: tenantHeaders,
+      })
       if (!response.ok) throw new Error('Error al eliminar familiar')
       toast.success('Familiar eliminado')
       cargarDatos()

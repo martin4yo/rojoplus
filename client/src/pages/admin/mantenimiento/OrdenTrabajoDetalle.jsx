@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Send, Wrench, MapPin, User, Calendar, DollarSign, MessageSquare, ArrowRightCircle, CheckCircle2, XCircle, AlertCircle, Trash2 } from 'lucide-react'
+import { ArrowLeft, Edit, Send, Wrench, MapPin, User, Calendar, DollarSign, MessageSquare, ArrowRightCircle, CheckCircle2, XCircle, AlertCircle, Trash2, Printer } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
+import reportTemplatesApi from '../../../services/reportTemplatesApi'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
@@ -41,6 +42,7 @@ export default function OrdenTrabajoDetalle() {
   const [cambioEstado, setCambioEstado] = useState(null) // { estado, requiereResolucion, requiereCosto }
   const [formCambio, setFormCambio] = useState({ comentario: '', resolucion: '', costoReal: '' })
   const [aplicandoCambio, setAplicandoCambio] = useState(false)
+  const [imprimiendo, setImprimiendo] = useState(false)
 
   useEffect(() => { cargar() }, [id])
 
@@ -101,6 +103,26 @@ export default function OrdenTrabajoDetalle() {
     }
   }
 
+  async function imprimirOrden() {
+    setImprimiendo(true)
+    try {
+      const templates = await reportTemplatesApi.getAll()
+      const template = (Array.isArray(templates) ? templates : []).find(t => t.queryKey === 'orden_trabajo')
+      if (!template) {
+        showModal({ type: 'error', message: 'No hay plantilla configurada para "Orden de trabajo".' })
+        return
+      }
+      const blob = await reportTemplatesApi.runReport(template.id, { numero: orden.numero })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      showModal({ type: 'error', message: err.message || 'Error generando el PDF' })
+    } finally {
+      setImprimiendo(false)
+    }
+  }
+
   async function eliminarOrden() {
     showModal({
       type: 'warning',
@@ -149,6 +171,9 @@ export default function OrdenTrabajoDetalle() {
           <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium border ${estadoCfg.color}`}>
             {estadoCfg.label}
           </span>
+          <Button variant="secondary" onClick={imprimirOrden} disabled={imprimiendo}>
+            <Printer className="w-4 h-4 mr-2" /> {imprimiendo ? 'Generando...' : 'Imprimir'}
+          </Button>
           {puedeGestionar && !cerrada && (
             <Button variant="secondary" onClick={() => navigate(`/admin/mantenimiento/${id}/editar`)}>
               <Edit className="w-4 h-4 mr-2" /> Editar
