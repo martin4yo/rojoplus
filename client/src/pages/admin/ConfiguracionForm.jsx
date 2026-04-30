@@ -608,6 +608,18 @@ export default function ConfiguracionForm() {
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cuota Mensual ($)</label>
+                  <input
+                    type="number"
+                    value={form.cuotaMensual}
+                    onChange={e => setForm({ ...form, cuotaMensual: e.target.value })}
+                    className="input-field w-full"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Concepto Tesorería</label>
                   <select
                     value={form.conceptoTesoreriaId}

@@ -141,7 +141,55 @@ async function main() {
 
   console.log(`📊 Total de registros a procesar: ${data.length}\n`)
 
-  // 2. Procesar socios
+  // 2. Sincronizar tablas auxiliares
+  // REGLA: Estado y Categoría se importan tal cual del Excel.
+  //        TipoSocio tiene EXACTAMENTE 3 valores fijos del sistema (no viene del Excel):
+  //          "Socio Unico" | "Titular Familia" | "Miembro Familia"
+  //        La columna __EMPTY_14 del Excel es PARENTESCO (no TipoSocio) → va a parentescoTitular.
+  console.log('📋 Sincronizando tablas auxiliares (estados, categorías, tipos)...')
+
+  const estadosEnExcel    = [...new Set(data.map(r => String(r['__EMPTY_10'] || '').trim()).filter(Boolean))]
+  const categoriasEnExcel = [...new Set(data.map(r => String(r['__EMPTY_9']  || '').trim()).filter(Boolean))]
+
+  // EstadoSocio: crear los que no existan (tal cual del Excel)
+  for (const est of estadosEnExcel) {
+    const codigo = est.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
+    const existe = await prisma.estadoSocio.findFirst({ where: { tenantId, OR: [{ codigo }, { nombre: est }] } })
+    if (!existe) {
+      const pd = est.toUpperCase().includes('ACTIV') || est.toUpperCase().includes('VIGENT')
+      await prisma.estadoSocio.create({ data: { tenantId, codigo, nombre: est, color: pd ? '#10B981' : '#9CA3AF', permiteDescuentos: pd } })
+    }
+  }
+  const mapEstado = {}
+  for (const e of await prisma.estadoSocio.findMany({ where: { tenantId } }))
+    mapEstado[e.nombre] = e.id
+
+  // CategoriaSocio: crear los que no existan (tal cual del Excel)
+  for (const cat of categoriasEnExcel) {
+    const codigo = cat.toUpperCase().replace(/\s+/g, '_').substring(0, 50)
+    const existe = await prisma.categoriaSocio.findFirst({ where: { tenantId, OR: [{ codigo }, { nombre: cat }] } })
+    if (!existe)
+      await prisma.categoriaSocio.create({ data: { tenantId, codigo, nombre: cat, color: '#3B82F6' } })
+  }
+  const mapCategoria = {}
+  for (const c of await prisma.categoriaSocio.findMany({ where: { tenantId } }))
+    mapCategoria[c.nombre] = c.id
+
+  // TipoSocio: garantizar los 3 valores fijos del sistema
+  const TIPOS_SISTEMA = ['Socio Unico', 'Miembro Familia', 'Titular Familia']
+  for (const nombre of TIPOS_SISTEMA) {
+    const codigo = nombre.toUpperCase().replace(/\s+/g, '_')
+    const existe = await prisma.tipoSocio.findFirst({ where: { tenantId, nombre } })
+    if (!existe)
+      await prisma.tipoSocio.create({ data: { tenantId, codigo, nombre, color: '#3B82F6' } })
+  }
+  const mapTipo = {}
+  for (const t of await prisma.tipoSocio.findMany({ where: { tenantId } }))
+    mapTipo[t.nombre] = t.id
+
+  console.log(`   ✓ ${estadosEnExcel.length} estados, ${categoriasEnExcel.length} categorías, 3 tipos sistema\n`)
+
+  // 3. Procesar socios
   console.log('👥 Importando socios...')
 
   let importados = 0
@@ -182,12 +230,20 @@ async function main() {
       const fechaBaja = excelDateToJS(row['__EMPTY_13']) // Fecha Baja (columna 14)
 
       // Respetar exactamente los valores del Excel
-      const sexo = String(row['__EMPTY_7'] || '').trim() || null // Sexo (columna 8)
-      const zona = String(row['__EMPTY_8'] || '').trim() || null // Zona (columna 9)
-      const categoria = String(row['__EMPTY_9'] || '').trim() || null // Categoria (columna 10)
-      const estadoRaw = String(row['__EMPTY_10'] || '').trim() // Estado (columna 11)
-      const estado = estadoRaw || 'VIGENTE' // Si está vacío, asumir VIGENTE
-      const tipoSocio = String(row['__EMPTY_14'] || '').trim() || null // TipoSocio (columna 15)
+      const sexo     = String(row['__EMPTY_7']  || '').trim() || null // Sexo (columna 8)
+      const zona     = String(row['__EMPTY_8']  || '').trim() || null // Zona (columna 9)
+      const categoria = String(row['__EMPTY_9'] || '').trim() || null // Categoría (columna 10)
+      const estadoRaw = String(row['__EMPTY_10'] || '').trim()        // Estado (columna 11)
+      const estado    = estadoRaw || 'VIGENTE' // Respeta el valor del Excel; fallback si viene vacío
+
+      // Columna 15 (__EMPTY_14) del Excel Brio = PARENTESCO familiar (no es TipoSocio)
+      // El TipoSocio del sistema es siempre uno de: Socio Unico | Miembro Familia | Titular Familia
+      const parentescoExcel = String(row['__EMPTY_14'] || '').trim() || null
+
+      // TipoSocio: se determina por la estructura familiar, no por el Excel.
+      // El script importar-grupos-familiares.js ajusta Titular/Miembro después.
+      // Por defecto todos ingresan como "Socio Unico".
+      const tipoSocio = 'Socio Unico'
 
       // Datos fiscales
       const condicionFiscal = String(row['__EMPTY_21'] || row['__EMPTY_40'] || '').trim() // Cond. Fiscal
@@ -269,6 +325,7 @@ async function main() {
             zona,
             categoria,
             tipoSocio,
+            parentescoTitular: parentescoExcel,
             obraSocial,
             profesion,
             libro,
@@ -277,6 +334,10 @@ async function main() {
             factorRh,
             observaciones,
             ...(rfidUid && { rfidUid }),
+            // IDs FK a tablas de parámetros
+            ...(estado    && mapEstado[estado]       && { estadoSocioId:    mapEstado[estado] }),
+            ...(categoria && mapCategoria[categoria] && { categoriaSocioId: mapCategoria[categoria] }),
+            tipoSocioRelId: mapTipo['Socio Unico'],
           }
         })
         actualizados++
@@ -317,6 +378,11 @@ async function main() {
             factorRh,
             observaciones,
             rfidUid,
+            parentescoTitular: parentescoExcel,
+            // IDs FK a tablas de parámetros
+            ...(estado    && mapEstado[estado]       && { estadoSocioId:    mapEstado[estado] }),
+            ...(categoria && mapCategoria[categoria] && { categoriaSocioId: mapCategoria[categoria] }),
+            tipoSocioRelId: mapTipo['Socio Unico'],
           }
         })
         importados++

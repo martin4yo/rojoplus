@@ -445,58 +445,107 @@ async function importarCuotas() {
     console.log(`\nEn BD — Pagados: ${pagados} | Pendientes: ${pendientes} | Tipo ACTIVIDAD: ${actividad}`)
     console.log(`Pagos históricos creados: ${pagosCreados}`)
 
-    // ── Actualizar cuotaMensual de TipoSocio y CategoriaActividad ─────────────
-    // Calcula los valores máximos desde el Excel y los aplica al tenant.
-    console.log('\n--- Actualizando cuotaMensual ---')
+    // ── Actualizar cuotaMensual con el importe del período más reciente ──────────
+    // Para actividades: por combinación Actividad+Categoria y por Actividad general.
+    // Para tipos de socio: por tipo (SOCIO_UNICO / TITULAR_FAMILIA).
+    // Criterio: el importe de la cuota PAGADA del período más reciente.
+    console.log('\n--- Actualizando cuotaMensual (importe más reciente) ---')
 
-    // Calcular máximos desde el Excel
-    let maxSocioUnico = 0
-    let maxTitularFamilia = 0
-    const maxPorActividad = new Map() // actNorm → importe máximo
+    // Helper: ¿es período A más reciente que B?
+    function esMoreReciente(a, b) {
+      if (!b) return true
+      return a.anio > b.anio || (a.anio === b.anio && a.mes > b.mes)
+    }
+
+    // Mapa para guardar {anio, mes, importe} más reciente por actividad
+    const recientePorAct = new Map() // actNorm → {anio, mes, importe}
+    // Cuota social: valores separados por tipo
+    //   Socio Unico    → más reciente con importe < $40.000
+    //   Titular Familia → más reciente sin filtro de importe
+    const recienteSocioUnico     = { anio: 0, mes: 0, importe: 0 }
+    const recienteTitularFamilia = { anio: 0, mes: 0, importe: 0 }
 
     for (const row of data) {
-      const tipo   = row['Tipo Cuota']?.toString().trim().toUpperCase()
-      const desc   = row['Desc. Cuota']?.toString().trim().toUpperCase()
-      const estado = row['Est. Cuota']?.toString().trim().toUpperCase()
+      const tipo    = row['Tipo Cuota']?.toString().trim().toUpperCase()
+      const desc    = row['Desc. Cuota']?.toString().trim() || ''
+      const estado  = row['Est. Cuota']?.toString().trim().toUpperCase()
       const importe = parseFloat(row['Importe Real']) || 0
-      if ((estado !== 'PAGADA' && estado !== 'PENDIENTE') || importe <= 0) continue
+      const periodo = parsePeriodo(row['Periodo']?.toString().trim())
 
-      if (tipo === 'CUOTA SOCIAL' && desc) {
-        if (desc.includes('GRUPO FAMILIAR')) {
-          if (importe > maxTitularFamilia) maxTitularFamilia = importe
-        } else {
-          if (importe < 40000 && importe > maxSocioUnico) maxSocioUnico = importe
-        }
+      if (estado !== 'PAGADA' || importe <= 0 || !periodo) continue
+
+      if (tipo === 'CUOTA SOCIAL') {
+        // Titular Familia: cualquier importe, el más reciente
+        if (esMoreReciente(periodo, recienteTitularFamilia))
+          Object.assign(recienteTitularFamilia, { ...periodo, importe })
+        // Socio Unico: solo importes < $40.000
+        if (importe < 40000 && esMoreReciente(periodo, recienteSocioUnico))
+          Object.assign(recienteSocioUnico, { ...periodo, importe })
+        continue
       }
 
+      // Actividades
       if (tipo === 'ACTIVIDAD' && desc) {
-        const actNorm = desc.split(' - ')[0].trim()
-        if (!maxPorActividad.has(actNorm) || importe > maxPorActividad.get(actNorm)) {
-          maxPorActividad.set(actNorm, importe)
+        const sepIdx  = desc.indexOf(' - ')
+        const actNorm = (sepIdx !== -1 ? desc.substring(0, sepIdx) : desc).toUpperCase().trim()
+        const catNorm = (sepIdx !== -1 ? desc.substring(sepIdx + 3) : '').toUpperCase().trim()
+
+        // Por actividad: el más reciente pagado de cualquier categoría
+        if (esMoreReciente(periodo, recientePorAct.get(actNorm)))
+          recientePorAct.set(actNorm, { ...periodo, importe })
+      }
+    }
+
+    // Actualizar categoriaActividad.cuotaMensual y actividad.cuotaMensual
+    const actividadesParaActualizar = await prisma.actividad.findMany({
+      where: { tenantId },
+      include: { categorias: { select: { id: true, nombre: true } } }
+    })
+
+    for (const act of actividadesParaActualizar) {
+      const actNorm = act.nombre.toUpperCase().trim()
+
+      // Actividad: importe más reciente pagado para esa actividad
+      const datoAct = recientePorAct.get(actNorm)
+      if (datoAct?.importe) {
+        await prisma.actividad.update({
+          where: { id: act.id },
+          data: { cuotaMensual: datoAct.importe }
+        })
+        console.log(`  ↳ Actividad ${act.nombre}: $${datoAct.importe.toLocaleString('es-AR')} (${datoAct.mes}/${datoAct.anio})`)
+
+        // Concepto de tesorería vinculado
+        if (act.conceptoTesoreriaId) {
+          await prisma.conceptoTesoreria.update({
+            where: { id: act.conceptoTesoreriaId },
+            data: { cuotaMensual: datoAct.importe }
+          })
         }
       }
     }
 
-    // Actualizar cuotaMensual en los ConceptoTesoreria vinculados a TipoSocio
+    // Actualizar tipoSocio.cuotaMensual y su concepto
     for (const ts of tiposSocio) {
       const cod = ts.codigo.toUpperCase()
-      let nuevo = null
-      if (cod === 'SOCIO_UNICO' && maxSocioUnico > 0)        nuevo = maxSocioUnico
-      if (cod === 'TITULAR_FAMILIA' && maxTitularFamilia > 0) nuevo = maxTitularFamilia
-      if (nuevo !== null && ts.conceptoTesoreriaId) {
-        await prisma.conceptoTesoreria.update({ where: { id: ts.conceptoTesoreriaId }, data: { cuotaMensual: nuevo } })
-        console.log(`  TipoSocio ${ts.codigo} → concepto ${ts.conceptoTesoreriaId}: cuotaMensual = ${nuevo}`)
+      let dato = null
+      if (cod === 'SOCIO_UNICO' || cod === 'MIEMBRO_FAMILIA') dato = recienteSocioUnico.importe > 0 ? recienteSocioUnico : null
+      if (cod === 'TITULAR_FAMILIA') dato = recienteTitularFamilia.importe > 0 ? recienteTitularFamilia : null
+      if (!dato) continue
+
+      await prisma.tipoSocio.update({
+        where: { id: ts.id },
+        data: { cuotaMensual: dato.importe }
+      })
+      console.log(`  TipoSocio ${ts.nombre}: $${dato.importe.toLocaleString('es-AR')} (${dato.mes}/${dato.anio})`)
+
+      if (ts.conceptoTesoreriaId) {
+        await prisma.conceptoTesoreria.update({
+          where: { id: ts.conceptoTesoreriaId },
+          data: { cuotaMensual: dato.importe }
+        })
       }
     }
 
-    // Actualizar cuotaMensual en los ConceptoTesoreria vinculados a Actividad
-    for (const act of actividadesConConcepto) {
-      const actNorm = act.nombre.toUpperCase().trim()
-      const max = maxPorActividad.get(actNorm)
-      if (!max || !act.conceptoTesoreriaId) continue
-      await prisma.conceptoTesoreria.update({ where: { id: act.conceptoTesoreriaId }, data: { cuotaMensual: max } })
-      console.log(`  Actividad ${act.nombre} → concepto ${act.conceptoTesoreriaId}: cuotaMensual = ${max}`)
-    }
     console.log('--- cuotaMensual actualizado ---')
 
   } catch (error) {

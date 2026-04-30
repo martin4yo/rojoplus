@@ -11,6 +11,22 @@ import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
+const PROVINCIAS_AR = [
+  'Buenos Aires', 'Ciudad Autónoma de Buenos Aires', 'Catamarca', 'Chaco', 'Chubut',
+  'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja',
+  'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis',
+  'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán',
+]
+
+function calcularEsMenor(fecha) {
+  if (!fecha) return false
+  const hoy = new Date()
+  const nac = new Date(fecha)
+  const edad = hoy.getFullYear() - nac.getFullYear()
+  const m = hoy.getMonth() - nac.getMonth()
+  return edad < 18 || (edad === 18 && m < 0) || (edad === 18 && m === 0 && hoy.getDate() < nac.getDate())
+}
+
 export default function SocioForm() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -21,6 +37,7 @@ export default function SocioForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('personal')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   // Datos auxiliares
   const [cobradores, setCobradores] = useState([])
@@ -132,6 +149,10 @@ export default function SocioForm() {
     cargarDatosAuxiliares()
     if (isEditing) {
       cargarSocio()
+    } else {
+      api.get('/admin/socios/proximo-numero')
+        .then(data => setForm(f => ({ ...f, nroSocio: data.proximo })))
+        .catch(() => {})
     }
   }, [id])
 
@@ -189,13 +210,15 @@ export default function SocioForm() {
       }
 
       // Convertir fechas a formato de input
+      const fechaNac = socio.fechaNacimiento ? socio.fechaNacimiento.split('T')[0] : ''
       setForm({
         ...sanitizado,
-        fechaNacimiento: socio.fechaNacimiento ? socio.fechaNacimiento.split('T')[0] : '',
+        fechaNacimiento: fechaNac,
         fechaAlta: socio.fechaAlta ? socio.fechaAlta.split('T')[0] : '',
         aptaFisicaVence: socio.aptaFisicaVence ? socio.aptaFisicaVence.split('T')[0] : '',
         responsableId: socio.responsableId || '',
         cobradorId: socio.cobradorId || '',
+        esMenor: calcularEsMenor(fechaNac),
       })
     } catch (err) {
       setError('Error al cargar el socio')
@@ -206,6 +229,10 @@ export default function SocioForm() {
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target
+    // Limpiar error del campo al editarlo
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => { const n = { ...prev }; delete n[name]; return n })
+    }
     setForm(prev => {
       const newForm = {
         ...prev,
@@ -216,35 +243,96 @@ export default function SocioForm() {
         const apellido = name === 'apellido' ? value : prev.apellido
         const nombre = name === 'nombre' ? value : prev.nombre
         newForm.apellidoNombre = `${apellido}, ${nombre}`.trim().replace(/^,\s*|,\s*$/g, '')
+        if (fieldErrors.apellidoNombre) {
+          setFieldErrors(prev => { const n = { ...prev }; delete n.apellidoNombre; return n })
+        }
+      }
+      // Auto-calcular esMenor
+      if (name === 'fechaNacimiento') {
+        newForm.esMenor = calcularEsMenor(value)
       }
       return newForm
     })
+  }
+
+  const REQUIRED_FIELDS = [
+    // Personal
+    { field: 'estado', tab: 'personal', label: 'Estado' },
+    { field: 'categoria', tab: 'personal', label: 'Categoría' },
+    { field: 'tipoSocio', tab: 'personal', label: 'Tipo de Socio' },
+    { field: 'apellido', tab: 'personal', label: 'Apellido' },
+    { field: 'nombre', tab: 'personal', label: 'Nombre' },
+    { field: 'documento', tab: 'personal', label: 'Documento' },
+    { field: 'fechaNacimiento', tab: 'personal', label: 'Fecha Nac.' },
+    { field: 'sexo', tab: 'personal', label: 'Sexo' },
+    { field: 'estadoCivil', tab: 'personal', label: 'Estado Civil' },
+    // Contacto
+    { field: 'celular', tab: 'contacto', label: 'Celular' },
+    { field: 'email', tab: 'contacto', label: 'Email' },
+    // Domicilio
+    { field: 'calle', tab: 'domicilio', label: 'Calle' },
+    { field: 'numero', tab: 'domicilio', label: 'Nro' },
+    { field: 'codigoPostal', tab: 'domicilio', label: 'C.P.' },
+    { field: 'ciudad', tab: 'domicilio', label: 'Ciudad' },
+    { field: 'provincia', tab: 'domicilio', label: 'Provincia' },
+  ]
+
+  function validarFormulario() {
+    const errors = {}
+    for (const { field, label } of REQUIRED_FIELDS) {
+      if (!form[field] || String(form[field]).trim() === '') {
+        errors[field] = `${label} es requerido`
+      }
+    }
+    // Contacto de emergencia obligatorio si es menor
+    if (calcularEsMenor(form.fechaNacimiento)) {
+      const c1 = form.emergenciaNombre1?.trim() && form.emergenciaTel1?.trim()
+      const c2 = form.emergenciaNombre2?.trim() && form.emergenciaTel2?.trim()
+      if (!c1 && !c2) {
+        errors.emergencia = 'Al menos 1 contacto de emergencia es requerido para menores de edad'
+      }
+    }
+    return errors
+  }
+
+  function erroresPorTab(tabId) {
+    let count = REQUIRED_FIELDS.filter(
+      ({ field, tab }) => tab === tabId && fieldErrors[field]
+    ).length
+    if (tabId === 'contacto' && fieldErrors.emergencia) count++
+    return count
+  }
+
+  function inputClass(field) {
+    return `input-field w-full${fieldErrors[field] ? ' border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
 
-    // Validaciones
-    if (!form.nroSocio) {
-      setError('El numero de socio es requerido')
+    const errors = validarFormulario()
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      // Ir al primer tab con error
+      const primerCampoConError = REQUIRED_FIELDS.find(({ field }) => errors[field])
+      if (primerCampoConError) setActiveTab(primerCampoConError.tab)
       return
     }
-    if (!form.apellidoNombre) {
-      setError('El nombre es requerido')
-      return
-    }
+    setFieldErrors({})
 
     setSaving(true)
     try {
       if (isEditing) {
-        await api.put(`/admin/socios/${id}`, form)
+        await api.put(`/admin/socios/${id}`, { ...form, esMenor: calcularEsMenor(form.fechaNacimiento) })
+        toast.success('Cambios guardados correctamente')
       } else {
-        await api.post('/admin/socios', form)
+        const resultado = await api.post('/admin/socios', { ...form, esMenor: calcularEsMenor(form.fechaNacimiento) })
+        toast.success(`Socio #${resultado?.nroSocio || form.nroSocio} creado correctamente`)
       }
       navigate('/admin/socios')
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al guardar')
+      setError(err.message || 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -406,20 +494,28 @@ export default function SocioForm() {
         {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">
           <div className="flex gap-1 overflow-x-auto">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition ${activeTab === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map(tab => {
+              const errCount = erroresPorTab(tab.id)
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition ${activeTab === tab.id
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                  {errCount > 0 && (
+                    <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                      {errCount}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -431,20 +527,20 @@ export default function SocioForm() {
               <div className="grid grid-cols-12 gap-3">
                 <div className="col-span-6 sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nro. Socio <span className="text-red-500">*</span>
+                    Nro. Socio
+                    {!isEditing && <span className="ml-1 text-xs text-gray-400 font-normal">(auto)</span>}
                   </label>
                   <input
                     type="text"
                     name="nroSocio"
                     value={form.nroSocio}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                    required
+                    readOnly
+                    className="input-field w-full bg-gray-50 text-gray-600 cursor-default"
                   />
                 </div>
                 <div className="col-span-6 sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                  <select name="estado" value={form.estado} onChange={handleChange} className="input-field w-full">
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.estado ? 'text-red-600' : 'text-gray-700'}`}>Estado <span className="text-red-500">*</span></label>
+                  <select name="estado" value={form.estado} onChange={handleChange} className={inputClass('estado')}>
                     <option value="">Seleccionar</option>
                     {estadosSocio.map(e => (
                       <option key={e.id} value={e.nombre}>{e.nombre}</option>
@@ -456,8 +552,8 @@ export default function SocioForm() {
                   </select>
                 </div>
                 <div className="col-span-6 sm:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-                  <select name="categoria" value={form.categoria} onChange={handleChange} className="input-field w-full">
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.categoria ? 'text-red-600' : 'text-gray-700'}`}>Categoría <span className="text-red-500">*</span></label>
+                  <select name="categoria" value={form.categoria} onChange={handleChange} className={inputClass('categoria')}>
                     <option value="">Seleccionar</option>
                     {categoriasSocio.map(c => (
                       <option key={c.id} value={c.nombre}>{c.nombre}</option>
@@ -468,8 +564,8 @@ export default function SocioForm() {
                   </select>
                 </div>
                 <div className="col-span-6 sm:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Socio</label>
-                  <select name="tipoSocio" value={form.tipoSocio} onChange={handleChange} className="input-field w-full">
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.tipoSocio ? 'text-red-600' : 'text-gray-700'}`}>Tipo de Socio <span className="text-red-500">*</span></label>
+                  <select name="tipoSocio" value={form.tipoSocio} onChange={handleChange} className={inputClass('tipoSocio')}>
                     <option value="">Seleccionar</option>
                     {tiposSocio.map(t => (
                       <option key={t.id} value={t.nombre}>{t.nombre}</option>
@@ -496,27 +592,17 @@ export default function SocioForm() {
               {/* Fila 2: Apellido, Nombre, Apellido y Nombre completo */}
               <div className="grid grid-cols-12 gap-3">
                 <div className="col-span-12 sm:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
-                  <input
-                    type="text"
-                    name="apellido"
-                    value={form.apellido}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.apellido ? 'text-red-600' : 'text-gray-700'}`}>Apellido <span className="text-red-500">*</span></label>
+                  <input type="text" name="apellido" value={form.apellido} onChange={handleChange} className={inputClass('apellido')} />
+                  {fieldErrors.apellido && <p className="mt-1 text-xs text-red-600">{fieldErrors.apellido}</p>}
                 </div>
                 <div className="col-span-12 sm:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                  <input
-                    type="text"
-                    name="nombre"
-                    value={form.nombre}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.nombre ? 'text-red-600' : 'text-gray-700'}`}>Nombre <span className="text-red-500">*</span></label>
+                  <input type="text" name="nombre" value={form.nombre} onChange={handleChange} className={inputClass('nombre')} />
+                  {fieldErrors.nombre && <p className="mt-1 text-xs text-red-600">{fieldErrors.nombre}</p>}
                 </div>
                 <div className="col-span-12 sm:col-span-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.apellidoNombre ? 'text-red-600' : 'text-gray-700'}`}>
                     Apellido y Nombre (completo) <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -524,9 +610,11 @@ export default function SocioForm() {
                     name="apellidoNombre"
                     value={form.apellidoNombre}
                     onChange={handleChange}
-                    className="input-field w-full"
-                    required
+                    className={inputClass('apellidoNombre')}
                   />
+                  {fieldErrors.apellidoNombre && (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.apellidoNombre}</p>
+                  )}
                 </div>
               </div>
 
@@ -541,14 +629,9 @@ export default function SocioForm() {
                   </select>
                 </div>
                 <div className="col-span-8 sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Documento</label>
-                  <input
-                    type="text"
-                    name="documento"
-                    value={form.documento}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.documento ? 'text-red-600' : 'text-gray-700'}`}>Documento <span className="text-red-500">*</span></label>
+                  <input type="text" name="documento" value={form.documento} onChange={handleChange} className={inputClass('documento')} />
+                  {fieldErrors.documento && <p className="mt-1 text-xs text-red-600">{fieldErrors.documento}</p>}
                 </div>
                 <div className="col-span-6 sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">CUIL</label>
@@ -562,18 +645,13 @@ export default function SocioForm() {
                   />
                 </div>
                 <div className="col-span-6 sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Nac.</label>
-                  <input
-                    type="date"
-                    name="fechaNacimiento"
-                    value={form.fechaNacimiento}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.fechaNacimiento ? 'text-red-600' : 'text-gray-700'}`}>Fecha Nac. <span className="text-red-500">*</span></label>
+                  <input type="date" name="fechaNacimiento" value={form.fechaNacimiento} onChange={handleChange} className={inputClass('fechaNacimiento')} />
+                  {fieldErrors.fechaNacimiento && <p className="mt-1 text-xs text-red-600">{fieldErrors.fechaNacimiento}</p>}
                 </div>
                 <div className="col-span-4 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-                  <select name="sexo" value={form.sexo} onChange={handleChange} className="input-field w-full">
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.sexo ? 'text-red-600' : 'text-gray-700'}`}>Sexo <span className="text-red-500">*</span></label>
+                  <select name="sexo" value={form.sexo} onChange={handleChange} className={inputClass('sexo')}>
                     <option value="">-</option>
                     <option value="M">M</option>
                     <option value="F">F</option>
@@ -591,8 +669,8 @@ export default function SocioForm() {
                   />
                 </div>
                 <div className="col-span-12 sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estado Civil</label>
-                  <select name="estadoCivil" value={form.estadoCivil} onChange={handleChange} className="input-field w-full">
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.estadoCivil ? 'text-red-600' : 'text-gray-700'}`}>Estado Civil <span className="text-red-500">*</span></label>
+                  <select name="estadoCivil" value={form.estadoCivil} onChange={handleChange} className={inputClass('estadoCivil')}>
                     <option value="">Seleccionar</option>
                     <option value="SOLTERO">Soltero/a</option>
                     <option value="CASADO">Casado/a</option>
@@ -617,43 +695,11 @@ export default function SocioForm() {
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    name="esMenor"
-                    checked={form.esMenor}
-                    onChange={handleChange}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="font-medium text-blue-800">Es menor de edad</span>
-                </label>
-                {form.esMenor && (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">ID del Responsable</label>
-                      <input
-                        type="number"
-                        name="responsableId"
-                        value={form.responsableId}
-                        onChange={handleChange}
-                        className="input-field w-full"
-                        placeholder="ID del socio responsable"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Parentesco</label>
-                      <select name="parentescoResponsable" value={form.parentescoResponsable} onChange={handleChange} className="input-field w-full">
-                        <option value="">Seleccionar</option>
-                        <option value="PADRE">Padre</option>
-                        <option value="MADRE">Madre</option>
-                        <option value="TUTOR">Tutor legal</option>
-                        <option value="OTRO">Otro</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {calcularEsMenor(form.fechaNacimiento) && (
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="font-medium text-amber-800 text-sm">Menor de edad (calculado por fecha de nacimiento)</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
@@ -674,14 +720,9 @@ export default function SocioForm() {
               {/* Telefonos y Emails en una fila compacta */}
               <div className="grid grid-cols-12 gap-3">
                 <div className="col-span-6 sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Celular</label>
-                  <input
-                    type="tel"
-                    name="celular"
-                    value={form.celular}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.celular ? 'text-red-600' : 'text-gray-700'}`}>Celular <span className="text-red-500">*</span></label>
+                  <input type="tel" name="celular" value={form.celular} onChange={handleChange} className={inputClass('celular')} />
+                  {fieldErrors.celular && <p className="mt-1 text-xs text-red-600">{fieldErrors.celular}</p>}
                 </div>
                 <div className="col-span-6 sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Cel. Secundario</label>
@@ -704,14 +745,9 @@ export default function SocioForm() {
                   />
                 </div>
                 <div className="col-span-12 sm:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.email ? 'text-red-600' : 'text-gray-700'}`}>Email <span className="text-red-500">*</span></label>
+                  <input type="email" name="email" value={form.email} onChange={handleChange} className={inputClass('email')} />
+                  {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
                 </div>
                 <div className="col-span-12 sm:col-span-3">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email Secundario</label>
@@ -753,10 +789,14 @@ export default function SocioForm() {
 
               <hr />
 
-              <h3 className="font-medium text-gray-800 flex items-center gap-2">
+              <h3 className={`font-medium flex items-center gap-2 ${fieldErrors.emergencia ? 'text-red-600' : 'text-gray-800'}`}>
                 <AlertCircle className="w-4 h-4 text-red-500" />
                 Contactos de Emergencia
+                {calcularEsMenor(form.fechaNacimiento) && <span className="text-xs font-normal text-red-600">(obligatorio para menores)</span>}
               </h3>
+              {fieldErrors.emergencia && (
+                <p className="text-sm text-red-600">{fieldErrors.emergencia}</p>
+              )}
 
               {/* Emergencia 1 */}
               <div className="grid grid-cols-12 gap-3">
@@ -834,24 +874,13 @@ export default function SocioForm() {
               {/* Calle, Numero, Piso, Depto */}
               <div className="grid grid-cols-12 gap-3">
                 <div className="col-span-12 sm:col-span-5">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Calle</label>
-                  <input
-                    type="text"
-                    name="calle"
-                    value={form.calle}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.calle ? 'text-red-600' : 'text-gray-700'}`}>Calle <span className="text-red-500">*</span></label>
+                  <input type="text" name="calle" value={form.calle} onChange={handleChange} className={inputClass('calle')} />
+                  {fieldErrors.calle && <p className="mt-1 text-xs text-red-600">{fieldErrors.calle}</p>}
                 </div>
                 <div className="col-span-4 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nro</label>
-                  <input
-                    type="text"
-                    name="numero"
-                    value={form.numero}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.numero ? 'text-red-600' : 'text-gray-700'}`}>Nro <span className="text-red-500">*</span></label>
+                  <input type="text" name="numero" value={form.numero} onChange={handleChange} className={inputClass('numero')} />
                 </div>
                 <div className="col-span-4 sm:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Piso</label>
@@ -884,38 +913,24 @@ export default function SocioForm() {
                   />
                 </div>
                 <div className="col-span-6 sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">C.P.</label>
-                  <input
-                    type="text"
-                    name="codigoPostal"
-                    value={form.codigoPostal}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.codigoPostal ? 'text-red-600' : 'text-gray-700'}`}>C.P. <span className="text-red-500">*</span></label>
+                  <input type="text" name="codigoPostal" value={form.codigoPostal} onChange={handleChange} className={inputClass('codigoPostal')} />
                 </div>
               </div>
 
               {/* Ciudad, Provincia */}
               <div className="grid grid-cols-12 gap-3">
                 <div className="col-span-6 sm:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
-                  <input
-                    type="text"
-                    name="ciudad"
-                    value={form.ciudad}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.ciudad ? 'text-red-600' : 'text-gray-700'}`}>Ciudad <span className="text-red-500">*</span></label>
+                  <input type="text" name="ciudad" value={form.ciudad} onChange={handleChange} className={inputClass('ciudad')} />
+                  {fieldErrors.ciudad && <p className="mt-1 text-xs text-red-600">{fieldErrors.ciudad}</p>}
                 </div>
                 <div className="col-span-6 sm:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
-                  <input
-                    type="text"
-                    name="provincia"
-                    value={form.provincia}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.provincia ? 'text-red-600' : 'text-gray-700'}`}>Provincia <span className="text-red-500">*</span></label>
+                  <select name="provincia" value={form.provincia} onChange={handleChange} className={inputClass('provincia')}>
+                    <option value="">Seleccionar...</option>
+                    {PROVINCIAS_AR.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
                 </div>
               </div>
 

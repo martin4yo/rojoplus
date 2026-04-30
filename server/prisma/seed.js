@@ -184,11 +184,10 @@ const categoriasSocio = [
 
 const estadosSocio = [
   { codigo: 'ACTIVO', nombre: 'ACTIVO', descripcion: 'Socio activo con todos los beneficios', color: '#10B981', permiteDescuentos: true, orden: 1 },
-  { codigo: 'VIGENTE', nombre: 'VIGENTE', descripcion: 'Socio con cuota al día', color: '#10B981', permiteDescuentos: true, orden: 2 },
-  { codigo: 'SUSPENDIDO', nombre: 'SUSPENDIDO', descripcion: 'Socio suspendido temporalmente', color: '#F59E0B', permiteDescuentos: false, orden: 3 },
-  { codigo: 'MOROSO', nombre: 'MOROSO', descripcion: 'Socio con cuotas adeudadas', color: '#EF4444', permiteDescuentos: false, orden: 4 },
-  { codigo: 'BAJA', nombre: 'BAJA', descripcion: 'Socio dado de baja', color: '#6B7280', permiteDescuentos: false, orden: 5 },
-  { codigo: 'INACTIVO', nombre: 'INACTIVO', descripcion: 'Socio inactivo', color: '#9CA3AF', permiteDescuentos: false, orden: 6 },
+  { codigo: 'SUSPENDIDO', nombre: 'SUSPENDIDO', descripcion: 'Socio suspendido temporalmente', color: '#F59E0B', permiteDescuentos: false, orden: 2 },
+  { codigo: 'MOROSO', nombre: 'MOROSO', descripcion: 'Socio con cuotas adeudadas', color: '#EF4444', permiteDescuentos: false, orden: 3 },
+  { codigo: 'BAJA', nombre: 'BAJA', descripcion: 'Socio dado de baja', color: '#6B7280', permiteDescuentos: false, orden: 4 },
+  { codigo: 'INACTIVO', nombre: 'INACTIVO', descripcion: 'Socio inactivo', color: '#9CA3AF', permiteDescuentos: false, orden: 5 },
 ];
 
 const centrosCosto = [

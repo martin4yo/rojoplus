@@ -9,6 +9,96 @@
 
 ---
 
+## Reglas de negocio para tablas de parámetros
+
+> ⚠️ **Definidas el 2026-04-30** al migrar sportivopilar → sportivotest.
+
+### EstadoSocio
+- Se importa **tal cual** del Excel (columna `__EMPTY_10` en el CLI)
+- No se normaliza ni renombra
+- Si un valor no existe en la tabla se crea automáticamente
+- Valores reales del Brio de Sportivo Pilar:
+  `VIGENTE`, `BAJA POR MOROSIDAD`, `BAJA POR RENUNCIA`, `BAJA POR FALLECIMIENTO`, `BAJA POR COMISION DIRECTIVA`
+- **No usar el seed**: los valores del seed (ACTIVO, SUSPENDIDO, MOROSO, BAJA, INACTIVO) son solo para demo/dev
+
+### CategoriaSocio
+- Se importa **tal cual** del Excel (columna `__EMPTY_9` en el CLI)
+- No se normaliza
+- Si un valor no existe en la tabla se crea automáticamente
+- Valores reales del Brio de Sportivo Pilar:
+  `ACTIVO`, `INFANTIL`, `CADETE`, `VITALICIO`, `BECADO`, `EXTERNO`, `ACTIVO 2`, `INVITADO`
+- **No usar el seed**: los valores del seed (Categoría A, B, C) son solo para demo/dev
+
+### TipoSocio ⚠️ NO viene del Excel
+- La columna `__EMPTY_14` del Excel Brio contiene **parentesco familiar** (Hijo/a, Esposo/a, Otro/a), **no es el tipo de socio**.
+- TipoSocio tiene exactamente **3 valores fijos del sistema**, siempre los mismos:
+
+| Valor | Descripción |
+|-------|-------------|
+| `Socio Unico` | Socio sin grupo familiar (default al importar) |
+| `Titular Familia` | Cabeza del grupo familiar |
+| `Miembro Familia` | Integrante de un grupo familiar |
+
+- Al importar desde el Excel todos los socios ingresan como `Socio Unico`.
+- El script `importar-grupos-familiares.js` actualiza a `Titular Familia` / `Miembro Familia`.
+
+### parentescoTitular
+- La columna `__EMPTY_14` del Excel (Brio) = parentesco del socio con el titular de su familia
+- Va al campo `parentescoTitular` de la tabla `socios`
+- Valores conocidos: `Hijo/a`, `Esposo/a`, `Otro/a`, `Padre`, `Hermano/a`, `Conyuge`
+- **NO va a TipoSocio**
+
+### Script de sincronización correctiva
+Si los parámetros quedaron desincronizados (ej. después de un `clonarTenant` o import manual):
+
+```bash
+# Ver qué haría sin escribir
+node --env-file=.env scripts/sincronizar-params-socios.js --tenant <slug> --dry-run
+
+# Aplicar
+node --env-file=.env scripts/sincronizar-params-socios.js --tenant <slug>
+```
+
+El script:
+1. Crea en `EstadoSocio`/`CategoriaSocio` los valores que tienen los socios pero no están en la tabla
+2. Elimina registros de esas tablas que ningún socio usa
+3. Garantiza que `TipoSocio` tenga exactamente los 3 valores del sistema
+4. Mueve valores de parentesco que hayan quedado en `tipoSocio` al campo `parentescoTitular`
+5. Asigna `Socio Unico` a socios sin tipo válido
+6. Actualiza todos los FK (`estadoSocioId`, `categoriaSocioId`, `tipoSocioRelId`)
+
+### Clonar tenant (copiar datos entre ambientes)
+
+```bash
+# Ver qué copiará sin escribir
+node scripts/clonarTenant.js --from sportivopilar --to sportivotest --dry-run
+
+# Aplicar (borra todos los datos del destino y los reemplaza con los del origen)
+node scripts/clonarTenant.js --from sportivopilar --to sportivotest
+```
+
+Después del clon, si los socios no se copiaron (tabla con PK compuesta detectada), ejecutar:
+```bash
+node --env-file=.env scripts/importar-socios.js --tenant sportivotest
+node --env-file=.env scripts/importar-grupos-familiares.js --tenant sportivotest
+node --env-file=.env scripts/sincronizar-params-socios.js --tenant sportivotest
+```
+
+---
+
+## Estado por tenant
+
+### sportivotest — post-migración 2026-04-30
+
+| Tabla | Registros | Valores |
+|-------|-----------|---------|
+| `estados_socio` | 5 | VIGENTE, BAJA POR MOROSIDAD, BAJA POR RENUNCIA, BAJA POR FALLECIMIENTO, BAJA POR COMISION DIRECTIVA |
+| `categorias_socio` | 8 | ACTIVO, INFANTIL, CADETE, VITALICIO, BECADO, EXTERNO, ACTIVO 2, INVITADO |
+| `tipos_socio` | 3 | Socio Unico (3922), Miembro Familia (483), Titular Familia (185) |
+| `socios` | 4590 | Clonados desde sportivopilar + sincronización de parámetros |
+
+---
+
 ## Archivos disponibles
 
 | Archivo | Contenido | Filas |
@@ -266,9 +356,70 @@ Al terminar la importación de cargos, el script también actualiza `cuotaMensua
 
 ---
 
-## Orden de ejecución
+## Orden de ejecución completo
 
 > Reemplazá `<slug>` por el slug del tenant destino (ej. `sportivopilar`).
+> Todos los comandos se ejecutan desde la carpeta `server/`.
+
+### Migración completa desde cero (nuevo tenant con datos de Brio)
+
+```bash
+cd server
+
+# 1. Socios (crea automáticamente EstadoSocio y CategoriaSocio desde el Excel)
+node --env-file=.env scripts/importar-socios.js --tenant <slug>
+
+# 2. Grupos familiares (actualiza tipoSocio a Titular/Miembro y setea titularFamiliaId)
+node --env-file=.env scripts/importar-grupos-familiares.js --tenant <slug>
+
+# 3. Sincronizar parámetros (corrige y garantiza consistencia de tablas auxiliares)
+node --env-file=.env scripts/sincronizar-params-socios.js --tenant <slug>
+
+# 4a. Actividades y categorías de actividades
+node --env-file=.env scripts/importar-actividades.js --tenant <slug> --reset
+
+# 4b. Inscripciones activas por socio
+node --env-file=.env scripts/importar-inscripciones.js --tenant <slug>
+
+# 5. Entidades / proveedores (desde Conceptos.xlsx)
+node --env-file=.env scripts/importar-proveedores.js --tenant <slug>
+
+# 6. Cuotas de socios (ajustar período según lo que se quiera importar)
+node --env-file=.env scripts/importar-cuotas.js --tenant <slug> --desde-anio 2026 --desde-mes 4
+
+# 7. Movimientos financieros (ajustar período según lo que se quiera importar)
+node --env-file=.env scripts/importar-movimientos.js --tenant <slug> --desde-anio 2026 --desde-mes 4
+```
+
+### Clonar de un tenant a otro + completar socios
+
+```bash
+cd server
+
+# 1. Clonar todos los datos del negocio (sin socios si la tabla tiene PK compuesta)
+node --env-file=.env scripts/clonarTenant.js --from sportivopilar --to <slug-destino>
+
+# 2. Si los socios no se clonaron, importarlos desde el Excel
+node --env-file=.env scripts/importar-socios.js --tenant <slug-destino>
+
+# 3. Grupos familiares
+node --env-file=.env scripts/importar-grupos-familiares.js --tenant <slug-destino>
+
+# 4. Sincronizar parámetros (obligatorio después del clon o import)
+node --env-file=.env scripts/sincronizar-params-socios.js --tenant <slug-destino>
+```
+
+### Solo re-sincronizar parámetros (correctivo)
+
+```bash
+cd server
+node --env-file=.env scripts/sincronizar-params-socios.js --tenant <slug> --dry-run  # ver antes
+node --env-file=.env scripts/sincronizar-params-socios.js --tenant <slug>
+```
+
+---
+
+## Orden de ejecución (original)
 
 ```bash
 cd server

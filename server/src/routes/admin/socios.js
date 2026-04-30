@@ -79,6 +79,7 @@ function cleanString(val) {
   return str === '' || str === 'n/a' || str === 'N/A' ? null : str
 }
 
+
 // GET /api/admin/socios - Listar socios con paginación y búsqueda
 router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   const {
@@ -288,6 +289,21 @@ router.get('/socios/grupos-familiares', authAdmin, asyncHandler(async (req, res)
   })
 }))
 
+// GET /api/admin/socios/proximo-numero - Primer número disponible (busca huecos desde el mínimo)
+router.get('/socios/proximo-numero', authAdmin, asyncHandler(async (req, res) => {
+  const socios = await req.db.socio.findMany({ select: { nroSocio: true } })
+  const usados = new Set(
+    socios.map(s => parseInt(s.nroSocio, 10)).filter(n => !isNaN(n) && n > 0)
+  )
+  if (usados.size === 0) {
+    return res.json({ success: true, data: { proximo: '1' } })
+  }
+  const minimo = Math.min(...usados)
+  let proximo = minimo
+  while (usados.has(proximo)) proximo++
+  res.json({ success: true, data: { proximo: String(proximo) } })
+}))
+
 // GET /api/admin/socios/:id - Detalle completo del socio
 router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
@@ -384,22 +400,26 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
   const data = req.body
 
   // Validaciones básicas
-  if (!data.nroSocio || !data.apellidoNombre) {
-    throw new AppError('Número de socio y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  if (!data.apellidoNombre) {
+    throw new AppError('El nombre del socio es requerido', 400, 'VALIDATION_ERROR')
   }
 
-  // Verificar que no exista
-  const existente = await req.db.socio.findUnique({
-    where: { nroSocio: data.nroSocio },
-  })
-
-  if (existente) {
-    throw new AppError('Ya existe un socio con ese número', 400, 'DUPLICATE')
+  // Recalcular nroSocio al momento de guardar para evitar colisiones
+  const todosLosSocios = await req.db.socio.findMany({ select: { nroSocio: true } })
+  const usados = new Set(
+    todosLosSocios.map(s => parseInt(s.nroSocio, 10)).filter(n => !isNaN(n) && n > 0)
+  )
+  let nroSocioFinal = data.nroSocio
+  if (!nroSocioFinal || usados.has(parseInt(nroSocioFinal, 10))) {
+    const minimo = usados.size > 0 ? Math.min(...usados) : 1
+    let proximo = minimo
+    while (usados.has(proximo)) proximo++
+    nroSocioFinal = String(proximo)
   }
 
   // Procesar datos
   const socioData = {
-    nroSocio: data.nroSocio,
+    nroSocio: nroSocioFinal,
     tipoDocumento: data.tipoDocumento || 'DNI',
     documento: data.documento || null,
     cuil: data.cuil || null,
@@ -440,8 +460,8 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
     antiguedadEstatutaria: data.antiguedadEstatutaria || null,
     // Menores
     esMenor: data.esMenor || false,
-    responsableId: data.responsableId || null,
-    parentescoResponsable: data.parentescoResponsable || null,
+    responsableId: (data.esMenor && data.responsableId) ? parseInt(data.responsableId, 10) || null : null,
+    parentescoResponsable: (data.esMenor && data.parentescoResponsable) ? data.parentescoResponsable : null,
     // Datos médicos
     grupoSanguineo: data.grupoSanguineo || null,
     factorRh: data.factorRh || null,
@@ -517,10 +537,10 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
   }
 
-  // Si cambia nroSocio, verificar que no exista otro
+  // Si cambia nroSocio, verificar que no exista otro (clave compuesta tenant+nroSocio)
   if (data.nroSocio && data.nroSocio !== existente.nroSocio) {
     const duplicado = await req.db.socio.findUnique({
-      where: { nroSocio: data.nroSocio },
+      where: { tenantId_nroSocio: { tenantId: req.tenantId, nroSocio: data.nroSocio } },
     })
     if (duplicado) {
       throw new AppError('Ya existe un socio con ese número', 400, 'DUPLICATE')
@@ -1174,10 +1194,10 @@ router.post('/socios/upload', authAdmin, upload.single('file'), asyncHandler(asy
       sexo: cleanString(row['Sexo']),
       nacionalidad: cleanString(row['Pais']) || 'Argentina',
       profesion: cleanString(row['Profesión']),
-      // Club
+      // Club — se respetan exactamente los valores del Excel
       fechaAlta: excelDateToJS(row['Fecha Alta']),
       fechaBaja: excelDateToJS(row['Fecha Baja']),
-      estado: cleanString(row['Estado']) || 'VIGENTE',
+      estado: cleanString(row['Estado']) || 'ACTIVO',
       categoria: cleanString(row['Categoria'] || row['Categoría']),
       tipoSocio: cleanString(row['TipoSocio'] || row['Tipo Socio'] || row['Tipo de Socio']),
       zona: cleanString(row['Zona']),
@@ -1221,9 +1241,9 @@ router.post('/socios/upload', authAdmin, upload.single('file'), asyncHandler(asy
       _cobrador: cleanString(row['Cobrador']),
     }
 
-    // Verificar si existe
+    // Verificar si existe (clave compuesta tenant+nroSocio)
     const existente = await req.db.socio.findUnique({
-      where: { nroSocio },
+      where: { tenantId_nroSocio: { tenantId: req.tenantId, nroSocio } },
     })
 
     if (existente) {
@@ -1354,16 +1374,19 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
   const limpiarCamposTemporales = (socio) => {
     const { _grupoFamiliar, _esTitular, _cobrador, id, ...datosLimpios } = socio
 
-    // Agregar IDs de relación basándose en los campos texto
-    if (socio.tipoSocio && mapeoTipoSocio[socio.tipoSocio]) {
-      datosLimpios.tipoSocioRelId = mapeoTipoSocio[socio.tipoSocio]
+    // Agregar IDs de relación basándose en los campos texto (sin normalizar — se respeta el valor del Excel)
+    if (datosLimpios.tipoSocio && mapeoTipoSocio[datosLimpios.tipoSocio]) {
+      datosLimpios.tipoSocioRelId = mapeoTipoSocio[datosLimpios.tipoSocio]
     }
-    if (socio.categoria && mapeoCategoriaSocio[socio.categoria]) {
-      datosLimpios.categoriaSocioId = mapeoCategoriaSocio[socio.categoria]
+    if (datosLimpios.categoria && mapeoCategoriaSocio[datosLimpios.categoria]) {
+      datosLimpios.categoriaSocioId = mapeoCategoriaSocio[datosLimpios.categoria]
     }
-    if (socio.estado && mapeoEstadoSocio[socio.estado]) {
-      datosLimpios.estadoSocioId = mapeoEstadoSocio[socio.estado]
+    if (datosLimpios.estado && mapeoEstadoSocio[datosLimpios.estado]) {
+      datosLimpios.estadoSocioId = mapeoEstadoSocio[datosLimpios.estado]
     }
+
+    // tenantId requerido para createMany (no se inyecta automáticamente)
+    datosLimpios.tenantId = tenantId
 
     return datosLimpios
   }
