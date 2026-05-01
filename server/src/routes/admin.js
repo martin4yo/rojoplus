@@ -2197,7 +2197,7 @@ router.get('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/actividades - Crear actividad
 router.post('/actividades', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, descripcion, requiereAptaFisica, cuotaMensual, color, orden } = req.body
+  const { codigo, nombre, descripcion, requiereAptaFisica, cuotaMensual, color, orden, imagen } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
@@ -2215,6 +2215,7 @@ router.post('/actividades', authAdmin, asyncHandler(async (req, res) => {
       cuotaMensual: cuotaMensual ? parseFloat(cuotaMensual) : null,
       color,
       orden: orden || 0,
+      imagen: imagen || null,
     },
   })
 
@@ -2227,7 +2228,7 @@ router.post('/actividades', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/actividades/:id - Actualizar actividad
 router.put('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, requiereAptaFisica, cuotaMensual, color, orden, activo } = req.body
+  const { codigo, nombre, descripcion, requiereAptaFisica, cuotaMensual, color, orden, activo, imagen } = req.body
 
   const existente = await req.db.actividad.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Actividad no encontrada', 404, 'NOT_FOUND')
@@ -2248,6 +2249,7 @@ router.put('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
       color: color !== undefined ? color : existente.color,
       orden: orden !== undefined ? orden : existente.orden,
       activo: activo !== undefined ? activo : existente.activo,
+      imagen: imagen !== undefined ? imagen : existente.imagen,
     },
   })
 

@@ -6,6 +6,7 @@ import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import ImageUpload from '../../components/ImageUpload'
 
 export default function ActividadForm() {
   const { id } = useParams()
@@ -24,6 +25,7 @@ export default function ActividadForm() {
     color: '',
     orden: 0,
     activo: true,
+    imagen: '',
   })
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export default function ActividadForm() {
         color: data.color || '',
         orden: data.orden || 0,
         activo: data.activo ?? true,
+        imagen: data.imagen || '',
       })
     } catch (err) {
       setError('Error al cargar actividad')
@@ -194,6 +197,24 @@ export default function ActividadForm() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
             />
           </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Foto de tapa <span className="text-gray-500 font-normal">(se muestra en el sitio público)</span>
+          </label>
+          <ImageUpload
+            value={form.imagen}
+            onChange={(base64) => setForm(prev => ({ ...prev, imagen: base64 || '' }))}
+            returnBase64={true}
+            returnFile={false}
+            maxSize={2 * 1024 * 1024}
+            previewSize="lg"
+            placeholder="Subí una foto que represente la actividad"
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            Se usa como tapa en /actividades del sitio público. Si no subís una, se usa una imagen genérica del deporte.
+          </p>
         </div>
 
         <div className="flex items-center gap-6 mt-4">

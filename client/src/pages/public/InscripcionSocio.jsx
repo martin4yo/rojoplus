@@ -104,43 +104,35 @@ export default function InscripcionSocio() {
   const required = <span className="text-primary">*</span>
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-      {/* Hero */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-primary via-primary to-primary-dark text-white">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute -top-10 -left-10 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute top-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
-        </div>
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-10 md:py-16">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
+      {/* Hero athletic */}
+      <div className="relative overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid-pub opacity-40" />
+        <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-20 blur-3xl" style={{ background: 'var(--color-primary)' }} />
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-12 md:py-20">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors text-sm"
+            className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-70 hover:text-pub-fg mb-8 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Volver al sitio web
+            <ArrowLeft className="w-3 h-3" />
+            Volver al sitio
           </Link>
 
-          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
-            <div className="bg-white rounded-2xl p-4 shadow-2xl animate-float">
-              <TenantLogo className="h-16 md:h-20 w-auto" />
-            </div>
-            <div className="text-center md:text-left flex-1">
-              <h1 className="text-3xl md:text-5xl font-bold leading-tight">
-                Sumate a la familia<br className="hidden md:block" />
-                {' '}<span className="text-yellow-200">{tenant?.nombre || 'del Club'}</span>
-              </h1>
-              <p className="text-white/90 mt-3 text-base md:text-lg max-w-xl">
-                Completá tus datos y unite a una comunidad llena de actividades, eventos y momentos para compartir.
-              </p>
-            </div>
-          </div>
+          <div className="pub-eyebrow text-pub-fg-70 mb-5">Membresía</div>
+          <h1 className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(40px, 6vw, 90px)', lineHeight: 0.92 }}>
+            Sumate a<br /><span style={{ color: 'var(--color-primary)' }}>{tenant?.nombre || 'del Club'}.</span>
+          </h1>
+          <p className="text-pub-fg-70 mt-6 text-lg md:text-xl max-w-2xl" style={{ fontWeight: 300 }}>
+            Completá tus datos y unite a una comunidad llena de actividades, eventos y momentos para compartir.
+          </p>
+          <div style={{ display: 'none' }}><TenantLogo /></div>
 
           {/* Pasos */}
-          <div className="mt-10 flex items-center justify-center md:justify-start gap-3 md:gap-6">
+          <div className="mt-10 flex items-center justify-start gap-3 md:gap-6">
             <StepDot active label="Tus datos" num={1} />
-            <div className="flex-1 max-w-16 h-0.5 bg-white/30" />
+            <div className="flex-1 max-w-16 h-0.5 bg-pub-fg-30" />
             <StepDot label="Tu familia" num={2} muted />
-            <div className="flex-1 max-w-16 h-0.5 bg-white/30" />
+            <div className="flex-1 max-w-16 h-0.5 bg-pub-fg-30" />
             <StepDot label="Listo" num={3} muted />
           </div>
         </div>
