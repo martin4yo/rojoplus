@@ -3,62 +3,62 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Design tokens — dark first. El acento sale del primario del tenant
+   Design tokens — light cálido. El acento sale del primario del tenant
    (inyectado por TenantContext.jsx en :root).
    ───────────────────────────────────────────────────────────────────────── */
 :root {
   /* Surfaces */
-  --bg-app: #0A0A0B;
-  --bg-surface: #141417;
-  --bg-surface-hi: #1A1A1E;
-  --bg-surface-lo: #0F0F11;
-  --bg-overlay: rgba(0, 0, 0, 0.65);
+  --bg-app: #F6F4EE;        /* cream cálido — fondo de la app */
+  --bg-surface: #FFFFFF;    /* cards, modals, sidebars internos */
+  --bg-surface-hi: #EFEBE0; /* hover, raised */
+  --bg-surface-lo: #FFFFFF; /* shells laterales (sidebar/topbar) */
+  --bg-overlay: rgba(20, 18, 14, 0.45);
 
   /* Borders */
-  --border: #26262B;
-  --border-hi: #33333A;
-  --border-soft: #1E1E22;
+  --border: #E2DCCC;        /* gris cálido */
+  --border-hi: #CFC8B4;
+  --border-soft: #ECE7D8;
 
   /* Text */
-  --text: #FAFAFA;
-  --text-dim: #A1A1AA;
-  --text-muted: #71717A;
-  --text-disabled: #52525B;
+  --text: #1A1814;          /* tinta tibia (no negro puro) */
+  --text-dim: #4D4A42;
+  --text-muted: #8A8674;
+  --text-disabled: #B6B19E;
 
   /* Tenant accent (con fallback) */
-  --color-primary: #D9F558;
-  --color-primary-dark: #9DBA1F;
-  --color-primary-light: #E4FF7B;
-  --color-primary-50:  color-mix(in srgb, #D9F558 6%, var(--bg-app));
-  --color-primary-100: color-mix(in srgb, #D9F558 12%, var(--bg-app));
-  --color-primary-200: color-mix(in srgb, #D9F558 20%, var(--bg-app));
-  --color-primary-300: color-mix(in srgb, #D9F558 35%, var(--bg-app));
-  --color-primary-400: color-mix(in srgb, #D9F558 55%, var(--bg-app));
-  --color-secondary: #1E1E22;
-  --color-secondary-dark: #141417;
-  --color-secondary-light: #26262B;
-  --color-accent: #D9F558;
+  --color-primary: #DC2626;
+  --color-primary-dark: #991B1B;
+  --color-primary-light: #FCA5A5;
+  --color-primary-50:  color-mix(in srgb, #DC2626 6%, white);
+  --color-primary-100: color-mix(in srgb, #DC2626 12%, white);
+  --color-primary-200: color-mix(in srgb, #DC2626 20%, white);
+  --color-primary-300: color-mix(in srgb, #DC2626 35%, white);
+  --color-primary-400: color-mix(in srgb, #DC2626 55%, white);
+  --color-secondary: #1F2937;
+  --color-secondary-dark: #111827;
+  --color-secondary-light: #374151;
+  --color-accent: #00C9A7;
 
   /* Aliases del acento para uso interno */
   --accent: var(--color-primary);
-  --accent-soft: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  --accent-glow: color-mix(in srgb, var(--color-primary) 35%, transparent);
-  --accent-fg: #0A0A0B;
+  --accent-soft: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  --accent-glow: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  --accent-fg: #FFFFFF;     /* blanco sobre acentos saturados (rojo, azul, navy) */
 
   /* Estados */
-  --error: #F87171;
-  --error-soft: color-mix(in srgb, #F87171 12%, transparent);
-  --success: #4ADE80;
-  --success-soft: color-mix(in srgb, #4ADE80 12%, transparent);
-  --warning: #FBBF24;
-  --warning-soft: color-mix(in srgb, #FBBF24 12%, transparent);
-  --info: #60A5FA;
-  --info-soft: color-mix(in srgb, #60A5FA 12%, transparent);
+  --error: #DC2626;
+  --error-soft: color-mix(in srgb, #DC2626 8%, transparent);
+  --success: #16A34A;
+  --success-soft: color-mix(in srgb, #16A34A 8%, transparent);
+  --warning: #D97706;
+  --warning-soft: color-mix(in srgb, #D97706 8%, transparent);
+  --info: #2563EB;
+  --info-soft: color-mix(in srgb, #2563EB 8%, transparent);
 
-  /* Sombras */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
-  --shadow-lg: 0 16px 40px -8px rgba(0,0,0,0.55);
+  /* Sombras suaves para light mode */
+  --shadow-sm: 0 1px 2px rgba(20,18,14,0.06);
+  --shadow-md: 0 6px 20px -4px rgba(20,18,14,0.08), 0 2px 6px rgba(20,18,14,0.05);
+  --shadow-lg: 0 24px 48px -16px rgba(20,18,14,0.18), 0 4px 12px rgba(20,18,14,0.06);
   --shadow-glow: 0 8px 32px -8px var(--accent-glow);
 
   /* Radii */
@@ -66,7 +66,7 @@
   --radius: 10px;
   --radius-lg: 14px;
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ input, button, select, textarea {
   color: var(--text);
 }
 
-/* Scrollbar dark */
+/* Scrollbar light */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border-hi) transparent;
@@ -105,14 +105,14 @@ input, button, select, textarea {
 *::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 999px; border: 2px solid var(--bg-app); }
 *::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-/* Autocomplete dark — Chrome relleno amarillo */
+/* Autocomplete — evita el amarillo de Chrome y mantiene el color correcto */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
   -webkit-text-fill-color: var(--text);
-  -webkit-box-shadow: 0 0 0px 1000px var(--bg-surface-hi) inset;
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-surface) inset;
   caret-color: var(--text);
   transition: background-color 9999s ease-in-out 0s;
 }
@@ -367,29 +367,8 @@ select:-webkit-autofill {
   .bg-blue-500,
   .bg-sky-500           { background-color: var(--info) !important; }
 
-  /* Overlay del modal */
+  /* Overlay del modal — semitransparente sobre cualquier fondo */
   .bg-black { background-color: #000 !important; }
-
-  /* ─── Grays oscuros (sidebars, modos dark legacy) → tokens dark ─── */
-  .bg-gray-700  { background-color: var(--bg-surface-hi) !important; }
-  .bg-gray-800  { background-color: var(--bg-surface-lo) !important; }
-  .bg-gray-900  { background-color: var(--bg-app) !important; }
-  .hover\:bg-gray-700:hover { background-color: var(--bg-surface-hi) !important; }
-  .hover\:bg-gray-800:hover { background-color: var(--bg-surface) !important; }
-  .border-gray-700 { border-color: var(--border) !important; }
-  .border-gray-800 { border-color: var(--border) !important; }
-  .border-gray-900 { border-color: var(--border-soft) !important; }
-
-  /* ─── Texto sobre acento ─── */
-  /* Cuando un elemento tiene bg-primary y text-white juntos, el texto blanco
-     puede no contrastar con acentos claros (lima, amarillos). Forzamos el
-     foreground del acento, que está calculado para contraste correcto. */
-  .bg-primary.text-white,
-  .bg-primary-600.text-white,
-  .hover\:bg-primary.hover\:text-white:hover,
-  [class*="bg-primary"][class*="text-white"] {
-    color: var(--accent-fg) !important;
-  }
 
   /* ─── Tono primary/X (opacity modifiers que no funcionan con CSS vars) ─── */
   .bg-primary\/5    { background-color: color-mix(in srgb, var(--accent) 5%, transparent) !important; }
@@ -399,11 +378,11 @@ select:-webkit-autofill {
   .hover\:bg-primary\/10:hover { background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important; }
   .hover\:bg-primary\/90:hover { background-color: color-mix(in srgb, var(--accent) 90%, transparent) !important; }
 
-  /* ─── Yellow chips/badges con texto blanco — usar texto oscuro ─── */
-  .bg-yellow-500.text-white,
-  .bg-amber-500.text-white { color: #1A1308 !important; }
+  /* Bordes del primario */
+  .border-primary    { border-color: var(--accent) !important; }
+  .ring-primary      { --tw-ring-color: var(--accent) !important; }
 
-  /* Sombras claras → sombras dark */
+  /* Sombras claras → sombras del sistema */
   .shadow-sm  { box-shadow: var(--shadow-sm) !important; }
   .shadow     { box-shadow: var(--shadow-md) !important; }
   .shadow-md  { box-shadow: var(--shadow-md) !important; }
