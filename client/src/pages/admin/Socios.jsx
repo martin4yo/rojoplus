@@ -19,6 +19,7 @@ import { usePagination } from '../../hooks/usePagination'
 import ChatWidget from '../../components/chat/ChatWidget'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { useTenant } from '../../contexts/TenantContext'
+import { formatCurrency } from '../../utils/formatters'
 
 // Componente Avatar con fallback si la imagen no carga
 function AvatarSocio({ foto, nombre }) {
@@ -329,6 +330,32 @@ export default function AdminSocios() {
       )
     },
     {
+      key: 'saldo',
+      label: 'Saldo',
+      sortable: false,
+      className: 'text-right',
+      cellClassName: 'text-right',
+      render: (socio) => {
+        const saldo = Number(socio.saldoPendiente) || 0
+        if (saldo <= 0) return <span className="text-gray-400 text-sm">-</span>
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/cuotas?cobrarSocioId=${socio.id}`)
+            }}
+            title={`${socio.cuotasPendientes} cuota(s) pendiente(s) — clic para cobrar`}
+            className="inline-flex flex-col items-end leading-tight hover:opacity-80 transition"
+          >
+            <span className="font-semibold text-red-600">{formatCurrency(saldo)}</span>
+            <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">
+              {socio.cuotasPendientes} cuota{socio.cuotasPendientes === 1 ? '' : 's'}
+            </span>
+          </button>
+        )
+      }
+    },
+    {
       key: 'info',
       label: 'Info',
       sortable: false,
@@ -348,18 +375,6 @@ export default function AdminSocios() {
             <span title="Debito automatico activo" className="p-1 rounded bg-green-100 text-green-600">
               <CreditCard className="w-4 h-4" />
             </span>
-          )}
-          {socio.tieneDeuda && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                navigate(`/admin/cuotas?cobrarSocioId=${socio.id}`)
-              }}
-              title="Cobrar cuotas pendientes"
-              className="p-1 rounded bg-orange-100 text-orange-600 hover:bg-orange-200 transition"
-            >
-              <DollarSign className="w-4 h-4" />
-            </button>
           )}
         </div>
       )

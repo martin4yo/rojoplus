@@ -198,6 +198,29 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
     req.db.socio.groupBy({ by: ['zona'], _count: true }),
   ])
 
+  // Saldo pendiente: una sola query agrupada para todos los socios de la página
+  const socioIds = socios.map(s => s.id)
+  let saldoPorSocio = {}
+  if (socioIds.length > 0) {
+    const deudas = await req.db.cargo.groupBy({
+      by: ['socioId'],
+      where: { socioId: { in: socioIds }, estado: 'PENDIENTE' },
+      _sum: { montoTotal: true },
+      _count: { _all: true },
+    })
+    saldoPorSocio = Object.fromEntries(
+      deudas.map(d => [d.socioId, {
+        saldoPendiente: Number(d._sum.montoTotal) || 0,
+        cuotasPendientes: d._count._all,
+      }])
+    )
+  }
+  const sociosConSaldo = socios.map(s => ({
+    ...s,
+    saldoPendiente: saldoPorSocio[s.id]?.saldoPendiente || 0,
+    cuotasPendientes: saldoPorSocio[s.id]?.cuotasPendientes || 0,
+  }))
+
   const currentPage = parseInt(page)
   const itemsPerPage = parseInt(limit)
   const from = total > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0
@@ -206,7 +229,7 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      socios,
+      socios: sociosConSaldo,
       pagination: {
         page: currentPage,
         limit: itemsPerPage,
