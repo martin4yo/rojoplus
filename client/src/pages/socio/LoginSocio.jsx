@@ -185,15 +185,6 @@ export default function LoginSocio() {
             </div>
           )}
 
-          <div className="mt-6 text-center">
-            <Link
-              to="/mi-qr"
-              className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] hover:underline"
-              style={{ color: 'var(--accent)' }}
-            >
-              ¿No tenés acceso? Pedí tu QR de socio →
-            </Link>
-          </div>
         </div>
       </section>
     </div>
