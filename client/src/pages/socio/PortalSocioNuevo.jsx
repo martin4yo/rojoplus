@@ -218,7 +218,7 @@ export default function PortalSocioNuevo() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-app)' }}>
         <LoadingSpinner />
       </div>
     )
@@ -226,39 +226,59 @@ export default function PortalSocioNuevo() {
 
   if (error || !socio) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <XMarkIcon className="h-10 w-10 text-red-600" />
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid-pub opacity-40" />
+        <div className="relative max-w-md w-full p-8 md:p-12" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+          <div
+            className="w-14 h-14 mb-6 flex items-center justify-center"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--error) 12%, transparent)' }}
+          >
+            <XMarkIcon className="h-7 w-7" style={{ color: 'var(--error)' }} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Acceso no válido</h1>
-          <p className="text-gray-600 mb-6">
-            El enlace que seguiste no es válido o ha expirado. Por favor, solicita un nuevo enlace.
+          <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>Acceso</div>
+          <h1 className="font-display-sport mb-3" style={{ fontSize: 'clamp(28px, 4vw, 48px)', lineHeight: 0.96, color: 'var(--text)' }}>
+            Link no válido.
+          </h1>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
+            El enlace que seguiste no es válido o ha expirado. Solicitá uno nuevo.
           </p>
+          <Link
+            to="/login-socio"
+            className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em]"
+            style={{ color: 'var(--accent)' }}
+          >
+            Volver al login →
+          </Link>
         </div>
       </div>
     )
   }
 
-  const colorPrimario = branding?.colores?.primario || '#dc2626'
-  const headerStyle = { background: `linear-gradient(to right, ${colorPrimario}, ${colorPrimario}dd)` }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 pb-20">
-      {/* Header */}
-      <header className="shadow-lg sticky top-0 z-40" style={headerStyle}>
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center space-x-3 hover:opacity-90 transition-opacity">
-              <img src={branding?.logoUrl || '/images/logo.png'} alt="Logo" className="h-12 w-auto" />
-              <div>
-                <h1 className="text-white font-bold text-lg">{branding?.nombre || 'Portal'}</h1>
-                <p className="text-white/70 text-xs">Portal del Socio</p>
+    <div className="min-h-screen pb-20" style={{ backgroundColor: 'var(--bg-app)' }}>
+      {/* Header athletic */}
+      <header className="sticky top-0 z-40 relative overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid-pub opacity-40 pointer-events-none" />
+        <div className="absolute -right-24 -top-24 w-64 h-64 rounded-full opacity-20 blur-3xl pointer-events-none" style={{ background: 'var(--color-primary)' }} />
+
+        <div className="relative max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity min-w-0">
+              <img src={branding?.logoUrl || '/images/logo.png'} alt="Logo" className="h-10 w-auto flex-shrink-0" />
+              <div className="leading-tight min-w-0">
+                <h1 className="font-display-sport text-pub-fg truncate" style={{ fontSize: 18, lineHeight: 1 }}>
+                  {branding?.nombre || 'Portal'}
+                </h1>
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-pub-fg-50 mt-0.5">
+                  Portal del socio
+                </p>
               </div>
             </Link>
-            <div className="text-right">
-              <p className="text-white font-semibold">{socio.apellidoNombre}</p>
-              <p className="text-red-100 text-sm">Socio N° {socio.nroSocio}</p>
+            <div className="text-right min-w-0">
+              <p className="font-medium text-pub-fg truncate" style={{ fontSize: 14 }}>{socio.apellidoNombre}</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-pub-fg-60 mt-0.5">
+                Socio Nº {socio.nroSocio}
+              </p>
             </div>
           </div>
         </div>
@@ -292,14 +312,14 @@ export default function PortalSocioNuevo() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`relative flex flex-col items-center justify-center py-3 px-2 transition-all duration-200 ${
                     isActive
-                      ? 'text-red-600'
+                      ? 'text-[var(--accent)]'
                       : 'text-gray-500 hover:text-gray-700 active:bg-gray-100'
                   }`}
                 >
                   <div className="relative">
                     <Icon className={`h-6 w-6 transition-transform ${isActive ? 'scale-110' : ''}`} />
                     {tab.badge && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      <span className="absolute -top-2 -right-2 bg-[var(--accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                         {tab.badge > 9 ? '9+' : tab.badge}
                       </span>
                     )}
@@ -308,7 +328,7 @@ export default function PortalSocioNuevo() {
                     {tab.label}
                   </span>
                   {isActive && (
-                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-12 h-1 bg-red-600 rounded-t-full" />
+                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-12 h-1 bg-[var(--accent)] rounded-t-full" />
                   )}
                 </button>
               )
@@ -319,7 +339,7 @@ export default function PortalSocioNuevo() {
               onClick={() => setMostrarMenuMas(true)}
               className={`relative flex flex-col items-center justify-center py-3 px-2 transition-all duration-200 ${
                 tabsSecundarias.some((t) => t.id === activeTab)
-                  ? 'text-red-600'
+                  ? 'text-[var(--accent)]'
                   : 'text-gray-500 hover:text-gray-700 active:bg-gray-100'
               }`}
             >
@@ -338,7 +358,7 @@ export default function PortalSocioNuevo() {
                 Más
               </span>
               {tabsSecundarias.some((t) => t.id === activeTab) && (
-                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-12 h-1 bg-red-600 rounded-t-full" />
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-12 h-1 bg-[var(--accent)] rounded-t-full" />
               )}
             </button>
           </div>
@@ -388,13 +408,13 @@ export default function PortalSocioNuevo() {
                       }`}
                     >
                       <Icon
-                        className={`h-6 w-6 ${isActive ? 'text-red-600' : 'text-gray-600'}`}
+                        className={`h-6 w-6 ${isActive ? 'text-[var(--accent)]' : 'text-gray-600'}`}
                       />
                     </div>
                     <div className="flex-1 text-left">
                       <div
                         className={`font-semibold ${
-                          isActive ? 'text-red-600' : 'text-gray-900'
+                          isActive ? 'text-[var(--accent)]' : 'text-gray-900'
                         }`}
                       >
                         {tab.label}
@@ -403,7 +423,7 @@ export default function PortalSocioNuevo() {
                     </div>
                     {isActive && (
                       <div className="flex-shrink-0">
-                        <div className="w-2 h-2 rounded-full bg-red-600"></div>
+                        <div className="w-2 h-2 rounded-full bg-[var(--accent)]"></div>
                       </div>
                     )}
                   </button>

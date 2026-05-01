@@ -299,34 +299,61 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   }
 
   // Buscar socio según método
-  let where
+  let socio = null
+
   if (metodo === 'email') {
-    where = { email: valor.trim().toLowerCase() }
+    socio = await req.db.socio.findFirst({
+      where: { email: valor.trim().toLowerCase() },
+      select: {
+        id: true, nroSocio: true, apellidoNombre: true, email: true,
+        documento: true, estado: true, celular: true, celularSecundario: true,
+        telefonoFijo: true, notifWhatsapp: true,
+      },
+    })
   } else if (metodo === 'dni') {
-    where = { documento: valor.trim() }
+    socio = await req.db.socio.findFirst({
+      where: { documento: valor.trim() },
+      select: {
+        id: true, nroSocio: true, apellidoNombre: true, email: true,
+        documento: true, estado: true, celular: true, celularSecundario: true,
+        telefonoFijo: true, notifWhatsapp: true,
+      },
+    })
   } else if (metodo === 'whatsapp') {
-    // Buscar en los 3 campos de teléfono
+    // Normalizar el input a solo dígitos y comparar con los 3 campos
+    // de teléfono también normalizados (regex_replace en SQL ignora guiones,
+    // paréntesis, espacios y prefijos como +54).
     const tel = valor.trim().replace(/\D/g, '')
-    where = { OR: [{ celular: { contains: tel } }, { celularSecundario: { contains: tel } }, { telefonoFijo: { contains: tel } }] }
+    if (!tel) {
+      throw new AppError('Ingresá un número de teléfono válido', 400, 'VALIDATION_ERROR')
+    }
+    // Para que el match sea más seguro tomamos los últimos 8 dígitos (cubre
+    // cuando el usuario ingresa con o sin código de área/país).
+    const ultimos8 = tel.length > 8 ? tel.slice(-8) : tel
+    const patron = `%${ultimos8}%`
+    const ids = await req.db.$queryRaw`
+      SELECT id FROM socios
+      WHERE tenant_id = ${req.tenantId}
+        AND (
+          regexp_replace(coalesce(celular, ''), '\D', '', 'g') LIKE ${patron}
+          OR regexp_replace(coalesce(celular_secundario, ''), '\D', '', 'g') LIKE ${patron}
+          OR regexp_replace(coalesce(telefono_fijo, ''), '\D', '', 'g') LIKE ${patron}
+        )
+      LIMIT 1
+    `
+    if (ids?.[0]?.id) {
+      socio = await req.db.socio.findUnique({
+        where: { id: ids[0].id },
+        select: {
+          id: true, nroSocio: true, apellidoNombre: true, email: true,
+          documento: true, estado: true, celular: true, celularSecundario: true,
+          telefonoFijo: true, notifWhatsapp: true,
+        },
+      })
+    }
   } else {
     throw new AppError('Método inválido', 400, 'VALIDATION_ERROR')
   }
-
-  const socio = await req.db.socio.findFirst({
-    where,
-    select: {
-      id: true,
-      nroSocio: true,
-      apellidoNombre: true,
-      email: true,
-      documento: true,
-      estado: true,
-      celular: true,
-      celularSecundario: true,
-      telefonoFijo: true,
-      notifWhatsapp: true,
-    },
-  })
 
   if (!socio) {
     throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
