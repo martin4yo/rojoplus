@@ -105,7 +105,10 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
       const errorMessage = typeof data.error === 'string'
         ? data.error
         : (data.error?.message || data.message || 'Error en la solicitud')
-      throw new Error(errorMessage)
+      const err = new Error(errorMessage)
+      err.code = data?.code || data?.error?.code || null
+      err.status = response.status
+      throw err
     }
 
     return returnFullResponse ? data : data.data
