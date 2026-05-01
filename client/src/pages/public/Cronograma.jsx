@@ -172,21 +172,21 @@ export default function Cronograma() {
   const cantidadFiltrosActivos = actividadesSeleccionadas.length + categoriasSeleccionadas.length
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Hero */}
-      <div className="bg-gradient-to-br from-primary to-primary-dark py-8 md:py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 mb-6">
-            <Calendar className="w-10 h-10 md:w-12 md:h-12 text-white" />
-            <div>
-              <h1 className="text-2xl md:text-4xl font-bold text-white">
-                Cronograma de Actividades
-              </h1>
-              <p className="text-primary-100 mt-1 text-sm md:text-base">
-                Entrenamientos, partidos y eventos del club
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
+      <section
+        className="relative py-16 md:py-20 overflow-hidden"
+        style={{ backgroundColor: 'var(--pub-hero-bg)' }}
+      >
+        <div className="absolute inset-0 bg-field-grid-pub opacity-40" />
+        <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-20 blur-3xl" style={{ background: 'var(--color-primary)' }} />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="pub-eyebrow text-pub-fg-70 mb-6">Calendario</div>
+          <h1 className="font-display-sport text-pub-fg mb-3" style={{ fontSize: 'clamp(40px, 6vw, 90px)', lineHeight: 0.92 }}>
+            Cronograma.
+          </h1>
+          <p className="text-pub-fg-70 text-lg mb-8" style={{ fontWeight: 300 }}>
+            Entrenamientos, partidos y eventos del club.
+          </p>
 
           {/* Barra de búsqueda tipo Google */}
           <div className="max-w-3xl mx-auto">
@@ -226,7 +226,7 @@ export default function Cronograma() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <BannerPublicitario tipo="HEADER" ubicacion="CRONOGRAMA" />
 

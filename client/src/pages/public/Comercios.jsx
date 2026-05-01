@@ -3,7 +3,7 @@ import BannerPublicitario from '../../components/public/BannerPublicitario'
 
 export default function ComerciosPublicos() {
   return (
-    <div className="min-h-screen bg-gray-300">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
       <ComerciosList showHeader={true} showInfo={true} />
 
       {/* Banner Footer */}

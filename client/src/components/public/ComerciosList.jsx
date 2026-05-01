@@ -7,6 +7,7 @@ import { MapPin, Phone, Navigation, Store, Percent, CheckCircle, ArrowRight } fr
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import PublicHero from './PublicHero'
 
 // Fix para el icono de Leaflet
 delete L.Icon.Default.prototype._getIconUrl
@@ -154,16 +155,12 @@ export default function ComerciosList({ showHeader = true, showInfo = true, clas
     <div className={className}>
       {/* Hero */}
       {showHeader && (
-        <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-              Beneficios para Socios
-            </h1>
-            <p className="text-base text-primary-100 max-w-2xl mx-auto">
-              Descuentos exclusivos en comercios adheridos de Pilar y alrededores
-            </p>
-          </div>
-        </section>
+        <PublicHero
+          eyebrow="Para socios"
+          title="Beneficios."
+          subtitle="Descuentos exclusivos en comercios adheridos."
+          compact
+        />
       )}
 
       {/* Contenido */}
