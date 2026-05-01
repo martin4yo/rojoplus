@@ -273,8 +273,19 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
     orderBy: { fecha: 'asc' },
   })
 
-  // Agrupar por mes
+  // Agrupar por mes y calcular saldo acumulado.
+  // Estrategia: para que el saldo de los meses tenga sentido (incluyendo arrastre histórico)
+  // calculo el saldo INICIAL de hace 6 meses como: saldoActual - flujoNetoDe6Meses.
   const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+  const totalIngresos6m = movimientosHistoricos
+    .filter(m => m.tipo === 'INGRESO')
+    .reduce((sum, m) => sum + Number(m.monto), 0)
+  const totalEgresos6m = movimientosHistoricos
+    .filter(m => m.tipo === 'EGRESO')
+    .reduce((sum, m) => sum + Number(m.monto), 0)
+  // saldoActual = saldoInicio6m + (ingresos6m - egresos6m) → saldoInicio6m = saldoActual - flujoNeto6m
+  let saldoAcumulado = saldoTotalCajas - (totalIngresos6m - totalEgresos6m)
+
   const cashFlowMensual = []
   for (let i = 5; i >= 0; i--) {
     const fecha = new Date(anioActual, mesActual - 1 - i, 1)
@@ -290,12 +301,15 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
 
     const ingresos = movsMes.filter(m => m.tipo === 'INGRESO').reduce((sum, m) => sum + Number(m.monto), 0)
     const egresos = movsMes.filter(m => m.tipo === 'EGRESO').reduce((sum, m) => sum + Number(m.monto), 0)
+    const neto = ingresos - egresos
+    saldoAcumulado += neto
 
     cashFlowMensual.push({
       mes: `${mesesNombres[mes]} ${anio.toString().slice(-2)}`,
       ingresos: Math.round(ingresos),
       egresos: Math.round(egresos),
-      neto: Math.round(ingresos - egresos),
+      neto: Math.round(neto),
+      saldo: Math.round(saldoAcumulado),
     })
   }
 

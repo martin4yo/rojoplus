@@ -100,10 +100,10 @@ export default function CajasLista() {
             return (
               <div
                 key={caja.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer"
+                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer flex flex-col h-full"
                 onClick={() => navigate(`/admin/tesoreria/cajas/${caja.id}`)}
               >
-                <div className="p-4">
+                <div className="p-4 flex-1">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${TIPO_COLORS[caja.tipo]?.replace('text-', 'bg-').replace('-700', '-100') || 'bg-gray-100'}`}>
@@ -128,7 +128,7 @@ export default function CajasLista() {
                   )}
                 </div>
 
-                <div className="px-4 py-2 bg-gray-50 border-t flex items-center justify-between">
+                <div className="px-4 py-2 bg-gray-50 border-t flex items-center justify-between flex-shrink-0">
                   <span className={`text-xs font-medium ${caja.activo ? 'text-green-600' : 'text-gray-400'}`}>
                     {caja.activo ? 'Activa' : 'Inactiva'}
                   </span>

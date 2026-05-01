@@ -292,15 +292,15 @@ export default function AdminLayout() {
         }}
       >
         <div className="flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface-lo)' }}>
-          {/* Expanded: logo + name + toggle button */}
-          <div className={`flex items-center justify-between px-4 py-3 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
-            <Link to="/admin" className="flex items-center gap-3 min-w-0">
-              <TenantLogo className="h-12 flex-shrink-0" />
+          {/* Expanded: logo + name + toggle button. Altura h-16 igual al topbar de la derecha. */}
+          <div className={`flex items-center justify-between px-4 h-16 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
+            <Link to="/admin" className="flex items-center gap-2.5 min-w-0">
+              <TenantLogo className="h-9 flex-shrink-0" />
               <div className="min-w-0 leading-tight">
-                <div className="font-medium text-[15px] truncate" style={{ color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                <div className="font-medium text-[14px] truncate" style={{ color: 'var(--text)', letterSpacing: '-0.01em' }}>
                   {tenant?.nombre || 'Admin'}
                 </div>
-                <div className="font-mono uppercase tracking-[0.2em] text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                <div className="font-mono uppercase tracking-[0.2em] text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
                   ops · admin
                 </div>
               </div>
@@ -325,17 +325,17 @@ export default function AdminLayout() {
               </button>
             </div>
           </div>
-          {/* Collapsed: small logo + expand button stacked */}
-          <div className={`hidden flex-col items-center gap-1 py-3 ${sidebarCollapsed ? 'md:flex' : ''}`}>
-            <Link to="/admin">
-              <TenantLogo className="h-10" />
-            </Link>
+          {/* Collapsed: solo logo, mismo h-16 que el topbar */}
+          <div className={`hidden items-center justify-center h-16 ${sidebarCollapsed ? 'md:flex' : ''}`}>
             <button
               onClick={() => setSidebarCollapsed(false)}
-              className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+              className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-surface-hi)'; e.currentTarget.style.color = 'var(--text)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}
               title="Expandir menú"
             >
-              <Menu className="w-5 h-5" />
+              <TenantLogo className="h-8" />
             </button>
           </div>
         </div>

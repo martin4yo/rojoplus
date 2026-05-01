@@ -241,8 +241,29 @@ export default function CashFlowPanel({ stats }) {
               <Wallet className="w-4 h-4" />
               Liquidez Total
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(liquidezTotal)}</p>
-            <p className="text-xs text-slate-400 mt-1">Disponible inmediato</p>
+            <p className={`text-2xl font-bold ${liquidezTotal < 0 ? 'text-red-400' : ''}`}>
+              {formatCurrency(liquidezTotal)}
+            </p>
+            {liquidezTotal < 0 ? (
+              <div className="mt-2 space-y-0.5">
+                <p className="text-[10px] text-red-300 font-mono uppercase tracking-wider flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Cajas en negativo:
+                </p>
+                {cajas.filter(c => Number(c.saldoActual) < 0).slice(0, 3).map(c => (
+                  <p key={c.id} className="text-[11px] text-red-200 truncate">
+                    {c.nombre}: <span className="font-semibold">{formatCurrency(Number(c.saldoActual))}</span>
+                  </p>
+                ))}
+                <button
+                  onClick={() => setActiveTab('flujo')}
+                  className="text-[10px] text-slate-300 hover:text-white underline mt-1"
+                >
+                  Ver todas las cajas →
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 mt-1">Disponible inmediato</p>
+            )}
           </div>
 
           <div className="bg-white/10 rounded-xl p-4 backdrop-blur">
@@ -674,22 +695,31 @@ export default function CashFlowPanel({ stats }) {
             </div>
           </div>
 
-          {/* Gráfico de línea Cash Flow Neto */}
+          {/* Gráfico de línea Cash Flow Neto + Saldo acumulado */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Cash Flow Neto - Tendencia</h3>
-            <ResponsiveContainer width="100%" height={256}>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">Evolución de saldos</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              El "saldo acumulado" arranca con el arrastre histórico y suma el flujo neto de cada mes.
+            </p>
+            <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={cashFlowMensual} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorNeto" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
                       <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                     </linearGradient>
+                    <linearGradient id="colorSaldo" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="mes" tick={{ fontSize: 12 }} stroke="#9CA3AF" />
                   <YAxis tick={{ fontSize: 12 }} stroke="#9CA3AF" tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area type="monotone" dataKey="neto" name="Cash Flow Neto" stroke="#3B82F6" fillOpacity={1} fill="url(#colorNeto)" strokeWidth={2} />
+                  <Legend />
+                  <Area type="monotone" dataKey="saldo" name="Saldo acumulado" stroke="#8B5CF6" fillOpacity={1} fill="url(#colorSaldo)" strokeWidth={2.5} />
+                  <Area type="monotone" dataKey="neto" name="Cash Flow Neto del mes" stroke="#3B82F6" fillOpacity={1} fill="url(#colorNeto)" strokeWidth={2} />
                 </AreaChart>
             </ResponsiveContainer>
           </div>
