@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban, Download, Eye, FileText } from 'lucide-react'
+import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban, Download, Eye, FileText, Paperclip, X } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Table from '../../../components/Table'
 import api from '../../../services/api'
@@ -12,6 +12,7 @@ import { useApiData } from '../../../hooks/useApiData'
 import { useConfirm } from '../../../hooks/useConfirm'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
 
 export default function MovimientosCajaLista() {
   const navigate = useNavigate()
@@ -38,6 +39,9 @@ export default function MovimientosCajaLista() {
   // Cargar movimientos
   const [movimientos, setMovimientos] = useState([])
   const [loading, setLoading] = useState(true)
+
+  // Modal de adjuntos
+  const [adjuntosModalMov, setAdjuntosModalMov] = useState(null) // movimiento o null
 
   useEffect(() => {
     cargarMovimientos()
@@ -241,6 +245,7 @@ export default function MovimientosCajaLista() {
         const rutaMC = mov.movimientoContable && RUTA_MC[mov.movimientoContable.tipo]
           ? RUTA_MC[mov.movimientoContable.tipo](mov.movimientoContable.id)
           : null
+        const cantAdjuntos = mov._count?.adjuntos || 0
         return (
           <div className="flex items-center justify-end gap-1">
             <button
@@ -250,6 +255,20 @@ export default function MovimientosCajaLista() {
             >
               <Eye className="w-4 h-4" />
             </button>
+            {cantAdjuntos > 0 ? (
+              <button
+                onClick={() => setAdjuntosModalMov(mov)}
+                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded relative"
+                title={`${cantAdjuntos} adjunto${cantAdjuntos === 1 ? '' : 's'}`}
+              >
+                <Paperclip className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {cantAdjuntos}
+                </span>
+              </button>
+            ) : (
+              <span className="w-7" />
+            )}
             {rutaMC ? (
               <button
                 onClick={() => navigate(rutaMC)}
@@ -397,6 +416,41 @@ export default function MovimientosCajaLista() {
         )}
       </div>
       <ConfirmDialog />
+
+      {/* Modal de adjuntos */}
+      {adjuntosModalMov && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
+          onClick={() => setAdjuntosModalMov(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">Adjuntos del movimiento</h3>
+                <p className="text-xs text-gray-500 font-mono">
+                  {adjuntosModalMov.numero} · {adjuntosModalMov.caja?.nombre}
+                </p>
+              </div>
+              <button
+                onClick={() => setAdjuntosModalMov(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <AdjuntosComprobante
+                tipo="movimientoCaja"
+                comprobanteId={adjuntosModalMov.id}
+                soloLectura={adjuntosModalMov.anulado}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

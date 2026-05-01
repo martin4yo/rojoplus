@@ -347,7 +347,8 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
             id: true,
             socio: { select: { id: true, nroSocio: true, apellidoNombre: true } }
           }
-        }
+        },
+        _count: { select: { adjuntos: true } },
       }
     }),
     req.db.movimientoCaja.count({ where })
