@@ -162,13 +162,11 @@ export default function Pagination({
                 <button
                   key={pageNum}
                   onClick={() => onPageChange(pageNum)}
-                  className={`
-                    min-w-[2.5rem] px-3 py-2 text-sm font-medium rounded-lg border
-                    ${isActive
-                      ? 'bg-primary-600 text-white border-primary-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }
-                  `}
+                  className="min-w-[2.5rem] px-3 py-2 text-sm font-medium rounded-lg border transition-colors"
+                  style={isActive
+                    ? { background: 'var(--accent)', color: 'var(--accent-fg)', borderColor: 'var(--accent)' }
+                    : { background: 'var(--bg-surface)', color: 'var(--text-dim)', borderColor: 'var(--border)' }
+                  }
                 >
                   {pageNum}
                 </button>

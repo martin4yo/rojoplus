@@ -78,13 +78,14 @@ function applyTheme(colores) {
     if (value) root.style.setProperty(cssVar, value)
   })
 
-  // Shades derivados del primario
-  const primario = colores.primario || '#DC2626'
-  root.style.setProperty('--color-primary-50',  `color-mix(in srgb, ${primario} 8%, white)`)
-  root.style.setProperty('--color-primary-100', `color-mix(in srgb, ${primario} 15%, white)`)
-  root.style.setProperty('--color-primary-200', `color-mix(in srgb, ${primario} 25%, white)`)
-  root.style.setProperty('--color-primary-300', `color-mix(in srgb, ${primario} 40%, white)`)
-  root.style.setProperty('--color-primary-400', `color-mix(in srgb, ${primario} 65%, white)`)
+  // Shades derivados del primario — mezclan con el fondo de la app (dark theme)
+  const primario = colores.primario || '#D9F558'
+  const bgBase = 'var(--bg-app, #0A0A0B)'
+  root.style.setProperty('--color-primary-50',  `color-mix(in srgb, ${primario} 8%, ${bgBase})`)
+  root.style.setProperty('--color-primary-100', `color-mix(in srgb, ${primario} 15%, ${bgBase})`)
+  root.style.setProperty('--color-primary-200', `color-mix(in srgb, ${primario} 25%, ${bgBase})`)
+  root.style.setProperty('--color-primary-300', `color-mix(in srgb, ${primario} 40%, ${bgBase})`)
+  root.style.setProperty('--color-primary-400', `color-mix(in srgb, ${primario} 65%, ${bgBase})`)
 }
 
 // Aplicar colores desde cache ANTES del primer render (evita FOUC).

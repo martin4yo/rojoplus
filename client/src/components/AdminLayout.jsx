@@ -266,45 +266,60 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="h-screen bg-gray-100 flex overflow-hidden">
+    <div className="h-screen flex overflow-hidden" style={{ background: 'var(--bg-app)' }}>
       {/* Overlay para móvil */}
       {menuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(2px)' }}
           onClick={() => setMenuOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`
-        fixed md:static inset-y-0 left-0 z-50
-        ${sidebarCollapsed ? 'md:w-20' : 'md:w-72'} w-72
-        bg-gray-800 shadow-lg flex flex-col h-screen
-        transform transition-all duration-300 ease-in-out
-        ${menuOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:translate-x-0
-      `}>
-        <div className="flex-shrink-0 border-b border-gray-200 bg-white">
+      <aside
+        className={`
+          fixed md:static inset-y-0 left-0 z-50
+          ${sidebarCollapsed ? 'md:w-20' : 'md:w-72'} w-72
+          flex flex-col h-screen
+          transform transition-all duration-300 ease-in-out
+          ${menuOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0
+        `}
+        style={{
+          background: 'var(--bg-surface-lo)',
+          borderRight: '1px solid var(--border)',
+        }}
+      >
+        <div className="flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface-lo)' }}>
           {/* Expanded: logo + name + toggle button */}
           <div className={`flex items-center justify-between px-4 py-3 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
             <Link to="/admin" className="flex items-center gap-3 min-w-0">
-              <TenantLogo className="h-14 flex-shrink-0" />
-              <div className="min-w-0">
-                <span className="font-bold text-primary text-lg whitespace-nowrap">{tenant?.nombre || 'Admin'}</span>
-                <p className="text-xs text-gray-500">Admin</p>
+              <TenantLogo className="h-12 flex-shrink-0" />
+              <div className="min-w-0 leading-tight">
+                <div className="font-medium text-[15px] truncate" style={{ color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                  {tenant?.nombre || 'Admin'}
+                </div>
+                <div className="font-mono uppercase tracking-[0.2em] text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  ops · admin
+                </div>
               </div>
             </Link>
             <div className="flex items-center gap-1 ml-2 flex-shrink-0">
               <button
                 onClick={() => setSidebarCollapsed(true)}
-                className="hidden md:flex p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+                className="hidden md:flex p-2 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-surface-hi)'; e.currentTarget.style.color = 'var(--text)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}
                 title="Colapsar menú"
               >
                 <Menu className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setMenuOpen(false)}
-                className="md:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+                className="md:hidden p-2 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -571,7 +586,10 @@ export default function AdminLayout() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Top bar */}
-        <header className="flex-shrink-0 bg-white shadow-sm h-16 flex items-center justify-between px-4 md:px-6">
+        <header
+          className="flex-shrink-0 h-16 flex items-center justify-between px-4 md:px-6"
+          style={{ background: 'var(--bg-app)', borderBottom: '1px solid var(--border)' }}
+        >
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="md:hidden min-w-0">
               <Link to="/admin" className="flex items-center gap-2 min-w-0">
