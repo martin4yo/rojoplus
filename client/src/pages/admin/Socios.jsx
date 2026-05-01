@@ -647,7 +647,7 @@ export default function AdminSocios() {
             <input
               type="text"
               value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
+              onChange={(e) => { setBusqueda(e.target.value); goToPage(1) }}
               placeholder="Buscar por nombre, nro. socio, DNI, email o celular (búsqueda automática)"
               className="input-field pl-10 pr-10 w-full"
             />
