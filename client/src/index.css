@@ -230,6 +230,23 @@ select:-webkit-autofill {
     color: var(--text);
   }
 
+  /* Display deportivo (Anton condensed) — para headlines grandes en sitio público */
+  .font-display-sport {
+    font-family: 'Anton', 'Geist', sans-serif;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    line-height: 0.92;
+  }
+
+  /* Field grid — líneas finas tipo cancha, decoración */
+  .bg-field-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 80px 80px;
+  }
+
   /* Chips/labels técnicos en mono uppercase (impronta del nuevo lenguaje) */
   .chip-mono {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] uppercase;
