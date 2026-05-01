@@ -586,10 +586,6 @@ export default function SocioDetalle() {
                   <dd className="text-gray-800">{formatDate(socio.fechaAlta)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-gray-500">Zona</dt>
-                  <dd className="text-gray-800">{socio.zona || '-'}</dd>
-                </div>
-                <div className="flex justify-between">
                   <dt className="text-gray-500">Libro/Folio</dt>
                   <dd className="text-gray-800">{socio.libro && socio.folio ? `${socio.libro}/${socio.folio}` : '-'}</dd>
                 </div>

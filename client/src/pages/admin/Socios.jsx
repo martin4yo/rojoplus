@@ -521,12 +521,8 @@ export default function AdminSocios() {
                   <option value="">Todos los tipos</option>
                   {filtros.tiposSocio.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <select value={zonaGrupos} onChange={e => { setZonaGrupos(e.target.value); setPageGrupos(1) }} className="input-field">
-                  <option value="">Todas las zonas</option>
-                  {filtros.zonas.map(z => <option key={z} value={z}>{z}</option>)}
-                </select>
               </div>
-              {(estadoGrupos || categoriaGrupos || tipoSocioGrupos || zonaGrupos || terminoBusquedaGrupos) && (
+              {(estadoGrupos || categoriaGrupos || tipoSocioGrupos || terminoBusquedaGrupos) && (
                 <div className="mt-3 flex justify-between items-center">
                   <span className="text-sm text-gray-500">{paginationGrupos?.total || 0} grupos encontrados</span>
                   <button type="button" onClick={limpiarFiltrosGrupos} className="text-sm text-primary hover:underline">
@@ -710,16 +706,6 @@ export default function AdminSocios() {
               <option value="">Todos los tipos</option>
               {filtros.tiposSocio.map(t => (
                 <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <select
-              value={zona}
-              onChange={(e) => { setZona(e.target.value); goToPage(1) }}
-              className="input-field"
-            >
-              <option value="">Todas las zonas</option>
-              {filtros.zonas.map(z => (
-                <option key={z} value={z}>{z}</option>
               ))}
             </select>
             <select

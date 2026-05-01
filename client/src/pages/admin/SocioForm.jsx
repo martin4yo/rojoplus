@@ -681,20 +681,6 @@ export default function SocioForm() {
                 </div>
               </div>
 
-              {/* Fila 4: Zona */}
-              <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-6 sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Zona</label>
-                  <input
-                    type="text"
-                    name="zona"
-                    value={form.zona}
-                    onChange={handleChange}
-                    className="input-field w-full"
-                  />
-                </div>
-              </div>
-
               {calcularEsMenor(form.fechaNacimiento) && (
                 <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
                   <p className="font-medium text-amber-800 text-sm">Menor de edad (calculado por fecha de nacimiento)</p>
