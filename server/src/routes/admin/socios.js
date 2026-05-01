@@ -101,13 +101,24 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   const where = {}
 
   if (q) {
-    where.OR = [
-      { nroSocio: { contains: q, mode: 'insensitive' } },
-      { documento: { contains: q, mode: 'insensitive' } },
-      { apellidoNombre: { contains: q, mode: 'insensitive' } },
-      { email: { contains: q, mode: 'insensitive' } },
-      { celular: { contains: q, mode: 'insensitive' } },
-    ]
+    // Tokenizar: cada palabra debe coincidir con AL MENOS uno de los campos
+    // (AND entre tokens, OR entre campos por token). Permite búsquedas tipo
+    // "MART FOUR" que matchee "Fournier, Martín" sin importar el orden.
+    const tokens = String(q).trim().split(/\s+/).filter(Boolean)
+    if (tokens.length > 0) {
+      where.AND = tokens.map(token => ({
+        OR: [
+          { nroSocio: { contains: token, mode: 'insensitive' } },
+          { documento: { contains: token, mode: 'insensitive' } },
+          { apellidoNombre: { contains: token, mode: 'insensitive' } },
+          { apellido: { contains: token, mode: 'insensitive' } },
+          { nombre: { contains: token, mode: 'insensitive' } },
+          { email: { contains: token, mode: 'insensitive' } },
+          { celular: { contains: token, mode: 'insensitive' } },
+          { celularSecundario: { contains: token, mode: 'insensitive' } },
+        ],
+      }))
+    }
   }
 
   // Filtrar por múltiples estados válidos (ej: estadosValidos=ACTIVO,VIGENTE)
@@ -221,11 +232,21 @@ router.get('/socios/grupos-familiares', authAdmin, asyncHandler(async (req, res)
   const where = { titularFamiliaId: null, miembrosFamilia: { some: {} } }
 
   if (q) {
-    where.OR = [
-      { nroSocio: { contains: q, mode: 'insensitive' } },
-      { apellidoNombre: { contains: q, mode: 'insensitive' } },
-      { documento: { contains: q, mode: 'insensitive' } },
-    ]
+    // Tokenizar igual que en /admin/socios para consistencia
+    const tokens = String(q).trim().split(/\s+/).filter(Boolean)
+    if (tokens.length > 0) {
+      where.AND = tokens.map(token => ({
+        OR: [
+          { nroSocio: { contains: token, mode: 'insensitive' } },
+          { apellidoNombre: { contains: token, mode: 'insensitive' } },
+          { apellido: { contains: token, mode: 'insensitive' } },
+          { nombre: { contains: token, mode: 'insensitive' } },
+          { documento: { contains: token, mode: 'insensitive' } },
+          { email: { contains: token, mode: 'insensitive' } },
+          { celular: { contains: token, mode: 'insensitive' } },
+        ],
+      }))
+    }
   }
 
   if (estado) where.estado = { contains: estado, mode: 'insensitive' }
