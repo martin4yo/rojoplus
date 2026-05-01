@@ -327,6 +327,8 @@ function App() {
                   <Route path="comercios" element={<ComerciosPublicos />} />
                   <Route path="menu-buffet" element={<MenuBuffet />} />
                   <Route path="buffet/menu" element={<MenuBuffet />} />
+                  <Route path="login-socio" element={<LoginSocio />} />
+                  <Route path="mi-qr" element={<AccesoSocio />} />
                   <Route path="*" element={<NotFoundPublic />} />
                 </Route>
 
@@ -343,10 +345,8 @@ function App() {
                 <Route path="/c/:token/editar" element={<ComercioEditar />} />
                 <Route path="/acceso-invalido" element={<TokenInvalido />} />
 
-                {/* Rutas del socio */}
-                <Route path="/mi-qr" element={<AccesoSocio />} />
+                {/* Rutas del socio (login-socio y mi-qr ahora viven dentro de PublicLayout) */}
                 <Route path="/s/:tokenPortal" element={<SocioPortal />} />
-                <Route path="/login-socio" element={<LoginSocio />} />
                 <Route path="/portal-socio/:tokenPortal" element={<PortalSocioNuevo />} />
 
                 {/* Reservas públicas */}

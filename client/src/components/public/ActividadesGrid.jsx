@@ -50,15 +50,8 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
       setActividades((data || []).slice(0, limit))
     } catch (err) {
       console.error('Error cargando actividades:', err)
-      // Datos de ejemplo si falla la API
-      setActividades([
-        { id: 1, nombre: 'Fútbol', descripcion: 'Escuela de fútbol para todas las edades', inscriptos: 120 },
-        { id: 2, nombre: 'Básquet', descripcion: 'Básquet competitivo y recreativo', inscriptos: 45 },
-        { id: 3, nombre: 'Voley', descripcion: 'Voley masculino y femenino', inscriptos: 38 },
-        { id: 4, nombre: 'Hockey', descripcion: 'Hockey sobre césped', inscriptos: 52 },
-        { id: 5, nombre: 'Natación', descripcion: 'Pileta climatizada todo el año', inscriptos: 85 },
-        { id: 6, nombre: 'Gimnasia', descripcion: 'Clases de fitness y gimnasia', inscriptos: 67 },
-      ])
+      // Sin fallback hardcodeado — los IDs ficticios llevaban a páginas de detalle 404.
+      setActividades([])
     } finally {
       setLoading(false)
     }
