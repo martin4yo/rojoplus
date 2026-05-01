@@ -799,6 +799,211 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
 }))
 
 // ============================================
+// ADELANTAR CUOTAS
+// ============================================
+
+/**
+ * Helper: encuentra o crea un período (anio, mes) calculando vencimiento
+ * desde la configuración del tenant. Devuelve el período.
+ */
+async function obtenerOCrearPeriodo(db, anio, mes, generadoPor) {
+  const existente = await db.periodo.findFirst({ where: { anio, mes } })
+  if (existente) return existente
+
+  // Cargar config para calcular vencimiento (mismo cálculo que POST /periodos)
+  const [configDia, configMismoMes] = await Promise.all([
+    db.configuracion.findFirst({ where: { clave: 'CUOTA_DIA_VENCIMIENTO' } }),
+    db.configuracion.findFirst({ where: { clave: 'CUOTA_VENCE_MISMO_MES' } }),
+  ])
+  const diaVenc = configDia ? parseInt(configDia.valor) : 10
+  const venceMismoMes = configMismoMes ? configMismoMes.valor === 'true' : false
+
+  let mesVenc = mes
+  let anioVenc = anio
+  if (!venceMismoMes) {
+    mesVenc = mes + 1
+    if (mesVenc > 12) { mesVenc = 1; anioVenc = anio + 1 }
+  }
+  const fechaVenc = new Date(anioVenc, mesVenc - 1, diaVenc)
+  const nombre = `${String(mes).padStart(2, '0')} / ${anio}`
+
+  return await db.periodo.create({
+    data: {
+      anio, mes, nombre,
+      fechaVencimiento: fechaVenc,
+      estado: 'PENDIENTE',
+    },
+  })
+}
+
+/**
+ * Helper: arma los cargos a crear para un socio en un período dado, usando
+ * la misma lógica que la generación masiva (cuota social + cuotas de actividad).
+ */
+function armarCargosParaSocio(socio, periodo) {
+  const cargos = []
+  const descuentoPct = socio.categoriaSocioRel?.porcentajeDescuento
+    ? Number(socio.categoriaSocioRel.porcentajeDescuento)
+    : 0
+
+  // Cuota social: solo titulares o socios únicos
+  const esTitularOUnico = !socio.titularFamiliaId
+  const cuotaSocialMonto = socio.tipoSocioRel?.conceptoTesoreria?.cuotaMensual
+    ? Number(socio.tipoSocioRel.conceptoTesoreria.cuotaMensual)
+    : Number(socio.tipoSocioRel?.cuotaMensual || 0)
+
+  if (esTitularOUnico && cuotaSocialMonto) {
+    const montoBase = cuotaSocialMonto
+    const montoBonificacion = montoBase * (descuentoPct / 100)
+    const montoTotal = montoBase - montoBonificacion
+    const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
+    const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
+    cargos.push({
+      periodoId: periodo.id,
+      socioId: socio.id,
+      grupoFamiliarId: socio.titularFamiliaId || socio.id,
+      categoria: 'CUOTA_SOCIAL',
+      tipoCuota,
+      conceptoTesoreriaId: socio.tipoSocioRel?.conceptoTesoreriaId || null,
+      descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'} (adelantada)`,
+      montoOriginal: montoBase,
+      montoBonificacion,
+      montoTotal,
+      estado: 'PENDIENTE',
+      fechaVencimiento: periodo.fechaVencimiento,
+      origen: 'ADELANTO',
+      motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+    })
+  }
+
+  // Cuotas de actividad (inscripciones activas)
+  for (const inscripcion of socio.inscripciones || []) {
+    if (inscripcion.exentoCuota) continue
+    const categoria = inscripcion.categoriaActividad
+    const actividad = categoria?.actividad
+    if (!actividad) continue
+
+    let montoBase = actividad.conceptoTesoreria?.cuotaMensual
+      ? Number(actividad.conceptoTesoreria.cuotaMensual)
+      : (categoria.cuotaMensual ? Number(categoria.cuotaMensual) : (actividad.cuotaMensual ? Number(actividad.cuotaMensual) : 0))
+
+    if (inscripcion.porcentajeCuota && Number(inscripcion.porcentajeCuota) !== 100) {
+      montoBase = montoBase * (Number(inscripcion.porcentajeCuota) / 100)
+    }
+    if (montoBase > 0) {
+      const montoBonificacion = montoBase * (descuentoPct / 100)
+      const montoTotal = montoBase - montoBonificacion
+      cargos.push({
+        periodoId: periodo.id,
+        socioId: socio.id,
+        grupoFamiliarId: socio.titularFamiliaId || socio.id,
+        categoria: 'CUOTA_ACTIVIDAD',
+        categoriaActividadId: categoria.id,
+        conceptoTesoreriaId: actividad.conceptoTesoreriaId || null,
+        descripcion: `${actividad.nombre} - ${categoria.nombre} (adelantada)`,
+        montoOriginal: montoBase,
+        montoBonificacion,
+        montoTotal,
+        estado: 'PENDIENTE',
+        fechaVencimiento: periodo.fechaVencimiento,
+        origen: 'ADELANTO',
+        motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+      })
+    }
+  }
+
+  return cargos
+}
+
+// POST /api/admin/cuotas/adelantar - Adelantar N meses de cuotas para un socio
+router.post('/cuotas/adelantar', authAdmin, asyncHandler(async (req, res) => {
+  const { socioId, meses } = req.body
+  const N = parseInt(meses)
+
+  if (!socioId || !N || N < 1 || N > 24) {
+    throw new AppError('socioId requerido y meses entre 1 y 24', 400, 'VALIDATION_ERROR')
+  }
+
+  // Cargar el socio con todas las relaciones que necesita el cálculo
+  const socio = await req.db.socio.findUnique({
+    where: { id: parseInt(socioId) },
+    include: {
+      tipoSocioRel: { include: { conceptoTesoreria: true } },
+      categoriaSocioRel: true,
+      inscripciones: {
+        where: { estado: 'ACTIVA' },
+        include: {
+          categoriaActividad: {
+            include: { actividad: { include: { conceptoTesoreria: true } } },
+          },
+        },
+      },
+    },
+  })
+
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
+
+  // Determinar el último mes/año para el que el socio ya tiene cargos
+  const ultimoCargo = await req.db.cargo.findFirst({
+    where: { socioId: socio.id, periodoId: { not: null } },
+    include: { periodo: { select: { anio: true, mes: true } } },
+    orderBy: [
+      { periodo: { anio: 'desc' } },
+      { periodo: { mes: 'desc' } },
+    ],
+  })
+
+  let anioBase, mesBase
+  if (ultimoCargo?.periodo) {
+    // Empezar desde el mes siguiente al último
+    anioBase = ultimoCargo.periodo.anio
+    mesBase = ultimoCargo.periodo.mes
+  } else {
+    // Sin cargos previos: empezar desde el mes actual
+    const hoy = new Date()
+    anioBase = hoy.getFullYear()
+    mesBase = hoy.getMonth() + 1 - 1 // -1 porque vamos a sumar antes del primer ciclo
+  }
+
+  let totalCargosCreados = 0
+  let mesesProcesados = 0
+  const periodosCreados = []
+
+  for (let i = 0; i < N; i++) {
+    mesBase += 1
+    if (mesBase > 12) { mesBase = 1; anioBase += 1 }
+
+    const periodo = await obtenerOCrearPeriodo(req.db, anioBase, mesBase, req.admin.id)
+
+    // Verificar que el socio NO tenga ya cargos en este período (idempotente)
+    const yaTiene = await req.db.cargo.count({
+      where: { socioId: socio.id, periodoId: periodo.id },
+    })
+    if (yaTiene > 0) continue
+
+    const cargos = armarCargosParaSocio(socio, periodo)
+    if (cargos.length > 0) {
+      await req.db.cargo.createMany({ data: cargos })
+      totalCargosCreados += cargos.length
+      periodosCreados.push(`${String(mesBase).padStart(2, '0')}/${anioBase}`)
+    }
+    mesesProcesados += 1
+  }
+
+  res.json({
+    success: true,
+    data: {
+      cargosCreados: totalCargosCreados,
+      mesesProcesados,
+      periodos: periodosCreados,
+      mensaje: totalCargosCreados > 0
+        ? `Se generaron ${totalCargosCreados} cargo(s) adelantado(s) para ${periodosCreados.length} período(s): ${periodosCreados.join(', ')}`
+        : 'No se generaron cargos nuevos (puede que el socio ya los tuviera o que no tenga cuotas configuradas).',
+    },
+  })
+}))
+
+// ============================================
 // PAGOS
 // ============================================
 

@@ -48,6 +48,11 @@ export default function Cuotas() {
   // Estado de expansión para el listado agrupado por socio
   const [socioListadoExpandido, setSocioListadoExpandido] = useState({})
 
+  // Modal de adelantar cuotas
+  const [showAdelantarModal, setShowAdelantarModal] = useState(false)
+  const [mesesAdelantar, setMesesAdelantar] = useState(11)
+  const [adelantando, setAdelantando] = useState(false)
+
   // Seleccion para pago
   const [seleccionadas, setSeleccionadas] = useState([])
   const [mediosPago, setMediosPago] = useState([])
@@ -339,6 +344,32 @@ export default function Cuotas() {
     setSociosExpandidos({})
   }
 
+  async function confirmarAdelantar() {
+    const N = parseInt(mesesAdelantar)
+    if (!N || N < 1 || N > 24) {
+      setError('Ingresá un número entre 1 y 24')
+      return
+    }
+    const socioId = cobranzaData?.titular?.id || cobranzaData?.sociosPorCobrar?.[0]?.socio?.id
+    if (!socioId) {
+      setError('No se pudo determinar el socio')
+      return
+    }
+    setAdelantando(true)
+    setError(null)
+    try {
+      const data = await api.post('/admin/cuotas/adelantar', { socioId, meses: N })
+      setSuccess(data?.mensaje || `Se generaron ${data?.cargosCreados || 0} cargos adelantados`)
+      setShowAdelantarModal(false)
+      // Refrescar la cobranza para que aparezcan las nuevas cuotas pendientes
+      await seleccionarSocioParaCobranza({ id: socioId })
+    } catch (err) {
+      setError(err.message || 'Error al adelantar cuotas')
+    } finally {
+      setAdelantando(false)
+    }
+  }
+
   function toggleSocioExpandido(socioId) {
     setSociosExpandidos(prev => ({
       ...prev,
@@ -583,6 +614,15 @@ export default function Cuotas() {
               </p>
             )}
           </div>
+          <Button
+            variant="secondary"
+            onClick={() => setShowAdelantarModal(true)}
+            className="flex items-center gap-2"
+            title="Generar cuotas futuras para cobrar adelantado"
+          >
+            <Plus className="w-4 h-4" />
+            Adelantar cuotas
+          </Button>
           <Button
             onClick={abrirModalPago}
             disabled={seleccionadas.length === 0}
@@ -927,6 +967,47 @@ export default function Cuotas() {
             if (socioId) seleccionarSocioParaCobranza({ id: socioId })
           }}
         />
+
+        {/* Modal de adelantar cuotas */}
+        <Modal
+          isOpen={showAdelantarModal}
+          onClose={() => setShowAdelantarModal(false)}
+          title="Adelantar cuotas"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Generá las próximas cuotas mensuales del socio con el precio actual.
+              Los cargos se crean en estado <span className="font-semibold">PENDIENTE</span> y aparecen
+              en la cobranza para que los selecciones y cobres en una sola operación.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cantidad de meses a adelantar
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                value={mesesAdelantar}
+                onChange={(e) => setMesesAdelantar(e.target.value)}
+                className="input-field w-full"
+                autoFocus
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Hasta 24 meses. Si el socio ya tiene cargos en alguno de los próximos meses, se omiten esos.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="secondary" onClick={() => setShowAdelantarModal(false)} disabled={adelantando}>
+                Cancelar
+              </Button>
+              <Button onClick={confirmarAdelantar} loading={adelantando}>
+                Generar cargos
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     )
   }
