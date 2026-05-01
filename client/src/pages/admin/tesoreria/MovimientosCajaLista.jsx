@@ -137,7 +137,26 @@ export default function MovimientosCajaLista() {
     {
       key: 'numero',
       label: 'Numero',
-      render: (mov) => <span className="font-mono text-sm text-gray-600">{mov.numero}</span>,
+      render: (mov) => {
+        // Resolver socio/entidad: directo, o desde el pago asociado
+        const socio = mov.socio || mov.pago?.socio
+        const entidad = mov.entidad
+        return (
+          <div>
+            <span className="font-mono text-sm text-gray-600">{mov.numero}</span>
+            {socio && (
+              <p className="text-xs text-blue-600 mt-0.5">
+                Socio #{socio.nroSocio} · {socio.apellidoNombre}
+              </p>
+            )}
+            {entidad && (
+              <p className="text-xs text-purple-600 mt-0.5">
+                {entidad.tipo === 'PROVEEDOR' ? 'Proveedor' : entidad.tipo === 'CLIENTE' ? 'Cliente' : 'Entidad'}: {entidad.nombre}
+              </p>
+            )}
+          </div>
+        )
+      },
       className: 'text-left'
     },
     {
@@ -169,14 +188,9 @@ export default function MovimientosCajaLista() {
       label: 'Concepto',
       render: (mov) => (
         <div>
-          <p className="text-gray-800">{mov.concepto || mov.descripcion || '-'}</p>
+          <p className="text-gray-800">{mov.concepto || '-'}</p>
           {mov.cuentaContable && (
             <p className="text-xs text-gray-500">{mov.cuentaContable.codigo} - {mov.cuentaContable.nombre}</p>
-          )}
-          {mov.pago?.socio && (
-            <p className="text-xs text-blue-600">
-              Socio #{mov.pago.socio.nroSocio} - {mov.pago.socio.apellidoNombre}
-            </p>
           )}
         </div>
       ),
@@ -187,9 +201,16 @@ export default function MovimientosCajaLista() {
       key: 'monto',
       label: 'Monto',
       render: (mov) => (
-        <span className={`font-bold ${mov.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
-          {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.monto, { showSymbol: false })}
-        </span>
+        <div>
+          <span className={`font-bold ${mov.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
+            {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.monto, { showSymbol: false })}
+          </span>
+          {mov.descripcion && (
+            <p className="text-xs text-gray-500 mt-0.5 font-normal whitespace-normal break-words max-w-[280px] ml-auto">
+              {mov.descripcion}
+            </p>
+          )}
+        </div>
       ),
       className: 'text-right',
       cellClassName: 'text-right'
