@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Receipt, CheckCircle, DollarSign, X, Users, ChevronDown, ChevronUp, Edit2, Plus, Trash2, CreditCard } from 'lucide-react'
 import { Button } from '../../components/Button'
@@ -44,6 +44,9 @@ export default function Cuotas() {
   const [cobranzaData, setCobranzaData] = useState(null)
   const [cargandoCobranza, setCargandoCobranza] = useState(false)
   const [sociosExpandidos, setSociosExpandidos] = useState({})
+
+  // Estado de expansión para el listado agrupado por socio
+  const [socioListadoExpandido, setSocioListadoExpandido] = useState({})
 
   // Seleccion para pago
   const [seleccionadas, setSeleccionadas] = useState([])
@@ -902,6 +905,37 @@ export default function Cuotas() {
     )
   }
 
+  // Agrupar cuotas por socio para el listado normal.
+  // Devuelve [{ socio, cuotas[], total, cantPendientes, cantPagadas }, ...]
+  const cuotasAgrupadas = useMemo(() => {
+    if (!cuotas || cuotas.length === 0) return []
+    const map = new Map()
+    for (const c of cuotas) {
+      const sid = c.socioId
+      if (!map.has(sid)) {
+        map.set(sid, {
+          socio: c.socio || { id: sid, apellidoNombre: '', nroSocio: '' },
+          cuotas: [],
+          total: 0,
+          totalPendiente: 0,
+          cantPendientes: 0,
+        })
+      }
+      const g = map.get(sid)
+      g.cuotas.push(c)
+      g.total += Number(c.montoTotal) || 0
+      if (c.estado === 'PENDIENTE') {
+        g.totalPendiente += Number(c.montoTotal) || 0
+        g.cantPendientes += 1
+      }
+    }
+    return Array.from(map.values())
+  }, [cuotas])
+
+  function toggleSocioListado(socioId) {
+    setSocioListadoExpandido(prev => ({ ...prev, [socioId]: !prev[socioId] }))
+  }
+
   // Vista normal de cuotas
   return (
     <div>
@@ -1104,102 +1138,153 @@ export default function Cuotas() {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Socio</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Periodo</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Concepto</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimiento</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {cuotas.map(cuota => (
-                    <tr key={cuota.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => navigate(`/admin/socios/${cuota.socioId}`)}
-                          className="text-left hover:text-primary"
-                        >
-                          <p className="font-medium text-gray-800">{cuota.socio?.apellidoNombre}</p>
-                          <p className="text-sm text-gray-500">#{cuota.socio?.nroSocio}</p>
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {cuota.periodo?.nombre || (cuota.fechaVencimiento &&
-                          new Date(cuota.fechaVencimiento).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+          <div className="space-y-3">
+            {cuotasAgrupadas.map(grupo => {
+              const expandido = socioListadoExpandido[grupo.socio.id]
+              return (
+                <div key={grupo.socio.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  {/* Header del socio */}
+                  <div
+                    className="flex items-center gap-3 p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                    onClick={() => toggleSocioListado(grupo.socio.id)}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary font-bold flex-shrink-0">
+                      {grupo.socio.apellidoNombre?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/admin/socios/${grupo.socio.id}`) }}
+                        className="text-left hover:text-primary font-medium text-gray-800 block truncate"
+                      >
+                        {grupo.socio.apellidoNombre}
+                      </button>
+                      <p className="text-xs text-gray-500 font-mono uppercase tracking-wider">
+                        #{grupo.socio.nroSocio} · {grupo.cuotas.length} cuota{grupo.cuotas.length === 1 ? '' : 's'}
+                        {grupo.cantPendientes > 0 && grupo.cantPendientes !== grupo.cuotas.length && (
+                          <span> · {grupo.cantPendientes} pendiente{grupo.cantPendientes === 1 ? '' : 's'}</span>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-gray-800">
-                          {formatCategoria(cuota.categoria)}
-                          {cuota.categoria === 'FINANCIACION' && cuota.descripcion && (
-                            <span className="text-blue-600 font-normal ml-1">
-                              {cuota.descripcion.match(/Cuota \d+\/\d+/)?.[0] || ''}
-                            </span>
-                          )}
-                        </p>
-                        {cuota.categoriaActividad && (
-                          <p className="text-xs text-gray-500">
-                            {cuota.categoriaActividad.actividad?.nombre} - {cuota.categoriaActividad.nombre}
-                          </p>
-                        )}
-                        {cuota.categoria === 'FINANCIACION' && cuota.descripcion && (
-                          <p className="text-xs text-gray-500">
-                            {cuota.descripcion.replace(/ - Cuota \d+\/\d+$/, '').replace('Financiación: ', '')}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <p className="font-semibold text-gray-800">
-                          {formatCurrency(cuota.montoTotal)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <StatusBadge status={cuota.estado} type="cuota" />
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {formatDate(cuota.fechaVencimiento)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center gap-1">
-                          {cuota.estado === 'PENDIENTE' && (
-                            <>
-                              <button
-                                onClick={() => seleccionarSocioParaCobranza({ id: cuota.socioId })}
-                                className="p-1.5 text-primary hover:bg-primary-light rounded transition"
-                                title="Cobrar"
-                              >
-                                <DollarSign className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => abrirEditarCargo(cuota)}
-                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-                                title="Editar"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => anularCargo(cuota.id)}
-                                className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition"
-                                title="Anular"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </p>
+                    </div>
+                    <div className="text-right mr-2 flex-shrink-0">
+                      {grupo.totalPendiente > 0 ? (
+                        <>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">A pagar</p>
+                          <p className="font-bold text-red-600 text-lg leading-tight">{formatCurrency(grupo.totalPendiente)}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Total</p>
+                          <p className="font-bold text-gray-700 text-lg leading-tight">{formatCurrency(grupo.total)}</p>
+                        </>
+                      )}
+                    </div>
+                    {grupo.cantPendientes > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); seleccionarSocioParaCobranza({ id: grupo.socio.id }) }}
+                        className="p-2 text-primary hover:bg-primary-light rounded-lg transition flex-shrink-0"
+                        title="Cobrar todas las pendientes"
+                      >
+                        <DollarSign className="w-5 h-5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="p-1 text-gray-400 hover:text-gray-600 flex-shrink-0"
+                      onClick={(e) => { e.stopPropagation(); toggleSocioListado(grupo.socio.id) }}
+                    >
+                      {expandido ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                  </div>
+
+                  {/* Detalle de cuotas (expandido) */}
+                  {expandido && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-white border-t border-gray-200">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider">Período</th>
+                            <th className="px-4 py-2 text-left text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
+                            <th className="px-4 py-2 text-right text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                            <th className="px-4 py-2 text-center text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                            <th className="px-4 py-2 text-left text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider">Vence</th>
+                            <th className="px-4 py-2 text-center text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {grupo.cuotas.map(cuota => (
+                            <tr key={cuota.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 text-sm text-gray-600">
+                                {cuota.periodo?.nombre || (cuota.fechaVencimiento &&
+                                  new Date(cuota.fechaVencimiento).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+                                )}
+                              </td>
+                              <td className="px-4 py-2">
+                                <p className="text-sm font-medium text-gray-800">
+                                  {formatCategoria(cuota.categoria)}
+                                  {cuota.categoria === 'FINANCIACION' && cuota.descripcion && (
+                                    <span className="text-blue-600 font-normal ml-1">
+                                      {cuota.descripcion.match(/Cuota \d+\/\d+/)?.[0] || ''}
+                                    </span>
+                                  )}
+                                </p>
+                                {cuota.categoriaActividad && (
+                                  <p className="text-xs text-gray-500">
+                                    {cuota.categoriaActividad.actividad?.nombre} - {cuota.categoriaActividad.nombre}
+                                  </p>
+                                )}
+                                {cuota.categoria === 'FINANCIACION' && cuota.descripcion && (
+                                  <p className="text-xs text-gray-500">
+                                    {cuota.descripcion.replace(/ - Cuota \d+\/\d+$/, '').replace('Financiación: ', '')}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-right font-semibold text-gray-800">
+                                {formatCurrency(cuota.montoTotal)}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <StatusBadge status={cuota.estado} type="cuota" />
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600">
+                                {formatDate(cuota.fechaVencimiento)}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <div className="flex justify-center gap-1">
+                                  {cuota.estado === 'PENDIENTE' && (
+                                    <>
+                                      <button
+                                        onClick={() => seleccionarSocioParaCobranza({ id: cuota.socioId })}
+                                        className="p-1.5 text-primary hover:bg-primary-light rounded transition"
+                                        title="Cobrar"
+                                      >
+                                        <DollarSign className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => abrirEditarCargo(cuota)}
+                                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                                        title="Editar"
+                                      >
+                                        <Edit2 className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => anularCargo(cuota.id)}
+                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition"
+                                        title="Anular"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {/* Paginacion */}
