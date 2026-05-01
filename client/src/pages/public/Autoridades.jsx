@@ -80,10 +80,10 @@ export default function Autoridades() {
             <div className="font-mono text-[10px] uppercase tracking-[0.3em] mb-4" style={{ color: 'var(--text-muted)' }}>
               Sin datos cargados
             </div>
-            <h2 className="font-display-sport mb-4" style={{ fontSize: 'clamp(32px, 4vw, 56px)', lineHeight: 1, color: 'var(--text)' }}>
+            <h2 className="font-display-sport mb-4" style={{ fontSize: 'clamp(32px, 4vw, 56px)', lineHeight: 1, color: 'var(--color-text-primary, var(--text))' }}>
               Próximamente.
             </h2>
-            <p style={{ color: 'var(--text-dim)' }}>
+            <p style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
               Estamos preparando la información de las autoridades del club.
             </p>
           </div>

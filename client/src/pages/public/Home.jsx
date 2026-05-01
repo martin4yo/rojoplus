@@ -145,16 +145,16 @@ export default function Home() {
       <section className="py-20 md:py-28" style={{ backgroundColor: 'var(--bg-app)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-12 max-w-2xl">
-            <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+            <div className="pub-eyebrow mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
               Contacto
             </div>
             <h2
               className="font-display-sport mb-4"
-              style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+              style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}
             >
               Visitanos.
             </h2>
-            <p className="text-lg" style={{ color: 'var(--text-dim)', fontWeight: 300 }}>
+            <p className="text-lg" style={{ color: 'var(--color-text-secondary, var(--text-dim))', fontWeight: 300 }}>
               Te esperamos en nuestras instalaciones.
             </p>
           </div>
@@ -212,12 +212,12 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
             <div>
-              <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+              <div className="pub-eyebrow mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 Novedades
               </div>
               <h2
                 className="font-display-sport"
-                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}
               >
                 Últimas noticias.
               </h2>
@@ -225,7 +225,7 @@ export default function Home() {
             <Link
               to="/noticias"
               className="group inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.2em] self-start md:self-end"
-              style={{ color: 'var(--text)' }}
+              style={{ color: 'var(--color-text-primary, var(--text))' }}
             >
               <span>Ver todas</span>
               <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
@@ -249,10 +249,10 @@ export default function Home() {
                     <p className="font-mono text-[10px] uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--text-muted)' }}>
                       Noticia {String(i).padStart(2, '0')}
                     </p>
-                    <h3 className="font-display-sport text-xl mb-2" style={{ color: 'var(--text)' }}>
+                    <h3 className="font-display-sport text-xl mb-2" style={{ color: 'var(--color-text-primary, var(--text))' }}>
                       Novedades del club
                     </h3>
-                    <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+                    <p className="text-sm" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                       Pronto podrás ver aquí las últimas novedades.
                     </p>
                   </div>
@@ -295,7 +295,7 @@ export default function Home() {
                     {noticia.categoria && (
                       <span
                         className="absolute top-3 left-3 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.25em] backdrop-blur-sm"
-                        style={{ background: 'rgba(255,255,255,0.85)', color: 'var(--text)' }}
+                        style={{ background: 'rgba(255,255,255,0.85)', color: 'var(--color-text-primary, var(--text))' }}
                       >
                         {noticia.categoria}
                       </span>
@@ -308,11 +308,11 @@ export default function Home() {
                       {formatFecha(noticia.fechaPublicacion)}
                     </div>
 
-                    <h3 className="font-display-sport mb-3 line-clamp-2 transition-colors" style={{ fontSize: 22, lineHeight: 1.05, color: 'var(--text)' }}>
+                    <h3 className="font-display-sport mb-3 line-clamp-2 transition-colors" style={{ fontSize: 22, lineHeight: 1.05, color: 'var(--color-text-primary, var(--text))' }}>
                       {noticia.titulo}
                     </h3>
 
-                    <p className="text-sm line-clamp-3 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                    <p className="text-sm line-clamp-3 leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                       {noticia.extracto}
                     </p>
 
@@ -358,12 +358,12 @@ function ContactCard({ icon: Icon, eyebrow, main, href, detail }) {
           </p>
           <p
             className="font-display-sport break-words leading-tight"
-            style={{ fontSize: 20, color: 'var(--text)' }}
+            style={{ fontSize: 20, color: 'var(--color-text-primary, var(--text))' }}
           >
             {main}
           </p>
           {detail && (
-            <p className="text-sm mt-2 whitespace-pre-line" style={{ color: 'var(--text-dim)' }}>
+            <p className="text-sm mt-2 whitespace-pre-line" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
               {detail}
             </p>
           )}

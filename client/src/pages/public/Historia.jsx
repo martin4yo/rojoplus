@@ -107,18 +107,18 @@ export default function Historia() {
             <div className="lg:col-span-7 order-2 lg:order-1">
               {intro.tituloSeccion && (
                 <>
-                  <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+                  <div className="pub-eyebrow mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                     Identidad
                   </div>
                   <h2
                     className="font-display-sport mb-8"
-                    style={{ fontSize: 'clamp(36px, 5vw, 76px)', lineHeight: 0.94, color: 'var(--text)' }}
+                    style={{ fontSize: 'clamp(36px, 5vw, 76px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}
                   >
                     {intro.tituloSeccion}
                   </h2>
                 </>
               )}
-              <div className="space-y-5 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+              <div className="space-y-5 leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 {intro.parrafos?.map((p, i) => p && <p key={i} className="text-base md:text-lg">{p}</p>)}
               </div>
             </div>
@@ -156,12 +156,12 @@ export default function Historia() {
         <section className="py-20 md:py-28" style={{ backgroundColor: 'var(--bg-surface-hi)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-16">
-              <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+              <div className="pub-eyebrow mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 Trayectoria
               </div>
               <h2
                 className="font-display-sport"
-                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}
               >
                 Más de 90 años<br />en cancha.
               </h2>
@@ -191,11 +191,11 @@ export default function Historia() {
                     <div className="md:col-span-7">
                       <div className="flex items-start gap-3 mb-3">
                         <Icono className="w-5 h-5 mt-1 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                        <h3 className="font-display-sport text-2xl md:text-3xl" style={{ color: 'var(--text)', lineHeight: 1.05 }}>
+                        <h3 className="font-display-sport text-2xl md:text-3xl" style={{ color: 'var(--color-text-primary, var(--text))', lineHeight: 1.05 }}>
                           {hito.titulo}
                         </h3>
                       </div>
-                      <p className="leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                      <p className="leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                         {hito.descripcion}
                       </p>
                     </div>
@@ -212,12 +212,12 @@ export default function Historia() {
         <section className="py-20 md:py-28">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-16">
-              <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+              <div className="pub-eyebrow mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 Vitrina
               </div>
               <h2
                 className="font-display-sport"
-                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}
               >
                 Palmarés.
               </h2>
@@ -249,7 +249,7 @@ export default function Historia() {
 
             {formativas.length > 0 && (
               <div>
-                <h3 className="font-display-sport mb-8" style={{ fontSize: 32, color: 'var(--text)' }}>
+                <h3 className="font-display-sport mb-8" style={{ fontSize: 32, color: 'var(--color-text-primary, var(--text))' }}>
                   Formativas de Oro
                 </h3>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-px" style={{ backgroundColor: 'var(--border)' }}>
@@ -278,12 +278,12 @@ export default function Historia() {
         <section className="py-20 md:py-28" style={{ backgroundColor: 'var(--bg-surface-hi)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-16 max-w-2xl">
-              <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+              <div className="pub-eyebrow mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 Lo que somos
               </div>
               <h2
                 className="font-display-sport"
-                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}
               >
                 Valores.
               </h2>
@@ -294,10 +294,10 @@ export default function Historia() {
                   <span className="font-mono text-[10px] uppercase tracking-[0.3em]" style={{ color: 'var(--text-muted)' }}>
                     {String(i + 1).padStart(2, '0')}
                   </span>
-                  <h3 className="font-display-sport mt-4 mb-3" style={{ fontSize: 28, lineHeight: 1.05, color: 'var(--text)' }}>
+                  <h3 className="font-display-sport mt-4 mb-3" style={{ fontSize: 28, lineHeight: 1.05, color: 'var(--color-text-primary, var(--text))' }}>
                     {v.titulo}
                   </h3>
-                  <p className="leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                  <p className="leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                     {v.descripcion}
                   </p>
                 </div>

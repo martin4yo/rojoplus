@@ -148,10 +148,10 @@ export default function ActividadDetalle() {
         <div className="font-mono text-[10px] uppercase tracking-[0.3em] mb-4" style={{ color: 'var(--text-muted)' }}>
           Error 404
         </div>
-        <h1 className="font-display-sport mb-4" style={{ fontSize: 'clamp(40px, 6vw, 80px)', lineHeight: 0.94, color: 'var(--text)' }}>
+        <h1 className="font-display-sport mb-4" style={{ fontSize: 'clamp(40px, 6vw, 80px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}>
           Actividad<br /><span style={{ color: 'var(--accent)' }}>no encontrada.</span>
         </h1>
-        <p className="mb-8 max-w-md" style={{ color: 'var(--text-dim)' }}>
+        <p className="mb-8 max-w-md" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
           {error || 'Esta actividad no está disponible o ya no se ofrece.'}
         </p>
         <Link
@@ -159,7 +159,7 @@ export default function ActividadDetalle() {
           className="group inline-flex items-center gap-3 px-6 py-3 transition-colors"
           style={{
             border: '1px solid var(--text)',
-            color: 'var(--text)',
+            color: 'var(--color-text-primary, var(--text))',
             fontFamily: 'Geist Mono, monospace',
             fontSize: 12,
             textTransform: 'uppercase',

@@ -55,14 +55,14 @@ export default function LoginSocio() {
                 <CheckCircle className="w-7 h-7" style={{ color: 'var(--success)' }} />
               </div>
 
-              <div className="pub-eyebrow mb-4" style={{ color: 'var(--text-dim)' }}>Listo</div>
-              <h2 className="font-display-sport mb-4" style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 0.94, color: 'var(--text)' }}>
+              <div className="pub-eyebrow mb-4" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>Listo</div>
+              <h2 className="font-display-sport mb-4" style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}>
                 Link enviado.
               </h2>
-              <p className="mb-6 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+              <p className="mb-6 leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 {metodo === 'whatsapp'
                   ? 'Revisá tu WhatsApp. Te enviamos un link de acceso válido por 24 horas.'
-                  : <>Revisá tu email <span className="font-semibold" style={{ color: 'var(--text)' }}>{metodo === 'email' ? valor : 'registrado'}</span>. Te enviamos un link de acceso válido por 24 horas.</>}
+                  : <>Revisá tu email <span className="font-semibold" style={{ color: 'var(--color-text-primary, var(--text))' }}>{metodo === 'email' ? valor : 'registrado'}</span>. Te enviamos un link de acceso válido por 24 horas.</>}
               </p>
 
               <div className="p-4 mb-6 flex items-start gap-3" style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}>
@@ -71,7 +71,7 @@ export default function LoginSocio() {
                   <p className="font-mono text-[10px] uppercase tracking-[0.25em] mb-1" style={{ color: 'var(--accent)' }}>
                     Link seguro
                   </p>
-                  <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+                  <p className="text-sm" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                     Por seguridad, sólo funciona desde el dispositivo donde lo abras.
                   </p>
                 </div>
@@ -85,7 +85,7 @@ export default function LoginSocio() {
               <button
                 onClick={() => { setLinkEnviado(false); setValor('') }}
                 className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] hover:underline"
-                style={{ color: 'var(--text)' }}
+                style={{ color: 'var(--color-text-primary, var(--text))' }}
               >
                 <ArrowLeft className="w-3 h-3" /> Volver
               </button>
@@ -97,11 +97,11 @@ export default function LoginSocio() {
               </div>
               <h2
                 className="font-display-sport mb-3"
-                style={{ fontSize: 'clamp(28px, 4vw, 48px)', lineHeight: 0.96, color: 'var(--text)' }}
+                style={{ fontSize: 'clamp(28px, 4vw, 48px)', lineHeight: 0.96, color: 'var(--color-text-primary, var(--text))' }}
               >
                 Entrar al portal.
               </h2>
-              <p className="mb-8 text-sm" style={{ color: 'var(--text-dim)' }}>
+              <p className="mb-8 text-sm" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 Elegí cómo querés que te enviemos el link.
               </p>
 
@@ -175,7 +175,7 @@ export default function LoginSocio() {
 
               <div
                 className="mt-8 px-4 py-3 text-xs flex items-start gap-3"
-                style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}
+                style={{ border: '1px solid var(--border)', color: 'var(--color-text-secondary, var(--text-dim))' }}
               >
                 <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
                 <p>

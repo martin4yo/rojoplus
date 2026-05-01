@@ -62,11 +62,11 @@ export default function AccesoSocio() {
               >
                 <CheckCircle className="w-7 h-7" style={{ color: 'var(--success)' }} />
               </div>
-              <div className="pub-eyebrow mb-4" style={{ color: 'var(--text-dim)' }}>Listo</div>
-              <h2 className="font-display-sport mb-4" style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 0.94, color: 'var(--text)' }}>
+              <div className="pub-eyebrow mb-4" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>Listo</div>
+              <h2 className="font-display-sport mb-4" style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}>
                 Link enviado.
               </h2>
-              <p className="mb-4" style={{ color: 'var(--text-dim)' }}>
+              <p className="mb-4" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 {enviado.via === 'whatsapp'
                   ? 'Te enviamos tu código QR de socio por WhatsApp a:'
                   : 'Te enviamos tu código QR y acceso al portal a:'}
@@ -79,7 +79,7 @@ export default function AccesoSocio() {
                 {enviado.via === 'whatsapp'
                   ? <MessageCircle className="w-4 h-4" style={{ color: 'var(--success)' }} />
                   : <Mail className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
-                <span className="font-medium text-sm" style={{ color: 'var(--text)' }}>{enviado.destino}</span>
+                <span className="font-medium text-sm" style={{ color: 'var(--color-text-primary, var(--text))' }}>{enviado.destino}</span>
               </div>
 
               {enviado.via !== 'whatsapp' && (
@@ -95,7 +95,7 @@ export default function AccesoSocio() {
               <button
                 onClick={() => { setEnviado(null); setBusqueda('') }}
                 className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] hover:underline"
-                style={{ color: 'var(--text)' }}
+                style={{ color: 'var(--color-text-primary, var(--text))' }}
               >
                 <ArrowLeft className="w-3 h-3" /> Volver a intentar
               </button>
@@ -111,11 +111,11 @@ export default function AccesoSocio() {
               <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-muted)' }}>Pedí tu QR</div>
               <h2
                 className="font-display-sport mb-3"
-                style={{ fontSize: 'clamp(28px, 4vw, 48px)', lineHeight: 0.96, color: 'var(--text)' }}
+                style={{ fontSize: 'clamp(28px, 4vw, 48px)', lineHeight: 0.96, color: 'var(--color-text-primary, var(--text))' }}
               >
                 Acceso a beneficios.
               </h2>
-              <p className="mb-8 text-sm" style={{ color: 'var(--text-dim)' }}>
+              <p className="mb-8 text-sm" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 Ingresá tu número de socio o DNI y te enviamos el link de acceso{waEnabled ? ' por email o WhatsApp' : ' a tu email registrado'}.
               </p>
 
@@ -194,7 +194,7 @@ export default function AccesoSocio() {
                 <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] mb-3" style={{ color: 'var(--text-muted)' }}>
                   ¿Cómo funciona?
                 </h3>
-                <ol className="text-sm space-y-2 leading-relaxed list-decimal list-inside" style={{ color: 'var(--text-dim)' }}>
+                <ol className="text-sm space-y-2 leading-relaxed list-decimal list-inside" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                   <li>Ingresá tu número de socio o DNI</li>
                   <li>Elegí recibir el link por {waEnabled ? 'email o WhatsApp' : 'email'}</li>
                   <li>Abrí el link y guardalo en tu celular</li>
@@ -216,7 +216,7 @@ export default function AccesoSocio() {
             <Link
               to="/login-socio"
               className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] hover:underline"
-              style={{ color: 'var(--text-dim)' }}
+              style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}
             >
               ¿Ya tenés acceso? Recuperar →
             </Link>

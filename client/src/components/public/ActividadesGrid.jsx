@@ -94,23 +94,23 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
         {showTitle && (
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
             <div className="max-w-2xl">
-              <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+              <div className="pub-eyebrow mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 Actividades
               </div>
               <h2
                 className="font-display-sport mb-4"
-                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}
               >
                 Encontrá tu<br />deporte.
               </h2>
-              <p style={{ color: 'var(--text-dim)', fontWeight: 300 }}>
+              <p style={{ color: 'var(--color-text-secondary, var(--text-dim))', fontWeight: 300 }}>
                 Variedad de actividades para toda la familia. Sumate al equipo.
               </p>
             </div>
             <Link
               to="/actividades"
               className="group inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.2em] self-start md:self-end"
-              style={{ color: 'var(--text)' }}
+              style={{ color: 'var(--color-text-primary, var(--text))' }}
             >
               <span>Ver todas</span>
               <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
@@ -150,7 +150,7 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
               </div>
 
               <div className="p-6">
-                <p className="text-sm leading-relaxed line-clamp-2 mb-5" style={{ color: 'var(--text-dim)' }}>
+                <p className="text-sm leading-relaxed line-clamp-2 mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                   {actividad.descripcion || 'Actividad deportiva del club para todas las edades.'}
                 </p>
 
