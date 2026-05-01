@@ -168,6 +168,28 @@ export default function Branding() {
     'Otros': ['acento', 'borde']
   }
 
+  // Labels descriptivos: nombre amigable + dónde se aplica
+  const colorMeta = {
+    primario:         { label: 'Color principal',          help: 'Botones, links y acentos del club' },
+    primarioOscuro:   { label: 'Principal — oscuro',       help: 'Hover de botones primarios' },
+    primarioClaro:    { label: 'Principal — claro',        help: 'Versión clara del primario (chips)' },
+    secundario:       { label: 'Color secundario',         help: 'Color complementario del club' },
+    secundarioOscuro: { label: 'Secundario — oscuro',      help: 'Hover del secundario' },
+    secundarioClaro:  { label: 'Secundario — claro',       help: 'Versión clara del secundario' },
+    exito:            { label: 'Éxito',                    help: 'Mensajes de confirmación, "al día"' },
+    advertencia:      { label: 'Advertencia',              help: 'Avisos y mensajes preventivos' },
+    error:            { label: 'Error',                    help: 'Mensajes de error y deudas' },
+    info:             { label: 'Información',              help: 'Mensajes informativos' },
+    fondoPrincipal:   { label: 'Fondo principal',          help: 'Color de fondo del admin (no usado en sitio público)' },
+    fondoSecundario:  { label: 'Fondo secundario',         help: 'Fondo de cards y secciones internas (admin)' },
+    textoPrincipal:   { label: 'Texto principal del sitio', help: 'Color de los títulos y textos en el sitio público y portal del socio. Si lo dejás vacío usa tinta tibia por default' },
+    textoSecundario:  { label: 'Texto secundario del sitio', help: 'Color de subtítulos, descripciones y bajadas en el sitio público' },
+    fondoSitio:       { label: 'Fondo del hero',           help: 'Fondo del hero/CTA athletic (negro por default). Afecta a todas las páginas públicas y a las del socio' },
+    textoSitio:       { label: 'Texto sobre el hero',      help: 'Color del texto que va sobre el fondo oscuro del hero (blanco por default)' },
+    acento:           { label: 'Acento',                   help: 'Color de detalle decorativo' },
+    borde:            { label: 'Bordes',                   help: 'Bordes de cards e inputs' },
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -342,29 +364,35 @@ export default function Branding() {
             <div key={groupName} className="border-l-4 border-primary pl-4">
               <h3 className="font-semibold text-gray-700 mb-3">{groupName}</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {keys.map(key => (
-                  <div key={key}>
-                    <label className="block text-sm font-medium mb-2 capitalize">
-                      {key.replace(/([A-Z])/g, ' $1').toLowerCase()}
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={colores[key] || defaultColors[key] || '#000000'}
-                        onChange={(e) => handleColorChange(key, e.target.value)}
-                        className="w-12 h-10 rounded cursor-pointer border border-gray-300"
-                      />
-                      <input
-                        type="text"
-                        value={colores[key] || defaultColors[key] || ''}
-                        onChange={(e) => handleColorChange(key, e.target.value)}
-                        placeholder="#000000"
-                        className="flex-1 px-2 py-1 border border-gray-300 rounded-lg text-sm font-mono"
-                      />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {keys.map(key => {
+                  const meta = colorMeta[key] || { label: key.replace(/([A-Z])/g, ' $1').toLowerCase(), help: '' }
+                  return (
+                    <div key={key}>
+                      <label className="block text-sm font-medium mb-1">
+                        {meta.label}
+                      </label>
+                      <div className="flex gap-2 mb-1.5">
+                        <input
+                          type="color"
+                          value={colores[key] || defaultColors[key] || '#000000'}
+                          onChange={(e) => handleColorChange(key, e.target.value)}
+                          className="w-12 h-10 rounded cursor-pointer border border-gray-300"
+                        />
+                        <input
+                          type="text"
+                          value={colores[key] || defaultColors[key] || ''}
+                          onChange={(e) => handleColorChange(key, e.target.value)}
+                          placeholder="#000000"
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded-lg text-sm font-mono"
+                        />
+                      </div>
+                      {meta.help && (
+                        <p className="text-xs text-gray-500 leading-snug">{meta.help}</p>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ))}

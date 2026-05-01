@@ -78,7 +78,10 @@ export default function ActividadDetalle() {
   async function cargarActividad() {
     try {
       setLoading(true)
-      const data = await api.get(`/public/actividades/${id}`)
+      // El endpoint público de detalle devuelve el objeto sin wrap
+      // {success, data}, por eso usamos getFull (api.get devolvería data.data
+      // que es undefined en ese caso).
+      const data = await api.getFull(`/public/actividades/${id}`)
       setActividad(data)
     } catch (err) {
       console.error('Error cargando actividad:', err)
