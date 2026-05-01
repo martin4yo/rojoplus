@@ -141,13 +141,21 @@ export default function InscripcionSocio() {
       {/* Body */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-6 pb-16 relative z-10">
         {/* Aviso del grupo familiar */}
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5 mb-6 shadow-sm animate-fade-in-up flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <Users className="w-6 h-6 text-white" />
+        <div
+          className="p-5 mb-6 animate-fade-in-up flex items-start gap-4"
+          style={{ backgroundColor: 'var(--bg-surface-hi)', border: '1px solid var(--border)' }}
+        >
+          <div
+            className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface)' }}
+          >
+            <Users className="w-4 h-4" style={{ color: 'var(--text-dim)' }} />
           </div>
           <div>
-            <h3 className="font-bold text-emerald-900">¿Querés inscribir a tu grupo familiar?</h3>
-            <p className="text-emerald-800 text-sm mt-0.5">
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] mb-1" style={{ color: 'var(--text-muted)' }}>
+              Grupo familiar
+            </h3>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
               Después de enviar tus datos vas a poder agregar a tus familiares (cónyuge, hijos, etc.) en un solo trámite,
               cada uno con sus propias actividades.
             </p>
@@ -283,20 +291,25 @@ export default function InscripcionSocio() {
               <div>
                 <p className={labelCls}>¿Tenés alguna enfermedad que debamos conocer? {required}</p>
                 <div className="flex gap-2">
-                  {['Si', 'No'].map(op => (
-                    <button
-                      key={op}
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, tieneEnfermedades: op }))}
-                      className={`px-5 py-2 rounded-xl border-2 font-medium transition-all ${
-                        formData.tieneEnfermedades === op
-                          ? 'border-rose-500 bg-rose-500 text-white shadow-md'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-rose-200'
-                      }`}
-                    >
-                      {op === 'Si' ? 'Sí' : 'No'}
-                    </button>
-                  ))}
+                  {['Si', 'No'].map(op => {
+                    const activo = formData.tieneEnfermedades === op
+                    return (
+                      <button
+                        key={op}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, tieneEnfermedades: op }))}
+                        className="px-6 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] font-semibold transition-all"
+                        style={{
+                          backgroundColor: activo ? 'var(--accent)' : 'var(--bg-surface)',
+                          color: activo ? 'var(--accent-fg, #fff)' : 'var(--text-dim)',
+                          border: `1px solid ${activo ? 'var(--accent)' : 'var(--border)'}`,
+                          borderRadius: 0,
+                        }}
+                      >
+                        {op === 'Si' ? 'Sí' : 'No'}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
               {formData.tieneEnfermedades === 'Si' && (
@@ -396,19 +409,38 @@ function StepDot({ num, label, active = false, muted = false }) {
   )
 }
 
-function FormSection({ icon: Icon, color, title, subtitle, badge, children, delay = 0, animate = false }) {
+function FormSection({ icon: Icon, title, subtitle, badge, children, delay = 0 }) {
+  // Estilo athletic uniforme: ícono en cuadro con borde, sin colores variados.
+  // El prop `color` queda ignorado para que todas las secciones se vean iguales.
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow animate-fade-in-up ${animate ? '' : ''}`}
-      style={{ animationDelay: `${delay}ms` }}
+      className="overflow-hidden animate-fade-in-up"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
+        animationDelay: `${delay}ms`,
+      }}
     >
-      <div className="px-5 sm:px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div className={`w-11 h-11 rounded-xl ${color} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-          <Icon className="w-5 h-5 text-white" />
+      <div
+        className="px-5 sm:px-6 py-4 flex items-center gap-3"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        <div
+          className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+          style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}
+        >
+          <Icon className="w-4 h-4" style={{ color: 'var(--text-dim)' }} />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-          {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+          <h2
+            className="font-display-sport"
+            style={{ fontSize: 22, lineHeight: 1.05, color: 'var(--color-text-primary, var(--text))' }}
+          >
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
+          )}
         </div>
         {badge}
       </div>

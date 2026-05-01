@@ -102,7 +102,7 @@ export default function Home() {
                   <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                 </Link>
                 <Link
-                  to="/mi-qr"
+                  to="/login-socio"
                   className="group inline-flex items-center justify-between gap-6 px-7 py-4 transition-all border border-pub-fg-30 hover:border-pub-fg text-pub-fg"
                   style={{
                     borderRadius: 0,
