@@ -55,6 +55,7 @@ const PortalSocioNuevo = lazy(() => import('./pages/socio/PortalSocioNuevo'))
 
 // Admin — generales
 const AdminLogin = lazy(() => import('./pages/admin/Login'))
+const AdminLoginAlt = lazy(() => import('./pages/admin/LoginAlt'))
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'))
 const AdminDashboardEjecutivo = lazy(() => import('./pages/admin/DashboardEjecutivo'))
 const AdminComercios = lazy(() => import('./pages/admin/Comercios'))
@@ -356,6 +357,7 @@ function App() {
 
                 {/* Rutas admin */}
                 <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/login-alt" element={<AdminLoginAlt />} />
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminDashboard />} />
                   <Route path="mi-perfil" element={<MiPerfil />} />

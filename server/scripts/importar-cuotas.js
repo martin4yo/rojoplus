@@ -459,9 +459,9 @@ async function importarCuotas() {
 
     // Mapa para guardar {anio, mes, importe} más reciente por actividad
     const recientePorAct = new Map() // actNorm → {anio, mes, importe}
-    // Cuota social: valores separados por tipo
-    //   Socio Unico    → más reciente con importe < $40.000
-    //   Titular Familia → más reciente sin filtro de importe
+    // Cuota social: valores separados por tipo según mapCategoria()
+    //   Desc. Cuota contiene "GRUPO FAMILIAR" → TITULAR_FAMILIA
+    //   resto                                 → SOCIO_UNICO
     const recienteSocioUnico     = { anio: 0, mes: 0, importe: 0 }
     const recienteTitularFamilia = { anio: 0, mes: 0, importe: 0 }
 
@@ -475,12 +475,14 @@ async function importarCuotas() {
       if (estado !== 'PAGADA' || importe <= 0 || !periodo) continue
 
       if (tipo === 'CUOTA SOCIAL') {
-        // Titular Familia: cualquier importe, el más reciente
-        if (esMoreReciente(periodo, recienteTitularFamilia))
-          Object.assign(recienteTitularFamilia, { ...periodo, importe })
-        // Socio Unico: solo importes < $40.000
-        if (importe < 40000 && esMoreReciente(periodo, recienteSocioUnico))
-          Object.assign(recienteSocioUnico, { ...periodo, importe })
+        const categoria = mapCategoria(tipo, desc) // 'TITULAR_FAMILIA' | 'SOCIO_UNICO'
+        if (categoria === 'TITULAR_FAMILIA') {
+          if (esMoreReciente(periodo, recienteTitularFamilia))
+            Object.assign(recienteTitularFamilia, { ...periodo, importe })
+        } else {
+          if (esMoreReciente(periodo, recienteSocioUnico))
+            Object.assign(recienteSocioUnico, { ...periodo, importe })
+        }
         continue
       }
 
