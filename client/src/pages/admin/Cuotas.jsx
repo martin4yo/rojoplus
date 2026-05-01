@@ -906,7 +906,7 @@ export default function Cuotas() {
   }
 
   // Agrupar cuotas por socio para el listado normal.
-  // Devuelve [{ socio, cuotas[], total, cantPendientes, cantPagadas }, ...]
+  // El total mostrado es siempre el saldo DEUDOR (sólo cuotas pendientes).
   const cuotasAgrupadas = useMemo(() => {
     if (!cuotas || cuotas.length === 0) return []
     const map = new Map()
@@ -916,14 +916,12 @@ export default function Cuotas() {
         map.set(sid, {
           socio: c.socio || { id: sid, apellidoNombre: '', nroSocio: '' },
           cuotas: [],
-          total: 0,
           totalPendiente: 0,
           cantPendientes: 0,
         })
       }
       const g = map.get(sid)
       g.cuotas.push(c)
-      g.total += Number(c.montoTotal) || 0
       if (c.estado === 'PENDIENTE') {
         g.totalPendiente += Number(c.montoTotal) || 0
         g.cantPendientes += 1
@@ -1168,13 +1166,13 @@ export default function Cuotas() {
                     <div className="text-right mr-2 flex-shrink-0">
                       {grupo.totalPendiente > 0 ? (
                         <>
-                          <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">A pagar</p>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Saldo deudor</p>
                           <p className="font-bold text-red-600 text-lg leading-tight">{formatCurrency(grupo.totalPendiente)}</p>
                         </>
                       ) : (
                         <>
-                          <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Total</p>
-                          <p className="font-bold text-gray-700 text-lg leading-tight">{formatCurrency(grupo.total)}</p>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Saldo</p>
+                          <p className="font-medium text-green-600 text-sm leading-tight">Al día</p>
                         </>
                       )}
                     </div>
