@@ -106,48 +106,49 @@ export default function MenuBuffet() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-app)' }}>
         <LoadingSpinner />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-200">
-      {/* Header con onda gris oscuro compacto */}
-      <header className="relative bg-gradient-to-b from-gray-800 to-gray-700 text-white overflow-hidden">
-        <div className="relative max-w-6xl mx-auto px-4 pt-3 pb-16">
-          <div className="flex items-center justify-between">
-            {/* Logo y título */}
-            <div className="flex items-center gap-4">
-              <TenantLogo className="h-10 w-auto drop-shadow-lg" />
-              <div className="text-left">
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                  Buffet del Club
-                </h1>
-                <p className="text-gray-300 text-sm md:text-base">
-                  Club Sportivo Pilar
-                </p>
-              </div>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
+      {/* Header athletic */}
+      <header className="relative overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid-pub opacity-40" />
+        <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-20 blur-3xl" style={{ background: 'var(--color-primary)' }} />
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <div className="pub-eyebrow text-pub-fg-70 mb-5">Carta del club</div>
+              <h1 className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(40px, 6vw, 90px)', lineHeight: 0.92 }}>
+                Buffet.
+              </h1>
+              <p className="mt-4 text-pub-fg-70 text-lg" style={{ fontWeight: 300 }}>
+                Lo que hay para comer y tomar hoy.
+              </p>
             </div>
 
-            {/* Botón descargar PDF */}
             <button
               onClick={descargarPDF}
-              className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg shadow-lg transition-all duration-200 hover:scale-105 font-medium"
+              className="group inline-flex items-center gap-3 px-5 py-3 transition-all flex-shrink-0"
+              style={{
+                background: 'var(--color-primary)',
+                color: 'var(--accent-fg, #fff)',
+                fontFamily: 'Geist Mono, monospace',
+                fontSize: 11,
+                textTransform: 'uppercase',
+                letterSpacing: '0.2em',
+                fontWeight: 600,
+              }}
               title="Descargar menú en PDF"
             >
-              <Download size={20} />
+              <Download size={16} />
               <span className="hidden sm:inline">Descargar PDF</span>
             </button>
           </div>
-        </div>
-
-        {/* Onda decorativa */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-            <path d="M0 60L60 52.5C120 45 240 30 360 22.5C480 15 600 15 720 18.75C840 22.5 960 30 1080 33.75C1200 37.5 1320 37.5 1380 37.5L1440 37.5V60H1380C1320 60 1200 60 1080 60C960 60 840 60 720 60C600 60 480 60 360 60C240 60 120 60 60 60H0Z" fill="#e5e7eb"/>
-          </svg>
         </div>
       </header>
 

@@ -325,6 +325,8 @@ function App() {
                   <Route path="noticias" element={<NoticiasPublic />} />
                   <Route path="noticias/:slug" element={<NoticiaDetallePublic />} />
                   <Route path="comercios" element={<ComerciosPublicos />} />
+                  <Route path="menu-buffet" element={<MenuBuffet />} />
+                  <Route path="buffet/menu" element={<MenuBuffet />} />
                   <Route path="*" element={<NotFoundPublic />} />
                 </Route>
 
@@ -346,10 +348,6 @@ function App() {
                 <Route path="/s/:tokenPortal" element={<SocioPortal />} />
                 <Route path="/login-socio" element={<LoginSocio />} />
                 <Route path="/portal-socio/:tokenPortal" element={<PortalSocioNuevo />} />
-
-                {/* Menú Buffet Público */}
-                <Route path="/buffet/menu" element={<MenuBuffet />} />
-                <Route path="/menu-buffet" element={<MenuBuffet />} />
 
                 {/* Reservas públicas */}
                 <Route path="/reservas" element={<ReservasPublico />} />

@@ -144,47 +144,87 @@ export default function ActividadDetalle() {
 
   if (error || !actividad) {
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-        <p className="text-gray-600 mb-4">{error || 'Actividad no encontrada'}</p>
-        <Link to="/actividades" className="text-primary hover:underline flex items-center gap-2">
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center" style={{ backgroundColor: 'var(--bg-app)' }}>
+        <div className="font-mono text-[10px] uppercase tracking-[0.3em] mb-4" style={{ color: 'var(--text-muted)' }}>
+          Error 404
+        </div>
+        <h1 className="font-display-sport mb-4" style={{ fontSize: 'clamp(40px, 6vw, 80px)', lineHeight: 0.94, color: 'var(--text)' }}>
+          Actividad<br /><span style={{ color: 'var(--accent)' }}>no encontrada.</span>
+        </h1>
+        <p className="mb-8 max-w-md" style={{ color: 'var(--text-dim)' }}>
+          {error || 'Esta actividad no está disponible o ya no se ofrece.'}
+        </p>
+        <Link
+          to="/actividades"
+          className="group inline-flex items-center gap-3 px-6 py-3 transition-colors"
+          style={{
+            border: '1px solid var(--text)',
+            color: 'var(--text)',
+            fontFamily: 'Geist Mono, monospace',
+            fontSize: 12,
+            textTransform: 'uppercase',
+            letterSpacing: '0.2em',
+            fontWeight: 600,
+          }}
+        >
           <ArrowLeft className="w-4 h-4" />
-          Volver a actividades
+          Ver todas las actividades
         </Link>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Hero con imagen */}
-      <div className="relative h-64 md:h-80 lg:h-96">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
+      {/* Hero con imagen athletic */}
+      <div className="relative h-[60vh] min-h-[400px] md:min-h-[500px] overflow-hidden">
         <img
           src={getActivityImage(actividad)}
           alt={actividad.nombre}
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-          <div className="max-w-7xl mx-auto">
-            <Link
-              to="/actividades"
-              className="inline-flex items-center text-white/80 hover:text-white mb-4 text-sm"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Volver a actividades
-            </Link>
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white">
-              {actividad.nombre}
-            </h1>
-            <div className="flex items-center gap-4 mt-3 text-white/90">
-              <span className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                {actividad.inscriptos || 0} inscriptos
-              </span>
-              <span className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                {actividad.categorias?.length || 0} categorías
-              </span>
+        {/* Triple overlay para legibilidad */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-black/15" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-field-grid opacity-40 mix-blend-overlay" />
+
+        <div className="absolute inset-0 flex flex-col">
+          {/* Top: back link */}
+          <div className="pt-24 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+              <Link
+                to="/actividades"
+                className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-white/70 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Volver a actividades
+              </Link>
+            </div>
+          </div>
+
+          {/* Bottom: title + stats */}
+          <div className="mt-auto px-4 sm:px-6 lg:px-8 pb-8 md:pb-12">
+            <div className="max-w-7xl mx-auto">
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/70 mb-4 flex items-center gap-3">
+                <span className="inline-block h-px w-8" style={{ backgroundColor: 'var(--color-primary)' }} />
+                Actividad
+              </div>
+              <h1
+                className="font-display-sport text-white"
+                style={{ fontSize: 'clamp(48px, 9vw, 140px)', lineHeight: 0.92 }}
+              >
+                {actividad.nombre}
+              </h1>
+              <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 font-mono text-[11px] uppercase tracking-[0.25em] text-white/85">
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+                  {actividad.inscriptos || 0} inscriptos
+                </span>
+                <span className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+                  {actividad.categorias?.length || 0} categorías
+                </span>
+              </div>
             </div>
           </div>
         </div>

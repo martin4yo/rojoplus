@@ -1,43 +1,19 @@
 import { useState, useEffect } from 'react'
-import { Mail } from 'lucide-react'
+import { Mail, ArrowUpRight } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
-// Datos de ejemplo (fallback si no hay datos en la BD)
-const datosFallback = {
-  periodoComision: 'Período 2024 - 2026',
-  COMISION_DIRECTIVA: [
-    { id: 1, cargo: 'Presidente', nombre: 'Carlos Alberto Fernández', desde: '2024', email: 'presidente@sportivopilar.com.ar' },
-    { id: 2, cargo: 'Vicepresidente', nombre: 'María Elena Rodríguez', desde: '2024' },
-    { id: 3, cargo: 'Secretario', nombre: 'Juan Pablo Martínez', desde: '2024', email: 'secretaria@sportivopilar.com.ar' },
-    { id: 4, cargo: 'Prosecretario', nombre: 'Laura Beatriz González', desde: '2024' },
-    { id: 5, cargo: 'Tesorero', nombre: 'Ricardo Antonio López', desde: '2024', email: 'tesoreria@sportivopilar.com.ar' },
-    { id: 6, cargo: 'Protesorero', nombre: 'Andrea Soledad Pérez', desde: '2024' },
-  ],
-  VOCALES: [
-    { id: 7, nombre: 'Martín Ignacio Silva', tipo: 'TITULAR' },
-    { id: 8, nombre: 'Gabriela Fernanda Torres', tipo: 'TITULAR' },
-    { id: 9, nombre: 'Diego Alejandro Ruiz', tipo: 'TITULAR' },
-    { id: 10, nombre: 'Patricia Lorena Díaz', tipo: 'SUPLENTE' },
-    { id: 11, nombre: 'Fernando Javier Castro', tipo: 'SUPLENTE' },
-    { id: 12, nombre: 'Luciana Mabel Romero', tipo: 'SUPLENTE' },
-  ],
-  REVISORES: [
-    { id: 13, nombre: 'Eduardo César Morales', tipo: 'TITULAR' },
-    { id: 14, nombre: 'Claudia Verónica Sánchez', tipo: 'TITULAR' },
-    { id: 15, nombre: 'Roberto Daniel Acosta', tipo: 'SUPLENTE' },
-  ],
-  SUBCOMISIONES: [
-    { id: 16, nombre: 'Subcomisión de Básquet', responsable: 'Martín Ignacio Silva', descripcion: 'Coordinación de todas las actividades de básquet: Liga Federal, formativas y recreativo.' },
-    { id: 17, nombre: 'Subcomisión de Deportes', responsable: 'Gabriela Fernanda Torres', descripcion: 'Gestión de las demás actividades deportivas: fútbol, gimnasia, natación, etc.' },
-    { id: 18, nombre: 'Subcomisión de Eventos', responsable: 'Patricia Lorena Díaz', descripcion: 'Organización de eventos sociales, fiestas y actividades para socios.' },
-    { id: 19, nombre: 'Subcomisión de Infraestructura', responsable: 'Fernando Javier Castro', descripcion: 'Mantenimiento y mejoras de las instalaciones del club.' },
-  ],
+const ESTADO_VACIO = {
+  periodoComision: '',
+  COMISION_DIRECTIVA: [],
+  VOCALES: [],
+  REVISORES: [],
+  SUBCOMISIONES: [],
 }
 
 export default function Autoridades() {
-  const [autoridades, setAutoridades] = useState(datosFallback)
+  const [autoridades, setAutoridades] = useState(ESTADO_VACIO)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,20 +23,26 @@ export default function Autoridades() {
   const fetchAutoridades = async () => {
     try {
       const data = await api.get('/autoridades/public')
-      // Si hay datos en alguna sección, usar los de la BD
-      if (data && (data.COMISION_DIRECTIVA?.length > 0 || data.VOCALES?.length > 0)) {
+      if (data) {
         setAutoridades({
-          ...data,
-          periodoComision: data.periodoComision || datosFallback.periodoComision
+          periodoComision: data.periodoComision || '',
+          COMISION_DIRECTIVA: data.COMISION_DIRECTIVA || [],
+          VOCALES: data.VOCALES || [],
+          REVISORES: data.REVISORES || [],
+          SUBCOMISIONES: data.SUBCOMISIONES || [],
         })
       }
     } catch (error) {
       console.error('Error cargando autoridades:', error)
-      // Usar fallback
     } finally {
       setLoading(false)
     }
   }
+
+  const sinDatos = !autoridades.COMISION_DIRECTIVA.length
+    && !autoridades.VOCALES.length
+    && !autoridades.REVISORES.length
+    && !autoridades.SUBCOMISIONES.length
 
   const getIniciales = (nombre) => {
     return nombre.split(' ').map(n => n[0]).slice(0, 2).join('')
@@ -92,7 +74,24 @@ export default function Autoridades() {
       {/* Banner Header */}
       <BannerPublicitario tipo="HEADER" ubicacion="AUTORIDADES" />
 
+      {sinDatos && (
+        <section className="py-20 md:py-28">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div className="font-mono text-[10px] uppercase tracking-[0.3em] mb-4" style={{ color: 'var(--text-muted)' }}>
+              Sin datos cargados
+            </div>
+            <h2 className="font-display-sport mb-4" style={{ fontSize: 'clamp(32px, 4vw, 56px)', lineHeight: 1, color: 'var(--text)' }}>
+              Próximamente.
+            </h2>
+            <p style={{ color: 'var(--text-dim)' }}>
+              Estamos preparando la información de las autoridades del club.
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* Comisión Directiva */}
+      {autoridades.COMISION_DIRECTIVA.length > 0 && (
       <section className="py-12 md:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -148,8 +147,10 @@ export default function Autoridades() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Vocales y Revisores */}
+      {(autoridades.VOCALES.length > 0 || autoridades.REVISORES.length > 0) && (
       <section className="py-12 bg-gray-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-8">
@@ -215,8 +216,10 @@ export default function Autoridades() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Subcomisiones */}
+      {autoridades.SUBCOMISIONES.length > 0 && (
       <section className="py-12 md:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -247,6 +250,7 @@ export default function Autoridades() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Contacto */}
       <section className="relative py-20 md:py-28 overflow-hidden text-pub-fg" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
