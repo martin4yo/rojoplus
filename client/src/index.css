@@ -367,8 +367,33 @@ select:-webkit-autofill {
   .bg-blue-500,
   .bg-sky-500           { background-color: var(--info) !important; }
 
-  /* Overlay del modal — semitransparente sobre cualquier fondo */
-  .bg-black { background-color: #000 !important; }
+  /* Overlays de modales — fondo blureado con tinte tibio en vez de negro sólido.
+     Detecta el patrón "fixed inset-0 bg-black*" usado en todos los modales y
+     cambia el negro saturado por un blur con un toque tibio que conserva la
+     legibilidad sin tapar la app por completo. */
+  .fixed.inset-0.bg-black,
+  .fixed.inset-0[class*="bg-black/"],
+  .fixed.inset-0.bg-black\/30,
+  .fixed.inset-0.bg-black\/40,
+  .fixed.inset-0.bg-black\/50,
+  .fixed.inset-0.bg-black\/60,
+  .fixed.inset-0.bg-black\/70,
+  .fixed.inset-0.bg-black\/80 {
+    background-color: rgba(20, 18, 14, 0.28) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  /* bg-black + bg-opacity-X (sintaxis vieja de Tailwind) */
+  .fixed.inset-0.bg-black.bg-opacity-25,
+  .fixed.inset-0.bg-black.bg-opacity-50,
+  .fixed.inset-0.bg-black.bg-opacity-60,
+  .fixed.inset-0.bg-black.bg-opacity-75 {
+    background-color: rgba(20, 18, 14, 0.28) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  /* Para uso fuera de overlays, bg-black queda como negro normal */
+  .bg-black { background-color: #000; }
 
   /* ─── Tono primary/X (opacity modifiers que no funcionan con CSS vars) ─── */
   .bg-primary\/5    { background-color: color-mix(in srgb, var(--accent) 5%, transparent) !important; }
