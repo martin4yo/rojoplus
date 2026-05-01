@@ -536,6 +536,32 @@ export default function Cuotas() {
   }
 
 
+  // Agrupar cuotas por socio para el listado normal (siempre se calcula
+  // antes de cualquier early return, para no romper el orden de hooks).
+  // El total mostrado es siempre el saldo DEUDOR (sólo cuotas pendientes).
+  const cuotasAgrupadas = useMemo(() => {
+    if (!cuotas || cuotas.length === 0) return []
+    const map = new Map()
+    for (const c of cuotas) {
+      const sid = c.socioId
+      if (!map.has(sid)) {
+        map.set(sid, {
+          socio: c.socio || { id: sid, apellidoNombre: '', nroSocio: '' },
+          cuotas: [],
+          totalPendiente: 0,
+          cantPendientes: 0,
+        })
+      }
+      const g = map.get(sid)
+      g.cuotas.push(c)
+      if (c.estado === 'PENDIENTE') {
+        g.totalPendiente += Number(c.montoTotal) || 0
+        g.cantPendientes += 1
+      }
+    }
+    return Array.from(map.values())
+  }, [cuotas])
+
   // Vista de Cobranza
   if (modoCobranza) {
     return (
@@ -904,31 +930,6 @@ export default function Cuotas() {
       </div>
     )
   }
-
-  // Agrupar cuotas por socio para el listado normal.
-  // El total mostrado es siempre el saldo DEUDOR (sólo cuotas pendientes).
-  const cuotasAgrupadas = useMemo(() => {
-    if (!cuotas || cuotas.length === 0) return []
-    const map = new Map()
-    for (const c of cuotas) {
-      const sid = c.socioId
-      if (!map.has(sid)) {
-        map.set(sid, {
-          socio: c.socio || { id: sid, apellidoNombre: '', nroSocio: '' },
-          cuotas: [],
-          totalPendiente: 0,
-          cantPendientes: 0,
-        })
-      }
-      const g = map.get(sid)
-      g.cuotas.push(c)
-      if (c.estado === 'PENDIENTE') {
-        g.totalPendiente += Number(c.montoTotal) || 0
-        g.cantPendientes += 1
-      }
-    }
-    return Array.from(map.values())
-  }, [cuotas])
 
   function toggleSocioListado(socioId) {
     setSocioListadoExpandido(prev => ({ ...prev, [socioId]: !prev[socioId] }))
