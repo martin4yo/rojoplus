@@ -40,7 +40,8 @@ const CSS_VARS = [
   '--color-secondary', '--color-secondary-dark', '--color-secondary-light',
   '--color-accent', '--color-success', '--color-warning', '--color-error', '--color-info',
   '--color-bg-primary', '--color-bg-secondary', '--color-text-primary', '--color-text-secondary', '--color-border',
-  '--color-primary-50', '--color-primary-100', '--color-primary-200', '--color-primary-300', '--color-primary-400'
+  '--color-primary-50', '--color-primary-100', '--color-primary-200', '--color-primary-300', '--color-primary-400',
+  '--pub-hero-bg', '--pub-hero-fg',
 ]
 
 function resetTheme() {
@@ -70,7 +71,10 @@ function applyTheme(colores) {
     fondoSecundario: '--color-bg-secondary',
     textoPrincipal: '--color-text-primary',
     textoSecundario: '--color-text-secondary',
-    borde: '--color-border'
+    borde: '--color-border',
+    // Sitio público: fondo y texto del hero/CTA athletic
+    fondoSitio: '--pub-hero-bg',
+    textoSitio: '--pub-hero-fg',
   }
 
   Object.entries(colorMap).forEach(([key, cssVar]) => {

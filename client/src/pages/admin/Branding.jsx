@@ -164,6 +164,7 @@ export default function Branding() {
     'Secundarios': ['secundario', 'secundarioOscuro', 'secundarioClaro'],
     'Estados': ['exito', 'advertencia', 'error', 'info'],
     'Fondos y Texto': ['fondoPrincipal', 'fondoSecundario', 'textoPrincipal', 'textoSecundario'],
+    'Sitio público (hero/CTA)': ['fondoSitio', 'textoSitio'],
     'Otros': ['acento', 'borde']
   }
 

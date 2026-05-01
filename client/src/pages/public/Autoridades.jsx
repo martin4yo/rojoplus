@@ -73,15 +73,18 @@ export default function Autoridades() {
   }
 
   return (
-    <div className="bg-gray-300 min-h-screen">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-            Autoridades del Club
+      <section className="relative py-20 md:py-28 overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid opacity-30" />
+        <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-25 blur-3xl" style={{ background: 'var(--color-primary)' }} />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="pub-eyebrow text-pub-fg-70 mb-6">El club</div>
+          <h1 className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(48px, 8vw, 130px)', lineHeight: 0.92 }}>
+            Autoridades.
           </h1>
-          <p className="text-base text-primary-100 max-w-2xl mx-auto">
-            Conocé a quienes lideran y trabajan por el crecimiento de Sportivo Pilar
+          <p className="mt-6 max-w-2xl text-lg md:text-xl text-pub-fg-70 leading-snug" style={{ fontWeight: 300 }}>
+            Quienes lideran y trabajan por el crecimiento del club.
           </p>
         </div>
       </section>
@@ -111,7 +114,7 @@ export default function Autoridades() {
                     {miembro.foto ? (
                       <img src={miembro.foto} alt={miembro.nombre} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-white text-xl font-bold">
+                      <span className="text-pub-fg text-xl font-bold">
                         {getIniciales(miembro.nombre)}
                       </span>
                     )}
@@ -246,20 +249,18 @@ export default function Autoridades() {
       </section>
 
       {/* Contacto */}
-      <section className="py-12 bg-primary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">
-            ¿Querés ser parte?
+      <section className="relative py-20 md:py-28 overflow-hidden text-pub-fg" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid opacity-30" />
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="font-display-sport text-pub-fg mb-6" style={{ fontSize: 'clamp(40px, 7vw, 110px)', lineHeight: 0.92 }}>
+            ¿Querés ser<br /><span style={{ color: 'var(--color-primary)' }}>parte?</span>
           </h2>
-          <p className="text-primary-100 mb-8 max-w-2xl mx-auto">
-            Si querés sumarte como voluntario o tenés propuestas para el club,
-            no dudes en contactarnos.
+          <p className="text-lg md:text-xl text-pub-fg-70 max-w-2xl mx-auto mb-10" style={{ fontWeight: 300 }}>
+            Sumate como voluntario o acercanos tus propuestas. Nos encantaría escucharte.
           </p>
-          <a
-            href="/contacto"
-            className="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
-          >
-            Contactar al Club
+          <a href="/contacto" className="pub-cta group inline-flex">
+            <span>Contactar al club</span>
+            <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
           </a>
         </div>
       </section>

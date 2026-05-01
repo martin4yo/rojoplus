@@ -43,7 +43,8 @@ export default function HeroSection() {
 
   return (
     <section
-      className="relative min-h-[88vh] flex items-end overflow-hidden bg-black text-white"
+      className="relative min-h-[88vh] flex items-end overflow-hidden text-pub-fg"
+      style={{ backgroundColor: 'var(--pub-hero-bg)' }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -72,11 +73,11 @@ export default function HeroSection() {
 
       {/* Top bar técnico */}
       <div className="absolute top-0 left-0 right-0 z-20 px-4 sm:px-8 pt-24 md:pt-28 flex items-center justify-between">
-        <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/70 flex items-center gap-3">
+        <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-pub-fg-70 flex items-center gap-3">
           <span className="inline-block w-8 h-px bg-white/40" />
           <span>Temporada {year}</span>
         </div>
-        <div className="hidden md:flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-white/70">
+        <div className="hidden md:flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-pub-fg-70">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: 'var(--color-primary)' }} />
             <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ backgroundColor: 'var(--color-primary)' }} />
@@ -90,7 +91,7 @@ export default function HeroSection() {
         <>
           <button
             onClick={prev}
-            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-20 p-3 text-white/70 hover:text-white transition border border-white/20 hover:border-white/60 backdrop-blur-sm"
+            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-20 p-3 text-pub-fg-70 hover:text-pub-fg transition border border-pub-fg-20 hover:border-pub-fg/60 backdrop-blur-sm"
             aria-label="Anterior"
             style={{ borderRadius: 0 }}
           >
@@ -98,7 +99,7 @@ export default function HeroSection() {
           </button>
           <button
             onClick={next}
-            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 p-3 text-white/70 hover:text-white transition border border-white/20 hover:border-white/60 backdrop-blur-sm"
+            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 p-3 text-pub-fg-70 hover:text-pub-fg transition border border-pub-fg-20 hover:border-pub-fg/60 backdrop-blur-sm"
             aria-label="Siguiente"
             style={{ borderRadius: 0 }}
           >
@@ -119,7 +120,7 @@ export default function HeroSection() {
                 aria-label={`Imagen ${i + 1}`}
               />
             ))}
-            <span className="ml-3 font-mono text-[10px] uppercase tracking-[0.3em] text-white/60 self-center">
+            <span className="ml-3 font-mono text-[10px] uppercase tracking-[0.3em] text-pub-fg-60 self-center">
               {String(current + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
             </span>
           </div>
@@ -135,15 +136,15 @@ export default function HeroSection() {
               className="inline-block h-px"
               style={{ width: 48, backgroundColor: 'var(--color-primary)' }}
             />
-            <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-white/80">
+            <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-pub-fg-80">
               {desdeAnio ? `Desde ${desdeAnio}` : 'Bienvenidos'}
-              {tenant?.ciudad && <span className="text-white/40 ml-3">· {tenant.ciudad}</span>}
+              {tenant?.ciudad && <span className="text-pub-fg-40 ml-3">· {tenant.ciudad}</span>}
             </span>
           </div>
 
           {/* Headline gigante condensed */}
           <h1
-            className="font-display-sport text-white animate-fade-in-up"
+            className="font-display-sport text-pub-fg animate-fade-in-up"
             style={{
               fontSize: 'clamp(56px, 11vw, 180px)',
               lineHeight: 0.88,
@@ -155,7 +156,7 @@ export default function HeroSection() {
 
           {tenant?.slogan && (
             <p
-              className="mt-6 max-w-2xl text-lg md:text-xl leading-snug text-white/85 animate-fade-in-up"
+              className="mt-6 max-w-2xl text-lg md:text-xl leading-snug text-pub-fg-90 animate-fade-in-up"
               style={{
                 fontFamily: 'Geist, sans-serif',
                 fontWeight: 300,
@@ -186,7 +187,7 @@ export default function HeroSection() {
 
             <Link
               to="/actividades"
-              className="group inline-flex items-center justify-between gap-6 px-8 py-5 transition-all border border-white/30 hover:border-white text-white"
+              className="group inline-flex items-center justify-between gap-6 px-8 py-5 transition-all border border-pub-fg-30 hover:border-pub-fg text-pub-fg"
               style={{ borderRadius: 0 }}
             >
               <span className="font-mono uppercase tracking-[0.2em] text-[13px] font-semibold">
@@ -217,7 +218,7 @@ export default function HeroSection() {
       </div>
 
       {/* Scroll cue */}
-      <div className="absolute bottom-6 left-6 sm:left-8 z-20 hidden md:flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-white/50">
+      <div className="absolute bottom-6 left-6 sm:left-8 z-20 hidden md:flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-pub-fg-50">
         <ArrowDown className="w-3 h-3 animate-bounce" style={{ animationDuration: '2s' }} />
         Explorar
       </div>
@@ -227,9 +228,9 @@ export default function HeroSection() {
 
 function StatBlock({ label, value }) {
   return (
-    <div className="border-l border-white/15 pl-4 sm:pl-6">
+    <div className="border-l border-pub-fg-20 pl-4 sm:pl-6">
       <p
-        className="font-display-sport text-white"
+        className="font-display-sport text-pub-fg"
         style={{
           fontSize: 'clamp(40px, 5vw, 72px)',
           lineHeight: 0.95,
@@ -237,7 +238,7 @@ function StatBlock({ label, value }) {
       >
         {value}
       </p>
-      <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60 mt-1">
+      <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-60 mt-1">
         {label}
       </p>
     </div>

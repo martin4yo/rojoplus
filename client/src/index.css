@@ -45,6 +45,10 @@
   --accent-glow: color-mix(in srgb, var(--color-primary) 28%, transparent);
   --accent-fg: #FFFFFF;     /* blanco sobre acentos saturados (rojo, azul, navy) */
 
+  /* Sitio público — fondo y texto del hero/CTA athletic. Configurable por tenant. */
+  --pub-hero-bg: #0A0A0B;
+  --pub-hero-fg: #FFFFFF;
+
   /* Estados */
   --error: #DC2626;
   --error-soft: color-mix(in srgb, #DC2626 8%, transparent);
@@ -314,6 +318,30 @@ select:-webkit-autofill {
   .pub-cta-outline:hover {
     background: var(--text);
     color: var(--bg-app);
+  }
+
+  /* Tokens del sitio público (configurables por tenant) */
+  .bg-pub-hero { background-color: var(--pub-hero-bg); }
+  .text-pub-fg     { color: var(--pub-hero-fg); }
+  .text-pub-fg-90  { color: color-mix(in srgb, var(--pub-hero-fg) 90%, transparent); }
+  .text-pub-fg-80  { color: color-mix(in srgb, var(--pub-hero-fg) 80%, transparent); }
+  .text-pub-fg-70  { color: color-mix(in srgb, var(--pub-hero-fg) 70%, transparent); }
+  .text-pub-fg-60  { color: color-mix(in srgb, var(--pub-hero-fg) 60%, transparent); }
+  .text-pub-fg-50  { color: color-mix(in srgb, var(--pub-hero-fg) 50%, transparent); }
+  .text-pub-fg-40  { color: color-mix(in srgb, var(--pub-hero-fg) 40%, transparent); }
+  .text-pub-fg-30  { color: color-mix(in srgb, var(--pub-hero-fg) 30%, transparent); }
+  .text-pub-fg-20  { color: color-mix(in srgb, var(--pub-hero-fg) 20%, transparent); }
+  .border-pub-fg-30 { border-color: color-mix(in srgb, var(--pub-hero-fg) 30%, transparent); }
+  .border-pub-fg-20 { border-color: color-mix(in srgb, var(--pub-hero-fg) 20%, transparent); }
+  .border-pub-fg-10 { border-color: color-mix(in srgb, var(--pub-hero-fg) 10%, transparent); }
+  .bg-pub-fg-10 { background-color: color-mix(in srgb, var(--pub-hero-fg) 10%, transparent); }
+
+  /* Field grid usando el color de texto público (para que se vea sobre cualquier bg) */
+  .bg-field-grid-pub {
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--pub-hero-fg) 6%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--pub-hero-fg) 6%, transparent) 1px, transparent 1px);
+    background-size: 80px 80px;
   }
 
   /* Card athletic — para grids del sitio público */

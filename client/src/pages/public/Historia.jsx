@@ -78,21 +78,21 @@ export default function Historia() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
       {/* Hero */}
-      <section className="relative py-20 md:py-28 overflow-hidden" style={{ backgroundColor: '#0A0A0B' }}>
+      <section className="relative py-20 md:py-28 overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
         <div className="absolute inset-0 bg-field-grid opacity-30" />
         <div
           className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-25 blur-3xl"
           style={{ background: 'var(--color-primary)' }}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="pub-eyebrow text-white/70 mb-6">El club</div>
+          <div className="pub-eyebrow text-pub-fg-70 mb-6">El club</div>
           <h1
-            className="font-display-sport text-white"
+            className="font-display-sport text-pub-fg"
             style={{ fontSize: 'clamp(48px, 8vw, 130px)', lineHeight: 0.92 }}
           >
             {intro.titulo || 'Nuestra historia'}.
           </h1>
-          <p className="mt-6 max-w-2xl text-lg md:text-xl text-white/70 leading-snug" style={{ fontWeight: 300 }}>
+          <p className="mt-6 max-w-2xl text-lg md:text-xl text-pub-fg-70 leading-snug" style={{ fontWeight: 300 }}>
             Conocé los logros y los valores que nos definen.
           </p>
         </div>
@@ -132,7 +132,7 @@ export default function Historia() {
                 />
                 {intro.badge && (
                   <div
-                    className="absolute -bottom-6 -left-6 p-6 text-white"
+                    className="absolute -bottom-6 -left-6 p-6 text-pub-fg"
                     style={{ background: 'var(--color-primary)' }}
                   >
                     <p className="font-display-sport" style={{ fontSize: 64, lineHeight: 1, color: 'var(--accent-fg, #fff)' }}>
@@ -231,15 +231,15 @@ export default function Historia() {
                     key={i}
                     className="p-8"
                     style={{
-                      backgroundColor: '#0A0A0B',
+                      backgroundColor: 'var(--pub-hero-bg)',
                       color: '#fff',
                     }}
                   >
                     <Icono className="w-6 h-6 mb-6" style={{ color: 'var(--color-primary)' }} />
-                    <p className="font-display-sport text-white mb-2" style={{ fontSize: 26, lineHeight: 1.05 }}>
+                    <p className="font-display-sport text-pub-fg mb-2" style={{ fontSize: 26, lineHeight: 1.05 }}>
                       {logro.titulo}
                     </p>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-60">
                       {logro.anios}
                     </p>
                   </div>
@@ -311,17 +311,17 @@ export default function Historia() {
 
       {/* CTA */}
       {cta.titulo && (
-        <section className="relative py-20 md:py-28 overflow-hidden text-white" style={{ backgroundColor: '#0A0A0B' }}>
+        <section className="relative py-20 md:py-28 overflow-hidden text-pub-fg" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
           <div className="absolute inset-0 bg-field-grid opacity-30" />
           <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2
-              className="font-display-sport text-white mb-6"
+              className="font-display-sport text-pub-fg mb-6"
               style={{ fontSize: 'clamp(40px, 7vw, 110px)', lineHeight: 0.92 }}
             >
               {cta.titulo}
             </h2>
             {cta.descripcion && (
-              <p className="text-lg md:text-xl text-white/70 max-w-2xl mx-auto mb-10" style={{ fontWeight: 300 }}>
+              <p className="text-lg md:text-xl text-pub-fg-70 max-w-2xl mx-auto mb-10" style={{ fontWeight: 300 }}>
                 {cta.descripcion}
               </p>
             )}

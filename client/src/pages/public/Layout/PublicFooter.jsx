@@ -11,18 +11,18 @@ export default function PublicFooter() {
   const direccionCompleta = [tenant?.direccion, tenant?.ciudad, tenant?.provincia].filter(Boolean).join(', ')
 
   return (
-    <footer className="text-white relative" style={{ backgroundColor: '#0A0A0B' }}>
+    <footer className="text-pub-fg relative" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
       <div className="absolute inset-0 bg-field-grid opacity-25 pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
         {/* Headline gigante con CTA al lado */}
         <div className="grid md:grid-cols-12 gap-8 items-end mb-16 pb-12" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <div className="md:col-span-8">
-            <div className="pub-eyebrow text-white/70 mb-6">
+            <div className="pub-eyebrow text-pub-fg-70 mb-6">
               {tenant?.nombre || 'El club'}
             </div>
             <h2
-              className="font-display-sport text-white"
+              className="font-display-sport text-pub-fg"
               style={{ fontSize: 'clamp(40px, 6vw, 96px)', lineHeight: 0.92 }}
             >
               Más que<br />un <span style={{ color: 'var(--color-primary)' }}>club</span>.
@@ -42,24 +42,24 @@ export default function PublicFooter() {
             <Link to="/" className="flex items-center gap-3 mb-5">
               <TenantLogo className="h-11 w-auto" />
               <div>
-                <h3 className="font-display-sport text-white" style={{ fontSize: 18, lineHeight: 1 }}>
+                <h3 className="font-display-sport text-pub-fg" style={{ fontSize: 18, lineHeight: 1 }}>
                   {tenant?.nombre || ''}
                 </h3>
                 {tenant?.slogan && (
-                  <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/50 mt-1">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-50 mt-1">
                     {tenant.slogan}
                   </p>
                 )}
               </div>
             </Link>
             {tenant?.descripcion && (
-              <p className="text-white/60 text-sm leading-relaxed">{tenant.descripcion}</p>
+              <p className="text-pub-fg-60 text-sm leading-relaxed">{tenant.descripcion}</p>
             )}
           </div>
 
           {/* Links Rápidos */}
           <div>
-            <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/40 mb-5">
+            <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40 mb-5">
               El club
             </h4>
             <ul className="space-y-3">
@@ -75,7 +75,7 @@ export default function PublicFooter() {
                 <li key={to}>
                   <Link
                     to={to}
-                    className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/60 hover:text-white transition-colors"
+                    className="font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg transition-colors"
                   >
                     {label}
                   </Link>
@@ -86,20 +86,20 @@ export default function PublicFooter() {
 
           {/* Contacto */}
           <div>
-            <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/40 mb-5">
+            <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40 mb-5">
               Contacto
             </h4>
             <ul className="space-y-4">
               {direccionCompleta && (
                 <li className="flex items-start gap-3">
                   <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
-                  <span className="text-white/70 text-sm leading-snug">{direccionCompleta}</span>
+                  <span className="text-pub-fg-70 text-sm leading-snug">{direccionCompleta}</span>
                 </li>
               )}
               {tenant?.telefono && (
                 <li className="flex items-center gap-3">
                   <Phone className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
-                  <a href={`tel:${tenant.telefono.replace(/\D/g,'')}`} className="text-white/70 hover:text-white text-sm transition-colors">
+                  <a href={`tel:${tenant.telefono.replace(/\D/g,'')}`} className="text-pub-fg-70 hover:text-pub-fg text-sm transition-colors">
                     {tenant.telefono}
                   </a>
                 </li>
@@ -107,7 +107,7 @@ export default function PublicFooter() {
               {tenant?.email && (
                 <li className="flex items-center gap-3">
                   <Mail className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
-                  <a href={`mailto:${tenant.email}`} className="text-white/70 hover:text-white text-sm transition-colors break-all">
+                  <a href={`mailto:${tenant.email}`} className="text-pub-fg-70 hover:text-pub-fg text-sm transition-colors break-all">
                     {tenant.email}
                   </a>
                 </li>
@@ -115,7 +115,7 @@ export default function PublicFooter() {
               {tenant?.horarios && (
                 <li className="flex items-start gap-3">
                   <Clock className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
-                  <span className="text-white/70 text-sm whitespace-pre-line leading-snug">{tenant.horarios}</span>
+                  <span className="text-pub-fg-70 text-sm whitespace-pre-line leading-snug">{tenant.horarios}</span>
                 </li>
               )}
             </ul>
@@ -123,7 +123,7 @@ export default function PublicFooter() {
 
           {/* Redes Sociales */}
           <div>
-            <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/40 mb-5">
+            <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40 mb-5">
               Seguinos
             </h4>
             <div className="flex gap-2">
@@ -143,19 +143,19 @@ export default function PublicFooter() {
             </div>
 
             <div className="mt-8">
-              <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/40 mb-4">
+              <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40 mb-4">
                 Soy socio
               </h4>
               <div className="space-y-2">
                 <Link
                   to="/login-socio"
-                  className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/60 hover:text-white transition-colors block"
+                  className="font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg transition-colors block"
                 >
                   Portal del socio
                 </Link>
                 <Link
                   to="/mi-qr"
-                  className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/60 hover:text-white transition-colors block"
+                  className="font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg transition-colors block"
                 >
                   QR para beneficios
                 </Link>
@@ -169,15 +169,15 @@ export default function PublicFooter() {
       <div className="relative" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 font-mono text-[10px] uppercase tracking-[0.25em]">
-            <p className="text-white/40 text-center md:text-left">
+            <p className="text-pub-fg-40 text-center md:text-left">
               © {currentYear} {tenant?.nombre || ''} · Todos los derechos reservados
             </p>
             <div className="flex items-center gap-6">
-              <Link to="/admin" className="text-white/30 hover:text-white/60 transition-colors">
+              <Link to="/admin" className="text-pub-fg-30 hover:text-pub-fg-60 transition-colors">
                 Gestión
               </Link>
-              <p className="text-white/30">
-                Hecho por <span className="text-white/60">AxiomaCloud</span>
+              <p className="text-pub-fg-30">
+                Hecho por <span className="text-pub-fg-60">AxiomaCloud</span>
               </p>
             </div>
           </div>

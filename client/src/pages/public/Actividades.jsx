@@ -7,7 +7,7 @@ export default function Actividades() {
       {/* Hero */}
       <section
         className="relative py-20 md:py-28 overflow-hidden"
-        style={{ backgroundColor: '#0A0A0B' }}
+        style={{ backgroundColor: 'var(--pub-hero-bg)' }}
       >
         <div className="absolute inset-0 bg-field-grid opacity-30" />
         <div
@@ -15,17 +15,17 @@ export default function Actividades() {
           style={{ background: 'var(--color-primary)' }}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="pub-eyebrow text-white/70 mb-6">
+          <div className="pub-eyebrow text-pub-fg-70 mb-6">
             Disciplinas
           </div>
           <h1
-            className="font-display-sport text-white"
+            className="font-display-sport text-pub-fg"
             style={{ fontSize: 'clamp(48px, 8vw, 130px)', lineHeight: 0.92 }}
           >
             Actividades<br /><span style={{ color: 'var(--color-primary)' }}>deportivas.</span>
           </h1>
           <p
-            className="mt-6 max-w-2xl text-lg md:text-xl text-white/70 leading-snug"
+            className="mt-6 max-w-2xl text-lg md:text-xl text-pub-fg-70 leading-snug"
             style={{ fontWeight: 300, letterSpacing: '-0.01em' }}
           >
             Descubrí todas las disciplinas que podés practicar en el club.

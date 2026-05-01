@@ -73,7 +73,7 @@ export default function Home() {
       <BannerPublicitario tipo="MEDIO" ubicacion="HOME" />
 
       {/* CTA Section - Hacete Socio (athletic, dark, asimétrico) */}
-      <section className="relative py-20 md:py-32 overflow-hidden bg-black text-white">
+      <section className="relative py-20 md:py-32 overflow-hidden bg-pub-hero text-pub-fg">
         <div className="absolute inset-0 bg-field-grid opacity-30" />
         <div
           className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-30 blur-3xl"
@@ -83,16 +83,16 @@ export default function Home() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-7">
-              <div className="pub-eyebrow text-white/70 mb-6">
+              <div className="pub-eyebrow text-pub-fg-70 mb-6">
                 Membresía
               </div>
               <h2
-                className="font-display-sport text-white mb-8"
+                className="font-display-sport text-pub-fg mb-8"
                 style={{ fontSize: 'clamp(48px, 7vw, 110px)', lineHeight: 0.92 }}
               >
                 ¿Todavía no<br />sos <span style={{ color: 'var(--color-primary)' }}>socio?</span>
               </h2>
-              <p className="text-lg md:text-xl text-white/70 leading-relaxed max-w-2xl mb-10" style={{ fontWeight: 300 }}>
+              <p className="text-lg md:text-xl text-pub-fg-70 leading-relaxed max-w-2xl mb-10" style={{ fontWeight: 300 }}>
                 Sumate al club y disfrutá actividades deportivas, instalaciones, eventos y la comunidad entera.
               </p>
 
@@ -103,7 +103,7 @@ export default function Home() {
                 </Link>
                 <Link
                   to="/mi-qr"
-                  className="group inline-flex items-center justify-between gap-6 px-7 py-4 transition-all border border-white/30 hover:border-white text-white"
+                  className="group inline-flex items-center justify-between gap-6 px-7 py-4 transition-all border border-pub-fg-30 hover:border-pub-fg text-pub-fg"
                   style={{
                     borderRadius: 0,
                     fontFamily: 'Geist Mono, monospace',
@@ -119,19 +119,19 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="lg:col-span-5 grid grid-cols-2 gap-px bg-white/10">
+            <div className="lg:col-span-5 grid grid-cols-2 gap-px bg-pub-fg-10">
               {[
                 { icon: Trophy, label: 'Actividades', value: '+10 deportes' },
                 { icon: Users, label: 'Comunidad', value: '+1.000 socios' },
                 { icon: Heart, label: 'Beneficios', value: 'Descuentos' },
                 { icon: Calendar, label: 'Eventos', value: 'Todo el año' },
               ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="bg-black p-6">
+                <div key={label} className="bg-pub-hero p-6">
                   <Icon className="w-5 h-5 mb-4" style={{ color: 'var(--color-primary)' }} />
-                  <p className="font-display-sport text-white mb-1" style={{ fontSize: 28, lineHeight: 1 }}>
+                  <p className="font-display-sport text-pub-fg mb-1" style={{ fontSize: 28, lineHeight: 1 }}>
                     {label}
                   </p>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/60">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-pub-fg-60">
                     {value}
                   </p>
                 </div>
@@ -279,7 +279,7 @@ export default function Home() {
                         className="w-full h-full flex items-center justify-center"
                         style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}
                       >
-                        <span className="font-display-sport text-white opacity-25" style={{ fontSize: 80 }}>
+                        <span className="font-display-sport text-pub-fg opacity-25" style={{ fontSize: 80 }}>
                           {String(idx + 1).padStart(2, '0')}
                         </span>
                       </div>

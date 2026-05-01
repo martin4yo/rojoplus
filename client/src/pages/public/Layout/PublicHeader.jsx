@@ -36,17 +36,21 @@ export default function PublicHeader() {
   ]
 
   const baseLink = "px-3 py-2 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors whitespace-nowrap"
-  const activeLink = "text-white"
-  const inactiveLink = "text-white/60 hover:text-white"
+  const activeLink = "text-pub-fg"
+  const inactiveLink = "text-pub-fg-60 hover:text-pub-fg"
 
   return (
     <header
       className="sticky top-0 z-50 transition-all duration-300"
       style={{
-        backgroundColor: scrolled ? 'rgba(10, 10, 11, 0.92)' : 'rgba(10, 10, 11, 0.55)',
+        backgroundColor: scrolled
+          ? 'color-mix(in srgb, var(--pub-hero-bg) 92%, transparent)'
+          : 'color-mix(in srgb, var(--pub-hero-bg) 55%, transparent)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
-        borderBottom: scrolled ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
+        borderBottom: scrolled
+          ? '1px solid color-mix(in srgb, var(--pub-hero-fg) 8%, transparent)'
+          : '1px solid transparent',
       }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -55,11 +59,11 @@ export default function PublicHeader() {
           <Link to="/" className="flex items-center gap-3 flex-shrink-0 relative z-10">
             <TenantLogo className="h-10 md:h-11 w-auto" fallbackSrc="/images/LogoClubixSolo.png" />
             <div className="hidden sm:block leading-tight">
-              <h1 className="font-display-sport text-white text-base md:text-lg whitespace-nowrap" style={{ fontSize: 18, lineHeight: 1 }}>
+              <h1 className="font-display-sport text-pub-fg text-base md:text-lg whitespace-nowrap" style={{ fontSize: 18, lineHeight: 1 }}>
                 {tenant?.nombre || ''}
               </h1>
               {tenant?.slogan && (
-                <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-white/50 whitespace-nowrap mt-0.5">
+                <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-pub-fg-50 whitespace-nowrap mt-0.5">
                   {tenant.slogan}
                 </p>
               )}
@@ -86,7 +90,7 @@ export default function PublicHeader() {
                     <div
                       className="absolute left-0 mt-1 w-52 py-2 z-50"
                       style={{
-                        backgroundColor: 'rgba(10, 10, 11, 0.96)',
+                        backgroundColor: 'color-mix(in srgb, var(--pub-hero-bg) 96%, transparent)',
                         backdropFilter: 'blur(14px)',
                         border: '1px solid rgba(255,255,255,0.08)',
                       }}
@@ -95,7 +99,7 @@ export default function PublicHeader() {
                         <Link
                           key={sub.path}
                           to={sub.path}
-                          className="block px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+                          className="block px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg hover:bg-pub-fg-10 transition-colors"
                         >
                           {sub.label}
                         </Link>
@@ -129,20 +133,20 @@ export default function PublicHeader() {
                 <div
                   className="absolute right-0 mt-1 w-56 py-2 z-50"
                   style={{
-                    backgroundColor: 'rgba(10, 10, 11, 0.96)',
+                    backgroundColor: 'color-mix(in srgb, var(--pub-hero-bg) 96%, transparent)',
                     backdropFilter: 'blur(14px)',
                     border: '1px solid rgba(255,255,255,0.08)',
                   }}
                 >
                   <Link
                     to="/login-socio"
-                    className="block px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-white/60 hover:text-white hover:bg-white/5"
+                    className="block px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg hover:bg-pub-fg-10"
                   >
                     Portal del socio
                   </Link>
                   <Link
                     to="/mi-qr"
-                    className="block px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-white/60 hover:text-white hover:bg-white/5"
+                    className="block px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg hover:bg-pub-fg-10"
                   >
                     QR para beneficios
                   </Link>
@@ -170,7 +174,7 @@ export default function PublicHeader() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 text-white"
+            className="lg:hidden p-2 text-pub-fg"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -178,12 +182,12 @@ export default function PublicHeader() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-white/10">
+          <div className="lg:hidden py-4 border-t border-pub-fg-10">
             <nav className="flex flex-col gap-1">
               {navLinks.map(link => (
                 link.submenu ? (
                   <div key={link.path}>
-                    <p className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.25em] text-white/40">
+                    <p className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40">
                       {link.label}
                     </p>
                     {link.submenu.map(sub => (
@@ -192,7 +196,7 @@ export default function PublicHeader() {
                         to={sub.path}
                         onClick={() => setMobileMenuOpen(false)}
                         className={`block px-6 py-3 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
-                          isActive(sub.path) ? 'text-white bg-white/5' : 'text-white/60 hover:text-white'
+                          isActive(sub.path) ? 'text-pub-fg bg-pub-fg-10' : 'text-pub-fg-60 hover:text-pub-fg'
                         }`}
                       >
                         {sub.label}
@@ -205,7 +209,7 @@ export default function PublicHeader() {
                     to={link.path}
                     onClick={() => setMobileMenuOpen(false)}
                     className={`px-4 py-3 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
-                      isActive(link.path) ? 'text-white bg-white/5' : 'text-white/60 hover:text-white'
+                      isActive(link.path) ? 'text-pub-fg bg-pub-fg-10' : 'text-pub-fg-60 hover:text-pub-fg'
                     }`}
                   >
                     {link.label}
@@ -213,21 +217,21 @@ export default function PublicHeader() {
                 )
               ))}
 
-              <div className="border-t border-white/10 my-2 pt-2">
-                <p className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.25em] text-white/40">
+              <div className="border-t border-pub-fg-10 my-2 pt-2">
+                <p className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40">
                   Soy socio
                 </p>
                 <Link
                   to="/login-socio"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-6 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-white/60 hover:text-white"
+                  className="block px-6 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg"
                 >
                   Portal del socio
                 </Link>
                 <Link
                   to="/mi-qr"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-6 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-white/60 hover:text-white"
+                  className="block px-6 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg"
                 >
                   QR para beneficios
                 </Link>

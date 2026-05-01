@@ -1,4 +1,5 @@
-import { Target, Heart, Users, Shield, Star, Trophy } from 'lucide-react'
+import { Target, Heart, Users, Shield, Star, Trophy, ArrowUpRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
 
 const valores = [
@@ -36,15 +37,18 @@ const valores = [
 
 export default function Mision() {
   return (
-    <div className="bg-gray-300 min-h-screen">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-            Misión y Valores
+      <section className="relative py-20 md:py-28 overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid opacity-30" />
+        <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-25 blur-3xl" style={{ background: 'var(--color-primary)' }} />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="pub-eyebrow text-pub-fg-70 mb-6">El club</div>
+          <h1 className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(48px, 8vw, 130px)', lineHeight: 0.92 }}>
+            Misión<br /><span style={{ color: 'var(--color-primary)' }}>y valores.</span>
           </h1>
-          <p className="text-base text-primary-100 max-w-3xl mx-auto">
-            Los principios que guían cada paso de Club Sportivo Pilar desde 1932
+          <p className="mt-6 max-w-2xl text-lg md:text-xl text-pub-fg-70 leading-snug" style={{ fontWeight: 300 }}>
+            Los principios que guían cada paso del club.
           </p>
         </div>
       </section>
@@ -84,7 +88,7 @@ export default function Mision() {
                 alt="Misión del Club"
                 className="rounded-2xl shadow-xl"
               />
-              <div className="absolute -bottom-6 -right-6 bg-primary text-white rounded-xl p-6 shadow-lg hidden md:block">
+              <div className="absolute -bottom-6 -right-6 bg-primary text-pub-fg rounded-xl p-6 shadow-lg hidden md:block">
                 <p className="text-3xl font-bold">+90</p>
                 <p className="text-primary-100 text-sm">años formando deportistas</p>
               </div>
@@ -148,7 +152,7 @@ export default function Mision() {
                   className="bg-gray-200 rounded-2xl p-6 hover:shadow-lg transition-shadow group"
                 >
                   <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary transition-colors">
-                    <Icono className="w-7 h-7 text-primary group-hover:text-white transition-colors" />
+                    <Icono className="w-7 h-7 text-primary group-hover:text-pub-fg transition-colors" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-3">
                     {valor.titulo}
@@ -167,27 +171,28 @@ export default function Mision() {
       <BannerPublicitario tipo="FOOTER" ubicacion="MISION" />
 
       {/* CTA */}
-      <section className="py-16 bg-primary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Compartí nuestros valores
+      <section className="relative py-20 md:py-28 overflow-hidden text-pub-fg" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid opacity-30" />
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="font-display-sport text-pub-fg mb-6" style={{ fontSize: 'clamp(40px, 7vw, 110px)', lineHeight: 0.92 }}>
+            Compartí<br /><span style={{ color: 'var(--color-primary)' }}>nuestros valores.</span>
           </h2>
-          <p className="text-primary-100 mb-8 max-w-2xl mx-auto">
-            Sumate a la familia de Sportivo Pilar y viví la pasión del deporte junto a nosotros.
+          <p className="text-lg md:text-xl text-pub-fg-70 max-w-2xl mx-auto mb-10" style={{ fontWeight: 300 }}>
+            Sumate a la familia y viví la pasión del deporte junto a nosotros.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="/inscripcion-socio"
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-primary rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link to="/inscripcion-socio" className="pub-cta group inline-flex">
+              <span>Hacete socio</span>
+              <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+            </Link>
+            <Link
+              to="/historia"
+              className="group inline-flex items-center justify-between gap-6 px-7 py-4 transition-all border border-pub-fg-30 hover:border-pub-fg text-pub-fg"
+              style={{ borderRadius: 0, fontFamily: 'Geist Mono, monospace', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.2em' }}
             >
-              Quiero ser Socio
-            </a>
-            <a
-              href="/historia"
-              className="inline-flex items-center justify-center px-8 py-4 bg-primary-dark text-white border border-primary rounded-xl text-lg font-semibold hover:bg-primary-dark transition-colors"
-            >
-              Conocer nuestra Historia
-            </a>
+              <span>Nuestra historia</span>
+              <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+            </Link>
           </div>
         </div>
       </section>
