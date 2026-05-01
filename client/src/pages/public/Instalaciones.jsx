@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MapPin, Users, Clock, Zap, Home, CheckCircle } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import PublicHero from '../../components/public/PublicHero'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { useTenant } from '../../contexts/TenantContext'
 import api from '../../services/api'
@@ -18,18 +19,12 @@ export default function Instalaciones() {
   }, [])
 
   return (
-    <div className="bg-gray-300 min-h-screen">
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-            Nuestras Instalaciones
-          </h1>
-          <p className="text-base text-primary-100 max-w-2xl mx-auto">
-            Conocé los espacios donde entrenamos, competimos y compartimos como familia
-          </p>
-        </div>
-      </section>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
+      <PublicHero
+        eyebrow="Espacios"
+        title="Instalaciones."
+        subtitle="Donde entrenamos, competimos y compartimos."
+      />
 
       {/* Banner Header */}
       <BannerPublicitario tipo="HEADER" ubicacion="INSTALACIONES" />

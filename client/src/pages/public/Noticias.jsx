@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, ChevronRight, Search, Newspaper } from 'lucide-react'
+import { Calendar, ChevronRight, Search, Newspaper, ArrowUpRight } from 'lucide-react'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import PublicHero from '../../components/public/PublicHero'
 import { useTenant } from '../../contexts/TenantContext'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -55,18 +56,12 @@ export default function Noticias() {
   }
 
   return (
-    <div className="bg-gray-300 min-h-screen">
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-            Noticias
-          </h1>
-          <p className="text-base text-primary-100 max-w-2xl mx-auto">
-            Enterate de las últimas novedades del club
-          </p>
-        </div>
-      </section>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
+      <PublicHero
+        eyebrow="Novedades"
+        title="Noticias."
+        subtitle="Enterate de las últimas novedades del club."
+      />
 
       {/* Filtros */}
       <section className="py-8 bg-gray-300">

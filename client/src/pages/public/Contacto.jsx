@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MapPin, Phone, Mail, Clock, Send, Instagram, Facebook, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import PublicHero from '../../components/public/PublicHero'
 import api from '../../services/api'
 import { useTenant } from '../../contexts/TenantContext'
 
@@ -43,18 +44,12 @@ export default function Contacto() {
   }
 
   return (
-    <div className="bg-gray-300">
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-primary to-primary-dark py-6 md:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-            Contacto
-          </h1>
-          <p className="text-base text-primary-100 max-w-2xl mx-auto">
-            Estamos para ayudarte. Escribinos y te responderemos a la brevedad.
-          </p>
-        </div>
-      </section>
+    <div style={{ backgroundColor: 'var(--bg-app)' }}>
+      <PublicHero
+        eyebrow="Estamos para ayudarte"
+        title="Contacto."
+        subtitle="Escribinos y te respondemos a la brevedad."
+      />
 
       {/* Contenido principal */}
       <section className="py-16 md:py-24">

@@ -100,7 +100,7 @@ export default function NoticiaDetalle() {
 
   if (error || !noticia) {
     return (
-      <div className="bg-gray-300 min-h-screen">
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
         <div className="max-w-4xl mx-auto px-4 py-16 text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
             {error || 'Noticia no encontrada'}
@@ -121,7 +121,7 @@ export default function NoticiaDetalle() {
   }
 
   return (
-    <div className="bg-gray-300 min-h-screen">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
       {/* Hero con imagen */}
       <section className="relative bg-gray-900">
         {noticia.imagen ? (
