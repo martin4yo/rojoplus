@@ -247,6 +247,88 @@ select:-webkit-autofill {
     background-size: 80px 80px;
   }
 
+  .bg-field-grid-dark {
+    background-image:
+      linear-gradient(rgba(20,18,14,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(20,18,14,0.05) 1px, transparent 1px);
+    background-size: 80px 80px;
+  }
+
+  /* Eyebrow del sitio público — pre-heading en mono uppercase con línea */
+  .pub-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+  }
+  .pub-eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 32px;
+    height: 1px;
+    background-color: var(--color-primary);
+  }
+
+  /* Botón CTA athletic — flecha + texto upper */
+  .pub-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1rem 1.75rem;
+    background: var(--color-primary);
+    color: var(--accent-fg, #fff);
+    border-radius: 0;
+    font-family: 'Geist Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    transition: transform .2s ease, box-shadow .25s ease, filter .15s ease;
+  }
+  .pub-cta:hover {
+    filter: brightness(1.05);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -8px var(--accent-glow);
+  }
+
+  .pub-cta-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1rem 1.75rem;
+    border: 1px solid var(--text);
+    color: var(--text);
+    border-radius: 0;
+    font-family: 'Geist Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    transition: background-color .2s ease, color .2s ease;
+  }
+  .pub-cta-outline:hover {
+    background: var(--text);
+    color: var(--bg-app);
+  }
+
+  /* Card athletic — para grids del sitio público */
+  .pub-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  }
+  .pub-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+    box-shadow: 0 16px 40px -16px rgba(20,18,14,0.18);
+  }
+
   /* Chips/labels técnicos en mono uppercase (impronta del nuevo lenguaje) */
   .chip-mono {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] uppercase;

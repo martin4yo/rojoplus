@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, Phone, Mail, ChevronRight, Users, Trophy, Heart, Calendar } from 'lucide-react'
+import { MapPin, Phone, Mail, ChevronRight, Users, Trophy, Heart, Calendar, ArrowUpRight } from 'lucide-react'
 import { useTenant } from '../../contexts/TenantContext'
 import HeroSection from '../../components/public/HeroSection'
 import ActividadesGrid from '../../components/public/ActividadesGrid'
@@ -72,159 +72,133 @@ export default function Home() {
       {/* Banner MEDIO - Entre secciones */}
       <BannerPublicitario tipo="MEDIO" ubicacion="HOME" />
 
-      {/* CTA Section - Hacete Socio */}
-      <section className="py-16 md:py-24 bg-primary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-                ¿Todavía no sos socio?
+      {/* CTA Section - Hacete Socio (athletic, dark, asimétrico) */}
+      <section className="relative py-20 md:py-32 overflow-hidden bg-black text-white">
+        <div className="absolute inset-0 bg-field-grid opacity-30" />
+        <div
+          className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-30 blur-3xl"
+          style={{ background: 'var(--color-primary)' }}
+        />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            <div className="lg:col-span-7">
+              <div className="pub-eyebrow text-white/70 mb-6">
+                Membresía
+              </div>
+              <h2
+                className="font-display-sport text-white mb-8"
+                style={{ fontSize: 'clamp(48px, 7vw, 110px)', lineHeight: 0.92 }}
+              >
+                ¿Todavía no<br />sos <span style={{ color: 'var(--color-primary)' }}>socio?</span>
               </h2>
-              <p className="text-primary-100 text-lg mb-8 leading-relaxed">
-                Sumate a la familia de Sportivo Pilar y disfrutá de todos los beneficios:
-                actividades deportivas, instalaciones, eventos y mucho más.
+              <p className="text-lg md:text-xl text-white/70 leading-relaxed max-w-2xl mb-10" style={{ fontWeight: 300 }}>
+                Sumate al club y disfrutá actividades deportivas, instalaciones, eventos y la comunidad entera.
               </p>
 
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-gray-200/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Trophy className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">Actividades</p>
-                    <p className="text-primary-200 text-sm">+10 deportes</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-gray-200/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Users className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">Comunidad</p>
-                    <p className="text-primary-200 text-sm">+1000 socios</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-gray-200/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Heart className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">Beneficios</p>
-                    <p className="text-primary-200 text-sm">Descuentos exclusivos</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-gray-200/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Calendar className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">Eventos</p>
-                    <p className="text-primary-200 text-sm">Todo el año</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link
-                  to="/inscripcion-socio"
-                  className="inline-flex items-center justify-center px-8 py-4 bg-gray-200 text-primary rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg"
-                >
-                  Quiero ser Socio
-                  <ChevronRight className="w-5 h-5 ml-2" />
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link to="/inscripcion-socio" className="pub-cta group">
+                  <span>Hacete socio</span>
+                  <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                 </Link>
                 <Link
                   to="/mi-qr"
-                  className="inline-flex items-center justify-center px-8 py-4 bg-primary-dark text-white border border-primary rounded-xl text-lg font-semibold hover:bg-primary-dark transition-colors"
+                  className="group inline-flex items-center justify-between gap-6 px-7 py-4 transition-all border border-white/30 hover:border-white text-white"
+                  style={{
+                    borderRadius: 0,
+                    fontFamily: 'Geist Mono, monospace',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.2em',
+                  }}
                 >
-                  Ya soy Socio
+                  <span>Ya soy socio</span>
+                  <ArrowUpRight className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                 </Link>
               </div>
             </div>
 
-            <div className="hidden md:block">
-              <img
-                src="/images/club/68f64b9d.jpeg"
-                alt="Socios del club"
-                className="rounded-2xl shadow-2xl"
-              />
+            <div className="lg:col-span-5 grid grid-cols-2 gap-px bg-white/10">
+              {[
+                { icon: Trophy, label: 'Actividades', value: '+10 deportes' },
+                { icon: Users, label: 'Comunidad', value: '+1.000 socios' },
+                { icon: Heart, label: 'Beneficios', value: 'Descuentos' },
+                { icon: Calendar, label: 'Eventos', value: 'Todo el año' },
+              ].map(({ icon: Icon, label, value }) => (
+                <div key={label} className="bg-black p-6">
+                  <Icon className="w-5 h-5 mb-4" style={{ color: 'var(--color-primary)' }} />
+                  <p className="font-display-sport text-white mb-1" style={{ fontSize: 28, lineHeight: 1 }}>
+                    {label}
+                  </p>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/60">
+                    {value}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
       {/* Contacto Section */}
-      <section className="py-16 md:py-24 bg-gray-300">
+      <section className="py-20 md:py-28" style={{ backgroundColor: 'var(--bg-app)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Visitanos
+          <div className="mb-12 max-w-2xl">
+            <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+              Contacto
+            </div>
+            <h2
+              className="font-display-sport mb-4"
+              style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+            >
+              Visitanos.
             </h2>
-            <p className="text-lg text-gray-600">
-              Te esperamos en nuestras instalaciones
+            <p className="text-lg" style={{ color: 'var(--text-dim)', fontWeight: 300 }}>
+              Te esperamos en nuestras instalaciones.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Teléfono */}
+          <div className="grid md:grid-cols-3 gap-px bg-[var(--border)] mb-10">
             {tenant?.telefono && (
-              <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Phone className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Llamanos</h3>
-                <a href={`tel:${tenant.telefono.replace(/\D/g,'')}`} className="text-primary font-medium text-lg hover:underline">
-                  {tenant.telefono}
-                </a>
-                {tenant?.horarios && (
-                  <p className="text-gray-500 text-sm mt-2 whitespace-pre-line">{tenant.horarios}</p>
-                )}
-              </div>
+              <ContactCard
+                icon={Phone}
+                eyebrow="Llamanos"
+                main={tenant.telefono}
+                href={`tel:${tenant.telefono.replace(/\D/g,'')}`}
+                detail={tenant?.horarios}
+              />
             )}
-
-            {/* Dirección */}
             {tenant?.direccion && (
-              <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <MapPin className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Donde Estamos</h3>
-                <p className="text-gray-700">{tenant.direccion}</p>
-                {(tenant.ciudad || tenant.provincia) && (
-                  <p className="text-gray-500 text-sm mt-2">{[tenant.ciudad, tenant.provincia].filter(Boolean).join(', ')}</p>
-                )}
-              </div>
+              <ContactCard
+                icon={MapPin}
+                eyebrow="Donde estamos"
+                main={tenant.direccion}
+                detail={[tenant.ciudad, tenant.provincia].filter(Boolean).join(', ')}
+              />
             )}
-
-            {/* Email */}
             {tenant?.email && (
-              <div className="bg-gray-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Mail className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Escribinos</h3>
-                <a href={`mailto:${tenant.email}`} className="text-primary font-medium hover:underline">
-                  {tenant.email}
-                </a>
-                <p className="text-gray-500 text-sm mt-2">Respondemos en 24hs</p>
-              </div>
+              <ContactCard
+                icon={Mail}
+                eyebrow="Escribinos"
+                main={tenant.email}
+                href={`mailto:${tenant.email}`}
+                detail="Respondemos en 24hs"
+              />
             )}
           </div>
 
           {/* Mapa */}
-          <div className="mt-12 rounded-2xl overflow-hidden shadow-lg">
+          <div style={{ border: '1px solid var(--border)' }}>
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3289.6!2d-58.9167!3d-34.4583!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzTCsDI3JzMwLjAiUyA1OMKwNTUnMDAuMCJX!5e0!3m2!1ses!2sar!4v1234567890"
               width="100%"
               height="400"
-              style={{ border: 0 }}
+              style={{ border: 0, display: 'block', filter: 'grayscale(0.4)' }}
               allowFullScreen=""
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               title="Ubicación del Club"
-              className="w-full"
             />
           </div>
         </div>
@@ -234,15 +208,28 @@ export default function Home() {
       <SponsorsSection />
 
       {/* Últimas Noticias */}
-      <section className="py-16 md:py-24 bg-gray-400">
+      <section className="py-20 md:py-28" style={{ backgroundColor: 'var(--bg-surface-hi)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Últimas Noticias
-            </h2>
-            <p className="text-lg text-gray-600">
-              Enterate de las novedades del club
-            </p>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+            <div>
+              <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+                Novedades
+              </div>
+              <h2
+                className="font-display-sport"
+                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+              >
+                Últimas noticias.
+              </h2>
+            </div>
+            <Link
+              to="/noticias"
+              className="group inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.2em] self-start md:self-end"
+              style={{ color: 'var(--text)' }}
+            >
+              <span>Ver todas</span>
+              <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+            </Link>
           </div>
 
           {loadingNoticias ? (
@@ -252,16 +239,20 @@ export default function Home() {
           ) : noticias.length === 0 ? (
             <div className="grid md:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="h-48 bg-gray-300 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm">Próximamente</span>
+                <div key={i} className="pub-card overflow-hidden">
+                  <div className="h-56 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-app)' }}>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.25em]" style={{ color: 'var(--text-muted)' }}>
+                      Próximamente
+                    </span>
                   </div>
                   <div className="p-6">
-                    <p className="text-gray-400 text-sm mb-2">Noticia {i}</p>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--text-muted)' }}>
+                      Noticia {String(i).padStart(2, '0')}
+                    </p>
+                    <h3 className="font-display-sport text-xl mb-2" style={{ color: 'var(--text)' }}>
                       Novedades del club
                     </h3>
-                    <p className="text-gray-500 text-sm">
+                    <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
                       Pronto podrás ver aquí las últimas novedades.
                     </p>
                   </div>
@@ -270,74 +261,114 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid md:grid-cols-3 gap-6">
-              {noticias.map((noticia) => (
-                <article
+              {noticias.map((noticia, idx) => (
+                <Link
                   key={noticia.id}
-                  className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group"
+                  to={`/noticias/${noticia.slug}`}
+                  className="pub-card overflow-hidden block group"
                 >
-                  <div className="h-48 bg-gray-300 relative overflow-hidden">
+                  <div className="h-56 relative overflow-hidden" style={{ backgroundColor: 'var(--bg-app)' }}>
                     {noticia.imagen ? (
                       <img
                         src={noticia.imagen}
                         alt={noticia.titulo}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary">
-                        <span className="text-white text-4xl font-bold opacity-30">SP</span>
+                      <div
+                        className="w-full h-full flex items-center justify-center"
+                        style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}
+                      >
+                        <span className="font-display-sport text-white opacity-25" style={{ fontSize: 80 }}>
+                          {String(idx + 1).padStart(2, '0')}
+                        </span>
                       </div>
                     )}
                     {noticia.destacada && (
-                      <span className="absolute top-3 right-3 px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-semibold rounded-full">
+                      <span
+                        className="absolute top-3 right-3 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.25em]"
+                        style={{ background: 'var(--color-primary)', color: 'var(--accent-fg, #fff)' }}
+                      >
                         Destacada
                       </span>
                     )}
-                    <span className="absolute top-3 left-3 px-3 py-1 bg-primary-100 text-primary-dark text-xs font-medium rounded-full">
-                      {noticia.categoria}
-                    </span>
+                    {noticia.categoria && (
+                      <span
+                        className="absolute top-3 left-3 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.25em] backdrop-blur-sm"
+                        style={{ background: 'rgba(255,255,255,0.85)', color: 'var(--text)' }}
+                      >
+                        {noticia.categoria}
+                      </span>
+                    )}
                   </div>
 
                   <div className="p-6">
-                    <div className="flex items-center gap-2 text-gray-500 text-sm mb-3">
-                      <Calendar className="w-4 h-4" />
+                    <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--text-muted)' }}>
+                      <Calendar className="w-3 h-3" />
                       {formatFecha(noticia.fechaPublicacion)}
                     </div>
 
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+                    <h3 className="font-display-sport mb-3 line-clamp-2 transition-colors" style={{ fontSize: 22, lineHeight: 1.05, color: 'var(--text)' }}>
                       {noticia.titulo}
                     </h3>
 
-                    <p className="text-gray-500 text-sm line-clamp-3 mb-4">
+                    <p className="text-sm line-clamp-3 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
                       {noticia.extracto}
                     </p>
 
-                    <Link
-                      to={`/noticias/${noticia.slug}`}
-                      className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark"
-                    >
-                      Leer más
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </Link>
+                    <div className="mt-4 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
+                      <span>Leer más</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </div>
                   </div>
-                </article>
+                </Link>
               ))}
             </div>
           )}
-
-          <div className="text-center mt-10">
-            <Link
-              to="/noticias"
-              className="inline-flex items-center px-6 py-3 bg-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
-            >
-              Ver todas las noticias
-              <ChevronRight className="w-5 h-5 ml-2" />
-            </Link>
-          </div>
         </div>
       </section>
 
       {/* Banner FOOTER - Al final de la página */}
       <BannerPublicitario tipo="FOOTER" ubicacion="HOME" />
     </div>
+  )
+}
+
+function ContactCard({ icon: Icon, eyebrow, main, href, detail }) {
+  const Wrapper = href ? 'a' : 'div'
+  const wrapperProps = href ? { href } : {}
+  return (
+    <Wrapper
+      {...wrapperProps}
+      className="block p-8 transition-colors"
+      style={{ backgroundColor: 'var(--bg-surface)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-surface-hi)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-surface)' }}
+    >
+      <div className="flex items-start gap-4">
+        <div
+          className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+          style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}
+        >
+          <Icon className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.25em] mb-2" style={{ color: 'var(--text-muted)' }}>
+            {eyebrow}
+          </p>
+          <p
+            className="font-display-sport break-words leading-tight"
+            style={{ fontSize: 20, color: 'var(--text)' }}
+          >
+            {main}
+          </p>
+          {detail && (
+            <p className="text-sm mt-2 whitespace-pre-line" style={{ color: 'var(--text-dim)' }}>
+              {detail}
+            </p>
+          )}
+        </div>
+      </div>
+    </Wrapper>
   )
 }

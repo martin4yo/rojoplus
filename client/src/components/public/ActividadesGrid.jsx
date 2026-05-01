@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, Users, Clock } from 'lucide-react'
+import { ChevronRight, Users, Clock, ArrowUpRight } from 'lucide-react'
 import api from '../../services/api'
 
 // Imágenes por defecto para cada tipo de actividad (Unsplash - libre de derechos)
@@ -68,22 +68,24 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
     ? ""
     : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
 
-  const sectionClass = fullWidth
-    ? ""
-    : "py-16 md:py-24 bg-gray-300"
+  const sectionPadding = fullWidth ? "" : "py-20 md:py-28"
+  const sectionStyle = fullWidth ? {} : { backgroundColor: 'var(--bg-app)' }
 
   if (loading) {
     return (
-      <section className={sectionClass}>
+      <section className={sectionPadding} style={sectionStyle}>
         <div className={containerClass}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="bg-gray-200 rounded-2xl overflow-hidden shadow-sm animate-pulse">
-                <div className="h-48 bg-gray-200" />
-                <div className="p-6">
-                  <div className="h-6 bg-gray-200 rounded w-3/4 mb-3" />
-                  <div className="h-4 bg-gray-200 rounded w-full mb-2" />
-                  <div className="h-4 bg-gray-200 rounded w-2/3" />
+              <div
+                key={i}
+                className="overflow-hidden animate-pulse"
+                style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+              >
+                <div className="h-56" style={{ backgroundColor: 'var(--bg-surface-hi)' }} />
+                <div className="p-6 space-y-3">
+                  <div className="h-5 w-2/3" style={{ backgroundColor: 'var(--bg-surface-hi)' }} />
+                  <div className="h-3 w-full" style={{ backgroundColor: 'var(--bg-surface-hi)' }} />
                 </div>
               </div>
             ))}
@@ -94,81 +96,96 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
   }
 
   return (
-    <section className={sectionClass}>
+    <section className={sectionPadding} style={sectionStyle}>
       <div className={containerClass}>
         {showTitle && (
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Nuestras Actividades
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Ofrecemos una amplia variedad de actividades deportivas para toda la familia.
-              Encontrá tu lugar en el club.
-            </p>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+            <div className="max-w-2xl">
+              <div className="pub-eyebrow mb-5" style={{ color: 'var(--text-dim)' }}>
+                Actividades
+              </div>
+              <h2
+                className="font-display-sport mb-4"
+                style={{ fontSize: 'clamp(40px, 6vw, 86px)', lineHeight: 0.94, color: 'var(--text)' }}
+              >
+                Encontrá tu<br />deporte.
+              </h2>
+              <p style={{ color: 'var(--text-dim)', fontWeight: 300 }}>
+                Variedad de actividades para toda la familia. Sumate al equipo.
+              </p>
+            </div>
+            <Link
+              to="/actividades"
+              className="group inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.2em] self-start md:self-end"
+              style={{ color: 'var(--text)' }}
+            >
+              <span>Ver todas</span>
+              <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+            </Link>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {actividades.map((actividad) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+          {actividades.map((actividad, idx) => (
             <Link
               to={`/actividades/${actividad.id}`}
               key={actividad.id}
-              className="group bg-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+              className="group block overflow-hidden relative"
+              style={{ backgroundColor: 'var(--bg-surface)' }}
             >
-              <div className="relative h-48 overflow-hidden">
+              <div className="relative h-72 overflow-hidden">
                 <img
                   src={getActivityImage(actividad)}
                   alt={actividad.nombre}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <h3 className="absolute bottom-4 left-4 text-xl font-bold text-white">
+                {/* Overlay gradient */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                {/* Numero esquina */}
+                <span
+                  className="absolute top-4 left-4 font-mono text-[10px] uppercase tracking-[0.3em] text-white/80"
+                >
+                  {String(idx + 1).padStart(2, '0')} / {String(actividades.length).padStart(2, '0')}
+                </span>
+                {/* Título sobre la imagen */}
+                <h3
+                  className="absolute bottom-4 left-4 right-4 font-display-sport text-white"
+                  style={{ fontSize: 'clamp(28px, 3vw, 44px)', lineHeight: 0.95 }}
+                >
                   {actividad.nombre}
                 </h3>
               </div>
 
               <div className="p-6">
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                <p className="text-sm leading-relaxed line-clamp-2 mb-5" style={{ color: 'var(--text-dim)' }}>
                   {actividad.descripcion || 'Actividad deportiva del club para todas las edades.'}
                 </p>
 
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <div className="flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
                     {actividad.inscriptos > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        {actividad.inscriptos}
+                      <span className="flex items-center gap-1.5">
+                        <Users className="w-3 h-3" />
+                        {actividad.inscriptos} inscriptos
                       </span>
                     )}
                     {actividad.categorias?.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {actividad.categorias.length} categorías
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        {actividad.categorias.length} cat.
                       </span>
                     )}
                   </div>
 
-                  <span className="text-primary font-medium text-sm flex items-center gap-1 group-hover:text-primary-dark">
-                    Ver más
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
+                    Ver
+                    <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                   </span>
                 </div>
               </div>
             </Link>
           ))}
         </div>
-
-        {showTitle && (
-          <div className="text-center mt-10">
-            <Link
-              to="/actividades"
-              className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary-dark transition-colors"
-            >
-              Ver todas las actividades
-              <ChevronRight className="w-5 h-5 ml-2" />
-            </Link>
-          </div>
-        )}
       </div>
     </section>
   )
