@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import {
-  ArrowRight, ArrowLeft, CheckCircle2, Trophy, Users, UserPlus,
-  Trash2, X, Cake, Heart, Baby, AlertCircle,
+  ArrowRight, ArrowLeft, CheckCircle2, Users, UserPlus,
+  Trash2, X, Cake, Heart, Baby, AlertCircle, Trophy,
 } from 'lucide-react'
 import { useConfirm } from '../../hooks/useConfirm'
-import TenantLogo from '../../components/TenantLogo'
 import { useTenant } from '../../contexts/TenantContext'
 
 export default function AgregarFamiliares() {
@@ -20,12 +19,8 @@ export default function AgregarFamiliares() {
   const [showForm, setShowForm] = useState(false)
 
   const [formData, setFormData] = useState({
-    apellidos: '',
-    nombres: '',
-    documento: '',
-    fechaNacimiento: '',
-    parentesco: '',
-    actividadesSeleccionadas: [],
+    apellidos: '', nombres: '', documento: '', fechaNacimiento: '',
+    parentesco: '', actividadesSeleccionadas: [],
   })
 
   const actividades = [
@@ -46,8 +41,8 @@ export default function AgregarFamiliares() {
       if (!res.ok) throw new Error('Error al cargar los datos')
       const data = await res.json()
       setFamiliares(data.data || [])
-    } catch (error) {
-      console.error('Error cargando datos:', error)
+    } catch (err) {
+      console.error(err)
       toast.error('Error al cargar los datos')
     }
   }
@@ -63,9 +58,7 @@ export default function AgregarFamiliares() {
       const idx = arr.indexOf(actividad)
       return {
         ...prev,
-        actividadesSeleccionadas: idx > -1
-          ? arr.filter(a => a !== actividad)
-          : [...arr, actividad],
+        actividadesSeleccionadas: idx > -1 ? arr.filter(a => a !== actividad) : [...arr, actividad],
       }
     })
   }
@@ -98,10 +91,7 @@ export default function AgregarFamiliares() {
 
       toast.success('Familiar agregado')
       setShowForm(false)
-      setFormData({
-        apellidos: '', nombres: '', documento: '', fechaNacimiento: '',
-        parentesco: '', actividadesSeleccionadas: [],
-      })
+      setFormData({ apellidos: '', nombres: '', documento: '', fechaNacimiento: '', parentesco: '', actividadesSeleccionadas: [] })
       cargarDatos()
     } catch (err) {
       toast.error(err.message)
@@ -136,94 +126,123 @@ export default function AgregarFamiliares() {
   const required = <span className="text-primary">*</span>
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
       <ConfirmDialog />
 
-      {/* Hero */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-primary via-primary to-primary-dark text-white">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute -top-10 -left-10 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute top-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
-        </div>
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-10 md:py-14">
-          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
-            <div className="bg-white rounded-2xl p-4 shadow-2xl animate-float">
-              <TenantLogo className="h-16 md:h-20 w-auto" />
-            </div>
-            <div className="text-center md:text-left flex-1">
-              <h1 className="text-3xl md:text-5xl font-bold leading-tight">
-                ¡Tu solicitud está <span className="text-yellow-200">en camino!</span>
-              </h1>
-              <p className="text-white/90 mt-3 text-base md:text-lg max-w-xl">
-                Ahora podés sumar a tu grupo familiar a la inscripción. Cada uno con sus propias actividades.
-              </p>
-              <p className="text-white/70 mt-2 text-xs">Solicitud #{solicitudId}</p>
-            </div>
-          </div>
+      {/* Hero athletic */}
+      <div className="relative overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
+        <div className="absolute inset-0 bg-field-grid-pub opacity-40" />
+        <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-20 blur-3xl" style={{ background: 'var(--color-primary)' }} />
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-12 md:py-20">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-70 hover:text-pub-fg mb-8 transition-colors"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            Volver al sitio
+          </Link>
+
+          <div className="pub-eyebrow text-pub-fg-70 mb-5">Paso 2 — Grupo familiar</div>
+          <h1 className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(40px, 6vw, 90px)', lineHeight: 0.92 }}>
+            Sumá a<br /><span style={{ color: 'var(--color-primary)' }}>tu familia.</span>
+          </h1>
+          <p className="text-pub-fg-70 mt-6 text-lg md:text-xl max-w-2xl" style={{ fontWeight: 300 }}>
+            Cada miembro queda dado de alta con sus propias actividades. Podés agregar todos los que necesites — o saltearlo si vas solo.
+          </p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-50 mt-4">
+            Solicitud #{solicitudId}
+          </p>
 
           {/* Pasos */}
-          <div className="mt-10 flex items-center justify-center md:justify-start gap-3 md:gap-6">
-            <StepDot num={1} label="Tus datos" done />
-            <div className="flex-1 max-w-16 h-0.5 bg-white" />
-            <StepDot num={2} label="Tu familia" active />
-            <div className="flex-1 max-w-16 h-0.5 bg-white/30" />
-            <StepDot num={3} label="Listo" muted />
+          <div className="mt-10 flex items-center justify-start gap-3 md:gap-6">
+            <StepDot label="Tus datos" num={1} done />
+            <div className="flex-1 max-w-16 h-0.5 bg-pub-fg" />
+            <StepDot label="Tu familia" num={2} active />
+            <div className="flex-1 max-w-16 h-0.5 bg-pub-fg-30" />
+            <StepDot label="Listo" num={3} muted />
           </div>
         </div>
       </div>
 
       {/* Body */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-6 pb-16 relative z-10">
+
         {/* Confirmación */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6 animate-fade-in-up">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md">
-              <CheckCircle2 className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900">¡Solicitud enviada!</h2>
-              <p className="text-gray-600 text-sm mt-0.5">
-                Recibimos tus datos. Si querés, podés sumar a tu cónyuge e hijos/as ahora — todos quedan dados de alta como un solo grupo familiar.
-              </p>
-            </div>
+        <div
+          className="p-5 mb-6 animate-fade-in-up flex items-start gap-4"
+          style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+        >
+          <div
+            className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}
+          >
+            <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--text-dim)' }} />
+          </div>
+          <div>
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] mb-1" style={{ color: 'var(--text-muted)' }}>
+              Solicitud recibida
+            </h3>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
+              Recibimos tus datos. Si querés, podés sumar a tu cónyuge e hijos/as ahora — todos quedan en un solo grupo familiar.
+            </p>
           </div>
         </div>
 
         {/* Lista de familiares */}
         {familiares.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6 animate-fade-in-up" style={{ animationDelay: '50ms' }}>
-            <div className="px-5 sm:px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-lg font-bold text-gray-900">Tu grupo familiar</h2>
-                <p className="text-xs text-gray-500">{familiares.length} {familiares.length === 1 ? 'persona agregada' : 'personas agregadas'}</p>
-              </div>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {familiares.map(f => (
-                <div key={f.id} className="px-5 sm:px-6 py-4 flex items-start gap-3 hover:bg-gray-50 transition-colors">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${f.parentesco === 'CONYUGE' ? 'bg-rose-100' : 'bg-amber-100'}`}>
+          <FormSection
+            icon={Users}
+            title="Tu grupo familiar"
+            subtitle={`${familiares.length} ${familiares.length === 1 ? 'persona agregada' : 'personas agregadas'}`}
+            delay={50}
+          >
+            <div className="space-y-0 -mx-5 sm:-mx-6 -my-5 sm:-my-6">
+              {familiares.map((f, i) => (
+                <div
+                  key={f.id}
+                  className="px-5 sm:px-6 py-4 flex items-start gap-3 hover:bg-black/[0.02] transition-colors"
+                  style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}
+                >
+                  <div
+                    className="w-9 h-9 flex items-center justify-center flex-shrink-0"
+                    style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}
+                  >
                     {f.parentesco === 'CONYUGE'
-                      ? <Heart className="w-5 h-5 text-rose-500" />
-                      : <Baby className="w-5 h-5 text-amber-600" />}
+                      ? <Heart className="w-4 h-4" style={{ color: 'var(--text-dim)' }} />
+                      : <Baby className="w-4 h-4" style={{ color: 'var(--text-dim)' }} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900">{f.apellidos} {f.nombres}</span>
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${f.parentesco === 'CONYUGE' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className="font-medium" style={{ color: 'var(--text)' }}>
+                        {f.apellidos} {f.nombres}
+                      </span>
+                      <span className="font-mono text-[9px] uppercase tracking-[0.2em] px-2 py-0.5"
+                        style={{
+                          border: '1px solid var(--border)',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
                         {f.parentesco === 'CONYUGE' ? 'Cónyuge' : 'Hijo/a'}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                    <div className="text-xs mt-1 flex flex-wrap gap-x-3 gap-y-0.5" style={{ color: 'var(--text-muted)' }}>
                       <span>DNI {f.documento}</span>
-                      <span className="inline-flex items-center gap-1"><Cake className="w-3 h-3" />{calcularEdad(f.fechaNacimiento)} años</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Cake className="w-3 h-3" />{calcularEdad(f.fechaNacimiento)} años
+                      </span>
                     </div>
                     {f.actividadesSeleccionadas?.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {f.actividadesSeleccionadas.map(a => (
-                          <span key={a} className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          <span
+                            key={a}
+                            className="text-[11px] px-2 py-0.5"
+                            style={{
+                              border: '1px solid var(--border)',
+                              color: 'var(--text-dim)',
+                              backgroundColor: 'var(--bg-surface-hi)',
+                            }}
+                          >
                             {a}
                           </span>
                         ))}
@@ -232,7 +251,8 @@ export default function AgregarFamiliares() {
                   </div>
                   <button
                     onClick={() => handleEliminar(f.id)}
-                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex-shrink-0"
+                    className="p-2 hover:bg-red-50 transition-colors flex-shrink-0"
+                    style={{ color: 'var(--text-muted)' }}
                     title="Eliminar"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -240,168 +260,172 @@ export default function AgregarFamiliares() {
                 </div>
               ))}
             </div>
-          </div>
+          </FormSection>
         )}
 
         {/* Form de nuevo familiar */}
         {showForm ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6 animate-fade-in-up">
-            <div className="px-5 sm:px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-purple-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                <UserPlus className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-lg font-bold text-gray-900">Agregar familiar</h2>
-                <p className="text-xs text-gray-500">Completá los datos de la persona</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Cerrar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Apellidos {required}</label>
-                  <input type="text" name="apellidos" value={formData.apellidos} onChange={handleChange} required className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Nombres {required}</label>
-                  <input type="text" name="nombres" value={formData.nombres} onChange={handleChange} required className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Documento {required}</label>
-                  <input type="text" name="documento" value={formData.documento} onChange={handleChange} required minLength="7" placeholder="Sin puntos" className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Fecha de nacimiento {required}</label>
-                  <input type="date" name="fechaNacimiento" value={formData.fechaNacimiento} onChange={handleChange} required className={inputCls} />
-                  {formData.fechaNacimiento && (
-                    <p className="text-xs text-gray-500 mt-1.5 inline-flex items-center gap-1">
-                      <Cake className="w-3 h-3" />
-                      {calcularEdad(formData.fechaNacimiento)} años
-                    </p>
-                  )}
-                </div>
-                <div className="md:col-span-2">
-                  <label className={labelCls}>Parentesco {required}</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, parentesco: 'CONYUGE' }))}
-                      className={`flex items-center gap-2 p-3 border-2 rounded-xl transition-all ${
-                        formData.parentesco === 'CONYUGE'
-                          ? 'border-rose-500 bg-rose-500 text-white shadow-md scale-[1.02]'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-rose-300 hover:bg-rose-50'
-                      }`}
-                    >
-                      <Heart className="w-5 h-5" />
-                      <span className="font-medium">Cónyuge</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, parentesco: 'HIJO' }))}
-                      className={`flex items-center gap-2 p-3 border-2 rounded-xl transition-all ${
-                        formData.parentesco === 'HIJO'
-                          ? 'border-amber-500 bg-amber-500 text-white shadow-md scale-[1.02]'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-amber-300 hover:bg-amber-50'
-                      }`}
-                    >
-                      <Baby className="w-5 h-5" />
-                      <span className="font-medium">Hijo/a</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Actividades {required}
-                  </label>
-                  {formData.actividadesSeleccionadas.length > 0 && (
-                    <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                      {formData.actividadesSeleccionadas.length} seleccionada{formData.actividadesSeleccionadas.length > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                  {actividades.map(actividad => {
-                    const selected = formData.actividadesSeleccionadas.includes(actividad)
-                    return (
-                      <button
-                        key={actividad}
-                        type="button"
-                        onClick={() => handleActividadChange(actividad)}
-                        className={`relative flex items-center gap-2 p-3 border-2 rounded-xl text-left transition-all duration-200 ${
-                          selected
-                            ? 'border-primary bg-primary text-white shadow-md scale-[1.02]'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:bg-primary/5'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                          selected ? 'border-white bg-white' : 'border-gray-300'
-                        }`}>
-                          {selected && <CheckCircle2 className="w-5 h-5 text-primary -m-0.5" />}
-                        </div>
-                        <span className="text-sm font-medium">{actividad}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-                {formData.actividadesSeleccionadas.length === 0 && (
-                  <p className="text-xs text-gray-500 mt-2 inline-flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    Elegí al menos una actividad
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <div className="mt-6">
+            <FormSection
+              icon={UserPlus}
+              title="Agregar familiar"
+              subtitle="Completá los datos de la persona"
+              delay={0}
+              badge={
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 sm:flex-none sm:px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors"
+                  className="p-2 hover:bg-black/5 transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  title="Cerrar"
                 >
-                  Cancelar
+                  <X className="w-4 h-4" />
                 </button>
-                <button
-                  type="submit"
-                  disabled={loading || formData.actividadesSeleccionadas.length === 0}
-                  className="flex-1 bg-gradient-to-r from-primary to-primary-dark text-white py-3 px-6 rounded-xl hover:shadow-xl hover:shadow-primary/30 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed font-semibold transition-all flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Agregando...
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="w-5 h-5" />
-                      Agregar familiar
-                    </>
+              }
+            >
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Apellidos {required}</label>
+                    <input type="text" name="apellidos" value={formData.apellidos} onChange={handleChange} required className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Nombres {required}</label>
+                    <input type="text" name="nombres" value={formData.nombres} onChange={handleChange} required className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Documento {required}</label>
+                    <input type="text" name="documento" value={formData.documento} onChange={handleChange} required minLength="7" placeholder="Sin puntos" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Fecha de nacimiento {required}</label>
+                    <input type="date" name="fechaNacimiento" value={formData.fechaNacimiento} onChange={handleChange} required className={inputCls} />
+                    {formData.fechaNacimiento && (
+                      <p className="text-xs text-gray-500 mt-1.5 inline-flex items-center gap-1">
+                        <Cake className="w-3 h-3" />
+                        {calcularEdad(formData.fechaNacimiento)} años
+                      </p>
+                    )}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className={labelCls}>Parentesco {required}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <ParentescoBtn
+                        active={formData.parentesco === 'CONYUGE'}
+                        onClick={() => setFormData(prev => ({ ...prev, parentesco: 'CONYUGE' }))}
+                        icon={Heart}
+                        label="Cónyuge"
+                      />
+                      <ParentescoBtn
+                        active={formData.parentesco === 'HIJO'}
+                        onClick={() => setFormData(prev => ({ ...prev, parentesco: 'HIJO' }))}
+                        icon={Baby}
+                        label="Hijo/a"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">Actividades {required}</label>
+                    {formData.actividadesSeleccionadas.length > 0 && (
+                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] px-2 py-0.5"
+                        style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                      >
+                        {formData.actividadesSeleccionadas.length} seleccionada{formData.actividadesSeleccionadas.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {actividades.map(actividad => {
+                      const selected = formData.actividadesSeleccionadas.includes(actividad)
+                      return (
+                        <button
+                          key={actividad}
+                          type="button"
+                          onClick={() => handleActividadChange(actividad)}
+                          className="flex items-center gap-2 p-3 text-left transition-all"
+                          style={{
+                            border: selected ? '1px solid var(--color-primary)' : '1px solid var(--border)',
+                            backgroundColor: selected ? 'var(--color-primary)' : 'var(--bg-surface)',
+                            color: selected ? '#fff' : 'var(--text)',
+                          }}
+                        >
+                          <div
+                            className="w-4 h-4 flex items-center justify-center flex-shrink-0"
+                            style={{
+                              border: selected ? '1px solid #fff' : '1px solid var(--border)',
+                              backgroundColor: selected ? '#fff' : 'transparent',
+                            }}
+                          >
+                            {selected && <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />}
+                          </div>
+                          <span className="text-sm font-medium">{actividad}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {formData.actividadesSeleccionadas.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-2 inline-flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Elegí al menos una actividad
+                    </p>
                   )}
-                </button>
-              </div>
-            </form>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="flex-1 sm:flex-none sm:px-6 py-3 border font-medium transition-colors"
+                    style={{
+                      backgroundColor: 'var(--bg-surface)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-dim)',
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || formData.actividadesSeleccionadas.length === 0}
+                    className="group flex-1 bg-gradient-to-r from-primary to-primary-dark text-white py-3 px-6 hover:shadow-xl hover:shadow-primary/30 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed font-semibold transition-all flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Agregando...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-5 h-5" />
+                        Agregar familiar
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </FormSection>
           </div>
         ) : (
           /* Botones de acción */
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6 animate-fade-in-up">
             <button
               onClick={() => setShowForm(true)}
-              className="group bg-white border-2 border-dashed border-primary/40 hover:border-primary text-primary py-5 px-6 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-all hover:bg-primary/5 hover:shadow-md"
+              className="py-5 px-6 font-medium flex items-center justify-center gap-2 transition-all"
+              style={{
+                border: '1px dashed var(--color-primary)',
+                color: 'var(--color-primary)',
+                backgroundColor: 'var(--bg-surface)',
+              }}
             >
               <UserPlus className="w-5 h-5" />
               {familiares.length === 0 ? 'Agregar primer familiar' : 'Agregar otro familiar'}
             </button>
             <button
               onClick={handleFinalizar}
-              className="group bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white py-5 px-6 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-xl hover:shadow-emerald-500/30 transition-all"
+              className="group bg-gradient-to-r from-primary to-primary-dark text-white py-5 px-6 font-semibold flex items-center justify-center gap-2 transition-all hover:shadow-xl hover:shadow-primary/30"
             >
               {familiares.length > 0 ? 'Finalizar y enviar' : 'Continuar sin familiares'}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -411,13 +435,21 @@ export default function AgregarFamiliares() {
 
         {/* Info final */}
         {!showForm && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 animate-fade-in-up flex items-start gap-3" style={{ animationDelay: '150ms' }}>
-            <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0">
-              <Trophy className="w-5 h-5 text-white" />
+          <div
+            className="mt-6 p-5 animate-fade-in-up flex items-start gap-4"
+            style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+          >
+            <div
+              className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}
+            >
+              <Trophy className="w-4 h-4" style={{ color: 'var(--text-dim)' }} />
             </div>
-            <div className="text-sm text-blue-900">
-              <p className="font-semibold mb-1">¿Qué pasa después?</p>
-              <p className="text-blue-800 text-xs leading-relaxed">
+            <div>
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] mb-1" style={{ color: 'var(--text-muted)' }}>
+                ¿Qué pasa después?
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                 Cuando finalices, nuestro equipo revisa la solicitud. En las próximas 48 horas vas a recibir un email con la
                 respuesta y, si está aprobada, un link para abonar la primera cuota.
               </p>
@@ -434,20 +466,80 @@ export default function AgregarFamiliares() {
 function StepDot({ num, label, active = false, muted = false, done = false }) {
   return (
     <div className="flex items-center gap-2">
-      <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
+      <div className={`w-9 h-9 flex items-center justify-center font-mono text-xs font-bold transition-all ${
         active
-          ? 'bg-white text-primary shadow-lg scale-110'
+          ? 'bg-pub-fg text-pub-hero-bg'
           : done
-            ? 'bg-white text-primary'
-            : muted
-              ? 'bg-white/20 text-white/70 border border-white/30'
-              : 'bg-white text-primary'
-      }`}>
-        {done ? <CheckCircle2 className="w-5 h-5" /> : num}
+            ? 'bg-pub-fg text-pub-hero-bg'
+            : 'border border-pub-fg-30 text-pub-fg-50'
+      }`}
+      style={done || active ? { backgroundColor: 'var(--pub-hero-fg)', color: 'var(--pub-hero-bg)' } : {}}
+      >
+        {done ? <CheckCircle2 className="w-4 h-4" /> : num}
       </div>
-      <span className={`text-xs font-medium hidden sm:inline ${active ? 'text-white' : 'text-white/70'}`}>
+      <span className={`font-mono text-[10px] uppercase tracking-[0.2em] hidden sm:inline ${
+        active ? 'text-pub-fg' : muted ? 'text-pub-fg-50' : 'text-pub-fg-70'
+      }`}>
         {label}
       </span>
     </div>
+  )
+}
+
+function FormSection({ icon: Icon, title, subtitle, badge, children, delay = 0 }) {
+  return (
+    <div
+      className="overflow-hidden animate-fade-in-up"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
+        animationDelay: `${delay}ms`,
+      }}
+    >
+      <div
+        className="px-5 sm:px-6 py-4 flex items-center gap-3"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        <div
+          className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+          style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}
+        >
+          <Icon className="w-4 h-4" style={{ color: 'var(--text-dim)' }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2
+            className="font-display-sport"
+            style={{ fontSize: 22, lineHeight: 1.05, color: 'var(--color-text-primary, var(--text))' }}
+          >
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
+          )}
+        </div>
+        {badge}
+      </div>
+      <div className="p-5 sm:p-6">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function ParentescoBtn({ active, onClick, icon: Icon, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2 p-3 transition-all"
+      style={{
+        border: active ? '1px solid var(--color-primary)' : '1px solid var(--border)',
+        backgroundColor: active ? 'var(--color-primary)' : 'var(--bg-surface)',
+        color: active ? '#fff' : 'var(--text)',
+      }}
+    >
+      <Icon className="w-5 h-5" />
+      <span className="font-medium">{label}</span>
+    </button>
   )
 }
