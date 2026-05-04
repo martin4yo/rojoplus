@@ -129,8 +129,8 @@ router.post('/resumen-mensual', authAdmin, asyncHandler(async (req, res) => {
     db.socio.count({
       where: { OR: [{ estado: { contains: 'Activ', mode: 'insensitive' } }, { estado: { contains: 'Vigent', mode: 'insensitive' } }] }
     }),
-    db.socio.count({ where: { createdAt: { gte: inicioMes } } }),
-    db.socio.count({ where: { estado: { contains: 'Baja', mode: 'insensitive' }, updatedAt: { gte: inicioMes } } }),
+    db.socio.count({ where: { fechaAlta: { gte: inicioMes } } }),
+    db.socio.count({ where: { estado: { contains: 'Baja', mode: 'insensitive' }, fechaBaja: { gte: inicioMes } } }),
     db.inscripcion.count({ where: { estado: 'ACTIVA' } }),
     db.movimientoCaja.aggregate({
       where: { tipo: 'INGRESO', fecha: { gte: inicioMes } },

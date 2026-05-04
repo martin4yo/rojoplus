@@ -48,7 +48,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   const bajas30Dias = await req.db.socio.count({
     where: {
       estado: { contains: 'Baja', mode: 'insensitive' },
-      updatedAt: { gte: hace30Dias },
+      fechaBaja: { gte: hace30Dias },
     },
   })
 
@@ -81,7 +81,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
       req.db.socio.count({
         where: {
           estado: { contains: 'Baja', mode: 'insensitive' },
-          updatedAt: { gte: inicioMes, lte: finMes },
+          fechaBaja: { gte: inicioMes, lte: finMes },
         },
       }),
     ])
