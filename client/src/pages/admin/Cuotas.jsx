@@ -1096,6 +1096,7 @@ export default function Cuotas() {
               <option value="">Todos</option>
               <option value="PENDIENTE">Pendientes</option>
               <option value="PAGADO">Pagados</option>
+              <option value="ANULADO">Anuladas</option>
               <option value="A_CONCILIAR">A conciliar</option>
             </select>
           </div>

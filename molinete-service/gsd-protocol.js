@@ -3,7 +3,6 @@ import { EventEmitter } from 'events'
 
 // Frames del protocolo GSD RS232
 const POLL_A     = Buffer.from([0x02, 0x64, 0x81, 0x81, 0x03, 0x65])
-const POLL_B     = Buffer.from([0x02, 0x65, 0x81, 0x81, 0x03, 0x64])
 const CMD_ABRIR  = Buffer.from([0x02, 0x64, 0x89, 0x83, 0x32, 0x03, 0x5d])
 const CMD_ACK    = Buffer.from([0x02, 0x64, 0x80, 0x80, 0x03, 0x65])  // limpia buffer de la placa
 
@@ -25,7 +24,6 @@ export class GSDProtocol extends EventEmitter {
     this.logger = logger
     this.port = null
     this.rxBuffer = Buffer.alloc(0)
-    this.pollToggle = false
     this.pollTimer = null
     this.pendienteApertura = false
     this.pendienteAck = false
@@ -76,18 +74,16 @@ export class GSDProtocol extends EventEmitter {
   _poll() {
     if (!this.port?.isOpen) return
 
-    if (this.pendienteApertura) {
-      this.pendienteApertura = false
-      this.pendienteAck = false
-      this.logger.info('→ GSD: Enviando comando ABRIR relay')
-      this.port.write(CMD_ABRIR)
-    } else if (this.pendienteAck) {
+    // ACK primero si está pendiente — la placa lo necesita antes del próximo comando
+    if (this.pendienteAck) {
       this.pendienteAck = false
       this.port.write(CMD_ACK)
+    } else if (this.pendienteApertura) {
+      this.pendienteApertura = false
+      this.logger.info('→ GSD: Enviando comando ABRIR relay')
+      this.port.write(CMD_ABRIR)
     } else {
-      const frame = this.pollToggle ? POLL_B : POLL_A
-      this.pollToggle = !this.pollToggle
-      this.port.write(frame)
+      this.port.write(POLL_A)
     }
   }
 

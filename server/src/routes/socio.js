@@ -1483,7 +1483,7 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
     movimientos.push({
       id: `C${cargo.id}`,
       tipo: 'DEBITO',
-      fecha: cargo.fechaEmision,
+      fecha: cargo.fechaGeneracion,
       concepto,
       detalle: detalle || '-',
       estado: cargo.estado,

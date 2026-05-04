@@ -1566,7 +1566,7 @@ router.get('/socios/:socioId/cuenta-corriente', authAdmin, asyncHandler(async (r
     where: {
       socioId: { in: socioIds },
       estado: { not: 'ANULADO' },
-      ...(desde || hasta ? { createdAt: whereFecha } : {})
+      ...(desde || hasta ? { fechaGeneracion: whereFecha } : {})
     },
     include: {
       socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
@@ -1624,7 +1624,7 @@ router.get('/socios/:socioId/cuenta-corriente', authAdmin, asyncHandler(async (r
     movimientos.push({
       id: `cargo-${cargo.id}`,
       tipo: 'CARGO',
-      fecha: cargo.createdAt,
+      fecha: cargo.fechaGeneracion || cargo.createdAt,
       concepto,
       debe: Number(cargo.montoTotal),
       haber: 0,
