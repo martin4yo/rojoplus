@@ -924,3 +924,136 @@ export async function verificarConexionSMTP() {
     return false
   }
 }
+
+// ─── TIENDA ONLINE ─────────────────────────────────────────────────────────
+
+function tiendaEmailWrapper({ tenantInfo, titulo, cuerpo, footer }) {
+  const color = tenantInfo.color || '#0EA5E9'
+  return `
+    <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background:#f8fafc;">
+      <div style="background-color: ${color}; padding: 28px; text-align: center;">
+        <h1 style="color: white; margin: 0; letter-spacing: 1px;">${tenantInfo.nombre || 'Club'}</h1>
+        <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0 0; text-transform: uppercase; font-size: 12px; letter-spacing: 2px;">Tienda Online</p>
+      </div>
+      <div style="padding: 32px; background-color: #ffffff;">
+        <h2 style="color: #0f172a; margin-top: 0;">${titulo}</h2>
+        ${cuerpo}
+      </div>
+      <div style="background-color: #0f172a; padding: 18px; text-align: center;">
+        <p style="color: #94a3b8; margin: 0; font-size: 12px;">${footer || tenantInfo.nombre || 'Clubix'}</p>
+      </div>
+    </div>
+  `
+}
+
+/**
+ * Envía email de verificación a un ShopCustomer recién registrado.
+ */
+export async function enviarVerificacionEmailTienda({ shopCustomer, token, tenantId, db }) {
+  const tenantInfo = await getTenantInfo(tenantId)
+  const link = `${tenantInfo.url}/tienda/verificar-email?token=${encodeURIComponent(token)}`
+
+  const cuerpo = `
+    <p style="color:#475569; line-height:1.6;">Hola ${shopCustomer.nombre},</p>
+    <p style="color:#475569; line-height:1.6;">Recibimos tu registro en la tienda online de <strong>${tenantInfo.nombre}</strong>. Para activar tu cuenta verificá tu email haciendo clic en el siguiente botón:</p>
+    <div style="text-align:center; margin:30px 0;">
+      <a href="${link}" style="display:inline-block; background:${tenantInfo.color}; color:white; padding:14px 32px; text-decoration:none; border-radius:6px; font-weight:bold;">Verificar mi email</a>
+    </div>
+    <p style="color:#94a3b8; font-size:12px; line-height:1.6;">Este link expira en 24 horas. Si no creaste esta cuenta podés ignorar este mensaje.</p>
+  `
+
+  await enviarEmail({
+    to: shopCustomer.email,
+    subject: `Verificá tu email - ${tenantInfo.nombre}`,
+    html: tiendaEmailWrapper({ tenantInfo, titulo: 'Confirmá tu email', cuerpo }),
+    db,
+  })
+}
+
+/**
+ * Envía un magic link al comprador (login sin password).
+ */
+export async function enviarMagicLinkTienda({ shopCustomer, token, tenantId, db }) {
+  const tenantInfo = await getTenantInfo(tenantId)
+  const link = `${tenantInfo.url}/tienda/login-magic?token=${encodeURIComponent(token)}`
+
+  const cuerpo = `
+    <p style="color:#475569; line-height:1.6;">Hola ${shopCustomer.nombre || ''},</p>
+    <p style="color:#475569; line-height:1.6;">Recibimos un pedido de acceso a la tienda online. Hacé clic para entrar:</p>
+    <div style="text-align:center; margin:30px 0;">
+      <a href="${link}" style="display:inline-block; background:${tenantInfo.color}; color:white; padding:14px 32px; text-decoration:none; border-radius:6px; font-weight:bold;">Ingresar</a>
+    </div>
+    <p style="color:#94a3b8; font-size:12px; line-height:1.6;">Este link expira en 15 minutos. Si no lo solicitaste, ignorá este email.</p>
+  `
+
+  await enviarEmail({
+    to: shopCustomer.email,
+    subject: `Tu link de acceso - ${tenantInfo.nombre} Tienda`,
+    html: tiendaEmailWrapper({ tenantInfo, titulo: 'Acceso a la tienda', cuerpo }),
+    db,
+  })
+}
+
+/**
+ * Notificación al comprador: pedido pagado confirmado.
+ */
+export async function enviarPedidoConfirmadoTienda({ pedidoTienda, items, tenantId, db }) {
+  const tenantInfo = await getTenantInfo(tenantId)
+  const itemsHtml = items.map(it => `
+    <tr>
+      <td style="padding:8px; border-bottom:1px solid #e2e8f0;">
+        ${it.snapshotNombre}
+        ${it.snapshotTalle ? ` <span style="color:#64748b">(${it.snapshotTalle}${it.snapshotColor ? ` ${it.snapshotColor}` : ''})</span>` : ''}
+      </td>
+      <td style="padding:8px; border-bottom:1px solid #e2e8f0; text-align:center;">${it.cantidad}</td>
+      <td style="padding:8px; border-bottom:1px solid #e2e8f0; text-align:right;">$${Number(it.subtotal).toLocaleString('es-AR')}</td>
+    </tr>
+  `).join('')
+
+  const cuerpo = `
+    <p style="color:#475569; line-height:1.6;">Hola ${pedidoTienda.compradorNombre},</p>
+    <p style="color:#475569; line-height:1.6;">Recibimos tu pago para el pedido <strong>${pedidoTienda.numero}</strong>. Te avisaremos cuando esté listo para retirar.</p>
+    <table style="width:100%; border-collapse:collapse; margin:20px 0;">
+      <thead>
+        <tr style="background:#f1f5f9;">
+          <th style="padding:8px; text-align:left;">Producto</th>
+          <th style="padding:8px; text-align:center;">Cantidad</th>
+          <th style="padding:8px; text-align:right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>${itemsHtml}</tbody>
+      <tfoot>
+        <tr><td colspan="3" style="padding:12px 8px; text-align:right; font-weight:bold; font-size:16px;">Total: $${Number(pedidoTienda.total).toLocaleString('es-AR')}</td></tr>
+      </tfoot>
+    </table>
+  `
+
+  await enviarEmail({
+    to: pedidoTienda.compradorEmail,
+    subject: `Pedido confirmado ${pedidoTienda.numero} - ${tenantInfo.nombre}`,
+    html: tiendaEmailWrapper({ tenantInfo, titulo: '¡Pedido confirmado!', cuerpo }),
+    db,
+  })
+}
+
+/**
+ * Notificación de cambio de estado al comprador.
+ */
+export async function enviarCambioEstadoTienda({ pedidoTienda, estadoNuevo, tenantId, db, mensajePersonalizado }) {
+  const tenantInfo = await getTenantInfo(tenantId)
+  const cuerpo = `
+    <p style="color:#475569; line-height:1.6;">Hola ${pedidoTienda.compradorNombre},</p>
+    <p style="color:#475569; line-height:1.6;">El estado de tu pedido <strong>${pedidoTienda.numero}</strong> cambió a:</p>
+    <div style="background:#f1f5f9; border-left:4px solid ${estadoNuevo.color || tenantInfo.color}; padding:16px; margin:16px 0;">
+      <strong style="color:#0f172a; font-size:18px;">${estadoNuevo.nombre}</strong>
+    </div>
+    ${mensajePersonalizado ? `<p style="color:#475569; line-height:1.6;">${mensajePersonalizado}</p>` : ''}
+  `
+
+  await enviarEmail({
+    to: pedidoTienda.compradorEmail,
+    subject: `Pedido ${pedidoTienda.numero}: ${estadoNuevo.nombre} - ${tenantInfo.nombre}`,
+    html: tiendaEmailWrapper({ tenantInfo, titulo: estadoNuevo.nombre, cuerpo }),
+    db,
+  })
+}

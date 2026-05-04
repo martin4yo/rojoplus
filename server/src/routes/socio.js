@@ -4,6 +4,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
 import { enviarLinkPortal, obtenerTelefonoSocio } from '../services/whatsappService.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
+import { getMpAccessToken } from '../lib/mercadoPagoConfig.js'
 import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.js'
 import { generatePDF } from '../services/pdfGenerator.js'
 import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
@@ -1266,6 +1267,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
     const periodo = cargo.periodo ? `${cargo.periodo.nombre}/${cargo.periodo.anio}` : ''
 
     const preferencia = await crearPreferenciaPago({
+      accessToken: await getMpAccessToken(req.db),
       title: cargo.descripcion || cargo.categoria,
       description: periodo ? `Cuota ${periodo}` : (cargo.descripcion || cargo.categoria),
       amount: parseFloat(cargo.montoTotal),
@@ -1367,6 +1369,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
     const baseUrl = getTenantFrontendUrl(req.tenant)
 
     const preferencia = await crearPreferenciaPago({
+      accessToken: await getMpAccessToken(req.db),
       title: `Pago de ${cargos.length} cuota(s)`,
       description: cargos.map(c => {
         const periodo = c.periodo ? `${c.periodo.nombre}/${c.periodo.anio}` : ''

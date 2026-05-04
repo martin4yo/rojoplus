@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { Button } from '../../../components/Button'
 import { Alert } from '../../../components/Alert'
 import { MultiImageUpload } from '../../../components/ImageUpload'
+import Switch from '../../../components/Switch'
 import api from '../../../services/api'
 import { useConfirm } from '../../../hooks/useConfirm'
 import LoadingSpinner from '../../../components/LoadingSpinner'
@@ -40,7 +41,11 @@ export default function ProductoForm() {
     conceptoCompraId: '',
     conceptoVentaId: '',
     activo: true,
-    aparecerEnCompras: true
+    aparecerEnCompras: true,
+    publicarEnTienda: false,
+    destacadoTienda: false,
+    precioOfertaTienda: '',
+    descripcionTienda: '',
   })
 
   // Variantes (talles)
@@ -87,7 +92,11 @@ export default function ProductoForm() {
         conceptoCompraId: producto.conceptoCompraId ? String(producto.conceptoCompraId) : '',
         conceptoVentaId: producto.conceptoVentaId ? String(producto.conceptoVentaId) : '',
         activo: producto.activo !== false,
-        aparecerEnCompras: producto.aparecerEnCompras !== false
+        aparecerEnCompras: producto.aparecerEnCompras !== false,
+        publicarEnTienda: !!producto.publicarEnTienda,
+        destacadoTienda: !!producto.destacadoTienda,
+        precioOfertaTienda: producto.precioOfertaTienda ?? '',
+        descripcionTienda: producto.descripcionTienda || '',
       })
       setVariantes(producto.variantes || [])
       setFotos(producto.fotos || [])
@@ -125,7 +134,11 @@ export default function ProductoForm() {
         conceptoCompraId: form.conceptoCompraId ? parseInt(form.conceptoCompraId) : null,
         conceptoVentaId: form.conceptoVentaId ? parseInt(form.conceptoVentaId) : null,
         activo: form.activo,
-        aparecerEnCompras: form.aparecerEnCompras
+        aparecerEnCompras: form.aparecerEnCompras,
+        publicarEnTienda: form.publicarEnTienda,
+        destacadoTienda: form.destacadoTienda,
+        precioOfertaTienda: form.precioOfertaTienda === '' ? null : Number(form.precioOfertaTienda),
+        descripcionTienda: form.descripcionTienda || null,
       }
 
       // Si es nuevo, incluir variantes iniciales
@@ -390,29 +403,21 @@ export default function ProductoForm() {
                     ))}
                   </select>
                 </div>
-                <div className="flex items-end gap-4">
+                <div className="flex items-end gap-6">
                   {isEditing && (
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.activo}
-                        onChange={e => setForm({ ...form, activo: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-300 text-primary"
-                        disabled={!editMode}
-                      />
-                      <span className="text-sm text-gray-700">Producto activo</span>
-                    </label>
-                  )}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.aparecerEnCompras}
-                      onChange={e => setForm({ ...form, aparecerEnCompras: e.target.checked })}
-                      className="w-4 h-4 rounded border-gray-300 text-primary"
-                      disabled={isEditing && !editMode}
+                    <Switch
+                      checked={form.activo}
+                      onChange={v => setForm({ ...form, activo: v })}
+                      label="Producto activo"
+                      disabled={!editMode}
                     />
-                    <span className="text-sm text-gray-700">Aparece en Compras</span>
-                  </label>
+                  )}
+                  <Switch
+                    checked={form.aparecerEnCompras}
+                    onChange={v => setForm({ ...form, aparecerEnCompras: v })}
+                    label="Aparece en Compras"
+                    disabled={isEditing && !editMode}
+                  />
                 </div>
               </div>
 
@@ -488,6 +493,61 @@ export default function ProductoForm() {
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">Para facturas de venta</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tienda Online */}
+              <div className="pt-4 border-t">
+                <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <span>Tienda Online</span>
+                  {form.publicarEnTienda && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Publicado</span>}
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-6">
+                    <Switch
+                      checked={form.publicarEnTienda}
+                      onChange={v => setForm({ ...form, publicarEnTienda: v })}
+                      label="Publicar en tienda online"
+                      disabled={isEditing && !editMode}
+                    />
+                    <Switch
+                      checked={form.destacadoTienda}
+                      onChange={v => setForm({ ...form, destacadoTienda: v })}
+                      label="Destacado"
+                      disabled={isEditing && !editMode}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Precio en Oferta (opcional)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={form.precioOfertaTienda}
+                          onChange={e => setForm({ ...form, precioOfertaTienda: e.target.value })}
+                          className="input-field w-full pl-7"
+                          placeholder="(sin oferta)"
+                          disabled={!editMode}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Si lo cargás, aparece con badge "OFERTA" y precio de venta tachado</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Descripción para tienda</label>
+                    <textarea
+                      rows={3}
+                      value={form.descripcionTienda}
+                      onChange={e => setForm({ ...form, descripcionTienda: e.target.value })}
+                      className="input-field w-full"
+                      placeholder="Texto que se muestra en la ficha del producto en /tienda (si está vacío, usa la descripción general)"
+                      disabled={!editMode}
+                    />
                   </div>
                 </div>
               </div>

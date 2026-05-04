@@ -379,6 +379,8 @@ model Socio {
   entradas                     Entrada[]
   ventasEventoQR               VentaEventoQRPendiente[]
   reservas                     ReservaEspacio[]
+  pedidosTienda                PedidoTienda[]
+  shopCustomers                ShopCustomer[]
   gestionesCobranza            GestionCobranza[]        @relation("GestionesCobranza")
   encuestasBaja                EncuestaBaja[]           @relation("EncuestasBaja")
   accionesRecupero             AccionRecupero[]         @relation("AccionesRecupero")
@@ -1525,6 +1527,8 @@ model Admin {
   tenantUsuarios               TenantUsuario[]
   favoritosAcceso              FavoritoAcceso[]
   favoritosCarpetas            FavoritoCarpeta[]
+  pedidosTiendaRegistrados     PedidoTienda[]                @relation("PedidoTiendaRegistrador")
+  historialEstadosTienda       HistorialEstadoPedidoTienda[] @relation("HistorialTiendaAdmin")
 
   @@map("admins")
 }
@@ -1848,6 +1852,8 @@ model Entidad {
   movimientosCaja      MovimientoCaja[]
   ordenesCompra        OrdenCompra[]
   pedidos              Pedido[]
+  pedidosTienda        PedidoTienda[]
+  shopCustomers        ShopCustomer[]
 
   tenantId Int @map("tenant_id")
 
@@ -1935,6 +1941,7 @@ model Pedido {
   facturas      MovimientoContable[]
   entidad       Entidad?             @relation(fields: [entidadId], references: [id])
   socio         Socio?               @relation(fields: [socioId], references: [id])
+  pedidoTienda  PedidoTienda?
 
   tenantId Int @map("tenant_id")
 
@@ -1993,6 +2000,10 @@ model Producto {
   margen            Decimal?           @db.Decimal(5, 2)
   activo            Boolean            @default(true)
   aparecerEnCompras Boolean            @default(true) @map("aparecer_en_compras")
+  publicarEnTienda  Boolean            @default(false) @map("publicar_en_tienda")
+  destacadoTienda   Boolean            @default(false) @map("destacado_tienda")
+  precioOfertaTienda Decimal?          @map("precio_oferta_tienda") @db.Decimal(12, 2)
+  descripcionTienda String?            @map("descripcion_tienda") @db.Text
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
   conceptoCompraId  Int?               @map("concepto_compra_id")
@@ -2030,7 +2041,9 @@ model ProductoVariante {
   itemsMovimiento  ItemMovimiento[]
   itemsOrdenCompra ItemOrdenCompra[]
   itemsPedido      ItemPedido[]
+  itemsPedidoTienda ItemPedidoTienda[]
   movimientos      MovimientoStock[]
+  reservas         ReservaStock[]
   producto         Producto          @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
   tenantId Int @map("tenant_id")
@@ -4825,4 +4838,245 @@ model ReportExecution {
   @@index([tenantId])
   @@index([templateId])
   @@map("report_executions")
+}
+
+// ==============================
+// TIENDA ONLINE (Shop / Merchandising)
+// ==============================
+
+model EstadoPedidoTienda {
+  id              Int     @id @default(autoincrement())
+  codigo          String
+  nombre          String
+  color           String  @default("#6B7280")
+  isInitial       Boolean @default(false) @map("is_initial")
+  isFinal         Boolean @default(false) @map("is_final")
+  permiteFacturar Boolean @default(false) @map("permite_facturar")
+  autoFacturar    Boolean @default(false) @map("auto_facturar")
+  notificaCliente Boolean @default(true) @map("notifica_cliente")
+  ordenKanban     Int     @default(0) @map("orden_kanban")
+  activo          Boolean @default(true)
+
+  pedidos           PedidoTienda[]
+  transicionesDesde TransicionEstadoTienda[]    @relation("EstadoDesde")
+  transicionesHasta TransicionEstadoTienda[]    @relation("EstadoHasta")
+  historial         HistorialEstadoPedidoTienda[]
+
+  tenantId Int @map("tenant_id")
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId])
+  @@map("estados_pedido_tienda")
+}
+
+model TransicionEstadoTienda {
+  id       Int @id @default(autoincrement())
+  desdeId  Int @map("desde_id")
+  hastaId  Int @map("hasta_id")
+  tenantId Int @map("tenant_id")
+
+  desde EstadoPedidoTienda @relation("EstadoDesde", fields: [desdeId], references: [id], onDelete: Cascade)
+  hasta EstadoPedidoTienda @relation("EstadoHasta", fields: [hastaId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, desdeId, hastaId])
+  @@index([tenantId])
+  @@map("transiciones_estado_tienda")
+}
+
+model ShopCustomer {
+  id             Int       @id @default(autoincrement())
+  email          String
+  passwordHash   String?   @map("password_hash")
+  nombre         String
+  telefono       String?
+  documento      String?
+  tipoDocumento  String?   @map("tipo_documento")
+  estado         String    @default("APPROVED") // PENDING | APPROVED | BLOCKED
+  emailVerificadoEn DateTime? @map("email_verificado_en")
+  verifyToken    String?   @map("verify_token")
+  verifyTokenExp DateTime? @map("verify_token_exp")
+  magicToken     String?   @map("magic_token")
+  magicTokenExp  DateTime? @map("magic_token_exp")
+  ultimoLogin    DateTime? @map("ultimo_login")
+  socioId        Int?      @map("socio_id")
+  entidadId      Int?      @map("entidad_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  socio    Socio?         @relation(fields: [socioId], references: [id])
+  entidad  Entidad?       @relation(fields: [entidadId], references: [id])
+  pedidos  PedidoTienda[]
+
+  tenantId Int @map("tenant_id")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([socioId])
+  @@index([entidadId])
+  @@map("shop_customers")
+}
+
+model PedidoTienda {
+  id                  Int      @id @default(autoincrement())
+  numero              String
+  estadoId            Int      @map("estado_id")
+  shopCustomerId      Int?     @map("shop_customer_id")
+  socioId             Int?     @map("socio_id")
+  entidadId           Int?     @map("entidad_id")
+
+  // Snapshot del comprador (para invitados o histórico)
+  compradorNombre     String   @map("comprador_nombre")
+  compradorEmail      String   @map("comprador_email")
+  compradorTelefono   String?  @map("comprador_telefono")
+  compradorDocumento  String?  @map("comprador_documento")
+
+  // Totales
+  subtotal Decimal @default(0) @db.Decimal(12, 2)
+  total    Decimal @default(0) @db.Decimal(12, 2)
+
+  // Pago
+  paymentStatus       String  @default("pending") @map("payment_status") // pending | paid | expired | refunded | cancelled
+  paymentMethod       String  @default("MP") @map("payment_method") // MP | PRESENCIAL
+  mpPreferenceId      String? @map("mp_preference_id")
+  mpPaymentId         String? @map("mp_payment_id")
+  mpExternalReference String? @unique @map("mp_external_reference")
+  mpInitPoint         String? @map("mp_init_point") @db.Text
+  expiraEn            DateTime? @map("expira_en")
+  pagadoEn            DateTime? @map("pagado_en")
+
+  // Entrega
+  metodoEntrega    String  @default("RETIRO_CLUB") @map("metodo_entrega")
+  notasComprador   String? @map("notas_comprador") @db.Text
+  notasAdmin       String? @map("notas_admin") @db.Text
+  fechaEntrega     DateTime? @map("fecha_entrega")
+  entregadoEn      DateTime? @map("entregado_en")
+
+  // Vinculo al pedido interno (se crea al confirmar pago)
+  pedidoId         Int? @unique @map("pedido_id")
+
+  // Auditoría
+  registradoPor    Int?     @map("registrado_por") // admin si fue creado desde admin
+  ipComprador      String?  @map("ip_comprador")
+  userAgent        String?  @map("user_agent") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  estado        EstadoPedidoTienda            @relation(fields: [estadoId], references: [id])
+  shopCustomer  ShopCustomer?                 @relation(fields: [shopCustomerId], references: [id])
+  socio         Socio?                        @relation(fields: [socioId], references: [id])
+  entidad       Entidad?                      @relation(fields: [entidadId], references: [id])
+  pedido        Pedido?                       @relation(fields: [pedidoId], references: [id])
+  registrador   Admin?                        @relation("PedidoTiendaRegistrador", fields: [registradoPor], references: [id])
+  items         ItemPedidoTienda[]
+  reservas      ReservaStock[]
+  historial     HistorialEstadoPedidoTienda[]
+
+  tenantId Int @map("tenant_id")
+
+  @@unique([tenantId, numero])
+  @@index([tenantId])
+  @@index([estadoId])
+  @@index([paymentStatus])
+  @@index([shopCustomerId])
+  @@index([socioId])
+  @@index([entidadId])
+  @@index([createdAt])
+  @@index([expiraEn])
+  @@map("pedidos_tienda")
+}
+
+model ItemPedidoTienda {
+  id                 Int     @id @default(autoincrement())
+  pedidoTiendaId     Int     @map("pedido_tienda_id")
+  productoVarianteId Int     @map("producto_variante_id")
+  cantidad           Decimal @db.Decimal(12, 2)
+  precioUnitario     Decimal @map("precio_unitario") @db.Decimal(12, 2)
+  subtotal           Decimal @db.Decimal(12, 2)
+
+  // Snapshot por si se modifica el producto/variante después
+  snapshotNombre  String  @map("snapshot_nombre")
+  snapshotTalle   String? @map("snapshot_talle")
+  snapshotColor   String? @map("snapshot_color")
+  snapshotSku     String? @map("snapshot_sku")
+  snapshotImagen  String? @map("snapshot_imagen") @db.Text
+
+  pedidoTienda     PedidoTienda     @relation(fields: [pedidoTiendaId], references: [id], onDelete: Cascade)
+  productoVariante ProductoVariante @relation(fields: [productoVarianteId], references: [id])
+
+  tenantId Int @map("tenant_id")
+
+  @@index([pedidoTiendaId])
+  @@index([productoVarianteId])
+  @@index([tenantId])
+  @@map("items_pedido_tienda")
+}
+
+model ReservaStock {
+  id                 Int      @id @default(autoincrement())
+  productoVarianteId Int      @map("producto_variante_id")
+  pedidoTiendaId     Int?     @map("pedido_tienda_id")
+  cantidad           Decimal  @db.Decimal(12, 2)
+  estado             String   @default("ACTIVA") // ACTIVA | CONFIRMADA | EXPIRADA | CONSUMIDA | CANCELADA
+  expiraEn           DateTime @map("expira_en")
+  consumidoEn        DateTime? @map("consumido_en")
+  liberadoEn         DateTime? @map("liberado_en")
+  motivo             String?  // ej: 'TIENDA_CHECKOUT'
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  productoVariante ProductoVariante @relation(fields: [productoVarianteId], references: [id])
+  pedidoTienda     PedidoTienda?    @relation(fields: [pedidoTiendaId], references: [id], onDelete: SetNull)
+
+  tenantId Int @map("tenant_id")
+
+  @@index([productoVarianteId])
+  @@index([estado])
+  @@index([expiraEn])
+  @@index([pedidoTiendaId])
+  @@index([tenantId])
+  @@map("reservas_stock")
+}
+
+model HistorialEstadoPedidoTienda {
+  id             Int      @id @default(autoincrement())
+  pedidoTiendaId Int      @map("pedido_tienda_id")
+  estadoId       Int      @map("estado_id")
+  registradoPor  Int?     @map("registrado_por")
+  nota           String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  pedidoTienda PedidoTienda       @relation(fields: [pedidoTiendaId], references: [id], onDelete: Cascade)
+  estado       EstadoPedidoTienda @relation(fields: [estadoId], references: [id])
+  admin        Admin?             @relation("HistorialTiendaAdmin", fields: [registradoPor], references: [id])
+
+  tenantId Int @map("tenant_id")
+
+  @@index([pedidoTiendaId])
+  @@index([tenantId])
+  @@map("historial_estado_pedido_tienda")
+}
+
+model ShopWebhookLog {
+  id                Int      @id @default(autoincrement())
+  source            String   @default("MERCADOPAGO") // MERCADOPAGO | otro futuro
+  paymentId         String?  @map("payment_id")
+  externalReference String?  @map("external_reference")
+  topic             String?
+  rawPayload        Json     @map("raw_payload")
+  processed         Boolean  @default(false)
+  hasError          Boolean  @default(false) @map("has_error")
+  errorMessage      String?  @map("error_message") @db.Text
+  retryCount        Int      @default(0) @map("retry_count")
+  lastRetryAt       DateTime? @map("last_retry_at")
+  processedAt       DateTime? @map("processed_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  tenantId Int? @map("tenant_id") // puede ser null si no se pudo extraer del externalReference
+
+  @@index([paymentId])
+  @@index([externalReference])
+  @@index([processed])
+  @@index([hasError])
+  @@index([tenantId])
+  @@map("shop_webhook_logs")
 }

@@ -14,16 +14,52 @@ import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { PrismaClient } from '@prisma/client'
 import { obtenerPago } from '../services/mercadoPagoQR.js'
+import { obtenerPagoTienda } from '../services/mercadoPagoTienda.js'
 import { generarNumeroMovimientoCaja } from './buffet/helpers.js'
+import { procesarPagoTienda } from '../services/procesarPagoTienda.js'
 
 const router = express.Router()
 const globalPrisma = new PrismaClient()
 
-// Extrae tenantId del externalReference "clubix-ventanilla-{tenantId}-{uuid}"
+/**
+ * Detecta el contexto del externalReference y devuelve { contexto, tenantId }.
+ *   clubix-ventanilla-{tenantId}-... → { contexto: 'ventanilla', tenantId }
+ *   clubix-tienda-{tenantId}-...     → { contexto: 'tienda', tenantId }
+ *   otro                              → { contexto: null }
+ */
+function parseExternalRef(ref) {
+  if (!ref || typeof ref !== 'string') return { contexto: null, tenantId: null }
+  const m = ref.match(/^clubix-(ventanilla|tienda)-(\d+)-/)
+  if (!m) return { contexto: null, tenantId: null }
+  return { contexto: m[1], tenantId: parseInt(m[2]) }
+}
+
+// Compat con código previo
 function parseTenantFromExternalRef(ref) {
-  if (!ref || typeof ref !== 'string') return null
-  const m = ref.match(/^clubix-ventanilla-(\d+)-/)
-  return m ? parseInt(m[1]) : null
+  const { contexto, tenantId } = parseExternalRef(ref)
+  return contexto === 'ventanilla' ? tenantId : null
+}
+
+/**
+ * Cuando el .env no tiene el token o no matchea, busca en los tenants
+ * configurados en Configuracion (modulo='PAGOS') uno que pueda obtener el pago.
+ * Ineficiente pero solo se usa como fallback en el webhook legacy.
+ */
+async function intentarObtenerPagoConTenants(paymentId) {
+  const cfgs = await globalPrisma.configuracion.findMany({
+    where: { modulo: 'PAGOS', clave: 'MP_ACCESS_TOKEN' },
+    select: { tenantId: true, valor: true },
+  })
+  for (const cfg of cfgs) {
+    if (!cfg.valor) continue
+    try {
+      const pago = await obtenerPago(paymentId, cfg.valor)
+      if (pago) return pago
+    } catch {
+      // probar siguiente
+    }
+  }
+  return null
 }
 
 /**
@@ -61,16 +97,129 @@ router.get('/mercadopago', (req, res) => {
   res.json({ status: 'ok' })
 })
 
+/**
+ * POST /api/webhooks/mercadopago/:tenantSlug
+ * Webhook por-tenant para tienda online. Usa el access token del tenant
+ * (resuelto a partir del slug) para consultar el pago en MP.
+ */
+router.post('/mercadopago/:tenantSlug', express.json(), async (req, res) => {
+  const { tenantSlug } = req.params
+  try {
+    const type = req.query.type || req.query.topic || req.body?.type || req.body?.topic
+    const paymentId = req.query['data.id'] || req.query.id || req.body?.data?.id || req.body?.id
+
+    console.log(`[MP Webhook][Tienda:${tenantSlug}] type=${type} paymentId=${paymentId}`)
+
+    if (type !== 'payment' || !paymentId) {
+      return res.status(200).json({ received: true, ignored: true })
+    }
+
+    res.status(200).json({ received: true })
+
+    procesarPagoTiendaWebhook(tenantSlug, paymentId).catch(err => {
+      console.error(`[MP Webhook][Tienda:${tenantSlug}] Error:`, err)
+    })
+  } catch (err) {
+    console.error('[MP Webhook][Tienda] Error general:', err)
+    if (!res.headersSent) res.status(200).json({ received: true, error: err.message })
+  }
+})
+
+router.get('/mercadopago/:tenantSlug', (req, res) => {
+  res.json({ status: 'ok', tenant: req.params.tenantSlug })
+})
+
+async function procesarPagoTiendaWebhook(tenantSlug, paymentId) {
+  // Resolver tenant + access token
+  const tenant = await globalPrisma.tenant.findUnique({
+    where: { subdomain: tenantSlug },
+    select: { id: true, slug: true, subdomain: true },
+  })
+  const tenantBySlug = tenant || await globalPrisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, slug: true, subdomain: true },
+  })
+  if (!tenantBySlug) {
+    console.warn(`[MP Webhook][Tienda] Tenant no encontrado para slug=${tenantSlug}`)
+    return
+  }
+
+  const cfg = await globalPrisma.configuracion.findUnique({
+    where: { tenantId_clave: { tenantId: tenantBySlug.id, clave: 'TIENDA_MP_ACCESS_TOKEN' } },
+  })
+  const accessToken = cfg?.valor
+  if (!accessToken) {
+    console.warn(`[MP Webhook][Tienda] No hay access token MP para tenant ${tenantBySlug.id}`)
+    return
+  }
+
+  let pago
+  try {
+    pago = await obtenerPagoTienda(accessToken, paymentId)
+  } catch (err) {
+    console.error(`[MP Webhook][Tienda] Error consultando pago ${paymentId}:`, err.message)
+    return
+  }
+  if (!pago) return
+
+  // Log + procesar
+  await globalPrisma.shopWebhookLog.create({
+    data: {
+      source: 'MERCADOPAGO',
+      paymentId: String(pago.id),
+      externalReference: pago.external_reference,
+      topic: 'payment',
+      rawPayload: pago,
+      processed: false,
+      tenantId: tenantBySlug.id,
+    },
+  })
+
+  try {
+    const result = await procesarPagoTienda(pago, tenantBySlug.id)
+    if (result) {
+      await globalPrisma.shopWebhookLog.updateMany({
+        where: { paymentId: String(pago.id), tenantId: tenantBySlug.id },
+        data: { processed: true, processedAt: new Date() },
+      })
+    }
+  } catch (err) {
+    console.error(`[MP Webhook][Tienda] Error procesando:`, err)
+    await globalPrisma.shopWebhookLog.updateMany({
+      where: { paymentId: String(pago.id), tenantId: tenantBySlug.id },
+      data: { hasError: true, errorMessage: err.message?.slice(0, 500) },
+    })
+  }
+}
+
 async function procesarPagoMP(paymentId) {
-  const pago = await obtenerPago(paymentId)
+  // Sin saber el tenant todavía, intentamos primero con el .env como antes
+  // (si está) para descubrir el external_reference y poder rutear
+  let pago
+  try {
+    pago = await obtenerPago(paymentId, process.env.MERCADOPAGO_ACCESS_TOKEN)
+  } catch (err) {
+    // Posible: el token global no tiene acceso a este pago. Intentamos con
+    // tokens de cada tenant hasta encontrar uno que matchee
+    pago = await intentarObtenerPagoConTenants(paymentId)
+  }
+
   if (!pago) {
     console.warn(`[MP Webhook] Pago ${paymentId} no encontrado en MP`)
     return
   }
 
-  const tenantId = parseTenantFromExternalRef(pago.external_reference)
-  if (!tenantId) {
-    console.log(`[MP Webhook] Pago ${paymentId} sin external_reference de ventanilla (ref=${pago.external_reference})`)
+  // Detectar contexto del externalReference y rutear
+  const { contexto, tenantId } = parseExternalRef(pago.external_reference)
+
+  if (contexto === 'tienda') {
+    // Tienda usa la URL /mercadopago/:tenantSlug — si llegó acá es config legacy
+    console.warn(`[MP Webhook] Pago de tienda llegó a la URL legacy. Usar /mercadopago/:tenantSlug`)
+    return
+  }
+
+  if (contexto !== 'ventanilla' || !tenantId) {
+    console.log(`[MP Webhook] Pago ${paymentId} sin external_reference reconocido (ref=${pago.external_reference})`)
     return
   }
 

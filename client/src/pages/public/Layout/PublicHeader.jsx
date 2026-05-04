@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, ChevronDown, ArrowUpRight } from 'lucide-react'
+import { Menu, X, ChevronDown, ArrowUpRight, ShoppingBag } from 'lucide-react'
 import { useTenant } from '../../../contexts/TenantContext'
 import TenantLogo from '../../../components/TenantLogo'
+import { useShopCart } from '../../../contexts/ShopCartContext'
 
 export default function PublicHeader() {
   const { tenant } = useTenant()
+  const { totalItems } = useShopCart()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [socioMenuOpen, setSocioMenuOpen] = useState(false)
   const [clubMenuOpen, setClubMenuOpen] = useState(false)
@@ -26,6 +28,7 @@ export default function PublicHeader() {
     { path: '/actividades', label: 'Actividades' },
     { path: '/instalaciones', label: 'Instalaciones' },
     { path: '/menu-buffet', label: 'Buffet' },
+    { path: '/tienda', label: 'Tienda' },
     { path: '/noticias', label: 'Noticias' },
     { path: '/comercios', label: 'Beneficios' },
     { path: '/nosotros', label: 'Nosotros', submenu: [
@@ -153,6 +156,23 @@ export default function PublicHeader() {
                 </div>
               )}
             </div>
+
+            {/* Cart icon */}
+            <Link
+              to="/tienda/carrito"
+              className="relative ml-2 p-2 text-pub-fg-70 hover:text-pub-fg transition"
+              title="Carrito"
+            >
+              <ShoppingBag className="w-5 h-5" />
+              {totalItems > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+                  style={{ background: 'var(--color-primary)', color: 'var(--accent-fg, #fff)' }}
+                >
+                  {totalItems}
+                </span>
+              )}
+            </Link>
 
             {/* CTA Button */}
             <Link

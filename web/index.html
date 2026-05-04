@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Navigation -->
@@ -21,10 +21,9 @@
                 </div>
                 <div class="nav-links">
                     <a href="#caracteristicas">Características</a>
-                    <a href="#caracteristicas">Módulos</a>
                     <a href="#beneficios">Beneficios</a>
                     <a href="#precios">Precios</a>
-                    <a href="#contacto" class="btn-primary">Solicitar Demo</a>
+                    <a href="#contacto" class="btn btn-primary">Solicitar Demo</a>
                 </div>
                 <button class="mobile-menu-btn" id="mobileMenuBtn">
                     <span></span>
@@ -35,54 +34,47 @@
         </div>
     </nav>
 
-    <!-- Hero Section con Parallax -->
+    <!-- Hero -->
     <section class="hero">
-        <div class="parallax-bg"></div>
+        <div class="hero-bg" id="heroBg" aria-hidden="true">
+            <div class="hero-slide is-active" data-deporte="Fútbol"   style="background-image:url('images/futbol.jpg')"></div>
+            <div class="hero-slide" data-deporte="Básquet"            style="background-image:url('images/basquet.jpg')"></div>
+            <div class="hero-slide" data-deporte="Tenis"              style="background-image:url('images/tenis.jpg')"></div>
+            <div class="hero-slide" data-deporte="Natación"           style="background-image:url('images/natacion.jpg')"></div>
+            <div class="hero-slide" data-deporte="Atletismo"          style="background-image:url('images/atletismo.jpg')"></div>
+            <div class="hero-slide" data-deporte="Vóley"              style="background-image:url('images/voley.jpg')"></div>
+            <div class="hero-slide" data-deporte="Hockey"             style="background-image:url('images/hockey.jpg')"></div>
+            <div class="hero-slide" data-deporte="Rugby"              style="background-image:url('images/rugby.jpg')"></div>
+            <div class="hero-slide" data-deporte="Golf"               style="background-image:url('images/golf.jpg')"></div>
+        </div>
+        <div class="hero-overlay" aria-hidden="true"></div>
+        <div class="hero-indicator" id="heroIndicator" aria-hidden="true">
+            <span class="hero-indicator__counter">01 / 09</span>
+            <span class="hero-indicator__bar"><span id="heroIndicatorFill"></span></span>
+            <span class="hero-indicator__name">FÚTBOL</span>
+        </div>
         <div class="container hero-content">
             <div class="hero-text" data-aos="fade-up">
-                <h1>El sistema inteligente que hace crecer tu club</h1>
-                <p class="hero-subtitle">Más que un gestor: una plataforma con IA predictiva que analiza, sugiere y te ayuda a tomar decisiones estratégicas para potenciar tu institución</p>
+                <div class="eyebrow on-dark">Plataforma de gestión 2026</div>
+                <h1>Software inteligente<span class="accent">para tu club</span></h1>
+                <p class="hero-subtitle">Más que un gestor: una plataforma con IA predictiva que analiza tus datos, genera informes y sugiere acciones estratégicas para hacer crecer tu institución.</p>
                 <div class="hero-buttons">
-                    <a href="#contacto" class="btn-primary btn-lg">Solicitar Demo Gratuita</a>
-                    <a href="#video" class="btn-secondary btn-lg">
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M6.3 2.84A1 1 0 004 3.5v13a1 1 0 001.6.8l10-6.5a1 1 0 000-1.6l-10-6.5a1 1 0 00-.3-.16z"/>
-                        </svg>
-                        Ver Video
-                    </a>
+                    <a href="#contacto" class="btn btn-primary btn-lg">Solicitar Demo</a>
+                    <a href="#caracteristicas" class="btn btn-secondary on-dark btn-lg">Conocer Módulos</a>
                 </div>
                 <div class="stats-bar">
-                    <div class="stat stat-icon">
-                        <svg class="stat-icon-svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                            <path d="M2 17l10 5 10-5"/>
-                            <path d="M2 12l10 5 10-5"/>
-                        </svg>
-                        <span class="stat-label">IA Integrada</span>
-                    </div>
                     <div class="stat">
                         <span class="stat-number">35+</span>
                         <span class="stat-label">Módulos</span>
                     </div>
-                    <div class="stat stat-icon">
-                        <svg class="stat-icon-svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            <circle cx="9" cy="10" r="1" fill="currentColor"/>
-                            <circle cx="12" cy="10" r="1" fill="currentColor"/>
-                            <circle cx="15" cy="10" r="1" fill="currentColor"/>
-                        </svg>
-                        <span class="stat-label">Asistente Axio</span>
+                    <div class="stat">
+                        <span class="stat-number">IA</span>
+                        <span class="stat-label">Predictiva integrada</span>
                     </div>
-                </div>
-            </div>
-            <div class="hero-image" data-aos="fade-left">
-                <div class="dashboard-preview">
-                    <div class="browser-bar">
-                        <div class="browser-dots">
-                            <span></span><span></span><span></span>
-                        </div>
+                    <div class="stat">
+                        <span class="stat-number">24/7</span>
+                        <span class="stat-label">Bot WhatsApp</span>
                     </div>
-                    <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80" alt="Dashboard Preview">
                 </div>
             </div>
         </div>
@@ -90,12 +82,11 @@
 
     <!-- Features Section -->
     <section class="features" id="caracteristicas">
-        <div class="features-parallax-bg"></div>
-        <div class="container" style="position:relative; z-index:1;">
-            <div class="section-header features-header" data-aos="fade-up">
+        <div class="container">
+            <div class="section-header" data-aos="fade-up">
                 <span class="features-eyebrow">Capacidades</span>
-                <h2>Todo lo que tu club necesita,<br>en una sola plataforma</h2>
-                <p>Módulos integrados que trabajan en sincronía para transformar la gestión de tu institución</p>
+                <h2>Todo lo que tu club necesita.<br>En una sola plataforma.</h2>
+                <p>Módulos integrados que trabajan en sincronía para transformar la gestión de tu institución.</p>
             </div>
             <div class="features-grid">
                 <div class="feature-card" data-aos="fade-up" data-aos-delay="50" data-tilt>
@@ -246,9 +237,9 @@
                     </div>
                 </div>
                 <div class="rojo-ia-text" data-aos="fade-left">
-                    <div class="badge-ai">Powered by AxiomaCloud</div>
-                    <h2>Axio - IA Predictiva Integrada</h2>
-                    <p class="subtitle">El cerebro inteligente de tu club, ahora también en WhatsApp</p>
+                    <div class="eyebrow on-dark">Inteligencia artificial</div>
+                    <h2>Axio,<br>el cerebro<br>de tu club.</h2>
+                    <p class="subtitle">Powered by AxiomaCloud · Sin costo variable</p>
                     <p>Más que un asistente: Axio analiza tus datos en tiempo real, genera informes estratégicos, sugiere acciones concretas y ahora responde consultas directamente por WhatsApp a socios y staff.</p>
                     <ul class="ai-features">
                         <li>
@@ -288,13 +279,11 @@
                             Recomendaciones basadas en mejores prácticas de la industria
                         </li>
                     </ul>
-                    <div style="margin-top: 28px; background: linear-gradient(135deg, rgba(59,159,243,0.12), rgba(0,212,212,0.12)); border: 1.5px solid rgba(59,159,243,0.35); border-radius: 14px; padding: 18px 22px; display: flex; align-items: flex-start; gap: 14px;">
-                        <svg style="flex-shrink:0; margin-top:2px;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3B9FF3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
+                    <div class="ai-callout">
+                        <div class="ai-callout-mark">i</div>
                         <div>
-                            <strong style="color: #3B9FF3; font-size: 15px;">Sin costo adicional por uso de IA</strong>
-                            <p style="margin: 4px 0 0; color: #cbd5e1; font-size: 14px; line-height: 1.5;">Axio utiliza un modelo de IA local propio de AxiomaCloud. Si tu plan lo incluye, el uso de Axio no genera ningún cargo variable extra — sin tokens, sin sorpresas en la factura.</p>
+                            <strong>Sin costo adicional por uso de IA.</strong>
+                            <p>Axio corre sobre un modelo propio de AxiomaCloud. Si tu plan lo incluye, no hay cargo variable: sin tokens, sin sorpresas en la factura.</p>
                         </div>
                     </div>
                 </div>
@@ -303,63 +292,52 @@
     </section>
 
     <!-- WhatsApp IA Section -->
-    <section class="whatsapp-ia" id="whatsapp-ia" style="background: linear-gradient(135deg, #0a0a0a 0%, #111827 100%); padding: 80px 0;">
+    <section class="whatsapp-ia" id="whatsapp-ia">
         <div class="container">
-            <div class="section-header" data-aos="fade-up" style="color: white;">
-                <h2 style="color: white;">Asistente Axio en WhatsApp</h2>
-                <p style="color: #9ca3af;">Inteligencia artificial disponible 24/7 en el canal que ya usan tus socios</p>
+            <div class="section-header" data-aos="fade-up">
+                <span class="features-eyebrow on-dark" style="color: var(--on-dark-soft);">Canal directo</span>
+                <h2>WhatsApp<br>con cerebro propio.</h2>
+                <p>Inteligencia artificial disponible 24/7 en el canal que ya usan tus socios.</p>
             </div>
-            <div class="whatsapp-ia-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-top: 48px;">
+            <div class="whatsapp-grid">
                 <!-- Chat mockup -->
-                <div data-aos="fade-right" style="display: flex; justify-content: center;">
-                    <div class="whatsapp-chat-mockup" style="background: #1a1a2e; border-radius: 24px; padding: 24px; width: 320px; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
-                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #2d2d2d;">
-                            <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #3B9FF3, #00D4D4); display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px;">X</div>
+                <div data-aos="fade-right" class="whatsapp-mockup-wrap">
+                    <div class="whatsapp-chat">
+                        <div class="whatsapp-chat__header">
+                            <div class="whatsapp-chat__avatar">A</div>
                             <div>
-                                <div style="color: white; font-weight: 600; font-size: 15px;">Axio - Asistente Clubix</div>
-                                <div style="color: #25D366; font-size: 12px;">● En línea</div>
+                                <div class="whatsapp-chat__name">Axio · Asistente Clubix</div>
+                                <div class="whatsapp-chat__status">En línea</div>
                             </div>
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5;">
-                            <div style="background: #2d2d2d; border-radius: 12px 12px 12px 4px; padding: 10px 14px; color: #e5e7eb; max-width: 85%;">
-                                Hola! ¿Cuánto debo de cuotas?
-                            </div>
-                            <div style="background: linear-gradient(135deg, #3B9FF3, #00D4D4); border-radius: 12px 12px 4px 12px; padding: 10px 14px; color: white; max-width: 85%; align-self: flex-end;">
-                                Hola María 👋 Tenés 2 cuotas vencidas por $18.500 en total. ¿Querés recibir el link de pago?
-                            </div>
-                            <div style="background: #2d2d2d; border-radius: 12px 12px 12px 4px; padding: 10px 14px; color: #e5e7eb; max-width: 85%;">
-                                Sí, mandame el link
-                            </div>
-                            <div style="background: linear-gradient(135deg, #3B9FF3, #00D4D4); border-radius: 12px 12px 4px 12px; padding: 10px 14px; color: white; max-width: 85%; align-self: flex-end;">
-                                Aquí está tu acceso al portal: 🔗 sportivopilar.clubix.com.ar/s/... <br><br>El link es personal y expira en 7 días ✅
-                            </div>
+                        <div class="whatsapp-chat__body">
+                            <div class="msg msg--in">¿Cuánto debo de cuotas?</div>
+                            <div class="msg msg--out">Hola María. Tenés 2 cuotas vencidas por $18.500. ¿Te paso el link de pago?</div>
+                            <div class="msg msg--in">Sí, mandame el link</div>
+                            <div class="msg msg--out">sportivopilar.clubix.com.ar/s/...<br><span class="msg__meta">Personal · Expira en 7 días</span></div>
                         </div>
-                        <div style="margin-top: 16px; background: #2d2d2d; border-radius: 24px; padding: 10px 16px; color: #6b7280; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div class="whatsapp-chat__input">
                             <span>Escribí tu consulta...</span>
-                            <div style="width: 28px; height: 28px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-                            </div>
+                            <div class="whatsapp-chat__send">→</div>
                         </div>
                     </div>
                 </div>
                 <!-- Features -->
-                <div data-aos="fade-left">
-                    <div style="display: grid; gap: 20px;">
-                        <div style="background: rgba(59,159,243,0.1); border: 1px solid rgba(59,159,243,0.2); border-radius: 16px; padding: 20px;">
-                            <div style="color: #3B9FF3; font-size: 24px; margin-bottom: 8px;">💬</div>
-                            <h4 style="color: white; margin-bottom: 6px;">Consultas en lenguaje natural</h4>
-                            <p style="color: #9ca3af; font-size: 14px; margin: 0;">Los socios preguntan como hablan: "¿cuánto debo?", "¿cuándo vence mi cuota?", "¿puedo traer invitados?"</p>
-                        </div>
-                        <div style="background: rgba(0,212,212,0.1); border: 1px solid rgba(0,212,212,0.2); border-radius: 16px; padding: 20px;">
-                            <div style="color: #00D4D4; font-size: 24px; margin-bottom: 8px;">🔗</div>
-                            <h4 style="color: white; margin-bottom: 6px;">Acceso directo al portal</h4>
-                            <p style="color: #9ca3af; font-size: 14px; margin: 0;">Envía automáticamente el link personalizado de pago o acceso al portal del socio, sin intervención humana</p>
-                        </div>
-                        <div style="background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.2); border-radius: 16px; padding: 20px;">
-                            <div style="color: #25D366; font-size: 24px; margin-bottom: 8px;">📣</div>
-                            <h4 style="color: white; margin-bottom: 6px;">Campañas inteligentes anti-ban</h4>
-                            <p style="color: #9ca3af; font-size: 14px; margin: 0;">Envíos masivos con delays variables, límites por hora/día, horarios configurables y lista blanca para modo demo</p>
-                        </div>
+                <div data-aos="fade-left" class="whatsapp-features">
+                    <div class="wa-feature">
+                        <div class="wa-feature__num">01</div>
+                        <h4>Consultas en lenguaje natural</h4>
+                        <p>Los socios preguntan como hablan: "¿cuánto debo?", "¿cuándo vence mi cuota?", "¿puedo traer invitados?".</p>
+                    </div>
+                    <div class="wa-feature">
+                        <div class="wa-feature__num">02</div>
+                        <h4>Acceso directo al portal</h4>
+                        <p>Envía automáticamente el link personalizado de pago o acceso al portal del socio, sin intervención humana.</p>
+                    </div>
+                    <div class="wa-feature">
+                        <div class="wa-feature__num">03</div>
+                        <h4>Campañas con anti-ban</h4>
+                        <p>Envíos masivos con delays variables, límites por hora/día, horarios configurables y lista blanca para modo demo.</p>
                     </div>
                 </div>
             </div>
@@ -370,8 +348,9 @@
     <section class="benefits" id="beneficios">
         <div class="container">
             <div class="section-header" data-aos="fade-up">
-                <h2>¿Por qué Clubix hace crecer tu club?</h2>
-                <p>No es solo gestión, es estrategia inteligente</p>
+                <span class="features-eyebrow">Diferencia</span>
+                <h2>No es solo gestión.<br>Es estrategia inteligente.</h2>
+                <p>Cuatro razones por las que Clubix hace crecer instituciones, no sólo administrarlas.</p>
             </div>
             <div class="benefits-grid">
                 <div class="benefit-item" data-aos="fade-up" data-aos-delay="100">
@@ -402,8 +381,9 @@
     <section class="pricing" id="precios">
         <div class="container">
             <div class="section-header" data-aos="fade-up">
-                <h2>Planes a tu medida</h2>
-                <p>Soluciones escalables según el tamaño de tu club</p>
+                <span class="features-eyebrow">Planes</span>
+                <h2>A tu medida.<br>Sin sorpresas.</h2>
+                <p>Tres planes escalables según el tamaño de tu club. Sin costos variables ocultos por uso de IA.</p>
             </div>
             <div class="pricing-grid">
                 <div class="pricing-card" data-aos="fade-up" data-aos-delay="100">
@@ -416,13 +396,13 @@
                         <p class="price-desc">Hasta 500 socios</p>
                     </div>
                     <ul class="pricing-features">
-                        <li>✓ Gestión de Socios</li>
-                        <li>✓ Portal del Socio</li>
-                        <li>✓ Cuotas y Pagos</li>
-                        <li>✓ Reportes Básicos</li>
-                        <li>✓ Soporte Email</li>
+                        <li>Gestión de socios</li>
+                        <li>Portal del socio</li>
+                        <li>Cuotas y pagos</li>
+                        <li>Reportes básicos</li>
+                        <li>Soporte por email</li>
                     </ul>
-                    <a href="#contacto" class="btn-outline">Consultar</a>
+                    <a href="#contacto" class="btn btn-outline">Consultar</a>
                 </div>
 
                 <div class="pricing-card featured" data-aos="fade-up" data-aos-delay="200">
@@ -436,15 +416,15 @@
                         <p class="price-desc">Hasta 2000 socios</p>
                     </div>
                     <ul class="pricing-features">
-                        <li>✓ Todo del plan Básico</li>
-                        <li>✓ Módulo Financiero Completo</li>
-                        <li>✓ Módulo Deportivo</li>
-                        <li>✓ Buffet/POS</li>
-                        <li>✓ Control de Accesos</li>
-                        <li>✓ Axio IA <span style="font-size:12px; color:#3B9FF3; font-weight:600;">— sin costo variable</span></li>
-                        <li>✓ Soporte Prioritario</li>
+                        <li>Todo del plan Básico</li>
+                        <li>Módulo financiero completo</li>
+                        <li>Módulo deportivo</li>
+                        <li>Buffet & POS</li>
+                        <li>Control de accesos</li>
+                        <li>Axio IA · sin costo variable</li>
+                        <li>Soporte prioritario</li>
                     </ul>
-                    <a href="#contacto" class="btn-primary">Solicitar Demo</a>
+                    <a href="#contacto" class="btn btn-primary">Solicitar Demo</a>
                 </div>
 
                 <div class="pricing-card" data-aos="fade-up" data-aos-delay="300">
@@ -457,14 +437,14 @@
                         <p class="price-desc">Ilimitado</p>
                     </div>
                     <ul class="pricing-features">
-                        <li>✓ Todo del plan Profesional</li>
-                        <li>✓ Módulos Personalizados</li>
-                        <li>✓ Integraciones a Medida</li>
-                        <li>✓ Capacitación In-Situ</li>
-                        <li>✓ Soporte 24/7</li>
-                        <li>✓ Gestor de Cuenta Dedicado</li>
+                        <li>Todo del plan Profesional</li>
+                        <li>Módulos personalizados</li>
+                        <li>Integraciones a medida</li>
+                        <li>Capacitación in-situ</li>
+                        <li>Soporte 24/7</li>
+                        <li>Gestor de cuenta dedicado</li>
                     </ul>
-                    <a href="#contacto" class="btn-outline">Contactar</a>
+                    <a href="#contacto" class="btn btn-outline">Contactar</a>
                 </div>
             </div>
         </div>
@@ -474,9 +454,10 @@
     <section class="cta">
         <div class="container">
             <div class="cta-content" data-aos="zoom-in">
-                <h2>¿Listo para hacer crecer tu club con IA?</h2>
-                <p>Solicita una demo gratuita y descubre cómo Axio puede transformar tu gestión con análisis predictivo e informes inteligentes</p>
-                <a href="#contacto" class="btn-primary btn-lg">Solicitar Demo Gratuita</a>
+                <div class="eyebrow on-dark" style="margin-bottom:24px; justify-content:center;">Ready to play</div>
+                <h2>Hacé crecer<br>tu club.</h2>
+                <p>Demo gratuita. 30 minutos. Te mostramos qué puede hacer Axio con tus datos reales.</p>
+                <a href="#contacto" class="btn btn-primary btn-lg">Solicitar Demo</a>
             </div>
         </div>
     </section>
@@ -489,36 +470,51 @@
                     <h2>Contáctanos</h2>
                     <p>Completa el formulario y te contactaremos a la brevedad para coordinar una demo personalizada</p>
                     <div class="contact-details">
-                        <div class="contact-item">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
-                            <a href="mailto:info@clubix.com.ar" style="color:inherit;">info@clubix.com.ar</a>
-                        </div>
-                        <div class="contact-item">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                            </svg>
-                            <a href="tel:+5492304346897" style="color:inherit;">+54 9 230 4346897</a>
-                        </div>
-                        <div class="contact-item">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <div class="contact-block">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <circle cx="12" cy="11" r="3"/>
                             </svg>
-                            <span><span style="white-space:nowrap;">San José 1176, Villa Rosa</span><br>Pilar, Buenos Aires<br>Argentina</span>
+                            <div class="contact-block__body">
+                                <h4>Oficinas</h4>
+                                <p><strong>Principal:</strong> Ciudad de La Paz 2963, 6B<br>Buenos Aires, Argentina</p>
+                                <p><strong>Sucursal Pilar:</strong> San José 1176, Pilar, BA</p>
+                                <p><strong>Sucursal Costa Atlántica:</strong> De las Acacias 1033, Miramar, BA</p>
+                            </div>
                         </div>
-                        <div class="contact-item">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+
+                        <div class="contact-block">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
                             </svg>
-                            <a href="https://instagram.com/clubix.ar" target="_blank" rel="noopener noreferrer" style="color:inherit;">@clubix.ar</a>
+                            <div class="contact-block__body">
+                                <h4>Teléfonos</h4>
+                                <p><a href="tel:+541134365783">+54 11 3436-5783</a></p>
+                                <p><a href="tel:+5492304346897">+54 230 4346897</a></p>
+                            </div>
                         </div>
-                        <div class="contact-item">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+
+                        <div class="contact-block">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                <polyline points="22,6 12,13 2,6"/>
                             </svg>
-                            <a href="https://wa.me/5492304346897" target="_blank" rel="noopener noreferrer" style="color:inherit;white-space:nowrap;">+54 9 230 4346897</a>
+                            <div class="contact-block__body">
+                                <h4>Email</h4>
+                                <p><a href="mailto:info@clubix.com.ar">info@clubix.com.ar</a></p>
+                            </div>
+                        </div>
+
+                        <div class="contact-block">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            <div class="contact-block__body">
+                                <h4>Horarios</h4>
+                                <p>Lunes a Viernes: 9:00 — 18:00</p>
+                                <p><strong>Soporte 24/7 disponible</strong></p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -547,7 +543,7 @@
                     <div class="form-group">
                         <textarea name="mensaje" placeholder="Mensaje (opcional)" rows="4"></textarea>
                     </div>
-                    <button type="submit" class="btn-primary btn-block">Enviar Solicitud</button>
+                    <button type="submit" class="btn btn-primary btn-block">Enviar Solicitud</button>
                 </form>
             </div>
         </div>

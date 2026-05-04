@@ -10,11 +10,33 @@ import SWUpdateNotifier from './components/SWUpdateNotifier'
 import { TenantProvider } from './contexts/TenantContext'
 import { TicketProvider } from './contexts/TicketContext'
 import { NotificacionBuffetProvider } from './contexts/NotificacionBuffetContext'
+import { ShopCartProvider } from './contexts/ShopCartContext'
+import { ShopAuthProvider } from './contexts/ShopAuthContext'
 
 // Layouts (no lazy — son el shell, se necesitan siempre)
 import PublicLayout from './pages/public/Layout/PublicLayout'
 import AdminLayout from './components/AdminLayout'
 import SuperAdminLayout from './components/SuperAdminLayout'
+
+// Configuración global — Mercado Pago
+const ConfiguracionMercadoPago = lazy(() => import('./pages/admin/configuracion/MercadoPago'))
+
+// Tienda Online — Admin
+const TiendaConfiguracion = lazy(() => import('./pages/admin/tienda/Configuracion'))
+const TiendaEstados = lazy(() => import('./pages/admin/tienda/Estados'))
+const TiendaPedidos = lazy(() => import('./pages/admin/tienda/Pedidos'))
+const TiendaPedidoDetalle = lazy(() => import('./pages/admin/tienda/PedidoDetalle'))
+
+// Tienda Online — Público
+const TiendaPublica = lazy(() => import('./pages/public/tienda/Tienda'))
+const TiendaProductoDetalle = lazy(() => import('./pages/public/tienda/ProductoDetalle'))
+const TiendaCarrito = lazy(() => import('./pages/public/tienda/Carrito'))
+const TiendaCheckout = lazy(() => import('./pages/public/tienda/Checkout'))
+const TiendaCheckoutResultado = lazy(() => import('./pages/public/tienda/CheckoutResultado'))
+const TiendaLogin = lazy(() => import('./pages/public/tienda/LoginTienda'))
+const TiendaLoginMagic = lazy(() => import('./pages/public/tienda/LoginMagic'))
+const TiendaVerificarEmail = lazy(() => import('./pages/public/tienda/VerificarEmail'))
+const TiendaMisPedidos = lazy(() => import('./pages/public/tienda/MisPedidos'))
 
 // Páginas públicas
 const HomePublic = lazy(() => import('./pages/public/Home'))
@@ -298,6 +320,8 @@ function App() {
       <TenantProvider>
         <TenantStyles />
         <ConnectionErrorOverlay />
+        <ShopAuthProvider>
+        <ShopCartProvider>
         <TicketProvider>
           <NotificacionBuffetProvider>
             <ScrollToTop />
@@ -329,6 +353,20 @@ function App() {
                   <Route path="buffet/menu" element={<MenuBuffet />} />
                   <Route path="login-socio" element={<LoginSocio />} />
                   <Route path="mi-qr" element={<AccesoSocio />} />
+
+                  {/* Tienda Online — Público */}
+                  <Route path="tienda" element={<TiendaPublica />} />
+                  <Route path="tienda/carrito" element={<TiendaCarrito />} />
+                  <Route path="tienda/checkout" element={<TiendaCheckout />} />
+                  <Route path="tienda/checkout/exito" element={<TiendaCheckoutResultado />} />
+                  <Route path="tienda/checkout/error" element={<TiendaCheckoutResultado />} />
+                  <Route path="tienda/checkout/pendiente" element={<TiendaCheckoutResultado />} />
+                  <Route path="tienda/login" element={<TiendaLogin />} />
+                  <Route path="tienda/login-magic" element={<TiendaLoginMagic />} />
+                  <Route path="tienda/verificar-email" element={<TiendaVerificarEmail />} />
+                  <Route path="tienda/mis-pedidos" element={<TiendaMisPedidos />} />
+                  <Route path="tienda/:id" element={<TiendaProductoDetalle />} />
+
                   <Route path="*" element={<NotFoundPublic />} />
                 </Route>
 
@@ -397,6 +435,7 @@ function App() {
                   <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
                   <Route path="configuracion" element={<AdminTablasAuxiliares />} />
                   <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
+                  <Route path="configuracion/pagos/mercadopago" element={<ConfiguracionMercadoPago />} />
                   <Route path="configuracion/autoridades" element={<AdminAutoridades />} />
                   <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
                   <Route path="configuracion/fiscal" element={<ConfiguracionFiscal />} />
@@ -492,6 +531,12 @@ function App() {
                   <Route path="contabilidad/presupuestos/vigente" element={<PresupuestoVigente />} />
                   <Route path="contabilidad/presupuestos/:id" element={<PresupuestoEditor />} />
                   <Route path="contabilidad/presupuestos/:id/ejecucion" element={<PresupuestoEjecucion />} />
+
+                  {/* Tienda Online */}
+                  <Route path="tienda/pedidos" element={<TiendaPedidos />} />
+                  <Route path="tienda/pedidos/:id" element={<TiendaPedidoDetalle />} />
+                  <Route path="tienda/estados" element={<TiendaEstados />} />
+                  <Route path="tienda/configuracion" element={<TiendaConfiguracion />} />
 
                   {/* Stock */}
                   <Route path="stock/productos" element={<ProductosLista />} />
@@ -605,6 +650,8 @@ function App() {
             </Suspense>
           </NotificacionBuffetProvider>
         </TicketProvider>
+        </ShopCartProvider>
+        </ShopAuthProvider>
       </TenantProvider>
     </ErrorBoundary>
   )

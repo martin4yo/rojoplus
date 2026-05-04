@@ -108,6 +108,12 @@ export function initSocket(httpServer) {
       socket.join('buffet')
     }
 
+    // Tienda: cualquier admin con permiso TIENDA_* o esSuperAdmin se une
+    if (admin.esSuperAdmin || permisos.some(p => p.startsWith('TIENDA_'))) {
+      socket.join('destino:TIENDA')
+      console.log(`[Socket] ${admin.nombre} unido a destino:TIENDA`)
+    }
+
     // Manejar desconexión
     socket.on('disconnect', () => {
       console.log(`[Socket] Desconectado: ${admin.nombre}`)

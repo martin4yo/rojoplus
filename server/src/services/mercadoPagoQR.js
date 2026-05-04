@@ -18,18 +18,18 @@
 
 const MP_BASE = 'https://api.mercadopago.com'
 
-function getAccessToken() {
-  const token = process.env.MERCADOPAGO_ACCESS_TOKEN
-  if (!token) throw new Error('MERCADOPAGO_ACCESS_TOKEN no está configurado')
+function resolveAccessToken(accessToken) {
+  const token = accessToken || process.env.MERCADOPAGO_ACCESS_TOKEN
+  if (!token) throw new Error('Mercado Pago no está configurado (falta accessToken)')
   return token
 }
 
-async function mpFetch(path, options = {}) {
+async function mpFetch(path, options = {}, accessToken) {
   const url = `${MP_BASE}${path}`
   const res = await fetch(url, {
     ...options,
     headers: {
-      Authorization: `Bearer ${getAccessToken()}`,
+      Authorization: `Bearer ${resolveAccessToken(accessToken)}`,
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },
@@ -50,14 +50,15 @@ async function mpFetch(path, options = {}) {
 
 /**
  * Obtiene el user_id (collector) asociado al access token.
- * Se cachea en memoria por proceso.
+ * Cache por token.
  */
-let _collectorIdCache = null
-export async function getCollectorId() {
-  if (_collectorIdCache) return _collectorIdCache
-  const user = await mpFetch('/users/me')
-  _collectorIdCache = user.id
-  return _collectorIdCache
+const _collectorIdCache = new Map()
+export async function getCollectorId(accessToken) {
+  const tok = resolveAccessToken(accessToken)
+  if (_collectorIdCache.has(tok)) return _collectorIdCache.get(tok)
+  const user = await mpFetch('/users/me', {}, tok)
+  _collectorIdCache.set(tok, user.id)
+  return user.id
 }
 
 /**
@@ -79,8 +80,9 @@ export async function crearOrdenQRDinamica({
   items,
   externalPosId,
   notificationUrl,
+  accessToken,
 }) {
-  const collectorId = await getCollectorId()
+  const collectorId = await getCollectorId(accessToken)
   const posId = externalPosId || process.env.MP_POS_VENTANILLA || 'clubix-ventanilla'
   const notifUrl = notificationUrl
     || `${process.env.PUBLIC_URL || 'http://localhost:3000'}/api/webhooks/mercadopago`
@@ -102,21 +104,20 @@ export async function crearOrdenQRDinamica({
   }
 
   const path = `/instore/orders/qr/seller/collectors/${collectorId}/pos/${encodeURIComponent(posId)}/qrs`
-  const res = await mpFetch(path, { method: 'PUT', body: JSON.stringify(body) })
+  const res = await mpFetch(path, { method: 'PUT', body: JSON.stringify(body) }, accessToken)
   return { ...res, external_pos_id: posId, collector_id: collectorId }
 }
 
 /**
  * Borra la orden QR dinámica asociada a un POS (para cancelar o preparar un nuevo cobro).
  */
-export async function borrarOrdenQRDinamica({ externalPosId }) {
-  const collectorId = await getCollectorId()
+export async function borrarOrdenQRDinamica({ externalPosId, accessToken }) {
+  const collectorId = await getCollectorId(accessToken)
   const posId = externalPosId || process.env.MP_POS_VENTANILLA || 'clubix-ventanilla'
   const path = `/instore/qr/seller/collectors/${collectorId}/pos/${encodeURIComponent(posId)}/orders`
   try {
-    return await mpFetch(path, { method: 'DELETE' })
+    return await mpFetch(path, { method: 'DELETE' }, accessToken)
   } catch (err) {
-    // 404 significa que no hay orden activa — no es error
     if (err.status === 404) return null
     throw err
   }
@@ -125,28 +126,26 @@ export async function borrarOrdenQRDinamica({ externalPosId }) {
 /**
  * Consulta los detalles de un pago por ID (para confirmar monto y estado).
  */
-export async function obtenerPago(paymentId) {
-  return await mpFetch(`/v1/payments/${paymentId}`)
+export async function obtenerPago(paymentId, accessToken) {
+  return await mpFetch(`/v1/payments/${paymentId}`, {}, accessToken)
 }
 
 /**
  * Busca pagos por external_reference (fallback si el webhook se perdió).
  */
-export async function buscarPagosPorReferencia(externalReference) {
+export async function buscarPagosPorReferencia(externalReference, accessToken) {
   const qs = new URLSearchParams({ external_reference: externalReference })
-  const res = await mpFetch(`/v1/payments/search?${qs}`)
+  const res = await mpFetch(`/v1/payments/search?${qs}`, {}, accessToken)
   return res?.results || []
 }
 
 /**
  * Asegura que el POS existe en la cuenta MP. Si no existe, lo crea.
- * Llamarlo una vez al arranque o on-demand.
  */
-export async function asegurarPOS({ externalPosId, name, storeId }) {
+export async function asegurarPOS({ externalPosId, name, storeId, accessToken }) {
   const posId = externalPosId || process.env.MP_POS_VENTANILLA || 'clubix-ventanilla'
   try {
-    // Buscar POS existente por external_id
-    const res = await mpFetch(`/pos?external_id=${encodeURIComponent(posId)}`)
+    const res = await mpFetch(`/pos?external_id=${encodeURIComponent(posId)}`, {}, accessToken)
     const existente = (res?.results || [])[0]
     if (existente) return existente
   } catch (err) {
@@ -156,9 +155,9 @@ export async function asegurarPOS({ externalPosId, name, storeId }) {
     name: name || 'Clubix Ventanilla',
     external_id: posId,
     ...(storeId && { store_id: storeId }),
-    category: 621102, // Clubes y organizaciones sociales/deportivas
+    category: 621102,
   }
-  return await mpFetch('/pos', { method: 'POST', body: JSON.stringify(body) })
+  return await mpFetch('/pos', { method: 'POST', body: JSON.stringify(body) }, accessToken)
 }
 
 export default {

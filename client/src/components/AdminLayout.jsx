@@ -4,7 +4,8 @@ import {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
   UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, CalendarPlus, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User, Wrench,
-  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone, Ticket, Shield, AlertCircle, UserX, Target, BrainCircuit
+  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone, Ticket, Shield, AlertCircle, UserX, Target, BrainCircuit,
+  Kanban, GitBranch
 } from 'lucide-react'
 import { Star, StarOff } from 'lucide-react'
 import api from '../services/api'
@@ -18,7 +19,8 @@ const ICONOS = {
   LayoutDashboard, Store, Users, BarChart3, LogOut, Settings, Menu, X, Receipt,
   TrendingUp, TrendingDown, Wallet, Package, ChevronDown, ChevronRight,
   UserCheck, FileText, FileCheck, Building2, Briefcase, CreditCard, ArrowLeftRight, BoxesIcon, Tag, AlertTriangle, ShoppingCart, DollarSign, BookOpen, Calculator, Trophy, MapPin, Calendar, CalendarPlus, ClipboardList, Mail, Sliders, UserPlus, Megaphone, Newspaper, ArrowUpCircle, User, Wrench,
-  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone, Ticket, Shield, AlertCircle, UserX, Target
+  UtensilsCrossed, Coffee, ChefHat, Printer, ShoppingBag, ExternalLink, Activity, Smartphone, Ticket, Shield, AlertCircle, UserX, Target,
+  Kanban, GitBranch
 }
 
 export default function AdminLayout() {

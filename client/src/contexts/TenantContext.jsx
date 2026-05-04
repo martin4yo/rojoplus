@@ -145,13 +145,20 @@ export function TenantProvider({ children }) {
     } catch (err) {
       console.error('Error cargando tenant:', err)
       // Si el subdomain no resuelve a un tenant válido (no existe, está
-      // inactivo o suspendido), redirigir al sitio principal de Clubix
-      // para que el usuario no quede mirando una pantalla de error vacía.
-      const codigosTenantInvalido = ['TENANT_REQUIRED', 'TENANT_NOT_FOUND']
+      // inactivo o suspendido), o si se entró sin tenant a la app,
+      // redirigir al sitio principal de Clubix.
+      const codigosTenantInvalido = ['TENANT_REQUIRED', 'TENANT_NOT_FOUND', 'TENANT_SUSPENDED']
       if (codigosTenantInvalido.includes(err?.code)) {
         const url = import.meta.env.VITE_CLUBIX_PUBLIC_URL || 'https://www.clubix.com.ar'
-        // Evitar bucle infinito si por alguna razón ya estamos en clubix.com.ar
-        if (!window.location.host.includes('clubix.com.ar')) {
+        // Evitar bucle infinito sólo si ya estamos en el host destino exacto
+        try {
+          const target = new URL(url)
+          if (window.location.host !== target.host) {
+            window.location.replace(url)
+            return
+          }
+        } catch {
+          // Si la URL viene mal formada, redirigir igual
           window.location.replace(url)
           return
         }

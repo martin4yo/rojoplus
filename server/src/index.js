@@ -59,10 +59,12 @@ import brandingRoutes from './routes/admin/branding.js'
 import authRoutes from './routes/admin/auth.js'
 import whatsappRoutes from './routes/whatsapp/webhook.js'
 import webhooksMpRoutes from './routes/webhooksMercadoPago.js'
+import tiendaRoutes from './routes/tienda/index.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
 import { iniciarCronJobs, detenerCronJobs } from './jobs/notificaciones.js'
+import { iniciarCronTienda, detenerCronTienda } from './jobs/tienda.js'
 import { initSocket } from './services/socketService.js'
 
 // Middlewares
@@ -167,6 +169,10 @@ app.use('/api/buffet/*', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()
 })
+app.use('/api/tienda/*', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+})
 app.use('/api/reservas/*', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()
@@ -267,6 +273,7 @@ app.use('/api/buffet', buffetRoutes) // Ruta pública para menú
 app.use('/api/importacion', importacionRoutes)
 app.use('/api/admin/facturacion', facturacionRoutes)
 app.use('/api/admin/menu', menuRoutes)
+app.use('/api/tienda', tiendaRoutes)
 app.use('/api/admin/branding', brandingRoutes)
 app.use('/api/chat/*', extractTenantOptional, (req, res, next) => {
   if (req.tenantId) req.db = createTenantPrisma(req.tenantId)
@@ -315,12 +322,15 @@ if (process.env.NODE_ENV !== 'test') {
 
     // Iniciar sistema de notificaciones automáticas
     iniciarCronJobs()
+    // Iniciar cron del módulo Tienda
+    iniciarCronTienda()
   })
 
   // Cerrar conexión de Prisma al salir
   process.on('SIGINT', async () => {
     console.log('\n👋 Cerrando servidor...')
     detenerCronJobs()
+    detenerCronTienda()
     await prisma.$disconnect()
     console.log('✅ Servidor cerrado correctamente\n')
     process.exit()

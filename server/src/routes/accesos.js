@@ -6,6 +6,7 @@ import { authDispositivo } from '../middleware/authDispositivo.js'
 import { extractTenant } from '../middleware/extractTenant.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
 import { crearOrdenQRDinamica, borrarOrdenQRDinamica, obtenerPago, asegurarPOS } from '../services/mercadoPagoQR.js'
+import { getMpAccessToken } from '../lib/mercadoPagoConfig.js'
 
 const router = express.Router()
 
@@ -1463,8 +1464,9 @@ router.post('/venta-ventanilla/qr', tenantForAdmin, authAdmin, checkPermiso('EVE
     })
 
     // Asegurar que el POS exista en MP y generar QR
+    const mpToken = await getMpAccessToken(req.db)
     try {
-      await asegurarPOS({ name: 'Clubix Ventanilla' })
+      await asegurarPOS({ name: 'Clubix Ventanilla', accessToken: mpToken })
     } catch (err) {
       console.warn('[MP] No se pudo verificar/crear POS (sigue igual):', err.message)
     }
@@ -1480,6 +1482,7 @@ router.post('/venta-ventanilla/qr', tenantForAdmin, authAdmin, checkPermiso('EVE
           quantity: i.cantidad,
           unit_price: i.precio,
         })),
+        accessToken: mpToken,
       })
     } catch (err) {
       // Si MP falla, marcar venta como CANCELADA para no dejar basura
@@ -1533,7 +1536,7 @@ router.get('/venta-ventanilla/qr/:id', tenantForAdmin, authAdmin, checkPermiso('
 
     // Si está PENDIENTE y expiró, marcarla como EXPIRADA y cancelar el QR en MP
     if (estado === 'PENDIENTE' && venta.expiresAt < new Date()) {
-      try { await borrarOrdenQRDinamica({ externalPosId: venta.mpExternalPosId }) } catch {}
+      try { await borrarOrdenQRDinamica({ externalPosId: venta.mpExternalPosId, accessToken: await getMpAccessToken(req.db) }) } catch {}
       await req.db.ventaEventoQRPendiente.update({
         where: { id: venta.id },
         data: { estado: 'EXPIRADA' }

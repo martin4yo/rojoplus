@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url'
 import { generarAsientoAutomatico } from './asientos.js'
 import { resolverCuentaCashId } from '../services/asientosContables.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
+import { getMpAccessToken } from '../lib/mercadoPagoConfig.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -1330,6 +1331,7 @@ router.post('/socio/:token/eventos/:eventoId/comprar', asyncHandler(async (req, 
   // Crear preferencia de MercadoPago
   const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
   const preferencia = await crearPreferenciaPago({
+    accessToken: await getMpAccessToken(req.db),
     title: `Entradas - ${evento.nombre}`,
     description: `${categoria.nombre} (x${cantidad})`,
     amount: parseFloat(total),

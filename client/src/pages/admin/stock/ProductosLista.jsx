@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Package, Search, Eye, Edit, AlertTriangle, Image, LayoutGrid, List, ArrowUpDown, Download } from 'lucide-react'
+import { Plus, Package, Search, Eye, Edit, AlertTriangle, Image, LayoutGrid, List, ArrowUpDown, Download, Store } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../../../components/Button'
 import Table from '../../../components/Table'
 import api from '../../../services/api'
@@ -218,6 +219,37 @@ export default function ProductosLista() {
       cellClassName: 'text-right hidden sm:table-cell',
       render: (producto) => (
         <span className="text-gray-800">{formatCurrency(parseFloat(producto.precioVenta) || 0)}</span>
+      )
+    },
+    {
+      key: 'tienda',
+      label: 'Tienda',
+      sortable: false,
+      className: 'text-center w-24',
+      cellClassName: 'text-center',
+      render: (producto) => (
+        <button
+          onClick={async (e) => {
+            e.stopPropagation()
+            const nuevo = !producto.publicarEnTienda
+            try {
+              await api.put(`/admin/productos/${producto.id}`, { publicarEnTienda: nuevo })
+              setProductos(prev => prev.map(p => p.id === producto.id ? { ...p, publicarEnTienda: nuevo } : p))
+              toast.success(nuevo ? 'Publicado en tienda' : 'Despublicado')
+            } catch (err) {
+              toast.error(err.message || 'No se pudo cambiar')
+            }
+          }}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${producto.publicarEnTienda ? 'bg-emerald-500' : 'bg-gray-300'}`}
+          title={producto.publicarEnTienda ? 'Publicado en tienda — clic para despublicar' : 'No publicado — clic para publicar'}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${producto.publicarEnTienda ? 'translate-x-6' : 'translate-x-1'}`} />
+          {producto.precioOfertaTienda && (
+            <span className="absolute -top-1.5 -right-1.5 px-1 text-[9px] font-bold bg-amber-500 text-white rounded">
+              OFERTA
+            </span>
+          )}
+        </button>
       )
     },
     {

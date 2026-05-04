@@ -56,7 +56,7 @@ router.get('/categorias-producto', asyncHandler(async (req, res) => {
   const where = {}
   if (activo !== undefined) where.activo = activo === 'true'
 
-  const categorias = await prisma.categoriaProducto.findMany({
+  const categorias = await req.db.categoriaProducto.findMany({
     where,
     orderBy: { nombre: 'asc' },
     include: {
@@ -75,12 +75,12 @@ router.post('/categorias-producto', asyncHandler(async (req, res) => {
     throw new AppError('Codigo y nombre son requeridos', 400)
   }
 
-  const existente = await prisma.categoriaProducto.findFirst({ where: { codigo } })
+  const existente = await req.db.categoriaProducto.findFirst({ where: { codigo } })
   if (existente) {
     throw new AppError('Ya existe una categoria con ese codigo', 400)
   }
 
-  const categoria = await prisma.categoriaProducto.create({
+  const categoria = await req.db.categoriaProducto.create({
     data: { codigo, nombre }
   })
 
@@ -92,19 +92,19 @@ router.put('/categorias-producto/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { codigo, nombre, activo } = req.body
 
-  const existente = await prisma.categoriaProducto.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.categoriaProducto.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
     throw new AppError('Categoria no encontrada', 404)
   }
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.categoriaProducto.findFirst({ where: { codigo } })
+    const duplicado = await req.db.categoriaProducto.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe una categoria con ese codigo', 400)
     }
   }
 
-  const categoria = await prisma.categoriaProducto.update({
+  const categoria = await req.db.categoriaProducto.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo || existente.codigo,
@@ -139,7 +139,7 @@ router.get('/productos', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [productos, total] = await Promise.all([
-    prisma.producto.findMany({
+    req.db.producto.findMany({
       where,
       orderBy: { nombre: 'asc' },
       skip,
@@ -159,7 +159,7 @@ router.get('/productos', asyncHandler(async (req, res) => {
         _count: { select: { variantes: true } }
       }
     }),
-    prisma.producto.count({ where })
+    req.db.producto.count({ where })
   ])
 
   // Formatear decimales y calcular stock total
@@ -197,7 +197,7 @@ router.get('/productos', asyncHandler(async (req, res) => {
 router.get('/productos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const producto = await prisma.producto.findUnique({
+  const producto = await req.db.producto.findUnique({
     where: { id: parseInt(id) },
     include: {
       categoria: true,
@@ -237,13 +237,13 @@ router.post('/productos', asyncHandler(async (req, res) => {
     throw new AppError('Codigo y nombre son requeridos', 400)
   }
 
-  const existente = await prisma.producto.findFirst({ where: { codigo, tenantId: req.tenantId } })
+  const existente = await req.db.producto.findFirst({ where: { codigo, tenantId: req.tenantId } })
   if (existente) {
     throw new AppError('Ya existe un producto con ese codigo', 400)
   }
 
   // Crear producto con variantes si se proporcionan
-  const producto = await prisma.producto.create({
+  const producto = await req.db.producto.create({
     data: {
       codigo,
       nombre,
@@ -292,21 +292,25 @@ router.post('/productos', asyncHandler(async (req, res) => {
 // PUT /api/admin/productos/:id - Actualizar producto
 router.put('/productos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, categoriaId, precioCompra, precioVenta, conceptoCompraId, conceptoVentaId, activo, aparecerEnCompras } = req.body
+  const {
+    codigo, nombre, descripcion, categoriaId, precioCompra, precioVenta,
+    conceptoCompraId, conceptoVentaId, activo, aparecerEnCompras,
+    publicarEnTienda, destacadoTienda, precioOfertaTienda, descripcionTienda,
+  } = req.body
 
-  const existente = await prisma.producto.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.producto.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
     throw new AppError('Producto no encontrado', 404)
   }
 
   if (codigo && codigo !== existente.codigo) {
-    const duplicado = await prisma.producto.findFirst({ where: { codigo } })
+    const duplicado = await req.db.producto.findFirst({ where: { codigo } })
     if (duplicado) {
       throw new AppError('Ya existe un producto con ese codigo', 400)
     }
   }
 
-  const producto = await prisma.producto.update({
+  const producto = await req.db.producto.update({
     where: { id: parseInt(id) },
     data: {
       codigo: codigo || existente.codigo,
@@ -318,7 +322,13 @@ router.put('/productos/:id', asyncHandler(async (req, res) => {
       conceptoCompraId: conceptoCompraId !== undefined ? (conceptoCompraId ? parseInt(conceptoCompraId) : null) : existente.conceptoCompraId,
       conceptoVentaId: conceptoVentaId !== undefined ? (conceptoVentaId ? parseInt(conceptoVentaId) : null) : existente.conceptoVentaId,
       activo: activo !== undefined ? activo : existente.activo,
-      aparecerEnCompras: aparecerEnCompras !== undefined ? aparecerEnCompras : existente.aparecerEnCompras
+      aparecerEnCompras: aparecerEnCompras !== undefined ? aparecerEnCompras : existente.aparecerEnCompras,
+      publicarEnTienda: publicarEnTienda !== undefined ? !!publicarEnTienda : existente.publicarEnTienda,
+      destacadoTienda: destacadoTienda !== undefined ? !!destacadoTienda : existente.destacadoTienda,
+      precioOfertaTienda: precioOfertaTienda !== undefined
+        ? (precioOfertaTienda === null || precioOfertaTienda === '' ? null : Number(precioOfertaTienda))
+        : existente.precioOfertaTienda,
+      descripcionTienda: descripcionTienda !== undefined ? (descripcionTienda || null) : existente.descripcionTienda,
     },
     include: {
       categoria: true,
@@ -357,13 +367,13 @@ router.post('/productos/:id/variantes', asyncHandler(async (req, res) => {
     throw new AppError('Talle es requerido', 400)
   }
 
-  const producto = await prisma.producto.findUnique({ where: { id: parseInt(id) } })
+  const producto = await req.db.producto.findUnique({ where: { id: parseInt(id) } })
   if (!producto) {
     throw new AppError('Producto no encontrado', 404)
   }
 
   // Verificar que no exista la combinacion talle-color
-  const existente = await prisma.productoVariante.findFirst({
+  const existente = await req.db.productoVariante.findFirst({
     where: {
       productoId: parseInt(id),
       talle,
@@ -376,13 +386,13 @@ router.post('/productos/:id/variantes', asyncHandler(async (req, res) => {
 
   // Verificar SKU unico si se proporciona
   if (sku) {
-    const skuExistente = await prisma.productoVariante.findFirst({ where: { sku } })
+    const skuExistente = await req.db.productoVariante.findFirst({ where: { sku } })
     if (skuExistente) {
       throw new AppError('Ya existe una variante con ese SKU', 400)
     }
   }
 
-  const variante = await prisma.productoVariante.create({
+  const variante = await req.db.productoVariante.create({
     data: {
       productoId: parseInt(id),
       tenantId: req.tenantId,
@@ -409,14 +419,14 @@ router.put('/producto-variantes/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
   const { talle, color, sku, stockMinimo, activo } = req.body
 
-  const existente = await prisma.productoVariante.findUnique({ where: { id: parseInt(id) } })
+  const existente = await req.db.productoVariante.findUnique({ where: { id: parseInt(id) } })
   if (!existente) {
     throw new AppError('Variante no encontrada', 404)
   }
 
   // Verificar combinacion unica si cambia
   if ((talle && talle !== existente.talle) || (color !== undefined && color !== existente.color)) {
-    const duplicado = await prisma.productoVariante.findFirst({
+    const duplicado = await req.db.productoVariante.findFirst({
       where: {
         productoId: existente.productoId,
         talle: talle || existente.talle,
@@ -431,13 +441,13 @@ router.put('/producto-variantes/:id', asyncHandler(async (req, res) => {
 
   // Verificar SKU unico si cambia
   if (sku && sku !== existente.sku) {
-    const skuExistente = await prisma.productoVariante.findFirst({ where: { sku } })
+    const skuExistente = await req.db.productoVariante.findFirst({ where: { sku } })
     if (skuExistente) {
       throw new AppError('Ya existe una variante con ese SKU', 400)
     }
   }
 
-  const variante = await prisma.productoVariante.update({
+  const variante = await req.db.productoVariante.update({
     where: { id: parseInt(id) },
     data: {
       talle: talle || existente.talle,
@@ -462,7 +472,7 @@ router.put('/producto-variantes/:id', asyncHandler(async (req, res) => {
 router.delete('/producto-variantes/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const variante = await prisma.productoVariante.findUnique({
+  const variante = await req.db.productoVariante.findUnique({
     where: { id: parseInt(id) },
     include: { _count: { select: { movimientos: true } } }
   })
@@ -476,7 +486,7 @@ router.delete('/producto-variantes/:id', asyncHandler(async (req, res) => {
     throw new AppError('No se puede eliminar una variante con movimientos asociados. Desactivela en su lugar.', 400)
   }
 
-  await prisma.productoVariante.delete({ where: { id: parseInt(id) } })
+  await req.db.productoVariante.delete({ where: { id: parseInt(id) } })
 
   res.json({ success: true, message: 'Variante eliminada correctamente' })
 }))
@@ -493,7 +503,7 @@ router.post('/productos/:id/fotos', upload.single('foto'), asyncHandler(async (r
     throw new AppError('No se proporciono una imagen', 400)
   }
 
-  const producto = await prisma.producto.findUnique({ where: { id: parseInt(id) } })
+  const producto = await req.db.producto.findUnique({ where: { id: parseInt(id) } })
   if (!producto) {
     // Eliminar archivo subido
     fs.unlinkSync(req.file.path)
@@ -501,11 +511,11 @@ router.post('/productos/:id/fotos', upload.single('foto'), asyncHandler(async (r
   }
 
   // Contar fotos existentes para determinar orden
-  const fotosCount = await prisma.productoFoto.count({
+  const fotosCount = await req.db.productoFoto.count({
     where: { productoId: parseInt(id) }
   })
 
-  const foto = await prisma.productoFoto.create({
+  const foto = await req.db.productoFoto.create({
     data: {
       productoId: parseInt(id),
       url: `/uploads/productos/${req.file.filename}`,
@@ -521,18 +531,18 @@ router.post('/productos/:id/fotos', upload.single('foto'), asyncHandler(async (r
 router.put('/producto-fotos/:id/principal', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const foto = await prisma.productoFoto.findUnique({ where: { id: parseInt(id) } })
+  const foto = await req.db.productoFoto.findUnique({ where: { id: parseInt(id) } })
   if (!foto) {
     throw new AppError('Foto no encontrada', 404)
   }
 
   // Quitar principal de otras fotos del producto
   await req.db.$transaction([
-    prisma.productoFoto.updateMany({
+    req.db.productoFoto.updateMany({
       where: { productoId: foto.productoId },
       data: { esPrincipal: false }
     }),
-    prisma.productoFoto.update({
+    req.db.productoFoto.update({
       where: { id: parseInt(id) },
       data: { esPrincipal: true }
     })
@@ -545,7 +555,7 @@ router.put('/producto-fotos/:id/principal', asyncHandler(async (req, res) => {
 router.delete('/producto-fotos/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const foto = await prisma.productoFoto.findUnique({ where: { id: parseInt(id) } })
+  const foto = await req.db.productoFoto.findUnique({ where: { id: parseInt(id) } })
   if (!foto) {
     throw new AppError('Foto no encontrada', 404)
   }
@@ -556,16 +566,16 @@ router.delete('/producto-fotos/:id', asyncHandler(async (req, res) => {
     fs.unlinkSync(filePath)
   }
 
-  await prisma.productoFoto.delete({ where: { id: parseInt(id) } })
+  await req.db.productoFoto.delete({ where: { id: parseInt(id) } })
 
   // Si era la principal, marcar la siguiente como principal
   if (foto.esPrincipal) {
-    const siguiente = await prisma.productoFoto.findFirst({
+    const siguiente = await req.db.productoFoto.findFirst({
       where: { productoId: foto.productoId },
       orderBy: { orden: 'asc' }
     })
     if (siguiente) {
-      await prisma.productoFoto.update({
+      await req.db.productoFoto.update({
         where: { id: siguiente.id },
         data: { esPrincipal: true }
       })
@@ -600,7 +610,7 @@ router.get('/movimientos-stock', asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
   const [movimientos, total] = await Promise.all([
-    prisma.movimientoStock.findMany({
+    req.db.movimientoStock.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
@@ -613,7 +623,7 @@ router.get('/movimientos-stock', asyncHandler(async (req, res) => {
         }
       }
     }),
-    prisma.movimientoStock.count({ where })
+    req.db.movimientoStock.count({ where })
   ])
 
   const movimientosFormateados = movimientos.map(m => ({
@@ -652,7 +662,7 @@ router.post('/movimientos-stock/ajuste', asyncHandler(async (req, res) => {
     throw new AppError('La cantidad debe ser mayor a cero', 400)
   }
 
-  const variante = await prisma.productoVariante.findUnique({
+  const variante = await req.db.productoVariante.findUnique({
     where: { id: parseInt(varianteId) },
     include: { producto: true }
   })
@@ -723,7 +733,7 @@ router.post('/movimientos-stock/ajuste', asyncHandler(async (req, res) => {
 
 // GET /api/admin/stock/alertas - Productos bajo stock minimo
 router.get('/stock/alertas', asyncHandler(async (req, res) => {
-  const variantes = await prisma.$queryRaw`
+  const variantes = await req.db.$queryRaw`
     SELECT
       pv.id,
       pv.talle,
@@ -756,9 +766,9 @@ router.get('/stock/alertas', asyncHandler(async (req, res) => {
 // GET /api/admin/stock/resumen - Resumen general de stock
 router.get('/stock/resumen', asyncHandler(async (req, res) => {
   const [totalProductos, totalVariantes, variantesBajoMinimo, valorStock] = await Promise.all([
-    prisma.producto.count({ where: { activo: true } }),
-    prisma.productoVariante.count({ where: { activo: true } }),
-    prisma.productoVariante.count({
+    req.db.producto.count({ where: { activo: true } }),
+    req.db.productoVariante.count({ where: { activo: true } }),
+    req.db.productoVariante.count({
       where: {
         activo: true,
         producto: { activo: true },
@@ -771,7 +781,7 @@ router.get('/stock/resumen', asyncHandler(async (req, res) => {
         COALESCE(SUM(pv.stock_actual * COALESCE(p.precio_compra, 0)), 0) as "valorCompra"
       FROM producto_variantes pv
       JOIN productos p ON pv.producto_id = p.id
-      WHERE pv.activo = true AND p.activo = true
+      WHERE pv.activo = true AND p.activo = true AND pv.tenant_id = ${req.tenantId}
     `
   ])
 

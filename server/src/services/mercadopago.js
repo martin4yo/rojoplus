@@ -1,13 +1,19 @@
 import { MercadoPagoConfig, Preference } from 'mercadopago'
 
-// Configuración de MercadoPago
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
-})
+/**
+ * Construye un cliente MP con el access token del tenant.
+ * Si no se pasa, fallback al .env para compatibilidad legacy.
+ */
+function buildClient(accessToken) {
+  const token = accessToken || process.env.MERCADOPAGO_ACCESS_TOKEN
+  if (!token) throw new Error('Mercado Pago no está configurado (falta accessToken)')
+  return new MercadoPagoConfig({ accessToken: token })
+}
 
 /**
  * Crear preferencia de pago en MercadoPago
  * @param {Object} data - Datos del pago
+ * @param {string} [data.accessToken] - Token MP del tenant (preferido). Si falta usa .env.
  * @param {string} data.title - Título del pago
  * @param {string} data.description - Descripción del pago
  * @param {number} data.amount - Monto total
@@ -24,6 +30,7 @@ const client = new MercadoPagoConfig({
  */
 export async function crearPreferenciaPago(data) {
   try {
+    const client = buildClient(data.accessToken)
     const preference = new Preference(client)
 
     // Validar URLs requeridos
@@ -101,11 +108,13 @@ export async function crearPreferenciaPago(data) {
 /**
  * Obtener información de un pago
  * @param {string} paymentId - ID del pago en MercadoPago
+ * @param {string} [accessToken] - Token MP del tenant (fallback al .env)
  * @returns {Promise<Object>} Información del pago
  */
-export async function obtenerPago(paymentId) {
+export async function obtenerPago(paymentId, accessToken) {
   try {
     const { Payment } = await import('mercadopago')
+    const client = buildClient(accessToken)
     const payment = new Payment(client)
     return await payment.get({ id: paymentId })
   } catch (error) {
@@ -117,11 +126,13 @@ export async function obtenerPago(paymentId) {
 /**
  * Crear reembolso total de un pago en MercadoPago
  * @param {string} paymentId - ID del pago original en MercadoPago
+ * @param {string} [accessToken] - Token MP del tenant (fallback al .env)
  * @returns {Promise<Object>} Resultado del reembolso
  */
-export async function crearReembolso(paymentId) {
+export async function crearReembolso(paymentId, accessToken) {
   try {
     const { PaymentRefund } = await import('mercadopago')
+    const client = buildClient(accessToken)
     const refund = new PaymentRefund(client)
     const result = await refund.create({ payment_id: paymentId })
     console.log(`✅ Reembolso MP creado para pago ${paymentId}:`, result.id)

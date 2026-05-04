@@ -8,6 +8,7 @@ import {
   enviarCancelacionReserva,
 } from '../services/email.js'
 import { crearReembolso } from '../services/mercadopago.js'
+import { getMpAccessToken } from '../lib/mercadoPagoConfig.js'
 import { obtenerTelefonoSocio } from '../services/whatsappService.js'
 
 const router = Router()
@@ -415,6 +416,7 @@ router.post('/', asyncHandler(async (req, res) => {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
     const preferencia = await crearPreferenciaPago({
+      accessToken: await getMpAccessToken(req.db),
       title: `Reserva ${espacio.nombre} - ${fecha} ${horaInicio}`,
       description: esRecurrente && semanas > 1 ? `${semanas} semanas (recurrente)` : `Turno ${horaInicio}-${slotElegido.horaFin}`,
       amount: precio * reservasCreadas.length,
@@ -587,6 +589,7 @@ router.post('/socio/:token', asyncHandler(async (req, res) => {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
     const preferencia = await crearPreferenciaPago({
+      accessToken: await getMpAccessToken(req.db),
       title: `Reserva ${espacio.nombre} - ${fecha} ${horaInicio}`,
       description: `Turno ${horaInicio}-${slotElegido.horaFin}`,
       amount: precio * reservasCreadas.length,
@@ -667,7 +670,7 @@ router.delete('/socio/:token/:codigo', asyncHandler(async (req, res) => {
   let reembolsado = false
   if (reserva.metodoPago === 'MERCADOPAGO' && reserva.paymentIdMP) {
     try {
-      await crearReembolso(reserva.paymentIdMP)
+      await crearReembolso(reserva.paymentIdMP, await getMpAccessToken(req.db))
       reembolsado = true
     } catch (err) {
       console.error(`[Cancelación socio] Error reembolso MP reserva ${reserva.codigo}:`, err.message)
@@ -737,7 +740,7 @@ router.post('/cancelar-token', asyncHandler(async (req, res) => {
   let reembolsado = false
   if (reserva.metodoPago === 'MERCADOPAGO' && reserva.paymentIdMP) {
     try {
-      await crearReembolso(reserva.paymentIdMP)
+      await crearReembolso(reserva.paymentIdMP, await getMpAccessToken(req.db))
       reembolsado = true
     } catch (err) {
       console.error(`[Cancelación token] Error reembolso MP reserva ${reserva.codigo}:`, err.message)
@@ -1183,7 +1186,7 @@ router.patch('/admin/:id/cancelar', authAdmin, asyncHandler(async (req, res) => 
   let reembolsado = false
   if (reserva.metodoPago === 'MERCADOPAGO' && reserva.paymentIdMP) {
     try {
-      await crearReembolso(reserva.paymentIdMP)
+      await crearReembolso(reserva.paymentIdMP, await getMpAccessToken(req.db))
       reembolsado = true
     } catch (err) {
       console.error(`[Cancelación] Error reembolso MP reserva ${reserva.codigo}:`, err.message)
