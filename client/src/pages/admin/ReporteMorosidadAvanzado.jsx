@@ -132,6 +132,11 @@ export default function ReporteMorosidadAvanzado() {
   const [proyeccion, setProyeccion] = useState(null)
   const [morosos, setMorosos] = useState(null)
 
+  // Filtro global de rango de períodos
+  const [periodos, setPeriodos] = useState([])
+  const [periodoIdDesde, setPeriodoIdDesde] = useState('')
+  const [periodoIdHasta, setPeriodoIdHasta] = useState('')
+
   // Filtros
   const [filtros, setFiltros] = useState({
     categoria: '',
@@ -148,15 +153,30 @@ export default function ReporteMorosidadAvanzado() {
   // Expansión de detalle de socio
   const [expandedSocio, setExpandedSocio] = useState(null)
 
+  // Resuelve el rango (desde, hasta) a la lista de IDs de períodos
+  const resolverPeriodoIds = () => {
+    if (!periodoIdDesde || !periodoIdHasta) return []
+    const desde = periodos.find(p => p.id.toString() === periodoIdDesde)
+    const hasta = periodos.find(p => p.id.toString() === periodoIdHasta)
+    if (!desde || !hasta) return []
+    const k = (p) => p.anio * 100 + p.mes
+    const min = Math.min(k(desde), k(hasta))
+    const max = Math.max(k(desde), k(hasta))
+    return periodos.filter(p => k(p) >= min && k(p) <= max).map(p => p.id)
+  }
+
   const cargarDatos = async () => {
     try {
       setLoading(true)
       setError(null)
 
+      const ids = resolverPeriodoIds()
+      const qs = ids.length > 0 ? `?periodoIds=${ids.join(',')}` : ''
+
       const [kpisRes, antiguedadRes, proyeccionRes, actividadesRes] = await Promise.all([
-        api.get('/admin/reportes/morosidad/resumen-kpis'),
-        api.get('/admin/reportes/morosidad/antiguedad'),
-        api.get('/admin/reportes/morosidad/proyeccion'),
+        api.get(`/admin/reportes/morosidad/resumen-kpis${qs}`),
+        api.get(`/admin/reportes/morosidad/antiguedad${qs}`),
+        api.get(`/admin/reportes/morosidad/proyeccion${qs}`),
         api.get('/admin/actividades'),
       ])
 
@@ -172,9 +192,31 @@ export default function ReporteMorosidadAvanzado() {
     }
   }
 
+  const cargarPeriodos = async () => {
+    try {
+      const data = await api.get('/admin/periodos')
+      const ordenados = [...(data || [])].sort((a, b) => {
+        if (a.anio !== b.anio) return b.anio - a.anio
+        return b.mes - a.mes
+      })
+      setPeriodos(ordenados)
+      const hoy = new Date()
+      const actual = ordenados.find(p => p.mes === hoy.getMonth() + 1 && p.anio === hoy.getFullYear())
+      const elegido = actual || ordenados[0]
+      if (elegido) {
+        setPeriodoIdDesde(elegido.id.toString())
+        setPeriodoIdHasta(elegido.id.toString())
+      }
+    } catch (err) {
+      console.error('Error cargando periodos:', err)
+    }
+  }
+
   const cargarMorosos = async () => {
     try {
       const params = new URLSearchParams()
+      const ids = resolverPeriodoIds()
+      if (ids.length > 0) params.append('periodoIds', ids.join(','))
       if (filtros.categoria) params.append('categoria', filtros.categoria)
       if (filtros.actividadId) params.append('actividadId', filtros.actividadId)
       if (filtros.diasMinimo) params.append('diasMinimo', filtros.diasMinimo)
@@ -192,18 +234,25 @@ export default function ReporteMorosidadAvanzado() {
   }
 
   useEffect(() => {
-    cargarDatos()
+    cargarPeriodos()
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'detalle') {
+    // Cargar datos solo cuando ya hay rango definido (o si el usuario lo limpió)
+    if (periodos.length > 0) cargarDatos()
+  }, [periodoIdDesde, periodoIdHasta, periodos.length])
+
+  useEffect(() => {
+    if (activeTab === 'detalle' && periodos.length > 0) {
       cargarMorosos()
     }
-  }, [activeTab, filtros, page])
+  }, [activeTab, filtros, page, periodoIdDesde, periodoIdHasta, periodos.length])
 
   const exportarExcel = async () => {
     try {
       const params = new URLSearchParams()
+      const ids = resolverPeriodoIds()
+      if (ids.length > 0) params.append('periodoIds', ids.join(','))
       if (filtros.categoria) params.append('categoria', filtros.categoria)
       if (filtros.actividadId) params.append('actividadId', filtros.actividadId)
       if (filtros.diasMinimo) params.append('diasMinimo', filtros.diasMinimo)
@@ -269,7 +318,29 @@ export default function ReporteMorosidadAvanzado() {
             Análisis detallado de deudas y proyección de recargos
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-sm text-gray-600">Desde:</label>
+          <select
+            value={periodoIdDesde}
+            onChange={(e) => setPeriodoIdDesde(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-40"
+          >
+            <option value="">Todos</option>
+            {periodos.map(p => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
+          <label className="text-sm text-gray-600">Hasta:</label>
+          <select
+            value={periodoIdHasta}
+            onChange={(e) => setPeriodoIdHasta(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-40"
+          >
+            <option value="">Todos</option>
+            {periodos.map(p => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
           <button
             onClick={exportarExcel}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"

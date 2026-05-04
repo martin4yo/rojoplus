@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import * as XLSX from 'xlsx'
-import { authAdmin } from '../middleware/auth.js'
+import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { generarAsientoMovimientoCaja, crearAsientoTransferencia, resolverCuentaCashId } from '../services/asientosContables.js'
 import { generarAsientoAutomatico } from './asientos.js'
@@ -129,7 +129,7 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/admin/cajas - Crear caja
-router.post('/cajas', asyncHandler(async (req, res) => {
+router.post('/cajas', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req, res) => {
   const {
     codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId, centroCostoId,
     requiereConciliacion, mediosPagoPermitidos,
@@ -183,7 +183,7 @@ router.post('/cajas', asyncHandler(async (req, res) => {
 }))
 
 // PUT /api/admin/cajas/:id - Actualizar caja
-router.put('/cajas/:id', asyncHandler(async (req, res) => {
+router.put('/cajas/:id', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req, res) => {
   const { id } = req.params
   const {
     codigo, nombre, tipo, descripcion, activo, cuentaContableId, centroCostoId,
@@ -441,7 +441,7 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
 //  - "Single": un único concepto/cuenta/CC (campos planos: monto, cuentaContableId, centroCostoId, concepto)
 //  - "Multi-item": items: [{ conceptoTesoreriaId, cuentaContableId, centroCostoId, monto, descripcion }]
 //    En este modo, monto = suma de items y se generan asientos por línea.
-router.post('/movimientos-caja', asyncHandler(async (req, res) => {
+router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req, res) => {
   const {
     cajaId, tipo,
     monto: montoBody, cuentaContableId, concepto, descripcion, centroCostoId,
@@ -764,7 +764,7 @@ router.post('/movimientos-caja', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/admin/movimientos-caja/:id/anular - Anular movimiento
-router.post('/movimientos-caja/:id/anular', asyncHandler(async (req, res) => {
+router.post('/movimientos-caja/:id/anular', checkPermiso('CAJA_ANULAR'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
   const movimiento = await req.db.movimientoCaja.findUnique({
@@ -956,7 +956,7 @@ router.get('/transferencias/:id', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/admin/transferencias - Crear transferencia
-router.post('/transferencias', asyncHandler(async (req, res) => {
+router.post('/transferencias', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req, res) => {
   const { cajaOrigenId, cajaDestinoId, monto, medioPago, conceptoId, concepto, descripcion,
           cuentaContableOrigenId, cuentaContableDestinoId, centroCostoId } = req.body
 
@@ -1159,7 +1159,7 @@ router.post('/transferencias', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/admin/transferencias/:id/anular - Anular transferencia
-router.post('/transferencias/:id/anular', asyncHandler(async (req, res) => {
+router.post('/transferencias/:id/anular', checkPermiso('CAJA_ANULAR'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
   const transferencia = await req.db.transferenciaCaja.findUnique({
@@ -1522,7 +1522,7 @@ router.get('/pendientes-conciliar/resumen', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/admin/pendientes-conciliar/conciliar - Marcar movimientos como conciliados
-router.post('/pendientes-conciliar/conciliar', asyncHandler(async (req, res) => {
+router.post('/pendientes-conciliar/conciliar', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req, res) => {
   const { movimientoIds, observacion } = req.body
 
   if (!movimientoIds || !Array.isArray(movimientoIds) || movimientoIds.length === 0) {
@@ -1576,7 +1576,7 @@ router.post('/pendientes-conciliar/conciliar', asyncHandler(async (req, res) => 
 }))
 
 // POST /api/admin/pendientes-conciliar/transferir - Transferir valores conciliados a cuenta bancaria
-router.post('/pendientes-conciliar/transferir', asyncHandler(async (req, res) => {
+router.post('/pendientes-conciliar/transferir', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req, res) => {
   const { cajaOrigenId, cajaDestinoId, movimientoIds, concepto } = req.body
 
   if (!cajaOrigenId || !cajaDestinoId || !movimientoIds || movimientoIds.length === 0) {

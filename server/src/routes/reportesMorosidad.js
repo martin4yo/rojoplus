@@ -5,6 +5,17 @@ import { authAdmin } from '../middleware/auth.js'
 
 const router = Router()
 
+// Aplica filtros de período (uno o varios IDs) al where de cargo.
+function aplicarFiltroPeriodos(where, query) {
+  const { periodoId, periodoIds } = query
+  if (periodoIds) {
+    const ids = periodoIds.split(',').map(s => parseInt(s)).filter(n => !Number.isNaN(n))
+    if (ids.length > 0) where.periodoId = { in: ids }
+  } else if (periodoId) {
+    where.periodoId = parseInt(periodoId)
+  }
+}
+
 // Función para calcular recargo de un cargo (duplicada de admin.js para modularidad)
 async function calcularRecargoCargo(prisma, cargo) {
   if (!cargo.fechaVencimiento || cargo.estado !== 'PENDIENTE') {
@@ -57,13 +68,12 @@ async function calcularRecargoCargo(prisma, cargo) {
 // KPIs principales de morosidad
 router.get('/resumen-kpis', authAdmin, asyncHandler(async (req, res) => {
   const hoy = new Date()
+  const wherePend = { estado: 'PENDIENTE', fechaVencimiento: { lt: hoy } }
+  aplicarFiltroPeriodos(wherePend, req.query)
 
   // Cuotas vencidas pendientes
   const cuotasVencidas = await req.db.cargo.findMany({
-    where: {
-      estado: 'PENDIENTE',
-      fechaVencimiento: { lt: hoy },
-    },
+    where: wherePend,
     select: {
       id: true,
       montoOriginal: true,
@@ -138,6 +148,7 @@ router.get('/antiguedad', authAdmin, asyncHandler(async (req, res) => {
     estado: 'PENDIENTE',
     fechaVencimiento: { lt: hoy },
   }
+  aplicarFiltroPeriodos(where, req.query)
 
   if (categoria) where.categoria = categoria
   if (actividadId) {
@@ -243,11 +254,10 @@ router.get('/proyeccion', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Cuotas pendientes (incluye no vencidas que podrían vencer)
+  const wherePendProy = { estado: 'PENDIENTE', fechaVencimiento: { not: null } }
+  aplicarFiltroPeriodos(wherePendProy, req.query)
   const cuotasPendientes = await req.db.cargo.findMany({
-    where: {
-      estado: 'PENDIENTE',
-      fechaVencimiento: { not: null },
-    },
+    where: wherePendProy,
     select: {
       id: true,
       montoOriginal: true,
@@ -337,6 +347,7 @@ router.get('/detalle', authAdmin, asyncHandler(async (req, res) => {
     estado: 'PENDIENTE',
     fechaVencimiento: { lt: hoy },
   }
+  aplicarFiltroPeriodos(where, req.query)
 
   if (categoria) where.categoria = categoria
   if (actividadId) {
@@ -479,6 +490,7 @@ router.get('/exportar', authAdmin, asyncHandler(async (req, res) => {
     estado: 'PENDIENTE',
     fechaVencimiento: { lt: hoy },
   }
+  aplicarFiltroPeriodos(where, req.query)
 
   if (categoria) where.categoria = categoria
   if (actividadId) {

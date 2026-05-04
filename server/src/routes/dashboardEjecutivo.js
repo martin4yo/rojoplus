@@ -198,30 +198,35 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     where: { estado: 'ACTIVA' },
   })
 
-  // Inscripciones por actividad (top 5)
-  const inscripcionesPorActividad = await req.db.inscripcion.groupBy({
+  // Inscripciones por actividad (top 5) — agrupado por Actividad (sumando todas sus categorías)
+  const inscripcionesPorCategoria = await req.db.inscripcion.groupBy({
     by: ['categoriaActividadId'],
     where: { estado: 'ACTIVA' },
     _count: true,
   })
 
-  // Obtener nombres de actividades
-  const categoriasIds = inscripcionesPorActividad.map(i => i.categoriaActividadId)
+  const categoriasIds = inscripcionesPorCategoria.map(i => i.categoriaActividadId)
   const categoriasInfo = await req.db.categoriaActividad.findMany({
     where: { id: { in: categoriasIds } },
-    include: { actividad: { select: { nombre: true } } },
+    include: { actividad: { select: { id: true, nombre: true } } },
   })
 
-  const categoriasMap = {}
+  const actividadDeCategoria = {}
   categoriasInfo.forEach(c => {
-    categoriasMap[c.id] = `${c.actividad.nombre} - ${c.nombre}`
+    actividadDeCategoria[c.id] = { id: c.actividad.id, nombre: c.actividad.nombre }
   })
 
-  const top5Actividades = inscripcionesPorActividad
-    .map(i => ({
-      nombre: categoriasMap[i.categoriaActividadId] || 'Sin nombre',
-      cantidad: i._count,
-    }))
+  const acumPorActividad = {}
+  for (const grupo of inscripcionesPorCategoria) {
+    const act = actividadDeCategoria[grupo.categoriaActividadId]
+    if (!act) continue
+    if (!acumPorActividad[act.id]) {
+      acumPorActividad[act.id] = { nombre: act.nombre, cantidad: 0 }
+    }
+    acumPorActividad[act.id].cantidad += grupo._count
+  }
+
+  const top5Actividades = Object.values(acumPorActividad)
     .sort((a, b) => b.cantidad - a.cantidad)
     .slice(0, 5)
 

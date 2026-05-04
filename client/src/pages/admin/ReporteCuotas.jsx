@@ -252,7 +252,8 @@ export default function ReporteCuotas() {
   const [error, setError] = useState(null)
   const [reporte, setReporte] = useState(null)
   const [periodos, setPeriodos] = useState([])
-  const [periodoId, setPeriodoId] = useState(null) // null = no cargado aún
+  const [periodoIdDesde, setPeriodoIdDesde] = useState('')
+  const [periodoIdHasta, setPeriodoIdHasta] = useState('')
   const [periodosCargados, setPeriodosCargados] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState({})
   const [expandedActivities, setExpandedActivities] = useState({})
@@ -275,32 +276,30 @@ export default function ReporteCuotas() {
     // Solo cargar reporte después de que los períodos estén cargados
     if (periodosCargados) {
       cargarReporte()
-      // Resetear el nivel del gráfico cuando cambia el período
+      // Resetear el nivel del gráfico cuando cambia el filtro
       setNivelGrafico('categorias')
       setActividadGrafico(null)
     }
-  }, [periodoId, periodosCargados])
+  }, [periodoIdDesde, periodoIdHasta, periodosCargados])
 
   async function cargarPeriodos() {
     try {
       const data = await api.get('/admin/periodos')
-      setPeriodos(data || [])
+      // Ordenar más recientes primero (anio desc, mes desc)
+      const ordenados = [...(data || [])].sort((a, b) => {
+        if (a.anio !== b.anio) return b.anio - a.anio
+        return b.mes - a.mes
+      })
+      setPeriodos(ordenados)
 
-      // Seleccionar el período actual por defecto
-      const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+      // Por defecto: seleccionar el período del mes/año actual si existe; si no, el más reciente
       const hoy = new Date()
-      const mesActual = meses[hoy.getMonth()]
-      const añoActual = hoy.getFullYear()
-      const nombrePeriodoActual = `${mesActual} ${añoActual}`
-
-      const periodoActual = (data || []).find(p =>
-        p.estado === 'GENERADO' && p.nombre === nombrePeriodoActual
-      )
-      if (periodoActual) {
-        setPeriodoId(periodoActual.id.toString())
-      } else {
-        setPeriodoId('') // Sin período seleccionado
+      const actual = ordenados.find(p => p.mes === hoy.getMonth() + 1 && p.anio === hoy.getFullYear())
+      const elegido = actual || ordenados[0]
+      if (elegido) {
+        const idStr = elegido.id.toString()
+        setPeriodoIdDesde(idStr)
+        setPeriodoIdHasta(idStr)
       }
       setPeriodosCargados(true)
     } catch (err) {
@@ -309,10 +308,26 @@ export default function ReporteCuotas() {
     }
   }
 
+  // Resuelve el rango (desde, hasta) a la lista de IDs de períodos comprendidos
+  function resolverPeriodoIds() {
+    if (!periodoIdDesde || !periodoIdHasta) return []
+    const desde = periodos.find(p => p.id.toString() === periodoIdDesde)
+    const hasta = periodos.find(p => p.id.toString() === periodoIdHasta)
+    if (!desde || !hasta) return []
+    // Comparar por (anio, mes)
+    const k = (p) => p.anio * 100 + p.mes
+    const min = Math.min(k(desde), k(hasta))
+    const max = Math.max(k(desde), k(hasta))
+    return periodos
+      .filter(p => k(p) >= min && k(p) <= max)
+      .map(p => p.id)
+  }
+
   async function cargarReporte() {
     setLoading(true)
     try {
-      const params = periodoId ? `?periodoId=${periodoId}` : ''
+      const ids = resolverPeriodoIds()
+      const params = ids.length > 0 ? `?periodoIds=${ids.join(',')}` : ''
       const data = await api.get(`/admin/reportes/cobranza${params}`)
       setReporte(data)
     } catch (err) {
@@ -324,7 +339,9 @@ export default function ReporteCuotas() {
 
   function exportarExcel() {
     if (!reporte) return
-    const periodoLabel = periodos.find(p => p.id?.toString() === periodoId)?.nombre || 'Todos'
+    const desde = periodos.find(p => p.id?.toString() === periodoIdDesde)?.nombre
+    const hasta = periodos.find(p => p.id?.toString() === periodoIdHasta)?.nombre
+    const periodoLabel = !desde ? 'Todos' : desde === hasta ? desde : `${desde} a ${hasta}`
 
     // Hoja resumen
     const resumen = [
@@ -368,7 +385,8 @@ export default function ReporteCuotas() {
 
     try {
       const params = new URLSearchParams()
-      if (periodoId) params.append('periodoId', periodoId)
+      const ids = resolverPeriodoIds()
+      if (ids.length > 0) params.append('periodoIds', ids.join(','))
       if (filtro.categoria) params.append('categoria', filtro.categoria)
       if (filtro.actividadId) params.append('actividadId', filtro.actividadId)
       if (filtro.categoriaActividadId) params.append('categoriaActividadId', filtro.categoriaActividadId)
@@ -423,14 +441,25 @@ export default function ReporteCuotas() {
 
         {/* Filtro de período + Export */}
         <div className="flex items-center gap-2 flex-wrap">
-          <label className="text-sm text-gray-600">Período:</label>
+          <label className="text-sm text-gray-600">Desde:</label>
           <select
-            value={periodoId || ''}
-            onChange={(e) => setPeriodoId(e.target.value)}
-            className="input-field w-48"
+            value={periodoIdDesde}
+            onChange={(e) => setPeriodoIdDesde(e.target.value)}
+            className="input-field w-44"
           >
-            <option value="">Todos los períodos</option>
-            {periodos.filter(p => p.estado === 'GENERADO').map(p => (
+            <option value="">Todos</option>
+            {periodos.map(p => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
+          <label className="text-sm text-gray-600">Hasta:</label>
+          <select
+            value={periodoIdHasta}
+            onChange={(e) => setPeriodoIdHasta(e.target.value)}
+            className="input-field w-44"
+          >
+            <option value="">Todos</option>
+            {periodos.map(p => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>

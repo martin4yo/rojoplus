@@ -9,6 +9,7 @@ import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import { tienePermiso, PERMISOS } from '../../../services/permisos'
 
 const TIPO_ICONS = {
   EFECTIVO: Wallet,
@@ -303,10 +304,12 @@ export default function CajaDetalle() {
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${caja.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
             {caja.activo ? 'Activa' : 'Inactiva'}
           </span>
-          <Button variant="secondary" onClick={() => navigate(`/admin/tesoreria/cajas/${id}/editar`)}>
-            <Edit className="w-4 h-4 mr-2" />
-            Editar
-          </Button>
+          {tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
+            <Button variant="secondary" onClick={() => navigate(`/admin/tesoreria/cajas/${id}/editar`)}>
+              <Edit className="w-4 h-4 mr-2" />
+              Editar
+            </Button>
+          )}
         </div>
       </div>
 
@@ -320,20 +323,22 @@ export default function CajaDetalle() {
       </div>
 
       {/* Acciones rápidas */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Button variant="secondary" className="justify-center" onClick={() => navigate(`/admin/tesoreria/movimientos/nuevo?cajaId=${id}&tipo=INGRESO`)}>
-          <TrendingUp className="w-4 h-4 mr-2 text-green-600" />
-          Registrar Ingreso
-        </Button>
-        <Button variant="secondary" className="justify-center" onClick={() => navigate(`/admin/tesoreria/movimientos/nuevo?cajaId=${id}&tipo=EGRESO`)}>
-          <TrendingDown className="w-4 h-4 mr-2 text-red-600" />
-          Registrar Egreso
-        </Button>
-        <Button variant="secondary" className="justify-center" onClick={() => navigate(`/admin/tesoreria/transferencias/nueva?origenId=${id}`)}>
-          <ArrowRightLeft className="w-4 h-4 mr-2 text-blue-600" />
-          Transferir
-        </Button>
-      </div>
+      {tienePermiso(PERMISOS.CAJA_MOVIMIENTOS) && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <Button variant="secondary" className="justify-center" onClick={() => navigate(`/admin/tesoreria/movimientos/nuevo?cajaId=${id}&tipo=INGRESO`)}>
+            <TrendingUp className="w-4 h-4 mr-2 text-green-600" />
+            Registrar Ingreso
+          </Button>
+          <Button variant="secondary" className="justify-center" onClick={() => navigate(`/admin/tesoreria/movimientos/nuevo?cajaId=${id}&tipo=EGRESO`)}>
+            <TrendingDown className="w-4 h-4 mr-2 text-red-600" />
+            Registrar Egreso
+          </Button>
+          <Button variant="secondary" className="justify-center" onClick={() => navigate(`/admin/tesoreria/transferencias/nueva?origenId=${id}`)}>
+            <ArrowRightLeft className="w-4 h-4 mr-2 text-blue-600" />
+            Transferir
+          </Button>
+        </div>
+      )}
 
       {/* Filtro de periodo */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-3 mb-6">

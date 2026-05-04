@@ -54,11 +54,16 @@ async function calcularRecargoCargo(prisma, cargo) {
 
 // GET /api/admin/reportes/cobranza - Reporte completo de cobranza con datos jerárquicos
 router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
-  const { periodoId, desde, hasta } = req.query
+  const { periodoId, periodoIds, desde, hasta } = req.query
 
   // Construir filtro base
   const whereBase = {}
-  if (periodoId) whereBase.periodoId = parseInt(periodoId)
+  if (periodoIds) {
+    const ids = periodoIds.split(',').map(s => parseInt(s)).filter(n => !Number.isNaN(n))
+    if (ids.length > 0) whereBase.periodoId = { in: ids }
+  } else if (periodoId) {
+    whereBase.periodoId = parseInt(periodoId)
+  }
   if (desde) whereBase.createdAt = { ...whereBase.createdAt, gte: new Date(desde) }
   if (hasta) whereBase.createdAt = { ...whereBase.createdAt, lte: new Date(hasta) }
 
@@ -136,9 +141,9 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
     _count: true,
   })
 
-  // 3. Para CUOTA_ACTIVIDAD, obtener desglose por actividad y categoría
+  // 3. Para ACTIVIDAD, obtener desglose por actividad y categoría
   const actividadesData = await req.db.cargo.findMany({
-    where: { ...whereBase, categoria: 'CUOTA_ACTIVIDAD', estado: { not: 'ANULADO' } },
+    where: { ...whereBase, categoria: { in: ['ACTIVIDAD', 'CUOTA_ACTIVIDAD'] }, estado: { not: 'ANULADO' } },
     include: {
       categoriaActividad: {
         include: {
@@ -218,36 +223,74 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
     })),
   }))
 
-  // Construir respuesta jerárquica
-  const categoriasFormateadas = ['CUOTA_SOCIAL', 'CUOTA_ACTIVIDAD', 'INSCRIPCION', 'FINANCIACION', 'OTRO'].map(cat => {
-    const gen = cargosPorCategoria.find(c => c.categoria === cat)
-    const pag = cargosPagadosPorCategoria.find(c => c.categoria === cat)
-    const pen = cargosPendientesPorCategoria.find(c => c.categoria === cat)
+  // Construir respuesta jerárquica — mapeo de categorías DB (incluye legacy y actuales)
+  // a grupos visibles del reporte.
+  const GRUPO_CATEGORIA = {
+    SOCIO_UNICO:      'CUOTA_SOCIAL',
+    TITULAR_FAMILIA:  'CUOTA_SOCIAL',
+    CUOTA_SOCIAL:     'CUOTA_SOCIAL',
+    ACTIVIDAD:        'CUOTA_ACTIVIDAD',
+    CUOTA_ACTIVIDAD:  'CUOTA_ACTIVIDAD',
+    INSCRIPCION:      'INSCRIPCION',
+    FINANCIADO:       'FINANCIACION',
+    FINANCIACION:     'FINANCIACION',
+    NOTA_CREDITO:     'NOTA_CREDITO',
+    MORA:             'MORA',
+    CONCEPTO:         'CONCEPTO',
+    OTRO:             'OTRO',
+  }
+  const NOMBRE_GRUPO = {
+    CUOTA_SOCIAL:     'Cuota Social',
+    CUOTA_ACTIVIDAD:  'Actividades',
+    INSCRIPCION:      'Inscripciones',
+    FINANCIACION:     'Financiación',
+    CONCEPTO:         'Conceptos',
+    MORA:             'Morosidad',
+    NOTA_CREDITO:     'Notas de Crédito',
+    OTRO:             'Otros',
+  }
+  const ORDEN_GRUPOS = ['CUOTA_SOCIAL', 'CUOTA_ACTIVIDAD', 'INSCRIPCION', 'CONCEPTO', 'MORA', 'FINANCIACION', 'NOTA_CREDITO', 'OTRO']
 
-    const generadoMonto = Number(gen?._sum?.montoTotal) || 0
-    const cobradoMonto = Number(pag?._sum?.montoTotal) || 0
-    const pendienteMonto = Number(pen?._sum?.montoTotal) || 0
+  function grupoDe(categoriaDb) {
+    return GRUPO_CATEGORIA[categoriaDb] || 'OTRO'
+  }
 
-    return {
-      categoria: cat,
-      nombre: {
-        'CUOTA_SOCIAL': 'Cuota Social',
-        'CUOTA_ACTIVIDAD': 'Actividades',
-        'INSCRIPCION': 'Inscripciones',
-        'FINANCIACION': 'Financiación',
-        'OTRO': 'Otros',
-      }[cat] || cat,
-      generado: generadoMonto,
-      cobrado: cobradoMonto,
-      pendiente: pendienteMonto,
-      cantGenerado: gen?._count || 0,
-      cantCobrado: pag?._count || 0,
-      cantPendiente: pen?._count || 0,
-      porcentajeCobro: generadoMonto > 0 ? Math.round((cobradoMonto / generadoMonto) * 100) : 0,
-      // Para CUOTA_ACTIVIDAD, incluir desglose
-      ...(cat === 'CUOTA_ACTIVIDAD' ? { actividades } : {}),
-    }
-  }).filter(c => c.cantGenerado > 0) // Solo mostrar categorías con datos
+  // Acumular por grupo a partir de los groupBy ya calculados
+  const acum = {}
+  function ensureGrupo(g) {
+    if (!acum[g]) acum[g] = { generado: 0, cobrado: 0, pendiente: 0, cantGenerado: 0, cantCobrado: 0, cantPendiente: 0 }
+    return acum[g]
+  }
+  for (const r of cargosPorCategoria) {
+    const g = ensureGrupo(grupoDe(r.categoria))
+    g.generado += Number(r._sum?.montoTotal) || 0
+    g.cantGenerado += r._count || 0
+  }
+  for (const r of cargosPagadosPorCategoria) {
+    const g = ensureGrupo(grupoDe(r.categoria))
+    g.cobrado += Number(r._sum?.montoTotal) || 0
+    g.cantCobrado += r._count || 0
+  }
+  for (const r of cargosPendientesPorCategoria) {
+    const g = ensureGrupo(grupoDe(r.categoria))
+    g.pendiente += Number(r._sum?.montoTotal) || 0
+    g.cantPendiente += r._count || 0
+  }
+
+  const categoriasFormateadas = ORDEN_GRUPOS
+    .filter(g => acum[g] && acum[g].cantGenerado > 0)
+    .map(g => ({
+      categoria: g,
+      nombre: NOMBRE_GRUPO[g] || g,
+      generado: acum[g].generado,
+      cobrado: acum[g].cobrado,
+      pendiente: acum[g].pendiente,
+      cantGenerado: acum[g].cantGenerado,
+      cantCobrado: acum[g].cantCobrado,
+      cantPendiente: acum[g].cantPendiente,
+      porcentajeCobro: acum[g].generado > 0 ? Math.round((acum[g].cobrado / acum[g].generado) * 100) : 0,
+      ...(g === 'CUOTA_ACTIVIDAD' ? { actividades } : {}),
+    }))
 
   res.json({
     success: true,
@@ -301,19 +344,32 @@ router.get('/reportes/cobranza/vencidas', authAdmin, asyncHandler(async (req, re
 
 // GET /api/admin/reportes/cobranza/morosos - Lista de morosos por concepto
 router.get('/reportes/cobranza/morosos', authAdmin, asyncHandler(async (req, res) => {
-  const { categoria, actividadId, categoriaActividadId, periodoId, desde, hasta } = req.query
+  const { categoria, actividadId, categoriaActividadId, periodoId, periodoIds, desde, hasta } = req.query
 
   const where = {
     estado: 'PENDIENTE',
   }
 
   // Filtros de periodo/fecha
-  if (periodoId) where.periodoId = parseInt(periodoId)
+  if (periodoIds) {
+    const ids = periodoIds.split(',').map(s => parseInt(s)).filter(n => !Number.isNaN(n))
+    if (ids.length > 0) where.periodoId = { in: ids }
+  } else if (periodoId) {
+    where.periodoId = parseInt(periodoId)
+  }
   if (desde) where.createdAt = { ...where.createdAt, gte: new Date(desde) }
   if (hasta) where.createdAt = { ...where.createdAt, lte: new Date(hasta) }
 
-  // Filtros de categoría
-  if (categoria) where.categoria = categoria
+  // Filtros de categoría — soporta tanto grupos del reporte como categorías DB legacy
+  const GRUPO_A_DB = {
+    CUOTA_SOCIAL:    ['SOCIO_UNICO', 'TITULAR_FAMILIA', 'CUOTA_SOCIAL'],
+    CUOTA_ACTIVIDAD: ['ACTIVIDAD', 'CUOTA_ACTIVIDAD'],
+    FINANCIACION:    ['FINANCIADO', 'FINANCIACION'],
+  }
+  if (categoria) {
+    const lista = GRUPO_A_DB[categoria]
+    where.categoria = lista ? { in: lista } : categoria
+  }
   if (categoriaActividadId) where.categoriaActividadId = parseInt(categoriaActividadId)
 
   // Si se filtra por actividad, buscar todas las categorías de esa actividad
