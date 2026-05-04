@@ -124,7 +124,8 @@ export default function AdminLoginAlt() {
       setAdminInfo(data.admin)
       setEsSuperAdmin(!!data.esSuperAdmin)
       setTenants(data.tenants || [])
-      if (!data.esSuperAdmin && data.tenants?.length === 1) {
+      // Si tiene un único tenant asignado, ingresá directamente sin pasar por el selector
+      if (data.tenants?.length === 1) {
         const t = data.tenants[0]
         const currentSubdomain = getCurrentSubdomain()
         if (currentSubdomain === t.subdomain) {
@@ -218,12 +219,6 @@ export default function AdminLoginAlt() {
             todo el club operando en una sola plataforma.
           </p>
 
-          {/* Métricas peeking */}
-          <div className="la-rise la-rise-5 mt-12 grid grid-cols-3 gap-3 max-w-lg">
-            <MetricChip label="Socios activos" value="12.847" trend="+3.2%" />
-            <MetricChip label="Cuotas hoy" value="284" trend="+12" />
-            <MetricChip label="Uptime" value="99.98%" trend="30d" subtle />
-          </div>
         </div>
 
         {/* Footer izquierdo */}
@@ -416,11 +411,11 @@ function SelectorView({ admin, tenants, esSuperAdmin, error, onPick, onBack }) {
           No tenés acceso a ningún club todavía.
         </div>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2 w-full">
           {tenants.map((t, idx) => (
             <li
               key={t.id}
-              className="la-rise la-tile cursor-pointer flex items-center gap-4 px-4 py-3.5 rounded-lg"
+              className="la-rise la-tile cursor-pointer flex items-center gap-3 px-3 sm:px-4 py-3 rounded-lg w-full overflow-hidden"
               style={{
                 border: `1px solid ${C.border}`,
                 backgroundColor: C.surface,
@@ -428,13 +423,13 @@ function SelectorView({ admin, tenants, esSuperAdmin, error, onPick, onBack }) {
               }}
               onClick={() => onPick(t)}
             >
-              <span className="font-mono text-[10px] tracking-[0.15em] w-6 text-right" style={{ color: C.textMuted }}>
+              <span className="hidden sm:inline font-mono text-[10px] tracking-[0.15em] w-6 text-right flex-shrink-0" style={{ color: C.textMuted }}>
                 {String(idx + 1).padStart(2, '0')}
               </span>
 
               <div
                 className="flex-shrink-0 flex items-center justify-center rounded-md overflow-hidden"
-                style={{ width: 40, height: 40, border: `1px solid ${C.border}`, backgroundColor: C.bg }}
+                style={{ width: 36, height: 36, border: `1px solid ${C.border}`, backgroundColor: C.bg }}
               >
                 {t.logoUrl
                   ? <img src={t.logoUrl} alt={t.nombre} className="max-w-7 max-h-7 object-contain" />
@@ -442,19 +437,17 @@ function SelectorView({ admin, tenants, esSuperAdmin, error, onPick, onBack }) {
                 }
               </div>
 
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="truncate font-medium" style={{ fontSize: 15, color: C.text, letterSpacing: '-0.01em' }}>
                   {t.nombre}
                 </div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.15em] mt-1 flex items-center gap-2 truncate"
+                <div className="truncate font-mono text-[10px] uppercase tracking-[0.15em] mt-1"
                      style={{ color: C.textMuted }}>
-                  <span>{t.subdomain}.clubix.com</span>
-                  <span style={{ color: C.border }}>·</span>
-                  <span>{t.rolEnTenant}</span>
+                  {t.subdomain}.clubix.com · {t.rolEnTenant}
                 </div>
               </div>
 
-              <ArrowRight size={16} className="la-tile-arrow" style={{ color: C.textMuted }} />
+              <ArrowRight size={16} className="la-tile-arrow flex-shrink-0" style={{ color: C.textMuted }} />
             </li>
           ))}
         </ul>
@@ -528,29 +521,6 @@ function LiveBadge({ compact }) {
       <span className="font-mono text-[10px] uppercase tracking-[0.25em] la-accent-text">
         {compact ? 'Live' : 'Live · 24/7'}
       </span>
-    </div>
-  )
-}
-
-function MetricChip({ label, value, trend, subtle }) {
-  return (
-    <div
-      className="rounded-xl p-4"
-      style={{ backgroundColor: C.surface, border: `1px solid ${C.border}` }}
-    >
-      <div className="font-mono text-[9px] uppercase tracking-[0.2em] mb-2" style={{ color: C.textMuted }}>
-        {label}
-      </div>
-      <div className="font-medium" style={{ fontSize: 22, color: C.text, letterSpacing: '-0.03em', lineHeight: 1 }}>
-        {value}
-      </div>
-      <div className="flex items-center gap-1.5 mt-2">
-        {!subtle && <Activity size={10} className="la-accent-text" />}
-        <span className={`font-mono text-[9px] uppercase tracking-[0.15em] ${subtle ? '' : 'la-accent-text'}`}
-              style={subtle ? { color: C.textMuted } : undefined}>
-          {trend}
-        </span>
-      </div>
     </div>
   )
 }
