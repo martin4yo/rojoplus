@@ -1,12 +1,12 @@
 {
-  "apiUrl": "https://sportivotest.clubix.com.ar/api",
+  "apiUrl": "https://sportivopilar.clubix.com.ar/api",
   "dispositivoId": 2,
   "puerto": 3002,
   "puertoWebSocket": 3003,
 
   "tenant": {
-    "slug": "sportivotest",
-    "apiToken": "tok_f00dd108773ea02d281b6189db67b577c5687f46209397a3",
+    "slug": "sportivopilar",
+    "apiToken": "tok_6e7d542ce3152b217f4cc4570b99d1def0cd27869a132351",
     "descripcion": "Credenciales del dispositivo. El token se genera en el admin del club y se vincula al DispositivoAcceso."
   },
 

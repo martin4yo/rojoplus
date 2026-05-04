@@ -267,12 +267,28 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // ============ RESUMEN FINANCIERO RÁPIDO ============
 
-  // Saldos de cajas
-  const cajas = await req.db.caja.findMany({
+  // Saldos de cajas — calculados desde movimientos (no usar campo denormalizado)
+  const cajasRaw = await req.db.caja.findMany({
     where: { activo: true },
-    select: { nombre: true, saldoActual: true },
+    select: { id: true, nombre: true, saldoInicial: true },
   })
-  const saldoTotalCajas = cajas.reduce((sum, c) => sum + Number(c.saldoActual), 0)
+  const cajaIds = cajasRaw.map(c => c.id)
+  const totsPorCaja = cajaIds.length
+    ? await req.db.movimientoCaja.groupBy({
+        by: ['cajaId', 'tipo'],
+        where: { cajaId: { in: cajaIds }, anulado: false },
+        _sum: { monto: true },
+      })
+    : []
+  const movsByCaja = {}
+  for (const t of totsPorCaja) {
+    if (!movsByCaja[t.cajaId]) movsByCaja[t.cajaId] = { INGRESO: 0, EGRESO: 0 }
+    movsByCaja[t.cajaId][t.tipo] = Number(t._sum.monto || 0)
+  }
+  const saldoTotalCajas = cajasRaw.reduce((sum, c) => {
+    const m = movsByCaja[c.id] || { INGRESO: 0, EGRESO: 0 }
+    return sum + (Number(c.saldoInicial) + m.INGRESO - m.EGRESO)
+  }, 0)
 
   // Ingresos y egresos del mes
   const [ingresosMes, egresosMes] = await Promise.all([

@@ -7,6 +7,7 @@ import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { useConfirm } from '../../hooks/useConfirm'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import { formatCurrency } from '../../utils/formatters'
 
 export default function ActividadesLista() {
   const navigate = useNavigate()
@@ -137,6 +138,11 @@ export default function ActividadesLista() {
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-500 mt-0.5">
                     <span>{actividad.categorias?.length || 0} categorías</span>
+                    {Number(actividad.cuotaMensual) > 0 && (
+                      <span className="font-medium text-gray-700">
+                        Cuota: {formatCurrency(actividad.cuotaMensual)}
+                      </span>
+                    )}
                     {actividad.requiereAptaFisica && (
                       <span className="text-orange-600">Requiere apta física</span>
                     )}

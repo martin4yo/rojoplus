@@ -341,7 +341,7 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
         medioPagoRel: { select: { id: true, nombre: true } },
         movimientoContable: { select: { id: true, tipo: true, numero: true } },
         socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
-        entidad: { select: { id: true, nombre: true, tipo: true } },
+        entidad: { select: { id: true, codigo: true, razonSocial: true, nombreFantasia: true, tipo: true } },
         pago: {
           select: {
             id: true,

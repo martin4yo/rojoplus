@@ -65,12 +65,84 @@ function separarApellidoNombre(completo) {
   return { apellido, nombre }
 }
 
-// Convertir fecha serial de Excel a Date
-function excelDateToJS(serial) {
-  if (!serial || typeof serial !== 'number') return null
-  const utc_days = Math.floor(serial - 25569)
-  const utc_value = utc_days * 86400
-  return new Date(utc_value * 1000)
+// Contador global de fechas que no se pudieron parsear (para reportar al final)
+const _fechasNoParseadas = { total: 0, samples: new Map() }
+
+// Convertir fecha desde Excel a Date.
+// Acepta: number (serial), Date, o string con varios formatos comunes (dd/mm/yyyy, dd-mm-yy, yyyy-mm-dd, dd.mm.yyyy).
+// Devuelve null si no se puede parsear y registra la muestra para warning final.
+//
+// @param {*} val      - valor de la celda
+// @param {string} [tag] - etiqueta del campo (ej: "fechaAlta") para diagnóstico
+function excelDateToJS(val, tag = 'fecha') {
+  if (val === null || val === undefined || val === '') return null
+
+  // Date directo
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : val
+  }
+
+  // Number → serial Excel
+  if (typeof val === 'number') {
+    if (val <= 0) return null
+    const utc_days = Math.floor(val - 25569)
+    return new Date(utc_days * 86400 * 1000)
+  }
+
+  // String
+  const s = String(val).trim()
+  if (!s) return null
+  const sLower = s.toLowerCase()
+  if (sLower === '0' || sLower === '-' || sLower === 'null' || sLower === 'undefined' || sLower === 'n/a') {
+    return null
+  }
+
+  // dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy (con o sin ceros, año 2 o 4 dígitos)
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/)
+  if (m) {
+    let [, d, mo, y] = m
+    d = parseInt(d, 10); mo = parseInt(mo, 10); y = parseInt(y, 10)
+    if (y < 100) y = y >= 50 ? 1900 + y : 2000 + y
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      const date = new Date(y, mo - 1, d)
+      if (!isNaN(date.getTime())) return date
+    }
+  }
+
+  // yyyy-mm-dd (ISO)
+  const iso = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/)
+  if (iso) {
+    const y = parseInt(iso[1], 10), mo = parseInt(iso[2], 10), d = parseInt(iso[3], 10)
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      const date = new Date(y, mo - 1, d)
+      if (!isNaN(date.getTime())) return date
+    }
+  }
+
+  // Fallback: parser nativo
+  const parsed = new Date(s)
+  if (!isNaN(parsed.getTime())) return parsed
+
+  // Registrar muestra para warning final (sin spamear consola)
+  _fechasNoParseadas.total++
+  if (!_fechasNoParseadas.samples.has(tag)) {
+    _fechasNoParseadas.samples.set(tag, { count: 0, samples: [] })
+  }
+  const bucket = _fechasNoParseadas.samples.get(tag)
+  bucket.count++
+  if (bucket.samples.length < 3) bucket.samples.push(s)
+  return null
+}
+
+// Imprime un resumen de las fechas que no se pudieron parsear.
+// Llamar al final del script.
+function reportarFechasNoParseadas() {
+  if (_fechasNoParseadas.total === 0) return
+  console.warn(`\n⚠️  ${_fechasNoParseadas.total} fechas no se pudieron parsear y quedaron como NULL:`)
+  for (const [tag, info] of _fechasNoParseadas.samples) {
+    console.warn(`   • ${tag}: ${info.count} ocurrencias. Ejemplos: ${info.samples.map(s => `"${s}"`).join(', ')}`)
+  }
+  console.warn('   Verificá el formato de la columna en el Excel original.\n')
 }
 
 // Normalizar DNI
@@ -119,22 +191,37 @@ async function main() {
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const allData = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
-  // Detectar dinámicamente la columna de PIN/RFID mirando la fila de headers reales.
-  // El archivo tiene "SOCIOS ORDENADOS" como único header en fila 1,
-  // y la fila 2 contiene los nombres reales de las columnas.
+  // El archivo tiene "SOCIOS ORDENADOS" como único header en fila 1.
+  // La fila 2 contiene los nombres reales de las columnas.
+  // Construimos un mapa header→key para acceder por nombre y evitar shifts por columna.
   const headersRow = allData[0] || {}
-  let columnaPin = null
+  const headerToKey = {}
   for (const [key, value] of Object.entries(headersRow)) {
-    const nombre = String(value || '').trim().toUpperCase()
-    if (['PIN', 'RFID', 'TARJETA', 'CARNET', 'UID'].includes(nombre)) {
-      columnaPin = key
-      console.log(`🔑 Columna PIN/RFID detectada en "${key}" (header: "${value}")`)
+    const nombre = String(value || '').trim()
+    if (nombre) headerToKey[nombre.toLowerCase()] = key
+  }
+
+  // Helper para acceder por nombre de header (case-insensitive). Si no existe, fallback null.
+  const getCol = (row, headerName) => {
+    const key = headerToKey[headerName.toLowerCase()]
+    return key !== undefined ? row[key] : undefined
+  }
+
+  // Detectar la columna de PIN/RFID por nombre conocido
+  let columnaPin = null
+  for (const candidato of ['PIN', 'RFID', 'TARJETA', 'CARNET', 'UID']) {
+    const k = headerToKey[candidato.toLowerCase()]
+    if (k) {
+      columnaPin = k
+      console.log(`🔑 Columna PIN/RFID detectada en "${k}" (header: "${candidato}")`)
       break
     }
   }
   if (!columnaPin) {
     console.warn('⚠️  No se detectó columna PIN/RFID en los headers. Los socios se importarán sin rfidUid.')
   }
+
+  console.log(`📋 Headers detectados: ${Object.keys(headerToKey).length} columnas`)
 
   // La primera fila contiene los headers, empezar desde la segunda
   const data = allData.slice(1)
@@ -148,8 +235,8 @@ async function main() {
   //        La columna __EMPTY_14 del Excel es PARENTESCO (no TipoSocio) → va a parentescoTitular.
   console.log('📋 Sincronizando tablas auxiliares (estados, categorías, tipos)...')
 
-  const estadosEnExcel    = [...new Set(data.map(r => String(r['__EMPTY_10'] || '').trim()).filter(Boolean))]
-  const categoriasEnExcel = [...new Set(data.map(r => String(r['__EMPTY_9']  || '').trim()).filter(Boolean))]
+  const estadosEnExcel    = [...new Set(data.map(r => String(getCol(r, 'Estado')    || '').trim()).filter(Boolean))]
+  const categoriasEnExcel = [...new Set(data.map(r => String(getCol(r, 'Categoria') || '').trim()).filter(Boolean))]
 
   // EstadoSocio: crear los que no existan (tal cual del Excel)
   for (const est of estadosEnExcel) {
@@ -201,8 +288,10 @@ async function main() {
     const row = data[i]
 
     try {
-      // Extraer campos del Excel de Brio (nombres exactos de columnas)
-      const nroSocio = String(row['SOCIOS ORDENADOS'] || '').trim()
+      // Extraer campos del Excel de Brio por NOMBRE de header (no por posición).
+      // El nro. de socio está en la primera columna que el header llama "Nro.Socio"
+      // pero la key del primer registro es "SOCIOS ORDENADOS" (header de la fila 1).
+      const nroSocio = String(row['SOCIOS ORDENADOS'] ?? getCol(row, 'Nro.Socio') ?? '').trim()
 
       if (!nroSocio) {
         errores++
@@ -211,52 +300,50 @@ async function main() {
       }
 
       // ApellidoNombre viene junto, necesitamos separar
-      const apellidoNombre = String(row['__EMPTY'] || '').trim()
+      const apellidoNombre = String(getCol(row, 'ApellidoNombre') || '').trim()
       const { apellido, nombre } = separarApellidoNombre(apellidoNombre)
 
-      const tipoDoc = mapearTipoDoc(row['__EMPTY_24']) // Tipo Doc.
-      const documento = normalizarDNI(row['__EMPTY_25']) // Documento
-      const email = String(row['__EMPTY_30'] || '').trim().toLowerCase() || null // Email
-      const emailSecundario = String(row['__EMPTY_45'] || '').trim().toLowerCase() || null // Email Secundario
-      const telefono = String(row['__EMPTY_28'] || '').trim() || null // Telefono
-      const celular = String(row['__EMPTY_29'] || '').trim() || null // Celular
-      const domicilio = String(row['__EMPTY_27'] || '').trim() || null // Domicilio
-      const ciudad = String(row['__EMPTY_31'] || '').trim() || null // Ciudad
-      const provincia = String(row['__EMPTY_33'] || '').trim() || 'Buenos Aires' // Provincia
-      const codigoPostal = String(row['__EMPTY_32'] || '').trim() || null // CP
+      const tipoDoc        = mapearTipoDoc(getCol(row, 'Tipo Doc.'))
+      const documento      = normalizarDNI(getCol(row, 'Documento'))
+      const email          = String(getCol(row, 'Email') || '').trim().toLowerCase() || null
+      const emailSecundario = String(getCol(row, 'Email Secundario') || '').trim().toLowerCase() || null
+      const telefono       = String(getCol(row, 'Telefono') || '').trim() || null
+      const celular        = String(getCol(row, 'Celular') || '').trim() || null
+      const domicilio      = String(getCol(row, 'Domicilio') || '').trim() || null
+      const ciudad         = String(getCol(row, 'Ciudad') || '').trim() || null
+      const provincia      = String(getCol(row, 'Provincia') || '').trim() || 'Buenos Aires'
+      const codigoPostal   = String(getCol(row, 'CP') || '').trim() || null
 
-      const fechaNacimiento = excelDateToJS(row['__EMPTY_2']) // Fecha Nac. (columna 3)
-      const fechaAlta = excelDateToJS(row['__EMPTY_12']) // Fecha Alta (columna 13)
-      const fechaBaja = excelDateToJS(row['__EMPTY_13']) // Fecha Baja (columna 14)
+      const fechaNacimiento = excelDateToJS(getCol(row, 'Fecha Nac.'), 'fechaNacimiento')
+      const fechaAlta       = excelDateToJS(getCol(row, 'Fecha Alta'), 'fechaAlta')
+      const fechaBaja       = excelDateToJS(getCol(row, 'Fecha Baja'), 'fechaBaja')
 
       // Respetar exactamente los valores del Excel
-      const sexo     = String(row['__EMPTY_7']  || '').trim() || null // Sexo (columna 8)
-      const zona     = String(row['__EMPTY_8']  || '').trim() || null // Zona (columna 9)
-      const categoria = String(row['__EMPTY_9'] || '').trim() || null // Categoría (columna 10)
-      const estadoRaw = String(row['__EMPTY_10'] || '').trim()        // Estado (columna 11)
-      const estado    = estadoRaw || 'VIGENTE' // Respeta el valor del Excel; fallback si viene vacío
+      const sexo      = String(getCol(row, 'Sexo') || '').trim() || null
+      const zona      = String(getCol(row, 'Zona') || '').trim() || null
+      const categoria = String(getCol(row, 'Categoria') || '').trim() || null
+      const estadoRaw = String(getCol(row, 'Estado') || '').trim()
+      const estado    = estadoRaw || 'VIGENTE'
 
-      // Columna 15 (__EMPTY_14) del Excel Brio = PARENTESCO familiar (no es TipoSocio)
-      // El TipoSocio del sistema es siempre uno de: Socio Unico | Miembro Familia | Titular Familia
-      const parentescoExcel = String(row['__EMPTY_14'] || '').trim() || null
+      // Parentesco familiar (no es TipoSocio del sistema)
+      const parentescoExcel = String(getCol(row, 'Parentesco') || '').trim() || null
 
       // TipoSocio: se determina por la estructura familiar, no por el Excel.
       // El script importar-grupos-familiares.js ajusta Titular/Miembro después.
-      // Por defecto todos ingresan como "Socio Unico".
       const tipoSocio = 'Socio Unico'
 
       // Datos fiscales
-      const condicionFiscal = String(row['__EMPTY_21'] || row['__EMPTY_40'] || '').trim() // Cond. Fiscal
-      const cuil = normalizarDNI(row['__EMPTY_26']) // CUIT/CUIL
-      const obraSocial = String(row['__EMPTY_35'] || '').trim() || null // Obra Social
-      const profesion = String(row['__EMPTY_36'] || '').trim() || null // Profesión
-      const libro = String(row['__EMPTY_37'] || '').trim() || null // Libro
-      const folio = String(row['__EMPTY_38'] || '').trim() || null // Folio
-      const grupoSanguineo = String(row['__EMPTY_46'] || '').trim() || null // Grupo Sanguíneo
-      const factorRh = String(row['__EMPTY_47'] || '').trim() || null // Factor RH
+      const condicionFiscal = String(getCol(row, 'Cond. Fiscal') || '').trim()
+      const cuil            = normalizarDNI(getCol(row, 'CUIT/CUIL'))
+      const obraSocial      = String(getCol(row, 'Obra Social') || '').trim() || null
+      const profesion       = String(getCol(row, 'Profesión') || getCol(row, 'Profesion') || '').trim() || null
+      const libro           = String(getCol(row, 'Libro') || '').trim() || null
+      const folio           = String(getCol(row, 'Folio') || '').trim() || null
+      const grupoSanguineo  = String(getCol(row, 'Grupo Sanguíneo') || getCol(row, 'Grupo Sanguineo') || '').trim() || null
+      const factorRh        = String(getCol(row, 'Factor RH') || '').trim() || null
 
       // Observaciones
-      const observaciones = String(row['__EMPTY_39'] || '').trim() || null // Observacion
+      const observaciones = String(getCol(row, 'Observacion') || getCol(row, 'Observaciones') || '').trim() || null
 
       // PIN / RFID UID del carnet que lee el molinete
       let rfidUid = null
@@ -437,6 +524,8 @@ async function main() {
   console.log(`   Total socios:        ${totalSocios}`)
   console.log(`   Activos:             ${sociosActivos}`)
   console.log('=' .repeat(50))
+
+  reportarFechasNoParseadas()
 
   console.log('\n✅ Importación completada!')
 }

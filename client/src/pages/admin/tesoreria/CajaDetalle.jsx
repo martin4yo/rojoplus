@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Edit, Wallet, Building, CreditCard, TrendingUp, TrendingDown,
   ArrowRightLeft, Calendar, ChevronDown, ChevronRight, Search, Banknote,
-  Smartphone, FileText, X, Scale
+  Smartphone, FileText, X, Scale, Eye
 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
@@ -36,6 +36,7 @@ function getMedioPagoKey(value) {
 }
 
 function MedioPagoRow({ grupo, cajaId, periodo }) {
+  const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
   const [movimientos, setMovimientos] = useState([])
   const [loading, setLoading] = useState(false)
@@ -152,6 +153,7 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
                     <th className="text-left px-4 py-2">Concepto</th>
                     <th className="text-left px-4 py-2">Observación</th>
                     <th className="text-right px-4 py-2">Monto</th>
+                    <th className="text-right px-4 py-2 w-12"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -168,6 +170,15 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
                       </td>
                       <td className={`px-4 py-2 text-right font-medium whitespace-nowrap ${mov.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
                         {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.monto, { showSymbol: false })}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        <button
+                          onClick={() => navigate(`/admin/tesoreria/movimientos/${mov.id}`)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Ver detalle"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}

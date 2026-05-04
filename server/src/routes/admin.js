@@ -138,14 +138,33 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
     }),
   ])
 
-  // Saldos de cajas activas
-  const cajas = await req.db.caja.findMany({
+  // Saldos de cajas activas — calculados desde movimientos (no usar campo denormalizado)
+  const cajasRaw = await req.db.caja.findMany({
     where: { activo: true },
-    select: { id: true, nombre: true, tipo: true, saldoActual: true },
+    select: { id: true, nombre: true, tipo: true, saldoInicial: true },
     orderBy: { nombre: 'asc' },
   })
-
-  const saldoTotalCajas = cajas.reduce((sum, c) => sum + Number(c.saldoActual), 0)
+  const cajaIds = cajasRaw.map(c => c.id)
+  const totsPorCaja = cajaIds.length
+    ? await req.db.movimientoCaja.groupBy({
+        by: ['cajaId', 'tipo'],
+        where: { cajaId: { in: cajaIds }, anulado: false },
+        _sum: { monto: true },
+      })
+    : []
+  const movsByCaja = {}
+  for (const t of totsPorCaja) {
+    if (!movsByCaja[t.cajaId]) movsByCaja[t.cajaId] = { INGRESO: 0, EGRESO: 0 }
+    movsByCaja[t.cajaId][t.tipo] = Number(t._sum.monto || 0)
+  }
+  const cajas = cajasRaw.map(c => {
+    const m = movsByCaja[c.id] || { INGRESO: 0, EGRESO: 0 }
+    return {
+      id: c.id, nombre: c.nombre, tipo: c.tipo,
+      saldoActual: Number(c.saldoInicial) + m.INGRESO - m.EGRESO,
+    }
+  })
+  const saldoTotalCajas = cajas.reduce((sum, c) => sum + c.saldoActual, 0)
 
   // Comercios pendientes de aprobación
   const comerciosPendientes = await req.db.comercio.count({ where: { estado: 'PENDIENTE' } })

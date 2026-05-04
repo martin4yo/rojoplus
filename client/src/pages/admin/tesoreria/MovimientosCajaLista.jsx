@@ -105,17 +105,6 @@ export default function MovimientosCajaLista() {
     }
   }
 
-  async function handleAnular(id) {
-    const confirmed = await confirm('Anular Movimiento', '¿Anular este movimiento? Se revertira el saldo de la caja.', { variant: 'danger', confirmText: 'Anular' })
-    if (!confirmed) return
-
-    try {
-      await api.post(`/admin/movimientos-caja/${id}/anular`)
-      cargarMovimientos()
-    } catch (err) {
-      toast.error(err.message || 'Error al anular')
-    }
-  }
 
   const cajaSeleccionada = cajas.find(c => c.id === parseInt(filtros.cajaId))
 
@@ -279,15 +268,6 @@ export default function MovimientosCajaLista() {
               </button>
             ) : (
               <span className="w-7" />
-            )}
-            {!mov.anulado && !mov.pagoId && tienePermiso(PERMISOS.CAJA_ANULAR) && (
-              <button
-                onClick={() => handleAnular(mov.id)}
-                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                title="Anular movimiento"
-              >
-                <XCircle className="w-4 h-4" />
-              </button>
             )}
           </div>
         )

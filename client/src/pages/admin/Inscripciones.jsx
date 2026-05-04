@@ -441,7 +441,7 @@ export default function Inscripciones() {
       </div>
 
       {/* Tabla */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -534,14 +534,15 @@ export default function Inscripciones() {
             </tbody>
           </table>
         </div>
-
-        {/* Paginación */}
-        <Pagination
-          pagination={pagination}
-          page={page}
-          onPageChange={goToPage}
-        />
       </div>
+
+      {/* Paginación (fuera de la grilla, igual que en Socios) */}
+      <Pagination
+        pagination={pagination}
+        page={page}
+        onPageChange={goToPage}
+        className="mt-6"
+      />
 
       {/* Modal Nueva Inscripción */}
       <Modal

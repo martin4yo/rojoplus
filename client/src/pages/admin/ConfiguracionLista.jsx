@@ -7,6 +7,7 @@ import api from '../../services/api'
 import { tienePermiso, onPermisosLoaded, PERMISOS } from '../../services/permisos'
 import { useConfirm } from '../../hooks/useConfirm'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import { formatCurrency } from '../../utils/formatters'
 
 const COLORES = {
   green: 'bg-green-100 text-green-800',
@@ -176,6 +177,11 @@ export default function ConfiguracionLista() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">{item.descripcion || '-'}</td>
+                {tabla === 'tipos-socio' && (
+                  <td className="px-4 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">
+                    {Number(item.cuotaMensual) > 0 ? formatCurrency(item.cuotaMensual) : '-'}
+                  </td>
+                )}
                 {tabla === 'categorias-socio' && (
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {item.porcentajeDescuento > 0 ? `${item.porcentajeDescuento}%` : '-'}

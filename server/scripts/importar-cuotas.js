@@ -58,10 +58,50 @@ const PERIODO_DESDE_ANIO = parseInt(arg('desde-anio', String(new Date().getFullY
 const PERIODO_DESDE_MES  = parseInt(arg('desde-mes',  '4'))
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Acepta number (serial Excel), Date, o string en varios formatos comunes.
 function excelDateToJS(val) {
-  if (!val) return null
-  if (typeof val === 'number') return new Date((val - 25569) * 86400 * 1000)
-  const parsed = new Date(val)
+  if (val === null || val === undefined || val === '') return null
+
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : val
+  }
+
+  if (typeof val === 'number') {
+    if (val <= 0) return null
+    return new Date((val - 25569) * 86400 * 1000)
+  }
+
+  const s = String(val).trim()
+  if (!s) return null
+  const sLower = s.toLowerCase()
+  if (sLower === '0' || sLower === '-' || sLower === 'null' || sLower === 'undefined' || sLower === 'n/a') {
+    return null
+  }
+
+  // dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/)
+  if (m) {
+    let [, d, mo, y] = m
+    d = parseInt(d, 10); mo = parseInt(mo, 10); y = parseInt(y, 10)
+    if (y < 100) y = y >= 50 ? 1900 + y : 2000 + y
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      const date = new Date(y, mo - 1, d)
+      if (!isNaN(date.getTime())) return date
+    }
+  }
+
+  // yyyy-mm-dd
+  const iso = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/)
+  if (iso) {
+    const y = parseInt(iso[1], 10), mo = parseInt(iso[2], 10), d = parseInt(iso[3], 10)
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      const date = new Date(y, mo - 1, d)
+      if (!isNaN(date.getTime())) return date
+    }
+  }
+
+  // Fallback: parser nativo
+  const parsed = new Date(s)
   return isNaN(parsed.getTime()) ? null : parsed
 }
 
@@ -261,7 +301,7 @@ async function importarCuotas() {
       const key = `${anio}-${String(mes).padStart(2, '0')}`
       if (periodosCache.has(key)) return periodosCache.get(key)
 
-      let periodo = await prisma.periodo.findFirst({ where: { mes, anio } })
+      let periodo = await prisma.periodo.findFirst({ where: { mes, anio, tenantId } })
       if (!periodo) {
         const fechaVencimiento = new Date(anio, mes, 10) // día 10 del mes siguiente
         periodo = await prisma.periodo.create({
@@ -362,6 +402,15 @@ async function importarCuotas() {
         conceptoTesoreriaId = conceptoPorActividad.get(actNorm) ?? conceptoTesoreriaId
       }
 
+      // Fallback razonable cuando la fecha del Excel viene null/inválida:
+      // primer día del período. Mejor que `new Date()` porque al menos
+      // queda en el mes correcto.
+      const fechaFallback = periodoData
+        ? new Date(periodoData.anio, periodoData.mes - 1, 1)
+        : new Date()
+      const fechaGeneracionFinal = fechaGen || fechaFallback
+      const fechaPagoFinal = esPagado ? (fechaCobro || fechaGen || fechaFallback) : null
+
       try {
         const cargoCreado = await prisma.cargo.create({
           data: {
@@ -378,8 +427,8 @@ async function importarCuotas() {
             montoBonificacion,
             montoTotal,
             estado:           esPagado ? 'PAGADO' : 'PENDIENTE',
-            fechaGeneracion:  fechaGen || new Date(),
-            fechaPago:        esPagado ? (fechaCobro || fechaGen) : null,
+            fechaGeneracion:  fechaGeneracionFinal,
+            fechaPago:        fechaPagoFinal,
             origen:           'MIGRACION_BRIO',
             observaciones:    `Brio: ${row['Categ. Socio'] || ''} | Est: ${row['Estado'] || ''}`,
           }
@@ -394,7 +443,7 @@ async function importarCuotas() {
             data: {
               tenantId,
               numero:         numeroPago,
-              fecha:          fechaCobro || fechaGen || new Date(),
+              fecha:          fechaCobro || fechaGen || fechaFallback,
               socioId,
               montoTotal,
               montoRecibido:  montoTotal,

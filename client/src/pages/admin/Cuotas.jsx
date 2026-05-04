@@ -593,6 +593,32 @@ export default function Cuotas() {
     return Array.from(map.values())
   }, [cuotas])
 
+  // Totales agregados de la vista actual (filtros aplicados)
+  const totalesVista = useMemo(() => {
+    if (!cuotas || cuotas.length === 0) return null
+    let total = 0
+    let pagado = 0
+    let pendiente = 0
+    let cantPagado = 0
+    let cantPendiente = 0
+    for (const c of cuotas) {
+      const monto = Number(c.montoTotal) || 0
+      total += monto
+      if (c.estado === 'PAGADO') {
+        pagado += monto
+        cantPagado++
+      } else if (c.estado === 'PENDIENTE') {
+        pendiente += monto
+        cantPendiente++
+      }
+    }
+    return {
+      total, pagado, pendiente,
+      cantTotal: cuotas.length,
+      cantPagado, cantPendiente,
+    }
+  }, [cuotas])
+
   // Vista de Cobranza
   if (modoCobranza) {
     return (
@@ -1218,6 +1244,32 @@ export default function Cuotas() {
         </div>
       ) : (
         <>
+          {/* Resumen total del listado actual */}
+          {totalesVista && (
+            <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center md:text-left">
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Cuotas</p>
+                  <p className="text-xl font-bold text-gray-800">{totalesVista.cantTotal}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Total importe</p>
+                  <p className="text-xl font-bold text-gray-800">{formatCurrency(totalesVista.total)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Pagado</p>
+                  <p className="text-xl font-bold text-green-600">{formatCurrency(totalesVista.pagado)}</p>
+                  <p className="text-[10px] text-gray-500">{totalesVista.cantPagado} cuota{totalesVista.cantPagado === 1 ? '' : 's'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Pendiente</p>
+                  <p className="text-xl font-bold text-red-600">{formatCurrency(totalesVista.pendiente)}</p>
+                  <p className="text-[10px] text-gray-500">{totalesVista.cantPendiente} cuota{totalesVista.cantPendiente === 1 ? '' : 's'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             {cuotasAgrupadas.map(grupo => {
               const expandido = socioListadoExpandido[grupo.socio.id]
