@@ -4,7 +4,6 @@ import { Receipt, CheckCircle, DollarSign, X, Users, ChevronDown, ChevronUp, Edi
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import Modal from '../../components/Modal'
-import { SearchInputWithDropdown } from '../../components/SearchInput'
 import { PlanPagosModal } from '../../components/PlanPagosModal'
 import ReciboAccionesModal from '../../components/ReciboAccionesModal'
 import SelectCentroCosto from '../../components/SelectCentroCosto'
@@ -30,14 +29,11 @@ export default function Cuotas() {
   // Filtros
   const [periodoId, setPeriodoId] = useState(searchParams.get('periodoId') || '')
   const [estado, setEstado] = useState(searchParams.get('estado') || '')
+  const [busquedaTexto, setBusquedaTexto] = useState('')
+  const [busquedaTextoDebounced, setBusquedaTextoDebounced] = useState('')
 
   // Paginación
   const { page, pagination, setPagination, goToPage } = usePagination()
-
-  // Buscador de socios
-  const [busquedaSocio, setBusquedaSocio] = useState('')
-  const [resultadosSocio, setResultadosSocio] = useState([])
-  const [buscandoSocio, setBuscandoSocio] = useState(false)
 
   // Modo cobranza
   const [modoCobranza, setModoCobranza] = useState(false)
@@ -106,7 +102,16 @@ export default function Cuotas() {
     if (!modoCobranza) {
       cargarCuotas()
     }
-  }, [periodoId, estado, page, modoCobranza])
+  }, [periodoId, estado, page, modoCobranza, busquedaTextoDebounced])
+
+  // Debounce del filtro de texto
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setBusquedaTextoDebounced(busquedaTexto.trim())
+      if (page !== 1) goToPage(1)
+    }, 350)
+    return () => clearTimeout(t)
+  }, [busquedaTexto])
 
   // Detectar si se debe abrir cobranza automáticamente
   useEffect(() => {
@@ -117,28 +122,6 @@ export default function Cuotas() {
       setSearchParams({})
     }
   }, [searchParams, modoCobranza])
-
-  // Buscar socios con debounce
-  useEffect(() => {
-    if (busquedaSocio.length < 2) {
-      setResultadosSocio([])
-      return
-    }
-
-    const timer = setTimeout(async () => {
-      setBuscandoSocio(true)
-      try {
-        const data = await api.get(`/admin/socios?q=${encodeURIComponent(busquedaSocio)}&limit=10`)
-        setResultadosSocio(data.socios || [])
-      } catch (err) {
-        console.error('Error buscando socios:', err)
-      } finally {
-        setBuscandoSocio(false)
-      }
-    }, 300)
-
-    return () => clearTimeout(timer)
-  }, [busquedaSocio])
 
   async function cargarDatosIniciales() {
     try {
@@ -284,6 +267,7 @@ export default function Cuotas() {
         const params = new URLSearchParams()
         if (periodoId) params.append('periodoId', periodoId)
         if (estado) params.append('estado', estado)
+        if (busquedaTextoDebounced) params.append('q', busquedaTextoDebounced)
         params.append('page', page.toString())
 
         const data = await api.get(`/admin/cuotas?${params}`)
@@ -299,7 +283,6 @@ export default function Cuotas() {
   }
 
   async function seleccionarSocioParaCobranza(socio) {
-    setBusquedaSocio('')
     setModoCobranza(true)
     setCargandoCobranza(true)
     setSeleccionadas([])
@@ -1064,50 +1047,27 @@ export default function Cuotas() {
       {error && <Alert type="error" className="mb-4" onClose={() => setError(null)}>{error}</Alert>}
       {success && <Alert type="success" className="mb-4" onClose={() => setSuccess(null)}>{success}</Alert>}
 
-      {/* Buscador de socios para cobranza */}
+      {/* Filtro por socio — filtra la grilla en vivo */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Cobrar a socio/familia</label>
-        <SearchInputWithDropdown
-          value={busquedaSocio}
-          onChange={setBusquedaSocio}
-          results={resultadosSocio}
-          loading={buscandoSocio}
-          onSelectResult={seleccionarSocioParaCobranza}
-          renderResult={(socio) => (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary font-bold flex-shrink-0">
-                {socio.apellidoNombre?.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-800 truncate">{socio.apellidoNombre}</p>
-                <p className="text-sm text-gray-500">#{socio.nroSocio} - DNI: {socio.documento}</p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {socio.titularFamiliaId === null && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                    {socio.tipoSocio?.includes('Familia') ? 'Titular' : 'Unico'}
-                  </span>
-                )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); abrirCrearCargo(socio) }}
-                  className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
-                  title="Agregar Cargo"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar cuotas por socio</label>
+        <div className="relative">
+          <input
+            type="text"
+            value={busquedaTexto}
+            onChange={(e) => setBusquedaTexto(e.target.value)}
+            placeholder="Filtrar por nombre, DNI o nro. socio..."
+            className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          />
+          {busquedaTexto && (
+            <button
+              onClick={() => setBusquedaTexto('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
+              title="Limpiar"
+            >
+              <X className="w-4 h-4" />
+            </button>
           )}
-          placeholder="Buscar socio por nombre, DNI o nro. socio..."
-          minChars={2}
-          debounceMs={300}
-          emptyMessage="No se encontraron socios"
-          onEnter={() => {
-            if (resultadosSocio.length > 0) {
-              seleccionarSocioParaCobranza(resultadosSocio[0])
-            }
-          }}
-        />
+        </div>
       </div>
 
       {/* Filtros */}

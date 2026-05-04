@@ -505,7 +505,7 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
 
 // GET /api/admin/cuotas - Listar cuotas con filtros
 router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
-  const { periodoId, socioId, familiaId, estado, page = 1 } = req.query
+  const { periodoId, socioId, familiaId, estado, q, page = 1 } = req.query
   const limit = 50
   const skip = (parseInt(page) - 1) * limit
 
@@ -514,6 +514,16 @@ router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
   if (socioId) where.socioId = parseInt(socioId)
   if (familiaId) where.grupoFamiliarId = parseInt(familiaId)
   if (estado) where.estado = estado
+  if (q && q.trim()) {
+    const term = q.trim()
+    where.socio = {
+      OR: [
+        { apellidoNombre: { contains: term, mode: 'insensitive' } },
+        { documento: { contains: term } },
+        { nroSocio: { contains: term } },
+      ],
+    }
+  }
 
   const [cuotas, total] = await Promise.all([
     req.db.cargo.findMany({
