@@ -893,6 +893,14 @@ section { padding: clamp(80px, 10vw, 140px) 0; }
 .benefit-item:nth-child(2n) { border-right: none; }
 @media (max-width: 800px) { .benefit-item { border-right: none; } }
 
+@media (max-width: 600px) {
+  .benefit-item {
+    flex-direction: column;
+    gap: 16px;
+    padding: 36px 24px;
+  }
+}
+
 .benefit-number {
   font-family: var(--font-display);
   font-size: 64px;
@@ -900,6 +908,12 @@ section { padding: clamp(80px, 10vw, 140px) 0; }
   color: var(--accent);
   flex-shrink: 0;
   width: 80px;
+}
+@media (max-width: 600px) {
+  .benefit-number {
+    width: auto;
+    font-size: 48px;
+  }
 }
 
 .benefit-item h3 {
