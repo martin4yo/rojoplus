@@ -165,6 +165,62 @@ export async function enviarWhatsAppImagen({ db, telefono, imagenBase64, caption
 }
 
 /**
+ * Envía un documento (PDF) por WhatsApp.
+ * Usa el endpoint sendMedia de Evolution API con mediatype='document'.
+ */
+export async function enviarWhatsAppDocumento({ db, telefono, pdfBase64, fileName = 'documento.pdf', caption = '', ignorarHorario = false }) {
+  const cfg = await getWhatsAppConfig(db)
+  if (!cfg) return { enviado: false, motivo: 'WhatsApp no configurado o deshabilitado' }
+
+  if (!ignorarHorario && !dentroDelHorario(cfg.horaInicio, cfg.horaFin)) {
+    return { enviado: false, motivo: 'Fuera del horario de envío' }
+  }
+
+  let numero = normalizarNumero(telefono)
+  if (!numero) return { enviado: false, motivo: 'Número inválido' }
+
+  if (cfg.modoDemo) {
+    if (!cfg.numeroDemo) return { enviado: false, motivo: 'Modo demo activo pero sin número de prueba configurado (WHATSAPP_DEMO_NUMERO)' }
+    console.log(`📱 MODO DEMO: Redirigiendo WhatsApp (documento) de ${numero} a ${cfg.numeroDemo}`)
+    caption = `[DEMO - Para: ${numero}]\n${caption}`
+    numero = cfg.numeroDemo
+  } else if (cfg.whitelist && !cfg.whitelist.includes(numero)) {
+    return { enviado: false, motivo: 'Número no está en la lista blanca' }
+  }
+
+  try {
+    const url = `${cfg.apiUrl}/message/sendMedia/${cfg.instance}`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': cfg.apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        number: numero,
+        mediatype: 'document',
+        mimetype: 'application/pdf',
+        media: pdfBase64,
+        caption,
+        fileName,
+        delay: cfg.delayMs,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.text()
+      console.error('[WhatsApp] Error enviando documento:', err)
+      return { enviado: false, motivo: `Error API: ${res.status}` }
+    }
+
+    return { enviado: true, numero }
+  } catch (err) {
+    console.error('[WhatsApp] Error de red (documento):', err.message)
+    return { enviado: false, motivo: err.message }
+  }
+}
+
+/**
  * Envía un mensaje de texto por WhatsApp.
  * @param {object} params
  * @param {object} params.db - Prisma client del tenant
@@ -380,11 +436,11 @@ export function obtenerTelefonoSocio(socio) {
 /**
  * Notifica a un socio que se registró un pago.
  */
-export async function notificarPago({ db, socio, pago }) {
+export async function notificarPago({ db, socio, pago, pdfBuffer = null, pdfFilename = null }) {
   const telefono = obtenerTelefonoSocio(socio)
   if (!telefono) return
 
-  const monto = Number(pago.importe || pago.monto || 0).toLocaleString('es-AR', {
+  const monto = Number(pago.montoTotal || pago.importe || pago.monto || 0).toLocaleString('es-AR', {
     style: 'currency', currency: 'ARS', maximumFractionDigits: 0
   })
 
@@ -392,6 +448,16 @@ export async function notificarPago({ db, socio, pago }) {
     nombre: socio.apellidoNombre,
     monto,
   })
+
+  if (pdfBuffer) {
+    return enviarWhatsAppDocumento({
+      db,
+      telefono,
+      pdfBase64: pdfBuffer.toString('base64'),
+      fileName: pdfFilename || `recibo-${pago.numero}.pdf`,
+      caption: texto,
+    })
+  }
   return enviarWhatsApp({ db, telefono, texto })
 }
 

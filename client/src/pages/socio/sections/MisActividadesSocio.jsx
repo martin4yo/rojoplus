@@ -96,48 +96,46 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-3">
-          <button
-            onClick={() => setTab('mis-actividades')}
-            className={`py-4 px-4 font-semibold transition-colors text-sm ${
-              tab === 'mis-actividades'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Mis Actividades ({inscripciones.length})
-          </button>
-          <button
-            onClick={() => setTab('disponibles')}
-            className={`py-4 px-4 font-semibold transition-colors text-sm ${
-              tab === 'disponibles'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Disponibles ({disponibles.length})
-          </button>
-          <button
-            onClick={() => setTab('asistencia')}
-            className={`py-4 px-4 font-semibold transition-colors text-sm ${
-              tab === 'asistencia'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Mi Asistencia
-          </button>
+    <div className="space-y-8">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Deportes
         </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Mis <span style={{ color: 'var(--color-primary)' }}>actividades</span>
+        </h1>
+      </div>
+
+      {/* Tabs athletic */}
+      <div className="grid grid-cols-3 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+        {[
+          { id: 'mis-actividades', label: 'Mis actividades', count: inscripciones.length },
+          { id: 'disponibles', label: 'Disponibles', count: disponibles.length },
+          { id: 'asistencia', label: 'Mi asistencia', count: null },
+        ].map(({ id, label, count }) => {
+          const activo = tab === id
+          return (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className="py-4 px-4 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors"
+              style={{
+                backgroundColor: activo ? 'var(--color-primary)' : 'var(--bg-surface)',
+                color: activo ? 'var(--accent-fg)' : 'var(--text-dim)',
+              }}
+            >
+              {label}{count !== null && ` (${count})`}
+            </button>
+          )
+        })}
       </div>
 
       {/* Contenido según tab */}
       {tab === 'mis-actividades' && (
         <div className="space-y-4">
           {inscripciones.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+            <div className="pub-card p-12 text-center">
               <TrophyIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 No estás inscripto en ninguna actividad
@@ -145,15 +143,15 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
               <p className="text-gray-600 mb-6">Explora las actividades disponibles y únete</p>
               <button
                 onClick={() => setTab('disponibles')}
-                className="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="pub-cta inline-flex"
               >
-                <PlusCircleIcon className="h-5 w-5 mr-2" />
-                Ver actividades
+                <PlusCircleIcon className="h-5 w-5" />
+                <span>Ver actividades</span>
               </button>
             </div>
           ) : (
             inscripciones.map((insc) => (
-              <div key={insc.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div key={insc.id} className="pub-card overflow-hidden">
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
@@ -235,7 +233,7 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
       {tab === 'disponibles' && (
         <div className="space-y-4">
           {disponibles.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+            <div className="pub-card p-12 text-center">
               <CheckCircleIcon className="h-16 w-16 text-green-500 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 No hay actividades disponibles en este momento
@@ -244,7 +242,7 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
             </div>
           ) : (
             disponibles.map((act) => (
-              <div key={act.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div key={act.id} className="pub-card overflow-hidden hover:shadow-md transition-shadow">
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
@@ -319,14 +317,14 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
           {loadingHistorial ? (
             <LoadingSpinner />
           ) : historial.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+            <div className="pub-card p-12 text-center">
               <ChartBarIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Sin historial de asistencia</h3>
               <p className="text-gray-600">No hay entrenamientos registrados en los últimos 90 días</p>
             </div>
           ) : (
             historial.map(item => (
-              <div key={item.inscripcionId} className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div key={item.inscripcionId} className="pub-card overflow-hidden">
                 {/* Cabecera con resumen */}
                 <div className="p-5 border-b border-gray-100">
                   <div className="flex items-center justify-between mb-3">

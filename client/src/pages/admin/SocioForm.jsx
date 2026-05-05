@@ -96,9 +96,9 @@ export default function SocioForm() {
     provincia: 'Buenos Aires',
     // Club
     fechaAlta: new Date().toISOString().split('T')[0],
-    estado: 'ACTIVO',
-    categoria: '',
-    tipoSocio: '',
+    estadoSocioId: '',
+    categoriaSocioId: '',
+    tipoSocioRelId: '',
     zona: '',
     libro: '',
     folio: '',
@@ -218,8 +218,22 @@ export default function SocioForm() {
         aptaFisicaVence: socio.aptaFisicaVence ? socio.aptaFisicaVence.split('T')[0] : '',
         responsableId: socio.responsableId || '',
         cobradorId: socio.cobradorId || '',
+        estadoSocioId: socio.estadoSocioId ? String(socio.estadoSocioId) : '',
+        categoriaSocioId: socio.categoriaSocioId ? String(socio.categoriaSocioId) : '',
+        tipoSocioRelId: socio.tipoSocioRelId ? String(socio.tipoSocioRelId) : '',
         esMenor: calcularEsMenor(fechaNac),
       })
+
+      // Si la relación apunta a un registro inactivo, agregarlo al dropdown para poder mostrarlo
+      if (socio.estadoSocioRel) {
+        setEstadosSocio(prev => prev.find(x => x.id === socio.estadoSocioRel.id) ? prev : [...prev, socio.estadoSocioRel])
+      }
+      if (socio.categoriaSocioRel) {
+        setCategoriasSocio(prev => prev.find(x => x.id === socio.categoriaSocioRel.id) ? prev : [...prev, socio.categoriaSocioRel])
+      }
+      if (socio.tipoSocioRel) {
+        setTiposSocio(prev => prev.find(x => x.id === socio.tipoSocioRel.id) ? prev : [...prev, socio.tipoSocioRel])
+      }
     } catch (err) {
       setError('Error al cargar el socio')
     } finally {
@@ -257,9 +271,9 @@ export default function SocioForm() {
 
   const REQUIRED_FIELDS = [
     // Personal
-    { field: 'estado', tab: 'personal', label: 'Estado' },
-    { field: 'categoria', tab: 'personal', label: 'Categoría' },
-    { field: 'tipoSocio', tab: 'personal', label: 'Tipo de Socio' },
+    { field: 'estadoSocioId', tab: 'personal', label: 'Estado' },
+    { field: 'categoriaSocioId', tab: 'personal', label: 'Categoría' },
+    { field: 'tipoSocioRelId', tab: 'personal', label: 'Tipo de Socio' },
     { field: 'apellido', tab: 'personal', label: 'Apellido' },
     { field: 'nombre', tab: 'personal', label: 'Nombre' },
     { field: 'documento', tab: 'personal', label: 'Documento' },
@@ -329,6 +343,17 @@ export default function SocioForm() {
       } else {
         const resultado = await api.post('/admin/socios', { ...form, esMenor: calcularEsMenor(form.fechaNacimiento) })
         toast.success(`Socio #${resultado?.nroSocio || form.nroSocio} creado correctamente`)
+        navigate('/admin/inscripciones', {
+          state: {
+            nuevoSocio: {
+              id: resultado.id,
+              nroSocio: resultado.nroSocio,
+              apellidoNombre: resultado.apellidoNombre,
+              documento: resultado.documento,
+            }
+          }
+        })
+        return
       }
       navigate('/admin/socios')
     } catch (err) {
@@ -539,40 +564,30 @@ export default function SocioForm() {
                   />
                 </div>
                 <div className="col-span-6 sm:col-span-2">
-                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.estado ? 'text-red-600' : 'text-gray-700'}`}>Estado <span className="text-red-500">*</span></label>
-                  <select name="estado" value={form.estado} onChange={handleChange} className={inputClass('estado')}>
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.estadoSocioId ? 'text-red-600' : 'text-gray-700'}`}>Estado <span className="text-red-500">*</span></label>
+                  <select name="estadoSocioId" value={form.estadoSocioId} onChange={handleChange} className={inputClass('estadoSocioId')}>
                     <option value="">Seleccionar</option>
                     {estadosSocio.map(e => (
-                      <option key={e.id} value={e.nombre}>{e.nombre}</option>
+                      <option key={e.id} value={e.id}>{e.nombre}{e.activo === false ? ' (inactivo)' : ''}</option>
                     ))}
-                    {/* Si el valor actual no está en la lista, mostrarlo igual */}
-                    {form.estado && !estadosSocio.find(e => e.nombre === form.estado) && (
-                      <option value={form.estado}>{form.estado}</option>
-                    )}
                   </select>
                 </div>
                 <div className="col-span-6 sm:col-span-3">
-                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.categoria ? 'text-red-600' : 'text-gray-700'}`}>Categoría <span className="text-red-500">*</span></label>
-                  <select name="categoria" value={form.categoria} onChange={handleChange} className={inputClass('categoria')}>
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.categoriaSocioId ? 'text-red-600' : 'text-gray-700'}`}>Categoría <span className="text-red-500">*</span></label>
+                  <select name="categoriaSocioId" value={form.categoriaSocioId} onChange={handleChange} className={inputClass('categoriaSocioId')}>
                     <option value="">Seleccionar</option>
                     {categoriasSocio.map(c => (
-                      <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                      <option key={c.id} value={c.id}>{c.nombre}{c.activo === false ? ' (inactivo)' : ''}</option>
                     ))}
-                    {form.categoria && !categoriasSocio.find(c => c.nombre === form.categoria) && (
-                      <option value={form.categoria}>{form.categoria}</option>
-                    )}
                   </select>
                 </div>
                 <div className="col-span-6 sm:col-span-3">
-                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.tipoSocio ? 'text-red-600' : 'text-gray-700'}`}>Tipo de Socio <span className="text-red-500">*</span></label>
-                  <select name="tipoSocio" value={form.tipoSocio} onChange={handleChange} className={inputClass('tipoSocio')}>
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.tipoSocioRelId ? 'text-red-600' : 'text-gray-700'}`}>Tipo de Socio <span className="text-red-500">*</span></label>
+                  <select name="tipoSocioRelId" value={form.tipoSocioRelId} onChange={handleChange} className={inputClass('tipoSocioRelId')}>
                     <option value="">Seleccionar</option>
                     {tiposSocio.map(t => (
-                      <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                      <option key={t.id} value={t.id}>{t.nombre}{t.activo === false ? ' (inactivo)' : ''}</option>
                     ))}
-                    {form.tipoSocio && !tiposSocio.find(t => t.nombre === form.tipoSocio) && (
-                      <option value={form.tipoSocio}>{form.tipoSocio}</option>
-                    )}
                   </select>
                 </div>
                 <div className="col-span-6 sm:col-span-2">

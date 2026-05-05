@@ -115,15 +115,17 @@ export default function BeneficiosSocio({ socio, tokenPortal }) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
-        <div className="flex items-center space-x-3 mb-2">
-          <TagIcon className="h-8 w-8" />
-          <h2 className="text-2xl font-bold">Beneficios para Socios</h2>
+    <div className="space-y-8">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Comunidad
         </div>
-        <p className="text-green-100">
-          Descuentos exclusivos en {comercios.length} comercios adheridos
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Tus <span style={{ color: 'var(--color-primary)' }}>beneficios</span>
+        </h1>
+        <p className="mt-3 text-sm md:text-base" style={{ color: 'var(--text-dim)' }}>
+          Descuentos exclusivos en {comercios.length} comercios adheridos.
         </p>
       </div>
 

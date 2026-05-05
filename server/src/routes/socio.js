@@ -408,16 +408,17 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
     return
   }
 
-  // Enviar email con Magic Link
-  await enviarMagicLinkSocio(socio, token, req.db)
+  // Enviar email con Magic Link (pasar tenantId para que la URL incluya el subdomain)
+  await enviarMagicLinkSocio(socio, token, req.db, req.tenantId)
 
-  // Enviar también por WhatsApp si el socio tiene el canal habilitado
-  if (socio.notifWhatsapp && (socio.celular || socio.celularSecundario)) {
+  // Enviar también por WhatsApp si el socio tiene el canal habilitado.
+  // Importante: chequear los 3 teléfonos (celular, secundario y fijo).
+  const telWA = obtenerTelefonoSocio(socio)
+  if (socio.notifWhatsapp && telWA) {
     req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_MAGIC_LINK' } })
       .then(flag => {
         if (flag?.valor !== 'false') {
-          const tel = socio.celular || socio.celularSecundario
-          enviarLinkPortal({ db: req.db, socio: { ...socio, celular: tel }, link: portalLink })
+          enviarLinkPortal({ db: req.db, socio: { ...socio, celular: telWA }, link: portalLink })
             .catch(err => console.error('Error enviando magic link por WA:', err.message))
         }
       })
@@ -1004,40 +1005,49 @@ router.get('/:tokenPortal/historial-asistencia', asyncHandler(async (req, res) =
 // ==============================================================================
 
 // GET /api/socio/:tokenPortal/estado-cuenta - Obtener resumen de estado de cuenta
+// Si el socio es titular de familia, agrega cuotas + actividades de todo el grupo.
 router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
   const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
+    select: {
+      id: true,
+      titularFamiliaId: true,
+      miembrosFamilia: { select: { id: true } },
+    },
   })
 
   if (!socio) {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
+  // Si es titular (no tiene titularFamiliaId) y tiene miembros, incluir la familia.
+  const esTitular = !socio.titularFamiliaId
+  const tieneFamilia = esTitular && socio.miembrosFamilia?.length > 0
+  const socioIds = tieneFamilia
+    ? [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
+    : [socio.id]
+
   // Contar cuotas pendientes
   const cuotasPendientes = await req.db.cargo.count({
     where: {
-      socioId: socio.id,
-      estado: {
-        in: ['PENDIENTE', 'VENCIDO'],
-      },
+      socioId: { in: socioIds },
+      estado: { in: ['PENDIENTE', 'VENCIDO'] },
     },
   })
 
   // Calcular monto total pendiente
   const cargos = await req.db.cargo.findMany({
     where: {
-      socioId: socio.id,
-      estado: {
-        in: ['PENDIENTE', 'VENCIDO'],
-      },
+      socioId: { in: socioIds },
+      estado: { in: ['PENDIENTE', 'VENCIDO'] },
     },
   })
 
   const montoPendiente = cargos.reduce((sum, c) => sum + parseFloat(c.montoTotal), 0)
 
-  // Contar actividades activas
+  // Contar actividades activas (sólo del socio titular del portal, no de la familia)
   const actividadesActivas = await req.db.inscripcion.count({
     where: {
       socioId: socio.id,
@@ -1051,6 +1061,8 @@ router.get('/:tokenPortal/estado-cuenta', asyncHandler(async (req, res) => {
       cuotasPendientes,
       montoPendiente,
       actividadesActivas,
+      incluyeFamilia: tieneFamilia,
+      cantMiembrosFamilia: tieneFamilia ? socio.miembrosFamilia.length : 0,
     },
   })
 }))
@@ -1463,6 +1475,7 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
     where: { socioId: { in: socioIds } },
     include: {
       socio: { select: { nroSocio: true, apellidoNombre: true } },
+      medioPago: { select: { nombre: true } },
     },
     orderBy: { fecha: 'asc' },
   })
@@ -1480,44 +1493,74 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
     if (cargo.categoriaActividad) {
       detalle += (detalle ? ' - ' : '') + `${cargo.categoriaActividad.actividad?.nombre || ''} ${cargo.categoriaActividad.nombre}`
     }
+
+    // Determinar si el cargo es un crédito (descuento, nota de crédito, devolución).
+    // Casos:
+    //  1) montoTotal negativo → es crédito por monto absoluto.
+    //  2) montoTotal = 0 pero montoBonificacion > 0 → la bonificación es el crédito.
+    //  3) descripción / tipoCuota / categoría con keyword de crédito y monto positivo
+    //     → se trata como crédito (defensivo para datos importados).
+    const montoTotalNum = parseFloat(cargo.montoTotal || 0)
+    const montoOrigNum = parseFloat(cargo.montoOriginal || 0)
+    const bonifNum = parseFloat(cargo.montoBonificacion || 0)
+    const textoCargo = `${cargo.descripcion || ''} ${cargo.tipoCuota || ''} ${cargo.categoria || ''}`.toUpperCase()
+    const esCreditoPorTexto = /DESCUENTO|NOTA.?DE.?CR[ÉE]DITO|NOTA.?CR[ÉE]DITO|DEVOLUCI[ÓO]N|BONIFICACI[ÓO]N/.test(textoCargo)
+
+    let debe = 0
+    let haber = 0
+    if (montoTotalNum < 0) {
+      haber = -montoTotalNum
+    } else if (montoTotalNum === 0 && bonifNum > 0) {
+      haber = bonifNum
+    } else if (esCreditoPorTexto && montoTotalNum > 0) {
+      haber = montoTotalNum
+    } else {
+      debe = montoTotalNum || montoOrigNum
+    }
+
     movimientos.push({
       id: `C${cargo.id}`,
-      tipo: 'DEBITO',
+      tipo: haber > 0 ? 'CREDITO' : 'DEBITO',
       fecha: cargo.fechaGeneracion,
       concepto,
       detalle: detalle || '-',
       estado: cargo.estado,
-      debe: parseFloat(cargo.montoTotal || cargo.montoOriginal || 0),
-      haber: 0,
+      debe,
+      haber,
       socioNombre: cargo.socio?.apellidoNombre,
       socioNro: cargo.socio?.nroSocio,
     })
   })
 
   pagos.forEach(pago => {
+    const medio = pago.medioPago?.nombre || 'Pago'
+    const numeroRecibo = pago.numero || pago.id
     movimientos.push({
       id: `P${pago.id}`,
       tipo: 'CREDITO',
       fecha: pago.fecha,
       concepto: 'Pago recibido',
-      detalle: `${pago.medioPago || ''} - Recibo #${pago.nroRecibo || pago.id}`,
+      detalle: `${medio} · Recibo #${numeroRecibo}`,
       estado: 'PAGADO',
       debe: 0,
-      haber: parseFloat(pago.monto || 0),
+      haber: parseFloat(pago.montoTotal || pago.monto || 0),
       socioNombre: pago.socio?.apellidoNombre,
       socioNro: pago.socio?.nroSocio,
     })
   })
 
-  // Ordenar por fecha
+  // Ordenar cronológicamente para calcular el saldo acumulado correcto
   movimientos.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
 
-  // Calcular saldo acumulado
+  // Calcular saldo acumulado en orden cronológico
   let saldo = 0
   movimientos.forEach(mov => {
     saldo += mov.debe - mov.haber
     mov.saldo = saldo
   })
+
+  // Devolver en orden descendente (más recientes primero) para la vista
+  movimientos.reverse()
 
   const totalDebe = movimientos.reduce((acc, m) => acc + m.debe, 0)
   const totalHaber = movimientos.reduce((acc, m) => acc + m.haber, 0)

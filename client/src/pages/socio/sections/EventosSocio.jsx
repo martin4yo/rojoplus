@@ -166,16 +166,18 @@ export default function EventosSocio({ socio, tokenPortal }) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg p-6 text-white">
-        <div className="flex items-center space-x-3">
-          <TicketIcon className="h-8 w-8" />
-          <div>
-            <h2 className="text-2xl font-bold">Eventos</h2>
-            <p className="text-red-100">Compra tus entradas y cárgalas a tu cuenta corriente</p>
-          </div>
+    <div className="space-y-8">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Calendario
         </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Próximos <span style={{ color: 'var(--color-primary)' }}>eventos</span>
+        </h1>
+        <p className="mt-3 text-sm md:text-base" style={{ color: 'var(--text-dim)' }}>
+          Comprá tus entradas y cargalas a tu cuenta corriente.
+        </p>
       </div>
 
       {/* Lista de eventos */}

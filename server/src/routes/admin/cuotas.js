@@ -374,25 +374,27 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
       const montoBonificacion = montoBase * (descuentoPct / 100)
       const montoTotal = montoBase - montoBonificacion
 
-      const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
-      const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
+      if (montoTotal > 0) {
+        const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
+        const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
 
-      cargosACrear.push({
-        periodoId: periodo.id,
-        socioId: socio.id,
-        grupoFamiliarId: socio.titularFamiliaId || socio.id,
-        categoria: 'CUOTA_SOCIAL',
-        tipoCuota,
-        conceptoTesoreriaId: socio.tipoSocioRel?.conceptoTesoreriaId || null,
-        descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'}`,
-        montoOriginal: montoBase,
-        montoBonificacion,
-        montoTotal,
-        estado: 'PENDIENTE',
-        fechaVencimiento: periodo.fechaVencimiento,
-        origen: 'GENERACION_MASIVA',
-        motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
-      })
+        cargosACrear.push({
+          periodoId: periodo.id,
+          socioId: socio.id,
+          grupoFamiliarId: socio.titularFamiliaId || socio.id,
+          categoria: 'CUOTA_SOCIAL',
+          tipoCuota,
+          conceptoTesoreriaId: socio.tipoSocioRel?.conceptoTesoreriaId || null,
+          descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'}`,
+          montoOriginal: montoBase,
+          montoBonificacion,
+          montoTotal,
+          estado: 'PENDIENTE',
+          fechaVencimiento: periodo.fechaVencimiento,
+          origen: 'GENERACION_MASIVA',
+          motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+        })
+      }
     } else if (yaTeníaCuotaSocial) {
       sociosSaltados++
     }
@@ -426,22 +428,24 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
         const montoBonificacion = montoBase * (descuentoPct / 100)
         const montoTotal = montoBase - montoBonificacion
 
-        cargosACrear.push({
-          periodoId: periodo.id,
-          socioId: socio.id,
-          grupoFamiliarId: socio.titularFamiliaId || socio.id,
-          categoria: 'CUOTA_ACTIVIDAD',
-          categoriaActividadId: categoria.id,
-          conceptoTesoreriaId: actividad.conceptoTesoreriaId || null,
-          descripcion: `${actividad.nombre} - ${categoria.nombre}`,
-          montoOriginal: montoBase,
-          montoBonificacion,
-          montoTotal,
-          estado: 'PENDIENTE',
-          fechaVencimiento: periodo.fechaVencimiento,
-          origen: 'GENERACION_MASIVA',
-          motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
-        })
+        if (montoTotal > 0) {
+          cargosACrear.push({
+            periodoId: periodo.id,
+            socioId: socio.id,
+            grupoFamiliarId: socio.titularFamiliaId || socio.id,
+            categoria: 'CUOTA_ACTIVIDAD',
+            categoriaActividadId: categoria.id,
+            conceptoTesoreriaId: actividad.conceptoTesoreriaId || null,
+            descripcion: `${actividad.nombre} - ${categoria.nombre}`,
+            montoOriginal: montoBase,
+            montoBonificacion,
+            montoTotal,
+            estado: 'PENDIENTE',
+            fechaVencimiento: periodo.fechaVencimiento,
+            origen: 'GENERACION_MASIVA',
+            motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+          })
+        }
       }
     }
   }
@@ -525,7 +529,7 @@ router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  const [cuotas, total] = await Promise.all([
+  const [cuotas, total, agregadosPorEstado] = await Promise.all([
     req.db.cargo.findMany({
       where,
       skip,
@@ -544,12 +548,34 @@ router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
       },
     }),
     req.db.cargo.count({ where }),
+    req.db.cargo.groupBy({
+      where,
+      by: ['estado'],
+      _sum: { montoTotal: true },
+      _count: { _all: true },
+    }),
   ])
+
+  // Construir totales agregados sobre TODO el filtro (no sólo la página actual)
+  const totales = { total: 0, pagado: 0, pendiente: 0, cantTotal: total, cantPagado: 0, cantPendiente: 0 }
+  for (const g of agregadosPorEstado) {
+    const monto = Number(g._sum.montoTotal || 0)
+    const cant = g._count._all || 0
+    totales.total += monto
+    if (g.estado === 'PAGADO') {
+      totales.pagado += monto
+      totales.cantPagado += cant
+    } else if (g.estado === 'PENDIENTE') {
+      totales.pendiente += monto
+      totales.cantPendiente += cant
+    }
+  }
 
   res.json({
     success: true,
     data: {
       data: cuotas,
+      totales,
       pagination: {
         page: parseInt(page),
         limit,
@@ -866,24 +892,26 @@ function armarCargosParaSocio(socio, periodo) {
     const montoBase = cuotaSocialMonto
     const montoBonificacion = montoBase * (descuentoPct / 100)
     const montoTotal = montoBase - montoBonificacion
-    const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
-    const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
-    cargos.push({
-      periodoId: periodo.id,
-      socioId: socio.id,
-      grupoFamiliarId: socio.titularFamiliaId || socio.id,
-      categoria: 'CUOTA_SOCIAL',
-      tipoCuota,
-      conceptoTesoreriaId: socio.tipoSocioRel?.conceptoTesoreriaId || null,
-      descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'} (adelantada)`,
-      montoOriginal: montoBase,
-      montoBonificacion,
-      montoTotal,
-      estado: 'PENDIENTE',
-      fechaVencimiento: periodo.fechaVencimiento,
-      origen: 'ADELANTO',
-      motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
-    })
+    if (montoTotal > 0) {
+      const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
+      const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
+      cargos.push({
+        periodoId: periodo.id,
+        socioId: socio.id,
+        grupoFamiliarId: socio.titularFamiliaId || socio.id,
+        categoria: 'CUOTA_SOCIAL',
+        tipoCuota,
+        conceptoTesoreriaId: socio.tipoSocioRel?.conceptoTesoreriaId || null,
+        descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'} (adelantada)`,
+        montoOriginal: montoBase,
+        montoBonificacion,
+        montoTotal,
+        estado: 'PENDIENTE',
+        fechaVencimiento: periodo.fechaVencimiento,
+        origen: 'ADELANTO',
+        motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+      })
+    }
   }
 
   // Cuotas de actividad (inscripciones activas)
@@ -903,22 +931,24 @@ function armarCargosParaSocio(socio, periodo) {
     if (montoBase > 0) {
       const montoBonificacion = montoBase * (descuentoPct / 100)
       const montoTotal = montoBase - montoBonificacion
-      cargos.push({
-        periodoId: periodo.id,
-        socioId: socio.id,
-        grupoFamiliarId: socio.titularFamiliaId || socio.id,
-        categoria: 'CUOTA_ACTIVIDAD',
-        categoriaActividadId: categoria.id,
-        conceptoTesoreriaId: actividad.conceptoTesoreriaId || null,
-        descripcion: `${actividad.nombre} - ${categoria.nombre} (adelantada)`,
-        montoOriginal: montoBase,
-        montoBonificacion,
-        montoTotal,
-        estado: 'PENDIENTE',
-        fechaVencimiento: periodo.fechaVencimiento,
-        origen: 'ADELANTO',
-        motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
-      })
+      if (montoTotal > 0) {
+        cargos.push({
+          periodoId: periodo.id,
+          socioId: socio.id,
+          grupoFamiliarId: socio.titularFamiliaId || socio.id,
+          categoria: 'CUOTA_ACTIVIDAD',
+          categoriaActividadId: categoria.id,
+          conceptoTesoreriaId: actividad.conceptoTesoreriaId || null,
+          descripcion: `${actividad.nombre} - ${categoria.nombre} (adelantada)`,
+          montoOriginal: montoBase,
+          montoBonificacion,
+          montoTotal,
+          estado: 'PENDIENTE',
+          fechaVencimiento: periodo.fechaVencimiento,
+          origen: 'ADELANTO',
+          motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+        })
+      }
     }
   }
 
@@ -1170,13 +1200,21 @@ router.post('/pagos/:id/enviar-recibo', authAdmin, asyncHandler(async (req, res)
   const { id } = req.params
   const { canales = ['email'] } = req.body
 
+  // Mismo include que /recibo-pdf para poder armar el PDF y adjuntarlo
   const pago = await req.db.pago.findUnique({
     where: { id: parseInt(id) },
     include: {
       socio: {
-        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true, notifWhatsapp: true }
+        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true, notifWhatsapp: true, domicilio: true, ciudad: true, calle: true, codigoPostal: true, estado: true }
       },
       medioPago: { select: { id: true, nombre: true } },
+      caja: { select: { nombre: true } },
+      mediosPago: {
+        include: {
+          medioPago: { select: { nombre: true } },
+          caja: { select: { nombre: true } }
+        }
+      },
       cargos: {
         include: {
           conceptoTesoreria: { select: { id: true, nombre: true } },
@@ -1191,6 +1229,31 @@ router.post('/pagos/:id/enviar-recibo', authAdmin, asyncHandler(async (req, res)
 
   if (!pago) throw new AppError('Pago no encontrado', 404, 'NOT_FOUND')
 
+  // Generar PDF del recibo (si falla, igual seguimos el envío sin adjunto)
+  let pdfBuffer = null
+  let pdfFilename = `recibo-${pago.numero}.pdf`
+  try {
+    const [admin, configList] = await Promise.all([
+      req.db.admin.findUnique({ where: { id: pago.registradoPor }, select: { nombre: true } }).catch(() => null),
+      req.db.configuracion.findMany({
+        where: { clave: { in: ['CLUB_NOMBRE', 'CLUB_DIRECCION', 'CLUB_TELEFONO'] } },
+        select: { clave: true, valor: true }
+      }).catch(() => []),
+    ])
+    const configMap = Object.fromEntries(configList.map(c => [c.clave, c.valor]))
+    if (req.tenant?.logoUrl) configMap.CLUB_LOGO_URL = req.tenant.logoUrl
+
+    pdfBuffer = await generarReciboPagoPDF(pago, admin?.nombre || '', configMap)
+
+    const nombreSocio = (pago.socio?.apellidoNombre || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .trim().replace(/\s+/g, '_')
+    pdfFilename = `recibo-${pago.numero}${nombreSocio ? '-' + nombreSocio : ''}.pdf`
+  } catch (err) {
+    console.error('Error generando PDF de recibo (se enviará sin adjunto):', err.message)
+  }
+
   const resultados = {}
 
   if (canales.includes('email')) {
@@ -1198,8 +1261,12 @@ router.post('/pagos/:id/enviar-recibo', authAdmin, asyncHandler(async (req, res)
       resultados.email = { ok: false, mensaje: 'El socio no tiene email registrado' }
     } else {
       try {
-        await enviarReciboPago(pago, req.db)
-        resultados.email = { ok: true, mensaje: `Recibo enviado a ${pago.socio.email}` }
+        const r = await enviarReciboPago(pago, req.db, pdfBuffer ? { pdfBuffer, pdfFilename } : {})
+        if (r && r.ok) {
+          resultados.email = { ok: true, mensaje: `Recibo enviado a ${pago.socio.email}${pdfBuffer ? ' (con PDF adjunto)' : ''}` }
+        } else {
+          resultados.email = { ok: false, mensaje: r?.motivo || 'No se pudo enviar el email (revisá la configuración SMTP)' }
+        }
       } catch (err) {
         resultados.email = { ok: false, mensaje: err.message }
       }
@@ -1212,8 +1279,12 @@ router.post('/pagos/:id/enviar-recibo', authAdmin, asyncHandler(async (req, res)
       resultados.whatsapp = { ok: false, mensaje: 'El socio no tiene teléfono registrado' }
     } else {
       try {
-        await notificarPagoWA({ db: req.db, socio: pago.socio, pago })
-        resultados.whatsapp = { ok: true, mensaje: `Mensaje enviado a ${tel}` }
+        const r = await notificarPagoWA({ db: req.db, socio: pago.socio, pago, pdfBuffer, pdfFilename })
+        if (r && r.enviado) {
+          resultados.whatsapp = { ok: true, mensaje: `Mensaje enviado a ${tel}${pdfBuffer ? ' (con PDF adjunto)' : ''}` }
+        } else {
+          resultados.whatsapp = { ok: false, mensaje: r?.motivo || 'No se pudo enviar el mensaje (revisá la configuración de WhatsApp)' }
+        }
       } catch (err) {
         resultados.whatsapp = { ok: false, mensaje: err.message }
       }
@@ -1321,14 +1392,20 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
 
   // Todo dentro de una transacción
   const pagoCompleto = await req.db.$transaction(async (tx) => {
-    // Generar número de recibo (dentro de transacción para evitar duplicados)
-    const ultimoPago = await tx.pago.findFirst({
+    // Generar número de recibo (dentro de transacción para evitar duplicados).
+    // Defensivo: si algún registro previo tiene numero no parseable (ej: 'NaN' por flujos
+    // viejos o importaciones), tomamos el máximo numérico válido de los últimos 100
+    // para no propagar '00000NaN' a futuros recibos.
+    const ultimosPagos = await tx.pago.findMany({
       orderBy: { id: 'desc' },
       select: { numero: true },
+      take: 100,
     })
-    const nuevoNumero = ultimoPago
-      ? String(parseInt(ultimoPago.numero) + 1).padStart(8, '0')
-      : '00000001'
+    const ultimoNumeroValido = ultimosPagos
+      .map(p => parseInt(p.numero, 10))
+      .filter(n => Number.isFinite(n) && n > 0)
+      .reduce((max, n) => Math.max(max, n), 0)
+    const nuevoNumero = String(ultimoNumeroValido + 1).padStart(8, '0')
 
     // Crear pago
     const pago = await tx.pago.create({
@@ -1482,6 +1559,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     }
 
     // Obtener pago con relaciones para respuesta (findFirst para mantenerse dentro de la transacción)
+    // Include alineado con /recibo-pdf para que el auto-envío pueda adjuntar el PDF.
     const pagoFinal = await tx.pago.findFirst({
       where: { id: pago.id },
       include: {
@@ -1493,12 +1571,27 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
             documento: true,
             email: true,
             celular: true,
+            celularSecundario: true,
+            telefonoFijo: true,
             notifWhatsapp: true,
+            domicilio: true,
+            ciudad: true,
+            calle: true,
+            codigoPostal: true,
+            estado: true,
           },
         },
         medioPago: { select: { id: true, nombre: true } },
+        caja: { select: { nombre: true } },
+        mediosPago: {
+          include: {
+            medioPago: { select: { nombre: true } },
+            caja: { select: { nombre: true } },
+          },
+        },
         cargos: {
           include: {
+            conceptoTesoreria: { select: { id: true, nombre: true } },
             periodo: { select: { nombre: true } },
             categoriaActividad: {
               select: {
@@ -1525,23 +1618,50 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     console.error('Error generando asiento contable para pago:', err)
   })
 
-  // Enviar recibo por email (fuera de transacción, async)
-  enviarReciboPago(pagoCompleto, req.db).catch(err => {
-    console.error('Error enviando recibo por email:', err)
-  })
+  // Generar PDF del recibo y disparar email + WhatsApp en background (no debe bloquear ni fallar el pago)
+  ;(async () => {
+    let pdfBuffer = null
+    let pdfFilename = `recibo-${pagoCompleto.numero}.pdf`
+    try {
+      const [adminReg, configList] = await Promise.all([
+        req.db.admin.findUnique({ where: { id: pagoCompleto.registradoPor }, select: { nombre: true } }).catch(() => null),
+        req.db.configuracion.findMany({
+          where: { clave: { in: ['CLUB_NOMBRE', 'CLUB_DIRECCION', 'CLUB_TELEFONO'] } },
+          select: { clave: true, valor: true }
+        }).catch(() => []),
+      ])
+      const configMap = Object.fromEntries(configList.map(c => [c.clave, c.valor]))
+      if (req.tenant?.logoUrl) configMap.CLUB_LOGO_URL = req.tenant.logoUrl
+      pdfBuffer = await generarReciboPagoPDF(pagoCompleto, adminReg?.nombre || '', configMap)
 
-  // Notificar pago por WhatsApp si el socio tiene el canal habilitado y el tenant lo permite
-  if (pagoCompleto.socio?.notifWhatsapp && obtenerTelefonoSocio(pagoCompleto.socio)) {
-    req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_PAGO' } })
-      .then(flag => {
+      const nombreSocio = (pagoCompleto.socio?.apellidoNombre || '')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .trim().replace(/\s+/g, '_')
+      pdfFilename = `recibo-${pagoCompleto.numero}${nombreSocio ? '-' + nombreSocio : ''}.pdf`
+    } catch (err) {
+      console.error('Error generando PDF de recibo (auto-envío seguirá sin adjunto):', err.message)
+    }
+
+    // Email
+    enviarReciboPago(pagoCompleto, req.db, pdfBuffer ? { pdfBuffer, pdfFilename } : {}).catch(err => {
+      console.error('Error enviando recibo por email:', err)
+    })
+
+    // WhatsApp si corresponde
+    if (pagoCompleto.socio?.notifWhatsapp && obtenerTelefonoSocio(pagoCompleto.socio)) {
+      try {
+        const flag = await req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_PAGO' } })
         if (flag?.valor !== 'false') {
-          notificarPagoWA({ db: req.db, socio: pagoCompleto.socio, pago: pagoCompleto }).catch(err => {
+          notificarPagoWA({ db: req.db, socio: pagoCompleto.socio, pago: pagoCompleto, pdfBuffer, pdfFilename }).catch(err => {
             console.error('Error enviando notif WA de pago:', err.message)
           })
         }
-      })
-      .catch(err => console.error('Error leyendo flag WA pago:', err.message))
-  }
+      } catch (err) {
+        console.error('Error leyendo flag WA pago:', err.message)
+      }
+    }
+  })()
 
   res.status(201).json({ success: true, data: pagoCompleto })
 }))

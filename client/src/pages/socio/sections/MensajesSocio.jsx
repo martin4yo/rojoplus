@@ -158,7 +158,18 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
   const conversacion = conversaciones.find((c) => c.id === conversacionActiva)
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
+    <div className="space-y-6">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Comunicación
+        </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Mis <span style={{ color: 'var(--color-primary)' }}>mensajes</span>
+        </h1>
+      </div>
+
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 280px)' }}>
       <div className="grid grid-cols-1 md:grid-cols-3 h-full">
         {/* Lista de conversaciones */}
         <div className="border-r border-gray-200 overflow-y-auto">
@@ -268,6 +279,7 @@ export default function MensajesSocio({ socio, tokenPortal, onMensajesLeidos }) 
           </form>
         </div>
       </div>
+    </div>
     </div>
   )
 }

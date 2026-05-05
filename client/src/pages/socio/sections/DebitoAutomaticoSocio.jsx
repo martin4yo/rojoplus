@@ -219,16 +219,18 @@ export default function DebitoAutomaticoSocio({ tokenPortal }) {
   const EstadoIcon = estadoInfo.icon
 
   return (
-    <div className="space-y-6">
-      {/* Título */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-red-100 rounded-lg">
-          <CreditCardIcon className="w-6 h-6 text-red-600" />
+    <div className="space-y-8">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Cobranza
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Débito Automático</h2>
-          <p className="text-sm text-gray-500">Gestiona la adhesión al débito automático</p>
-        </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Débito <span style={{ color: 'var(--color-primary)' }}>automático</span>
+        </h1>
+        <p className="mt-3 text-sm md:text-base" style={{ color: 'var(--text-dim)' }}>
+          Gestioná tu adhesión al débito automático.
+        </p>
       </div>
 
       {/* Estado actual */}

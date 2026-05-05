@@ -299,11 +299,13 @@ export async function enviarEmailLinkAcceso(comercio, db) {
 }
 
 // Enviar recibo de pago por email
-export async function enviarReciboPago(pago, db) {
+// opts.pdfBuffer / opts.pdfFilename: si vienen, se adjunta el PDF al mail.
+// Devuelve { ok, motivo } para que el caller pueda mostrar la causa al usuario.
+export async function enviarReciboPago(pago, db, opts = {}) {
   // Si el socio no tiene email, no enviar
   if (!pago.socio?.email) {
     console.log(`📧 Recibo ${pago.numero}: socio sin email, no se envía`)
-    return false
+    return { ok: false, motivo: 'El socio no tiene email registrado' }
   }
 
   const fechaPago = new Date(pago.fecha).toLocaleDateString('es-AR', {
@@ -395,23 +397,34 @@ export async function enviarReciboPago(pago, db) {
   `
 
   try {
+    const attachments = []
+    if (opts.pdfBuffer) {
+      attachments.push({
+        filename: opts.pdfFilename || `recibo-${pago.numero}.pdf`,
+        content: opts.pdfBuffer,
+        contentType: 'application/pdf',
+      })
+    }
     await enviarEmail({
       to: pago.socio.email,
       subject: `Recibo de Pago #${pago.numero} - Club Sportivo Pilar`,
       html,
       db,
+      attachments,
     })
-    console.log(`📧 Recibo ${pago.numero} enviado a ${pago.socio.email}`)
-    return true
+    console.log(`📧 Recibo ${pago.numero} enviado a ${pago.socio.email}${attachments.length ? ' (con PDF adjunto)' : ''}`)
+    return { ok: true }
   } catch (error) {
     console.error(`❌ Error enviando recibo ${pago.numero}:`, error.message)
-    return false
+    return { ok: false, motivo: error.message || 'Error al enviar email (revisá la configuración SMTP)' }
   }
 }
 
 // Enviar Magic Link al socio para acceso al portal
-export async function enviarMagicLinkSocio(socio, token, db) {
-  const linkAcceso = `${frontendUrl}/portal-socio/${token}`
+export async function enviarMagicLinkSocio(socio, token, db, tenantId = null) {
+  // Resolver URL con subdomain del tenant (cae a frontendUrl global si no hay tenant)
+  const tenantInfo = await getTenantInfo(tenantId ?? socio?.tenantId)
+  const linkAcceso = `${tenantInfo.url}/portal-socio/${token}`
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

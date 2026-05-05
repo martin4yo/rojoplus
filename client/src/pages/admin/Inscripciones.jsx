@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ClipboardList, Plus, Edit2, X, Search, Filter, UserMinus, Download } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
@@ -16,6 +16,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Inscripciones() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -70,6 +71,18 @@ export default function Inscripciones() {
 
   useEffect(() => {
     cargarActividades()
+  }, [])
+
+  // Si llegamos desde el alta de un socio nuevo, abrir el modal de Nueva Inscripción precargado
+  useEffect(() => {
+    const nuevoSocio = location.state?.nuevoSocio
+    if (!nuevoSocio) return
+    setSocioSeleccionado(nuevoSocio)
+    setFormNueva(prev => ({ ...prev, socioId: nuevoSocio.id }))
+    setModalNueva(true)
+    // Limpiar el state para que un refresh no reabra el modal
+    navigate(location.pathname, { replace: true, state: {} })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

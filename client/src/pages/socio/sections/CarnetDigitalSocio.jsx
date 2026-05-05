@@ -42,14 +42,16 @@ export default function CarnetDigitalSocio({ socio, tokenPortal, branding }) {
   })
 
   return (
-    <div className="space-y-4 max-w-md mx-auto">
-      {/* Encabezado */}
+    <div className="space-y-6 max-w-md mx-auto">
+      {/* Header athletic */}
       <div className="text-center">
-        <h2 className="text-xl font-bold text-gray-800 flex items-center justify-center gap-2">
-          <IdentificationIcon className="h-6 w-6" style={{ color: colorPrimario }} />
-          Mi Carnet Digital
-        </h2>
-        <p className="text-sm text-gray-500 mt-1">Mostrá este código al ingresar al club</p>
+        <div className="pub-eyebrow inline-flex mb-3" style={{ color: 'var(--text-dim)' }}>
+          Identificación
+        </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(26px, 4vw, 38px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Carnet <span style={{ color: 'var(--color-primary)' }}>digital</span>
+        </h1>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-dim)' }}>Mostrá este código al ingresar al club.</p>
       </div>
 
       {/* Tarjeta principal del carnet */}

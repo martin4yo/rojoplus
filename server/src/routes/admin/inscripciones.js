@@ -277,7 +277,7 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
         }
       })
 
-      if (!yaExiste) {
+      if (!yaExiste && montoTotal > 0) {
         cargoGenerado = await req.db.cargo.create({
           data: {
             socio: { connect: { id: parseInt(socioId) } },

@@ -4,12 +4,109 @@ import multer from 'multer'
 import * as XLSX from 'xlsx'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
+import { resolverPeriodoAlta } from '../../lib/cuotasPeriodoAlta.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
 // Cache temporal para uploads
 const uploadCache = new Map()
+
+// Calcula el próximo nroSocio. Si están seteadas las claves de configuración
+// SOCIO_NRO_MIN y SOCIO_NRO_MAX, asigna secuencialmente dentro del rango
+// (no rellena huecos). Si no, usa el comportamiento legacy (primer hueco desde el mínimo).
+async function calcularProximoNroSocio(db) {
+  const [cfgMin, cfgMax] = await Promise.all([
+    db.configuracion.findFirst({ where: { clave: 'SOCIO_NRO_MIN' } }),
+    db.configuracion.findFirst({ where: { clave: 'SOCIO_NRO_MAX' } }),
+  ])
+  const min = cfgMin?.valor ? parseInt(cfgMin.valor, 10) : null
+  const max = cfgMax?.valor ? parseInt(cfgMax.valor, 10) : null
+
+  const socios = await db.socio.findMany({ select: { nroSocio: true } })
+  const todos = socios.map(s => parseInt(s.nroSocio, 10)).filter(n => !isNaN(n) && n > 0)
+
+  if (Number.isInteger(min) && Number.isInteger(max) && max >= min) {
+    const enRango = todos.filter(n => n >= min && n <= max)
+    const proximo = enRango.length === 0 ? min : Math.max(...enRango) + 1
+    if (proximo > max) {
+      throw new AppError(`Rango de números de socio agotado (${min}-${max})`, 400, 'RANGO_AGOTADO')
+    }
+    return String(proximo)
+  }
+
+  // Sin rango configurado: comportamiento legacy (primer hueco desde el mínimo).
+  if (todos.length === 0) return '1'
+  const usados = new Set(todos)
+  const minimo = Math.min(...todos)
+  let proximo = minimo
+  while (usados.has(proximo)) proximo++
+  return String(proximo)
+}
+
+// Resuelve estado/categoria/tipoSocio del socio desde IDs (preferido) o strings legacy.
+// Devuelve { estadoSocioId, categoriaSocioId, tipoSocioRelId, estado, categoria, tipoSocio, tipoSocioRecord }
+// con sólo las claves que el body proveyó. Permite mantener sincronizados FK + string legacy.
+async function resolverRelacionesSocio(db, tenantId, data) {
+  const out = {}
+  let tipoSocioRecord = null
+
+  // Estado
+  if (data.estadoSocioId !== undefined && data.estadoSocioId !== null && data.estadoSocioId !== '') {
+    const est = await db.estadoSocio.findFirst({
+      where: { id: parseInt(data.estadoSocioId), tenantId },
+    })
+    if (!est) throw new AppError('Estado de socio no encontrado', 400, 'INVALID_FK')
+    out.estadoSocioId = est.id
+    out.estado = est.nombre
+  } else if (data.estado !== undefined) {
+    out.estado = data.estado || null
+    if (data.estado) {
+      const est = await db.estadoSocio.findFirst({ where: { tenantId, nombre: data.estado } })
+      out.estadoSocioId = est?.id || null
+    } else {
+      out.estadoSocioId = null
+    }
+  }
+
+  // Categoría
+  if (data.categoriaSocioId !== undefined && data.categoriaSocioId !== null && data.categoriaSocioId !== '') {
+    const cat = await db.categoriaSocio.findFirst({
+      where: { id: parseInt(data.categoriaSocioId), tenantId },
+    })
+    if (!cat) throw new AppError('Categoría de socio no encontrada', 400, 'INVALID_FK')
+    out.categoriaSocioId = cat.id
+    out.categoria = cat.nombre
+  } else if (data.categoria !== undefined) {
+    out.categoria = data.categoria || null
+    if (data.categoria) {
+      const cat = await db.categoriaSocio.findFirst({ where: { tenantId, nombre: data.categoria } })
+      out.categoriaSocioId = cat?.id || null
+    } else {
+      out.categoriaSocioId = null
+    }
+  }
+
+  // Tipo socio
+  if (data.tipoSocioRelId !== undefined && data.tipoSocioRelId !== null && data.tipoSocioRelId !== '') {
+    tipoSocioRecord = await db.tipoSocio.findFirst({
+      where: { id: parseInt(data.tipoSocioRelId), tenantId },
+    })
+    if (!tipoSocioRecord) throw new AppError('Tipo de socio no encontrado', 400, 'INVALID_FK')
+    out.tipoSocioRelId = tipoSocioRecord.id
+    out.tipoSocio = tipoSocioRecord.nombre
+  } else if (data.tipoSocio !== undefined) {
+    out.tipoSocio = data.tipoSocio || null
+    if (data.tipoSocio) {
+      tipoSocioRecord = await db.tipoSocio.findFirst({ where: { tenantId, nombre: data.tipoSocio } })
+      out.tipoSocioRelId = tipoSocioRecord?.id || null
+    } else {
+      out.tipoSocioRelId = null
+    }
+  }
+
+  return { ...out, tipoSocioRecord }
+}
 
 // Función auxiliar para convertir fecha de Excel
 function excelDateToJS(excelDate) {
@@ -333,19 +430,12 @@ router.get('/socios/grupos-familiares', authAdmin, asyncHandler(async (req, res)
   })
 }))
 
-// GET /api/admin/socios/proximo-numero - Primer número disponible (busca huecos desde el mínimo)
+// GET /api/admin/socios/proximo-numero - Próximo nroSocio disponible.
+// Usa SOCIO_NRO_MIN/MAX (Configuracion) para asignar secuencial dentro del rango;
+// si no están seteadas, busca el primer hueco desde el mínimo (legacy).
 router.get('/socios/proximo-numero', authAdmin, asyncHandler(async (req, res) => {
-  const socios = await req.db.socio.findMany({ select: { nroSocio: true } })
-  const usados = new Set(
-    socios.map(s => parseInt(s.nroSocio, 10)).filter(n => !isNaN(n) && n > 0)
-  )
-  if (usados.size === 0) {
-    return res.json({ success: true, data: { proximo: '1' } })
-  }
-  const minimo = Math.min(...usados)
-  let proximo = minimo
-  while (usados.has(proximo)) proximo++
-  res.json({ success: true, data: { proximo: String(proximo) } })
+  const proximo = await calcularProximoNroSocio(req.db)
+  res.json({ success: true, data: { proximo } })
 }))
 
 // GET /api/admin/socios/:id - Detalle completo del socio
@@ -381,6 +471,9 @@ router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
       autorizaciones: {
         where: { activa: true }
       },
+      estadoSocioRel: { select: { id: true, nombre: true, activo: true } },
+      categoriaSocioRel: { select: { id: true, nombre: true, activo: true } },
+      tipoSocioRel: { select: { id: true, nombre: true, activo: true } },
     },
   })
 
@@ -448,17 +541,20 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('El nombre del socio es requerido', 400, 'VALIDATION_ERROR')
   }
 
-  // Recalcular nroSocio al momento de guardar para evitar colisiones
-  const todosLosSocios = await req.db.socio.findMany({ select: { nroSocio: true } })
-  const usados = new Set(
-    todosLosSocios.map(s => parseInt(s.nroSocio, 10)).filter(n => !isNaN(n) && n > 0)
-  )
-  let nroSocioFinal = data.nroSocio
-  if (!nroSocioFinal || usados.has(parseInt(nroSocioFinal, 10))) {
-    const minimo = usados.size > 0 ? Math.min(...usados) : 1
-    let proximo = minimo
-    while (usados.has(proximo)) proximo++
-    nroSocioFinal = String(proximo)
+  // Resolver FK + string legacy de estado/categoria/tipoSocio
+  const rel = await resolverRelacionesSocio(req.db, req.tenantId, data)
+
+  // Recalcular nroSocio al momento de guardar (respeta SOCIO_NRO_MIN/MAX si están configurados).
+  let nroSocioFinal = data.nroSocio ? String(data.nroSocio) : null
+  if (nroSocioFinal) {
+    const colision = await req.db.socio.findFirst({
+      where: { nroSocio: nroSocioFinal },
+      select: { id: true },
+    })
+    if (colision) nroSocioFinal = null
+  }
+  if (!nroSocioFinal) {
+    nroSocioFinal = await calcularProximoNroSocio(req.db)
   }
 
   // Procesar datos
@@ -495,9 +591,12 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
     provincia: data.provincia || 'Buenos Aires',
     // Club
     fechaAlta: data.fechaAlta ? new Date(data.fechaAlta) : new Date(),
-    estado: data.estado || 'ACTIVO',
-    categoria: data.categoria || null,
-    tipoSocio: data.tipoSocio || null,
+    estado: rel.estado || 'ACTIVO',
+    categoria: rel.categoria !== undefined ? rel.categoria : null,
+    tipoSocio: rel.tipoSocio !== undefined ? rel.tipoSocio : null,
+    estadoSocioId: rel.estadoSocioId ?? null,
+    categoriaSocioId: rel.categoriaSocioId ?? null,
+    tipoSocioRelId: rel.tipoSocioRelId ?? null,
     zona: data.zona || null,
     libro: data.libro || null,
     folio: data.folio || null,
@@ -558,11 +657,56 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
     },
   })
 
+  // Generar cuota social automáticamente según el TipoSocio (si tiene cuotaMensual > 0)
+  // No se genera si el socio es miembro de una familia (la cuota la paga el titular).
+  // Aplica descuento de la CategoriaSocio del socio; si el monto final es 0, no se crea.
+  let cuotaSocialGenerada = null
+  const tipoSocio = rel.tipoSocioRecord
+  if (tipoSocio && !data.titularFamiliaId) {
+    if (tipoSocio.cuotaMensual && Number(tipoSocio.cuotaMensual) > 0) {
+      const fechaAlta = data.fechaAlta ? new Date(data.fechaAlta) : new Date()
+      const periodo = await resolverPeriodoAlta(req.db, fechaAlta)
+      if (periodo) {
+        const montoBase = Number(tipoSocio.cuotaMensual)
+        const categoriaSocio = rel.categoriaSocioId
+          ? await req.db.categoriaSocio.findUnique({ where: { id: rel.categoriaSocioId } })
+          : null
+        const descuentoPct = categoriaSocio?.porcentajeDescuento ? Number(categoriaSocio.porcentajeDescuento) : 0
+        const montoBonificacion = montoBase * (descuentoPct / 100)
+        const montoTotal = montoBase - montoBonificacion
+        if (montoTotal > 0) {
+          cuotaSocialGenerada = await req.db.cargo.create({
+            data: {
+              socio: { connect: { id: socio.id } },
+              periodo: { connect: { id: periodo.id } },
+              ...(tipoSocio.conceptoTesoreriaId ? {
+                conceptoTesoreria: { connect: { id: tipoSocio.conceptoTesoreriaId } }
+              } : {}),
+              categoria: 'CUOTA_SOCIAL',
+              descripcion: `Cuota Social ${periodo.nombre || `${periodo.mes}/${periodo.anio}`}`,
+              tipoCuota: tipoSocio.codigo || tipoSocio.nombre,
+              montoOriginal: montoBase,
+              montoBonificacion,
+              montoTotal,
+              estado: 'PENDIENTE',
+              fechaVencimiento: periodo.fechaVencimiento,
+              origen: 'ALTA_SOCIO',
+              motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+            },
+          })
+        }
+      }
+    }
+  }
+
   res.status(201).json({
     success: true,
     data: {
       ...socio,
-      mensaje: 'Socio creado correctamente',
+      cuotaSocialGenerada,
+      mensaje: cuotaSocialGenerada
+        ? 'Socio creado correctamente y cuota social generada'
+        : 'Socio creado correctamente',
     },
   })
 }))
@@ -594,14 +738,14 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   // Preparar datos de actualización
   const updateData = {}
 
-  // Campos básicos
+  // Campos básicos (estado/categoria/tipoSocio se manejan vía resolverRelacionesSocio)
   const camposBasicos = [
     'nroSocio', 'tipoDocumento', 'documento', 'cuil', 'apellido', 'nombre',
     'apellidoNombre', 'lugarNacimiento', 'sexo', 'nacionalidad', 'estadoCivil',
     'profesion', 'fotoUrl', 'email', 'emailSecundario', 'telefonoFijo', 'celular',
     'celularSecundario', 'domicilio', 'calle', 'numero', 'piso', 'depto',
-    'barrio', 'codigoPostal', 'ciudad', 'provincia', 'estado', 'categoria',
-    'tipoSocio', 'zona', 'libro', 'folio', 'antiguedadEstatutaria',
+    'barrio', 'codigoPostal', 'ciudad', 'provincia',
+    'zona', 'libro', 'folio', 'antiguedadEstatutaria',
     'parentescoResponsable', 'grupoSanguineo', 'factorRh', 'obraSocial',
     'nroObraSocial', 'alergias', 'condicionesMedicas', 'medicamentos',
     'emergenciaNombre1', 'emergenciaTel1', 'emergenciaParent1',
@@ -617,6 +761,15 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
       updateData[campo] = data[campo] || null
     }
   })
+
+  // Resolver FK + string legacy de estado/categoria/tipoSocio
+  const rel = await resolverRelacionesSocio(req.db, req.tenantId, data)
+  if ('estado' in rel) updateData.estado = rel.estado
+  if ('categoria' in rel) updateData.categoria = rel.categoria
+  if ('tipoSocio' in rel) updateData.tipoSocio = rel.tipoSocio
+  if ('estadoSocioId' in rel) updateData.estadoSocioId = rel.estadoSocioId
+  if ('categoriaSocioId' in rel) updateData.categoriaSocioId = rel.categoriaSocioId
+  if ('tipoSocioRelId' in rel) updateData.tipoSocioRelId = rel.tipoSocioRelId
 
   // Campos booleanos
   const camposBooleanos = [

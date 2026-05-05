@@ -9,7 +9,7 @@ import {
   ExclamationTriangleIcon,
   QrCodeIcon,
 } from '@heroicons/react/24/outline'
-import { Calendar, Clock, MapPin } from 'lucide-react'
+import { Calendar, Clock, MapPin, ArrowUpRight } from 'lucide-react'
 
 export default function DashboardSocio({ socio, tokenPortal, onNavigate, mensajesNoLeidos = 0 }) {
   const [estadoCuenta, setEstadoCuenta] = useState(null)
@@ -49,9 +49,9 @@ export default function DashboardSocio({ socio, tokenPortal, onNavigate, mensaje
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white rounded-xl shadow-sm p-6 animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+          <div key={i} className="pub-card p-6 animate-pulse" style={{ borderRadius: 0 }}>
+            <div className="h-4 rounded w-1/4 mb-4" style={{ backgroundColor: 'var(--border)' }} />
+            <div className="h-8 rounded w-1/2" style={{ backgroundColor: 'var(--border)' }} />
           </div>
         ))}
       </div>
@@ -61,205 +61,230 @@ export default function DashboardSocio({ socio, tokenPortal, onNavigate, mensaje
   const cuotasPendientes = estadoCuenta?.cuotasPendientes || 0
   const montoPendiente = estadoCuenta?.montoPendiente || 0
   const actividadesActivas = estadoCuenta?.actividadesActivas || 0
+  const incluyeFamilia = estadoCuenta?.incluyeFamilia
+  const cantMiembrosFamilia = estadoCuenta?.cantMiembrosFamilia || 0
+
+  const nombrePila = socio.apellidoNombre?.includes(',')
+    ? socio.apellidoNombre.split(',')[1]?.trim()
+    : socio.apellidoNombre
 
   return (
-    <div className="space-y-6">
-      {/* Bienvenida */}
-      <div
-        className="rounded-xl shadow-lg p-6 text-white"
-        style={{ background: 'linear-gradient(to right, var(--color-primary), var(--color-primary-dark, var(--color-primary)))' }}
-      >
-        <h2 className="text-2xl font-bold mb-2">
-          ¡Hola, {socio.apellidoNombre?.includes(',')
-            ? socio.apellidoNombre.split(',')[1]?.trim()
-            : socio.apellidoNombre}!
-        </h2>
-        <p className="text-white/70">Bienvenido a tu portal del club</p>
-      </div>
+    <div className="space-y-10">
+      {/* Hero athletic de bienvenida */}
+      <section className="relative overflow-hidden p-8 md:p-12" style={{ backgroundColor: 'var(--pub-hero-bg)', color: 'var(--pub-hero-fg)' }}>
+        <div className="absolute inset-0 bg-field-grid-pub opacity-40 pointer-events-none" />
+        <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-20 blur-3xl pointer-events-none" style={{ background: 'var(--color-primary)' }} />
 
-      {/* Cards de resumen */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Estado de cuotas */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
-          <div className="flex items-center justify-between mb-4">
-            <div className="bg-green-100 rounded-lg p-3">
-              <CreditCardIcon className="h-6 w-6 text-green-600" />
+        <div className="relative grid md:grid-cols-3 gap-8 items-end">
+          <div className="md:col-span-2">
+            <div className="pub-eyebrow mb-4 text-pub-fg-70">
+              Hola, socio Nº {socio.nroSocio}
             </div>
-            {cuotasPendientes === 0 ? (
-              <CheckCircleIcon className="h-8 w-8 text-green-500" />
-            ) : (
-              <ExclamationTriangleIcon className="h-8 w-8 text-orange-500" />
+            <h2 className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(34px, 5vw, 64px)', lineHeight: 0.94 }}>
+              {nombrePila}
+            </h2>
+            <p className="mt-4 text-pub-fg-70 max-w-lg">
+              Pagá cuotas, gestioná tu carnet y reservas, accedé a beneficios y eventos del club. Todo desde acá.
+            </p>
+          </div>
+
+          <div className="md:text-right">
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-50 mb-2">
+              Estado
+            </div>
+            <p className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(28px, 3vw, 40px)', lineHeight: 1 }}>
+              {cuotasPendientes === 0 ? (
+                <span style={{ color: 'var(--success)' }}>Al día</span>
+              ) : (
+                <span style={{ color: 'var(--warning)' }}>{cuotasPendientes} pend.</span>
+              )}
+            </p>
+            {cuotasPendientes > 0 && (
+              <p className="mt-2 text-pub-fg-70 text-sm">{formatMonto(montoPendiente)}</p>
+            )}
+            {incluyeFamilia && cuotasPendientes > 0 && (
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-pub-fg-50">
+                Grupo familiar · {cantMiembrosFamilia + 1} socios
+              </p>
             )}
           </div>
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Estado de Cuotas</h3>
-          {cuotasPendientes === 0 ? (
-            <p className="text-2xl font-bold text-green-600">Al día</p>
-          ) : (
-            <>
-              <p className="text-2xl font-bold text-orange-600">{cuotasPendientes} pendientes</p>
-              <p className="text-sm text-gray-500 mt-1">{formatMonto(montoPendiente)}</p>
-            </>
-          )}
         </div>
+      </section>
 
-        {/* Actividades */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between mb-4">
-            <div className="bg-blue-100 rounded-lg p-3">
-              <TrophyIcon className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Mis Actividades</h3>
-          <p className="text-2xl font-bold text-blue-600">
-            {actividadesActivas} {actividadesActivas === 1 ? 'activa' : 'activas'}
-          </p>
-        </div>
-
-        {/* Mi QR */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-500">
-          <div className="flex items-center justify-between mb-4">
-            <div className="bg-purple-100 rounded-lg p-3">
-              <QrCodeIcon className="h-6 w-6 text-purple-600" />
-            </div>
-          </div>
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Mi Código QR</h3>
-          <p className="text-sm text-gray-500 mb-3">Para descuentos en comercios</p>
-          <button
+      {/* Cards de resumen — pub-card pattern */}
+      <section>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+          <SummaryCard
+            label="Estado de cuotas"
+            value={cuotasPendientes === 0 ? 'Al día' : `${cuotasPendientes} pend.`}
+            sub={cuotasPendientes === 0 ? 'Sin saldo pendiente' : formatMonto(montoPendiente)}
+            icon={CreditCardIcon}
+            tone={cuotasPendientes === 0 ? 'success' : 'warning'}
+            statusIcon={cuotasPendientes === 0 ? CheckCircleIcon : ExclamationTriangleIcon}
+            number="01"
+          />
+          <SummaryCard
+            label="Mis actividades"
+            value={`${actividadesActivas} ${actividadesActivas === 1 ? 'activa' : 'activas'}`}
+            sub="Inscripciones vigentes"
+            icon={TrophyIcon}
+            tone="info"
+            number="02"
+          />
+          <SummaryCard
+            label="Mi código QR"
+            value="Beneficios"
+            sub="Para descuentos en comercios"
+            icon={QrCodeIcon}
+            tone="accent"
+            number="03"
             onClick={() => onNavigate?.('perfil')}
-            className="text-purple-600 font-semibold text-sm hover:text-purple-700 transition-colors"
-          >
-            Ver mi QR →
-          </button>
+          />
+          <SummaryCard
+            label="Mis avisos"
+            value={
+              cuotasPendientes === 0 && mensajesNoLeidos === 0
+                ? 'Sin novedades'
+                : `${cuotasPendientes + mensajesNoLeidos} nuevos`
+            }
+            sub={
+              mensajesNoLeidos > 0
+                ? `${mensajesNoLeidos} mensaje${mensajesNoLeidos > 1 ? 's' : ''} sin leer`
+                : cuotasPendientes > 0 ? 'Cuotas por pagar' : 'Todo en orden'
+            }
+            icon={CheckCircleIcon}
+            tone={cuotasPendientes > 0 || mensajesNoLeidos > 0 ? 'warning' : 'muted'}
+            number="04"
+            onClick={() => onNavigate?.(cuotasPendientes > 0 ? 'pagos' : 'mensajes')}
+          />
         </div>
+      </section>
 
-        {/* Notificaciones — siempre visible */}
-        <div
-          className={`bg-white rounded-xl shadow-sm p-6 border-l-4 ${
-            cuotasPendientes > 0 || mensajesNoLeidos > 0
-              ? 'border-orange-500'
-              : 'border-gray-300'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className={`rounded-lg p-3 ${cuotasPendientes > 0 || mensajesNoLeidos > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
-              <CheckCircleIcon className={`h-6 w-6 ${cuotasPendientes > 0 || mensajesNoLeidos > 0 ? 'text-orange-600' : 'text-gray-500'}`} />
-            </div>
-            {(cuotasPendientes > 0 || mensajesNoLeidos > 0) && (
-              <span className="inline-flex items-center justify-center w-6 h-6 bg-red-600 text-white text-xs font-bold rounded-full">
-                {cuotasPendientes + mensajesNoLeidos}
-              </span>
-            )}
-          </div>
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Mis Avisos</h3>
-          {cuotasPendientes === 0 && mensajesNoLeidos === 0 ? (
-            <p className="text-lg font-bold text-gray-500">Sin novedades</p>
-          ) : (
-            <>
-              {cuotasPendientes > 0 && (
-                <p className="text-sm font-semibold text-orange-600">
-                  {cuotasPendientes} cuota{cuotasPendientes > 1 ? 's' : ''} pendiente{cuotasPendientes > 1 ? 's' : ''}
-                </p>
-              )}
-              {mensajesNoLeidos > 0 && (
-                <p className="text-sm font-semibold text-blue-600">
-                  {mensajesNoLeidos} mensaje{mensajesNoLeidos > 1 ? 's' : ''} sin leer
-                </p>
-              )}
-              <button
-                onClick={() => onNavigate?.(cuotasPendientes > 0 ? 'pagos' : 'mensajes')}
-                className="mt-2 text-xs font-semibold text-orange-600 hover:text-orange-700"
-              >
-                Ver →
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Próximos eventos/entrenamientos */}
+      {/* Próximos entrenamientos */}
       {proximosEventos.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center space-x-2">
-              <CalendarIcon className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Próximos Entrenamientos</h3>
-            </div>
+        <section>
+          <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+            Agenda
           </div>
-          <div className="divide-y divide-gray-200">
-            {proximosEventos.slice(0, 5).map((evento, index) => (
-              <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{evento.actividad}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{evento.descripcion}</p>
-                    <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">
+          <h3 className="font-display-sport mb-6" style={{ fontSize: 'clamp(22px, 3vw, 32px)', lineHeight: 1, color: 'var(--text)' }}>
+            Próximos <span style={{ color: 'var(--color-primary)' }}>entrenamientos</span>
+          </h3>
+          <div className="pub-card p-0 overflow-hidden" style={{ borderRadius: 0 }}>
+            <div className="divide-y" style={{ borderColor: 'var(--border-soft)' }}>
+              {proximosEventos.slice(0, 5).map((evento, index) => (
+                <div key={index} className="p-5 flex items-start gap-4 hover:bg-[var(--bg-surface-hi)] transition-colors">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.25em] mt-1 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                    {String(index + 1).padStart(2, '0')}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium" style={{ color: 'var(--text)' }}>{evento.actividad}</h4>
+                    {evento.descripcion && (
+                      <p className="text-sm mt-1" style={{ color: 'var(--text-dim)' }}>{evento.descripcion}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+                      <span className="flex items-center gap-1.5">
                         <Calendar className="w-3 h-3" />
                         {evento.fecha}
                       </span>
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1.5">
                         <Clock className="w-3 h-3" />
                         {evento.hora}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {evento.lugar}
-                      </span>
+                      {evento.lugar && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3" />
+                          {evento.lugar}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* Accesos rápidos */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Accesos Rápidos</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button
-            onClick={() => onNavigate?.('pagos')}
-            className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="bg-red-100 rounded-full p-3 mb-2">
-              <CreditCardIcon className="h-6 w-6 text-red-600" />
-            </div>
-            <span className="text-sm font-medium text-gray-700">Pagar Cuota</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate?.('actividades')}
-            className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="bg-blue-100 rounded-full p-3 mb-2">
-              <TrophyIcon className="h-6 w-6 text-blue-600" />
-            </div>
-            <span className="text-sm font-medium text-gray-700">Inscribirme</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate?.('beneficios')}
-            className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="bg-green-100 rounded-full p-3 mb-2">
-              <CalendarIcon className="h-6 w-6 text-green-600" />
-            </div>
-            <span className="text-sm font-medium text-gray-700">Beneficios</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate?.('perfil')}
-            className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <div className="bg-purple-100 rounded-full p-3 mb-2">
-              <UserGroupIcon className="h-6 w-6 text-purple-600" />
-            </div>
-            <span className="text-sm font-medium text-gray-700">Mi Perfil</span>
-          </button>
+      <section>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Acciones
         </div>
-      </div>
-
+        <h3 className="font-display-sport mb-6" style={{ fontSize: 'clamp(22px, 3vw, 32px)', lineHeight: 1, color: 'var(--text)' }}>
+          Accesos <span style={{ color: 'var(--color-primary)' }}>rápidos</span>
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+          {[
+            { id: 'pagos', label: 'Pagar cuota', icon: CreditCardIcon, num: '01' },
+            { id: 'actividades', label: 'Inscribirme', icon: TrophyIcon, num: '02' },
+            { id: 'beneficios', label: 'Beneficios', icon: CalendarIcon, num: '03' },
+            { id: 'perfil', label: 'Mi perfil', icon: UserGroupIcon, num: '04' },
+          ].map(({ id, label, icon: Icon, num }) => (
+            <button
+              key={id}
+              onClick={() => onNavigate?.(id)}
+              className="group p-6 flex flex-col items-start gap-4 transition-all"
+              style={{ backgroundColor: 'var(--bg-surface)' }}
+            >
+              <div className="flex items-center justify-between w-full">
+                <Icon className="h-7 w-7" style={{ color: 'var(--color-primary)' }} />
+                <span className="font-mono text-[10px] tracking-[0.25em]" style={{ color: 'var(--text-muted)' }}>{num}</span>
+              </div>
+              <div className="flex items-center gap-2 w-full">
+                <span className="font-display-sport text-base" style={{ color: 'var(--text)', fontSize: 18 }}>
+                  {label}
+                </span>
+                <ArrowUpRight className="w-4 h-4 ml-auto group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" style={{ color: 'var(--color-primary)' }} />
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
+  )
+}
+
+function SummaryCard({ label, value, sub, icon: Icon, statusIcon: StatusIcon, tone, number, onClick }) {
+  const toneColor = {
+    success: 'var(--success)',
+    warning: 'var(--warning)',
+    info: 'var(--info)',
+    accent: 'var(--color-primary)',
+    muted: 'var(--text-muted)',
+  }[tone] || 'var(--text-dim)'
+
+  const Component = onClick ? 'button' : 'div'
+
+  return (
+    <Component
+      onClick={onClick}
+      className={`group relative p-5 flex flex-col gap-3 text-left ${onClick ? 'hover:bg-[var(--bg-surface-hi)] transition-colors cursor-pointer' : ''}`}
+      style={{ backgroundColor: 'var(--bg-surface)' }}
+    >
+      <div className="flex items-center justify-between">
+        <Icon className="h-6 w-6" style={{ color: toneColor }} />
+        <span className="font-mono text-[10px] tracking-[0.25em]" style={{ color: 'var(--text-muted)' }}>
+          {number}
+        </span>
+      </div>
+      <div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: 'var(--text-muted)' }}>
+          {label}
+        </p>
+        <p className="font-display-sport" style={{ fontSize: 22, lineHeight: 1, color: 'var(--text)' }}>
+          {value}
+        </p>
+        {sub && (
+          <p className="mt-1 text-xs" style={{ color: toneColor }}>
+            {sub}
+          </p>
+        )}
+      </div>
+      {StatusIcon && (
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <StatusIcon className="h-4 w-4" style={{ color: toneColor }} />
+        </div>
+      )}
+    </Component>
   )
 }

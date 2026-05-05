@@ -4616,14 +4616,18 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
 
   // Todo dentro de una transacción
   const pagoCompleto = await req.db.$transaction(async (tx) => {
-    // Generar número de recibo (dentro de transacción para evitar duplicados)
-    const ultimoPago = await tx.pago.findFirst({
+    // Generar número de recibo (dentro de transacción para evitar duplicados).
+    // Defensivo contra numeros no parseables previos.
+    const ultimosPagos = await tx.pago.findMany({
       orderBy: { id: 'desc' },
       select: { numero: true },
+      take: 100,
     })
-    const nuevoNumero = ultimoPago
-      ? String(parseInt(ultimoPago.numero) + 1).padStart(8, '0')
-      : '00000001'
+    const ultimoNumeroValido = ultimosPagos
+      .map(p => parseInt(p.numero, 10))
+      .filter(n => Number.isFinite(n) && n > 0)
+      .reduce((max, n) => Math.max(max, n), 0)
+    const nuevoNumero = String(ultimoNumeroValido + 1).padStart(8, '0')
 
     // Crear pago
     const pago = await tx.pago.create({

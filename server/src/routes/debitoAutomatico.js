@@ -810,14 +810,17 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
           const medioPagoId = await obtenerMedioPagoDebito(tx)
           const caja = await obtenerCajaDebito(tx)
 
-          // Generar número de pago único
-          const ultimoPago = await tx.pago.findFirst({
+          // Generar número de pago único (defensivo contra numeros no parseables previos)
+          const ultimosPagos = await tx.pago.findMany({
             orderBy: { id: 'desc' },
-            select: { numero: true }
+            select: { numero: true },
+            take: 100,
           })
-          const nuevoNumero = ultimoPago
-            ? String(parseInt(ultimoPago.numero) + 1).padStart(8, '0')
-            : '00000001'
+          const ultimoNumeroValido = ultimosPagos
+            .map(p => parseInt(p.numero, 10))
+            .filter(n => Number.isFinite(n) && n > 0)
+            .reduce((max, n) => Math.max(max, n), 0)
+          const nuevoNumero = String(ultimoNumeroValido + 1).padStart(8, '0')
 
           // Crear pago con todos los campos requeridos
           const pago = await tx.pago.create({
@@ -1752,10 +1755,16 @@ router.post('/archivos/:id/importar-respuesta-banco', authAdmin, asyncHandler(as
           const medioPagoId = await obtenerMedioPagoDebito(tx)
           const caja = await obtenerCajaDebito(tx)
 
-          const ultimoPago = await tx.pago.findFirst({ orderBy: { id: 'desc' }, select: { numero: true } })
-          const nuevoNumero = ultimoPago
-            ? String(parseInt(ultimoPago.numero) + 1).padStart(8, '0')
-            : '00000001'
+          const ultimosPagos = await tx.pago.findMany({
+            orderBy: { id: 'desc' },
+            select: { numero: true },
+            take: 100,
+          })
+          const ultimoNumeroValido = ultimosPagos
+            .map(p => parseInt(p.numero, 10))
+            .filter(n => Number.isFinite(n) && n > 0)
+            .reduce((max, n) => Math.max(max, n), 0)
+          const nuevoNumero = String(ultimoNumeroValido + 1).padStart(8, '0')
 
           const pago = await tx.pago.create({
             data: {

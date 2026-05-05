@@ -22,6 +22,7 @@ export default function Cuotas() {
   const { confirm, ConfirmDialog } = useConfirm()
 
   const [cuotas, setCuotas] = useState([])
+  const [totalesBackend, setTotalesBackend] = useState(null)
   const [periodos, setPeriodos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -57,6 +58,7 @@ export default function Cuotas() {
   // splits: [{ medioPagoId, cajaId, monto }]
   const [splits, setSplits] = useState([{ medioPagoId: '', cajaId: '', monto: '' }])
   const [registrandoPago, setRegistrandoPago] = useState(false)
+  const [errorPago, setErrorPago] = useState(null)
   const [success, setSuccess] = useState(null)
   const [showPagoExitosoModal, setShowPagoExitosoModal] = useState(false)
   const [numeroRecibo, setNumeroRecibo] = useState(null)
@@ -262,6 +264,7 @@ export default function Cuotas() {
         setPagosInformados(data.data || [])
         setPagination(data.pagination)
         setCuotas([]) // Limpiar cuotas normales
+        setTotalesBackend(null)
       } else {
         // Cargar cuotas normales
         const params = new URLSearchParams()
@@ -273,6 +276,7 @@ export default function Cuotas() {
         const data = await api.get(`/admin/cuotas?${params}`)
         setCuotas(data.data || [])
         setPagination(data.pagination)
+        setTotalesBackend(data.totales || null)
         setPagosInformados([]) // Limpiar pagos informados
       }
     } catch (err) {
@@ -317,6 +321,7 @@ export default function Cuotas() {
     const defaultMedio = primerMedio?.id?.toString() || ''
     const defaultCaja = primerMedio?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
     setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: total.toFixed(2) }])
+    setErrorPago(null)
     setShowPagoModal(true)
   }
 
@@ -407,23 +412,23 @@ export default function Cuotas() {
 
     for (const sp of splits) {
       if (!sp.medioPagoId || !sp.cajaId || !sp.monto) {
-        setError('Completá todos los campos en los medios de pago')
+        setErrorPago('Completá todos los campos en los medios de pago')
         return
       }
     }
     if (Math.abs(sumaSplits - total) > 1) {
-      setError(`La suma de los medios de pago ($${sumaSplits.toFixed(2)}) debe ser igual al total ($${total.toFixed(2)})`)
+      setErrorPago(`La suma de los medios de pago ($${sumaSplits.toFixed(2)}) debe ser igual al total ($${total.toFixed(2)})`)
       return
     }
 
     const socioIdPago = cobranzaData?.titular?.id || cobranzaData?.sociosPorCobrar?.[0]?.socio?.id
     if (!socioIdPago) {
-      setError('No se pudo determinar el socio para el pago')
+      setErrorPago('No se pudo determinar el socio para el pago')
       return
     }
 
     setRegistrandoPago(true)
-    setError(null)
+    setErrorPago(null)
 
     try {
       const result = await api.post('/admin/pagos', {
@@ -441,7 +446,7 @@ export default function Cuotas() {
       setShowPagoModal(false)
       setShowPagoExitosoModal(true)
     } catch (err) {
-      setError(err.message || 'Error al registrar pago')
+      setErrorPago(err.message || 'Error al registrar pago')
     } finally {
       setRegistrandoPago(false)
     }
@@ -576,8 +581,10 @@ export default function Cuotas() {
     return Array.from(map.values())
   }, [cuotas])
 
-  // Totales agregados de la vista actual (filtros aplicados)
+  // Totales agregados sobre TODO el filtro aplicado (vienen del backend, no sólo la página actual).
+  // Fallback al cálculo local sobre la página si por algún motivo no llegaran del server.
   const totalesVista = useMemo(() => {
+    if (totalesBackend) return totalesBackend
     if (!cuotas || cuotas.length === 0) return null
     let total = 0
     let pagado = 0
@@ -600,7 +607,7 @@ export default function Cuotas() {
       cantTotal: cuotas.length,
       cantPagado, cantPendiente,
     }
-  }, [cuotas])
+  }, [totalesBackend, cuotas])
 
   // Vista de Cobranza
   if (modoCobranza) {
@@ -847,6 +854,9 @@ export default function Cuotas() {
 
             return (
               <div className="space-y-4">
+                {errorPago && (
+                  <Alert type="error" onClose={() => setErrorPago(null)}>{errorPago}</Alert>
+                )}
                 {/* Resumen total */}
                 <div className="bg-gray-50 rounded-lg p-4">
                   <p className="text-sm text-gray-500">Total a cobrar</p>

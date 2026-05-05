@@ -132,7 +132,16 @@ export default function ReservasSocio({ socio, tokenPortal }) {
   // ── render principal ──────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4 pb-4">
+    <div className="space-y-6 pb-4">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Espacios
+        </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Tus <span style={{ color: 'var(--color-primary)' }}>reservas</span>
+        </h1>
+      </div>
       {/* Header con tabs */}
       <div className="flex gap-2">
         <button

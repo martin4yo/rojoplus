@@ -91,7 +91,17 @@ export default function MiPerfilSocio({ socio, tokenPortal, onUpdate }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Cuenta
+        </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Mi <span style={{ color: 'var(--color-primary)' }}>perfil</span>
+        </h1>
+      </div>
+
       {/* Datos personales */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">

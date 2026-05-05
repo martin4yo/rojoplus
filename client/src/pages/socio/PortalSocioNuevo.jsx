@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { MapPin, Phone, Mail, Facebook, Instagram, MessageCircle } from 'lucide-react'
+import { useTenant } from '../../contexts/TenantContext'
 import api from '../../services/api'
 import {
   HomeIcon,
@@ -53,6 +55,7 @@ export default function PortalSocioNuevo() {
   const { tokenPortal } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showModal, ModalComponent } = useModal()
+  const { tenant } = useTenant()
   const [activeTab, setActiveTab] = useState('inicio')
   const [socio, setSocio] = useState(null)
   const [branding, setBranding] = useState(null)
@@ -297,6 +300,9 @@ export default function PortalSocioNuevo() {
         {activeTab === 'perfil' && <MiPerfilSocio socio={socio} tokenPortal={tokenPortal} onUpdate={cargarDatosSocio} />}
       </main>
 
+      {/* Footer athletic — slim arriba del bottom nav */}
+      <PortalFooter tenant={tenant} branding={branding} />
+
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="max-w-7xl mx-auto">
@@ -451,5 +457,109 @@ export default function PortalSocioNuevo() {
       {/* Axio - Chat Widget */}
       <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
     </div>
+  )
+}
+
+function PortalFooter({ tenant, branding }) {
+  const redes = tenant?.redesSociales || {}
+  const direccion = [tenant?.direccion, tenant?.ciudad, tenant?.provincia].filter(Boolean).join(', ')
+  const tieneInfo = direccion || tenant?.telefono || tenant?.email
+  const tieneRedes = redes.facebook || redes.instagram || redes.whatsapp
+
+  return (
+    <footer className="relative overflow-hidden mt-12" style={{ backgroundColor: 'var(--pub-hero-bg)', color: 'var(--pub-hero-fg)' }}>
+      <div className="absolute inset-0 bg-field-grid-pub opacity-25 pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-4 py-10">
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Brand */}
+          <div>
+            <div className="pub-eyebrow text-pub-fg-70 mb-3">
+              {branding?.nombre || tenant?.nombre || 'Club'}
+            </div>
+            <h3 className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(22px, 3vw, 32px)', lineHeight: 1 }}>
+              Portal del<br /><span style={{ color: 'var(--color-primary)' }}>socio</span>.
+            </h3>
+            {tenant?.slogan && (
+              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-50 mt-3">
+                {tenant.slogan}
+              </p>
+            )}
+          </div>
+
+          {/* Contacto */}
+          {tieneInfo && (
+            <div>
+              <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40 mb-4">
+                Contacto
+              </h4>
+              <ul className="space-y-3">
+                {direccion && (
+                  <li className="flex items-start gap-3">
+                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                    <span className="text-pub-fg-70 text-sm leading-snug">{direccion}</span>
+                  </li>
+                )}
+                {tenant?.telefono && (
+                  <li className="flex items-center gap-3">
+                    <Phone className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                    <a href={`tel:${tenant.telefono.replace(/\D/g, '')}`} className="text-pub-fg-70 hover:text-pub-fg text-sm transition-colors">
+                      {tenant.telefono}
+                    </a>
+                  </li>
+                )}
+                {tenant?.email && (
+                  <li className="flex items-center gap-3">
+                    <Mail className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                    <a href={`mailto:${tenant.email}`} className="text-pub-fg-70 hover:text-pub-fg text-sm transition-colors break-all">
+                      {tenant.email}
+                    </a>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {/* Redes sociales */}
+          {tieneRedes && (
+            <div>
+              <h4 className="font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40 mb-4">
+                Seguinos
+              </h4>
+              <div className="flex gap-2">
+                {redes.facebook && <FooterSocial href={redes.facebook} icon={Facebook} />}
+                {redes.instagram && <FooterSocial href={redes.instagram} icon={Instagram} />}
+                {redes.whatsapp && (
+                  <FooterSocial href={`https://wa.me/${redes.whatsapp.replace(/\D/g, '')}`} icon={MessageCircle} />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 pt-5 flex flex-col sm:flex-row justify-between items-center gap-3 font-mono text-[10px] uppercase tracking-[0.25em]" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <p className="text-pub-fg-40">
+            © {new Date().getFullYear()} {tenant?.nombre || 'Club'}
+          </p>
+          <p className="text-pub-fg-30">
+            Hecho por <span className="text-pub-fg-60">AxiomaCloud</span>
+          </p>
+        </div>
+      </div>
+    </footer>
+  )
+}
+
+function FooterSocial({ href, icon: Icon }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="w-10 h-10 flex items-center justify-center transition-all hover:bg-pub-fg-10"
+      style={{ border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.7)' }}
+    >
+      <Icon className="w-4 h-4" />
+    </a>
   )
 }

@@ -80,18 +80,18 @@ export default function NotificacionesSocio({ tokenPortal }) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-red-100 rounded-lg">
-            <BellIcon className="h-6 w-6 text-red-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Preferencias de Notificaciones</h2>
-            <p className="text-gray-600 text-sm">Configura qué notificaciones quieres recibir</p>
-          </div>
+    <div className="space-y-8">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Preferencias
         </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Mis <span style={{ color: 'var(--color-primary)' }}>avisos</span>
+        </h1>
+        <p className="mt-3 text-sm md:text-base" style={{ color: 'var(--text-dim)' }}>
+          Configurá qué notificaciones querés recibir.
+        </p>
       </div>
 
       {/* Canales de notificación */}

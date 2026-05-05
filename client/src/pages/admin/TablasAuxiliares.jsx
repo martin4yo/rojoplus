@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Key } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Key, Hash } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -80,6 +80,13 @@ export default function TablasAuxiliares() {
   })
   const [guardandoFiscal, setGuardandoFiscal] = useState(false)
 
+  // Rango de numeración de socios
+  const [rangoSocioMin, setRangoSocioMin] = useState('')
+  const [rangoSocioMax, setRangoSocioMax] = useState('')
+  const [rangoSocioInicial, setRangoSocioInicial] = useState({ min: '', max: '' })
+  const [guardandoRangoSocios, setGuardandoRangoSocios] = useState(false)
+  const rangoSociosModificado = rangoSocioMin !== rangoSocioInicial.min || rangoSocioMax !== rangoSocioInicial.max
+
   // Configuración SMTP
   const [configSmtp, setConfigSmtp] = useState({
     host: '',
@@ -91,10 +98,12 @@ export default function TablasAuxiliares() {
     fromName: '',
     emailContacto: '',
   })
+  const [configSmtpInicial, setConfigSmtpInicial] = useState(null)
   const [guardandoSmtp, setGuardandoSmtp] = useState(false)
   const [testeandoSmtp, setTesteandoSmtp] = useState(false)
   const [resultadoTestSmtp, setResultadoTestSmtp] = useState(null) // null | 'ok' | 'error'
   const [mostrarPassSmtp, setMostrarPassSmtp] = useState(false)
+  const smtpModificado = configSmtpInicial !== null && JSON.stringify(configSmtp) !== JSON.stringify(configSmtpInicial)
 
   // Configuración WhatsApp
   const [configWa, setConfigWa] = useState({
@@ -145,6 +154,7 @@ export default function TablasAuxiliares() {
     cargarDiaCorte()
     cargarConfigFiscal()
     cargarConfigSmtp()
+    cargarRangoSocios()
     cargarConfigWa()
     cargarNotifTextos()
     cargarNotifEventos()
@@ -525,6 +535,51 @@ export default function TablasAuxiliares() {
     }
   }
 
+  async function cargarRangoSocios() {
+    try {
+      const [cfgMin, cfgMax] = await Promise.all([
+        api.get('/admin/sistema/configuracion/SOCIO_NRO_MIN').catch(() => null),
+        api.get('/admin/sistema/configuracion/SOCIO_NRO_MAX').catch(() => null),
+      ])
+      const min = cfgMin?.valor || ''
+      const max = cfgMax?.valor || ''
+      setRangoSocioMin(min)
+      setRangoSocioMax(max)
+      setRangoSocioInicial({ min, max })
+    } catch (err) {
+      console.error('Error cargando rango de socios:', err)
+    }
+  }
+
+  async function guardarRangoSocios() {
+    const min = rangoSocioMin?.toString().trim()
+    const max = rangoSocioMax?.toString().trim()
+    if (min && max && parseInt(min, 10) > parseInt(max, 10)) {
+      setError('El número mínimo no puede ser mayor que el máximo')
+      return
+    }
+    setGuardandoRangoSocios(true)
+    setError(null)
+    try {
+      await Promise.all([
+        api.put('/admin/sistema/configuracion/SOCIO_NRO_MIN', {
+          valor: min || '', tipo: 'NUMBER', modulo: 'SOCIOS',
+          descripcion: 'Número mínimo del rango para nuevos socios (vacío = sin rango)',
+        }),
+        api.put('/admin/sistema/configuracion/SOCIO_NRO_MAX', {
+          valor: max || '', tipo: 'NUMBER', modulo: 'SOCIOS',
+          descripcion: 'Número máximo del rango para nuevos socios (vacío = sin rango)',
+        }),
+      ])
+      setRangoSocioInicial({ min, max })
+      setSuccess('Rango de numeración de socios actualizado')
+    } catch (err) {
+      setError(err.message || 'Error al guardar rango de socios')
+    } finally {
+      setGuardandoRangoSocios(false)
+    }
+  }
+
   async function cargarConfigSmtp() {
     try {
       const claves = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_SECURE', 'SMTP_FROM', 'SMTP_FROM_NAME', 'EMAIL_CONTACTO']
@@ -532,7 +587,7 @@ export default function TablasAuxiliares() {
         claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null))
       )
       const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
-      setConfigSmtp({
+      const cargado = {
         host: cfg.SMTP_HOST,
         port: cfg.SMTP_PORT || '587',
         user: cfg.SMTP_USER,
@@ -541,7 +596,9 @@ export default function TablasAuxiliares() {
         from: cfg.SMTP_FROM,
         fromName: cfg.SMTP_FROM_NAME,
         emailContacto: cfg.EMAIL_CONTACTO,
-      })
+      }
+      setConfigSmtp(cargado)
+      setConfigSmtpInicial(cargado)
     } catch (err) {
       console.error('Error cargando configuración SMTP:', err)
     }
@@ -579,6 +636,8 @@ export default function TablasAuxiliares() {
           api.put(`/admin/sistema/configuracion/${clave}`, { valor, tipo: 'STRING', modulo: 'EMAIL', descripcion })
         )
       )
+      setConfigSmtpInicial(configSmtp)
+      setResultadoTestSmtp(null)
       setSuccess('Configuración de email actualizada')
     } catch (err) {
       setError(err.message || 'Error al guardar configuración de email')
@@ -918,6 +977,65 @@ export default function TablasAuxiliares() {
                 title="Guardar"
               >
                 {guardandoDeportes ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Numeración de Socios */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[280px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-purple-100">
+                <Hash className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Numeración de Socios</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Rango de números para nuevos socios. Asigna secuencialmente desde el mínimo (no rellena huecos previos).
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Desde</label>
+                    <input
+                      type="number"
+                      value={rangoSocioMin}
+                      onChange={e => setRangoSocioMin(e.target.value)}
+                      placeholder="Ej: 200000"
+                      min="1"
+                      className="input-field w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+                    <input
+                      type="number"
+                      value={rangoSocioMax}
+                      onChange={e => setRangoSocioMax(e.target.value)}
+                      placeholder="Ej: 300000"
+                      min="1"
+                      className="input-field w-full"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Dejar ambos vacíos para usar el comportamiento legacy (rellena huecos desde el mínimo).
+                </p>
+                {rangoSocioMin && rangoSocioMax && parseInt(rangoSocioMin, 10) > parseInt(rangoSocioMax, 10) && (
+                  <p className="text-xs text-red-600 mt-2">El mínimo no puede ser mayor que el máximo.</p>
+                )}
+              </div>
+            </div>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarRangoSocios}
+                disabled={guardandoRangoSocios || !rangoSociosModificado}
+                title={!rangoSociosModificado ? 'No hay cambios' : 'Guardar'}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {guardandoRangoSocios ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Save className="w-5 h-5" />
@@ -2137,21 +2255,29 @@ export default function TablasAuxiliares() {
             </div>
             <div className="mt-4 pt-4 border-t flex items-start justify-between gap-3 flex-wrap">
               <div className="flex-1 min-w-0">
-                {resultadoTestSmtp?.tipo === 'ok' && (
-                  <div className="flex items-start gap-2 text-sm text-green-700">
-                    <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <span>{resultadoTestSmtp.mensaje}</span>
+                {smtpModificado ? (
+                  <div className="text-sm text-amber-700">
+                    Hay cambios sin guardar. Guardá antes de testear.
                   </div>
-                )}
-                {resultadoTestSmtp?.tipo === 'error' && (
-                  <div className="flex items-start gap-2 text-sm text-red-700">
-                    <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <span className="break-words">{resultadoTestSmtp.mensaje}</span>
-                  </div>
+                ) : (
+                  <>
+                    {resultadoTestSmtp?.tipo === 'ok' && (
+                      <div className="flex items-start gap-2 text-sm text-green-700">
+                        <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <span>{resultadoTestSmtp.mensaje}</span>
+                      </div>
+                    )}
+                    {resultadoTestSmtp?.tipo === 'error' && (
+                      <div className="flex items-start gap-2 text-sm text-red-700">
+                        <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <span className="break-words">{resultadoTestSmtp.mensaje}</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="flex gap-3">
-                <button type="button" onClick={testearSmtp} disabled={testeandoSmtp || !configSmtp.host || !configSmtp.user} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">
+                <button type="button" onClick={testearSmtp} disabled={testeandoSmtp || !configSmtp.host || !configSmtp.user || smtpModificado} title={smtpModificado ? 'Guardá los cambios antes de testear' : ''} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition">
                   {testeandoSmtp ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : <Mail className="w-4 h-4" />}
                   Testear
                 </button>

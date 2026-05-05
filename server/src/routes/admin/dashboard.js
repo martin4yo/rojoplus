@@ -40,9 +40,9 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
   // Socios sin actividad = activos - con actividad
   const sociosSinActividad = Math.max(0, sociosActivos - cantSociosConActividad)
 
-  // Periodo actual (más reciente con estado GENERADO)
+  // Periodo actual: el más reciente (sin filtrar por estado, porque los periodos
+  // pueden estar en 'ABIERTO' / 'PENDIENTE' / 'GENERADO' / 'CERRADO' según el flujo).
   const periodoActual = await req.db.periodo.findFirst({
-    where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
   })
 
@@ -339,9 +339,8 @@ router.get('/dashboard', authAdmin, asyncHandler(async (req, res) => {
     })
   }
 
-  // Cobranza de cuotas de los últimos 6 periodos
+  // Cobranza de cuotas de los últimos 6 periodos (sin filtrar por estado)
   const periodosHistoricos = await req.db.periodo.findMany({
-    where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
     take: 6,
     include: {

@@ -317,114 +317,80 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
   const cuotasVencidas = cuotas.filter((c) => c.estado === 'VENCIDO').length
 
   return (
-    <div className="space-y-6">
-      {/* Resumen */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-500">
-          <div className="flex items-center justify-between mb-2">
-            <div className="bg-yellow-100 rounded-lg p-3">
-              <ClockIcon className="h-6 w-6 text-yellow-600" />
-            </div>
-          </div>
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Cuotas Pendientes</h3>
-          <p className="text-2xl font-bold text-yellow-600">{cuotas.length}</p>
+    <div className="space-y-8">
+      {/* Header athletic */}
+      <div>
+        <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+          Cuenta corriente
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-500">
-          <div className="flex items-center justify-between mb-2">
-            <div className="bg-red-100 rounded-lg p-3">
-              <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
-            </div>
-          </div>
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Cuotas Vencidas</h3>
-          <p className="text-2xl font-bold text-red-600">{cuotasVencidas}</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between mb-2">
-            <div className="bg-blue-100 rounded-lg p-3">
-              <CurrencyDollarIcon className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Total a Pagar</h3>
-          <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalPendiente, { minimumFractionDigits: 0 })}</p>
-        </div>
-
-        {/* Avisos — siempre visible */}
-        <div className={`bg-white rounded-xl shadow-sm p-6 border-l-4 ${mensajesNoLeidos > 0 ? 'border-orange-500' : 'border-gray-300'}`}>
-          <div className="flex items-center justify-between mb-2">
-            <div className={`rounded-lg p-3 ${mensajesNoLeidos > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
-              <CheckCircleIcon className={`h-6 w-6 ${mensajesNoLeidos > 0 ? 'text-orange-600' : 'text-gray-400'}`} />
-            </div>
-            {mensajesNoLeidos > 0 && (
-              <span className="inline-flex items-center justify-center w-6 h-6 bg-red-600 text-white text-xs font-bold rounded-full">
-                {mensajesNoLeidos}
-              </span>
-            )}
-          </div>
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Mis Avisos</h3>
-          {mensajesNoLeidos === 0 ? (
-            <p className="text-lg font-bold text-gray-500">Sin novedades</p>
-          ) : (
-            <>
-              <p className="text-sm font-semibold text-orange-600">
-                {mensajesNoLeidos} mensaje{mensajesNoLeidos > 1 ? 's' : ''} sin leer
-              </p>
-              <button
-                onClick={() => onNavigate?.('mensajes')}
-                className="mt-2 text-xs font-semibold text-orange-600 hover:text-orange-700"
-              >
-                Ver →
-              </button>
-            </>
-          )}
-        </div>
+        <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
+          Mis <span style={{ color: 'var(--color-primary)' }}>pagos</span>
+        </h1>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-3">
-          <button
-            onClick={() => setTab('pendientes')}
-            className={`py-4 px-6 font-semibold transition-colors ${
-              tab === 'pendientes'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <ClockIcon className="h-5 w-5 inline-block mr-2" />
-            Pendientes ({cuotas.length})
-          </button>
-          <button
-            onClick={() => setTab('historial')}
-            className={`py-4 px-6 font-semibold transition-colors ${
-              tab === 'historial'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <CheckCircleIcon className="h-5 w-5 inline-block mr-2" />
-            Historial ({historial.length})
-          </button>
-          <button
-            onClick={() => setTab('cuenta-corriente')}
-            className={`py-4 px-6 font-semibold transition-colors ${
-              tab === 'cuenta-corriente'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <TableCellsIcon className="h-5 w-5 inline-block mr-2" />
-            Cuenta Corriente
-          </button>
-        </div>
+      {/* Resumen athletic — grid con líneas finas */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+        <PagoStatCard
+          label="Pendientes"
+          value={cuotas.length}
+          tone="warning"
+          icon={ClockIcon}
+          number="01"
+        />
+        <PagoStatCard
+          label="Vencidas"
+          value={cuotasVencidas}
+          tone="error"
+          icon={ExclamationTriangleIcon}
+          number="02"
+        />
+        <PagoStatCard
+          label="Total a pagar"
+          value={formatCurrency(totalPendiente, { minimumFractionDigits: 0 })}
+          tone="info"
+          icon={CurrencyDollarIcon}
+          number="03"
+        />
+        <PagoStatCard
+          label="Mis avisos"
+          value={mensajesNoLeidos === 0 ? 'Sin novedades' : `${mensajesNoLeidos} sin leer`}
+          tone={mensajesNoLeidos > 0 ? 'warning' : 'muted'}
+          icon={CheckCircleIcon}
+          number="04"
+          onClick={mensajesNoLeidos > 0 ? () => onNavigate?.('mensajes') : null}
+        />
+      </div>
+
+      {/* Tabs athletic */}
+      <div className="grid grid-cols-3 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+        {[
+          { id: 'pendientes', label: 'Pendientes', count: cuotas.length, icon: ClockIcon },
+          { id: 'historial', label: 'Historial', count: historial.length, icon: CheckCircleIcon },
+          { id: 'cuenta-corriente', label: 'Cuenta corriente', count: null, icon: TableCellsIcon },
+        ].map(({ id, label, count, icon: Icon }) => {
+          const activo = tab === id
+          return (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className="py-4 px-3 font-mono text-[10px] uppercase tracking-[0.2em] transition-colors flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: activo ? 'var(--color-primary)' : 'var(--bg-surface)',
+                color: activo ? 'var(--accent-fg)' : 'var(--text-dim)',
+              }}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}{count !== null && ` (${count})`}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Contenido */}
       {tab === 'pendientes' && (
         <div className="space-y-4">
           {cuotas.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+            <div className="pub-card p-12 text-center">
               <CheckCircleIcon className="h-16 w-16 text-green-500 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">¡Todo pago!</h3>
               <p className="text-gray-600">No tienes cuotas pendientes</p>
@@ -434,7 +400,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
               {/* Opciones de pago - Compacto */}
               {cuotas.length > 0 && (
                 <>
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <div className="pub-card border border-gray-200 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">Opciones de pago</h3>
                       <span className="text-sm font-medium text-gray-600">Total: {formatCurrency(totalPendiente, { minimumFractionDigits: 0 })}</span>
@@ -668,7 +634,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
               {/* Lista de cuotas */}
               {cuotas.map((cuota) => {
                 return (
-                  <div key={cuota.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div key={cuota.id} className="pub-card overflow-hidden">
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
@@ -729,7 +695,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
       )}
 
       {tab === 'historial' && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="pub-card overflow-hidden">
           {historial.length === 0 ? (
             <div className="p-12 text-center">
               <DocumentTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -787,7 +753,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
           ) : cuentaCorriente ? (
             <>
               {/* Resumen */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="pub-card p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen de Cuenta</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="bg-red-50 rounded-lg p-4">
@@ -825,7 +791,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
               </div>
 
               {/* Tabla de movimientos */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="pub-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
@@ -907,7 +873,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
               </div>
             </>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+            <div className="pub-card p-12 text-center">
               <DocumentTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Error cargando cuenta corriente</h3>
               <p className="text-gray-600 mb-4">No se pudo cargar la información</p>
@@ -927,5 +893,40 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
       {/* Axio - Chat Widget */}
       <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
     </div>
+  )
+}
+
+function PagoStatCard({ label, value, tone, icon: Icon, number, onClick }) {
+  const toneColor = {
+    success: 'var(--success)',
+    warning: 'var(--warning)',
+    error: 'var(--error)',
+    info: 'var(--info)',
+    muted: 'var(--text-muted)',
+  }[tone] || 'var(--text-dim)'
+
+  const Component = onClick ? 'button' : 'div'
+
+  return (
+    <Component
+      onClick={onClick}
+      className={`p-5 flex flex-col gap-3 text-left ${onClick ? 'hover:bg-[var(--bg-surface-hi)] transition-colors cursor-pointer' : ''}`}
+      style={{ backgroundColor: 'var(--bg-surface)' }}
+    >
+      <div className="flex items-center justify-between">
+        <Icon className="h-6 w-6" style={{ color: toneColor }} />
+        <span className="font-mono text-[10px] tracking-[0.25em]" style={{ color: 'var(--text-muted)' }}>
+          {number}
+        </span>
+      </div>
+      <div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: 'var(--text-muted)' }}>
+          {label}
+        </p>
+        <p className="font-display-sport" style={{ fontSize: 22, lineHeight: 1, color: toneColor }}>
+          {value}
+        </p>
+      </div>
+    </Component>
   )
 }
