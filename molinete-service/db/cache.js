@@ -26,10 +26,16 @@ export function inicializarDB() {
       estado TEXT,
       tokenPortal TEXT,
       rfidUid TEXT,
+      permiteIngresoMolinete INTEGER DEFAULT 0,
+      estadoNombre TEXT,
       UNIQUE(tokenPortal),
       UNIQUE(rfidUid)
     )
   `)
+
+  // Migración suave: agregar columnas si la tabla ya existía sin ellas
+  try { db.exec(`ALTER TABLE socios ADD COLUMN permiteIngresoMolinete INTEGER DEFAULT 0`) } catch (_) {}
+  try { db.exec(`ALTER TABLE socios ADD COLUMN estadoNombre TEXT`) } catch (_) {}
 
   // Índices para búsqueda rápida
   db.exec(`
@@ -97,8 +103,8 @@ export function actualizarCache(socios, habilitaciones) {
 
     // Insertar socios
     const insertSocio = db.prepare(`
-      INSERT INTO socios (id, nroSocio, apellidoNombre, documento, estado, tokenPortal, rfidUid)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO socios (id, nroSocio, apellidoNombre, documento, estado, tokenPortal, rfidUid, permiteIngresoMolinete, estadoNombre)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     for (const socio of socios) {
@@ -109,7 +115,9 @@ export function actualizarCache(socios, habilitaciones) {
         socio.documento,
         socio.estado,
         socio.tokenPortal,
-        socio.rfidUid
+        socio.rfidUid,
+        socio.permiteIngresoMolinete ? 1 : 0,
+        socio.estadoNombre || null
       )
     }
 

@@ -122,10 +122,17 @@ router.post('/validar', authDispositivo, async (req, res) => {
         }
       }
     } else if (tipoLectura === 'RFID') {
-      // rfidUid es @@unique([tenantId, rfidUid]) — usar findFirst, no findUnique
-      // (el plugin multi-tenant scopea automáticamente por tenantId)
+      // rfidUid es @@unique([tenantId, rfidUid]) — usar findFirst.
+      // Tolerar diferencias de padding de ceros: si el algoritmo manda "0013150823"
+      // y la BD tiene "13150823" (o viceversa), igual matchea.
+      const variantes = new Set([valorLeido])
+      const sinCeros = String(parseInt(valorLeido, 10) || 0)
+      if (sinCeros !== '0') variantes.add(sinCeros)
+      // También probar con padding a 10 dígitos por si el operador lo cargó corto
+      if (sinCeros !== '0') variantes.add(sinCeros.padStart(10, '0'))
+
       persona = await req.db.socio.findFirst({
-        where: { rfidUid: valorLeido },
+        where: { rfidUid: { in: Array.from(variantes) } },
         select: {
           id: true,
           nroSocio: true,
@@ -137,6 +144,8 @@ router.post('/validar', authDispositivo, async (req, res) => {
           estadoSocioRel: { select: { permiteIngresoMolinete: true, nombre: true } }
         }
       })
+
+      console.log(`[RFID validar] valorLeido="${valorLeido}" variantes=${JSON.stringify(Array.from(variantes))} match=${persona ? `socio#${persona.id} rfidUid="${persona.rfidUid}"` : 'ninguno'}`)
       tipo = 'SOCIO'
     }
 
@@ -413,11 +422,16 @@ router.get('/cache-socios', authDispositivo, async (req, res) => {
       }).catch(() => {}) // Ignorar si no existe
     }
 
-    // Solo socios cuyo estado tiene permiteIngresoMolinete = true.
-    // El cache local del molinete es la fuente offline: si está acá, puede entrar.
-    const socios = await req.db.socio.findMany({
+    // Cachea TODOS los socios identificables (con rfidUid, tokenPortal o documento)
+    // y el flag de ingreso por molinete + nombre del estado, así el offline
+    // puede distinguir "no encontrado" de "encontrado pero no habilitado".
+    const sociosRaw = await req.db.socio.findMany({
       where: {
-        estadoSocioRel: { permiteIngresoMolinete: true }
+        OR: [
+          { rfidUid: { not: null } },
+          { tokenPortal: { not: null } },
+          { documento: { not: null } }
+        ]
       },
       select: {
         id: true,
@@ -426,9 +440,22 @@ router.get('/cache-socios', authDispositivo, async (req, res) => {
         documento: true,
         estado: true,
         tokenPortal: true,
-        rfidUid: true
+        rfidUid: true,
+        estadoSocioRel: { select: { permiteIngresoMolinete: true, nombre: true } }
       }
     })
+
+    const socios = sociosRaw.map(s => ({
+      id: s.id,
+      nroSocio: s.nroSocio,
+      apellidoNombre: s.apellidoNombre,
+      documento: s.documento,
+      estado: s.estado,
+      tokenPortal: s.tokenPortal,
+      rfidUid: s.rfidUid,
+      permiteIngresoMolinete: s.estadoSocioRel?.permiteIngresoMolinete === true,
+      estadoNombre: s.estadoSocioRel?.nombre || s.estado || null
+    }))
 
     // Obtener habilitaciones vigentes
     const ahora = new Date()

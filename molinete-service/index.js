@@ -329,20 +329,32 @@ function handleUSBData(valorLeido) {
   let tipoLectura = 'DNI'
   let nombreCompleto = null
 
-  // QR del portal suele ser UUID (36 chars con guiones)
+  // 1) QR uuid-style (36 chars con guiones)
   if (valorLeido.length === 36 && valorLeido.includes('-')) {
     tipoLectura = 'QR'
   }
-  // DNI argentino tiene 7-8 dígitos
-  else if (/^\d{7,8}$/.test(valorLeido)) {
-    tipoLectura = 'DNI'
-  }
-  // Código de barras PDF417 del DNI argentino (largo, campos separados por @)
-  else if (valorLeido.includes('@') || valorLeido.length > 20) {
-    tipoLectura = 'DNI'
-    const parsed = parsearDniArgentino(valorLeido)
-    valorLeido = parsed.valor
-    nombreCompleto = parsed.nombreCompleto
+  // 2) QR del carnet digital (token hex largo, 32+ chars). El scanner suele entregar
+  //    la URL completa "https://.../portal-socio/<token>" — y a veces los caracteres
+  //    especiales vienen mapeados por el layout del teclado (`:`→`Ñ`, `/`→`-`).
+  //    Nos quedamos solo con el token, ignorando todo lo demás.
+  else {
+    const tokenHex = valorLeido.match(/[a-f0-9]{32,}/i)
+    if (tokenHex) {
+      tipoLectura = 'QR'
+      valorLeido = tokenHex[0]
+      logger.info(`[QR portal] token extraído: ${valorLeido.slice(0, 16)}…`)
+    }
+    // 3) DNI argentino (7-8 dígitos puros)
+    else if (/^\d{7,8}$/.test(valorLeido)) {
+      tipoLectura = 'DNI'
+    }
+    // 4) PDF417 del DNI (separadores @ / " / |)
+    else if (valorLeido.includes('@') || valorLeido.includes('"') || valorLeido.length > 20) {
+      tipoLectura = 'DNI'
+      const parsed = parsearDniArgentino(valorLeido)
+      valorLeido = parsed.valor
+      nombreCompleto = parsed.nombreCompleto
+    }
   }
 
   procesarLectura(valorLeido, tipoLectura, { nombreCompleto })
@@ -442,14 +454,17 @@ async function procesarLectura(valorLeido, tipoLectura, metadata = {}) {
   try {
     // Intentar validación ONLINE primero
     resultado = await validarOnline(valorLeido, tipoLectura)
-    logger.info('✓ Validación ONLINE exitosa')
+    logger.info(`✓ Validación ONLINE OK — motivo=${resultado.motivo} permitido=${resultado.permitido}`)
   } catch (error) {
-    logger.warn(`⚠️ Error validación online: ${error.message}`)
+    // Loguear el detalle (status, body) para entender por qué cae
+    const status = error.response?.status
+    const body = error.response?.data
+    logger.warn(`⚠️ Online FALLÓ → cae a OFFLINE. status=${status || 'N/A'} msg="${error.message}" body=${body ? JSON.stringify(body) : 'N/A'}`)
 
     // Fallback a validación OFFLINE
     if (config.offline.habilitado) {
       resultado = await validarOffline(valorLeido, tipoLectura)
-      logger.info('✓ Validación OFFLINE aplicada')
+      logger.info(`✓ Validación OFFLINE aplicada — motivo=${resultado.motivo} permitido=${resultado.permitido}`)
     } else {
       // Si no hay modo offline, denegar acceso
       resultado = {
@@ -558,19 +573,36 @@ async function validarOffline(valorLeido, tipoLectura) {
 
   // Validar según tipo
   if (tipo === 'SOCIO') {
-    // El cache server-side ya filtra solo socios cuyo estado tiene
-    // permiteIngresoMolinete=true (o fallback estado='VIGENTE').
-    // Por lo tanto si el socio está en el cache local, puede ingresar.
-    return {
-      permitido: true,
-      motivo: 'SOCIO_VIGENTE',
-      mensaje: `Bienvenido/a ${persona.apellidoNombre}`,
-      tipo: 'SOCIO',
-      persona: {
-        id: persona.id,
-        nombre: persona.apellidoNombre,
-        nroSocio: persona.nroSocio,
-        documento: persona.documento
+    // El cache trae el flag permiteIngresoMolinete por socio. Misma lógica que online:
+    // solo permite si el flag está en true. Sin flag → deniega con NO_VIGENTE.
+    const puedeIngresar = persona.permiteIngresoMolinete === 1 || persona.permiteIngresoMolinete === true
+
+    if (puedeIngresar) {
+      return {
+        permitido: true,
+        motivo: 'SOCIO_VIGENTE',
+        mensaje: `Bienvenido/a ${persona.apellidoNombre}`,
+        tipo: 'SOCIO',
+        persona: {
+          id: persona.id,
+          nombre: persona.apellidoNombre,
+          nroSocio: persona.nroSocio,
+          documento: persona.documento
+        }
+      }
+    } else {
+      const nombreEstado = persona.estadoNombre || persona.estado || 'sin estado'
+      return {
+        permitido: false,
+        motivo: 'NO_VIGENTE',
+        mensaje: `Socio ${nombreEstado} - Diríjase a Secretaría`,
+        tipo: 'SOCIO',
+        persona: {
+          id: persona.id,
+          nombre: persona.apellidoNombre,
+          nroSocio: persona.nroSocio,
+          documento: persona.documento
+        }
       }
     }
   } else if (tipo === 'HABILITACION') {
