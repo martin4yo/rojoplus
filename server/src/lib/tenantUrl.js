@@ -12,6 +12,7 @@ export function getTenantFrontendUrl(tenant) {
     return `https://${tenant.dominioCustom}`
   }
 
-  const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
+  const rawDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
+  const appDomain = rawDomain.replace(/^www\./i, '')
   return `https://${tenant.subdomain}.${appDomain}`
 }

@@ -38,12 +38,12 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
     try {
       setLoading(true)
       const [misActividades, actDisponibles] = await Promise.all([
-        api.get(`/socio/${tokenPortal}/inscripciones`).catch(() => ({ data: [] })),
-        api.get(`/socio/${tokenPortal}/actividades-disponibles`).catch(() => ({ data: [] })),
+        api.get(`/socio/${tokenPortal}/inscripciones`).catch(() => []),
+        api.get(`/socio/${tokenPortal}/actividades-disponibles`).catch(() => []),
       ])
 
-      setInscripciones(misActividades.data || [])
-      setDisponibles(actDisponibles.data || [])
+      setInscripciones(Array.isArray(misActividades) ? misActividades : [])
+      setDisponibles(Array.isArray(actDisponibles) ? actDisponibles : [])
     } catch (err) {
       console.error('Error cargando actividades:', err)
     } finally {
@@ -55,7 +55,7 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
     try {
       setLoadingHistorial(true)
       const res = await api.get(`/socio/${tokenPortal}/historial-asistencia?dias=90`)
-      setHistorial(res.data || [])
+      setHistorial(Array.isArray(res) ? res : (res?.data || []))
     } catch (err) {
       console.error('Error cargando historial de asistencia:', err)
     } finally {
