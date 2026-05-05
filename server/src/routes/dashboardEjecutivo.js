@@ -30,9 +30,17 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     },
   })
 
-  // Socios con inscripciones activas
+  // Socios con inscripciones activas (mismo criterio que inscripcionesActivas:
+  // ya iniciadas y no terminadas).
   const sociosConInscripcion = await req.db.inscripcion.findMany({
-    where: { estado: 'ACTIVA' },
+    where: {
+      estado: 'ACTIVA',
+      fechaInicio: { lte: hoy },
+      OR: [
+        { fechaFin: null },
+        { fechaFin: { gte: hoy } },
+      ],
+    },
     select: { socioId: true },
     distinct: ['socioId'],
   })
@@ -229,9 +237,17 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // ============ SECCIÓN ACTIVIDADES ============
 
-  // Inscripciones activas totales
+  // Inscripciones activas: que ya iniciaron y no terminaron al día de hoy.
+  // Filtramos por fechaInicio <= hoy y (fechaFin null o futura), no por createdAt.
   const inscripcionesActivas = await req.db.inscripcion.count({
-    where: { estado: 'ACTIVA' },
+    where: {
+      estado: 'ACTIVA',
+      fechaInicio: { lte: hoy },
+      OR: [
+        { fechaFin: null },
+        { fechaFin: { gte: hoy } },
+      ],
+    },
   })
 
   // Inscripciones del periodo actual: las que comenzaron este mes calendario
