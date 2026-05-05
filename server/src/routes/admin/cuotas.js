@@ -1295,12 +1295,23 @@ router.post('/pagos/:id/enviar-recibo', authAdmin, asyncHandler(async (req, res)
 }))
 
 // POST /api/admin/pagos - Registrar pago
+// Body: { socioId, cuotaIds, mediosPago?: [{ medioPagoId, cajaId, monto }],
+//         saldosAplicados?: [{ saldoFavorId, monto }], montoRecibido?, observaciones? }
 router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
-  const { socioId, cuotaIds, medioPagoId, cajaId, montoRecibido, observaciones, mediosPago: mediosPagoInput } = req.body
+  const { socioId, cuotaIds, medioPagoId, cajaId, montoRecibido, observaciones,
+          mediosPago: mediosPagoInput, saldosAplicados: saldosInput } = req.body
 
   if (!socioId || !cuotaIds || !cuotaIds.length) {
     throw new AppError('socioId y cuotaIds son requeridos', 400, 'VALIDATION_ERROR')
   }
+
+  // Saldos a favor a aplicar
+  const saldosAplicar = Array.isArray(saldosInput)
+    ? saldosInput
+        .map(s => ({ saldoFavorId: parseInt(s.saldoFavorId), monto: parseFloat(s.monto) }))
+        .filter(s => s.saldoFavorId && s.monto > 0)
+    : []
+  const sumaSaldos = saldosAplicar.reduce((s, x) => s + x.monto, 0)
 
   // Normalizar splits: aceptar array nuevo O par medioPagoId/cajaId legacy
   let splits // [{ medioPagoId, cajaId, monto }]
@@ -1312,8 +1323,11 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     }))
   } else if (medioPagoId && cajaId) {
     splits = [{ medioPagoId: parseInt(medioPagoId), cajaId: parseInt(cajaId), monto: null }] // monto se calcula después
+  } else if (saldosAplicar.length > 0) {
+    // Cobranza 100% con saldo a favor — sin medios de pago en efectivo
+    splits = []
   } else {
-    throw new AppError('Debe indicar al menos un medio de pago y caja', 400, 'VALIDATION_ERROR')
+    throw new AppError('Debe indicar al menos un medio de pago, caja o saldo a favor', 400, 'VALIDATION_ERROR')
   }
 
   // Obtener cuotas a pagar (fuera de transacción para validar)
@@ -1358,13 +1372,35 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   const montoTotal = montoBase + totalRecargo - totalDescuento
   const montoRecibidoNum = parseFloat(montoRecibido) || montoTotal
 
-  // Si el split legacy no tiene monto, asignar el total
-  if (splits[0].monto === null) splits[0].monto = montoTotal
+  // Si el split legacy no tiene monto, asignar el total descontado el saldo aplicado
+  if (splits.length > 0 && splits[0].monto === null) {
+    splits[0].monto = montoTotal - sumaSaldos
+  }
 
-  // Validar que la suma de splits sea consistente (tolerancia de $1 por redondeo)
+  // Validar que (cash + saldos) coincida con el total (tolerancia $1 por redondeo)
   const sumaSplits = splits.reduce((s, sp) => s + sp.monto, 0)
-  if (Math.abs(sumaSplits - montoTotal) > 1) {
-    throw new AppError(`La suma de los medios de pago ($${sumaSplits.toFixed(2)}) no coincide con el total ($${montoTotal.toFixed(2)})`, 400, 'MONTO_INCORRECTO')
+  if (Math.abs((sumaSplits + sumaSaldos) - montoTotal) > 1) {
+    throw new AppError(
+      `La suma de medios de pago ($${sumaSplits.toFixed(2)}) + saldo aplicado ($${sumaSaldos.toFixed(2)}) no coincide con el total ($${montoTotal.toFixed(2)})`,
+      400, 'MONTO_INCORRECTO'
+    )
+  }
+
+  // Validar saldos a favor: existencia, pertenencia al socio, monto disponible
+  if (saldosAplicar.length > 0) {
+    const saldoIds = saldosAplicar.map(s => s.saldoFavorId)
+    const saldosBD = await req.db.saldoFavor.findMany({
+      where: { id: { in: saldoIds }, socioId: parseInt(socioId) }
+    })
+    const saldoMap = Object.fromEntries(saldosBD.map(s => [s.id, s]))
+    for (const s of saldosAplicar) {
+      const sBD = saldoMap[s.saldoFavorId]
+      if (!sBD) throw new AppError(`Saldo a favor #${s.saldoFavorId} no encontrado o no pertenece al socio`, 400, 'SALDO_INVALIDO')
+      const disp = Number(sBD.montoDisponible)
+      if (s.monto > disp + 0.01) {
+        throw new AppError(`Saldo #${s.saldoFavorId} disponible: $${disp.toFixed(2)}, solicitado: $${s.monto.toFixed(2)}`, 400, 'SALDO_INSUFICIENTE')
+      }
+    }
   }
 
   // Obtener cajas y medios de pago para todos los splits
@@ -1372,8 +1408,8 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   const mediosIds = [...new Set(splits.map(s => s.medioPagoId))]
 
   const [cajasData, mediosData] = await Promise.all([
-    req.db.caja.findMany({ where: { id: { in: cajasIds } }, include: { cuentaContable: true } }),
-    req.db.medioPago.findMany({ where: { id: { in: mediosIds } }, include: { conceptoTesoreria: true } }),
+    cajasIds.length ? req.db.caja.findMany({ where: { id: { in: cajasIds } }, include: { cuentaContable: true } }) : [],
+    mediosIds.length ? req.db.medioPago.findMany({ where: { id: { in: mediosIds } }, include: { conceptoTesoreria: true } }) : [],
   ])
 
   const cajaMap = Object.fromEntries(cajasData.map(c => [c.id, c]))
@@ -1387,9 +1423,9 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     if (!caja.cuentaContableId) throw new AppError(`La caja "${caja.nombre}" no tiene cuenta contable configurada`, 400, 'CAJA_SIN_CUENTA_CONTABLE')
   }
 
-  // Usar primera caja/medio como primarios (para Pago.cajaId y Pago.medioPagoId — backwards compat)
-  const caja = cajaMap[splits[0].cajaId]
-  const medioPago = medioMap[splits[0].medioPagoId]
+  // Caja/medio primarios (legacy fields). Cuando es 100% saldo, quedan null.
+  const caja = splits.length > 0 ? cajaMap[splits[0].cajaId] : null
+  const medioPago = splits.length > 0 ? medioMap[splits[0].medioPagoId] : null
 
   // Todo dentro de una transacción
   const pagoCompleto = await req.db.$transaction(async (tx) => {
@@ -1408,7 +1444,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       .reduce((max, n) => Math.max(max, n), 0)
     const nuevoNumero = String(ultimoNumeroValido + 1).padStart(8, '0')
 
-    // Crear pago
+    // Crear pago. medioPagoId/cajaId quedan null cuando se cobra 100% con saldo a favor.
     const pago = await tx.pago.create({
       data: {
         numero: nuevoNumero,
@@ -1417,12 +1453,27 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         montoTotal,
         montoRecibido: montoRecibidoNum,
         montoACuenta: montoRecibidoNum > montoTotal ? montoRecibidoNum - montoTotal : 0,
-        medioPagoId: splits[0].medioPagoId,
-        cajaId: caja.id,
+        medioPagoId: splits.length > 0 ? splits[0].medioPagoId : null,
+        cajaId: splits.length > 0 ? caja.id : null,
         observaciones,
         registradoPor: req.admin.id,
       },
     })
+
+    // Aplicar saldos a favor: crear AplicacionSaldo y decrementar montoDisponible
+    for (const s of saldosAplicar) {
+      await tx.aplicacionSaldo.create({
+        data: {
+          saldoFavorId: s.saldoFavorId,
+          pagoId: pago.id,
+          monto: s.monto,
+        }
+      })
+      await tx.saldoFavor.update({
+        where: { id: s.saldoFavorId },
+        data: { montoDisponible: { decrement: s.monto } }
+      })
+    }
 
     // Actualizar cada cuota con su recargo/descuento y marcar como pagada
     for (const cuota of cuotas) {
@@ -1505,7 +1556,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         cuota.categoriaActividad?.actividad?.conceptoTesoreria?.centroCostoId ??
         cuota.conceptoTesoreria?.centroCostoId ??
         conceptoPorDefecto.centroCostoId ??
-        caja.centroCostoId
+        caja?.centroCostoId
 
       if (!ccEfectivo) {
         throw new AppError(

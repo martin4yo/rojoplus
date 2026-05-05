@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Save, User, Phone, MapPin, Heart, CreditCard, AlertCircle, Users, X, ListPlus
+  ArrowLeft, Save, User, Phone, MapPin, Heart, CreditCard, AlertCircle, Users, X, ListPlus, Wallet
 } from 'lucide-react'
+import SaldoFavorTab from './socio/SaldoFavorTab'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Button } from '../../components/Button'
@@ -500,6 +501,7 @@ export default function SocioForm() {
     { id: 'medico', label: 'Medico', icon: Heart },
     { id: 'debito', label: 'Debito', icon: CreditCard },
     ...(isEditing ? [{ id: 'familia', label: 'Familia', icon: Users }] : []),
+    ...(isEditing ? [{ id: 'saldo', label: 'Saldo a favor', icon: Wallet }] : []),
   ]
 
   if (loading) {
@@ -1409,6 +1411,10 @@ export default function SocioForm() {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === 'saldo' && isEditing && socioData && (
+            <SaldoFavorTab socioId={socioData.id} socioNombre={socioData.apellidoNombre} />
           )}
         </div>
 

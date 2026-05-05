@@ -2054,4 +2054,123 @@ router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
   res.send(buffer)
 }))
 
+// ---------------------------------------------------------------------------
+// SALDO A FAVOR DEL SOCIO
+// ---------------------------------------------------------------------------
+
+// GET /api/admin/socios/:id/saldos-favor
+// Retorna saldos del socio + total disponible + lista de aplicaciones
+router.get('/socios/:id/saldos-favor', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+
+  const saldos = await req.db.saldoFavor.findMany({
+    where: { socioId },
+    orderBy: { fecha: 'desc' },
+    include: {
+      aplicaciones: {
+        orderBy: { fecha: 'desc' },
+        include: { pago: { select: { id: true, numero: true, fecha: true } } }
+      },
+      movimientoCajaEgreso: { select: { id: true, numero: true, fecha: true, monto: true, caja: { select: { nombre: true } } } },
+      pagoOrigen: { select: { id: true, numero: true, fecha: true } }
+    }
+  })
+
+  const totalDisponible = saldos.reduce((sum, s) => sum + Number(s.montoDisponible), 0)
+  const totalOriginal = saldos.reduce((sum, s) => sum + Number(s.montoOriginal), 0)
+  const totalAplicado = totalOriginal - totalDisponible
+
+  res.json({
+    success: true,
+    data: {
+      saldos: saldos.map(s => ({
+        ...s,
+        montoOriginal: Number(s.montoOriginal),
+        montoDisponible: Number(s.montoDisponible),
+        aplicaciones: s.aplicaciones.map(a => ({ ...a, monto: Number(a.monto) }))
+      })),
+      totalDisponible,
+      totalOriginal,
+      totalAplicado,
+    }
+  })
+}))
+
+// POST /api/admin/socios/:id/saldos-favor
+// Crea un nuevo saldo a favor (atención del club, ajuste, etc).
+// Body: { monto, motivo, observaciones?, origen?, movimientoCajaEgresoId? }
+// Si movimientoCajaEgresoId viene, se vincula con el egreso real (el frontend lo crea
+// previamente vía POST /movimientos-caja).
+router.post('/socios/:id/saldos-favor', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const { monto, motivo, observaciones, origen, movimientoCajaEgresoId } = req.body
+
+  const montoNum = parseFloat(monto)
+  if (!montoNum || montoNum <= 0) {
+    throw new AppError('El monto debe ser mayor a 0', 400, 'VALIDATION')
+  }
+  if (!motivo || !motivo.trim()) {
+    throw new AppError('El motivo es requerido', 400, 'VALIDATION')
+  }
+
+  const socio = await req.db.socio.findUnique({ where: { id: socioId } })
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
+
+  // Si viene un egreso, validar que exista, sea EGRESO, no esté anulado y matchee monto + socio
+  if (movimientoCajaEgresoId) {
+    const mov = await req.db.movimientoCaja.findUnique({
+      where: { id: parseInt(movimientoCajaEgresoId) }
+    })
+    if (!mov) throw new AppError('Movimiento de caja no encontrado', 404, 'NOT_FOUND')
+    if (mov.tipo !== 'EGRESO') throw new AppError('El movimiento debe ser un EGRESO', 400, 'VALIDATION')
+    if (mov.anulado) throw new AppError('El movimiento está anulado', 400, 'VALIDATION')
+    if (Math.abs(Number(mov.monto) - montoNum) > 0.01) {
+      throw new AppError(`El monto del saldo ($${montoNum}) no coincide con el del egreso ($${Number(mov.monto)})`, 400, 'VALIDATION')
+    }
+  }
+
+  const saldo = await req.db.saldoFavor.create({
+    data: {
+      socioId,
+      montoOriginal: montoNum,
+      montoDisponible: montoNum,
+      origen: origen || (movimientoCajaEgresoId ? 'DEVOLUCION' : 'ATENCION_CLUB'),
+      motivo: motivo.trim(),
+      observaciones: observaciones?.trim() || null,
+      movimientoCajaEgresoId: movimientoCajaEgresoId ? parseInt(movimientoCajaEgresoId) : null,
+      registradoPor: req.admin.id,
+    },
+    include: {
+      movimientoCajaEgreso: { select: { id: true, numero: true, caja: { select: { nombre: true } } } }
+    }
+  })
+
+  res.status(201).json({
+    success: true,
+    data: {
+      ...saldo,
+      montoOriginal: Number(saldo.montoOriginal),
+      montoDisponible: Number(saldo.montoDisponible),
+    }
+  })
+}))
+
+// DELETE /api/admin/socios/:id/saldos-favor/:saldoId
+// Anula un saldo (siempre que no tenga aplicaciones)
+router.delete('/socios/:id/saldos-favor/:saldoId', authAdmin, asyncHandler(async (req, res) => {
+  const saldoId = parseInt(req.params.saldoId)
+
+  const saldo = await req.db.saldoFavor.findUnique({
+    where: { id: saldoId },
+    include: { aplicaciones: true }
+  })
+  if (!saldo) throw new AppError('Saldo no encontrado', 404, 'NOT_FOUND')
+  if (saldo.aplicaciones.length > 0) {
+    throw new AppError('No se puede anular un saldo que ya fue aplicado a pagos', 400, 'HAS_APPLICATIONS')
+  }
+
+  await req.db.saldoFavor.delete({ where: { id: saldoId } })
+  res.json({ success: true, data: { mensaje: 'Saldo anulado' } })
+}))
+
 export default router

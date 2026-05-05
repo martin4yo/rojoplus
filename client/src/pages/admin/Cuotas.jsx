@@ -57,6 +57,10 @@ export default function Cuotas() {
   const [showPagoModal, setShowPagoModal] = useState(false)
   // splits: [{ medioPagoId, cajaId, monto }]
   const [splits, setSplits] = useState([{ medioPagoId: '', cajaId: '', monto: '' }])
+  // Saldo a favor del socio (lotes ordenados por fecha asc para FIFO)
+  const [saldoSocio, setSaldoSocio] = useState({ totalDisponible: 0, saldos: [] })
+  const [saldoAplicar, setSaldoAplicar] = useState(0)
+  const [aplicarSaldo, setAplicarSaldo] = useState(false)
   const [registrandoPago, setRegistrandoPago] = useState(false)
   const [errorPago, setErrorPago] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -307,6 +311,19 @@ export default function Cuotas() {
       // Seleccionar solo las cuotas PENDIENTES por defecto (para cobrar)
       const pendientes = data.cuotas?.filter(c => c.estado === 'PENDIENTE').map(c => c.id) || []
       setSeleccionadas(pendientes)
+
+      // Cargar saldo a favor del socio (titular del grupo si aplica)
+      const socioIdSaldo = data.titular?.id || socio.id
+      try {
+        const saldoData = await api.get(`/admin/socios/${socioIdSaldo}/saldos-favor`)
+        // Ordenar saldos por fecha asc para distribuir FIFO
+        const saldosOrdenados = [...(saldoData?.saldos || [])]
+          .filter(s => Number(s.montoDisponible) > 0)
+          .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+        setSaldoSocio({ totalDisponible: Number(saldoData?.totalDisponible || 0), saldos: saldosOrdenados })
+      } catch (_) {
+        setSaldoSocio({ totalDisponible: 0, saldos: [] })
+      }
     } catch (err) {
       setError('Error al cargar cuotas para cobranza')
       setModoCobranza(false)
@@ -320,9 +337,39 @@ export default function Cuotas() {
     const primerMedio = mediosPago[0]
     const defaultMedio = primerMedio?.id?.toString() || ''
     const defaultCaja = primerMedio?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
-    setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: total.toFixed(2) }])
+
+    // Si tiene saldo a favor, lo aplicamos por default
+    const usarSaldo = saldoSocio.totalDisponible > 0
+    const saldoUsable = Math.min(saldoSocio.totalDisponible, total)
+    const restante = Math.max(0, total - (usarSaldo ? saldoUsable : 0))
+
+    setAplicarSaldo(usarSaldo)
+    setSaldoAplicar(usarSaldo ? saldoUsable : 0)
+
+    if (restante > 0) {
+      setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: restante.toFixed(2) }])
+    } else {
+      // Cobranza 100% con saldo: sin splits de cash
+      setSplits([])
+    }
     setErrorPago(null)
     setShowPagoModal(true)
+  }
+
+  // Distribuye un monto total a aplicar entre los lotes de saldo del socio (FIFO)
+  function distribuirSaldoFIFO(montoTotal) {
+    let resto = montoTotal
+    const aplicaciones = []
+    for (const s of saldoSocio.saldos) {
+      if (resto <= 0) break
+      const disp = Number(s.montoDisponible)
+      const aplicar = Math.min(disp, resto)
+      if (aplicar > 0) {
+        aplicaciones.push({ saldoFavorId: s.id, monto: Math.round(aplicar * 100) / 100 })
+        resto -= aplicar
+      }
+    }
+    return aplicaciones
   }
 
   function salirModoCobranza() {
@@ -409,6 +456,12 @@ export default function Cuotas() {
 
     const total = calcularTotalSeleccionado().total
     const sumaSplits = splits.reduce((s, sp) => s + (parseFloat(sp.monto) || 0), 0)
+    const saldoAAplicar = aplicarSaldo ? Number(saldoAplicar) || 0 : 0
+
+    if (saldoAAplicar > saldoSocio.totalDisponible + 0.01) {
+      setErrorPago(`Saldo a aplicar ($${saldoAAplicar.toFixed(2)}) excede el disponible ($${saldoSocio.totalDisponible.toFixed(2)})`)
+      return
+    }
 
     for (const sp of splits) {
       if (!sp.medioPagoId || !sp.cajaId || !sp.monto) {
@@ -416,8 +469,10 @@ export default function Cuotas() {
         return
       }
     }
-    if (Math.abs(sumaSplits - total) > 1) {
-      setErrorPago(`La suma de los medios de pago ($${sumaSplits.toFixed(2)}) debe ser igual al total ($${total.toFixed(2)})`)
+    if (Math.abs((sumaSplits + saldoAAplicar) - total) > 1) {
+      setErrorPago(
+        `La suma de medios de pago ($${sumaSplits.toFixed(2)}) + saldo aplicado ($${saldoAAplicar.toFixed(2)}) debe ser igual al total ($${total.toFixed(2)})`
+      )
       return
     }
 
@@ -439,6 +494,7 @@ export default function Cuotas() {
           cajaId: parseInt(sp.cajaId),
           monto: parseFloat(sp.monto),
         })),
+        saldosAplicados: saldoAAplicar > 0 ? distribuirSaldoFIFO(saldoAAplicar) : [],
       })
       setNumeroRecibo(result.numero)
       setPagoId(result.id)
@@ -826,7 +882,8 @@ export default function Cuotas() {
           {(() => {
             const totalAPagar = calcularTotalSeleccionado().total
             const sumaSplits = splits.reduce((s, sp) => s + (parseFloat(sp.monto) || 0), 0)
-            const diferencia = Math.round((totalAPagar - sumaSplits) * 100) / 100
+            const saldoAAplicar = aplicarSaldo ? Number(saldoAplicar) || 0 : 0
+            const diferencia = Math.round((totalAPagar - sumaSplits - saldoAAplicar) * 100) / 100
 
             function updateSplit(idx, field, value) {
               setSplits(prev => prev.map((sp, i) => {
@@ -873,6 +930,78 @@ export default function Cuotas() {
                   )}
                   <p className="text-xs text-gray-400 mt-1">{seleccionadas.length} ítem{seleccionadas.length > 1 ? 's' : ''}</p>
                 </div>
+
+                {/* Saldo a favor del socio (si tiene) */}
+                {saldoSocio.totalDisponible > 0 && (
+                  <div className="border border-emerald-200 bg-emerald-50 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={aplicarSaldo}
+                          onChange={(e) => {
+                            const on = e.target.checked
+                            setAplicarSaldo(on)
+                            if (on) {
+                              const usable = Math.min(saldoSocio.totalDisponible, totalAPagar)
+                              setSaldoAplicar(usable)
+                              const restante = Math.max(0, totalAPagar - usable)
+                              if (restante === 0) setSplits([])
+                              else if (splits.length === 0) {
+                                const dm = mediosPago[0]?.id?.toString() || ''
+                                const dc = mediosPago[0]?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
+                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: restante.toFixed(2) }])
+                              } else {
+                                setSplits(prev => prev.map((sp, i) => i === 0 ? { ...sp, monto: restante.toFixed(2) } : sp))
+                              }
+                            } else {
+                              setSaldoAplicar(0)
+                              if (splits.length === 0) {
+                                const dm = mediosPago[0]?.id?.toString() || ''
+                                const dc = mediosPago[0]?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
+                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: totalAPagar.toFixed(2) }])
+                              } else {
+                                setSplits(prev => prev.map((sp, i) => i === 0 ? { ...sp, monto: totalAPagar.toFixed(2) } : sp))
+                              }
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-emerald-800">Aplicar saldo a favor</p>
+                          <p className="text-xs text-emerald-700">Disponible: {formatCurrency(saldoSocio.totalDisponible)}</p>
+                        </div>
+                      </label>
+                      {aplicarSaldo && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-emerald-700">Aplicar:</span>
+                          <input
+                            type="number"
+                            value={saldoAplicar}
+                            min="0"
+                            max={Math.min(saldoSocio.totalDisponible, totalAPagar)}
+                            step="0.01"
+                            onChange={(e) => {
+                              const v = Math.max(0, Math.min(parseFloat(e.target.value) || 0, saldoSocio.totalDisponible, totalAPagar))
+                              setSaldoAplicar(v)
+                              const restante = Math.max(0, totalAPagar - v)
+                              if (restante === 0) {
+                                setSplits([])
+                              } else if (splits.length === 0) {
+                                const dm = mediosPago[0]?.id?.toString() || ''
+                                const dc = mediosPago[0]?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
+                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: restante.toFixed(2) }])
+                              } else {
+                                setSplits(prev => prev.map((sp, i) => i === 0 ? { ...sp, monto: restante.toFixed(2) } : sp))
+                              }
+                            }}
+                            className="w-28 input-field text-sm text-right"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Splits de medios de pago */}
                 <div>

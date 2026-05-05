@@ -695,8 +695,10 @@
     // Un timeout entre teclas descarta escritura humana (muy lenta).
     const TECLADO_TIMEOUT_MS = 80   // tiempo máx entre teclas (humano ~150-300ms, lector <20ms)
     const TECLADO_MIN_LARGO = 4     // largo mínimo para considerar lectura válida
+    const TECLADO_FLUSH_INACT_MS = 200  // si no llega tecla por X ms y hay buffer, flush
     let tecladoBuffer = ''
     let tecladoUltimaTecla = 0
+    let tecladoFlushTimer = null
 
     async function enviarLecturaTeclado(valorLeido) {
       try {
@@ -707,6 +709,19 @@
         })
       } catch (error) {
         console.error('Error enviando lectura:', error)
+      }
+    }
+
+    function flushBufferTeclado(motivo) {
+      const valor = tecladoBuffer
+      tecladoBuffer = ''
+      if (tecladoFlushTimer) { clearTimeout(tecladoFlushTimer); tecladoFlushTimer = null }
+      console.log('[lector] flush (' + motivo + '). Valor="' + valor + '" largo=' + valor.length)
+      if (valor.length >= TECLADO_MIN_LARGO) {
+        console.log('[lector] ENVIANDO al backend:', valor)
+        enviarLecturaTeclado(valor)
+      } else {
+        console.log('[lector] DESCARTADO (muy corto, min=' + TECLADO_MIN_LARGO + ')')
       }
     }
 
@@ -732,21 +747,21 @@
 
       // Fin de lectura: Enter o Tab
       if (e.key === 'Enter' || e.key === 'Tab') {
-        const valor = tecladoBuffer
-        tecladoBuffer = ''
-        console.log('[lector] fin de lectura. Valor="' + valor + '" largo=' + valor.length)
-        if (valor.length >= TECLADO_MIN_LARGO) {
-          console.log('[lector] ENVIANDO al backend:', valor)
-          enviarLecturaTeclado(valor)
-        } else {
-          console.log('[lector] DESCARTADO (muy corto, min=' + TECLADO_MIN_LARGO + ')')
-        }
+        flushBufferTeclado('Enter/Tab')
         return
       }
 
       // Acumular solo caracteres imprimibles (length 1 filtra Shift, Ctrl, F-keys, etc)
       if (e.key.length === 1) {
         tecladoBuffer += e.key
+
+        // Programar flush por inactividad: si el scanner NO emite Enter al final
+        // (algunos scanners de QR sin terminator configurado), igual descargamos
+        // el buffer cuando no llega ninguna tecla nueva por TECLADO_FLUSH_INACT_MS.
+        if (tecladoFlushTimer) clearTimeout(tecladoFlushTimer)
+        tecladoFlushTimer = setTimeout(() => {
+          if (tecladoBuffer.length > 0) flushBufferTeclado('inactividad')
+        }, TECLADO_FLUSH_INACT_MS)
       }
     })
     console.log('[lector] capturador de teclado activo. Escaneá un código para probar.')

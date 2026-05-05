@@ -766,8 +766,8 @@ model Pago {
   montoTotal        Decimal              @map("monto_total") @db.Decimal(12, 2)
   montoRecibido     Decimal              @map("monto_recibido") @db.Decimal(12, 2)
   montoACuenta      Decimal              @default(0) @map("monto_a_cuenta") @db.Decimal(12, 2)
-  medioPagoId       Int                  @map("medio_pago_id")
-  cajaId            Int                  @map("caja_id")
+  medioPagoId       Int?                 @map("medio_pago_id")
+  cajaId            Int?                 @map("caja_id")
   cobradorId        Int?                 @map("cobrador_id")
   centroCostoId     Int?                 @map("centro_costo_id")
   bancoOrigen       String?              @map("banco_origen")
@@ -792,11 +792,11 @@ model Pago {
   cargos            Cargo[]
   movimientos       MovimientoCaja[]
   mediosPago        PagoMedioPago[]
-  caja              Caja                 @relation(fields: [cajaId], references: [id])
+  caja              Caja?                @relation(fields: [cajaId], references: [id])
   centroCosto       CentroCosto?         @relation(fields: [centroCostoId], references: [id])
   cobrador          Cobrador?            @relation(fields: [cobradorId], references: [id])
   linkPago          LinkPago?            @relation(fields: [linkPagoId], references: [id])
-  medioPago         MedioPago            @relation(fields: [medioPagoId], references: [id])
+  medioPago         MedioPago?           @relation(fields: [medioPagoId], references: [id])
   socio             Socio                @relation(fields: [socioId], references: [id])
   saldosGenerados   SaldoFavor[]         @relation("SaldoOrigen")
 
@@ -834,14 +834,18 @@ model SaldoFavor {
   grupo_familiar_id Int?
   montoOriginal     Decimal           @map("monto_original") @db.Decimal(12, 2)
   montoDisponible   Decimal           @map("monto_disponible") @db.Decimal(12, 2)
-  origen            String
+  origen            String            // PAGO_PARCIAL | DEVOLUCION | AJUSTE | ATENCION_CLUB | ANULACION_PAGO
   pagoOrigenId      Int?              @map("pago_origen_id")
+  movimientoCajaEgresoId Int?         @map("movimiento_caja_egreso_id")  // si la atención generó salida real de caja
+  motivo            String?           // motivo corto del crédito
   fecha             DateTime          @default(now())
   observaciones     String?
+  registradoPor     Int?              @map("registrado_por")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
   aplicaciones      AplicacionSaldo[]
   pagoOrigen        Pago?             @relation("SaldoOrigen", fields: [pagoOrigenId], references: [id])
+  movimientoCajaEgreso MovimientoCaja? @relation("SaldoEgresoCaja", fields: [movimientoCajaEgresoId], references: [id])
   socio             Socio?            @relation(fields: [socioId], references: [id])
 
   tenantId Int @map("tenant_id")
@@ -1229,6 +1233,7 @@ model MovimientoCaja {
   ventasQRPendientes      VentaEventoQRPendiente[]
   items                   ItemMovimientoCaja[]
   mediosPago              MedioPagoMovimientoCaja[]
+  saldosFavorOrigen       SaldoFavor[]              @relation("SaldoEgresoCaja")
 
   tenantId Int @map("tenant_id")
 
