@@ -262,7 +262,7 @@ router.get('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/estados-socio
 router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, descripcion, color, permiteDescuentos, orden } = req.body
+  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, orden } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
@@ -278,6 +278,7 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
       descripcion,
       color,
       permiteDescuentos: permiteDescuentos || false,
+      permiteIngresoMolinete: permiteIngresoMolinete || false,
       orden: orden || 0,
     },
   })
@@ -288,7 +289,7 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/estados-socio/:id
 router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, color, permiteDescuentos, orden, activo } = req.body
+  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, orden, activo } = req.body
 
   const existente = await req.db.estadoSocio.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
@@ -306,6 +307,7 @@ router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
       descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
       color: color !== undefined ? color : existente.color,
       permiteDescuentos: permiteDescuentos !== undefined ? permiteDescuentos : existente.permiteDescuentos,
+      permiteIngresoMolinete: permiteIngresoMolinete !== undefined ? permiteIngresoMolinete : existente.permiteIngresoMolinete,
       orden: orden !== undefined ? orden : existente.orden,
       activo: activo !== undefined ? activo : existente.activo,
     },

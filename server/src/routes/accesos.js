@@ -132,10 +132,20 @@ router.post('/validar', authDispositivo, async (req, res) => {
           documento: true,
           estado: true,
           rfidUid: true,
-          tokenPortal: true
+          tokenPortal: true,
+          estadoSocioRel: { select: { permiteIngresoMolinete: true, nombre: true } }
         }
       })
       tipo = 'SOCIO'
+    }
+
+    // Para QR/DNI también traemos la relación de estado para chequear flag de molinete
+    if (tipo === 'SOCIO' && persona && !persona.estadoSocioRel) {
+      const completo = await req.db.socio.findUnique({
+        where: { id: persona.id },
+        select: { estadoSocioRel: { select: { permiteIngresoMolinete: true, nombre: true } } }
+      })
+      persona.estadoSocioRel = completo?.estadoSocioRel || null
     }
 
     // 2. Si no se encontró ni persona ni entrada
@@ -202,15 +212,22 @@ router.post('/validar', authDispositivo, async (req, res) => {
       }
     } else
     if (tipo === 'SOCIO') {
-      // Validar estado VIGENTE
-      if (persona.estado === 'VIGENTE') {
+      // La FK al estado es fuente de verdad: el flag permiteIngresoMolinete decide.
+      // Fallback a estado === 'VIGENTE' si todavía no se completó la FK.
+      const flagFK = persona.estadoSocioRel?.permiteIngresoMolinete
+      const puedeIngresar = flagFK !== undefined && flagFK !== null
+        ? flagFK
+        : persona.estado === 'VIGENTE'
+
+      if (puedeIngresar) {
         permitido = true
         motivo = 'SOCIO_VIGENTE'
         mensaje = `Bienvenido/a ${persona.apellidoNombre}`
       } else {
         permitido = false
         motivo = 'NO_VIGENTE'
-        mensaje = `Socio ${persona.estado} - Diríjase a Secretaría`
+        const nombreEstado = persona.estadoSocioRel?.nombre || persona.estado
+        mensaje = `Socio ${nombreEstado} - Diríjase a Secretaría`
       }
     } else if (tipo === 'HABILITACION') {
       const ahora = new Date()
@@ -398,10 +415,14 @@ router.get('/cache-socios', authDispositivo, async (req, res) => {
       }).catch(() => {}) // Ignorar si no existe
     }
 
-    // Obtener socios VIGENTES
+    // Solo socios cuyo estado tiene permiteIngresoMolinete = true (FK como fuente de verdad).
+    // Para estados sin FK todavía completada, fallback a string 'VIGENTE'.
     const socios = await req.db.socio.findMany({
       where: {
-        estado: 'VIGENTE'
+        OR: [
+          { estadoSocioRel: { permiteIngresoMolinete: true } },
+          { AND: [{ estadoSocioId: null }, { estado: 'VIGENTE' }] }
+        ]
       },
       select: {
         id: true,

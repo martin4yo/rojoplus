@@ -6,6 +6,7 @@ import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import SelectCentroCosto from '../../components/SelectCentroCosto'
+import Switch from '../../components/Switch'
 
 const COLORES = [
   { value: 'green', label: 'Verde', class: 'bg-green-100 text-green-800' },
@@ -67,6 +68,7 @@ export default function ConfiguracionForm() {
     porcentajeDescuento: 0,
     // estados-socio
     permiteDescuentos: true,
+    permiteIngresoMolinete: false,
     // conceptos-tesoreria
     tipo: 'INGRESO',
     usaEnCompras: false,
@@ -135,6 +137,7 @@ export default function ConfiguracionForm() {
         cuotaMensual: data.cuotaMensual || '',
         porcentajeDescuento: data.porcentajeDescuento || 0,
         permiteDescuentos: data.permiteDescuentos !== false,
+        permiteIngresoMolinete: data.permiteIngresoMolinete === true,
         // conceptos-tesoreria
         tipo: data.tipo || 'INGRESO',
         usaEnCompras: data.usaEnCompras || false,
@@ -189,6 +192,7 @@ export default function ConfiguracionForm() {
       if (tabla === 'estados-socio') {
         datos.color = form.color
         datos.permiteDescuentos = form.permiteDescuentos
+        datos.permiteIngresoMolinete = form.permiteIngresoMolinete
       }
 
       if (tabla === 'categorias-cargo') {
@@ -677,17 +681,25 @@ export default function ConfiguracionForm() {
 
           {/* Campos específicos para estados-socio */}
           {tabla === 'estados-socio' && (
-            <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
-              <input
-                type="checkbox"
-                id="permiteDescuentos"
-                checked={form.permiteDescuentos}
-                onChange={e => setForm({ ...form, permiteDescuentos: e.target.checked })}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor="permiteDescuentos" className="text-sm text-green-800">
-                Permite usar descuentos en comercios (Clubix)
-              </label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                <label className="text-sm text-green-800">
+                  Permite usar descuentos en comercios (Clubix)
+                </label>
+                <Switch
+                  checked={form.permiteDescuentos}
+                  onChange={(v) => setForm({ ...form, permiteDescuentos: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <label className="text-sm text-blue-800">
+                  Permite ingresar por molinete (control de accesos)
+                </label>
+                <Switch
+                  checked={form.permiteIngresoMolinete}
+                  onChange={(v) => setForm({ ...form, permiteIngresoMolinete: v })}
+                />
+              </div>
             </div>
           )}
 

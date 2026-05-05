@@ -206,6 +206,7 @@ model EstadoSocio {
   descripcion       String?
   color             String?
   permiteDescuentos Boolean  @default(false) @map("permite_descuentos")
+  permiteIngresoMolinete Boolean @default(false) @map("permite_ingreso_molinete")
   orden             Int      @default(0)
   activo            Boolean  @default(true)
   createdAt         DateTime @default(now()) @map("created_at")

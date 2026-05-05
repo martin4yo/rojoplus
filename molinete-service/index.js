@@ -340,35 +340,66 @@ function handleUSBData(valorLeido) {
   // Código de barras PDF417 del DNI argentino (largo, campos separados por @)
   else if (valorLeido.includes('@') || valorLeido.length > 20) {
     tipoLectura = 'DNI'
-    // Formato PDF417 DNI argentino: APELLIDO@NOMBRE@NOMBRE2@DNI@D@FECHA@SEXO@NACION@TRAMITE
-    // (NOMBRE2 solo aparece si la persona tiene segundo nombre — puede no estar)
-    const partes = valorLeido.split('@')
-    if (partes.length >= 4) {
-      // Buscar el índice del DNI (primer grupo de 7-8 dígitos)
-      let dniIndex = -1
-      for (let i = 0; i < partes.length; i++) {
-        const limpio = partes[i].replace(/\D/g, '')
-        if (/^\d{7,8}$/.test(limpio)) {
-          dniIndex = i
-          break
-        }
-      }
-      if (dniIndex > 0) {
-        const apellido = (partes[0] || '').trim()
-        const nombres = partes.slice(1, dniIndex).map(p => p.trim()).filter(Boolean).join(' ')
-        if (apellido || nombres) {
-          nombreCompleto = `${apellido}${apellido && nombres ? ', ' : ''}${nombres}`.trim()
-        }
-        valorLeido = partes[dniIndex].replace(/\D/g, '')
-      }
-    } else {
-      // Fallback: primer grupo de 7-8 dígitos
-      const match = valorLeido.match(/\b\d{7,8}\b/)
-      if (match) valorLeido = match[0]
-    }
+    const parsed = parsearDniArgentino(valorLeido)
+    valorLeido = parsed.valor
+    nombreCompleto = parsed.nombreCompleto
   }
 
   procesarLectura(valorLeido, tipoLectura, { nombreCompleto })
+}
+
+/**
+ * Parser de DNI argentino PDF417.
+ *
+ * Formato real (DNI tarjeta moderno):
+ *   numTramite@APELLIDO@NOMBRES@SEXO@nroDNI@ejemplar@fechaNac@fechaEmision[@CUIL]
+ *
+ * El campo 0 es el número de trámite (10-11 dígitos), NO el apellido — bug histórico.
+ * También hay variantes con campo 0 vacío o con orden distinto. La heurística:
+ *   - DNI = primer campo con 7-8 dígitos puros
+ *   - apellido = primer campo de TEXTO (>1 char, no puramente numérico) antes del DNI
+ *   - nombres = siguientes campos de texto antes del DNI
+ *   - se ignoran campos de 1 char (sexo) y puramente numéricos (numTramite, ejemplar)
+ */
+function parsearDniArgentino(raw) {
+  const result = { valor: raw, nombreCompleto: null }
+  const partes = raw.split('@').map(p => (p || '').trim())
+
+  let idxDni = -1
+  for (let i = 0; i < partes.length; i++) {
+    if (/^\d{7,8}$/.test(partes[i])) {
+      idxDni = i
+      break
+    }
+  }
+
+  if (idxDni < 0) {
+    // Sin DNI claro: fallback a primer 7-8 dígitos en cualquier parte
+    const m = raw.match(/\b\d{7,8}\b/)
+    if (m) result.valor = m[0]
+    logger.info(`[DNI parser] sin idxDni — partes=${JSON.stringify(partes)}`)
+    return result
+  }
+
+  result.valor = partes[idxDni]
+
+  const camposTexto = []
+  for (let i = 0; i < idxDni; i++) {
+    const p = partes[i]
+    if (!p) continue                 // vacío
+    if (/^\d+$/.test(p)) continue    // puramente numérico (numTramite)
+    if (p.length === 1) continue     // sexo M/F u otra letra suelta
+    camposTexto.push(p)
+  }
+
+  if (camposTexto.length >= 1) {
+    const apellido = camposTexto[0]
+    const nombres = camposTexto.slice(1).join(' ')
+    result.nombreCompleto = nombres ? `${apellido}, ${nombres}` : apellido
+  }
+
+  logger.info(`[DNI parser] idxDni=${idxDni} dni=${result.valor} nombre="${result.nombreCompleto || ''}" partes=${JSON.stringify(partes)}`)
+  return result
 }
 
 /**
@@ -526,30 +557,19 @@ async function validarOffline(valorLeido, tipoLectura) {
 
   // Validar según tipo
   if (tipo === 'SOCIO') {
-    if (persona.estado === 'VIGENTE') {
-      return {
-        permitido: true,
-        motivo: 'SOCIO_VIGENTE',
-        mensaje: `Bienvenido/a ${persona.apellidoNombre}`,
-        tipo: 'SOCIO',
-        persona: {
-          id: persona.id,
-          nombre: persona.apellidoNombre,
-          nroSocio: persona.nroSocio,
-          documento: persona.documento
-        }
-      }
-    } else {
-      return {
-        permitido: false,
-        motivo: 'NO_VIGENTE',
-        mensaje: `Socio ${persona.estado} - Diríjase a Secretaría`,
-        tipo: 'SOCIO',
-        persona: {
-          id: persona.id,
-          nombre: persona.apellidoNombre,
-          nroSocio: persona.nroSocio
-        }
+    // El cache server-side ya filtra solo socios cuyo estado tiene
+    // permiteIngresoMolinete=true (o fallback estado='VIGENTE').
+    // Por lo tanto si el socio está en el cache local, puede ingresar.
+    return {
+      permitido: true,
+      motivo: 'SOCIO_VIGENTE',
+      mensaje: `Bienvenido/a ${persona.apellidoNombre}`,
+      tipo: 'SOCIO',
+      persona: {
+        id: persona.id,
+        nombre: persona.apellidoNombre,
+        nroSocio: persona.nroSocio,
+        documento: persona.documento
       }
     }
   } else if (tipo === 'HABILITACION') {
