@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 export default function MisActividadesSocio({ socio, tokenPortal }) {
+  const esMiembroFamilia = !!socio?.titularFamiliaId
   const { confirm, ConfirmDialog } = useConfirm()
   const [inscripciones, setInscripciones] = useState([])
   const [disponibles, setDisponibles] = useState([])
@@ -155,23 +156,24 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900">{insc.actividad}</h3>
-                      <p className="text-gray-600 mt-1">{insc.categoria}</p>
+                      <h3 className="text-xl font-bold" style={{ color: 'var(--text)' }}>{insc.actividad}</h3>
+                      <p className="mt-1" style={{ color: 'var(--text-dim)' }}>{insc.categoria}</p>
                       <div className="flex items-center space-x-2 mt-2">
                         <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                          className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
+                          style={
                             insc.estado === 'ACTIVA'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
+                              ? { backgroundColor: 'var(--accent-soft)', color: 'var(--color-primary)' }
+                              : { backgroundColor: 'var(--bg-surface)', color: 'var(--text-dim)' }
+                          }
                         >
                           {insc.estado}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="bg-red-100 rounded-lg p-3">
-                        <TrophyIcon className="h-8 w-8 text-red-600" />
+                      <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--accent-soft)' }}>
+                        <TrophyIcon className="h-8 w-8" style={{ color: 'var(--color-primary)' }} />
                       </div>
                     </div>
                   </div>
@@ -180,30 +182,30 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     {insc.entrenador && (
                       <div className="flex items-start space-x-3">
-                        <UserGroupIcon className="h-5 w-5 text-gray-400 mt-0.5" />
+                        <UserGroupIcon className="h-5 w-5 mt-0.5" style={{ color: 'var(--text-dim)' }} />
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Entrenador</p>
-                          <p className="text-base text-gray-900">{insc.entrenador}</p>
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-dim)' }}>Entrenador</p>
+                          <p className="text-base" style={{ color: 'var(--text)' }}>{insc.entrenador}</p>
                         </div>
                       </div>
                     )}
 
                     {insc.horarios && (
                       <div className="flex items-start space-x-3">
-                        <ClockIcon className="h-5 w-5 text-gray-400 mt-0.5" />
+                        <ClockIcon className="h-5 w-5 mt-0.5" style={{ color: 'var(--text-dim)' }} />
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Horarios</p>
-                          <p className="text-base text-gray-900">{insc.horarios}</p>
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-dim)' }}>Horarios</p>
+                          <p className="text-base" style={{ color: 'var(--text)' }}>{insc.horarios}</p>
                         </div>
                       </div>
                     )}
 
                     {insc.cuotaMensual && (
                       <div className="flex items-start space-x-3">
-                        <CalendarIcon className="h-5 w-5 text-gray-400 mt-0.5" />
+                        <CalendarIcon className="h-5 w-5 mt-0.5" style={{ color: 'var(--text-dim)' }} />
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Cuota mensual</p>
-                          <p className="text-base text-gray-900">
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-dim)' }}>Cuota mensual</p>
+                          <p className="text-base" style={{ color: 'var(--text)' }}>
                             ${parseFloat(insc.cuotaMensual).toLocaleString('es-AR')}
                           </p>
                         </div>
@@ -211,16 +213,27 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
                     )}
                   </div>
 
+                  {esMiembroFamilia && (
+                    <div
+                      className="mt-4 p-3 rounded-lg text-sm"
+                      style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
+                    >
+                      El pago lo gestiona el titular del grupo familiar.
+                    </div>
+                  )}
+
                   {/* Botones de acción */}
                   <div className="mt-6 flex items-center justify-end space-x-3">
                     <button
                       onClick={() => darDeBaja(insc.id)}
-                      className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
+                      className="px-4 py-2 rounded-lg transition-colors font-medium"
+                      style={{ color: 'var(--text-dim)' }}
                     >
                       Darme de baja
                     </button>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                      Ver horarios
+                    <button className="pub-cta inline-flex">
+                      <ClockIcon className="h-5 w-5" />
+                      <span>Ver horarios</span>
                     </button>
                   </div>
                 </div>
@@ -246,14 +259,14 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900">{act.actividad}</h3>
-                      <p className="text-gray-600 mt-1">{act.categoria}</p>
+                      <h3 className="text-xl font-bold" style={{ color: 'var(--text)' }}>{act.actividad}</h3>
+                      <p className="mt-1" style={{ color: 'var(--text-dim)' }}>{act.categoria}</p>
                       {act.descripcion && (
-                        <p className="text-sm text-gray-500 mt-2">{act.descripcion}</p>
+                        <p className="text-sm mt-2" style={{ color: 'var(--text-dim)' }}>{act.descripcion}</p>
                       )}
                     </div>
-                    <div className="bg-blue-100 rounded-lg p-3">
-                      <TrophyIcon className="h-8 w-8 text-blue-600" />
+                    <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--accent-soft)' }}>
+                      <TrophyIcon className="h-8 w-8" style={{ color: 'var(--color-primary)' }} />
                     </div>
                   </div>
 
@@ -261,20 +274,20 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     {act.entrenador && (
                       <div className="flex items-start space-x-3">
-                        <UserGroupIcon className="h-5 w-5 text-gray-400 mt-0.5" />
+                        <UserGroupIcon className="h-5 w-5 mt-0.5" style={{ color: 'var(--text-dim)' }} />
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Entrenador</p>
-                          <p className="text-base text-gray-900">{act.entrenador}</p>
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-dim)' }}>Entrenador</p>
+                          <p className="text-base" style={{ color: 'var(--text)' }}>{act.entrenador}</p>
                         </div>
                       </div>
                     )}
 
                     {act.cuposDisponibles !== undefined && (
                       <div className="flex items-start space-x-3">
-                        <UserGroupIcon className="h-5 w-5 text-gray-400 mt-0.5" />
+                        <UserGroupIcon className="h-5 w-5 mt-0.5" style={{ color: 'var(--text-dim)' }} />
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Cupos</p>
-                          <p className="text-base text-gray-900">
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-dim)' }}>Cupos</p>
+                          <p className="text-base" style={{ color: 'var(--text)' }}>
                             {act.cuposDisponibles} disponibles
                           </p>
                         </div>
@@ -283,10 +296,10 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
 
                     {act.cuotaMensual && (
                       <div className="flex items-start space-x-3">
-                        <CalendarIcon className="h-5 w-5 text-gray-400 mt-0.5" />
+                        <CalendarIcon className="h-5 w-5 mt-0.5" style={{ color: 'var(--text-dim)' }} />
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Cuota mensual</p>
-                          <p className="text-base text-gray-900">
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-dim)' }}>Cuota mensual</p>
+                          <p className="text-base" style={{ color: 'var(--text)' }}>
                             ${parseFloat(act.cuotaMensual).toLocaleString('es-AR')}
                           </p>
                         </div>
@@ -298,10 +311,10 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
                   <div className="mt-6">
                     <button
                       onClick={() => inscribirseEnActividad(act.id)}
-                      className="w-full inline-flex items-center justify-center px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
+                      className="pub-cta w-full justify-center"
                     >
-                      <PlusCircleIcon className="h-5 w-5 mr-2" />
-                      Inscribirme
+                      <PlusCircleIcon className="h-5 w-5" />
+                      <span>Inscribirme</span>
                     </button>
                   </div>
                 </div>
