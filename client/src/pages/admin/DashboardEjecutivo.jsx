@@ -468,8 +468,9 @@ export default function DashboardEjecutivo() {
               color="red"
             />
             <KPICard
-              title="Inscripciones"
-              value={formatNumber(actividades.inscripcionesActivas)}
+              title="Inscripciones del mes"
+              value={formatNumber(actividades.inscripcionesPeriodo ?? actividades.inscripcionesActivas)}
+              subtitle="Iniciadas este mes"
               icon={Activity}
               color="purple"
               trend={actividades.tendenciaInscripciones > 0 ? 'up' : actividades.tendenciaInscripciones < 0 ? 'down' : undefined}

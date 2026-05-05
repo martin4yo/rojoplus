@@ -234,6 +234,15 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     where: { estado: 'ACTIVA' },
   })
 
+  // Inscripciones del periodo actual: las que comenzaron este mes calendario
+  // (filtrado por fechaInicio, no por createdAt). Card "Inscripciones" en General.
+  const inscripcionesPeriodo = await req.db.inscripcion.count({
+    where: {
+      estado: 'ACTIVA',
+      fechaInicio: { gte: inicioMesActual, lte: finMesActual },
+    },
+  })
+
   // Inscripciones por actividad (top 5) — agrupado por Actividad (sumando todas sus categorías)
   const inscripcionesPorCategoria = await req.db.inscripcion.groupBy({
     by: ['categoriaActividadId'],
@@ -676,6 +685,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
       // Sección Actividades
       actividades: {
         inscripcionesActivas,
+        inscripcionesPeriodo,
         top5Actividades,
         tendenciaInscripciones,
         ocupacionActividades,
