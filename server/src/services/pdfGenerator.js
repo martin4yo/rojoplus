@@ -1036,6 +1036,7 @@ export async function generarReciboPagoPDF(pago, adminNombre = '', configMap = {
       const socio  = pago.socio || {}
       const cargos = pago.cargos || []
       const mediosPago = pago.mediosPago || []
+      const saldosAplicados = pago.saldosAplicados || []
 
       // Construir dirección del socio
       const domParts = [socio.domicilio || socio.calle, socio.ciudad].filter(Boolean)
@@ -1169,7 +1170,8 @@ export async function generarReciboPagoPDF(pago, adminNombre = '', configMap = {
       // ─────────────────────────────────────────────────────
       const HDR_ROW_H = 16
       const ROW_H     = 14
-      const numRows   = Math.max(cargos.length, mediosPago.length > 0 ? mediosPago.length : 1, 1)
+      const totalFilasDerecha = mediosPago.length + saldosAplicados.length
+      const numRows   = Math.max(cargos.length, totalFilasDerecha > 0 ? totalFilasDerecha : 1, 1)
       // Máximo disponible en la página para que el footer no se salga
       const PAGE_H    = doc.page.height
       const MAX_TBL_H = PAGE_H - MG - SEC2_BOT - 40 - 35  // footer + subfooter + margen
@@ -1266,12 +1268,28 @@ export async function generarReciboPagoPDF(pago, adminNombre = '', configMap = {
           doc.text(monto, divTblX + 4 + rcFormaPago + rcLeyenda, rowYR, { width: rcImporte - IMP_PAD, align: 'right', lineBreak: false })
           rowYR += ROW_H
         })
-      } else if (pago.medioPago) {
-        // Fallback si no hay mediosPago[]
+      } else if (pago.medioPago && saldosAplicados.length === 0) {
+        // Fallback si no hay mediosPago[] y tampoco saldos (cobranzas viejas)
         const formaPago = pago.medioPago?.nombre || '-'
         doc.text(formaPago, divTblX + 4, rowYR, { width: rcFormaPago - 4, lineBreak: false })
         doc.text(leyendaBase, divTblX + 4 + rcFormaPago, rowYR, { width: rcLeyenda - 4, ellipsis: true, lineBreak: false })
         doc.text(`$ ${montoStr}`, divTblX + 4 + rcFormaPago + rcLeyenda, rowYR, { width: rcImporte - IMP_PAD, align: 'right', lineBreak: false })
+      }
+
+      // Filas de saldo a favor aplicado — con gap respecto al bloque anterior para no encimar
+      if (saldosAplicados.length > 0) {
+        const SALDO_ROW_H = ROW_H + 4  // un poco más de aire para estas filas
+        if (mediosPago.length > 0 || pago.medioPago) rowYR += 4  // separación visual entre cash y saldo
+        saldosAplicados.forEach(ap => {
+          const monto = `$ ${Number(ap.monto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+          const leyenda = ap.saldoFavor?.motivo
+            ? `Saldo a favor: ${ap.saldoFavor.motivo}`
+            : 'Saldo a favor del socio'
+          doc.text('Saldo a favor', divTblX + 4, rowYR, { width: rcFormaPago - 4, lineBreak: false })
+          doc.text(leyenda, divTblX + 4 + rcFormaPago, rowYR, { width: rcLeyenda - 4, ellipsis: true, lineBreak: false })
+          doc.text(monto, divTblX + 4 + rcFormaPago + rcLeyenda, rowYR, { width: rcImporte - IMP_PAD, align: 'right', lineBreak: false })
+          rowYR += SALDO_ROW_H
+        })
       }
 
       // ─────────────────────────────────────────────────────

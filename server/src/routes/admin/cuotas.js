@@ -1151,6 +1151,7 @@ router.get('/pagos/:id/recibo-pdf', authAdmin, asyncHandler(async (req, res) => 
           caja: { select: { nombre: true } }
         }
       },
+      saldosAplicados: { include: { saldoFavor: { select: { id: true, motivo: true, origen: true } } } },
       cargos: {
         include: {
           conceptoTesoreria: { select: { id: true, nombre: true } },
@@ -1215,6 +1216,7 @@ router.post('/pagos/:id/enviar-recibo', authAdmin, asyncHandler(async (req, res)
           caja: { select: { nombre: true } }
         }
       },
+      saldosAplicados: { include: { saldoFavor: { select: { id: true, motivo: true, origen: true } } } },
       cargos: {
         include: {
           conceptoTesoreria: { select: { id: true, nombre: true } },

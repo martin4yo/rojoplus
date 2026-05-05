@@ -37,12 +37,11 @@ export default function SaldoFavorTab({ socioId, socioNombre }) {
   }
 
   async function anularSaldo(saldo) {
-    const ok = await confirm({
-      title: 'Anular saldo a favor',
-      message: `¿Anular el saldo de ${formatCurrency(saldo.montoOriginal)} (${saldo.motivo || ORIGEN_LABEL[saldo.origen] || saldo.origen})?`,
-      confirmText: 'Anular',
-      tipo: 'danger'
-    })
+    const ok = await confirm(
+      'Anular saldo a favor',
+      `¿Anular el saldo de ${formatCurrency(saldo.montoOriginal)} (${saldo.motivo || ORIGEN_LABEL[saldo.origen] || saldo.origen})?`,
+      { confirmText: 'Anular', variant: 'danger' }
+    )
     if (!ok) return
     try {
       await api.delete(`/admin/socios/${socioId}/saldos-favor/${saldo.id}`)
@@ -73,7 +72,7 @@ export default function SaldoFavorTab({ socioId, socioNombre }) {
 
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-800">Movimientos de saldo</h3>
-        <Button onClick={() => setModalOpen(true)}>
+        <Button type="button" onClick={() => setModalOpen(true)}>
           <Plus className="w-4 h-4 mr-1" />
           Acreditar saldo
         </Button>
@@ -129,6 +128,7 @@ export default function SaldoFavorTab({ socioId, socioNombre }) {
                     <td className="px-3 py-2 text-center">
                       {s.aplicaciones.length === 0 && (
                         <button
+                          type="button"
                           onClick={() => anularSaldo(s)}
                           className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
                           title="Anular"
