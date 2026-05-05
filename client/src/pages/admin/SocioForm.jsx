@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Save, User, Phone, MapPin, Heart, CreditCard, AlertCircle, Users, X
+  ArrowLeft, Save, User, Phone, MapPin, Heart, CreditCard, AlertCircle, Users, X, ListPlus
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -511,6 +511,26 @@ export default function SocioForm() {
         <h1 className="text-2xl font-bold text-gray-800">
           {isEditing ? 'Editar Socio' : 'Nuevo Socio'}
         </h1>
+        {isEditing && socioData && (
+          <Button
+            type="button"
+            variant="secondary"
+            className="ml-auto"
+            onClick={() => navigate('/admin/inscripciones', {
+              state: {
+                nuevoSocio: {
+                  id: socioData.id,
+                  nroSocio: socioData.nroSocio,
+                  apellidoNombre: socioData.apellidoNombre,
+                  documento: socioData.documento,
+                }
+              }
+            })}
+          >
+            <ListPlus className="w-4 h-4 mr-2" />
+            Inscribir en actividad
+          </Button>
+        )}
       </div>
 
       {error && <Alert type="error" className="mb-6">{error}</Alert>}

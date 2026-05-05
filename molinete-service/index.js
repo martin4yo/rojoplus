@@ -388,7 +388,7 @@ function uidGsdAPin(uidHex) {
  * Procesar datos del lector RFID
  */
 function handleRFIDData(data, origen = '') {
-  // UID crudo del lector — se conserva en log para debugging
+  // UID crudo del lector — se conserva en log y se manda al monitor para debugging
   const uidOriginal = (data || '').replace(/\s/g, '').toUpperCase()
   logger.info(`📡 Lectura RFID${origen ? ` [${origen}]` : ''}: UID=${uidOriginal}`)
 
@@ -396,7 +396,7 @@ function handleRFIDData(data, origen = '') {
   const valorLeido = uidGsdAPin(uidOriginal)
   logger.info(`📡 RFID PIN convertido: ${valorLeido}`)
 
-  procesarLectura(valorLeido, 'RFID')
+  procesarLectura(valorLeido, 'RFID', { uidOriginal })
 }
 
 /**
@@ -435,6 +435,7 @@ async function procesarLectura(valorLeido, tipoLectura, metadata = {}) {
     data: {
       tipoLectura,
       valorLeido,
+      uidOriginal: metadata.uidOriginal || null,
       resultado: resultado.permitido ? 'PERMITIDO' : 'DENEGADO',
       motivo: resultado.motivo,
       mensaje: resultado.mensaje,

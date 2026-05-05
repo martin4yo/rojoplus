@@ -265,6 +265,20 @@
       opacity: 0.7;
     }
 
+    .acceso-rfid {
+      font-size: 11px;
+      opacity: 0.85;
+      margin-top: 4px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .acceso-rfid code {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: bold;
+    }
+
     .acceso-hora {
       font-size: 14px;
       opacity: 0.8;
@@ -580,6 +594,11 @@
         const clase = esRepetido ? `${claseBase} repetido` : claseBase
         const iconoNombre = a.resultado === 'PERMITIDO' ? 'user-check' : 'user-x'
 
+        // Para RFID mostramos UID original del lector + PIN convertido (algoritmo)
+        const detalleRfid = (a.tipoLectura === 'RFID' && a.uidOriginal)
+          ? `<div class="acceso-rfid">UID lector: <code>${escapeHtml(a.uidOriginal)}</code> → PIN: <code>${escapeHtml(a.valorLeido)}</code></div>`
+          : ''
+
         return `
           <div class="acceso-item ${clase}">
             <div class="acceso-info">
@@ -591,6 +610,7 @@
               <div class="acceso-detalle">
                 ${escapeHtml(a.tipoLectura)} • ${escapeHtml(a.motivo)} • ${escapeHtml(a.mensaje)}
               </div>
+              ${detalleRfid}
             </div>
             <div class="acceso-hora">
               ${fecha.toLocaleTimeString('es-AR')}

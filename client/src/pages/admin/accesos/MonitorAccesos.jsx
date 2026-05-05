@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Activity, CheckCircle, XCircle, Users, Clock, MapPin,
-  QrCode, CreditCard, Radio, WifiOff, AlertTriangle, UserCheck
+  QrCode, CreditCard, Radio, WifiOff, AlertTriangle, UserCheck, UserPlus
 } from 'lucide-react'
 import Pagination from '../../../components/Pagination'
 import { Button } from '../../../components/Button'
 import PermitirAccesoManualModal from '../../../components/PermitirAccesoManualModal'
+import AsignarRfidASocioModal from '../../../components/AsignarRfidASocioModal'
 
 const PAGE_SIZE = 20
 const REPEAT_WINDOW_MS = 3 * 60 * 1000 // 3 minutos
@@ -20,6 +21,7 @@ export default function MonitorAccesos() {
   const [dispositivosEstado, setDispositivosEstado] = useState([])
   const [page, setPage] = useState(1)
   const [permitirManualOpen, setPermitirManualOpen] = useState(false)
+  const [asignarRfid, setAsignarRfid] = useState({ open: false, valorLeido: null })
 
   // Detecta accesos repetidos: misma persona escaneada dos o más veces en < 3 minutos.
   // Se marca a partir del segundo scan (el primero del burst no es "repetido" todavía).
@@ -198,6 +200,15 @@ export default function MonitorAccesos() {
         }}
       />
 
+      <AsignarRfidASocioModal
+        isOpen={asignarRfid.open}
+        valorLeido={asignarRfid.valorLeido}
+        onClose={() => setAsignarRfid({ open: false, valorLeido: null })}
+        onAsignado={() => {
+          cargarAccesosRecientes()
+        }}
+      />
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -286,6 +297,7 @@ export default function MonitorAccesos() {
                   <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 hidden md:table-cell">Motivo</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 hidden lg:table-cell">Dispositivo</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 w-40">Fecha</th>
+                  <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600 w-24">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -373,6 +385,22 @@ export default function MonitorAccesos() {
                           <Clock className="w-4 h-4 text-gray-400" />
                           {formatFecha(acceso.fecha)}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {acceso.tipoLectura === 'RFID'
+                          && acceso.resultado === 'DENEGADO'
+                          && acceso.motivoRechazo === 'NO_ENCONTRADO'
+                          && acceso.valorLeido && (
+                          <button
+                            type="button"
+                            onClick={() => setAsignarRfid({ open: true, valorLeido: acceso.valorLeido })}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/10"
+                            title="Asignar este carnet a un socio"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            Asignar a socio
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )

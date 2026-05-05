@@ -831,6 +831,42 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   })
 }))
 
+// PUT /api/admin/socios/:id/rfid - Asignar PIN del carnet RFID al socio
+// El valor viene desde el monitor de accesos cuando una lectura no fue identificada.
+router.put('/socios/:id/rfid', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { rfidUid } = req.body
+
+  const valor = (rfidUid || '').trim()
+  if (!valor) {
+    throw new AppError('rfidUid requerido', 400, 'VALIDATION')
+  }
+
+  const socio = await req.db.socio.findUnique({ where: { id: parseInt(id) } })
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
+
+  // Verificar que no esté asignado a otro socio (en este tenant)
+  const duplicado = await req.db.socio.findFirst({
+    where: { rfidUid: valor, NOT: { id: parseInt(id) } },
+    select: { id: true, nroSocio: true, apellidoNombre: true },
+  })
+  if (duplicado) {
+    throw new AppError(
+      `El PIN ya está asignado a ${duplicado.apellidoNombre} (N° ${duplicado.nroSocio})`,
+      400,
+      'DUPLICATE'
+    )
+  }
+
+  const actualizado = await req.db.socio.update({
+    where: { id: parseInt(id) },
+    data: { rfidUid: valor, actualizadoPor: req.admin.id },
+    select: { id: true, nroSocio: true, apellidoNombre: true, rfidUid: true },
+  })
+
+  res.json({ success: true, data: actualizado })
+}))
+
 // POST /api/admin/socios/:id/desactivar - Desactivar socio
 router.post('/socios/:id/desactivar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
