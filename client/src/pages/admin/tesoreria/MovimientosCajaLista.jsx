@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban, Download, Eye, FileText, Paperclip, X } from 'lucide-react'
+import { Plus, ArrowRightLeft, TrendingUp, TrendingDown, XCircle, Ban, Download, Eye, FileText, Paperclip, X, Printer } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import Table from '../../../components/Table'
 import api from '../../../services/api'
@@ -13,6 +13,7 @@ import { useConfirm } from '../../../hooks/useConfirm'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
+import ComprobanteMovimientoModal from '../../../components/ComprobanteMovimientoModal'
 
 export default function MovimientosCajaLista() {
   const navigate = useNavigate()
@@ -42,6 +43,7 @@ export default function MovimientosCajaLista() {
 
   // Modal de adjuntos
   const [adjuntosModalMov, setAdjuntosModalMov] = useState(null) // movimiento o null
+  const [comprobanteMov, setComprobanteMov] = useState(null) // movimiento o null
 
   useEffect(() => {
     cargarMovimientos()
@@ -244,6 +246,13 @@ export default function MovimientosCajaLista() {
             >
               <Eye className="w-4 h-4" />
             </button>
+            <button
+              onClick={() => setComprobanteMov(mov)}
+              className="p-1.5 text-gray-400 hover:text-primary hover:bg-gray-100 rounded"
+              title="Imprimir / enviar comprobante"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
             {cantAdjuntos > 0 ? (
               <button
                 onClick={() => setAdjuntosModalMov(mov)}
@@ -431,6 +440,12 @@ export default function MovimientosCajaLista() {
           </div>
         </div>
       )}
+
+      <ComprobanteMovimientoModal
+        isOpen={!!comprobanteMov}
+        onClose={() => setComprobanteMov(null)}
+        movimiento={comprobanteMov}
+      />
     </div>
   )
 }

@@ -210,6 +210,11 @@ export async function enviarWhatsAppDocumento({ db, telefono, pdfBase64, fileNam
     if (!res.ok) {
       const err = await res.text()
       console.error('[WhatsApp] Error enviando documento:', err)
+      // 413 = el PDF supera el límite del nginx delante de Evolution API.
+      // Devolvemos código específico para que el caller pueda fallback a texto.
+      if (res.status === 413) {
+        return { enviado: false, motivo: 'PDF muy grande para WhatsApp', code: 'PDF_TOO_LARGE' }
+      }
       return { enviado: false, motivo: `Error API: ${res.status}` }
     }
 
@@ -511,4 +516,55 @@ export async function enviarLinkPortal({ db, socio, link }) {
     link,
   })
   return enviarWhatsApp({ db, telefono, texto, ignorarHorario: true })
+}
+
+/**
+ * Enviar comprobante de movimiento de caja por WhatsApp (con PDF si está disponible).
+ * Acepta un teléfono override (cargado en el modal); si no, intenta del socio/entidad.
+ */
+export async function enviarComprobanteMovimientoWhatsApp({ movimiento, telefono, pdfBuffer = null, pdfFilename = null, db }) {
+  const tel = telefono
+    || obtenerTelefonoSocio(movimiento.socio)
+    || movimiento.entidad?.telefono
+    || null
+  if (!tel) return { enviado: false, motivo: 'Sin teléfono destino' }
+
+  const esIngreso = movimiento.tipo === 'INGRESO'
+  const tipoLabel = esIngreso ? 'Ingreso' : 'Egreso'
+  const nombre = movimiento.socio?.apellidoNombre
+    || movimiento.entidad?.razonSocial
+    || movimiento.entidad?.nombreFantasia
+    || ''
+
+  const fechaStr = new Date(movimiento.fecha).toLocaleDateString('es-AR', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  })
+  const monto = Number(movimiento.monto || 0).toLocaleString('es-AR', {
+    style: 'currency', currency: 'ARS', maximumFractionDigits: 0
+  })
+
+  const texto = `${nombre ? `Hola ${nombre}, ` : ''}te enviamos el comprobante de ${tipoLabel} Nº ${movimiento.numero} del ${fechaStr}.\n` +
+    `Concepto: ${movimiento.concepto || movimiento.descripcion || '-'}\n` +
+    `Total: ${monto}`
+
+  if (pdfBuffer) {
+    const r = await enviarWhatsAppDocumento({
+      db,
+      telefono: tel,
+      pdfBase64: pdfBuffer.toString('base64'),
+      fileName: pdfFilename || `comprobante-${movimiento.numero}.pdf`,
+      caption: texto,
+    })
+    // Si el PDF excede el límite del proxy de Evolution API, mandar al menos el texto
+    if (!r?.enviado && r?.code === 'PDF_TOO_LARGE') {
+      console.log('[WhatsApp comprobante] PDF excede límite, fallback a texto')
+      const fallback = await enviarWhatsApp({ db, telefono: tel, texto })
+      if (fallback?.enviado) {
+        return { ...fallback, motivo: 'Mensaje enviado sin PDF (excede límite del servidor de WhatsApp)' }
+      }
+      return fallback
+    }
+    return r
+  }
+  return enviarWhatsApp({ db, telefono: tel, texto })
 }

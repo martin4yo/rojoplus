@@ -573,9 +573,12 @@ async function validarOffline(valorLeido, tipoLectura) {
 
   // Validar según tipo
   if (tipo === 'SOCIO') {
-    // El cache trae el flag permiteIngresoMolinete por socio. Misma lógica que online:
-    // solo permite si el flag está en true. Sin flag → deniega con NO_VIGENTE.
-    const puedeIngresar = persona.permiteIngresoMolinete === 1 || persona.permiteIngresoMolinete === true
+    // Misma lógica que el server (/accesos/validar):
+    //   flag explícito true → permite
+    //   ó estado legacy 'VIGENTE'/'ACTIVO' → permite (compat con cache previo al flag)
+    const flagFK = persona.permiteIngresoMolinete === 1 || persona.permiteIngresoMolinete === true
+    const estadoLegacyOK = ['VIGENTE', 'ACTIVO'].includes((persona.estado || '').toUpperCase())
+    const puedeIngresar = flagFK || estadoLegacyOK
 
     if (puedeIngresar) {
       return {

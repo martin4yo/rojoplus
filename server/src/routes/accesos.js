@@ -222,9 +222,13 @@ router.post('/validar', authDispositivo, async (req, res) => {
       }
     } else
     if (tipo === 'SOCIO') {
-      // El flag permiteIngresoMolinete del estado es la única fuente de verdad.
-      // Sin estado FK o sin flag explícito en true → deniega.
-      const puedeIngresar = persona.estadoSocioRel?.permiteIngresoMolinete === true
+      // Flag FK explícito en true → permite.
+      // Si el flag está en false pero el estado legacy es 'VIGENTE'/'ACTIVO',
+      // permite igual (compat con datos previos al flag). Si querés que
+      // un socio VIGENTE no entre, marcá su estado distinto.
+      const flagFK = persona.estadoSocioRel?.permiteIngresoMolinete === true
+      const estadoLegacyOK = ['VIGENTE', 'ACTIVO'].includes((persona.estado || '').toUpperCase())
+      const puedeIngresar = flagFK || estadoLegacyOK
 
       if (puedeIngresar) {
         permitido = true
@@ -445,17 +449,22 @@ router.get('/cache-socios', authDispositivo, async (req, res) => {
       }
     })
 
-    const socios = sociosRaw.map(s => ({
-      id: s.id,
-      nroSocio: s.nroSocio,
-      apellidoNombre: s.apellidoNombre,
-      documento: s.documento,
-      estado: s.estado,
-      tokenPortal: s.tokenPortal,
-      rfidUid: s.rfidUid,
-      permiteIngresoMolinete: s.estadoSocioRel?.permiteIngresoMolinete === true,
-      estadoNombre: s.estadoSocioRel?.nombre || s.estado || null
-    }))
+    const socios = sociosRaw.map(s => {
+      // Mismo criterio que /validar: flag explícito O estado legacy VIGENTE/ACTIVO
+      const flagFK = s.estadoSocioRel?.permiteIngresoMolinete === true
+      const estadoLegacyOK = ['VIGENTE', 'ACTIVO'].includes((s.estado || '').toUpperCase())
+      return {
+        id: s.id,
+        nroSocio: s.nroSocio,
+        apellidoNombre: s.apellidoNombre,
+        documento: s.documento,
+        estado: s.estado,
+        tokenPortal: s.tokenPortal,
+        rfidUid: s.rfidUid,
+        permiteIngresoMolinete: flagFK || estadoLegacyOK,
+        estadoNombre: s.estadoSocioRel?.nombre || s.estado || null
+      }
+    })
 
     // Obtener habilitaciones vigentes
     const ahora = new Date()

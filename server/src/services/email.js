@@ -1070,3 +1070,69 @@ export async function enviarCambioEstadoTienda({ pedidoTienda, estadoNuevo, tena
     db,
   })
 }
+
+/**
+ * Enviar comprobante de movimiento de caja por email.
+ * Devuelve { ok, motivo }.
+ */
+export async function enviarComprobanteMovimientoEmail({ movimiento, destinatario, pdfBuffer, pdfFilename, db }) {
+  if (!destinatario) return { ok: false, motivo: 'Sin email destino' }
+
+  const esIngreso = movimiento.tipo === 'INGRESO'
+  const tipoLabel = esIngreso ? 'Ingreso' : 'Egreso'
+  const verbo     = esIngreso ? 'Recibimos de' : 'Pagamos a'
+  const nombre    = movimiento.socio?.apellidoNombre
+    || movimiento.entidad?.razonSocial
+    || movimiento.entidad?.nombreFantasia
+    || destinatario
+
+  const fechaStr = new Date(movimiento.fecha).toLocaleDateString('es-AR', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  })
+  const monto = Number(movimiento.monto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #DC2626; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Comprobante de ${tipoLabel}</h1>
+        <p style="color: white; margin: 5px 0 0 0;">Nº ${movimiento.numero}</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <div style="background-color: white; border-radius: 8px; padding: 20px; border: 1px solid #e5e7eb;">
+          <p style="color: #6b7280; font-size: 12px; margin: 0;">FECHA</p>
+          <p style="color: #1f2937; margin: 0 0 15px 0;">${fechaStr}</p>
+          <p style="color: #6b7280; font-size: 12px; margin: 0;">${verbo.toUpperCase()}</p>
+          <p style="color: #1f2937; font-weight: bold; margin: 0 0 15px 0;">${nombre}</p>
+          <p style="color: #6b7280; font-size: 12px; margin: 0;">CONCEPTO</p>
+          <p style="color: #1f2937; margin: 0 0 15px 0;">${movimiento.concepto || movimiento.descripcion || '-'}</p>
+          <p style="color: #6b7280; font-size: 12px; margin: 0;">CAJA</p>
+          <p style="color: #1f2937; margin: 0 0 15px 0;">${movimiento.caja?.nombre || '-'}</p>
+          <div style="border-top: 1px solid #e5e7eb; padding-top: 15px; margin-top: 15px; text-align: right;">
+            <p style="color: #6b7280; font-size: 12px; margin: 0;">TOTAL</p>
+            <p style="color: #DC2626; font-size: 22px; font-weight: bold; margin: 0;">$${monto}</p>
+          </div>
+        </div>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 20px; text-align: center;">
+          Conservalo como comprobante.
+        </p>
+      </div>
+    </div>
+  `
+
+  const attachments = pdfBuffer
+    ? [{ filename: pdfFilename || `comprobante-${movimiento.numero}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
+    : []
+
+  try {
+    await enviarEmail({
+      to: destinatario,
+      subject: `Comprobante de ${tipoLabel} Nº ${movimiento.numero}`,
+      html,
+      db,
+      attachments,
+    })
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, motivo: err.message || 'Error al enviar' }
+  }
+}

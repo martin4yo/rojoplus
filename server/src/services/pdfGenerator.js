@@ -1325,3 +1325,234 @@ export async function generarReciboPagoPDF(pago, adminNombre = '', configMap = {
     }
   })
 }
+
+/**
+ * Genera el PDF del comprobante de un Movimiento de Caja (ingreso/egreso suelto).
+ * Mismo layout que el recibo de pago, adaptado a la información del movimiento:
+ * cabecera con club + tipo (I/E), datos del socio o entidad, tabla con concepto/items
+ * y medios de pago, footer con total.
+ */
+export async function generarComprobanteMovimientoPDF(movimiento, adminNombre = '', configMap = {}) {
+  return new Promise((resolve, reject) => {
+    try {
+      const MG = 30
+      const PW = 595.28
+      const INNER = PW - MG * 2
+
+      const doc = new PDFDocument({ size: 'A4', margin: MG, autoFirstPage: true })
+      const buffers = []
+      doc.on('data', buffers.push.bind(buffers))
+      doc.on('end', () => resolve(Buffer.concat(buffers)))
+      doc.on('error', reject)
+
+      const clubNombre = configMap.CLUB_NOMBRE || 'Club'
+      const clubDir    = configMap.CLUB_DIRECCION || ''
+      const clubTel    = configMap.CLUB_TELEFONO || ''
+
+      const esIngreso = movimiento.tipo === 'INGRESO'
+      const tipoLetra = esIngreso ? 'I' : 'E'
+      const tipoLabel = esIngreso ? 'COMPROBANTE INGRESO' : 'COMPROBANTE EGRESO'
+      const verbo     = esIngreso ? 'RECIBIMOS DE:' : 'PAGAMOS A:'
+
+      const fechaObj = new Date(movimiento.fecha)
+      const fechaStr = fechaObj.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+      const partes = (movimiento.numero || '').split('-')
+      const puntoVenta = partes[0] || '0001'
+      const nroComp    = partes[1] || movimiento.numero || ''
+
+      const montoTotal  = Number(movimiento.monto || 0)
+      const montoStr    = montoTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+      const montoLetras = numeroALetras(montoTotal)
+
+      // Persona/entidad asociada al movimiento
+      const socio   = movimiento.socio || movimiento.pago?.socio || null
+      const entidad = movimiento.entidad || null
+      const nombrePersona = socio?.apellidoNombre || entidad?.razonSocial || entidad?.nombreFantasia || '-'
+      const docPersona    = socio?.documento || entidad?.documento || ''
+      const idPersona     = socio?.nroSocio ? `Socio #${socio.nroSocio}` : (entidad?.tipo ? entidad.tipo : '')
+
+      const items      = Array.isArray(movimiento.items) && movimiento.items.length > 0 ? movimiento.items : []
+      const mediosPago = movimiento.mediosPago || []
+
+      // ─── Cabecera ───
+      const HDR_TOP = MG, HDR_H = 90, HDR_BOT = HDR_TOP + HDR_H
+      doc.rect(MG, HDR_TOP, INNER, HDR_H).strokeColor('#000000').lineWidth(0.5).stroke()
+      const divX1 = MG + INNER * 0.42
+      const divX2 = MG + INNER * 0.58
+      doc.moveTo(divX1, HDR_TOP).lineTo(divX1, HDR_BOT).stroke()
+      doc.moveTo(divX2, HDR_TOP).lineTo(divX2, HDR_BOT).stroke()
+
+      // Bloque izquierdo — logo + datos del club
+      const LX = MG + 8
+      const logoUrl = configMap.CLUB_LOGO_URL || null
+      const LOGO_SIZE = 54
+      let logoLoaded = false
+      if (logoUrl) {
+        try {
+          let logoPath
+          if (logoUrl.startsWith('http')) logoPath = logoUrl
+          else if (logoUrl.startsWith('/uploads/')) logoPath = `./uploads${logoUrl.slice('/uploads'.length)}`
+          else logoPath = `./public${logoUrl}`
+          const logoY = HDR_TOP + (HDR_H - LOGO_SIZE) / 2
+          doc.image(logoPath, LX, logoY, { width: LOGO_SIZE, height: LOGO_SIZE, fit: [LOGO_SIZE, LOGO_SIZE] })
+          logoLoaded = true
+        } catch (e) { /* ignore */ }
+      }
+      const textX = logoLoaded ? LX + LOGO_SIZE + 6 : LX
+      const textW = divX1 - textX - 4
+      const textY = logoLoaded ? HDR_TOP + (HDR_H - 42) / 2 : HDR_TOP + 8
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9).text(clubNombre, textX, textY, { width: textW })
+      doc.font('Helvetica').fontSize(7)
+        .text(clubDir, textX, doc.y + 2, { width: textW })
+        .text(clubTel, textX, doc.y + 1, { width: textW })
+
+      // Bloque central — tipo I/E
+      const CX = divX1 + 2, CW = divX2 - divX1 - 4
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(38).text(tipoLetra, CX, HDR_TOP + 10, { width: CW, align: 'center' })
+      doc.fontSize(9).text(puntoVenta, CX, HDR_TOP + 56, { width: CW, align: 'center' })
+
+      // Bloque derecho
+      const RX = divX2 + 6, RW = MG + INNER - RX - 4
+      doc.font('Helvetica-Bold').fontSize(11).text(tipoLabel, RX, HDR_TOP + 6, { width: RW * 0.6 })
+      doc.rect(RX + RW * 0.62, HDR_TOP + 4, RW * 0.36, 14).strokeColor('#000000').lineWidth(0.5).stroke()
+      doc.font('Helvetica-Bold').fontSize(7).text('ORIGINAL', RX + RW * 0.62 + 2, HDR_TOP + 7, { width: RW * 0.36, align: 'center' })
+      doc.font('Helvetica').fontSize(8)
+        .text(`Nº   ${puntoVenta} - ${nroComp}`, RX, HDR_TOP + 24, { width: RW })
+        .text(`Fecha:  ${fechaStr}`, RX, doc.y + 4, { width: RW })
+
+      doc.moveTo(divX2, HDR_TOP + HDR_H - 18).lineTo(MG + INNER, HDR_TOP + HDR_H - 18).strokeColor('#000000').lineWidth(0.5).stroke()
+      doc.font('Helvetica-Bold').fontSize(7).text('I.V.A EXENTO', RX, HDR_TOP + HDR_H - 14, { width: RW, align: 'center' })
+
+      // ─── Datos del receptor ───
+      const SEC2_TOP = HDR_BOT, SEC2_H = 62, SEC2_BOT = SEC2_TOP + SEC2_H
+      doc.rect(MG, SEC2_TOP, INNER, SEC2_H).strokeColor('#000000').lineWidth(0.5).stroke()
+      const midSocioY = SEC2_TOP + 42
+      doc.moveTo(MG, midSocioY).lineTo(MG + INNER, midSocioY).stroke()
+      const midSecX = MG + INNER / 2
+      doc.moveTo(midSecX, midSocioY).lineTo(midSecX, SEC2_BOT).stroke()
+      const S2X = MG + 6
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#000000')
+        .text(verbo, S2X, SEC2_TOP + 5, { continued: true })
+        .font('Helvetica').text(`  ${nombrePersona}`)
+      doc.font('Helvetica-Bold').fontSize(8)
+        .text('CONCEPTO:', S2X, doc.y + 2, { continued: true })
+        .font('Helvetica').text(`  ${movimiento.concepto || movimiento.descripcion || '-'}`)
+      doc.font('Helvetica-Bold').fontSize(8)
+        .text('LA CANTIDAD DE PESOS:', S2X, doc.y + 2, { continued: true })
+        .font('Helvetica').text(`  ${montoLetras}`)
+      doc.font('Helvetica-Bold').fontSize(8)
+        .text(idPersona ? 'Identif:' : 'Documento:', S2X, midSocioY + 4, { continued: true })
+        .font('Helvetica').text(`  ${idPersona || docPersona || '-'}`)
+      doc.font('Helvetica-Bold').fontSize(8)
+        .text('Caja:', midSecX + 6, midSocioY + 4, { continued: true })
+        .font('Helvetica').text(`  ${movimiento.caja?.nombre || '-'}`)
+
+      // ─── Tabla items / medios de pago ───
+      const HDR_ROW_H = 16, ROW_H = 14
+      const filasIzq = items.length > 0 ? items.length : 1
+      const filasDer = mediosPago.length > 0 ? mediosPago.length : 1
+      const numRows  = Math.max(filasIzq, filasDer, 1)
+      const PAGE_H   = doc.page.height
+      const MAX_TBL_H = PAGE_H - MG - SEC2_BOT - 40 - 35
+      const TBL_TOP  = SEC2_BOT
+      const TBL_H    = Math.min(Math.max(HDR_ROW_H + numRows * ROW_H + 10, 60), MAX_TBL_H)
+      const TBL_BOT  = TBL_TOP + TBL_H
+
+      doc.rect(MG, TBL_TOP, INNER, TBL_H).strokeColor('#000000').lineWidth(0.5).stroke()
+      const divTblX = MG + INNER / 2
+      doc.moveTo(divTblX, TBL_TOP).lineTo(divTblX, TBL_BOT).stroke()
+
+      doc.rect(MG, TBL_TOP, INNER / 2, HDR_ROW_H).fillColor('#f3f4f6').fillOpacity(1).fill().fillOpacity(1)
+      doc.rect(divTblX, TBL_TOP, INNER / 2, HDR_ROW_H).fillColor('#f3f4f6').fillOpacity(1).fill().fillOpacity(1)
+      doc.rect(MG, TBL_TOP, INNER, HDR_ROW_H).strokeColor('#000000').lineWidth(0.5).stroke()
+
+      const LCW = INNER / 2
+      const lcConcepto = LCW - 65
+      const lcImporte  = 65
+      const RCW = INNER / 2
+      const rcFormaPago = 70
+      const rcLeyenda   = RCW - rcFormaPago - 65
+      const rcImporte   = 65
+      const HDR_Y = TBL_TOP + 4
+      const IMP_PAD = 8
+
+      doc.fillColor('#374151').font('Helvetica-Bold').fontSize(7)
+        .text('CONCEPTO', MG + 4, HDR_Y, { width: lcConcepto })
+        .text('IMPORTE', MG + 4 + lcConcepto, HDR_Y, { width: lcImporte - IMP_PAD, align: 'right' })
+
+      doc.moveTo(divTblX - lcImporte, TBL_TOP).lineTo(divTblX - lcImporte, TBL_BOT).strokeColor('#000000').lineWidth(0.3).stroke()
+
+      doc.fillColor('#374151').font('Helvetica-Bold').fontSize(7)
+        .text('FORMA PAGO', divTblX + 4, HDR_Y, { width: rcFormaPago })
+        .text('LEYENDA', divTblX + 4 + rcFormaPago, HDR_Y, { width: rcLeyenda })
+        .text('IMPORTE', divTblX + 4 + rcFormaPago + rcLeyenda, HDR_Y, { width: rcImporte - IMP_PAD, align: 'right' })
+
+      doc.moveTo(divTblX + rcFormaPago, TBL_TOP + HDR_ROW_H).lineTo(divTblX + rcFormaPago, TBL_BOT).strokeColor('#000000').lineWidth(0.3).stroke()
+      doc.moveTo(divTblX + rcFormaPago + rcLeyenda, TBL_TOP).lineTo(divTblX + rcFormaPago + rcLeyenda, TBL_BOT).strokeColor('#000000').lineWidth(0.3).stroke()
+      doc.moveTo(MG, TBL_TOP + HDR_ROW_H).lineTo(MG + INNER, TBL_TOP + HDR_ROW_H).strokeColor('#000000').lineWidth(0.5).stroke()
+
+      // Filas izquierda — items o concepto único
+      let rowY = TBL_TOP + HDR_ROW_H + 4
+      doc.fillColor('#111827').font('Helvetica').fontSize(7.5)
+      if (items.length > 0) {
+        items.forEach(it => {
+          const concepto = [it.conceptoTesoreria?.nombre, it.descripcion].filter(Boolean).join(' - ') || '-'
+          const monto    = `$ ${Number(it.monto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+          doc.text(concepto, MG + 4, rowY, { width: lcConcepto, ellipsis: true, lineBreak: false })
+          doc.text(monto, MG + 4 + lcConcepto, rowY, { width: lcImporte - IMP_PAD, align: 'right', lineBreak: false })
+          rowY += ROW_H
+        })
+      } else {
+        const concepto = movimiento.concepto || movimiento.descripcion || '-'
+        doc.text(concepto, MG + 4, rowY, { width: lcConcepto, ellipsis: true, lineBreak: false })
+        doc.text(`$ ${montoStr}`, MG + 4 + lcConcepto, rowY, { width: lcImporte - IMP_PAD, align: 'right', lineBreak: false })
+      }
+
+      // Filas derecha — medios de pago
+      let rowYR = TBL_TOP + HDR_ROW_H + 4
+      const leyendaBase = idPersona ? `${idPersona} ${nombrePersona}`.trim() : nombrePersona
+      if (mediosPago.length > 0) {
+        mediosPago.forEach(mp => {
+          const formaPago = mp.medioPago?.nombre || '-'
+          const monto = `$ ${Number(mp.monto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+          doc.text(formaPago, divTblX + 4, rowYR, { width: rcFormaPago - 4, lineBreak: false })
+          doc.text(leyendaBase, divTblX + 4 + rcFormaPago, rowYR, { width: rcLeyenda - 4, ellipsis: true, lineBreak: false })
+          doc.text(monto, divTblX + 4 + rcFormaPago + rcLeyenda, rowYR, { width: rcImporte - IMP_PAD, align: 'right', lineBreak: false })
+          rowYR += ROW_H
+        })
+      } else {
+        const formaPago = movimiento.medioPagoRel?.nombre || movimiento.medioPago || '-'
+        doc.text(formaPago, divTblX + 4, rowYR, { width: rcFormaPago - 4, lineBreak: false })
+        doc.text(leyendaBase, divTblX + 4 + rcFormaPago, rowYR, { width: rcLeyenda - 4, ellipsis: true, lineBreak: false })
+        doc.text(`$ ${montoStr}`, divTblX + 4 + rcFormaPago + rcLeyenda, rowYR, { width: rcImporte - IMP_PAD, align: 'right', lineBreak: false })
+      }
+
+      // ─── Footer ───
+      const FTR_TOP = TBL_BOT, FTR_H = 40, FTR_BOT = FTR_TOP + FTR_H
+      doc.rect(MG, FTR_TOP, INNER, FTR_H).strokeColor('#000000').lineWidth(0.5).stroke()
+      const fDiv1 = MG + INNER * 0.28
+      const fDiv2 = MG + INNER * 0.52
+      const fDiv3 = MG + INNER * 0.72
+      doc.moveTo(fDiv1, FTR_TOP).lineTo(fDiv1, FTR_BOT).stroke()
+      doc.moveTo(fDiv2, FTR_TOP).lineTo(fDiv2, FTR_BOT).stroke()
+      doc.moveTo(fDiv3, FTR_TOP).lineTo(fDiv3, FTR_BOT).stroke()
+      doc.fillColor('#374151').font('Helvetica').fontSize(7)
+        .text('FIRMA AUTORIZADA', MG + 4, FTR_TOP + 14, { width: fDiv1 - MG - 8, align: 'center' })
+        .text('SELLO AUTORIZADO', fDiv1 + 4, FTR_TOP + 14, { width: fDiv2 - fDiv1 - 8, align: 'center' })
+      doc.font('Helvetica-Bold').fontSize(8).text('TOTAL', fDiv2 + 4, FTR_TOP + 10, { width: fDiv3 - fDiv2 - 8, align: 'right' })
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000')
+        .text(`$${montoStr}`, fDiv3 + 4, FTR_TOP + 8, { width: MG + INNER - fDiv3 - 8, align: 'right' })
+
+      const SF_TOP = FTR_BOT + 4
+      doc.fillColor('#6b7280').font('Helvetica').fontSize(7)
+      if (adminNombre) doc.text(`Imprimió: ${adminNombre}`, fDiv3 + 4, SF_TOP, { width: MG + INNER - fDiv3 - 8 })
+      doc.font('Helvetica').fontSize(7).fillColor('#374151')
+        .text(`${nombrePersona}${idPersona ? ` (${idPersona})` : ''} - ${fechaStr}`, MG, SF_TOP + 2)
+
+      doc.end()
+    } catch (error) {
+      reject(error)
+    }
+  })
+}

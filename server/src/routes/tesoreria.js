@@ -5,6 +5,9 @@ import { authAdmin, checkPermiso } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { generarAsientoMovimientoCaja, crearAsientoTransferencia, resolverCuentaCashId } from '../services/asientosContables.js'
 import { generarAsientoAutomatico } from './asientos.js'
+import { generarComprobanteMovimientoPDF } from '../services/pdfGenerator.js'
+import { enviarComprobanteMovimientoEmail } from '../services/email.js'
+import { enviarComprobanteMovimientoWhatsApp } from '../services/whatsappService.js'
 
 const router = Router()
 
@@ -384,8 +387,18 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
       centroCosto: true,
       medioPagoRel: true,
       movimientoContable: { select: { id: true, tipo: true, numero: true } },
-      socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
-      entidad: { select: { id: true, razonSocial: true, tipo: true } },
+      socio: {
+        select: {
+          id: true, nroSocio: true, apellidoNombre: true,
+          email: true, celular: true, celularSecundario: true, telefonoFijo: true,
+        }
+      },
+      entidad: {
+        select: {
+          id: true, razonSocial: true, tipo: true,
+          email: true, telefono: true,
+        }
+      },
       items: {
         orderBy: { orden: 'asc' },
         include: {
@@ -1741,6 +1754,150 @@ router.get('/movimientos-caja/exportar', authAdmin, asyncHandler(async (req, res
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   res.setHeader('Content-Disposition', `attachment; filename="movimientos_caja_${fecha}.xlsx"`)
   res.send(buffer)
+}))
+
+// ---------------------------------------------------------------------------
+// Comprobante de movimiento de caja (PDF + email/WhatsApp)
+// ---------------------------------------------------------------------------
+
+async function cargarMovimientoComprobante(db, id) {
+  return db.movimientoCaja.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      caja: { select: { nombre: true } },
+      medioPagoRel: { select: { id: true, nombre: true } },
+      socio: {
+        select: {
+          id: true, nroSocio: true, apellidoNombre: true, documento: true,
+          email: true, celular: true, celularSecundario: true, telefonoFijo: true,
+          domicilio: true, ciudad: true, calle: true, codigoPostal: true,
+          notifWhatsapp: true,
+        }
+      },
+      entidad: {
+        select: {
+          id: true, tipo: true, razonSocial: true, nombreFantasia: true, documento: true,
+          email: true, telefono: true, direccion: true, ciudad: true,
+        }
+      },
+      items: {
+        orderBy: { orden: 'asc' },
+        include: { conceptoTesoreria: { select: { nombre: true } } }
+      },
+      mediosPago: {
+        orderBy: { orden: 'asc' },
+        include: { medioPago: { select: { nombre: true } } }
+      },
+      pago: { include: { socio: { select: { id: true, nroSocio: true, apellidoNombre: true } } } },
+    }
+  })
+}
+
+async function obtenerConfigClubMap(db, tenant) {
+  const config = await db.configuracion.findMany({
+    where: { clave: { in: ['CLUB_NOMBRE', 'CLUB_DIRECCION', 'CLUB_TELEFONO'] } },
+    select: { clave: true, valor: true }
+  }).catch(() => [])
+  const configMap = Object.fromEntries(config.map(c => [c.clave, c.valor]))
+  if (tenant?.logoUrl) configMap.CLUB_LOGO_URL = tenant.logoUrl
+  return configMap
+}
+
+// GET /api/admin/movimientos-caja/:id/comprobante-pdf
+router.get('/movimientos-caja/:id/comprobante-pdf', asyncHandler(async (req, res) => {
+  const movimiento = await cargarMovimientoComprobante(req.db, req.params.id)
+  if (!movimiento) throw new AppError('Movimiento no encontrado', 404, 'NOT_FOUND')
+
+  const admin = await req.db.admin.findUnique({
+    where: { id: req.admin.id }, select: { nombre: true }
+  }).catch(() => null)
+
+  const configMap = await obtenerConfigClubMap(req.db, req.tenant)
+  const pdfBuffer = await generarComprobanteMovimientoPDF(movimiento, admin?.nombre || '', configMap)
+
+  const base = (movimiento.socio?.apellidoNombre || movimiento.entidad?.razonSocial || movimiento.entidad?.nombreFantasia || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+  const filename = `comprobante-${movimiento.numero}${base ? '-' + base : ''}.pdf`
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+  res.send(pdfBuffer)
+}))
+
+// POST /api/admin/movimientos-caja/:id/enviar-comprobante
+// Body: { canales: ['email'|'whatsapp'], email?: string, telefono?: string }
+router.post('/movimientos-caja/:id/enviar-comprobante', asyncHandler(async (req, res) => {
+  const { canales = ['email'], email: emailOverride, telefono: telefonoOverride } = req.body
+
+  const movimiento = await cargarMovimientoComprobante(req.db, req.params.id)
+  if (!movimiento) throw new AppError('Movimiento no encontrado', 404, 'NOT_FOUND')
+
+  // Generar PDF (si falla, igual seguimos sin adjunto)
+  let pdfBuffer = null
+  let pdfFilename = `comprobante-${movimiento.numero}.pdf`
+  try {
+    const [admin, configMap] = await Promise.all([
+      req.db.admin.findUnique({ where: { id: req.admin.id }, select: { nombre: true } }).catch(() => null),
+      obtenerConfigClubMap(req.db, req.tenant),
+    ])
+    pdfBuffer = await generarComprobanteMovimientoPDF(movimiento, admin?.nombre || '', configMap)
+
+    const base = (movimiento.socio?.apellidoNombre || movimiento.entidad?.razonSocial || movimiento.entidad?.nombreFantasia || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_')
+    pdfFilename = `comprobante-${movimiento.numero}${base ? '-' + base : ''}.pdf`
+  } catch (err) {
+    console.error('Error generando PDF de comprobante (se enviará sin adjunto):', err.message)
+  }
+
+  const resultados = {}
+
+  if (canales.includes('email')) {
+    const destino = (emailOverride || movimiento.socio?.email || movimiento.entidad?.email || '').trim()
+    if (!destino) {
+      resultados.email = { ok: false, mensaje: 'No hay email destino (cargá uno en el modal)' }
+    } else {
+      try {
+        const r = await enviarComprobanteMovimientoEmail({
+          movimiento, destinatario: destino, pdfBuffer, pdfFilename, db: req.db
+        })
+        resultados.email = r?.ok
+          ? { ok: true, mensaje: `Comprobante enviado a ${destino}${pdfBuffer ? ' (con PDF adjunto)' : ''}` }
+          : { ok: false, mensaje: r?.motivo || 'No se pudo enviar el email' }
+      } catch (err) {
+        resultados.email = { ok: false, mensaje: err.message }
+      }
+    }
+  }
+
+  if (canales.includes('whatsapp')) {
+    const tel = (telefonoOverride
+      || movimiento.socio?.celular || movimiento.socio?.celularSecundario || movimiento.socio?.telefonoFijo
+      || movimiento.entidad?.telefono || '').trim()
+    if (!tel) {
+      resultados.whatsapp = { ok: false, mensaje: 'No hay teléfono destino (cargá uno en el modal)' }
+    } else {
+      try {
+        const r = await enviarComprobanteMovimientoWhatsApp({
+          movimiento, telefono: tel, pdfBuffer, pdfFilename, db: req.db
+        })
+        if (r?.enviado) {
+          // Si hubo fallback a texto (PDF muy grande), el motivo viene seteado
+          const detalle = r.motivo
+            ? r.motivo
+            : `Mensaje enviado a ${tel}${pdfBuffer ? ' (con PDF adjunto)' : ''}`
+          resultados.whatsapp = { ok: true, mensaje: detalle }
+        } else {
+          resultados.whatsapp = { ok: false, mensaje: r?.motivo || 'No se pudo enviar el mensaje' }
+        }
+      } catch (err) {
+        resultados.whatsapp = { ok: false, mensaje: err.message }
+      }
+    }
+  }
+
+  res.json({ success: true, data: resultados })
 }))
 
 export default router

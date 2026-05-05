@@ -6,6 +6,7 @@ import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import ConceptoTesoreriaModal from '../../../components/ConceptoTesoreriaModal'
 import { SearchInputWithDropdown } from '../../../components/SearchInput'
 import AdjuntosComprobante from '../../../components/AdjuntosComprobante'
+import ComprobanteMovimientoModal from '../../../components/ComprobanteMovimientoModal'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
@@ -35,6 +36,7 @@ export default function MovimientoCajaForm() {
   const [mediosPago, setMediosPago] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [movimientoCreado, setMovimientoCreado] = useState(null)
   const [error, setError] = useState(null)
   const [datosContablesOpen, setDatosContablesOpen] = useState(false)
 
@@ -430,7 +432,7 @@ export default function MovimientoCajaForm() {
 
     setSaving(true)
     try {
-      await api.post('/admin/movimientos-caja', {
+      const creado = await api.post('/admin/movimientos-caja', {
         cajaId: parseInt(form.cajaId),
         tipo: form.tipo,
         fecha: form.fecha || undefined,
@@ -452,15 +454,25 @@ export default function MovimientoCajaForm() {
         })),
       })
 
-      if (cajaIdParam) {
-        navigate(`/admin/tesoreria/cajas/${cajaIdParam}`)
-      } else {
-        navigate('/admin/tesoreria/movimientos')
-      }
+      // Recargar con relaciones (socio/entidad) para precargar email/teléfono en el modal
+      let completo = creado
+      try {
+        completo = await api.get(`/admin/movimientos-caja/${creado.id}`)
+      } catch (_) { /* fallback al objeto sin relaciones */ }
+      setMovimientoCreado(completo)
     } catch (err) {
       setError(err.message || 'Error al guardar')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function cerrarModalYNavegar() {
+    setMovimientoCreado(null)
+    if (cajaIdParam) {
+      navigate(`/admin/tesoreria/cajas/${cajaIdParam}`)
+    } else {
+      navigate('/admin/tesoreria/movimientos')
     }
   }
 
@@ -995,6 +1007,13 @@ export default function MovimientoCajaForm() {
         onClose={() => setShowConceptoModal(false)}
         onCreated={handleConceptoCreado}
         tipoDefault={form.tipo}
+      />
+
+      <ComprobanteMovimientoModal
+        isOpen={!!movimientoCreado}
+        onClose={cerrarModalYNavegar}
+        movimiento={movimientoCreado}
+        variante="success"
       />
     </div>
   )

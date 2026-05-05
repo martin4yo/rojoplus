@@ -3,13 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Edit, Wallet, Building, CreditCard, TrendingUp, TrendingDown,
   ArrowRightLeft, Calendar, ChevronDown, ChevronRight, Search, Banknote,
-  Smartphone, FileText, X, Scale, Eye
+  Smartphone, FileText, X, Scale, Eye, Printer
 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
+import ComprobanteMovimientoModal from '../../../components/ComprobanteMovimientoModal'
 
 const TIPO_ICONS = {
   EFECTIVO: Wallet,
@@ -42,6 +43,7 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
   const [movimientos, setMovimientos] = useState([])
   const [loading, setLoading] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [comprobanteMov, setComprobanteMov] = useState(null)
 
   const config = MEDIO_PAGO_CONFIG[grupo.medioPagoTipo] || MEDIO_PAGO_CONFIG.OTRO
   const Icon = config.icon
@@ -172,13 +174,20 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
                       <td className={`px-4 py-2 text-right font-medium whitespace-nowrap ${mov.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
                         {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.monto, { showSymbol: false })}
                       </td>
-                      <td className="px-2 py-2 text-right">
+                      <td className="px-2 py-2 text-right whitespace-nowrap">
                         <button
                           onClick={() => navigate(`/admin/tesoreria/movimientos/${mov.id}`)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
                           title="Ver detalle"
                         >
                           <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setComprobanteMov(mov)}
+                          className="p-1.5 text-gray-400 hover:text-primary hover:bg-gray-100 rounded ml-1"
+                          title="Imprimir / enviar comprobante"
+                        >
+                          <Printer className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -189,6 +198,12 @@ function MedioPagoRow({ grupo, cajaId, periodo }) {
           )}
         </div>
       )}
+
+      <ComprobanteMovimientoModal
+        isOpen={!!comprobanteMov}
+        onClose={() => setComprobanteMov(null)}
+        movimiento={comprobanteMov}
+      />
     </div>
   )
 }
