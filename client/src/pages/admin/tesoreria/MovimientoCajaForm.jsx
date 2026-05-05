@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, TrendingUp, TrendingDown, Plus, ChevronDown, ChevronRight, Search, X, FileText, Ban, Trash2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
@@ -169,6 +169,9 @@ export default function MovimientoCajaForm() {
             medioPagoLabel: mp.medioPago?.nombre || '',
             monto: String(mp.monto),
             nroOperacion: mp.nroOperacion || '',
+            nroCupon: mp.nroCupon || '',
+            nroLote: mp.nroLote || '',
+            nroAutorizacion: mp.nroAutorizacion || '',
             descripcion: mp.descripcion || '',
           })))
         } else if (mov.medioPagoId) {
@@ -177,6 +180,9 @@ export default function MovimientoCajaForm() {
             medioPagoLabel: mov.medioPagoRel?.nombre || '',
             monto: String(mov.monto),
             nroOperacion: '',
+            nroCupon: '',
+            nroLote: '',
+            nroAutorizacion: '',
             descripcion: '',
           }])
         }
@@ -319,6 +325,9 @@ export default function MovimientoCajaForm() {
       medioPagoId: '',
       monto: restante > 0 ? restante.toFixed(2) : '',
       nroOperacion: '',
+      nroCupon: '',
+      nroLote: '',
+      nroAutorizacion: '',
       descripcion: '',
     }])
   }
@@ -422,6 +431,16 @@ export default function MovimientoCajaForm() {
         setError(`Medio de pago ${idx + 1}: el monto debe ser mayor a cero`)
         return
       }
+      const medio = mediosPago.find(x => x.id.toString() === mp.medioPagoId.toString())
+      const tipoMP = (medio?.tipo || '').toUpperCase()
+      if ((tipoMP === 'TARJETA_CREDITO' || tipoMP === 'TARJETA_DEBITO') && (!mp.nroCupon?.trim() || !mp.nroLote?.trim())) {
+        setError(`"${medio.nombre}" requiere N° de cupón y N° de lote.`)
+        return
+      }
+      if (tipoMP === 'TRANSFERENCIA' && !mp.nroOperacion?.trim()) {
+        setError(`"${medio.nombre}" requiere N° de operación bancaria.`)
+        return
+      }
     }
 
     if (!balanceaTotal) {
@@ -449,7 +468,10 @@ export default function MovimientoCajaForm() {
         mediosPago: mediosPagoLista.map(mp => ({
           medioPagoId: parseInt(mp.medioPagoId),
           monto: parseFloat(mp.monto),
-          nroOperacion: mp.nroOperacion || null,
+          nroOperacion: mp.nroOperacion?.trim() || null,
+          nroCupon: mp.nroCupon?.trim() || null,
+          nroLote: mp.nroLote?.trim() || null,
+          nroAutorizacion: mp.nroAutorizacion?.trim() || null,
           descripcion: mp.descripcion || null,
         })),
       })
@@ -864,8 +886,15 @@ export default function MovimientoCajaForm() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {mediosPagoLista.map((mp, idx) => (
-                    <tr key={idx}>
+                  {mediosPagoLista.map((mp, idx) => {
+                    const medio = mediosPago.find(m => m.id.toString() === mp.medioPagoId?.toString())
+                    const tipoMP = (medio?.tipo || '').toUpperCase()
+                    const esTarjeta = tipoMP === 'TARJETA_CREDITO' || tipoMP === 'TARJETA_DEBITO'
+                    const esTransfer = tipoMP === 'TRANSFERENCIA'
+                    const requiereExtras = esTarjeta || esTransfer
+                    return (
+                    <Fragment key={idx}>
+                    <tr>
                       <td className="px-3 py-2">
                         {isReadOnly ? (
                           <span>{mp.medioPagoLabel || '-'}</span>
@@ -944,7 +973,59 @@ export default function MovimientoCajaForm() {
                         </td>
                       )}
                     </tr>
-                  ))}
+                    {requiereExtras && (
+                      <tr className="bg-amber-50/40">
+                        <td colSpan={isReadOnly ? 5 : 6} className="px-3 py-2">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            {esTarjeta && (
+                              <>
+                                <input
+                                  type="text"
+                                  value={mp.nroCupon || ''}
+                                  onChange={(e) => handleMedioPagoChange(idx, 'nroCupon', e.target.value)}
+                                  readOnly={isReadOnly}
+                                  disabled={isReadOnly}
+                                  className="input-field text-sm disabled:bg-gray-50 disabled:text-gray-700"
+                                  placeholder="N° Cupón *"
+                                />
+                                <input
+                                  type="text"
+                                  value={mp.nroLote || ''}
+                                  onChange={(e) => handleMedioPagoChange(idx, 'nroLote', e.target.value)}
+                                  readOnly={isReadOnly}
+                                  disabled={isReadOnly}
+                                  className="input-field text-sm disabled:bg-gray-50 disabled:text-gray-700"
+                                  placeholder="N° Lote *"
+                                />
+                                <input
+                                  type="text"
+                                  value={mp.nroAutorizacion || ''}
+                                  onChange={(e) => handleMedioPagoChange(idx, 'nroAutorizacion', e.target.value)}
+                                  readOnly={isReadOnly}
+                                  disabled={isReadOnly}
+                                  className="input-field text-sm disabled:bg-gray-50 disabled:text-gray-700"
+                                  placeholder="N° Autorización (opcional)"
+                                />
+                              </>
+                            )}
+                            {esTransfer && (
+                              <input
+                                type="text"
+                                value={mp.nroOperacion || ''}
+                                onChange={(e) => handleMedioPagoChange(idx, 'nroOperacion', e.target.value)}
+                                readOnly={isReadOnly}
+                                disabled={isReadOnly}
+                                className="input-field text-sm md:col-span-3 disabled:bg-gray-50 disabled:text-gray-700"
+                                placeholder="N° de operación bancaria *"
+                              />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                    )
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-50 border-t-2 border-gray-300">

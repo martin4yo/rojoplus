@@ -55,8 +55,8 @@ export default function Cuotas() {
   const [mediosPago, setMediosPago] = useState([])
   const [cajas, setCajas] = useState([])
   const [showPagoModal, setShowPagoModal] = useState(false)
-  // splits: [{ medioPagoId, cajaId, monto }]
-  const [splits, setSplits] = useState([{ medioPagoId: '', cajaId: '', monto: '' }])
+  // splits: [{ medioPagoId, cajaId, monto, nroOperacion, nroCupon, nroLote, nroAutorizacion }]
+  const [splits, setSplits] = useState([{ medioPagoId: '', cajaId: '', monto: '', nroOperacion: '', nroCupon: '', nroLote: '', nroAutorizacion: '' }])
   // Saldo a favor del socio (lotes ordenados por fecha asc para FIFO)
   const [saldoSocio, setSaldoSocio] = useState({ totalDisponible: 0, saldos: [] })
   const [saldoAplicar, setSaldoAplicar] = useState(0)
@@ -145,7 +145,7 @@ export default function Cuotas() {
       const primerMedio = mediosData?.[0]
       const defaultMedio = primerMedio?.id?.toString() || ''
       const defaultCaja = primerMedio?.cajaDefaultId?.toString() || cajasData?.find(c => c.paraCaja)?.id?.toString() || ''
-      setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: '' }])
+      setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: '', nroOperacion: '', nroCupon: '', nroLote: '', nroAutorizacion: '' }])
     } catch (err) {
       console.error('Error cargando datos iniciales:', err)
     }
@@ -347,7 +347,7 @@ export default function Cuotas() {
     setSaldoAplicar(usarSaldo ? saldoUsable : 0)
 
     if (restante > 0) {
-      setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: restante.toFixed(2) }])
+      setSplits([{ medioPagoId: defaultMedio, cajaId: defaultCaja, monto: restante.toFixed(2), nroOperacion: '', nroCupon: '', nroLote: '', nroAutorizacion: '' }])
     } else {
       // Cobranza 100% con saldo: sin splits de cash
       setSplits([])
@@ -468,6 +468,16 @@ export default function Cuotas() {
         setErrorPago('Completá todos los campos en los medios de pago')
         return
       }
+      const m = mediosPago.find(mp => mp.id.toString() === sp.medioPagoId.toString())
+      const tipo = (m?.tipo || '').toUpperCase()
+      if ((tipo === 'TARJETA_CREDITO' || tipo === 'TARJETA_DEBITO') && (!sp.nroCupon?.trim() || !sp.nroLote?.trim())) {
+        setErrorPago(`"${m.nombre}" requiere N° de cupón y N° de lote.`)
+        return
+      }
+      if (tipo === 'TRANSFERENCIA' && !sp.nroOperacion?.trim()) {
+        setErrorPago(`"${m.nombre}" requiere N° de operación.`)
+        return
+      }
     }
     if (Math.abs((sumaSplits + saldoAAplicar) - total) > 1) {
       setErrorPago(
@@ -493,6 +503,10 @@ export default function Cuotas() {
           medioPagoId: parseInt(sp.medioPagoId),
           cajaId: parseInt(sp.cajaId),
           monto: parseFloat(sp.monto),
+          nroOperacion: sp.nroOperacion?.trim() || null,
+          nroCupon: sp.nroCupon?.trim() || null,
+          nroLote: sp.nroLote?.trim() || null,
+          nroAutorizacion: sp.nroAutorizacion?.trim() || null,
         })),
         saldosAplicados: saldoAAplicar > 0 ? distribuirSaldoFIFO(saldoAAplicar) : [],
       })
@@ -903,7 +917,7 @@ export default function Cuotas() {
               const restante = Math.max(0, Math.round((totalAPagar - sumaSplits) * 100) / 100)
               const defaultMedio = mediosPago[0]?.id?.toString() || ''
               const defaultCaja = mediosPago[0]?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
-              setSplits(prev => [...prev, { medioPagoId: defaultMedio, cajaId: defaultCaja, monto: restante.toFixed(2) }])
+              setSplits(prev => [...prev, { medioPagoId: defaultMedio, cajaId: defaultCaja, monto: restante.toFixed(2), nroOperacion: '', nroCupon: '', nroLote: '', nroAutorizacion: '' }])
             }
             function removeSplit(idx) {
               setSplits(prev => prev.filter((_, i) => i !== idx))
@@ -950,7 +964,7 @@ export default function Cuotas() {
                               else if (splits.length === 0) {
                                 const dm = mediosPago[0]?.id?.toString() || ''
                                 const dc = mediosPago[0]?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
-                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: restante.toFixed(2) }])
+                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: restante.toFixed(2), nroOperacion: '', nroCupon: '', nroLote: '', nroAutorizacion: '' }])
                               } else {
                                 setSplits(prev => prev.map((sp, i) => i === 0 ? { ...sp, monto: restante.toFixed(2) } : sp))
                               }
@@ -959,7 +973,7 @@ export default function Cuotas() {
                               if (splits.length === 0) {
                                 const dm = mediosPago[0]?.id?.toString() || ''
                                 const dc = mediosPago[0]?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
-                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: totalAPagar.toFixed(2) }])
+                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: totalAPagar.toFixed(2), nroOperacion: '', nroCupon: '', nroLote: '', nroAutorizacion: '' }])
                               } else {
                                 setSplits(prev => prev.map((sp, i) => i === 0 ? { ...sp, monto: totalAPagar.toFixed(2) } : sp))
                               }
@@ -990,7 +1004,7 @@ export default function Cuotas() {
                               } else if (splits.length === 0) {
                                 const dm = mediosPago[0]?.id?.toString() || ''
                                 const dc = mediosPago[0]?.cajaDefaultId?.toString() || cajas[0]?.id?.toString() || ''
-                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: restante.toFixed(2) }])
+                                setSplits([{ medioPagoId: dm, cajaId: dc, monto: restante.toFixed(2), nroOperacion: '', nroCupon: '', nroLote: '', nroAutorizacion: '' }])
                               } else {
                                 setSplits(prev => prev.map((sp, i) => i === 0 ? { ...sp, monto: restante.toFixed(2) } : sp))
                               }
@@ -1017,41 +1031,83 @@ export default function Cuotas() {
                   </div>
 
                   <div className="space-y-2">
-                    {splits.map((sp, idx) => (
-                      <div key={idx} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
-                        <div className="grid grid-cols-[1fr_8rem_auto] gap-2">
-                          <select
-                            value={sp.medioPagoId}
-                            onChange={e => updateSplit(idx, 'medioPagoId', e.target.value)}
-                            className="input-field text-sm"
-                          >
-                            <option value="">Medio de pago...</option>
-                            {mediosPago.map(mp => <option key={mp.id} value={mp.id}>{mp.nombre}</option>)}
-                          </select>
-                          <input
-                            type="number"
-                            value={sp.monto}
-                            onChange={e => updateSplit(idx, 'monto', e.target.value)}
-                            className="input-field text-sm text-right"
-                            step="0.01"
-                            min="0.01"
-                            placeholder="0.00"
-                          />
-                          {splits.length > 1
-                            ? <button type="button" onClick={() => removeSplit(idx)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                            : <div />
-                          }
-                          <select
-                            value={sp.cajaId}
-                            onChange={e => updateSplit(idx, 'cajaId', e.target.value)}
-                            className="input-field text-sm col-span-2 mt-2"
-                          >
-                            <option value="">Caja...</option>
-                            {cajas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                          </select>
+                    {splits.map((sp, idx) => {
+                      const medio = mediosPago.find(mp => mp.id.toString() === sp.medioPagoId?.toString())
+                      const tipoMedio = (medio?.tipo || '').toUpperCase()
+                      const esTarjeta = tipoMedio === 'TARJETA_CREDITO' || tipoMedio === 'TARJETA_DEBITO'
+                      const esTransfer = tipoMedio === 'TRANSFERENCIA'
+                      return (
+                        <div key={idx} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
+                          <div className="grid grid-cols-[1fr_8rem_auto] gap-2">
+                            <select
+                              value={sp.medioPagoId}
+                              onChange={e => updateSplit(idx, 'medioPagoId', e.target.value)}
+                              className="input-field text-sm"
+                            >
+                              <option value="">Medio de pago...</option>
+                              {mediosPago.map(mp => <option key={mp.id} value={mp.id}>{mp.nombre}</option>)}
+                            </select>
+                            <input
+                              type="number"
+                              value={sp.monto}
+                              onChange={e => updateSplit(idx, 'monto', e.target.value)}
+                              className="input-field text-sm text-right"
+                              step="0.01"
+                              min="0.01"
+                              placeholder="0.00"
+                            />
+                            {splits.length > 1
+                              ? <button type="button" onClick={() => removeSplit(idx)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                              : <div />
+                            }
+                            <select
+                              value={sp.cajaId}
+                              onChange={e => updateSplit(idx, 'cajaId', e.target.value)}
+                              className="input-field text-sm col-span-2 mt-2"
+                            >
+                              <option value="">Caja...</option>
+                              {cajas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Campos extra según tipo de medio */}
+                          {esTarjeta && (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              <input
+                                type="text"
+                                value={sp.nroCupon || ''}
+                                onChange={e => updateSplit(idx, 'nroCupon', e.target.value)}
+                                placeholder="N° Cupón *"
+                                className="input-field text-sm"
+                              />
+                              <input
+                                type="text"
+                                value={sp.nroLote || ''}
+                                onChange={e => updateSplit(idx, 'nroLote', e.target.value)}
+                                placeholder="N° Lote *"
+                                className="input-field text-sm"
+                              />
+                              <input
+                                type="text"
+                                value={sp.nroAutorizacion || ''}
+                                onChange={e => updateSplit(idx, 'nroAutorizacion', e.target.value)}
+                                placeholder="N° Autorización (opcional)"
+                                className="input-field text-sm col-span-2"
+                              />
+                            </div>
+                          )}
+                          {esTransfer && (
+                            <input
+                              type="text"
+                              value={sp.nroOperacion || ''}
+                              onChange={e => updateSplit(idx, 'nroOperacion', e.target.value)}
+                              placeholder="N° de operación bancaria *"
+                              className="input-field text-sm w-full mt-2"
+                            />
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
 
                   {/* Indicador diferencia */}

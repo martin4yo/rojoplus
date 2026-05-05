@@ -548,7 +548,10 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
       mediosNorm.push({
         medioPagoId: parseInt(mp.medioPagoId),
         monto: m,
-        nroOperacion: mp.nroOperacion || null,
+        nroOperacion: mp.nroOperacion?.trim() || null,
+        nroCupon: mp.nroCupon?.trim() || null,
+        nroLote: mp.nroLote?.trim() || null,
+        nroAutorizacion: mp.nroAutorizacion?.trim() || null,
         descripcion: mp.descripcion || null,
       })
       totalMedios += m
@@ -645,6 +648,31 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
     mediosPagoRecords.push(medioPagoRecord)
   }
 
+  // Validar campos obligatorios según tipo de medio:
+  //   TARJETA_CREDITO/DEBITO → nroCupon + nroLote requeridos
+  //   TRANSFERENCIA → nroOperacion requerido
+  for (let i = 0; i < mediosNorm.length; i++) {
+    const mp = mediosNorm[i]
+    const rec = mediosPagoRecords[i]
+    const tipoMP = (rec?.tipo || '').toUpperCase()
+    if (tipoMP === 'TARJETA_CREDITO' || tipoMP === 'TARJETA_DEBITO') {
+      if (!mp.nroCupon || !mp.nroLote) {
+        throw new AppError(
+          `Para "${rec.nombre}" (tarjeta) son obligatorios el N° de cupón y N° de lote.`,
+          400, 'TARJETA_DATOS_REQUERIDOS'
+        )
+      }
+    }
+    if (tipoMP === 'TRANSFERENCIA') {
+      if (!mp.nroOperacion) {
+        throw new AppError(
+          `Para "${rec.nombre}" (transferencia) es obligatorio el N° de operación.`,
+          400, 'TRANSF_DATOS_REQUERIDOS'
+        )
+      }
+    }
+  }
+
   // Verificar saldo suficiente para egresos — chequea por cada medio de pago
   const montoNum = montoTotal
   if (tipo === 'EGRESO') {
@@ -715,6 +743,9 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
       medioPagoId: mp.medioPagoId,
       monto: mp.monto,
       nroOperacion: mp.nroOperacion,
+      nroCupon: mp.nroCupon || null,
+      nroLote: mp.nroLote || null,
+      nroAutorizacion: mp.nroAutorizacion || null,
       descripcion: mp.descripcion,
       orden: idx,
     }))

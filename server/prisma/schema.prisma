@@ -813,15 +813,21 @@ model Pago {
 }
 
 model PagoMedioPago {
-  id          Int       @id @default(autoincrement())
-  pagoId      Int       @map("pago_id")
-  medioPagoId Int       @map("medio_pago_id")
-  cajaId      Int       @map("caja_id")
-  monto       Decimal   @db.Decimal(12, 2)
-  pago        Pago      @relation(fields: [pagoId], references: [id])
-  medioPago   MedioPago @relation(fields: [medioPagoId], references: [id])
-  caja        Caja      @relation(fields: [cajaId], references: [id])
-  tenantId    Int       @map("tenant_id")
+  id              Int       @id @default(autoincrement())
+  pagoId          Int       @map("pago_id")
+  medioPagoId     Int       @map("medio_pago_id")
+  cajaId          Int       @map("caja_id")
+  monto           Decimal   @db.Decimal(12, 2)
+  // Datos opcionales según el medio de pago
+  nroOperacion    String?   @map("nro_operacion")     // transferencia, MP
+  nroCupon        String?   @map("nro_cupon")         // tarjeta de crédito/débito
+  nroLote         String?   @map("nro_lote")          // tarjeta
+  nroAutorizacion String?   @map("nro_autorizacion")  // tarjeta (opcional)
+  observaciones   String?
+  pago            Pago      @relation(fields: [pagoId], references: [id])
+  medioPago       MedioPago @relation(fields: [medioPagoId], references: [id])
+  caja            Caja      @relation(fields: [cajaId], references: [id])
+  tenantId        Int       @map("tenant_id")
 
   @@index([pagoId])
   @@index([tenantId])
@@ -1290,6 +1296,9 @@ model MedioPagoMovimientoCaja {
   medioPagoId      Int      @map("medio_pago_id")
   monto            Decimal  @db.Decimal(12, 2)
   nroOperacion     String?  @map("nro_operacion")
+  nroCupon         String?  @map("nro_cupon")
+  nroLote          String?  @map("nro_lote")
+  nroAutorizacion  String?  @map("nro_autorizacion")
   descripcion      String?
   orden            Int      @default(0)
   createdAt        DateTime @default(now()) @map("created_at")

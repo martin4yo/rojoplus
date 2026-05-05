@@ -1316,12 +1316,17 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   const sumaSaldos = saldosAplicar.reduce((s, x) => s + x.monto, 0)
 
   // Normalizar splits: aceptar array nuevo O par medioPagoId/cajaId legacy
-  let splits // [{ medioPagoId, cajaId, monto }]
+  let splits // [{ medioPagoId, cajaId, monto, nroOperacion?, nroCupon?, nroLote?, ... }]
   if (Array.isArray(mediosPagoInput) && mediosPagoInput.length > 0) {
     splits = mediosPagoInput.map(s => ({
       medioPagoId: parseInt(s.medioPagoId),
       cajaId: parseInt(s.cajaId),
       monto: parseFloat(s.monto),
+      nroOperacion: s.nroOperacion?.trim() || null,
+      nroCupon: s.nroCupon?.trim() || null,
+      nroLote: s.nroLote?.trim() || null,
+      nroAutorizacion: s.nroAutorizacion?.trim() || null,
+      observaciones: s.observaciones?.trim() || null,
     }))
   } else if (medioPagoId && cajaId) {
     splits = [{ medioPagoId: parseInt(medioPagoId), cajaId: parseInt(cajaId), monto: null }] // monto se calcula después
@@ -1429,6 +1434,31 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   const caja = splits.length > 0 ? cajaMap[splits[0].cajaId] : null
   const medioPago = splits.length > 0 ? medioMap[splits[0].medioPagoId] : null
 
+  // Validar campos obligatorios según el tipo de medio:
+  //   TARJETA_CREDITO/DEBITO → nroCupon + nroLote requeridos
+  //   TRANSFERENCIA → nroOperacion requerido
+  for (const split of splits) {
+    const m = medioMap[split.medioPagoId]
+    if (!m) continue
+    const tipo = (m.tipo || '').toUpperCase()
+    if (tipo === 'TARJETA_CREDITO' || tipo === 'TARJETA_DEBITO') {
+      if (!split.nroCupon || !split.nroLote) {
+        throw new AppError(
+          `Para "${m.nombre}" (tarjeta) son obligatorios el N° de cupón y N° de lote.`,
+          400, 'TARJETA_DATOS_REQUERIDOS'
+        )
+      }
+    }
+    if (tipo === 'TRANSFERENCIA') {
+      if (!split.nroOperacion) {
+        throw new AppError(
+          `Para "${m.nombre}" (transferencia) es obligatorio el N° de operación.`,
+          400, 'TRANSF_DATOS_REQUERIDOS'
+        )
+      }
+    }
+  }
+
   // Todo dentro de una transacción
   const pagoCompleto = await req.db.$transaction(async (tx) => {
     // Generar número de recibo (dentro de transacción para evitar duplicados).
@@ -1511,6 +1541,11 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
           medioPagoId: split.medioPagoId,
           cajaId: split.cajaId,
           monto: split.monto,
+          nroOperacion: split.nroOperacion || null,
+          nroCupon: split.nroCupon || null,
+          nroLote: split.nroLote || null,
+          nroAutorizacion: split.nroAutorizacion || null,
+          observaciones: split.observaciones || null,
           tenantId: pago.tenantId || (await tx.caja.findUnique({ where: { id: split.cajaId }, select: { tenantId: true } }))?.tenantId || 0,
         }
       })
