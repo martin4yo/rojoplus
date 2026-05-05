@@ -119,6 +119,7 @@ export default function Autoridades() {
     setFormData({
       seccion,
       nombre: '',
+      nroSocio: '',
       cargo: '',
       tipo: 'TITULAR',
       desde: new Date().getFullYear().toString(),
@@ -280,6 +281,20 @@ export default function Autoridades() {
                 onChange={(e) => setFormData(prev => ({ ...prev, cargo: e.target.value }))}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
                 placeholder="Ej: Presidente"
+              />
+            </div>
+          )}
+
+          {/* Nº Socio (no Subcomisión) */}
+          {!esSubcomision && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nº Socio (opcional)</label>
+              <input
+                type="text"
+                value={formData.nroSocio || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, nroSocio: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary"
+                placeholder="Ej: 16725"
               />
             </div>
           )}

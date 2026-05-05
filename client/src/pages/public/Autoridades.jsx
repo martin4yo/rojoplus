@@ -127,6 +127,11 @@ export default function Autoridades() {
                     <h3 className="text-lg font-bold text-gray-900 mt-1">
                       {miembro.nombre}
                     </h3>
+                    {miembro.nroSocio && (
+                      <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-1" style={{ color: 'var(--text-muted)' }}>
+                        Socio #{miembro.nroSocio}
+                      </p>
+                    )}
                     {miembro.desde && (
                       <p className="text-gray-500 text-sm">Desde {miembro.desde}</p>
                     )}
@@ -170,7 +175,14 @@ export default function Autoridades() {
                           </span>
                         )}
                       </div>
-                      <span className="text-gray-900">{vocal.nombre}</span>
+                      <div>
+                        <span className="text-gray-900 block">{vocal.nombre}</span>
+                        {vocal.nroSocio && (
+                          <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+                            Socio #{vocal.nroSocio}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       vocal.tipo === 'TITULAR'
@@ -200,7 +212,14 @@ export default function Autoridades() {
                           </span>
                         )}
                       </div>
-                      <span className="text-gray-900">{revisor.nombre}</span>
+                      <div>
+                        <span className="text-gray-900 block">{revisor.nombre}</span>
+                        {revisor.nroSocio && (
+                          <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+                            Socio #{revisor.nroSocio}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       revisor.tipo === 'TITULAR'

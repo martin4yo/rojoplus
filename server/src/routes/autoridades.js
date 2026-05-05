@@ -19,6 +19,24 @@ router.get('/public', async (req, res) => {
       ]
     })
 
+    // Fallback de foto: si la autoridad no tiene foto cargada pero tiene nroSocio,
+    // usamos la fotoUrl del perfil del socio.
+    const nrosSinFoto = autoridades
+      .filter(a => !a.foto && a.nroSocio)
+      .map(a => a.nroSocio)
+    if (nrosSinFoto.length > 0) {
+      const socios = await req.db.socio.findMany({
+        where: { nroSocio: { in: nrosSinFoto }, fotoUrl: { not: null } },
+        select: { nroSocio: true, fotoUrl: true },
+      })
+      const fotoBySocio = new Map(socios.map(s => [s.nroSocio, s.fotoUrl]))
+      for (const a of autoridades) {
+        if (!a.foto && a.nroSocio && fotoBySocio.has(a.nroSocio)) {
+          a.foto = fotoBySocio.get(a.nroSocio)
+        }
+      }
+    }
+
     // Obtener período de la configuración
     const configPeriodo = await req.db.configuracion.findFirst({
       where: { clave: 'PERIODO_COMISION_DIRECTIVA' }
@@ -125,6 +143,7 @@ router.post('/', authAdmin, async (req, res) => {
       seccion,
       cargo,
       nombre,
+      nroSocio,
       tipo,
       desde,
       email,
@@ -155,6 +174,7 @@ router.post('/', authAdmin, async (req, res) => {
         seccion,
         cargo: cargo || null,
         nombre,
+        nroSocio: nroSocio || null,
         tipo: tipo || null,
         desde: desde || null,
         email: email || null,
@@ -182,6 +202,7 @@ router.put('/:id', authAdmin, async (req, res) => {
       seccion,
       cargo,
       nombre,
+      nroSocio,
       tipo,
       desde,
       email,
@@ -199,6 +220,7 @@ router.put('/:id', authAdmin, async (req, res) => {
         seccion,
         cargo: cargo || null,
         nombre,
+        nroSocio: nroSocio || null,
         tipo: tipo || null,
         desde: desde || null,
         email: email || null,

@@ -3191,6 +3191,7 @@ model Autoridad {
   seccion     String
   cargo       String?
   nombre      String
+  nroSocio    String?  @map("nro_socio")
   tipo        String?
   desde       String?
   email       String?

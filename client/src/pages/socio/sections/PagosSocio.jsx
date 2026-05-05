@@ -23,6 +23,8 @@ import ChatWidget from '../../../components/chat/ChatWidget'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensajesNoLeidos = 0, onNavigate }) {
+  const esMiembroFamilia = !!socio?.titularFamiliaId
+  const titularNombre = socio?.titularFamilia?.apellidoNombre || socio?.grupoFamiliar?.titular?.apellidoNombre
   const [cuotas, setCuotas] = useState([])
   const [historial, setHistorial] = useState([])
   const [cuentaCorriente, setCuentaCorriente] = useState(null)
@@ -391,19 +393,42 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
         <div className="space-y-4">
           {cuotas.length === 0 ? (
             <div className="pub-card p-12 text-center">
-              <CheckCircleIcon className="h-16 w-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">¡Todo pago!</h3>
-              <p className="text-gray-600">No tienes cuotas pendientes</p>
+              <CheckCircleIcon className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
+              <p className="font-display-sport mb-2" style={{ fontSize: 26, lineHeight: 1, color: 'var(--text)' }}>
+                ¡Todo <span style={{ color: 'var(--color-primary)' }}>pago</span>!
+              </p>
+              <p className="text-sm" style={{ color: 'var(--text-dim)' }}>No tenés cuotas pendientes</p>
             </div>
           ) : (
             <>
-              {/* Opciones de pago - Compacto */}
-              {cuotas.length > 0 && (
+              {/* Aviso para miembros del grupo familiar — sin opciones de pago */}
+              {esMiembroFamilia && cuotas.length > 0 && (
+                <div className="pub-card p-6">
+                  <div className="pub-eyebrow mb-2" style={{ color: 'var(--text-dim)' }}>
+                    Grupo familiar
+                  </div>
+                  <p className="font-display-sport mb-2" style={{ fontSize: 22, lineHeight: 1.05, color: 'var(--text)' }}>
+                    El pago lo gestiona el <span style={{ color: 'var(--color-primary)' }}>titular</span>
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+                    {titularNombre
+                      ? <>Tus cuotas figuran en la cuenta de <span style={{ color: 'var(--text)' }}>{titularNombre}</span>. Abajo podés ver el detalle y el saldo pendiente.</>
+                      : 'Tus cuotas figuran en la cuenta del titular del grupo familiar. Abajo podés ver el detalle y el saldo pendiente.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Opciones de pago — sólo titulares */}
+              {!esMiembroFamilia && cuotas.length > 0 && (
                 <>
-                  <div className="pub-card border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">Opciones de pago</h3>
-                      <span className="text-sm font-medium text-gray-600">Total: {formatCurrency(totalPendiente, { minimumFractionDigits: 0 })}</span>
+                  <div className="pub-card p-6">
+                    <div className="flex items-end justify-between mb-5 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
+                      <div>
+                        <div className="pub-eyebrow" style={{ color: 'var(--text-dim)' }}>Opciones de pago</div>
+                        <p className="font-display-sport mt-1" style={{ fontSize: 24, lineHeight: 1, color: 'var(--text)' }}>
+                          Total <span style={{ color: 'var(--color-primary)' }}>{formatCurrency(totalPendiente, { minimumFractionDigits: 0 })}</span>
+                        </p>
+                      </div>
                     </div>
 
                     {!modoTransferencia ? (
@@ -416,37 +441,30 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                             className="px-6 py-3 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
                             title="Pagar con MercadoPago"
                           >
-                            <img
-                              src="/images/MP.png"
-                              alt="MercadoPago"
-                              className="h-8"
-                            />
+                            <img src="/images/MP.png" alt="MercadoPago" className="h-8" />
                           </button>
                           <button
                             disabled
                             className="px-6 py-3 bg-white rounded-lg cursor-not-allowed opacity-60 shadow-lg border-b-4 border-gray-300 border border-gray-200"
                             title="MODO - Próximamente"
                           >
-                            <img
-                              src="/images/MODO.webp"
-                              alt="MODO"
-                              className="h-8"
-                            />
+                            <img src="/images/MODO.webp" alt="MODO" className="h-8" />
                           </button>
                         </div>
 
                         {/* Switch para transferencia */}
                         {configPagos && (
-                          <div className="pt-4 border-t border-gray-200">
+                          <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
                             <button
                               onClick={() => setModoTransferencia(true)}
-                              className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 hover:bg-orange-100 border-2 border-orange-300 rounded-lg transition-colors"
+                              className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors"
+                              style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
                             >
                               <div className="flex items-center gap-2">
-                                <BanknotesIcon className="w-5 h-5 text-orange-600" />
-                                <span className="font-semibold text-orange-900">Pagar por transferencia</span>
+                                <BanknotesIcon className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+                                <span className="font-mono text-[11px] uppercase tracking-[0.2em]">Pagar por transferencia</span>
                               </div>
-                              <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-dim)' }}>
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
                             </button>
@@ -454,86 +472,80 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                         )}
                       </>
                     ) : (
-                      <>
-                        {/* Vista de transferencia */}
-                        <div className="space-y-4">
-                          <button
-                            onClick={() => {
-                              setModoTransferencia(false)
-                              setMostrarInformarPago(false)
-                            }}
-                            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                            <span className="text-sm font-medium">Volver a opciones de pago</span>
-                          </button>
+                      <div className="space-y-4">
+                        <button
+                          onClick={() => {
+                            setModoTransferencia(false)
+                            setMostrarInformarPago(false)
+                          }}
+                          className="inline-flex items-center gap-2 transition-colors font-mono text-[11px] uppercase tracking-[0.2em]"
+                          style={{ color: 'var(--text-dim)' }}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                          Volver a opciones
+                        </button>
 
-                          {/* Datos bancarios */}
-                          <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4">
-                            <h4 className="font-bold text-orange-900 mb-3 flex items-center gap-2">
-                              <BanknotesIcon className="w-5 h-5" />
-                              Datos para transferencia
-                            </h4>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="text-xs font-medium text-orange-700 uppercase block mb-1">Alias</label>
-                                <div className="flex items-center gap-2">
-                                  <p className="text-lg font-semibold text-orange-900 flex-1">{configPagos.alias}</p>
-                                  <button
-                                    onClick={() => copiarAlPortapapeles(configPagos.alias, 'alias')}
-                                    className="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                                    title="Copiar alias"
-                                  >
-                                    {copiadoAlias ? (
-                                      <CheckIcon className="w-5 h-5" />
-                                    ) : (
-                                      <ClipboardDocumentIcon className="w-5 h-5" />
-                                    )}
-                                  </button>
-                                </div>
+                        {/* Datos bancarios */}
+                        <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                          <div className="pub-eyebrow mb-3 flex items-center gap-2" style={{ color: 'var(--text-dim)' }}>
+                            <BanknotesIcon className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+                            Datos para transferencia
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="font-mono text-[10px] uppercase tracking-[0.2em] block mb-1" style={{ color: 'var(--text-muted)' }}>Alias</label>
+                              <div className="flex items-center gap-2">
+                                <p className="font-display-sport flex-1" style={{ fontSize: 18, color: 'var(--text)' }}>{configPagos.alias}</p>
+                                <button
+                                  onClick={() => copiarAlPortapapeles(configPagos.alias, 'alias')}
+                                  className="p-2 rounded-lg transition-colors"
+                                  style={{ backgroundColor: 'var(--color-primary)', color: 'var(--accent-fg)' }}
+                                  title="Copiar alias"
+                                >
+                                  {copiadoAlias ? <CheckIcon className="w-5 h-5" /> : <ClipboardDocumentIcon className="w-5 h-5" />}
+                                </button>
                               </div>
-                              <div>
-                                <label className="text-xs font-medium text-orange-700 uppercase block mb-1">CBU</label>
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-mono text-orange-900 flex-1">{configPagos.cbu}</p>
-                                  <button
-                                    onClick={() => copiarAlPortapapeles(configPagos.cbu, 'cbu')}
-                                    className="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                                    title="Copiar CBU"
-                                  >
-                                    {copiadoCBU ? (
-                                      <CheckIcon className="w-5 h-5" />
-                                    ) : (
-                                      <ClipboardDocumentIcon className="w-5 h-5" />
-                                    )}
-                                  </button>
-                                </div>
+                            </div>
+                            <div>
+                              <label className="font-mono text-[10px] uppercase tracking-[0.2em] block mb-1" style={{ color: 'var(--text-muted)' }}>CBU</label>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-mono flex-1" style={{ color: 'var(--text)' }}>{configPagos.cbu}</p>
+                                <button
+                                  onClick={() => copiarAlPortapapeles(configPagos.cbu, 'cbu')}
+                                  className="p-2 rounded-lg transition-colors"
+                                  style={{ backgroundColor: 'var(--color-primary)', color: 'var(--accent-fg)' }}
+                                  title="Copiar CBU"
+                                >
+                                  {copiadoCBU ? <CheckIcon className="w-5 h-5" /> : <ClipboardDocumentIcon className="w-5 h-5" />}
+                                </button>
                               </div>
                             </div>
                           </div>
-
-                          {/* Botón informar pago */}
-                          <button
-                            onClick={() => setMostrarInformarPago(!mostrarInformarPago)}
-                            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all font-semibold shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-orange-800"
-                          >
-                            <ArrowUpTrayIcon className="w-5 h-5" />
-                            {mostrarInformarPago ? 'Ocultar formulario' : 'Informar pago realizado'}
-                          </button>
                         </div>
-                      </>
+
+                        {/* Botón informar pago */}
+                        <button
+                          onClick={() => setMostrarInformarPago(!mostrarInformarPago)}
+                          className="pub-cta w-full justify-center"
+                        >
+                          <ArrowUpTrayIcon className="w-5 h-5" />
+                          <span>{mostrarInformarPago ? 'Ocultar formulario' : 'Informar pago realizado'}</span>
+                        </button>
+                      </div>
                     )}
                   </div>
 
                   {/* Formulario informar pago */}
                   {mostrarInformarPago && modoTransferencia && configPagos && (
-                    <div className="bg-white border-2 border-orange-500 rounded-lg p-6 shadow-lg">
-                      <h4 className="font-bold text-gray-900 mb-4">Subir comprobante de transferencia</h4>
+                    <div className="pub-card p-6">
+                      <div className="pub-eyebrow mb-4" style={{ color: 'var(--text-dim)' }}>
+                        Subir comprobante de transferencia
+                      </div>
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="font-mono text-[10px] uppercase tracking-[0.2em] block mb-2" style={{ color: 'var(--text-muted)' }}>
                             Comprobante de pago *
                           </label>
                           <input
@@ -545,7 +557,8 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                           />
                           <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-orange-500 transition-colors flex items-center justify-center gap-2 text-gray-600 hover:text-orange-600"
+                            className="w-full py-3 px-4 border-2 border-dashed rounded-lg transition-colors flex items-center justify-center gap-2"
+                            style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}
                           >
                             <ArrowUpTrayIcon className="w-5 h-5" />
                             {comprobante ? 'Cambiar comprobante' : 'Seleccionar archivo'}
@@ -555,15 +568,16 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                               <img
                                 src={comprobantePreview}
                                 alt="Preview"
-                                className="w-full max-h-64 object-contain rounded-lg border"
+                                className="w-full max-h-64 object-contain rounded-lg"
+                                style={{ border: '1px solid var(--border)' }}
                               />
-                              {/* Botón escanear si está disponible */}
                               {configPagos?.parseDisponible && (
                                 <button
                                   type="button"
                                   onClick={escanearComprobante}
                                   disabled={escaneando}
-                                  className="w-full flex items-center justify-center gap-2 py-2 border-2 border-teal-400 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors text-sm font-medium disabled:opacity-60"
+                                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg transition-colors text-sm font-medium disabled:opacity-60"
+                                  style={{ border: '2px solid var(--color-primary)', color: 'var(--color-primary)' }}
                                 >
                                   {escaneando ? (
                                     <>
@@ -578,21 +592,19 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                                   )}
                                 </button>
                               )}
-                              {/* Datos extraídos */}
                               {datosEscaneados && (
-                                <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm space-y-1">
-                                  <p className="font-semibold text-teal-800 mb-2">Datos detectados:</p>
-                                  {datosEscaneados.monto && <p className="text-teal-700">💰 Monto: <span className="font-bold">${Number(datosEscaneados.monto).toLocaleString('es-AR')}</span></p>}
-                                  {datosEscaneados.fecha && <p className="text-teal-700">📅 Fecha: {datosEscaneados.fecha}</p>}
-                                  {datosEscaneados.referencia && <p className="text-teal-700">🔖 Referencia: {datosEscaneados.referencia}</p>}
+                                <div className="rounded-lg p-3 text-sm space-y-1" style={{ backgroundColor: 'var(--accent-soft)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] mb-2" style={{ color: 'var(--text-dim)' }}>Datos detectados</p>
+                                  {datosEscaneados.monto && <p>Monto: <span className="font-semibold">${Number(datosEscaneados.monto).toLocaleString('es-AR')}</span></p>}
+                                  {datosEscaneados.fecha && <p>Fecha: {datosEscaneados.fecha}</p>}
+                                  {datosEscaneados.referencia && <p>Referencia: {datosEscaneados.referencia}</p>}
                                 </div>
                               )}
                             </div>
                           )}
                         </div>
-                        {/* Campo monto (editable, pre-relleno si se escaneó) */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="font-mono text-[10px] uppercase tracking-[0.2em] block mb-1" style={{ color: 'var(--text-muted)' }}>
                             Monto transferido
                           </label>
                           <input
@@ -600,17 +612,18 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                             value={montoManual}
                             onChange={e => setMontoManual(e.target.value)}
                             placeholder={`${formatCurrency(totalPendiente, { minimumFractionDigits: 0 })} (pendiente)`}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
+                            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface)', color: 'var(--text)' }}
                           />
-                          <p className="text-xs text-gray-400 mt-0.5">Dejá vacío para usar el total pendiente</p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Dejá vacío para usar el total pendiente</p>
                         </div>
                         <div className="flex gap-3">
                           <button
                             onClick={informarPago}
                             disabled={enviandoPago || !comprobante}
-                            className="flex-1 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 font-semibold"
+                            className="pub-cta flex-1 justify-center disabled:opacity-50"
                           >
-                            {enviandoPago ? 'Enviando...' : 'Confirmar pago'}
+                            <span>{enviandoPago ? 'Enviando...' : 'Confirmar pago'}</span>
                           </button>
                           <button
                             onClick={() => {
@@ -620,7 +633,8 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                               setDatosEscaneados(null)
                               setMontoManual('')
                             }}
-                            className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                            className="px-4 py-3 rounded-lg transition-colors"
+                            style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}
                           >
                             Cancelar
                           </button>
@@ -677,10 +691,10 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                     {grupo.cuotas.map((cuota) => (
                       <div key={cuota.id} className="pub-card overflow-hidden">
                         <div className="p-6">
-                          <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-start justify-between mb-4 gap-4">
                             <div className="flex-1">
-                              <h3 className="text-lg font-semibold text-gray-900">{cuota.concepto}</h3>
-                              <p className="text-gray-600 mt-1">
+                              <h3 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{cuota.concepto}</h3>
+                              <p className="mt-1 text-sm" style={{ color: 'var(--text-dim)' }}>
                                 Periodo: {cuota.periodo}
                               </p>
                               <div className="mt-2">
@@ -688,44 +702,42 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-2xl font-bold text-gray-900">{formatCurrency(cuota.montoTotal, { minimumFractionDigits: 0 })}</p>
-                              <p className="text-sm text-gray-500 mt-1">Vence: {formatDate(cuota.fechaVencimiento, { format: 'long' })}</p>
+                              <p className="font-display-sport" style={{ fontSize: 26, lineHeight: 1, color: 'var(--text)' }}>
+                                {formatCurrency(cuota.montoTotal, { minimumFractionDigits: 0 })}
+                              </p>
+                              <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-2" style={{ color: 'var(--text-muted)' }}>
+                                Vence {formatDate(cuota.fechaVencimiento, { format: 'long' })}
+                              </p>
                             </div>
                           </div>
 
                           {cuota.recargo > 0 && (
-                            <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-3 mb-4">
-                              <p className="text-sm text-orange-800">
+                            <div className="rounded p-3 mb-4" style={{ backgroundColor: 'var(--accent-soft)', borderLeft: '4px solid var(--color-primary)' }}>
+                              <p className="text-sm" style={{ color: 'var(--text)' }}>
                                 Incluye recargo por mora: {formatCurrency(cuota.recargo, { minimumFractionDigits: 0 })}
                               </p>
                             </div>
                           )}
 
-                          <div className="flex flex-wrap gap-3">
-                            <button
-                              onClick={() => pagarCuota(cuota.id, 'MERCADOPAGO')}
-                              disabled={procesandoPago}
-                              className="px-4 py-2 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
-                              title="Pagar con MercadoPago"
-                            >
-                              <img
-                                src="/images/MP.png"
-                                alt="MercadoPago"
-                                className="h-6"
-                              />
-                            </button>
-                            <button
-                              disabled
-                              className="px-4 py-2 bg-white rounded-lg cursor-not-allowed opacity-60 shadow-lg border-b-4 border-gray-300 border border-gray-200"
-                              title="MODO - Próximamente"
-                            >
-                              <img
-                                src="/images/MODO.webp"
-                                alt="MODO"
-                                className="h-6"
-                              />
-                            </button>
-                          </div>
+                          {!esMiembroFamilia && (
+                            <div className="flex flex-wrap gap-3">
+                              <button
+                                onClick={() => pagarCuota(cuota.id, 'MERCADOPAGO')}
+                                disabled={procesandoPago}
+                                className="px-4 py-2 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
+                                title="Pagar con MercadoPago"
+                              >
+                                <img src="/images/MP.png" alt="MercadoPago" className="h-6" />
+                              </button>
+                              <button
+                                disabled
+                                className="px-4 py-2 bg-white rounded-lg cursor-not-allowed opacity-60 shadow-lg border-b-4 border-gray-300 border border-gray-200"
+                                title="MODO - Próximamente"
+                              >
+                                <img src="/images/MODO.webp" alt="MODO" className="h-6" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -741,41 +753,50 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
         <div className="pub-card overflow-hidden">
           {historial.length === 0 ? (
             <div className="p-12 text-center">
-              <DocumentTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Sin historial</h3>
-              <p className="text-gray-600">No hay pagos registrados</p>
+              <DocumentTextIcon className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+              <p className="font-display-sport mb-2" style={{ fontSize: 22, lineHeight: 1, color: 'var(--text)' }}>Sin historial</p>
+              <p className="text-sm" style={{ color: 'var(--text-dim)' }}>No hay pagos registrados</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
               {historial.map((pago) => (
-                <div key={pago.id} className="p-6 hover:bg-gray-50 transition-colors">
+                <div
+                  key={pago.id}
+                  className="p-6 transition-colors"
+                  style={{ backgroundColor: 'transparent' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-surface)'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">{pago.concepto}</h4>
+                      <h4 className="font-semibold" style={{ color: 'var(--text)' }}>{pago.concepto}</h4>
                       {pago.esDeOtroMiembro && (
                         <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-1" style={{ color: 'var(--text-muted)' }}>
                           Pago de {pago.socioApellidoNombre} · #{pago.socioNroSocio}
                         </p>
                       )}
-                      <p className="text-sm text-gray-600 mt-1">{formatDate(pago.fecha, { format: 'long' })}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {pago.metodoPago} - {pago.comprobante}
+                      <p className="text-sm mt-1" style={{ color: 'var(--text-dim)' }}>{formatDate(pago.fecha, { format: 'long' })}</p>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-1" style={{ color: 'var(--text-muted)' }}>
+                        {pago.metodoPago} · {pago.comprobante}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-green-600">{formatCurrency(pago.monto, { minimumFractionDigits: 0 })}</p>
-                        <CheckCircleIcon className="h-5 w-5 text-green-500 inline ml-2" />
+                      <div className="text-right flex items-center gap-2">
+                        <p className="font-display-sport" style={{ fontSize: 20, lineHeight: 1, color: 'var(--color-primary)' }}>
+                          {formatCurrency(pago.monto, { minimumFractionDigits: 0 })}
+                        </p>
+                        <CheckCircleIcon className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
                       </div>
                       <button
                         onClick={() => descargarReciboPDF(pago.id, pago.numero)}
                         disabled={descargandoPDF === pago.id}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                        className="px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-mono uppercase tracking-[0.15em] text-[11px]"
+                        style={{ backgroundColor: 'var(--color-primary)', color: 'var(--accent-fg)' }}
                         title="Descargar recibo"
                       >
                         {descargandoPDF === pago.id ? (
                           <>
-                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                            <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
                             <span>Descargando...</span>
                           </>
                         ) : (
@@ -800,41 +821,32 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
             <LoadingSpinner />
           ) : cuentaCorriente ? (
             <>
-              {/* Resumen */}
-              <div className="pub-card p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen de Cuenta</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-red-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-1">Total Debe</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {formatCurrency(cuentaCorriente.resumen.totalDebe)}
-                    </p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-1">Total Haber</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {formatCurrency(cuentaCorriente.resumen.totalHaber)}
-                    </p>
-                  </div>
-                  <div className={`rounded-lg p-4 ${
-                    parseFloat(cuentaCorriente.resumen.saldoFinal) > 0 ? 'bg-orange-50' : 'bg-blue-50'
-                  }`}>
-                    <p className="text-sm text-gray-600 mb-1">Saldo Final</p>
-                    <p className={`text-2xl font-bold ${
-                      parseFloat(cuentaCorriente.resumen.saldoFinal) > 0 ? 'text-orange-600' : 'text-blue-600'
-                    }`}>
-                      {formatCurrency(cuentaCorriente.resumen.saldoFinal)}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-1">Pendiente de Pago</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(cuentaCorriente.resumen.totalPendiente)}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {cuentaCorriente.resumen.cargosPendientes} cuota(s)
-                    </p>
-                  </div>
+              {/* Resumen — grid athletic con líneas finas */}
+              <div>
+                <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>Resumen de cuenta</div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+                  <CuentaStatTile
+                    label="Total debe"
+                    value={formatCurrency(cuentaCorriente.resumen.totalDebe)}
+                    number="01"
+                  />
+                  <CuentaStatTile
+                    label="Total haber"
+                    value={formatCurrency(cuentaCorriente.resumen.totalHaber)}
+                    number="02"
+                  />
+                  <CuentaStatTile
+                    label="Saldo final"
+                    value={formatCurrency(cuentaCorriente.resumen.saldoFinal)}
+                    number="03"
+                    accent={parseFloat(cuentaCorriente.resumen.saldoFinal) > 0}
+                  />
+                  <CuentaStatTile
+                    label="Pendiente de pago"
+                    value={formatCurrency(cuentaCorriente.resumen.totalPendiente)}
+                    sub={`${cuentaCorriente.resumen.cargosPendientes} cuota(s)`}
+                    number="04"
+                  />
                 </div>
               </div>
 
@@ -842,47 +854,35 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
               <div className="pub-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead style={{ backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Fecha
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Concepto
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Detalle
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Debe
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Haber
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Saldo
-                        </th>
+                        {['Fecha', 'Concepto', 'Detalle', 'Debe', 'Haber', 'Saldo'].map((h, i) => (
+                          <th
+                            key={h}
+                            className={`px-6 py-3 font-mono text-[10px] uppercase tracking-[0.2em] ${i >= 3 ? 'text-right' : 'text-left'}`}
+                            style={{ color: 'var(--text-muted)' }}
+                          >
+                            {h}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
                       {cuentaCorriente.movimientos.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                          <td colSpan="6" className="px-6 py-12 text-center" style={{ color: 'var(--text-dim)' }}>
                             No hay movimientos registrados
                           </td>
                         </tr>
                       ) : (
                         cuentaCorriente.movimientos.map((mov) => (
-                          <tr
-                            key={mov.id}
-                            className={`hover:bg-gray-50 ${
-                              mov.tipo === 'DEBITO' ? 'bg-red-50/30' : 'bg-green-50/30'
-                            }`}
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <tr key={mov.id} className="transition-colors" style={{ backgroundColor: 'transparent' }}
+                              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-surface)'}
+                              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: 'var(--text)' }}>
                               {formatDate(mov.fecha, { format: 'long' })}
                             </td>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            <td className="px-6 py-4 text-sm font-medium" style={{ color: 'var(--text)' }}>
                               {mov.concepto}
                               {mov.estado === 'PENDIENTE' && (
                                 <span className="ml-2">
@@ -895,18 +895,17 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                                 </p>
                               )}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">
+                            <td className="px-6 py-4 text-sm" style={{ color: 'var(--text-dim)' }}>
                               {mov.detalle}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600 font-medium">
-                              {mov.debe > 0 ? formatCurrency(mov.debe) : '-'}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium" style={{ color: 'var(--text-dim)' }}>
+                              {mov.debe > 0 ? formatCurrency(mov.debe) : '—'}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-medium">
-                              {mov.haber > 0 ? formatCurrency(mov.haber) : '-'}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium" style={{ color: 'var(--text)' }}>
+                              {mov.haber > 0 ? formatCurrency(mov.haber) : '—'}
                             </td>
-                            <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
-                              parseFloat(mov.saldo) > 0 ? 'text-orange-600' : 'text-blue-600'
-                            }`}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold"
+                                style={{ color: parseFloat(mov.saldo) > 0 ? 'var(--color-primary)' : 'var(--text)' }}>
                               {formatCurrency(mov.saldo)}
                             </td>
                           </tr>
@@ -917,8 +916,8 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                 </div>
 
                 {cuentaCorriente.movimientos.length > 0 && (
-                  <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                    <p className="text-sm text-gray-600">
+                  <div className="px-6 py-4" style={{ backgroundColor: 'var(--bg-surface)', borderTop: '1px solid var(--border)' }}>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
                       Mostrando {cuentaCorriente.movimientos.length} movimiento(s)
                     </p>
                   </div>
@@ -927,14 +926,11 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
             </>
           ) : (
             <div className="pub-card p-12 text-center">
-              <DocumentTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Error cargando cuenta corriente</h3>
-              <p className="text-gray-600 mb-4">No se pudo cargar la información</p>
-              <button
-                onClick={cargarCuentaCorriente}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Reintentar
+              <DocumentTextIcon className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+              <p className="font-display-sport mb-2" style={{ fontSize: 22, lineHeight: 1, color: 'var(--text)' }}>Error cargando cuenta corriente</p>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-dim)' }}>No se pudo cargar la información</p>
+              <button onClick={cargarCuentaCorriente} className="pub-cta inline-flex">
+                <span>Reintentar</span>
               </button>
             </div>
           )}
@@ -981,5 +977,28 @@ function PagoStatCard({ label, value, tone, icon: Icon, number, onClick }) {
         </p>
       </div>
     </Component>
+  )
+}
+
+function CuentaStatTile({ label, value, sub, number, accent }) {
+  return (
+    <div className="p-5 flex flex-col gap-3" style={{ backgroundColor: 'var(--bg-surface)' }}>
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+          {label}
+        </span>
+        <span className="font-mono text-[10px] tracking-[0.25em]" style={{ color: 'var(--text-muted)' }}>
+          {number}
+        </span>
+      </div>
+      <p className="font-display-sport" style={{ fontSize: 22, lineHeight: 1, color: accent ? 'var(--color-primary)' : 'var(--text)' }}>
+        {value}
+      </p>
+      {sub && (
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
+          {sub}
+        </p>
+      )}
+    </div>
   )
 }
