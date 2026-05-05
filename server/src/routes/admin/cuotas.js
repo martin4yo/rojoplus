@@ -1323,9 +1323,10 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
       estado: 'PENDIENTE',
     },
     include: {
+      conceptoTesoreria: true,
       categoriaActividad: {
         include: {
-          actividad: true,
+          actividad: { include: { conceptoTesoreria: true } },
           conceptoTesoreria: true,
         }
       }
@@ -1488,13 +1489,21 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     }
 
     // Agrupar cargos por centro de costo efectivo
-    // Prioridad: cargo.centroCostoId → CC del concepto de la actividad → CC del concepto por defecto → CC de la caja
+    // Prioridad:
+    //   1. cargo.centroCostoId (override manual)
+    //   2. CC del concepto de la Categoría de Actividad
+    //   3. CC del concepto de la Actividad (heredado por todas sus categorías)
+    //   4. CC del concepto del propio cargo (cuota social, viene del TipoSocio)
+    //   5. CC del concepto por defecto
+    //   6. CC de la caja
     const gruposPorCC = {}
     for (const cuota of cuotas) {
       const montoEfectivo = Number(cuota.montoTotal) + cuota.recargoCalculado - cuota.descuentoCalculado
       const ccEfectivo =
         cuota.centroCostoId ??
         cuota.categoriaActividad?.conceptoTesoreria?.centroCostoId ??
+        cuota.categoriaActividad?.actividad?.conceptoTesoreria?.centroCostoId ??
+        cuota.conceptoTesoreria?.centroCostoId ??
         conceptoPorDefecto.centroCostoId ??
         caja.centroCostoId
 
@@ -1505,9 +1514,11 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         )
       }
 
-      const conceptoNombre = (cuota.categoriaActividad?.conceptoTesoreria?.activo)
-        ? cuota.categoriaActividad.conceptoTesoreria.nombre
-        : conceptoPorDefecto.nombre
+      const conceptoNombre =
+        (cuota.categoriaActividad?.conceptoTesoreria?.activo && cuota.categoriaActividad.conceptoTesoreria.nombre) ||
+        (cuota.categoriaActividad?.actividad?.conceptoTesoreria?.activo && cuota.categoriaActividad.actividad.conceptoTesoreria.nombre) ||
+        (cuota.conceptoTesoreria?.activo && cuota.conceptoTesoreria.nombre) ||
+        conceptoPorDefecto.nombre
 
       if (!gruposPorCC[ccEfectivo]) {
         gruposPorCC[ccEfectivo] = { centroCostoId: ccEfectivo, monto: 0, conceptoNombre }

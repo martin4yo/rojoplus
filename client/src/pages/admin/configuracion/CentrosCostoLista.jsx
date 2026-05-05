@@ -50,13 +50,11 @@ export default function CentrosCostoLista() {
   }
 
   const handleEliminar = async (centro) => {
-    const confirmado = await confirm({
-      title: 'Desactivar Centro de Costo',
-      message: `¿Estás seguro de que deseas desactivar el centro de costo "${centro.nombre}"?`,
-      confirmText: 'Desactivar',
-      cancelText: 'Cancelar',
-      isDangerous: true
-    })
+    const confirmado = await confirm(
+      'Desactivar Centro de Costo',
+      `¿Estás seguro de que deseas desactivar el centro de costo "${centro.nombre}"?`,
+      { confirmText: 'Desactivar', cancelText: 'Cancelar', variant: 'danger' }
+    )
 
     if (!confirmado) return
 

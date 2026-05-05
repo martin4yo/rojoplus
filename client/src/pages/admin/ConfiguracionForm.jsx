@@ -5,6 +5,7 @@ import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import SelectCentroCosto from '../../components/SelectCentroCosto'
 
 const COLORES = [
   { value: 'green', label: 'Verde', class: 'bg-green-100 text-green-800' },
@@ -72,6 +73,7 @@ export default function ConfiguracionForm() {
     usaEnVentas: false,
     usaEnTesoreria: true,
     cuentaContableId: '',
+    centroCostoId: '',
     // descuentos-disponibles
     porcentaje: '',
     // medios-pago
@@ -139,6 +141,7 @@ export default function ConfiguracionForm() {
         usaEnVentas: data.usaEnVentas || false,
         usaEnTesoreria: data.usaEnTesoreria !== false,
         cuentaContableId: data.cuentaContableId ? String(data.cuentaContableId) : '',
+        centroCostoId: data.centroCostoId ? String(data.centroCostoId) : '',
         // medios-pago
         tipoMedioPago: data.tipo || 'EFECTIVO',
         requiereDatosBanco: data.requiereDatosBanco || false,
@@ -198,6 +201,7 @@ export default function ConfiguracionForm() {
         datos.usaEnVentas = form.usaEnVentas
         datos.usaEnTesoreria = form.usaEnTesoreria
         datos.cuentaContableId = form.cuentaContableId ? parseInt(form.cuentaContableId) : null
+        datos.centroCostoId = form.centroCostoId ? parseInt(form.centroCostoId) : null
       }
 
       if (tabla === 'descuentos-disponibles') {
@@ -478,8 +482,8 @@ export default function ConfiguracionForm() {
                 </div>
               </div>
 
-              {/* Fila 2: Cuenta Contable | Descripción */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Fila 2: Cuenta Contable | Centro de Costo | Descripción */}
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Cuenta Contable <span className="text-gray-400 text-xs">(opcional)</span>
@@ -500,6 +504,21 @@ export default function ConfiguracionForm() {
                         <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
                       ))}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Centro de Costo <span className="text-gray-400 text-xs">(opcional)</span>
+                  </label>
+                  <SelectCentroCosto
+                    value={form.centroCostoId}
+                    onChange={(val) => setForm({ ...form, centroCostoId: val ? String(val) : '' })}
+                    showEmpty
+                    emptyLabel="Sin asignar"
+                    className="input-field w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Se usa al cobrar cuotas asociadas a este concepto
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>

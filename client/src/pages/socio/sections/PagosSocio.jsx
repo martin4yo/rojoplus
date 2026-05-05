@@ -631,64 +631,107 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                 </>
               )}
 
-              {/* Lista de cuotas */}
-              {cuotas.map((cuota) => {
-                return (
-                  <div key={cuota.id} className="pub-card overflow-hidden">
-                    <div className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900">{cuota.concepto}</h3>
-                          <p className="text-gray-600 mt-1">
-                            Periodo: {cuota.periodo}
+              {/* Lista de cuotas — agrupadas por socio (titular + miembros del grupo familiar) */}
+              {(() => {
+                // Agrupar por socio. El propio (titular) primero, después miembros por nombre.
+                const grupos = new Map()
+                for (const c of cuotas) {
+                  const key = c.socioId ?? socio.id
+                  if (!grupos.has(key)) {
+                    grupos.set(key, {
+                      socioId: key,
+                      nombre: c.socioApellidoNombre || socio.apellidoNombre,
+                      nroSocio: c.socioNroSocio || socio.nroSocio,
+                      esTitular: !c.esDeOtroMiembro,
+                      cuotas: [],
+                      total: 0,
+                    })
+                  }
+                  const g = grupos.get(key)
+                  g.cuotas.push(c)
+                  g.total += Number(c.montoTotal) || 0
+                }
+                const ordenados = [...grupos.values()].sort((a, b) =>
+                  (a.esTitular === b.esTitular) ? a.nombre.localeCompare(b.nombre) : (a.esTitular ? -1 : 1)
+                )
+
+                return ordenados.map((grupo) => (
+                  <div key={grupo.socioId} className="space-y-3">
+                    {/* Header del socio (sólo si hay más de un grupo, para no agregar ruido) */}
+                    {ordenados.length > 1 && (
+                      <div className="flex items-end justify-between border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+                        <div>
+                          <div className="pub-eyebrow" style={{ color: 'var(--text-dim)' }}>
+                            {grupo.esTitular ? 'Tus cuotas' : 'Cuotas de'}
+                          </div>
+                          <p className="font-display-sport mt-1" style={{ fontSize: 22, lineHeight: 1, color: 'var(--text)' }}>
+                            {grupo.nombre} <span className="font-mono text-xs ml-2" style={{ color: 'var(--text-muted)' }}>#{grupo.nroSocio}</span>
                           </p>
-                          <div className="mt-2">
-                            <StatusBadge status={cuota.estado} type="cuota" />
+                        </div>
+                        <p className="font-display-sport" style={{ fontSize: 22, lineHeight: 1, color: 'var(--text)' }}>
+                          {formatCurrency(grupo.total, { minimumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                    )}
+
+                    {grupo.cuotas.map((cuota) => (
+                      <div key={cuota.id} className="pub-card overflow-hidden">
+                        <div className="p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-900">{cuota.concepto}</h3>
+                              <p className="text-gray-600 mt-1">
+                                Periodo: {cuota.periodo}
+                              </p>
+                              <div className="mt-2">
+                                <StatusBadge status={cuota.estado} type="cuota" />
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-gray-900">{formatCurrency(cuota.montoTotal, { minimumFractionDigits: 0 })}</p>
+                              <p className="text-sm text-gray-500 mt-1">Vence: {formatDate(cuota.fechaVencimiento, { format: 'long' })}</p>
+                            </div>
+                          </div>
+
+                          {cuota.recargo > 0 && (
+                            <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-3 mb-4">
+                              <p className="text-sm text-orange-800">
+                                Incluye recargo por mora: {formatCurrency(cuota.recargo, { minimumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-3">
+                            <button
+                              onClick={() => pagarCuota(cuota.id, 'MERCADOPAGO')}
+                              disabled={procesandoPago}
+                              className="px-4 py-2 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
+                              title="Pagar con MercadoPago"
+                            >
+                              <img
+                                src="/images/MP.png"
+                                alt="MercadoPago"
+                                className="h-6"
+                              />
+                            </button>
+                            <button
+                              disabled
+                              className="px-4 py-2 bg-white rounded-lg cursor-not-allowed opacity-60 shadow-lg border-b-4 border-gray-300 border border-gray-200"
+                              title="MODO - Próximamente"
+                            >
+                              <img
+                                src="/images/MODO.webp"
+                                alt="MODO"
+                                className="h-6"
+                              />
+                            </button>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(cuota.montoTotal, { minimumFractionDigits: 0 })}</p>
-                          <p className="text-sm text-gray-500 mt-1">Vence: {formatDate(cuota.fechaVencimiento, { format: 'long' })}</p>
-                        </div>
                       </div>
-
-                      {cuota.recargo > 0 && (
-                        <div className="bg-orange-50 border-l-4 border-orange-500 rounded p-3 mb-4">
-                          <p className="text-sm text-orange-800">
-                            Incluye recargo por mora: {formatCurrency(cuota.recargo, { minimumFractionDigits: 0 })}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          onClick={() => pagarCuota(cuota.id, 'MERCADOPAGO')}
-                          disabled={procesandoPago}
-                          className="px-4 py-2 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
-                          title="Pagar con MercadoPago"
-                        >
-                          <img
-                            src="/images/MP.png"
-                            alt="MercadoPago"
-                            className="h-6"
-                          />
-                        </button>
-                        <button
-                          disabled
-                          className="px-4 py-2 bg-white rounded-lg cursor-not-allowed opacity-60 shadow-lg border-b-4 border-gray-300 border border-gray-200"
-                          title="MODO - Próximamente"
-                        >
-                          <img
-                            src="/images/MODO.webp"
-                            alt="MODO"
-                            className="h-6"
-                          />
-                        </button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                )
-              })}
+                ))
+              })()}
             </>
           )}
         </div>
@@ -709,6 +752,11 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <h4 className="font-semibold text-gray-900">{pago.concepto}</h4>
+                      {pago.esDeOtroMiembro && (
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-1" style={{ color: 'var(--text-muted)' }}>
+                          Pago de {pago.socioApellidoNombre} · #{pago.socioNroSocio}
+                        </p>
+                      )}
                       <p className="text-sm text-gray-600 mt-1">{formatDate(pago.fecha, { format: 'long' })}</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {pago.metodoPago} - {pago.comprobante}
@@ -840,6 +888,11 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                                 <span className="ml-2">
                                   <StatusBadge status="PENDIENTE" type="cuota" size="sm" />
                                 </span>
+                              )}
+                              {mov.socioNro && String(mov.socioNro) !== String(socio.nroSocio) && (
+                                <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-1" style={{ color: 'var(--text-muted)' }}>
+                                  de {mov.socioNombre} · #{mov.socioNro}
+                                </p>
                               )}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600">

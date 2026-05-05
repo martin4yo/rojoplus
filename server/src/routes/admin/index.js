@@ -2,7 +2,6 @@ import { Router } from 'express'
 
 // Importar módulos
 import authRoutes from './auth.js'
-import dashboardRoutes from './dashboard.js'
 import sociosRoutes from './socios.js'
 import cuotasRoutes from './cuotas.js'
 import reportesRoutes from './reportes.js'
@@ -31,7 +30,6 @@ const router = Router()
 
 // Montar rutas
 router.use(authRoutes)
-router.use(dashboardRoutes)
 router.use(sociosRoutes)
 router.use(cuotasRoutes)
 router.use(reportesRoutes)

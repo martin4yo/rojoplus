@@ -86,8 +86,8 @@ router.post('/centros-costo', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('Tipo debe ser OPERATIVO o ADMINISTRATIVO', 400, 'VALIDATION_ERROR')
   }
 
-  // Verificar código único
-  const existente = await req.db.centroCosto.findUnique({
+  // Verificar código único (dentro del tenant; req.db ya scope por tenantId)
+  const existente = await req.db.centroCosto.findFirst({
     where: { codigo },
   })
 
@@ -127,7 +127,7 @@ router.put('/centros-costo/:id', authAdmin, asyncHandler(async (req, res) => {
 
   // Si se cambió el código, verificar que no exista otro con ese código
   if (codigo && codigo !== centroExistente.codigo) {
-    const codigoExistente = await req.db.centroCosto.findUnique({
+    const codigoExistente = await req.db.centroCosto.findFirst({
       where: { codigo },
     })
 

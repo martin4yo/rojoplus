@@ -30,6 +30,15 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     },
   })
 
+  // Socios con inscripciones activas
+  const sociosConInscripcion = await req.db.inscripcion.findMany({
+    where: { estado: 'ACTIVA' },
+    select: { socioId: true },
+    distinct: ['socioId'],
+  })
+  const sociosConActividad = sociosConInscripcion.length
+  const sociosSinActividad = Math.max(0, sociosActivos - sociosConActividad)
+
   // Nuevos socios últimos 30 días
   const nuevos30Dias = await req.db.socio.count({
     where: {
@@ -96,9 +105,9 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // ============ SECCIÓN FINANCIERA ============
 
-  // Periodo actual
+  // Periodo actual: el más reciente (sin filtrar por estado, porque los periodos
+  // pueden estar en 'ABIERTO' / 'PENDIENTE' / 'GENERADO' / 'CERRADO' según el flujo).
   const periodoActual = await req.db.periodo.findFirst({
-    where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
   })
 
@@ -157,9 +166,8 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   })
   morosidadTotal.cantSocios = sociosMorosos.length
 
-  // Evolución de cobranza (últimos 6 periodos)
+  // Evolución de cobranza (últimos 6 periodos, sin filtrar por estado)
   const periodosHistoricos = await req.db.periodo.findMany({
-    where: { estado: 'GENERADO' },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
     take: 6,
     include: {
@@ -275,7 +283,8 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // Saldos de cajas — calculados desde movimientos (no usar campo denormalizado)
   const cajasRaw = await req.db.caja.findMany({
     where: { activo: true },
-    select: { id: true, nombre: true, saldoInicial: true },
+    select: { id: true, nombre: true, tipo: true, saldoInicial: true },
+    orderBy: { nombre: 'asc' },
   })
   const cajaIds = cajasRaw.map(c => c.id)
   const totsPorCaja = cajaIds.length
@@ -290,13 +299,19 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     if (!movsByCaja[t.cajaId]) movsByCaja[t.cajaId] = { INGRESO: 0, EGRESO: 0 }
     movsByCaja[t.cajaId][t.tipo] = Number(t._sum.monto || 0)
   }
-  const saldoTotalCajas = cajasRaw.reduce((sum, c) => {
+  const cajas = cajasRaw.map(c => {
     const m = movsByCaja[c.id] || { INGRESO: 0, EGRESO: 0 }
-    return sum + (Number(c.saldoInicial) + m.INGRESO - m.EGRESO)
-  }, 0)
+    return {
+      id: c.id,
+      nombre: c.nombre,
+      tipo: c.tipo,
+      saldoActual: Number(c.saldoInicial) + m.INGRESO - m.EGRESO,
+    }
+  })
+  const saldoTotalCajas = cajas.reduce((sum, c) => sum + c.saldoActual, 0)
 
   // Ingresos y egresos del mes
-  const [ingresosMes, egresosMes] = await Promise.all([
+  const [ingresosMesAgg, egresosMesAgg] = await Promise.all([
     req.db.movimientoCaja.aggregate({
       where: { tipo: 'INGRESO', fecha: { gte: inicioMesActual } },
       _sum: { monto: true },
@@ -306,13 +321,250 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
       _sum: { monto: true },
     }),
   ])
+  const ingresosMesMonto = Number(ingresosMesAgg._sum.monto) || 0
+  const egresosMesMonto = Number(egresosMesAgg._sum.monto) || 0
 
   const resumenFinanciero = {
     saldoCajas: Math.round(saldoTotalCajas),
-    ingresosMes: Math.round(Number(ingresosMes._sum.monto) || 0),
-    egresosMes: Math.round(Number(egresosMes._sum.monto) || 0),
-    cashFlowMes: Math.round((Number(ingresosMes._sum.monto) || 0) - (Number(egresosMes._sum.monto) || 0)),
+    ingresosMes: Math.round(ingresosMesMonto),
+    egresosMes: Math.round(egresosMesMonto),
+    cashFlowMes: Math.round(ingresosMesMonto - egresosMesMonto),
   }
+
+  // Días de cobertura (con liquidez actual)
+  const promedioEgresoDiario = egresosMesMonto / 30
+  const diasCobertura = promedioEgresoDiario > 0
+    ? Math.round(saldoTotalCajas / promedioEgresoDiario)
+    : 999
+
+  // Cuentas corrientes — Saldo Clientes / Proveedores / Sueldos por pagar
+  let saldoClientes = 0
+  let saldoProveedores = 0
+  let sueldosPorPagar = 0
+  try {
+    if (req.db.movimientoContable) {
+      const [saldoClientesResult, saldoProveedoresResult] = await Promise.all([
+        req.db.movimientoContable.aggregate({
+          where: {
+            tipo: 'FACTURA_VENTA',
+            estado: { not: 'ANULADO' },
+            saldoPendiente: { gt: 0 },
+          },
+          _sum: { saldoPendiente: true },
+        }),
+        req.db.movimientoContable.aggregate({
+          where: {
+            tipo: 'FACTURA_COMPRA',
+            estado: { not: 'ANULADO' },
+            saldoPendiente: { gt: 0 },
+          },
+          _sum: { saldoPendiente: true },
+        }),
+      ])
+      saldoClientes = Number(saldoClientesResult._sum.saldoPendiente) || 0
+      saldoProveedores = Number(saldoProveedoresResult._sum.saldoPendiente) || 0
+    }
+  } catch (err) {
+    console.warn('movimientoContable table may not exist yet:', err.message)
+  }
+
+  try {
+    if (req.db.liquidacionSueldo) {
+      const sueldosPorPagarResult = await req.db.liquidacionSueldo.aggregate({
+        where: { estado: 'PENDIENTE' },
+        _sum: { totalNeto: true },
+      })
+      sueldosPorPagar = Number(sueldosPorPagarResult._sum.totalNeto) || 0
+    }
+  } catch (err) {
+    console.warn('liquidacionSueldo table may not exist yet:', err.message)
+  }
+
+  // Tarjetas pendientes de conciliación
+  let tarjetasPendientesRaw = []
+  try {
+    tarjetasPendientesRaw = await req.db.movimientoCaja.findMany({
+      where: {
+        conciliado: false,
+        anulado: false,
+        tipo: 'INGRESO',
+        pago: { medioPago: { tipo: 'TARJETA' } },
+      },
+      include: { pago: { include: { medioPago: true } } },
+      orderBy: { fecha: 'asc' },
+    })
+  } catch (err) {
+    console.warn('Error querying tarjetas pendientes:', err.message)
+  }
+
+  const tarjetasPorTipo = {}
+  let tarjetasMontoTotal = 0
+  tarjetasPendientesRaw.forEach(m => {
+    const tipo = m.pago?.medioPago?.nombre || 'Sin clasificar'
+    if (!tarjetasPorTipo[tipo]) tarjetasPorTipo[tipo] = { cantidad: 0, monto: 0 }
+    tarjetasPorTipo[tipo].cantidad++
+    tarjetasPorTipo[tipo].monto += Number(m.monto)
+    tarjetasMontoTotal += Number(m.monto)
+  })
+  const tarjetasPendientes = {
+    cantidad: tarjetasPendientesRaw.length,
+    montoTotal: Math.round(tarjetasMontoTotal),
+    detalle: Object.entries(tarjetasPorTipo).map(([tipo, d]) => ({
+      tipo,
+      cantidad: d.cantidad,
+      monto: Math.round(d.monto),
+    })),
+  }
+
+  // eCheqs pendientes
+  let echequesRecibidos = []
+  let echequesEmitidos = []
+  try {
+    if (req.db.eCheq) {
+      [echequesRecibidos, echequesEmitidos] = await Promise.all([
+        req.db.eCheq.findMany({
+          where: { tipo: 'RECIBIDO', estado: { in: ['CARTERA', 'DEPOSITADO'] } },
+          select: { id: true, monto: true, estado: true, fechaVencimiento: true },
+          orderBy: { fechaVencimiento: 'asc' },
+        }),
+        req.db.eCheq.findMany({
+          where: { tipo: 'EMITIDO', estado: 'PENDIENTE' },
+          select: { id: true, monto: true, estado: true, fechaVencimiento: true },
+          orderBy: { fechaVencimiento: 'asc' },
+        }),
+      ])
+    }
+  } catch (err) {
+    console.warn('eCheq table may not exist yet:', err.message)
+  }
+
+  const hoyDate = new Date()
+  hoyDate.setHours(0, 0, 0, 0)
+  const en7Dias = new Date(hoyDate)
+  en7Dias.setDate(en7Dias.getDate() + 7)
+
+  const echeqsRecibidos = {
+    cantidad: echequesRecibidos.length,
+    montoTotal: Math.round(echequesRecibidos.reduce((s, e) => s + Number(e.monto), 0)),
+    enCartera: echequesRecibidos.filter(e => e.estado === 'CARTERA').length,
+    montoEnCartera: Math.round(echequesRecibidos.filter(e => e.estado === 'CARTERA').reduce((s, e) => s + Number(e.monto), 0)),
+    depositados: echequesRecibidos.filter(e => e.estado === 'DEPOSITADO').length,
+    montoDepositados: Math.round(echequesRecibidos.filter(e => e.estado === 'DEPOSITADO').reduce((s, e) => s + Number(e.monto), 0)),
+    vencidos: echequesRecibidos.filter(e => new Date(e.fechaVencimiento) < hoyDate).length,
+    proximosAVencer: echequesRecibidos.filter(e => {
+      const v = new Date(e.fechaVencimiento)
+      return v >= hoyDate && v <= en7Dias
+    }).length,
+  }
+
+  const echeqsEmitidos = {
+    cantidad: echequesEmitidos.length,
+    montoTotal: Math.round(echequesEmitidos.reduce((s, e) => s + Number(e.monto), 0)),
+    vencidos: echequesEmitidos.filter(e => new Date(e.fechaVencimiento) < hoyDate).length,
+    proximosAVencer: echequesEmitidos.filter(e => {
+      const v = new Date(e.fechaVencimiento)
+      return v >= hoyDate && v <= en7Dias
+    }).length,
+  }
+
+  // Comercios pendientes de aprobación
+  let comerciosPendientes = 0
+  try {
+    comerciosPendientes = await req.db.comercio.count({ where: { estado: 'PENDIENTE' } })
+  } catch (err) {
+    console.warn('comercio table may not exist yet:', err.message)
+  }
+
+  // ============ DATOS HISTÓRICOS PARA GRÁFICOS ============
+
+  // Movimientos de caja últimos 6 meses (para cashFlow y composición)
+  const movimientosHistoricos = await req.db.movimientoCaja.findMany({
+    where: { fecha: { gte: inicio6Meses }, anulado: false },
+    select: { fecha: true, tipo: true, monto: true, concepto: true },
+    orderBy: { fecha: 'asc' },
+  })
+
+  const totalIngresos6m = movimientosHistoricos
+    .filter(m => m.tipo === 'INGRESO')
+    .reduce((sum, m) => sum + Number(m.monto), 0)
+  const totalEgresos6m = movimientosHistoricos
+    .filter(m => m.tipo === 'EGRESO')
+    .reduce((sum, m) => sum + Number(m.monto), 0)
+  let saldoAcumulado = saldoTotalCajas - (totalIngresos6m - totalEgresos6m)
+
+  const cashFlowMensual = []
+  for (let i = 5; i >= 0; i--) {
+    const fecha = new Date(anioActual, mesActual - 1 - i, 1)
+    const mes = fecha.getMonth()
+    const anio = fecha.getFullYear()
+    const inicioMesHist = new Date(anio, mes, 1)
+    const finMesHist = new Date(anio, mes + 1, 0, 23, 59, 59)
+
+    const movsMes = movimientosHistoricos.filter(m => {
+      const f = new Date(m.fecha)
+      return f >= inicioMesHist && f <= finMesHist
+    })
+
+    const ingresos = movsMes.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + Number(m.monto), 0)
+    const egresos = movsMes.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0)
+    const neto = ingresos - egresos
+    saldoAcumulado += neto
+
+    cashFlowMensual.push({
+      mes: `${mesesNombres[mes]} ${anio.toString().slice(-2)}`,
+      ingresos: Math.round(ingresos),
+      egresos: Math.round(egresos),
+      neto: Math.round(neto),
+      saldo: Math.round(saldoAcumulado),
+    })
+  }
+
+  // Composición ingresos / egresos del mes actual
+  const ingresosDelMes = movimientosHistoricos.filter(m => {
+    const f = new Date(m.fecha)
+    return f >= inicioMesActual && m.tipo === 'INGRESO'
+  })
+  const composicionIngresos = {}
+  ingresosDelMes.forEach(m => {
+    const concepto = m.concepto?.toLowerCase() || ''
+    let categoria = 'Otros'
+    if (concepto.includes('cuota') || concepto.includes('cobranza')) categoria = 'Cuotas'
+    else if (concepto.includes('venta') || concepto.includes('factura')) categoria = 'Ventas'
+    else if (concepto.includes('inscripcion') || concepto.includes('inscripción')) categoria = 'Inscripciones'
+    else if (concepto.includes('alquiler')) categoria = 'Alquileres'
+    composicionIngresos[categoria] = (composicionIngresos[categoria] || 0) + Number(m.monto)
+  })
+  const ingresosComposicion = Object.entries(composicionIngresos).map(([nombre, valor]) => ({
+    nombre,
+    valor: Math.round(valor),
+  }))
+
+  const egresosDelMes = movimientosHistoricos.filter(m => {
+    const f = new Date(m.fecha)
+    return f >= inicioMesActual && m.tipo === 'EGRESO'
+  })
+  const composicionEgresos = {}
+  egresosDelMes.forEach(m => {
+    const concepto = m.concepto?.toLowerCase() || ''
+    let categoria = 'Otros'
+    if (concepto.includes('sueldo') || concepto.includes('salario')) categoria = 'Sueldos'
+    else if (concepto.includes('compra') || concepto.includes('proveedor')) categoria = 'Compras'
+    else if (concepto.includes('servicio') || concepto.includes('luz') || concepto.includes('gas') || concepto.includes('agua')) categoria = 'Servicios'
+    else if (concepto.includes('mantenimiento')) categoria = 'Mantenimiento'
+    composicionEgresos[categoria] = (composicionEgresos[categoria] || 0) + Number(m.monto)
+  })
+  const egresosComposicion = Object.entries(composicionEgresos).map(([nombre, valor]) => ({
+    nombre,
+    valor: Math.round(valor),
+  }))
+
+  // ============ INDICADORES DE SALUD ============
+
+  const cashFlowNeto = ingresosMesMonto - egresosMesMonto
+  const indiceCobranzaPct = cobranzaMes.porcentaje
+  const saludFinanciera =
+    cashFlowNeto >= 0 && indiceCobranzaPct >= 70 && diasCobertura >= 30 ? 'good' :
+    cashFlowNeto < 0 || indiceCobranzaPct < 50 || diasCobertura < 15 ? 'danger' : 'warning'
 
   // ============ ALERTAS ============
 
@@ -348,6 +600,16 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     })
   }
 
+  // Alerta comercios pendientes
+  if (comerciosPendientes > 0) {
+    alertas.push({
+      tipo: 'warning',
+      titulo: 'Comercios Pendientes',
+      mensaje: `${comerciosPendientes} solicitudes de comercios esperando aprobación`,
+      accion: '/admin/comercios?estado=PENDIENTE',
+    })
+  }
+
   res.json({
     success: true,
     data: {
@@ -362,10 +624,12 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
       // Sección Socios
       socios: {
         activos: sociosActivos,
+        conActividad: sociosConActividad,
+        sinActividad: sociosSinActividad,
         nuevos30Dias,
         bajas30Dias,
         tasaRetencion,
-        tendenciaNuevos, // % de cambio vs período anterior
+        tendenciaNuevos,
       },
 
       // Sección Financiera
@@ -374,6 +638,11 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
         morosidadTotal,
         proyeccionCierre,
         resumenFinanciero,
+        diasCobertura,
+        saludFinanciera,
+        saldoClientes: Math.round(saldoClientes),
+        saldoProveedores: Math.round(saldoProveedores),
+        sueldosPorPagar: Math.round(sueldosPorPagar),
       },
 
       // Sección Actividades
@@ -384,10 +653,25 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
         ocupacionActividades,
       },
 
+      // Sección Tesorería
+      tesoreria: {
+        cajas: cajas.map(c => ({ ...c, saldoActual: Number(c.saldoActual) })),
+        saldoTotalCajas: Math.round(saldoTotalCajas),
+        tarjetasPendientes,
+        echeqsRecibidos,
+        echeqsEmitidos,
+      },
+
+      // Comercios pendientes (también disponibles vía alertas)
+      comerciosPendientes,
+
       // Gráficos
       graficos: {
         crecimientoSocios,
         evolucionCobranza,
+        cashFlowMensual,
+        ingresosComposicion,
+        egresosComposicion,
       },
 
       // Alertas

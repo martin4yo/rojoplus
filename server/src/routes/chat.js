@@ -224,17 +224,25 @@ router.post(
 router.get('/health', asyncHandler(async (req, res) => {
   const assistant = getAIAssistant()
   let agentName = 'Axio'
+  let chatEnabled = true
+
   if (req.db && req.tenantId) {
-    const cfg = await req.db.configuracion.findFirst({
-      where: { clave: 'WA_AGENT_NOMBRE' }
-    }).catch(() => null)
-    if (cfg?.valor) agentName = cfg.valor
+    const [nombreCfg, enabledCfg] = await Promise.all([
+      req.db.configuracion.findFirst({ where: { clave: 'WA_AGENT_NOMBRE' } }).catch(() => null),
+      req.db.configuracion.findFirst({ where: { clave: 'CHAT_AGENT_ENABLED' } }).catch(() => null),
+    ])
+    if (nombreCfg?.valor) agentName = nombreCfg.valor
+    // El flag por tenant tiene prioridad sobre la API key global.
+    // Si el tenant lo desactivó explícitamente, el chat no se ofrece (UI lo oculta).
+    if (enabledCfg?.valor === 'false') chatEnabled = false
   }
+
   return res.json({
-    available: assistant !== null,
+    available: assistant !== null && chatEnabled,
     agentName,
     service: `${agentName} - Chat Assistant`,
-    model: assistant ? 'claude-sonnet-4-20250514' : null
+    model: (assistant && chatEnabled) ? 'claude-sonnet-4-20250514' : null,
+    chatEnabled,
   })
 }))
 

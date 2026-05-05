@@ -4,7 +4,6 @@ const prisma = new PrismaClient()
 
 const menuData = [
   { titulo: 'Dashboard', icono: 'LayoutDashboard', url: '/admin', orden: 1 },
-  { titulo: 'Dashboard Ejecutivo', icono: 'BarChart3', url: '/admin/dashboard-ejecutivo', orden: 2 },
   {
     titulo: 'Socios', icono: 'Users', orden: 3,
     children: [

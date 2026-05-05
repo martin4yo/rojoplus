@@ -1110,39 +1110,41 @@ router.get('/:tokenPortal/proximos-eventos', asyncHandler(async (req, res) => {
 // ==============================================================================
 
 // GET /api/socio/:tokenPortal/cuotas/pendientes - Obtener cuotas pendientes
+// Si el socio es titular de familia, incluye también las cuotas de los miembros.
 router.get('/:tokenPortal/cuotas/pendientes', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
 
   const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
+    include: {
+      miembrosFamilia: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+    },
   })
 
   if (!socio) {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
+  const esTitular = !socio.titularFamiliaId
+  const tieneFamilia = esTitular && socio.miembrosFamilia?.length > 0
+  const socioIds = tieneFamilia
+    ? [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
+    : [socio.id]
+
   const cargos = await req.db.cargo.findMany({
     where: {
-      socioId: socio.id,
-      estado: {
-        in: ['PENDIENTE', 'VENCIDO'],
-      },
+      socioId: { in: socioIds },
+      estado: { in: ['PENDIENTE', 'VENCIDO'] },
     },
     include: {
       periodo: true,
-      categoriaActividad: {
-        include: {
-          actividad: true,
-        },
-      },
+      categoriaActividad: { include: { actividad: true } },
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
     },
-    orderBy: {
-      fechaVencimiento: 'asc',
-    },
+    orderBy: { fechaVencimiento: 'asc' },
   })
 
   const result = cargos.map(cargo => {
-    // Determinar si está vencido
     const hoy = new Date()
     const vencido = cargo.fechaVencimiento && new Date(cargo.fechaVencimiento) < hoy
 
@@ -1159,6 +1161,11 @@ router.get('/:tokenPortal/cuotas/pendientes', asyncHandler(async (req, res) => {
       estado: vencido ? 'VENCIDO' : 'PENDIENTE',
       tipo: cargo.categoria,
       actividad: cargo.categoriaActividad?.actividad?.nombre || null,
+      // Info del socio dueño del cargo (para distinguir miembros del grupo familiar)
+      socioId: cargo.socio?.id,
+      socioNroSocio: cargo.socio?.nroSocio,
+      socioApellidoNombre: cargo.socio?.apellidoNombre,
+      esDeOtroMiembro: cargo.socio?.id !== socio.id,
     }
   })
 
@@ -1174,33 +1181,37 @@ router.get('/:tokenPortal/pagos/historial', asyncHandler(async (req, res) => {
 
   const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
+    include: {
+      miembrosFamilia: { select: { id: true } },
+    },
   })
 
   if (!socio) {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
+  const esTitular = !socio.titularFamiliaId
+  const tieneFamilia = esTitular && socio.miembrosFamilia?.length > 0
+  const socioIds = tieneFamilia
+    ? [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
+    : [socio.id]
+
   const pagos = await req.db.pago.findMany({
     where: {
-      socioId: socio.id,
+      socioId: { in: socioIds },
       estado: 'CONFIRMADO',
     },
     include: {
       medioPago: true,
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
       cargos: {
         include: {
           periodo: true,
-          categoriaActividad: {
-            include: {
-              actividad: true,
-            },
-          },
+          categoriaActividad: { include: { actividad: true } },
         },
       },
     },
-    orderBy: {
-      fecha: 'desc',
-    },
+    orderBy: { fecha: 'desc' },
     take: 50,
   })
 
@@ -1217,6 +1228,10 @@ router.get('/:tokenPortal/pagos/historial', asyncHandler(async (req, res) => {
       periodo: c.periodo?.nombre || null,
       monto: c.montoTotal,
     })),
+    socioId: pago.socio?.id,
+    socioNroSocio: pago.socio?.nroSocio,
+    socioApellidoNombre: pago.socio?.apellidoNombre,
+    esDeOtroMiembro: pago.socio?.id !== socio.id,
   }))
 
   res.json({
@@ -1232,19 +1247,27 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
 
   const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
+    include: {
+      miembrosFamilia: { select: { id: true } },
+    },
   })
 
   if (!socio) {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
+  // Si es titular de familia, puede pagar cuotas propias o de los miembros del grupo
+  const esTitular = !socio.titularFamiliaId
+  const tieneFamilia = esTitular && socio.miembrosFamilia?.length > 0
+  const socioIdsAutorizados = tieneFamilia
+    ? [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
+    : [socio.id]
+
   const cargo = await req.db.cargo.findFirst({
     where: {
       id: parseInt(cuotaId),
-      socioId: socio.id,
-      estado: {
-        in: ['PENDIENTE', 'VENCIDO'],
-      },
+      socioId: { in: socioIdsAutorizados },
+      estado: { in: ['PENDIENTE', 'VENCIDO'] },
     },
     include: {
       periodo: true,
@@ -1453,9 +1476,17 @@ router.get('/:token/cuenta-corriente', asyncHandler(async (req, res) => {
     throw new AppError('Token inválido', 404, 'INVALID_TOKEN')
   }
 
-  // Determinar qué socios incluir
+  // Determinar qué socios incluir.
+  // Default: si el socio es titular de familia, incluye al grupo. Se puede
+  // forzar `?incluirFamilia=false` para ver sólo el propio movimiento.
+  const esTitular = !socio.titularFamiliaId
+  const tieneFamilia = esTitular && socio.miembrosFamilia?.length > 0
+  const incluirFamiliaResuelto = incluirFamilia === 'false'
+    ? false
+    : (incluirFamilia === 'true' || tieneFamilia)
+
   let socioIds = [socio.id]
-  if (incluirFamilia === 'true' && socio.miembrosFamilia?.length > 0) {
+  if (incluirFamiliaResuelto && tieneFamilia) {
     socioIds = [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
   }
 

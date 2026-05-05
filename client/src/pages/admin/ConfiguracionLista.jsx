@@ -156,6 +156,13 @@ export default function ConfiguracionLista() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Comisión</th>
                 </>
               )}
+              {tabla === 'conceptos-tesoreria' && (
+                <>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cuenta Contable</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Centro de Costo</th>
+                </>
+              )}
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orden</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
@@ -209,6 +216,33 @@ export default function ConfiguracionLista() {
                     </td>
                   </>
                 )}
+                {tabla === 'conceptos-tesoreria' && (
+                  <>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      {item.tipo ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full ${
+                          item.tipo === 'INGRESO'
+                            ? 'bg-green-100 text-green-800'
+                            : item.tipo === 'EGRESO'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {item.tipo}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      {item.cuentaContable
+                        ? <span><span className="font-mono text-xs text-gray-500">{item.cuentaContable.codigo}</span> · {item.cuentaContable.nombre}</span>
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      {item.centroCosto
+                        ? <span><span className="font-mono text-xs text-gray-500">{item.centroCosto.codigo}</span> · {item.centroCosto.nombre}</span>
+                        : '-'}
+                    </td>
+                  </>
+                )}
                 <td className="px-4 py-3 text-sm text-gray-600">{item.orden}</td>
                 <td className="px-4 py-3 text-sm">
                   {item.activo ? (
@@ -241,7 +275,7 @@ export default function ConfiguracionLista() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={20} className="px-4 py-8 text-center text-gray-500">
                   No hay registros. Haz clic en "Nuevo" para agregar.
                 </td>
               </tr>

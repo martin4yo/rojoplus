@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import ScrollToTop from './components/ScrollToTop'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -78,8 +78,7 @@ const PortalSocioNuevo = lazy(() => import('./pages/socio/PortalSocioNuevo'))
 // Admin — generales
 const AdminLogin = lazy(() => import('./pages/admin/Login'))
 const AdminLoginAlt = lazy(() => import('./pages/admin/LoginAlt'))
-const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'))
-const AdminDashboardEjecutivo = lazy(() => import('./pages/admin/DashboardEjecutivo'))
+const AdminDashboard = lazy(() => import('./pages/admin/DashboardEjecutivo'))
 const AdminComercios = lazy(() => import('./pages/admin/Comercios'))
 const AdminComercioDetalle = lazy(() => import('./pages/admin/ComercioDetalle'))
 const AdminSocios = lazy(() => import('./pages/admin/Socios'))
@@ -398,7 +397,7 @@ function App() {
                   <Route index element={<AdminDashboard />} />
                   <Route path="mi-perfil" element={<MiPerfil />} />
                   <Route path="accesos-rapidos" element={<AccesosRapidos />} />
-                  <Route path="dashboard-ejecutivo" element={<AdminDashboardEjecutivo />} />
+                  <Route path="dashboard-ejecutivo" element={<Navigate to="/admin" replace />} />
                   <Route path="comercios" element={<AdminComercios />} />
                   <Route path="comercios/:id" element={<AdminComercioDetalle />} />
                   <Route path="socios" element={<AdminSocios />} />

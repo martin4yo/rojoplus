@@ -5,7 +5,12 @@ import { ChartBarIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, ArrowDownTray
 import { BarChart3, Eye } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
-const toISO = d => d.toISOString().split('T')[0]
+const toISO = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 const RANGOS = [
   { id: 'hoy', label: 'Hoy', getDates: () => {
@@ -27,7 +32,7 @@ const RANGOS = [
   { id: 'personalizado', label: 'Personalizado', getDates: () => null },
 ]
 
-export default function ReporteCentrosCosto() {
+export default function ReporteCentrosCosto({ embedded = false } = {}) {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -141,36 +146,57 @@ export default function ReporteCentrosCosto() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <BarChart3 className="w-6 h-6 text-primary" />
+      {/* Header (sólo cuando NO está embebido) */}
+      {!embedded && (
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <BarChart3 className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Estado de Resultados por Centro de Costo</h1>
+              <p className="text-sm text-gray-500">Análisis multidimensional de ingresos y egresos</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Estado de Resultados por Centro de Costo</h1>
-            <p className="text-sm text-gray-500">Análisis multidimensional de ingresos y egresos</p>
-          </div>
+          {data && (
+            <div className="flex gap-2">
+              <button
+                onClick={exportarExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+              >
+                <ArrowDownTrayIcon className="h-4 w-4" />
+                Excel
+              </button>
+              <button
+                onClick={exportarPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                <ArrowDownTrayIcon className="h-4 w-4" />
+                PDF
+              </button>
+            </div>
+          )}
         </div>
-        {data && (
-          <div className="flex gap-2">
-            <button
-              onClick={exportarExcel}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-            >
-              <ArrowDownTrayIcon className="h-4 w-4" />
-              Excel
-            </button>
-            <button
-              onClick={exportarPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-            >
-              <ArrowDownTrayIcon className="h-4 w-4" />
-              PDF
-            </button>
-          </div>
-        )}
-      </div>
+      )}
+
+      {embedded && data && (
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={exportarExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            Excel
+          </button>
+          <button
+            onClick={exportarPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            PDF
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4">
@@ -415,6 +441,9 @@ export default function ReporteCentrosCosto() {
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Resultado
                     </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      % Result.
+                    </th>
                     <th className="px-6 py-3"></th>
                   </tr>
                 </thead>
@@ -453,6 +482,11 @@ export default function ReporteCentrosCosto() {
                       }`}>
                         {formatMonto(centro.resultado)}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        {data.resumenGeneral.resultado !== 0
+                          ? formatPorcentaje((centro.resultado / Math.abs(data.resumenGeneral.resultado)) * 100)
+                          : '—'}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <button
                           onClick={() => navigate(`/admin/reportes/centros-costo/movimientos?centroId=${centro.id}&fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}`)}
@@ -487,6 +521,10 @@ export default function ReporteCentrosCosto() {
                     }`}>
                       {formatMonto(data.resumenGeneral.resultado)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                      100%
+                    </td>
+                    <td></td>
                   </tr>
                 </tfoot>
               </table>

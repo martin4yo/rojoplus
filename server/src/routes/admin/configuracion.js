@@ -675,7 +675,7 @@ router.post('/conceptos-tesoreria', authAdmin, asyncHandler(async (req, res) => 
       usaEnVentas: usaEnVentas || false,
       usaEnTesoreria: usaEnTesoreria !== false,
       cuentaContableId: parseInt(cuentaContableId),
-      centroCostoId: parseInt(centroCostoId),
+      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       orden: orden || 0,
     },
     include: {

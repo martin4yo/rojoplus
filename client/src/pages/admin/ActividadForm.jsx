@@ -13,9 +13,10 @@ export default function ActividadForm() {
   const navigate = useNavigate()
   const isEdit = id && id !== 'nueva'
 
-  const [loading, setLoading] = useState(isEdit)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [conceptos, setConceptos] = useState([])
   const [form, setForm] = useState({
     codigo: '',
     nombre: '',
@@ -26,28 +27,33 @@ export default function ActividadForm() {
     orden: 0,
     activo: true,
     imagen: '',
+    conceptoTesoreriaId: '',
   })
 
   useEffect(() => {
-    if (isEdit) {
-      cargarActividad()
-    }
+    cargarDatos()
   }, [id])
 
-  async function cargarActividad() {
+  async function cargarDatos() {
     try {
-      const data = await api.get(`/admin/actividades/${id}`)
-      setForm({
-        codigo: data.codigo || '',
-        nombre: data.nombre || '',
-        descripcion: data.descripcion || '',
-        requiereAptaFisica: data.requiereAptaFisica ?? true,
-        cuotaMensual: data.cuotaMensual || '',
-        color: data.color || '',
-        orden: data.orden || 0,
-        activo: data.activo ?? true,
-        imagen: data.imagen || '',
-      })
+      const conceptosData = await api.get('/admin/conceptos-tesoreria?activo=true').catch(() => [])
+      setConceptos((conceptosData || []).filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS'))
+
+      if (isEdit) {
+        const data = await api.get(`/admin/actividades/${id}`)
+        setForm({
+          codigo: data.codigo || '',
+          nombre: data.nombre || '',
+          descripcion: data.descripcion || '',
+          requiereAptaFisica: data.requiereAptaFisica ?? true,
+          cuotaMensual: data.cuotaMensual || '',
+          color: data.color || '',
+          orden: data.orden || 0,
+          activo: data.activo ?? true,
+          imagen: data.imagen || '',
+          conceptoTesoreriaId: data.conceptoTesoreriaId ? String(data.conceptoTesoreriaId) : '',
+        })
+      }
     } catch (err) {
       setError('Error al cargar actividad')
     } finally {
@@ -73,6 +79,7 @@ export default function ActividadForm() {
         ...form,
         cuotaMensual: form.cuotaMensual ? parseFloat(form.cuotaMensual) : null,
         orden: parseInt(form.orden) || 0,
+        conceptoTesoreriaId: form.conceptoTesoreriaId ? parseInt(form.conceptoTesoreriaId) : null,
       }
 
       if (isEdit) {
@@ -197,6 +204,26 @@ export default function ActividadForm() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
             />
           </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Concepto Tesorería <span className="text-gray-400 text-xs">(opcional)</span>
+          </label>
+          <select
+            name="conceptoTesoreriaId"
+            value={form.conceptoTesoreriaId}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
+          >
+            <option value="">Usar concepto por defecto</option>
+            {conceptos.map(c => (
+              <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.nombre}` : c.nombre}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Aplica a todas las categorías de esta actividad. Define el centro de costo donde se registran las cobranzas.
+          </p>
         </div>
 
         <div className="mt-4">

@@ -243,13 +243,11 @@ export default function BuffetTakeAway() {
   async function eliminarPedido(pedido, e) {
     e.stopPropagation() // Evitar abrir el detalle
 
-    const confirmado = await confirm({
-      title: 'Eliminar Pedido',
-      message: `¿Estás seguro de que deseas eliminar el pedido #${pedido.numero}?`,
-      confirmText: 'Eliminar',
-      cancelText: 'Cancelar',
-      isDangerous: true
-    })
+    const confirmado = await confirm(
+      'Eliminar Pedido',
+      `¿Estás seguro de que deseas eliminar el pedido #${pedido.numero}?`,
+      { confirmText: 'Eliminar', cancelText: 'Cancelar', variant: 'danger' }
+    )
 
     if (!confirmado) return
 

@@ -307,8 +307,9 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
 
   if (desde || hasta) {
     where.fecha = {}
-    if (desde) where.fecha.gte = new Date(desde)
-    if (hasta) where.fecha.lte = new Date(hasta + 'T23:59:59.999Z')
+    // Interpretar fechas como inicio/fin de día en Argentina (UTC-3)
+    if (desde) where.fecha.gte = new Date(desde + 'T00:00:00-03:00')
+    if (hasta) where.fecha.lte = new Date(hasta + 'T23:59:59.999-03:00')
   }
 
   if (medioPagoId !== undefined) {
@@ -1267,8 +1268,9 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
 
   if (desde || hasta) {
     whereMovimientos.fecha = {}
-    if (desde) whereMovimientos.fecha.gte = new Date(desde)
-    if (hasta) whereMovimientos.fecha.lte = new Date(hasta + 'T23:59:59.999Z')
+    // Interpretar fechas como inicio/fin de día en Argentina (UTC-3)
+    if (desde) whereMovimientos.fecha.gte = new Date(desde + 'T00:00:00-03:00')
+    if (hasta) whereMovimientos.fecha.lte = new Date(hasta + 'T23:59:59.999-03:00')
   }
 
   // Obtener totales por tipo
@@ -1334,10 +1336,10 @@ router.get('/cajas/:id/resumen', asyncHandler(async (req, res) => {
     .map(m => ({ ...m, neto: m.ingresos - m.egresos }))
     .sort((a, b) => (a.medioPago ?? 'ZZZ').localeCompare(b.medioPago ?? 'ZZZ'))
 
-  // Saldo anterior al período (todo hasta el día antes del desde)
+  // Saldo anterior al período (todo hasta el día antes del desde, ART)
   let saldoAnterior = Number(caja.saldoInicial)
   if (desde) {
-    const fechaAntes = new Date(desde)
+    const fechaAntes = new Date(desde + 'T00:00:00-03:00')
     const [ingAnt, egrAnt] = await Promise.all([
       req.db.movimientoCaja.aggregate({
         where: { cajaId: parseInt(id), anulado: false, tipo: 'INGRESO', fecha: { lt: fechaAntes } },
