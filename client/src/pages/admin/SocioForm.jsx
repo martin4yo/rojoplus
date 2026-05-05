@@ -241,8 +241,15 @@ export default function SocioForm() {
     }
   }
 
+  // Campos que se guardan siempre en mayúsculas
+  const CAMPOS_MAYUSCULA = ['apellido', 'nombre', 'apellidoNombre']
+
   function handleChange(e) {
-    const { name, value, type, checked } = e.target
+    const { name, type, checked } = e.target
+    let { value } = e.target
+    if (type !== 'checkbox' && CAMPOS_MAYUSCULA.includes(name)) {
+      value = (value || '').toUpperCase()
+    }
     // Limpiar error del campo al editarlo
     if (fieldErrors[name]) {
       setFieldErrors(prev => { const n = { ...prev }; delete n[name]; return n })

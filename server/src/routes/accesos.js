@@ -122,8 +122,9 @@ router.post('/validar', authDispositivo, async (req, res) => {
         }
       }
     } else if (tipoLectura === 'RFID') {
-      // Buscar por rfidUid
-      persona = await req.db.socio.findUnique({
+      // rfidUid es @@unique([tenantId, rfidUid]) — usar findFirst, no findUnique
+      // (el plugin multi-tenant scopea automáticamente por tenantId)
+      persona = await req.db.socio.findFirst({
         where: { rfidUid: valorLeido },
         select: {
           id: true,

@@ -369,6 +369,7 @@ function ModalHabilitacion({ isOpen, dni, nombreSugerido, intentos, onClose, onS
     { value: 3, label: '3 días' },
     { value: 7, label: '7 días (Recomendado)' },
     { value: 30, label: '30 días' },
+    { value: 365, label: '1 año' },
     { value: 0, label: 'Personalizado' }
   ]
 
@@ -398,8 +399,9 @@ function ModalHabilitacion({ isOpen, dni, nombreSugerido, intentos, onClose, onS
               type="text"
               required
               value={formData.nombreCompleto}
-              onChange={(e) => setFormData({ ...formData, nombreCompleto: e.target.value })}
-              placeholder="Ej: Juan Pérez"
+              onChange={(e) => setFormData({ ...formData, nombreCompleto: (e.target.value || '').toUpperCase() })}
+              placeholder="EJ: PEREZ, JUAN"
+              style={{ textTransform: 'uppercase' }}
               className="input-field w-full"
             />
           </div>

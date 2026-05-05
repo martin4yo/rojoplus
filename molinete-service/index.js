@@ -363,7 +363,8 @@ function handleUSBData(valorLeido) {
  */
 function parsearDniArgentino(raw) {
   const result = { valor: raw, nombreCompleto: null }
-  const partes = raw.split('@').map(p => (p || '').trim())
+  // Algunos lectores usan @ (canónico), otros " (vimos en producción), otros |
+  const partes = raw.split(/[@"|]/).map(p => (p || '').trim())
 
   let idxDni = -1
   for (let i = 0; i < partes.length; i++) {
