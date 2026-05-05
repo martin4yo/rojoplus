@@ -386,21 +386,22 @@ export default function MonitorAccesos() {
                           {formatFecha(acceso.fecha)}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        {acceso.tipoLectura === 'RFID'
-                          && acceso.resultado === 'DENEGADO'
-                          && acceso.motivoRechazo === 'NO_ENCONTRADO'
-                          && acceso.valorLeido && (
-                          <button
-                            type="button"
-                            onClick={() => setAsignarRfid({ open: true, valorLeido: acceso.valorLeido })}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary border border-primary/30 rounded hover:bg-primary/10"
-                            title="Asignar este carnet a un socio"
-                          >
-                            <UserPlus className="w-3.5 h-3.5" />
-                            Asignar a socio
-                          </button>
-                        )}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {acceso.tipoLectura === 'RFID'
+                            && acceso.resultado === 'DENEGADO'
+                            && acceso.motivoRechazo === 'NO_ENCONTRADO'
+                            && acceso.valorLeido && (
+                            <button
+                              type="button"
+                              onClick={() => setAsignarRfid({ open: true, valorLeido: acceso.valorLeido })}
+                              className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg"
+                              title="Asignar carnet a socio"
+                            >
+                              <UserPlus className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
