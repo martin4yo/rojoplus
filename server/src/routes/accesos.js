@@ -213,12 +213,9 @@ router.post('/validar', authDispositivo, async (req, res) => {
       }
     } else
     if (tipo === 'SOCIO') {
-      // La FK al estado es fuente de verdad: el flag permiteIngresoMolinete decide.
-      // Fallback a estado === 'VIGENTE' si todavía no se completó la FK.
-      const flagFK = persona.estadoSocioRel?.permiteIngresoMolinete
-      const puedeIngresar = flagFK !== undefined && flagFK !== null
-        ? flagFK
-        : persona.estado === 'VIGENTE'
+      // El flag permiteIngresoMolinete del estado es la única fuente de verdad.
+      // Sin estado FK o sin flag explícito en true → deniega.
+      const puedeIngresar = persona.estadoSocioRel?.permiteIngresoMolinete === true
 
       if (puedeIngresar) {
         permitido = true
@@ -227,7 +224,7 @@ router.post('/validar', authDispositivo, async (req, res) => {
       } else {
         permitido = false
         motivo = 'NO_VIGENTE'
-        const nombreEstado = persona.estadoSocioRel?.nombre || persona.estado
+        const nombreEstado = persona.estadoSocioRel?.nombre || persona.estado || 'sin estado'
         mensaje = `Socio ${nombreEstado} - Diríjase a Secretaría`
       }
     } else if (tipo === 'HABILITACION') {
@@ -416,14 +413,11 @@ router.get('/cache-socios', authDispositivo, async (req, res) => {
       }).catch(() => {}) // Ignorar si no existe
     }
 
-    // Solo socios cuyo estado tiene permiteIngresoMolinete = true (FK como fuente de verdad).
-    // Para estados sin FK todavía completada, fallback a string 'VIGENTE'.
+    // Solo socios cuyo estado tiene permiteIngresoMolinete = true.
+    // El cache local del molinete es la fuente offline: si está acá, puede entrar.
     const socios = await req.db.socio.findMany({
       where: {
-        OR: [
-          { estadoSocioRel: { permiteIngresoMolinete: true } },
-          { AND: [{ estadoSocioId: null }, { estado: 'VIGENTE' }] }
-        ]
+        estadoSocioRel: { permiteIngresoMolinete: true }
       },
       select: {
         id: true,

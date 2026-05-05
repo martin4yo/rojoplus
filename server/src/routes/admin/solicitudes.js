@@ -128,7 +128,8 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     throw new AppError('Esta solicitud ya fue procesada', 400)
   }
 
-  // Helper function para inscribir en actividades
+  // Helper function para inscribir en actividades. También conecta el centroCosto
+  // por defecto de la actividad si tiene uno cargado (para que el cargo lo herede).
   const inscribirEnActividades = async (socioId, actividades, edadSocio) => {
     const actividadesArray = Array.isArray(actividades) ? actividades : [actividades]
 
@@ -161,6 +162,9 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
               data: {
                 socio: { connect: { id: socioId } },
                 categoriaActividad: { connect: { id: categoriaApropiada.id } },
+                ...(actividad.centroCostoId ? {
+                  centroCosto: { connect: { id: actividad.centroCostoId } }
+                } : {}),
                 fechaInicio: new Date(),
                 estado: 'ACTIVA'
               }
@@ -307,9 +311,18 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
       cuotasGeneradas.push(cargoSocial)
     }
 
-    // GENERAR CUOTAS DE ACTIVIDADES: Para cada integrante (titular + familiares)
+    // GENERAR CUOTAS DE ACTIVIDADES: Para cada integrante (titular + familiares).
+    // Misma lógica que POST /admin/inscripciones: cascade de monto + descuentos.
     for (const socio of sociosCreados) {
-      // Obtener inscripciones activas del socio
+      // Cargar relación de categoría del socio para aplicar descuento
+      const socioCompleto = await req.db.socio.findUnique({
+        where: { id: socio.id },
+        include: { categoriaSocioRel: true }
+      })
+      const descuentoPct = socioCompleto?.categoriaSocioRel?.porcentajeDescuento
+        ? Number(socioCompleto.categoriaSocioRel.porcentajeDescuento)
+        : 0
+
       const inscripciones = await req.db.inscripcion.findMany({
         where: {
           socioId: socio.id,
@@ -318,37 +331,64 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
         include: {
           categoriaActividad: {
             include: {
-              actividad: true
+              actividad: { include: { conceptoTesoreria: true } }
             }
           }
         }
       })
 
-      // Generar cargo por cada actividad
       for (const insc of inscripciones) {
-        const categoria = insc.categoriaActividad
-        if (categoria.cuotaMensual && parseFloat(categoria.cuotaMensual) > 0) {
-          const montoCuota = insc.exentoCuota
-            ? 0
-            : parseFloat(categoria.cuotaMensual) * (insc.porcentajeCuota || 100) / 100
+        if (insc.exentoCuota) continue
 
-          if (montoCuota > 0) {
-            const cargoActividad = await req.db.cargo.create({
-              data: {
-                socio: { connect: { id: socio.id } },
-                periodo: { connect: { id: periodoActual.id } },
-                categoriaActividad: { connect: { id: categoria.id } },
-                categoria: 'CUOTA_ACTIVIDAD',
-                descripcion: `${categoria.nombre} - ${socio.apellidoNombre} - ${periodoActual.mes}/${periodoActual.anio}`,
-                montoOriginal: montoCuota,
-                montoTotal: montoCuota,
-                fechaVencimiento: periodoActual.fechaVencimiento,
-                estado: 'PENDIENTE'
-              }
-            })
-            cuotasGeneradas.push(cargoActividad)
+        const categoria = insc.categoriaActividad
+        const actividad = categoria.actividad
+
+        // Cascade de monto: conceptoTesoreria → categoria → actividad
+        let montoBase = actividad.conceptoTesoreria?.cuotaMensual
+          ? Number(actividad.conceptoTesoreria.cuotaMensual)
+          : (categoria.cuotaMensual ? Number(categoria.cuotaMensual)
+          : (actividad.cuotaMensual ? Number(actividad.cuotaMensual) : 0))
+
+        if (montoBase <= 0) continue
+
+        const pctInsc = parseFloat(insc.porcentajeCuota) || 100
+        if (pctInsc !== 100) montoBase = montoBase * (pctInsc / 100)
+
+        const montoBonificacion = montoBase * (descuentoPct / 100)
+        const montoTotal = montoBase - montoBonificacion
+
+        if (montoTotal <= 0) continue
+
+        // Anti-duplicado por (socio, categoría, período)
+        const yaExiste = await req.db.cargo.findFirst({
+          where: {
+            socioId: socio.id,
+            categoriaActividadId: categoria.id,
+            periodoId: periodoActual.id
           }
-        }
+        })
+        if (yaExiste) continue
+
+        const cargoActividad = await req.db.cargo.create({
+          data: {
+            socio: { connect: { id: socio.id } },
+            periodo: { connect: { id: periodoActual.id } },
+            categoriaActividad: { connect: { id: categoria.id } },
+            ...(actividad.conceptoTesoreriaId ? {
+              conceptoTesoreria: { connect: { id: actividad.conceptoTesoreriaId } }
+            } : {}),
+            categoria: 'CUOTA_ACTIVIDAD',
+            descripcion: `${actividad.nombre} - ${categoria.nombre} - ${socio.apellidoNombre} - ${periodoActual.mes}/${periodoActual.anio}`,
+            montoOriginal: montoBase,
+            montoBonificacion,
+            montoTotal,
+            fechaVencimiento: periodoActual.fechaVencimiento,
+            estado: 'PENDIENTE',
+            origen: 'ALTA_INSCRIPCION',
+            motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+          }
+        })
+        cuotasGeneradas.push(cargoActividad)
       }
     }
   }
