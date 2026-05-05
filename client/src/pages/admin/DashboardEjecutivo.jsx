@@ -52,6 +52,9 @@ import {
   Area,
 } from 'recharts'
 import api from '../../services/api'
+import Switch from '../../components/Switch'
+
+const LS_CAJAS_EXCLUIDAS = 'dashboard.tesoreria.cajasExcluidas'
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 const COLORS_INGRESOS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0', '#D1FAE5']
@@ -195,6 +198,22 @@ export default function DashboardEjecutivo() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('general')
+  const [cajasExcluidas, setCajasExcluidas] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_CAJAS_EXCLUIDAS)
+      return new Set(raw ? JSON.parse(raw) : [])
+    } catch { return new Set() }
+  })
+
+  const toggleCajaExcluida = (id) => {
+    setCajasExcluidas(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      try { localStorage.setItem(LS_CAJAS_EXCLUIDAS, JSON.stringify([...next])) } catch {}
+      return next
+    })
+  }
 
   const cargarDatos = async () => {
     try {
@@ -251,8 +270,8 @@ export default function DashboardEjecutivo() {
 
   const cajasEfectivo = cajas.filter(c => c.tipo === 'EFECTIVO')
   const cajasBanco = cajas.filter(c => c.tipo === 'BANCO')
-  const totalEfectivo = cajasEfectivo.reduce((s, c) => s + Number(c.saldoActual), 0)
-  const totalBancos = cajasBanco.reduce((s, c) => s + Number(c.saldoActual), 0)
+  const totalEfectivo = cajasEfectivo.filter(c => !cajasExcluidas.has(c.id)).reduce((s, c) => s + Number(c.saldoActual), 0)
+  const totalBancos = cajasBanco.filter(c => !cajasExcluidas.has(c.id)).reduce((s, c) => s + Number(c.saldoActual), 0)
   const cajasNegativas = cajas.filter(c => Number(c.saldoActual) < 0)
 
   const totalPorCobrar = (financiero.saldoClientes || 0) + (financiero.cobranzaMes.pendiente || 0)
@@ -836,10 +855,14 @@ export default function DashboardEjecutivo() {
               <div className="space-y-3">
                 {cajasEfectivo.map(caja => {
                   const saldo = Number(caja.saldoActual) || 0
+                  const incluida = !cajasExcluidas.has(caja.id)
                   return (
-                    <div key={caja.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">{caja.nombre}</span>
-                      <span className={`text-sm font-semibold ${saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div key={caja.id} className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${incluida ? '' : 'opacity-50'}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Switch size="sm" checked={incluida} onChange={() => toggleCajaExcluida(caja.id)} />
+                        <span className="text-sm text-gray-600 truncate">{caja.nombre}</span>
+                      </div>
+                      <span className={`text-sm font-semibold ${incluida ? (saldo >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-400 line-through'}`}>
                         {formatCurrency(saldo)}
                       </span>
                     </div>
@@ -865,10 +888,14 @@ export default function DashboardEjecutivo() {
               <div className="space-y-3">
                 {cajasBanco.map(caja => {
                   const saldo = Number(caja.saldoActual) || 0
+                  const incluida = !cajasExcluidas.has(caja.id)
                   return (
-                    <div key={caja.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">{caja.nombre}</span>
-                      <span className={`text-sm font-semibold ${saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                    <div key={caja.id} className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${incluida ? '' : 'opacity-50'}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Switch size="sm" checked={incluida} onChange={() => toggleCajaExcluida(caja.id)} />
+                        <span className="text-sm text-gray-600 truncate">{caja.nombre}</span>
+                      </div>
+                      <span className={`text-sm font-semibold ${incluida ? (saldo >= 0 ? 'text-blue-600' : 'text-red-600') : 'text-gray-400 line-through'}`}>
                         {formatCurrency(saldo)}
                       </span>
                     </div>

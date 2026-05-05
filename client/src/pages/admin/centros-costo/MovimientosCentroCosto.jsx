@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
-import { ArrowLeft, X, CreditCard, BookOpen, ChevronRight } from 'lucide-react'
+import { ArrowLeft, X, CreditCard, BookOpen, ChevronRight, Eye } from 'lucide-react'
 
 const fmt = (v) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(v ?? 0)
@@ -15,6 +15,18 @@ const TIPO_LABEL = {
   FACTURA_VENTA: 'Factura Venta', RECIBO_COBRO: 'Recibo Cobro',
   NOTA_CREDITO_CLIENTE: 'NC Cliente', FACTURA_COMPRA: 'Factura Compra',
   ORDEN_PAGO: 'Orden Pago', PAGO: 'Pago', NOTA_CREDITO_PROVEEDOR: 'NC Proveedor',
+}
+
+// Devuelve la ruta al detalle dedicado, o null si hay que caer al SlideOver
+function rutaDetalle(mov, tipoTab) {
+  if (tipoTab === 'caja') return `/admin/tesoreria/movimientos/${mov.id}`
+  switch (mov.tipo) {
+    case 'FACTURA_VENTA':   return `/admin/ingresos/facturas/${mov.id}`
+    case 'RECIBO_COBRO':    return `/admin/ingresos/recibos/${mov.id}`
+    case 'FACTURA_COMPRA':  return `/admin/egresos/facturas/${mov.id}`
+    case 'ORDEN_PAGO':      return `/admin/egresos/ordenes-pago/${mov.id}`
+    default: return null
+  }
 }
 
 function Badge({ tipo }) {
@@ -351,7 +363,7 @@ export default function MovimientosCentroCosto() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Referencia</th>
                   {tipo === 'caja' && <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Caja</th>}
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Monto</th>
-                  <th className="px-4 py-3"></th>
+                  <th className="px-4 py-3 w-20"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -360,8 +372,10 @@ export default function MovimientosCentroCosto() {
                   const referencia = mov.pago?.socio?.apellidoNombre || mov.socio?.apellidoNombre || mov.entidad?.razonSocial
                     || (tipo === 'contable' ? `${mov.tipoComprobante || ''} ${mov.numeroComprobante || mov.numero}`.trim() : mov.numero)
                   const monto = tipo === 'caja' ? mov.monto : mov.montoTotal
+                  const ruta = rutaDetalle(mov, tipo)
+                  const abrirDetalle = () => ruta ? navigate(ruta) : setSeleccionado(mov)
                   return (
-                    <tr key={mov.id} onClick={() => setSeleccionado(mov)}
+                    <tr key={mov.id} onClick={abrirDetalle}
                       className="hover:bg-gray-50 cursor-pointer transition-colors">
                       <td className="px-4 py-3 text-gray-600">{fmtDate(mov.fecha)}</td>
                       <td className="px-4 py-3"><Badge tipo={mov.tipo} /></td>
@@ -370,9 +384,18 @@ export default function MovimientosCentroCosto() {
                       <td className={`px-4 py-3 text-right font-semibold ${esIngreso ? 'text-green-600' : 'text-red-600'}`}>
                         {fmt(monto)}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        {tipo === 'caja' && mov.movimientoContable && <BookOpen className="w-3.5 h-3.5 text-blue-400 inline" />}
-                        {tipo === 'contable' && mov.movimientosCaja?.length > 0 && <CreditCard className="w-3.5 h-3.5 text-green-400 inline" />}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {tipo === 'caja' && mov.movimientoContable && <BookOpen className="w-3.5 h-3.5 text-blue-400" title="Tiene asiento contable vinculado" />}
+                          {tipo === 'contable' && mov.movimientosCaja?.length > 0 && <CreditCard className="w-3.5 h-3.5 text-green-400" title="Tiene movimientos de caja vinculados" />}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); abrirDetalle() }}
+                            title="Ver detalle"
+                            className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-primary transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

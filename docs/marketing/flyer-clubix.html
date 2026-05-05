@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Clubix — Flyer & Email</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── Paleta del sitio Clubix ── */
+  :root {
+    --bg:        #F4F1EB;     /* fondo cálido tipo papel */
+    --bg-dark:   #0A0A0B;     /* hero/secciones oscuras */
+    --bg-surface:#FFFFFF;
+    --ink:       #14120E;
+    --ink-soft:  #4B4942;
+    --ink-mute:  #8C887E;
+    --line:      rgba(20,18,14,0.10);
+    --line-strong: rgba(20,18,14,0.22);
+    --accent:        #2563EB;
+    --accent-bright: #1D4ED8;
+    --on-dark:       #FFFFFF;
+    --on-dark-soft:  rgba(255,255,255,0.65);
+    --on-dark-mute:  rgba(255,255,255,0.40);
+    --on-dark-line:  rgba(255,255,255,0.12);
+    --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Anton', 'Inter', sans-serif;
+    --font-mono:    'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2a2a30;
+    font-family: var(--font-sans);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body { padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 28px; }
+
+  /* ── A4 (210x297 mm) ── */
+  .flyer {
+    width: 210mm;
+    height: 297mm;
+    background: var(--bg);
+    color: var(--ink);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 24px 60px rgba(0,0,0,.4);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HERO oscuro ── */
+  .hero {
+    background: var(--bg-dark);
+    color: var(--on-dark);
+    padding: 14mm 14mm 12mm;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    top: -40%; right: -20%;
+    width: 380px; height: 380px;
+    background: radial-gradient(circle, rgba(37,99,235,.25) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .hero > * { position: relative; z-index: 1; }
+
+  .brand-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 9mm;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .brand-logo {
+    width: 38px; height: 38px;
+    background: var(--accent);
+    color: #fff;
+    display: grid; place-items: center;
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 1px;
+  }
+  .brand-name {
+    font-family: var(--font-display);
+    font-size: 26px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+  .brand-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    color: var(--on-dark-mute);
+    text-transform: uppercase;
+  }
+
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: var(--on-dark-soft);
+    font-weight: 500;
+    margin-bottom: 6mm;
+  }
+  .eyebrow::before {
+    content: ""; width: 28px; height: 1px;
+    background: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 76px;
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    margin-bottom: 5mm;
+  }
+  h1 .accent { color: var(--accent); display: inline-block; margin-left: .15em; }
+
+  .hero-sub {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--on-dark-soft);
+    max-width: 165mm;
+    margin-bottom: 8mm;
+  }
+  .hero-sub strong { color: var(--on-dark); font-weight: 600; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--on-dark-line);
+    padding-top: 5mm;
+  }
+  .stat {
+    border-right: 1px solid var(--on-dark-line);
+    padding-right: 8mm;
+  }
+  .stat:last-child { border-right: 0; }
+  .stat-num {
+    font-family: var(--font-display);
+    font-size: 36px;
+    line-height: 1;
+    color: var(--on-dark);
+    letter-spacing: -.5px;
+  }
+  .stat-num .accent { color: var(--accent); }
+  .stat-lbl {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--on-dark-mute);
+    margin-top: 2mm;
+  }
+
+  /* ── BODY claro ── */
+  .body {
+    flex: 1;
+    padding: 8mm 14mm 6mm;
+    position: relative;
+  }
+
+  .section-eyebrow {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: var(--ink-mute);
+    margin-bottom: 4mm;
+  }
+  .section-eyebrow::before {
+    content: ""; width: 28px; height: 1px;
+    background: var(--accent);
+  }
+
+  .axio-block {
+    background: var(--bg-dark);
+    color: var(--on-dark);
+    padding: 6mm 8mm;
+    margin-bottom: 5mm;
+    position: relative;
+    overflow: hidden;
+  }
+  .axio-block::before {
+    content: "";
+    position: absolute;
+    top: -20px; right: -20px;
+    width: 180px; height: 180px;
+    background: radial-gradient(circle, rgba(37,99,235,.4) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .axio-block > * { position: relative; z-index: 1; }
+  .axio-block .label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 3mm;
+  }
+  .axio-block .title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: -.5px;
+    margin-bottom: 3mm;
+  }
+  .axio-block .title .accent { color: var(--accent); }
+  .axio-block .desc {
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--on-dark-soft);
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+    margin-bottom: 0;
+  }
+  .feat {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 5mm 5mm;
+    background: var(--bg-surface);
+  }
+  .feat .num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    margin-bottom: 2mm;
+  }
+  .feat h3 {
+    font-family: var(--font-display);
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0;
+    line-height: 1;
+    margin-bottom: 2mm;
+    color: var(--ink);
+  }
+  .feat p {
+    font-size: 9.5px;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+
+  /* ── OFERTA DE ONBOARDING ── */
+  .onboarding {
+    margin: 0 14mm 6mm;
+    border: 1px solid var(--accent);
+    background: rgba(37,99,235,.06);
+    padding: 5mm 6mm;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5mm;
+    align-items: center;
+  }
+  .onboarding .badge {
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 1;
+    color: var(--accent);
+    letter-spacing: -.5px;
+    text-transform: uppercase;
+    border-right: 1px solid var(--accent);
+    padding-right: 5mm;
+    white-space: nowrap;
+  }
+  .onboarding .badge small {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--ink-mute);
+    letter-spacing: 2px;
+    margin-top: 1mm;
+    font-weight: 500;
+  }
+  .onboarding .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5mm;
+  }
+  .onboarding .step {
+    font-size: 9.5px;
+    line-height: 1.4;
+    color: var(--ink-soft);
+  }
+  .onboarding .step strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 13px;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0;
+    margin-bottom: 1mm;
+    font-weight: 400;
+  }
+  .onboarding .step-num {
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    margin-bottom: 1mm;
+  }
+
+  /* ── FOOTER / CTA ── */
+  .footer {
+    margin-top: auto;
+    background: var(--bg-dark);
+    color: var(--on-dark);
+    padding: 7mm 14mm 7mm;
+    position: relative;
+  }
+  .cta-row {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    gap: 8mm;
+    padding-bottom: 6mm;
+    border-bottom: 1px solid var(--on-dark-line);
+    margin-bottom: 5mm;
+  }
+  .cta-text h2 {
+    font-family: var(--font-display);
+    font-size: 32px;
+    text-transform: uppercase;
+    letter-spacing: -.5px;
+    line-height: 1;
+    margin-bottom: 3mm;
+  }
+  .cta-text h2 .accent { color: var(--accent); }
+  .cta-text p {
+    font-size: 11px;
+    color: var(--on-dark-soft);
+    line-height: 1.5;
+    max-width: 110mm;
+  }
+  .cta-btn {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    padding: 4mm 8mm;
+    font-family: var(--font-display);
+    font-size: 17px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .contact {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5mm;
+    font-size: 9.5px;
+    color: var(--on-dark-soft);
+  }
+  .contact h4 {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--on-dark-mute);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 2mm;
+    font-weight: 500;
+  }
+  .contact div p { line-height: 1.45; margin-bottom: 1mm; }
+  .contact strong { color: var(--on-dark); font-weight: 600; }
+
+  .powered {
+    margin-top: 5mm;
+    padding-top: 4mm;
+    border-top: 1px solid var(--on-dark-line);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--on-dark-mute);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── EMAIL CARD ── */
+  .email-card {
+    width: 210mm; max-width: 100%;
+    background: #fff;
+    color: var(--ink);
+    padding: 28px 32px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.3);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .email-card .meta {
+    font-size: 12px;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 12px;
+    margin-bottom: 18px;
+  }
+  .email-card .meta strong { color: var(--ink); }
+  .email-card .hello {
+    font-family: var(--font-display);
+    font-size: 24px;
+    text-transform: uppercase;
+    letter-spacing: 0;
+    margin-bottom: 14px;
+  }
+  .email-card .hello .accent { color: var(--accent); }
+  .email-card p { margin-bottom: 12px; }
+  .email-card ul { margin: 8px 0 14px 22px; }
+  .email-card li { margin-bottom: 6px; }
+  .email-card .firma {
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+  .copy-bar {
+    width: 210mm;
+    display: flex; justify-content: space-between; align-items: center;
+    color: #d1d5db;
+    font-size: 12px;
+  }
+  .copy-bar button {
+    background: var(--accent); color: #fff;
+    border: 0; padding: 8px 14px;
+    font-family: var(--font-mono);
+    font-weight: 600; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  /* ── PRINT ── */
+  @page { size: A4; margin: 0; }
+  @media print {
+    body { background: #fff; padding: 0; gap: 0; }
+    .flyer { box-shadow: none; }
+    .email-card, .copy-bar, .screen-only { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ====== FLYER (A4) ====== -->
+  <section class="flyer">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="brand-row">
+        <div class="brand">
+          <div class="brand-logo">C</div>
+          <div>
+            <div class="brand-name">Clubix</div>
+            <div class="brand-tag">Inteligencia para tu club</div>
+          </div>
+        </div>
+        <div class="brand-tag">www.clubix.com.ar</div>
+      </div>
+
+      <div class="eyebrow">Plataforma de gestión 2026</div>
+      <h1>Software inteligente<br /><span class="accent">para tu club.</span></h1>
+
+      <p class="hero-sub">
+        Más que un gestor: una plataforma con <strong>IA predictiva</strong> que analiza tus datos,
+        automatiza lo administrativo y sugiere acciones estratégicas para que tu equipo dedique tiempo
+        a <strong>gestionar los recursos de la institución</strong>, no a cargar planillas.
+      </p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-num">35<span class="accent">+</span></div>
+          <div class="stat-lbl">Módulos integrados</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num"><span class="accent">IA</span></div>
+          <div class="stat-lbl">Predictiva integrada</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">24/7</div>
+          <div class="stat-lbl">Bot WhatsApp Axio</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="body">
+
+      <div class="axio-block">
+        <div class="label">⚡ Axio · Inteligencia artificial integrada</div>
+        <div class="title">Menos administración.<br /><span class="accent">Más institución.</span></div>
+        <p class="desc">
+          Axio analiza patrones, automatiza la generación de cuotas, asiste la conciliación bancaria,
+          extrae datos de comprobantes sin tipeo, ejecuta el recupero de morosos por WhatsApp y
+          responde consultas de socios 24/7. <strong style="color:#fff">Sin costo variable por uso de IA</strong>
+          — corre sobre AxiomaCloud.
+        </p>
+      </div>
+
+      <div class="section-eyebrow">Capacidades</div>
+
+      <div class="features">
+        <div class="feat">
+          <div class="num">01</div>
+          <h3>Socios</h3>
+          <p>Padrón, grupos familiares, inscripciones y cuenta corriente individual.</p>
+        </div>
+        <div class="feat">
+          <div class="num">02</div>
+          <h3>Financiero &amp; AFIP</h3>
+          <p>Tesorería, contabilidad, factura electrónica y conciliación bancaria.</p>
+        </div>
+        <div class="feat">
+          <div class="num">03</div>
+          <h3>Cobranzas</h3>
+          <p>Mercado Pago, débito automático CBU y recupero asistido por IA.</p>
+        </div>
+        <div class="feat">
+          <div class="num">04</div>
+          <h3>Buffet &amp; POS</h3>
+          <p>Mesas, comandas, kiosco, takeaway y tickets fiscales con CAE.</p>
+        </div>
+        <div class="feat">
+          <div class="num">05</div>
+          <h3>Control de Accesos</h3>
+          <p>QR de socio + verificación automática y monitoreo en tiempo real.</p>
+        </div>
+        <div class="feat">
+          <div class="num">06</div>
+          <h3>Portal del Socio</h3>
+          <p>App PWA: pagos, cuenta corriente, carnet digital y grupo familiar.</p>
+        </div>
+        <div class="feat">
+          <div class="num">07</div>
+          <h3>Extracción IA</h3>
+          <p>Adjuntás factura, Axio extrae proveedor, monto, fecha e impuestos.</p>
+        </div>
+        <div class="feat">
+          <div class="num">08</div>
+          <h3>Bot WhatsApp</h3>
+          <p>Consultas en lenguaje natural y campañas masivas con anti-ban.</p>
+        </div>
+        <div class="feat">
+          <div class="num">09</div>
+          <h3>Reservas &amp; Eventos</h3>
+          <p>Canchas, salones, eventos y entradas con QR. Pago online integrado.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ONBOARDING SIN RIESGO -->
+    <div class="onboarding">
+      <div class="badge">
+        Empezá<br />sin riesgo
+        <small>Oferta de lanzamiento</small>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <strong>Análisis de viabilidad</strong>
+          Evaluamos tu club, datos y procesos. Sin compromiso.
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <strong>Migración sin cargo</strong>
+          Pasamos socios, cuotas e historial al sistema. Lo hacemos nosotros.
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <strong>1 mes de uso bonificado</strong>
+          Operás el club con la plataforma completa, sin pagar el primer mes.
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA + CONTACTO -->
+    <div class="footer">
+      <div class="cta-row">
+        <div class="cta-text">
+          <h2>Hacé crecer<br /><span class="accent">tu club.</span></h2>
+          <p>Demo gratuita de 30 minutos con tus datos reales. Después: análisis de viabilidad, migración sin cargo y un mes de uso bonificado.</p>
+        </div>
+        <a href="https://www.clubix.com.ar/#contacto" class="cta-btn">Solicitar Demo →</a>
+      </div>
+
+      <div class="contact">
+        <div>
+          <h4>Oficinas</h4>
+          <p><strong>Buenos Aires</strong></p>
+          <p>Ciudad de La Paz 2963, 6B</p>
+          <p style="margin-top:2mm"><strong>Pilar</strong> · San José 1176</p>
+          <p><strong>Miramar</strong> · De las Acacias 1033</p>
+        </div>
+        <div>
+          <h4>WhatsApp</h4>
+          <p><strong>+54 11 3436-5783</strong></p>
+          <p><strong>+54 9 230 4346897</strong></p>
+        </div>
+        <div>
+          <h4>Email</h4>
+          <p><strong>info@clubix.com.ar</strong></p>
+          <p style="margin-top:2mm">Lun a Vie · 9 a 18 h</p>
+          <p>Soporte 24/7</p>
+        </div>
+        <div>
+          <h4>Redes</h4>
+          <p><strong>@clubix.ar</strong></p>
+          <p style="margin-top:2mm"><strong>www.clubix.com.ar</strong></p>
+        </div>
+      </div>
+
+      <div class="powered">
+        <span>© 2026 Clubix</span>
+        <span>Powered by AxiomaCloud</span>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ====== EMAIL TEXT (screen only) ====== -->
+  <div class="copy-bar screen-only">
+    <span>Texto sugerido para enviar por mail ↓</span>
+    <button onclick="copiarEmail()">Copiar texto</button>
+  </div>
+
+  <article class="email-card screen-only" id="email-card">
+    <div class="meta">
+      <div><strong>Asunto:</strong> Software inteligente para tu club — conocé Clubix</div>
+      <div><strong>Preheader:</strong> Plataforma con IA predictiva que reduce tareas administrativas y deja a tu equipo enfocado en gestionar la institución.</div>
+    </div>
+
+    <h2 class="hello">Hola <span class="accent">[Nombre]</span>,</h2>
+
+    <p>
+      ¿Cuánto tiempo del equipo administrativo de tu club se va en cargar cuotas, conciliar pagos,
+      perseguir morosos y armar reportes manualmente?
+    </p>
+
+    <p>
+      <strong>Clubix</strong> es la plataforma con <strong>IA predictiva integrada</strong> que reúne
+      <strong>+35 módulos</strong> en un solo sistema —socios, finanzas, buffet, accesos, eventos,
+      portal del socio, contabilidad— para que la administración deje de consumir el día y tu equipo
+      pueda <strong>gestionar los recursos de la institución</strong>.
+    </p>
+
+    <p><strong>Qué hace la IA por tu club:</strong></p>
+    <ul>
+      <li><strong>Axio, el cerebro de tu club</strong> — analiza patrones, anticipa tendencias y sugiere acciones concretas para retención e ingresos.</li>
+      <li><strong>Bot de WhatsApp 24/7</strong> — los socios consultan saldo, vencimientos o piden link de pago en lenguaje natural, sin intervención humana.</li>
+      <li><strong>Extracción automática de comprobantes</strong> — adjuntás una factura y el sistema extrae proveedor, monto, fecha e impuestos. Sin tipeo.</li>
+      <li><strong>Conciliación bancaria asistida</strong> — importás el extracto y la IA cruza movimientos, marca diferencias y propone matcheos.</li>
+      <li><strong>Recupero inteligente de morosos</strong> — secuencias automáticas por WhatsApp, email y SMS con anti-ban.</li>
+      <li><strong>Informes en lenguaje natural</strong> — pedís "comparame socios activos vs el año pasado" y obtenés el reporte hecho.</li>
+    </ul>
+
+    <p><strong>Plataforma completa, además de la IA:</strong></p>
+    <ul>
+      <li>Gestión de socios, cuotas, cobranzas, débito automático y factura electrónica AFIP.</li>
+      <li>Buffet con POS, mesas, kiosco, takeaway, tickets fiscales y comandas a cocina/barra.</li>
+      <li>Control de accesos por QR, portal del socio (PWA), reservas de instalaciones, eventos con entradas QR y módulo deportivo completo.</li>
+    </ul>
+
+    <p style="background:#F4F1EB; border-left: 3px solid #2563EB; padding: 12px 16px; margin: 18px 0;">
+      <strong>Sin costo variable por uso de IA.</strong> Axio corre sobre AxiomaCloud. Si tu plan lo
+      incluye, no hay cargos por tokens ni sorpresas en la factura.
+    </p>
+
+    <p style="background:#0A0A0B; color:#fff; padding: 14px 18px; margin: 18px 0; border-left: 3px solid #2563EB;">
+      <strong style="color:#fff; font-size: 15px;">Empezá sin riesgo — oferta de lanzamiento</strong><br />
+      <span style="color: rgba(255,255,255,.85);">
+        <strong style="color:#fff;">1.</strong> Análisis de viabilidad gratuito de tu operación. ·
+        <strong style="color:#fff;">2.</strong> Migramos tus datos (socios, cuotas, historial) <strong style="color:#fff;">sin cargo</strong>. ·
+        <strong style="color:#fff;">3.</strong> <strong style="color:#fff;">Primer mes bonificado</strong> usando la plataforma completa.
+      </span>
+    </p>
+
+    <p>
+      Te propongo arrancar con una <strong>demo gratuita de 30 minutos</strong> donde te muestro qué
+      puede hacer Axio con los datos reales de tu club. Si encaja, seguimos con el análisis de viabilidad
+      y la migración — sin costo, sin compromiso.
+    </p>
+
+    <p>
+      ¿Te viene bien esta semana? Respondé este mail con un día y horario, o escribime directamente:<br />
+      WhatsApp · <a href="https://wa.me/541134365783">+54 11 3436-5783</a><br />
+      Web · <a href="https://www.clubix.com.ar">www.clubix.com.ar</a>
+    </p>
+
+    <div class="firma">
+      Saludos,<br />
+      <strong>[Tu nombre]</strong><br />
+      Clubix — Software inteligente para tu club<br />
+      info@clubix.com.ar · +54 11 3436-5783 · @clubix.ar<br />
+      <em style="color: #8C887E;">Powered by AxiomaCloud</em>
+    </div>
+  </article>
+
+  <script>
+    function copiarEmail() {
+      const card = document.getElementById('email-card');
+      const text = card.innerText.replace(/\n{3,}/g, '\n\n').trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('.copy-bar button');
+        const old = btn.innerText;
+        btn.innerText = 'Copiado ✓';
+        setTimeout(() => btn.innerText = old, 1500);
+      });
+    }
+  </script>
+
+</body>
+</html>

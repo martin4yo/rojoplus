@@ -372,13 +372,29 @@ function handleUSBData(valorLeido) {
 }
 
 /**
+ * Convertir UID RFID GSD (5 bytes hex) al PIN del socio.
+ * Toma los últimos 3 bytes (6 chars hex finales), los pasa a decimal y rellena con ceros a 10.
+ * Ej: "01005AA4FE" -> "5AA4FE" -> 5940478 -> "0005940478"
+ */
+function uidGsdAPin(uidHex) {
+  if (!uidHex || uidHex.length < 6) return uidHex
+  const ultimos3Bytes = uidHex.slice(-6)
+  const decimal = parseInt(ultimos3Bytes, 16)
+  if (Number.isNaN(decimal)) return uidHex
+  return decimal.toString().padStart(10, '0')
+}
+
+/**
  * Procesar datos del lector RFID
  */
 function handleRFIDData(data, origen = '') {
-  logger.info(`📡 Lectura RFID${origen ? ` [${origen}]` : ''}: ${data}`)
+  // UID crudo del lector — se conserva en log para debugging
+  const uidOriginal = (data || '').replace(/\s/g, '').toUpperCase()
+  logger.info(`📡 Lectura RFID${origen ? ` [${origen}]` : ''}: UID=${uidOriginal}`)
 
-  // Parsear UID hexadecimal
-  const valorLeido = data.replace(/\s/g, '').toUpperCase()
+  // Convertir a PIN del socio para hacer el lookup contra la base
+  const valorLeido = uidGsdAPin(uidOriginal)
+  logger.info(`📡 RFID PIN convertido: ${valorLeido}`)
 
   procesarLectura(valorLeido, 'RFID')
 }
