@@ -105,11 +105,16 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // ============ SECCIÓN FINANCIERA ============
 
-  // Periodo actual: el más reciente (sin filtrar por estado, porque los periodos
-  // pueden estar en 'ABIERTO' / 'PENDIENTE' / 'GENERADO' / 'CERRADO' según el flujo).
-  const periodoActual = await req.db.periodo.findFirst({
-    orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
+  // Periodo actual: el del mes calendario en curso. Si no existe (no se generó
+  // todavía), caemos al más reciente como fallback. Sin filtrar por estado.
+  let periodoActual = await req.db.periodo.findFirst({
+    where: { mes: mesActual, anio: anioActual },
   })
+  if (!periodoActual) {
+    periodoActual = await req.db.periodo.findFirst({
+      orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
+    })
+  }
 
   let cobranzaMes = { generado: 0, cobrado: 0, pendiente: 0, porcentaje: 0 }
   if (periodoActual) {
@@ -119,8 +124,9 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
         _sum: { montoTotal: true },
         _count: true,
       }),
+      // Pendiente = PENDIENTE + VENCIDO (los vencidos siguen siendo deuda no cobrada)
       req.db.cargo.aggregate({
-        where: { periodoId: periodoActual.id, estado: 'PENDIENTE' },
+        where: { periodoId: periodoActual.id, estado: { in: ['PENDIENTE', 'VENCIDO'] } },
         _sum: { montoTotal: true },
         _count: true,
       }),
@@ -140,11 +146,14 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  // Morosidad total (todas las cuotas vencidas pendientes)
+  // Morosidad total: cargos vencidos sin pagar.
+  // Incluye estado='VENCIDO' Y estado='PENDIENTE' con fechaVencimiento < hoy.
   const morosidadResult = await req.db.cargo.aggregate({
     where: {
-      estado: 'PENDIENTE',
-      fechaVencimiento: { lt: hoy },
+      OR: [
+        { estado: 'VENCIDO' },
+        { estado: 'PENDIENTE', fechaVencimiento: { lt: hoy } },
+      ],
     },
     _sum: { montoTotal: true },
     _count: true,
@@ -158,31 +167,50 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // Socios morosos (únicos)
   const sociosMorosos = await req.db.cargo.findMany({
     where: {
-      estado: 'PENDIENTE',
-      fechaVencimiento: { lt: hoy },
+      OR: [
+        { estado: 'VENCIDO' },
+        { estado: 'PENDIENTE', fechaVencimiento: { lt: hoy } },
+      ],
     },
     select: { socioId: true },
     distinct: ['socioId'],
   })
   morosidadTotal.cantSocios = sociosMorosos.length
 
-  // Evolución de cobranza (últimos 6 periodos, sin filtrar por estado)
-  const periodosHistoricos = await req.db.periodo.findMany({
-    orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
-    take: 6,
+  // Evolución de cobranza: últimos 6 meses calendarios reales (incluido el actual).
+  // Si en algún mes no hubo periodo cargado, se muestra en cero para mantener la
+  // continuidad temporal del gráfico.
+  const ultimos6Meses = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(anioActual, mesActual - 1 - i, 1)
+    ultimos6Meses.push({ mes: d.getMonth() + 1, anio: d.getFullYear() })
+  }
+
+  const periodosUltimos6 = await req.db.periodo.findMany({
+    where: {
+      OR: ultimos6Meses.map(m => ({ mes: m.mes, anio: m.anio })),
+    },
     include: {
-      cargos: {
-        select: { montoTotal: true, estado: true },
-      },
+      cargos: { select: { montoTotal: true, estado: true } },
     },
   })
+  const periodoMap = new Map(periodosUltimos6.map(p => [`${p.anio}-${p.mes}`, p]))
 
-  const evolucionCobranza = periodosHistoricos.reverse().map(p => {
-    const cobrado = p.cargos.filter(c => c.estado === 'PAGADO').reduce((sum, c) => sum + Number(c.montoTotal), 0)
-    const pendiente = p.cargos.filter(c => c.estado === 'PENDIENTE').reduce((sum, c) => sum + Number(c.montoTotal), 0)
+  const evolucionCobranza = ultimos6Meses.map(m => {
+    const p = periodoMap.get(`${m.anio}-${m.mes}`)
+    let cobrado = 0
+    let pendiente = 0
+    if (p) {
+      cobrado = p.cargos
+        .filter(c => c.estado === 'PAGADO')
+        .reduce((sum, c) => sum + Number(c.montoTotal), 0)
+      pendiente = p.cargos
+        .filter(c => ['PENDIENTE', 'VENCIDO'].includes(c.estado))
+        .reduce((sum, c) => sum + Number(c.montoTotal), 0)
+    }
     const total = cobrado + pendiente
     return {
-      periodo: `${mesesNombres[p.mes - 1]} ${p.anio.toString().slice(-2)}`,
+      periodo: `${mesesNombres[m.mes - 1]} ${String(m.anio).slice(-2)}`,
       cobrado: Math.round(cobrado),
       pendiente: Math.round(pendiente),
       porcentaje: total > 0 ? Math.round((cobrado / total) * 100) : 0,
