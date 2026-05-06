@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Save, User, Phone, MapPin, Heart, CreditCard, AlertCircle, Users, X, ListPlus, Wallet
+  ArrowLeft, Save, User, Phone, MapPin, Heart, CreditCard, AlertCircle, Users, X, ListPlus, Wallet, Receipt
 } from 'lucide-react'
 import SaldoFavorTab from './socio/SaldoFavorTab'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import { Modal } from '../../components/Modal'
 import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -58,6 +59,17 @@ export default function SocioForm() {
   const [parentescoModal, setParentescoModal] = useState({ open: false, titular: null, socioAAgregar: null, modo: 'asignar' })
   const [parentescoSeleccionado, setParentescoSeleccionado] = useState('')
   const parentescoOptions = ['Conyuge', 'Hijo/a', 'Padre', 'Madre', 'Hermano/a', 'Otro']
+
+  // Cuota social individual
+  const hoyCuota = new Date()
+  const [cuotaSocialModal, setCuotaSocialModal] = useState({
+    open: false,
+    anio: hoyCuota.getFullYear(),
+    mes: hoyCuota.getMonth() + 1,
+    preview: null,
+    loadingPreview: false,
+    generando: false,
+  })
 
   // Datos del formulario
   const [form, setForm] = useState({
@@ -494,6 +506,49 @@ export default function SocioForm() {
     }
   }
 
+  // === Cuota Social Individual ===
+  const estadoSeleccionado = estadosSocio.find(e => String(e.id) === String(form.estadoSocioId))
+  const puedeGenerarCuotaSocial = isEditing && estadoSeleccionado?.permiteIngresoMolinete === true
+
+  function abrirCuotaSocialModal() {
+    const ahora = new Date()
+    setCuotaSocialModal({
+      open: true,
+      anio: ahora.getFullYear(),
+      mes: ahora.getMonth() + 1,
+      preview: null,
+      loadingPreview: false,
+      generando: false,
+    })
+  }
+
+  async function cargarPreviewCuotaSocial(anio, mes) {
+    setCuotaSocialModal(prev => ({ ...prev, loadingPreview: true, preview: null }))
+    try {
+      const data = await api.get(`/admin/cuotas/preview-cuota-social/${id}?anio=${anio}&mes=${mes}`)
+      setCuotaSocialModal(prev => ({ ...prev, preview: data, loadingPreview: false }))
+    } catch (err) {
+      toast.error(err.message || 'Error al obtener preview')
+      setCuotaSocialModal(prev => ({ ...prev, loadingPreview: false }))
+    }
+  }
+
+  async function generarCuotaSocial() {
+    const { anio, mes, preview } = cuotaSocialModal
+    if (!preview || !preview.puedeGenerar || preview.yaExiste) return
+    setCuotaSocialModal(prev => ({ ...prev, generando: true }))
+    try {
+      await api.post(`/admin/cuotas/generar-cuota-social/${id}`, { anio, mes })
+      toast.success(`Cuota social generada para ${String(mes).padStart(2, '0')}/${anio}`)
+      setCuotaSocialModal(prev => ({ ...prev, open: false, generando: false }))
+    } catch (err) {
+      toast.error(err.message || 'Error al generar la cuota social')
+      setCuotaSocialModal(prev => ({ ...prev, generando: false }))
+      // Refrescar preview por si ahora ya existe
+      cargarPreviewCuotaSocial(anio, mes)
+    }
+  }
+
   const tabs = [
     { id: 'personal', label: 'Personal', icon: User },
     { id: 'contacto', label: 'Contacto', icon: Phone },
@@ -521,24 +576,35 @@ export default function SocioForm() {
           {isEditing ? 'Editar Socio' : 'Nuevo Socio'}
         </h1>
         {isEditing && socioData && (
-          <Button
-            type="button"
-            variant="secondary"
-            className="ml-auto"
-            onClick={() => navigate('/admin/inscripciones', {
-              state: {
-                nuevoSocio: {
-                  id: socioData.id,
-                  nroSocio: socioData.nroSocio,
-                  apellidoNombre: socioData.apellidoNombre,
-                  documento: socioData.documento,
+          <div className="ml-auto flex gap-2">
+            {puedeGenerarCuotaSocial && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={abrirCuotaSocialModal}
+              >
+                <Receipt className="w-4 h-4 mr-2" />
+                Generar Cuota Social
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate('/admin/inscripciones', {
+                state: {
+                  nuevoSocio: {
+                    id: socioData.id,
+                    nroSocio: socioData.nroSocio,
+                    apellidoNombre: socioData.apellidoNombre,
+                    documento: socioData.documento,
+                  }
                 }
-              }
-            })}
-          >
-            <ListPlus className="w-4 h-4 mr-2" />
-            Inscribir en actividad
-          </Button>
+              })}
+            >
+              <ListPlus className="w-4 h-4 mr-2" />
+              Inscribir en actividad
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1500,6 +1566,129 @@ export default function SocioForm() {
           </div>
         </div>
       )}
+      {/* Modal Generar Cuota Social */}
+      <Modal
+        isOpen={cuotaSocialModal.open}
+        onClose={() => setCuotaSocialModal(prev => ({ ...prev, open: false }))}
+        title="Generar Cuota Social"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Seleccione el período para el cual desea generar la cuota social del socio
+            <span className="font-medium text-gray-800"> {socioData?.apellidoNombre}</span>.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+              <select
+                value={cuotaSocialModal.mes}
+                onChange={(e) => setCuotaSocialModal(prev => ({ ...prev, mes: parseInt(e.target.value), preview: null }))}
+                className="input-field w-full"
+              >
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
+              <input
+                type="number"
+                value={cuotaSocialModal.anio}
+                onChange={(e) => setCuotaSocialModal(prev => ({ ...prev, anio: parseInt(e.target.value) || prev.anio, preview: null }))}
+                className="input-field w-full"
+                min={2000}
+                max={2100}
+              />
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => cargarPreviewCuotaSocial(cuotaSocialModal.anio, cuotaSocialModal.mes)}
+            loading={cuotaSocialModal.loadingPreview}
+            className="w-full"
+          >
+            Calcular importe
+          </Button>
+
+          {cuotaSocialModal.preview && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
+              {cuotaSocialModal.preview.yaExiste ? (
+                <div className="flex items-start gap-2 text-red-700">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium">
+                    La cuota social ya esta generada para {String(cuotaSocialModal.mes).padStart(2, '0')}/{cuotaSocialModal.anio}.
+                  </p>
+                </div>
+              ) : !cuotaSocialModal.preview.puedeGenerar ? (
+                <div className="flex items-start gap-2 text-amber-700">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm">{cuotaSocialModal.preview.motivo}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Importe base:</span>
+                    <span className="font-medium text-gray-800">
+                      $ {Number(cuotaSocialModal.preview.montoBase).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {Number(cuotaSocialModal.preview.montoBonificacion) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">
+                        Bonificación ({Number(cuotaSocialModal.preview.descuentoPct)}%):
+                      </span>
+                      <span className="font-medium text-green-700">
+                        - $ {Number(cuotaSocialModal.preview.montoBonificacion).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-base border-t pt-2">
+                    <span className="font-semibold text-gray-800">Total:</span>
+                    <span className="font-bold text-primary">
+                      $ {Number(cuotaSocialModal.preview.montoTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-1">
+                    <span className="text-gray-600">Vencimiento:</span>
+                    <span className="font-medium text-gray-800">
+                      {new Date(cuotaSocialModal.preview.fechaVencimiento).toLocaleDateString('es-AR')}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setCuotaSocialModal(prev => ({ ...prev, open: false }))}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={generarCuotaSocial}
+              loading={cuotaSocialModal.generando}
+              disabled={
+                !cuotaSocialModal.preview ||
+                !cuotaSocialModal.preview.puedeGenerar ||
+                cuotaSocialModal.preview.yaExiste ||
+                cuotaSocialModal.generando
+              }
+            >
+              Generar Cuota
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       <ConfirmDialog />
     </div>
   )

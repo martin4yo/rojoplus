@@ -1043,6 +1043,183 @@ router.post('/cuotas/adelantar', authAdmin, asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/admin/cuotas/preview-cuota-social/:socioId - Preview de cuota social individual
+router.get('/cuotas/preview-cuota-social/:socioId', authAdmin, asyncHandler(async (req, res) => {
+  const { socioId } = req.params
+  const { anio, mes } = req.query
+  const anioInt = parseInt(anio)
+  const mesInt = parseInt(mes)
+
+  if (!anioInt || !mesInt || mesInt < 1 || mesInt > 12) {
+    throw new AppError('anio y mes son requeridos (mes entre 1 y 12)', 400, 'VALIDATION_ERROR')
+  }
+
+  const socio = await req.db.socio.findUnique({
+    where: { id: parseInt(socioId) },
+    include: {
+      tipoSocioRel: { include: { conceptoTesoreria: true } },
+      categoriaSocioRel: true,
+    },
+  })
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
+
+  // Calcular fechaVencimiento (sin crear el período si no existe)
+  const periodoExistente = await req.db.periodo.findFirst({ where: { anio: anioInt, mes: mesInt } })
+  let fechaVencimiento
+  if (periodoExistente) {
+    fechaVencimiento = periodoExistente.fechaVencimiento
+  } else {
+    const [configDia, configMismoMes] = await Promise.all([
+      req.db.configuracion.findFirst({ where: { clave: 'CUOTA_DIA_VENCIMIENTO' } }),
+      req.db.configuracion.findFirst({ where: { clave: 'CUOTA_VENCE_MISMO_MES' } }),
+    ])
+    const diaVenc = configDia ? parseInt(configDia.valor) : 10
+    const venceMismoMes = configMismoMes ? configMismoMes.valor === 'true' : false
+    let mesV = mesInt, anioV = anioInt
+    if (!venceMismoMes) {
+      mesV = mesInt + 1
+      if (mesV > 12) { mesV = 1; anioV = anioInt + 1 }
+    }
+    fechaVencimiento = new Date(anioV, mesV - 1, diaVenc)
+  }
+
+  // Calcular monto cuota social (excluye actividades)
+  const descuentoPct = socio.categoriaSocioRel?.porcentajeDescuento
+    ? Number(socio.categoriaSocioRel.porcentajeDescuento)
+    : 0
+  const esTitularOUnico = !socio.titularFamiliaId
+  const cuotaSocialMonto = socio.tipoSocioRel?.conceptoTesoreria?.cuotaMensual
+    ? Number(socio.tipoSocioRel.conceptoTesoreria.cuotaMensual)
+    : Number(socio.tipoSocioRel?.cuotaMensual || 0)
+
+  let montoBase = 0
+  let montoBonificacion = 0
+  let montoTotal = 0
+  let puedeGenerar = false
+  let motivo = null
+
+  if (!esTitularOUnico) {
+    motivo = 'El socio es miembro de una familia (la cuota social la paga el titular)'
+  } else if (!cuotaSocialMonto) {
+    motivo = 'El tipo de socio no tiene cuota mensual configurada'
+  } else {
+    montoBase = cuotaSocialMonto
+    montoBonificacion = montoBase * (descuentoPct / 100)
+    montoTotal = montoBase - montoBonificacion
+    puedeGenerar = montoTotal > 0
+    if (!puedeGenerar) motivo = 'El monto resultante es cero'
+  }
+
+  // Verificar si ya existe la cuota social para este período
+  let yaExiste = false
+  if (periodoExistente) {
+    const existente = await req.db.cargo.findFirst({
+      where: {
+        socioId: socio.id,
+        periodoId: periodoExistente.id,
+        categoria: 'CUOTA_SOCIAL',
+      },
+    })
+    yaExiste = !!existente
+  }
+
+  res.json({
+    success: true,
+    data: {
+      anio: anioInt,
+      mes: mesInt,
+      fechaVencimiento,
+      montoBase,
+      montoBonificacion,
+      montoTotal,
+      descuentoPct,
+      yaExiste,
+      puedeGenerar,
+      motivo,
+    },
+  })
+}))
+
+// POST /api/admin/cuotas/generar-cuota-social/:socioId - Genera la cuota social para un socio en un período
+router.post('/cuotas/generar-cuota-social/:socioId', authAdmin, asyncHandler(async (req, res) => {
+  const { socioId } = req.params
+  const { anio, mes } = req.body
+  const anioInt = parseInt(anio)
+  const mesInt = parseInt(mes)
+
+  if (!anioInt || !mesInt || mesInt < 1 || mesInt > 12) {
+    throw new AppError('anio y mes son requeridos (mes entre 1 y 12)', 400, 'VALIDATION_ERROR')
+  }
+
+  const socio = await req.db.socio.findUnique({
+    where: { id: parseInt(socioId) },
+    include: {
+      tipoSocioRel: { include: { conceptoTesoreria: true } },
+      categoriaSocioRel: true,
+    },
+  })
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
+
+  if (socio.titularFamiliaId) {
+    throw new AppError('El socio es miembro de una familia, no se le genera cuota social', 400, 'NOT_TITULAR')
+  }
+
+  const cuotaSocialMonto = socio.tipoSocioRel?.conceptoTesoreria?.cuotaMensual
+    ? Number(socio.tipoSocioRel.conceptoTesoreria.cuotaMensual)
+    : Number(socio.tipoSocioRel?.cuotaMensual || 0)
+  if (!cuotaSocialMonto) {
+    throw new AppError('El tipo de socio no tiene cuota mensual configurada', 400, 'SIN_CUOTA')
+  }
+
+  const periodo = await obtenerOCrearPeriodo(req.db, anioInt, mesInt, req.admin.id)
+
+  const yaExiste = await req.db.cargo.findFirst({
+    where: { socioId: socio.id, periodoId: periodo.id, categoria: 'CUOTA_SOCIAL' },
+  })
+  if (yaExiste) {
+    throw new AppError(
+      `La cuota social ya esta generada para ${String(mesInt).padStart(2, '0')}/${anioInt}`,
+      409,
+      'YA_EXISTE'
+    )
+  }
+
+  const descuentoPct = socio.categoriaSocioRel?.porcentajeDescuento
+    ? Number(socio.categoriaSocioRel.porcentajeDescuento)
+    : 0
+  const montoBase = cuotaSocialMonto
+  const montoBonificacion = montoBase * (descuentoPct / 100)
+  const montoTotal = montoBase - montoBonificacion
+
+  if (montoTotal <= 0) {
+    throw new AppError('El monto resultante es cero', 400, 'MONTO_CERO')
+  }
+
+  const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
+  const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
+
+  const cargo = await req.db.cargo.create({
+    data: {
+      periodoId: periodo.id,
+      socioId: socio.id,
+      grupoFamiliarId: socio.titularFamiliaId || socio.id,
+      categoria: 'CUOTA_SOCIAL',
+      tipoCuota,
+      conceptoTesoreriaId: socio.tipoSocioRel?.conceptoTesoreriaId || null,
+      descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'}`,
+      montoOriginal: montoBase,
+      montoBonificacion,
+      montoTotal,
+      estado: 'PENDIENTE',
+      fechaVencimiento: periodo.fechaVencimiento,
+      origen: 'INDIVIDUAL',
+      motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
+    },
+  })
+
+  res.status(201).json({ success: true, data: cargo })
+}))
+
 // ============================================
 // PAGOS
 // ============================================
