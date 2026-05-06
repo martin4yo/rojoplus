@@ -5,6 +5,7 @@ import { enviarReciboPago } from '../../services/email.js'
 import { generarAsientoPagoCuota } from '../../services/asientosContables.js'
 import { notificarPago as notificarPagoWA, obtenerTelefonoSocio } from '../../services/whatsappService.js'
 import { generarReciboPagoPDF } from '../../services/pdfGenerator.js'
+import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
 
 const router = Router()
 
@@ -518,16 +519,8 @@ router.get('/cuotas', authAdmin, asyncHandler(async (req, res) => {
   if (socioId) where.socioId = parseInt(socioId)
   if (familiaId) where.grupoFamiliarId = parseInt(familiaId)
   if (estado) where.estado = estado
-  if (q && q.trim()) {
-    const term = q.trim()
-    where.socio = {
-      OR: [
-        { apellidoNombre: { contains: term, mode: 'insensitive' } },
-        { documento: { contains: term } },
-        { nroSocio: { contains: term } },
-      ],
-    }
-  }
+  const socioFilter = buildSocioSearchFilter(q)
+  if (socioFilter) where.socio = socioFilter
 
   const [cuotas, total, agregadosPorEstado] = await Promise.all([
     req.db.cargo.findMany({
@@ -1639,21 +1632,26 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  // Todo dentro de una transacción
-  const pagoCompleto = await req.db.$transaction(async (tx) => {
-    // Generar número de recibo (dentro de transacción para evitar duplicados).
-    // Defensivo: si algún registro previo tiene numero no parseable (ej: 'NaN' por flujos
-    // viejos o importaciones), tomamos el máximo numérico válido de los últimos 100
-    // para no propagar '00000NaN' a futuros recibos.
-    const ultimosPagos = await tx.pago.findMany({
-      orderBy: { id: 'desc' },
-      select: { numero: true },
-      take: 100,
-    })
-    const ultimoNumeroValido = ultimosPagos
-      .map(p => parseInt(p.numero, 10))
-      .filter(n => Number.isFinite(n) && n > 0)
-      .reduce((max, n) => Math.max(max, n), 0)
+  // Todo dentro de una transacción.
+  // Se envuelve en un retry loop porque la generación de `numero` no es atómica:
+  // dos requests concurrentes pueden leer el mismo max y chocar contra el unique
+  // constraint (tenant_id, numero) al hacer pago.create. En ese caso reintentamos.
+  const MAX_INTENTOS_NUMERO = 5
+  let pagoCompleto = null
+  let ultimoErrorNumero = null
+  for (let intento = 0; intento < MAX_INTENTOS_NUMERO; intento++) {
+    try {
+      pagoCompleto = await req.db.$transaction(async (tx) => {
+    // Obtener el max(numero::int) del tenant directamente en la DB.
+    // Casteo en SQL para no depender del orden lexicográfico ni de imports
+    // con numeros en formatos heterogéneos. Filtra solo valores numéricos.
+    const rows = await tx.$queryRaw`
+      SELECT COALESCE(MAX(CAST(numero AS INTEGER)), 0)::int AS max_num
+      FROM pagos
+      WHERE tenant_id = ${req.tenantId}
+        AND numero ~ '^[0-9]+$'
+    `
+    const ultimoNumeroValido = Number(rows?.[0]?.max_num || 0)
     const nuevoNumero = String(ultimoNumeroValido + 1).padStart(8, '0')
 
     // Crear pago. medioPagoId/cajaId quedan null cuando se cobra 100% con saldo a favor.
@@ -1884,7 +1882,19 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     })
     if (!pagoFinal) throw new Error('No se pudo recuperar el pago creado')
     return pagoFinal
-  })
+      })
+      break
+    } catch (err) {
+      const esConflictoNumero = err?.code === 'P2002' && Array.isArray(err?.meta?.target) && err.meta.target.includes('numero')
+      if (!esConflictoNumero) throw err
+      ultimoErrorNumero = err
+      // Pequeño backoff aleatorio antes de reintentar para reducir colisiones
+      await new Promise(r => setTimeout(r, 20 + Math.floor(Math.random() * 60)))
+    }
+  }
+  if (!pagoCompleto) {
+    throw new AppError('No se pudo generar un número de recibo único después de varios intentos. Reintentá la operación.', 500, 'NUMERO_PAGO_CONFLICTO')
+  }
 
   // Generar asiento contable automático (fuera de transacción, no debe fallar el pago)
   generarAsientoPagoCuota(req.db, {

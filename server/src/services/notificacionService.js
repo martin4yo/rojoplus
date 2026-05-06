@@ -119,8 +119,8 @@ async function getModoDemo(db) {
   try {
     const client = db || prisma
     const [modoDemo, emailDemo] = await Promise.all([
-      client.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
-      client.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
+      client.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
+      client.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
     ])
     return {
       activo: modoDemo?.valor === 'true',

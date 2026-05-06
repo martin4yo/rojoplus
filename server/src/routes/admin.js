@@ -10,6 +10,7 @@ import { enviarEmailAprobacion, enviarEmailRechazo, enviarEmailLinkAcceso, envia
 import { enviarEmailConTemplate } from '../services/notificacionService.js'
 import { generarAsientoPagoCuota } from '../services/asientosContables.js'
 import { resolverPeriodoAlta } from '../lib/cuotasPeriodoAlta.js'
+import { buildSocioSearchFilter } from '../lib/socioSearch.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -736,14 +737,21 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
 
   const where = {}
 
-  if (q) {
-    where.OR = [
-      { nroSocio: { contains: q, mode: 'insensitive' } },
-      { documento: { contains: q, mode: 'insensitive' } },
-      { apellidoNombre: { contains: q, mode: 'insensitive' } },
-      { email: { contains: q, mode: 'insensitive' } },
-      { celular: { contains: q, mode: 'insensitive' } },
-    ]
+  if (q && String(q).trim()) {
+    // Multi-palabra AND: extiende los campos del helper con email + celular.
+    const palabras = String(q).trim().split(/\s+/).filter(Boolean)
+    where.AND = palabras.map(w => ({
+      OR: [
+        { nroSocio: { contains: w, mode: 'insensitive' } },
+        { documento: { contains: w, mode: 'insensitive' } },
+        { cuil: { contains: w, mode: 'insensitive' } },
+        { apellidoNombre: { contains: w, mode: 'insensitive' } },
+        { apellido: { contains: w, mode: 'insensitive' } },
+        { nombre: { contains: w, mode: 'insensitive' } },
+        { email: { contains: w, mode: 'insensitive' } },
+        { celular: { contains: w, mode: 'insensitive' } },
+      ],
+    }))
   }
 
   // Filtrar por múltiples estados válidos (ej: estadosValidos=ACTIVO,VIGENTE)
@@ -1371,11 +1379,7 @@ router.get('/socios/titulares/buscar', authAdmin, asyncHandler(async (req, res) 
   const titulares = await req.db.socio.findMany({
     where: {
       tipoSocio: { contains: 'Titular', mode: 'insensitive' },
-      OR: [
-        { nroSocio: { contains: q, mode: 'insensitive' } },
-        { apellidoNombre: { contains: q, mode: 'insensitive' } },
-        { documento: { contains: q, mode: 'insensitive' } },
-      ],
+      ...buildSocioSearchFilter(q),
     },
     select: {
       id: true,
@@ -1414,12 +1418,7 @@ router.get('/socios/miembros/buscar', authAdmin, asyncHandler(async (req, res) =
       id: { not: parseInt(titularId) },
       // Solo socios sin familia asignada
       titularFamiliaId: null,
-      // Que no sean titulares de familia (o que no tengan miembros)
-      OR: [
-        { nroSocio: { contains: q, mode: 'insensitive' } },
-        { apellidoNombre: { contains: q, mode: 'insensitive' } },
-        { documento: { contains: q, mode: 'insensitive' } },
-      ],
+      ...buildSocioSearchFilter(q),
     },
     select: {
       id: true,
@@ -4614,19 +4613,22 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     throw new AppError('La caja seleccionada no tiene una cuenta contable configurada. Por favor, configurá la cuenta contable en Tesorería > Cajas.', 400, 'CAJA_SIN_CUENTA_CONTABLE')
   }
 
-  // Todo dentro de una transacción
-  const pagoCompleto = await req.db.$transaction(async (tx) => {
-    // Generar número de recibo (dentro de transacción para evitar duplicados).
-    // Defensivo contra numeros no parseables previos.
-    const ultimosPagos = await tx.pago.findMany({
-      orderBy: { id: 'desc' },
-      select: { numero: true },
-      take: 100,
-    })
-    const ultimoNumeroValido = ultimosPagos
-      .map(p => parseInt(p.numero, 10))
-      .filter(n => Number.isFinite(n) && n > 0)
-      .reduce((max, n) => Math.max(max, n), 0)
+  // Todo dentro de una transacción.
+  // Retry loop para race conditions sobre el unique (tenant_id, numero).
+  const MAX_INTENTOS_NUMERO = 5
+  let pagoCompleto = null
+  for (let intento = 0; intento < MAX_INTENTOS_NUMERO; intento++) {
+    try {
+      pagoCompleto = await req.db.$transaction(async (tx) => {
+    // Obtener el max(numero::int) del tenant directamente en la DB.
+    // Casteo en SQL — robusto contra formatos heterogéneos / imports.
+    const rows = await tx.$queryRaw`
+      SELECT COALESCE(MAX(CAST(numero AS INTEGER)), 0)::int AS max_num
+      FROM pagos
+      WHERE tenant_id = ${req.tenantId}
+        AND numero ~ '^[0-9]+$'
+    `
+    const ultimoNumeroValido = Number(rows?.[0]?.max_num || 0)
     const nuevoNumero = String(ultimoNumeroValido + 1).padStart(8, '0')
 
     // Crear pago
@@ -4778,7 +4780,17 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     })
     if (!pagoFinal) throw new Error('No se pudo recuperar el pago creado')
     return pagoFinal
-  })
+      })
+      break
+    } catch (err) {
+      const esConflictoNumero = err?.code === 'P2002' && Array.isArray(err?.meta?.target) && err.meta.target.includes('numero')
+      if (!esConflictoNumero) throw err
+      await new Promise(r => setTimeout(r, 20 + Math.floor(Math.random() * 60)))
+    }
+  }
+  if (!pagoCompleto) {
+    throw new AppError('No se pudo generar un número de recibo único después de varios intentos. Reintentá la operación.', 500, 'NUMERO_PAGO_CONFLICTO')
+  }
 
   // Generar asiento contable automático (fuera de transacción, no debe fallar el pago)
   generarAsientoPagoCuota(req.db, {
@@ -6809,13 +6821,17 @@ router.get('/solicitudes', asyncHandler(async (req, res) => {
     }
   }
 
-  if (buscar) {
-    where.OR = [
-      { apellidos: { contains: buscar, mode: 'insensitive' } },
-      { nombres: { contains: buscar, mode: 'insensitive' } },
-      { documento: { contains: buscar } },
-      { email: { contains: buscar, mode: 'insensitive' } }
-    ]
+  if (buscar && String(buscar).trim()) {
+    // Multi-palabra AND sobre solicitudSocio (apellidos, nombres, documento, email)
+    const palabras = String(buscar).trim().split(/\s+/).filter(Boolean)
+    where.AND = palabras.map(w => ({
+      OR: [
+        { apellidos: { contains: w, mode: 'insensitive' } },
+        { nombres: { contains: w, mode: 'insensitive' } },
+        { documento: { contains: w } },
+        { email: { contains: w, mode: 'insensitive' } },
+      ],
+    }))
   }
 
   const skip = (parseInt(pagina) - 1) * parseInt(limite)
@@ -7316,15 +7332,8 @@ router.get('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  if (search) {
-    where.socio = {
-      OR: [
-        { apellidoNombre: { contains: search, mode: 'insensitive' } },
-        { documento: { contains: search } },
-        { nroSocio: { contains: search } }
-      ]
-    }
-  }
+  const socioFilter = buildSocioSearchFilter(search)
+  if (socioFilter) where.socio = socioFilter
 
   const [inscripciones, total] = await Promise.all([
     req.db.inscripcion.findMany({

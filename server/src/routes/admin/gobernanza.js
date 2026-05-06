@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { fileURLToPath } from 'url'
 import { authAdmin } from '../../middleware/auth.js'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
+import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
 
 const router = Router()
 const __filename = fileURLToPath(import.meta.url)
@@ -253,13 +254,10 @@ router.get('/votaciones/:id/padron', authAdmin, asyncHandler(async (req, res) =>
   const yaVotaron = await req.db.votoRegistrado.findMany({ where: { votacionId }, select: { socioId: true } })
   const idsYaVotaron = yaVotaron.map(v => v.socioId)
 
-  const where = { estado: 'ACTIVO', id: { notIn: idsYaVotaron.length ? idsYaVotaron : [-1] } }
-  if (buscar) {
-    where.OR = [
-      { nombre: { contains: buscar, mode: 'insensitive' } },
-      { apellido: { contains: buscar, mode: 'insensitive' } },
-      { nroSocio: { contains: buscar, mode: 'insensitive' } },
-    ]
+  const where = {
+    estado: 'ACTIVO',
+    id: { notIn: idsYaVotaron.length ? idsYaVotaron : [-1] },
+    ...buildSocioSearchFilter(buscar),
   }
 
   const socios = await req.db.socio.findMany({

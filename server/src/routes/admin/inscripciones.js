@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
 import { resolverPeriodoAlta } from '../../lib/cuotasPeriodoAlta.js'
+import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
 
 const router = Router()
 
@@ -52,15 +53,8 @@ router.get('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  if (searchTerm) {
-    where.socio = {
-      OR: [
-        { apellidoNombre: { contains: searchTerm, mode: 'insensitive' } },
-        { documento: { contains: searchTerm } },
-        { nroSocio: { contains: searchTerm } }
-      ]
-    }
-  }
+  const socioFilter = buildSocioSearchFilter(searchTerm)
+  if (socioFilter) where.socio = socioFilter
 
   const [inscripciones, total] = await Promise.all([
     req.db.inscripcion.findMany({

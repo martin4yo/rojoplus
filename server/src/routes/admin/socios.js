@@ -4,6 +4,7 @@ import multer from 'multer'
 import * as XLSX from 'xlsx'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
+import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
 import { resolverPeriodoAlta } from '../../lib/cuotasPeriodoAlta.js'
 import { calcularProximoNroSocio } from '../../lib/nroSocio.js'
 
@@ -176,6 +177,7 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
         OR: [
           { nroSocio: { contains: token, mode: 'insensitive' } },
           { documento: { contains: token, mode: 'insensitive' } },
+          { cuil: { contains: token, mode: 'insensitive' } },
           { apellidoNombre: { contains: token, mode: 'insensitive' } },
           { apellido: { contains: token, mode: 'insensitive' } },
           { nombre: { contains: token, mode: 'insensitive' } },
@@ -331,6 +333,7 @@ router.get('/socios/grupos-familiares', authAdmin, asyncHandler(async (req, res)
           { apellido: { contains: token, mode: 'insensitive' } },
           { nombre: { contains: token, mode: 'insensitive' } },
           { documento: { contains: token, mode: 'insensitive' } },
+          { cuil: { contains: token, mode: 'insensitive' } },
           { email: { contains: token, mode: 'insensitive' } },
           { celular: { contains: token, mode: 'insensitive' } },
         ],
@@ -1064,11 +1067,7 @@ router.get('/socios/titulares/buscar', authAdmin, asyncHandler(async (req, res) 
   const titulares = await req.db.socio.findMany({
     where: {
       tipoSocio: { contains: 'Titular', mode: 'insensitive' },
-      OR: [
-        { nroSocio: { contains: q, mode: 'insensitive' } },
-        { apellidoNombre: { contains: q, mode: 'insensitive' } },
-        { documento: { contains: q, mode: 'insensitive' } },
-      ],
+      ...buildSocioSearchFilter(q),
     },
     select: {
       id: true,
@@ -1107,12 +1106,7 @@ router.get('/socios/miembros/buscar', authAdmin, asyncHandler(async (req, res) =
       id: { not: parseInt(titularId) },
       // Solo socios sin familia asignada
       titularFamiliaId: null,
-      // Que no sean titulares de familia (o que no tengan miembros)
-      OR: [
-        { nroSocio: { contains: q, mode: 'insensitive' } },
-        { apellidoNombre: { contains: q, mode: 'insensitive' } },
-        { documento: { contains: q, mode: 'insensitive' } },
-      ],
+      ...buildSocioSearchFilter(q),
     },
     select: {
       id: true,
@@ -1964,14 +1958,7 @@ router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
 
   const where = {}
   if (estado) where.estado = estado
-  if (buscar) {
-    where.OR = [
-      { nombre: { contains: buscar, mode: 'insensitive' } },
-      { apellido: { contains: buscar, mode: 'insensitive' } },
-      { nroSocio: { contains: buscar, mode: 'insensitive' } },
-      { dni: { contains: buscar, mode: 'insensitive' } },
-    ]
-  }
+  Object.assign(where, buildSocioSearchFilter(buscar) || {})
 
   const socios = await req.db.socio.findMany({
     where,

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
+import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
 
 const router = Router()
 
@@ -91,15 +92,8 @@ router.get('/encuestas-baja', authAdmin, asyncHandler(async (req, res) => {
     where.volveria = volveria === 'true'
   }
 
-  if (search) {
-    where.socio = {
-      OR: [
-        { apellidoNombre: { contains: search, mode: 'insensitive' } },
-        { nroSocio: { contains: search } },
-        { documento: { contains: search } }
-      ]
-    }
-  }
+  const socioFilter = buildSocioSearchFilter(search)
+  if (socioFilter) where.socio = socioFilter
 
   const [encuestas, total] = await Promise.all([
     req.db.encuestaBaja.findMany({

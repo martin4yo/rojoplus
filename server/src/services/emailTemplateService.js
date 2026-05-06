@@ -11,8 +11,8 @@ const handlebars = Handlebars
 async function getModoDemo(prisma) {
   try {
     const [modoDemo, emailDemo] = await Promise.all([
-      prisma.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
-      prisma.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
+      prisma.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
+      prisma.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
     ])
     return {
       activo: modoDemo?.valor === 'true',

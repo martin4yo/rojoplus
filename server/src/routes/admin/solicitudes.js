@@ -35,13 +35,17 @@ router.get('/solicitudes', asyncHandler(async (req, res) => {
     }
   }
 
-  if (buscar) {
-    where.OR = [
-      { apellidos: { contains: buscar, mode: 'insensitive' } },
-      { nombres: { contains: buscar, mode: 'insensitive' } },
-      { documento: { contains: buscar } },
-      { email: { contains: buscar, mode: 'insensitive' } }
-    ]
+  if (buscar && String(buscar).trim()) {
+    // Multi-palabra AND: cada palabra debe matchear en alguno de los campos
+    const palabras = String(buscar).trim().split(/\s+/).filter(Boolean)
+    where.AND = palabras.map(w => ({
+      OR: [
+        { apellidos: { contains: w, mode: 'insensitive' } },
+        { nombres: { contains: w, mode: 'insensitive' } },
+        { documento: { contains: w } },
+        { email: { contains: w, mode: 'insensitive' } },
+      ],
+    }))
   }
 
   const skip = (parseInt(pagina) - 1) * parseInt(limite)

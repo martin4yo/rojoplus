@@ -984,22 +984,30 @@ router.get('/buscar-socio', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GES
       return res.json({ success: true, data: [] })
     }
     const term = q.trim()
-    // Limpiar el término por si el usuario escribe DNI con puntos/espacios/guiones
-    const termClean = term.replace(/[.\s-]/g, '')
-
-    const orConditions = [
-      { apellidoNombre: { contains: term, mode: 'insensitive' } },
-      { nroSocio: { contains: term } },
-      { documento: { contains: term } },
-    ]
-    // Si el término tiene caracteres no-alfanuméricos, agregar variante limpia
-    if (termClean !== term && termClean.length >= 2) {
-      orConditions.push({ documento: { contains: termClean } })
-      orConditions.push({ nroSocio: { contains: termClean } })
-    }
+    // Multi-palabra AND: cada palabra debe matchear en alguno de los campos.
+    // Para cada palabra también probamos una variante limpia (sin puntos/espacios/guiones)
+    // para soportar DNI escrito como "20.123.456" o nro de socio con guiones.
+    const palabras = term.split(/\s+/).filter(Boolean)
+    const andConditions = palabras.map(w => {
+      const wClean = w.replace(/[.\s-]/g, '')
+      const fields = [
+        { apellido: { contains: w, mode: 'insensitive' } },
+        { nombre: { contains: w, mode: 'insensitive' } },
+        { apellidoNombre: { contains: w, mode: 'insensitive' } },
+        { documento: { contains: w } },
+        { cuil: { contains: w } },
+        { nroSocio: { contains: w } },
+      ]
+      if (wClean !== w && wClean.length >= 2) {
+        fields.push({ documento: { contains: wClean } })
+        fields.push({ cuil: { contains: wClean } })
+        fields.push({ nroSocio: { contains: wClean } })
+      }
+      return { OR: fields }
+    })
 
     let socios = await req.db.socio.findMany({
-      where: { OR: orConditions },
+      where: { AND: andConditions },
       select: {
         id: true,
         nroSocio: true,

@@ -8,6 +8,7 @@ import express from 'express'
 import prisma from '../../lib/prisma.js'
 import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 import { getCajasPermitidas, applyCajasFilter } from './helpers.js'
+import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
 
 const router = express.Router()
 
@@ -109,20 +110,11 @@ router.get('/clientes/buscar', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_
       return res.json({ success: true, data: [] })
     }
 
-    const busqueda = q.toLowerCase()
-
     // Buscar socios
     const socios = await req.db.socio.findMany({
       where: {
-        OR: [
-          { nroSocio: { contains: busqueda } },
-          { nombre: { contains: busqueda, mode: 'insensitive' } },
-          { apellido: { contains: busqueda, mode: 'insensitive' } },
-          { apellidoNombre: { contains: busqueda, mode: 'insensitive' } },
-          { dni: { contains: busqueda } },
-          { cuit: { contains: busqueda } }
-        ],
-        estado: 'ACTIVO'
+        ...buildSocioSearchFilter(q),
+        estado: 'ACTIVO',
       },
       take: 10,
       select: {

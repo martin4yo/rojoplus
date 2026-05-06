@@ -108,8 +108,8 @@ async function getModoDemo(db) {
   try {
     const dbToUse = db || prisma
     const [modoDemo, emailDemo] = await Promise.all([
-      dbToUse.configuracion.findUnique({ where: { clave: 'MODO_DEMO' } }),
-      dbToUse.configuracion.findUnique({ where: { clave: 'EMAIL_DEMO' } }),
+      dbToUse.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
+      dbToUse.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
     ])
     return {
       activo: modoDemo?.valor === 'true',
@@ -146,6 +146,7 @@ export async function enviarEmail({ to, subject, html, db, attachments = [] }) {
   if (attachments.length > 0) mailOpts.attachments = attachments
 
   await mailConfig.transporter.sendMail(mailOpts)
+  return { destinatario, destinatarioOriginal: to, redirigido: destinatario !== to }
 }
 
 export async function enviarEmailAprobacion(comercio, db) {
@@ -405,14 +406,17 @@ export async function enviarReciboPago(pago, db, opts = {}) {
         contentType: 'application/pdf',
       })
     }
-    await enviarEmail({
+    const envio = await enviarEmail({
       to: pago.socio.email,
       subject: `Recibo de Pago #${pago.numero} - Club Sportivo Pilar`,
       html,
       db,
       attachments,
     })
-    console.log(`📧 Recibo ${pago.numero} enviado a ${pago.socio.email}${attachments.length ? ' (con PDF adjunto)' : ''}`)
+    const destinoLog = envio?.redirigido
+      ? `${envio.destinatario} (DEMO, original: ${envio.destinatarioOriginal})`
+      : (envio?.destinatario || pago.socio.email)
+    console.log(`📧 Recibo ${pago.numero} enviado a ${destinoLog}${attachments.length ? ' (con PDF adjunto)' : ''}`)
     return { ok: true }
   } catch (error) {
     console.error(`❌ Error enviando recibo ${pago.numero}:`, error.message)

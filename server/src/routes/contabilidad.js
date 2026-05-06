@@ -342,13 +342,17 @@ router.get('/entidades', asyncHandler(async (req, res) => {
   const where = {}
   if (tipo) where.tipo = tipo
   if (activo !== undefined) where.activo = activo === 'true'
-  if (busqueda) {
-    where.OR = [
-      { codigo: { contains: busqueda, mode: 'insensitive' } },
-      { razonSocial: { contains: busqueda, mode: 'insensitive' } },
-      { nombreFantasia: { contains: busqueda, mode: 'insensitive' } },
-      { documento: { contains: busqueda, mode: 'insensitive' } }
-    ]
+  if (busqueda && String(busqueda).trim()) {
+    // Multi-palabra AND sobre Entidad (codigo, razonSocial, nombreFantasia, documento)
+    const palabras = String(busqueda).trim().split(/\s+/).filter(Boolean)
+    where.AND = palabras.map(w => ({
+      OR: [
+        { codigo: { contains: w, mode: 'insensitive' } },
+        { razonSocial: { contains: w, mode: 'insensitive' } },
+        { nombreFantasia: { contains: w, mode: 'insensitive' } },
+        { documento: { contains: w, mode: 'insensitive' } },
+      ],
+    }))
   }
 
   const skip = (parseInt(page) - 1) * parseInt(limit)
@@ -1019,13 +1023,25 @@ router.get('/pedidos', asyncHandler(async (req, res) => {
     if (desde) where.fecha.gte = new Date(desde)
     if (hasta) where.fecha.lte = new Date(hasta)
   }
-  if (busqueda) {
-    where.OR = [
-      { numero: { contains: busqueda, mode: 'insensitive' } },
-      { entidad: { razonSocial: { contains: busqueda, mode: 'insensitive' } } },
-      { socio: { apellidoNombre: { contains: busqueda, mode: 'insensitive' } } },
-      { observaciones: { contains: busqueda, mode: 'insensitive' } }
-    ]
+  if (busqueda && String(busqueda).trim()) {
+    // Multi-palabra AND: cada palabra debe matchear en numero, entidad,
+    // observaciones o algún campo del socio (apellido/nombre/dni/cuit/nroSocio).
+    const palabras = String(busqueda).trim().split(/\s+/).filter(Boolean)
+    where.AND = palabras.map(w => ({
+      OR: [
+        { numero: { contains: w, mode: 'insensitive' } },
+        { entidad: { razonSocial: { contains: w, mode: 'insensitive' } } },
+        { socio: { OR: [
+          { apellidoNombre: { contains: w, mode: 'insensitive' } },
+          { apellido: { contains: w, mode: 'insensitive' } },
+          { nombre: { contains: w, mode: 'insensitive' } },
+          { documento: { contains: w } },
+          { cuil: { contains: w } },
+          { nroSocio: { contains: w } },
+        ]}},
+        { observaciones: { contains: w, mode: 'insensitive' } },
+      ],
+    }))
   }
 
   const skip = (parseInt(page) - 1) * parseInt(limit)
