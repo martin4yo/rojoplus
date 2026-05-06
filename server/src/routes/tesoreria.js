@@ -649,13 +649,16 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
   }
 
   // Validar campos obligatorios según tipo de medio:
-  //   TARJETA_CREDITO/DEBITO → nroCupon + nroLote requeridos
-  //   TRANSFERENCIA → nroOperacion requerido
+  //   TARJETA_CREDITO/DEBITO/TARJETA → nroCupon + nroLote requeridos
+  //   TRANSFERENCIA o BANCO con "transferencia" en el nombre → nroOperacion requerido
   for (let i = 0; i < mediosNorm.length; i++) {
     const mp = mediosNorm[i]
     const rec = mediosPagoRecords[i]
     const tipoMP = (rec?.tipo || '').toUpperCase()
-    if (tipoMP === 'TARJETA_CREDITO' || tipoMP === 'TARJETA_DEBITO') {
+    const nombreMP = (rec?.nombre || '').toLowerCase()
+    const esTarjeta = ['TARJETA_CREDITO', 'TARJETA_DEBITO', 'TARJETA'].includes(tipoMP)
+    const esTransfer = tipoMP === 'TRANSFERENCIA' || (tipoMP === 'BANCO' && nombreMP.includes('transfer'))
+    if (esTarjeta) {
       if (!mp.nroCupon || !mp.nroLote) {
         throw new AppError(
           `Para "${rec.nombre}" (tarjeta) son obligatorios el N° de cupón y N° de lote.`,
@@ -663,7 +666,7 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
         )
       }
     }
-    if (tipoMP === 'TRANSFERENCIA') {
+    if (esTransfer) {
       if (!mp.nroOperacion) {
         throw new AppError(
           `Para "${rec.nombre}" (transferencia) es obligatorio el N° de operación.`,

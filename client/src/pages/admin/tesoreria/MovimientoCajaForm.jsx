@@ -433,11 +433,14 @@ export default function MovimientoCajaForm() {
       }
       const medio = mediosPago.find(x => x.id.toString() === mp.medioPagoId.toString())
       const tipoMP = (medio?.tipo || '').toUpperCase()
-      if ((tipoMP === 'TARJETA_CREDITO' || tipoMP === 'TARJETA_DEBITO') && (!mp.nroCupon?.trim() || !mp.nroLote?.trim())) {
+      const nombreMP = (medio?.nombre || '').toLowerCase()
+      const esTarjetaV = ['TARJETA_CREDITO', 'TARJETA_DEBITO', 'TARJETA'].includes(tipoMP)
+      const esTransferV = tipoMP === 'TRANSFERENCIA' || (tipoMP === 'BANCO' && nombreMP.includes('transfer'))
+      if (esTarjetaV && (!mp.nroCupon?.trim() || !mp.nroLote?.trim())) {
         setError(`"${medio.nombre}" requiere N° de cupón y N° de lote.`)
         return
       }
-      if (tipoMP === 'TRANSFERENCIA' && !mp.nroOperacion?.trim()) {
+      if (esTransferV && !mp.nroOperacion?.trim()) {
         setError(`"${medio.nombre}" requiere N° de operación bancaria.`)
         return
       }
@@ -889,8 +892,9 @@ export default function MovimientoCajaForm() {
                   {mediosPagoLista.map((mp, idx) => {
                     const medio = mediosPago.find(m => m.id.toString() === mp.medioPagoId?.toString())
                     const tipoMP = (medio?.tipo || '').toUpperCase()
-                    const esTarjeta = tipoMP === 'TARJETA_CREDITO' || tipoMP === 'TARJETA_DEBITO'
-                    const esTransfer = tipoMP === 'TRANSFERENCIA'
+                    const nombreMP = (medio?.nombre || '').toLowerCase()
+                    const esTarjeta = ['TARJETA_CREDITO', 'TARJETA_DEBITO', 'TARJETA'].includes(tipoMP)
+                    const esTransfer = tipoMP === 'TRANSFERENCIA' || (tipoMP === 'BANCO' && nombreMP.includes('transfer'))
                     const requiereExtras = esTarjeta || esTransfer
                     return (
                     <Fragment key={idx}>

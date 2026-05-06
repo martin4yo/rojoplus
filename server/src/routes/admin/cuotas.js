@@ -1435,13 +1435,16 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   const medioPago = splits.length > 0 ? medioMap[splits[0].medioPagoId] : null
 
   // Validar campos obligatorios según el tipo de medio:
-  //   TARJETA_CREDITO/DEBITO → nroCupon + nroLote requeridos
-  //   TRANSFERENCIA → nroOperacion requerido
+  //   TARJETA_CREDITO/DEBITO/TARJETA → nroCupon + nroLote requeridos
+  //   TRANSFERENCIA o BANCO con "transferencia" en el nombre → nroOperacion requerido
   for (const split of splits) {
     const m = medioMap[split.medioPagoId]
     if (!m) continue
     const tipo = (m.tipo || '').toUpperCase()
-    if (tipo === 'TARJETA_CREDITO' || tipo === 'TARJETA_DEBITO') {
+    const nombre = (m.nombre || '').toLowerCase()
+    const esTarjeta = ['TARJETA_CREDITO', 'TARJETA_DEBITO', 'TARJETA'].includes(tipo)
+    const esTransfer = tipo === 'TRANSFERENCIA' || (tipo === 'BANCO' && nombre.includes('transfer'))
+    if (esTarjeta) {
       if (!split.nroCupon || !split.nroLote) {
         throw new AppError(
           `Para "${m.nombre}" (tarjeta) son obligatorios el N° de cupón y N° de lote.`,
@@ -1449,7 +1452,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         )
       }
     }
-    if (tipo === 'TRANSFERENCIA') {
+    if (esTransfer) {
       if (!split.nroOperacion) {
         throw new AppError(
           `Para "${m.nombre}" (transferencia) es obligatorio el N° de operación.`,

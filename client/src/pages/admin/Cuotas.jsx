@@ -470,11 +470,14 @@ export default function Cuotas() {
       }
       const m = mediosPago.find(mp => mp.id.toString() === sp.medioPagoId.toString())
       const tipo = (m?.tipo || '').toUpperCase()
-      if ((tipo === 'TARJETA_CREDITO' || tipo === 'TARJETA_DEBITO') && (!sp.nroCupon?.trim() || !sp.nroLote?.trim())) {
+      const nombre = (m?.nombre || '').toLowerCase()
+      const esTarjetaV = ['TARJETA_CREDITO', 'TARJETA_DEBITO', 'TARJETA'].includes(tipo)
+      const esTransferV = tipo === 'TRANSFERENCIA' || (tipo === 'BANCO' && nombre.includes('transfer'))
+      if (esTarjetaV && (!sp.nroCupon?.trim() || !sp.nroLote?.trim())) {
         setErrorPago(`"${m.nombre}" requiere N° de cupón y N° de lote.`)
         return
       }
-      if (tipo === 'TRANSFERENCIA' && !sp.nroOperacion?.trim()) {
+      if (esTransferV && !sp.nroOperacion?.trim()) {
         setErrorPago(`"${m.nombre}" requiere N° de operación.`)
         return
       }
@@ -1034,8 +1037,10 @@ export default function Cuotas() {
                     {splits.map((sp, idx) => {
                       const medio = mediosPago.find(mp => mp.id.toString() === sp.medioPagoId?.toString())
                       const tipoMedio = (medio?.tipo || '').toUpperCase()
-                      const esTarjeta = tipoMedio === 'TARJETA_CREDITO' || tipoMedio === 'TARJETA_DEBITO'
+                      const nombreMedio = (medio?.nombre || '').toLowerCase()
+                      const esTarjeta = ['TARJETA_CREDITO', 'TARJETA_DEBITO', 'TARJETA'].includes(tipoMedio)
                       const esTransfer = tipoMedio === 'TRANSFERENCIA'
+                        || (tipoMedio === 'BANCO' && nombreMedio.includes('transfer'))
                       return (
                         <div key={idx} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
                           <div className="grid grid-cols-[1fr_8rem_auto] gap-2">
