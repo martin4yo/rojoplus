@@ -51,9 +51,12 @@ export default function InscripcionSocio() {
   const edad = calcularEdad(formData.fechaNacimiento)
   const esMenor = edad !== null && edad < 18
 
+  const UPPERCASE_FIELDS = new Set(['apellidos', 'nombres', 'tutorApellidos', 'tutorNombres'])
+
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    const finalValue = UPPERCASE_FIELDS.has(name) ? value.toUpperCase() : value
+    setFormData(prev => ({ ...prev, [name]: finalValue }))
   }
 
   const handleActividadChange = (actividad) => {

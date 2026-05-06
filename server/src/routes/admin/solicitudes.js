@@ -4,6 +4,7 @@ import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin, generateToken } from '../../middleware/auth.js'
 import { enviarEmailConTemplate } from '../../services/notificacionService.js'
 import { getTenantFrontendUrl } from '../../lib/tenantUrl.js'
+import { calcularProximoNroSocio } from '../../lib/nroSocio.js'
 
 const router = Router()
 
@@ -177,27 +178,17 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     }
   }
 
-  // Generar números de socio para todos (titular + familiares)
-  // Obtenemos todos los nroSocio y buscamos el máximo numérico
-  const socios = await req.db.socio.findMany({
-    select: { nroSocio: true }
-  })
-
-  let proximoNumero = 1
-  if (socios.length > 0) {
-    const maxNro = Math.max(...socios.map(s => parseInt(s.nroSocio) || 0))
-    proximoNumero = maxNro + 1
-  }
-
   // Calcular edad del titular
   const fechaNacTitular = new Date(solicitud.fechaNacimiento)
   const edadTitular = Math.floor((new Date() - fechaNacTitular) / (365.25 * 24 * 60 * 60 * 1000))
   const esMenorTitular = edadTitular < 18
 
   // PASO 1: Crear el socio titular
+  // Usa la lógica de rangos (SOCIO_NRO_MIN/MAX) o legacy según configuración
+  const nroTitular = await calcularProximoNroSocio(req.db)
   const nuevoSocio = await req.db.socio.create({
     data: {
-      nroSocio: proximoNumero.toString(),
+      nroSocio: nroTitular,
       apellido: solicitud.apellidos,
       nombre: solicitud.nombres,
       apellidoNombre: `${solicitud.apellidos} ${solicitud.nombres}`,
@@ -218,8 +209,6 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     }
   })
 
-  proximoNumero++
-
   // PASO 2: Inscribir al titular en sus actividades
   const actividadesTitular = JSON.parse(solicitud.actividadesSeleccionadas || '[]')
   if (actividadesTitular.length > 0) {
@@ -234,9 +223,10 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     const edadFamiliar = Math.floor((new Date() - fechaNacFamiliar) / (365.25 * 24 * 60 * 60 * 1000))
     const esMenorFamiliar = edadFamiliar < 18
 
+    const nroFamiliar = await calcularProximoNroSocio(req.db)
     const socioFamiliar = await req.db.socio.create({
       data: {
-        nroSocio: proximoNumero.toString(),
+        nroSocio: nroFamiliar,
         apellido: familiar.apellidos,
         nombre: familiar.nombres,
         apellidoNombre: `${familiar.apellidos} ${familiar.nombres}`,
@@ -256,8 +246,6 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
         titularFamiliaId: nuevoSocio.id // Establecer relación con titular
       }
     })
-
-    proximoNumero++
 
     // Actualizar el registro de FamiliarSolicitud con el socio creado
     await req.db.familiarSolicitud.update({

@@ -254,7 +254,7 @@ async function main() {
       saldosCount++
     }
     console.log(`  ✓ ${saldosCount} saldos a favor creados`)
-  }, { timeout: 120000 })
+  }, { maxWait: 60000, timeout: 600000 })
 
   console.log(`\n✅ Limpieza completa.\n`)
 }

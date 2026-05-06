@@ -47,9 +47,12 @@ export default function AgregarFamiliares() {
     }
   }
 
+  const UPPERCASE_FIELDS = new Set(['apellidos', 'nombres'])
+
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    const finalValue = UPPERCASE_FIELDS.has(name) ? value.toUpperCase() : value
+    setFormData(prev => ({ ...prev, [name]: finalValue }))
   }
 
   const handleActividadChange = (actividad) => {

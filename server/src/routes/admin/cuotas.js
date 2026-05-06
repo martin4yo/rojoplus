@@ -861,7 +861,7 @@ async function obtenerOCrearPeriodo(db, anio, mes, generadoPor) {
     if (mesVenc > 12) { mesVenc = 1; anioVenc = anio + 1 }
   }
   const fechaVenc = new Date(anioVenc, mesVenc - 1, diaVenc)
-  const nombre = `${String(mes).padStart(2, '0')} / ${anio}`
+  const nombre = `${String(mes).padStart(2, '0')}/${anio}`
 
   return await db.periodo.create({
     data: {

@@ -1,0 +1,982 @@
+
+Tenant: sportivopilar (id=1)
+Modo: 🟡 DRY-RUN (no aplica cambios)
+
+Cargos ANTICIPO SOCIOS encontrados: 805
+
+Socios afectados: 239
+
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+#4566 CENICCOLA, ROSA DEL CARMEN
+  Cargos: +1 ($14000.00), -1 ($14000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#6746 PERESSA, KARINA VERONICA
+  Cargos: +2 ($130000.00), -2 ($123000.00)  →  Caso B: saldo vigente $7000.00 → crear SaldoFavor
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#9793 SPITALIERI, PABLO
+  Cargos: +1 ($20000.00), -1 ($20000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#10794 ARANA, ANDREA
+  Cargos: +1 ($14000.00), -1 ($14000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#15146 RODRIGUEZ, AMARAL GLADYS
+  Cargos: +1 ($41000.00), -1 ($41000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#16090 MERLINO, ULLON MATEO
+  Cargos: +1 ($60000.00), -1 ($60000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#16100 FIGUEREDO, PEDRO
+  Cargos: +1 ($77000.00), -1 ($72000.00)  →  Caso B: saldo vigente $5000.00 → crear SaldoFavor
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#16221 CAREY, ARTURO
+  Cargos: +6 ($312000.00), -6 ($312000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 12 cargos | 6 pagos exclusivos
+
+#16319 VELIZ, BAUTISTA LIONEL
+  Cargos: +2 ($81500.00), -1 ($81500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 2 pagos exclusivos
+
+#16354 PERRONE, GUILLERMO
+  Cargos: +2 ($82000.00), -2 ($82000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#16357 MILENS, GONZALO DAMIAN (MOTO)
+  Cargos: +1 ($10000.00), -1 ($10000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#16452 ARRIAGADA, NUÑEZ MARCELA MARGARITA
+  Cargos: +3 ($247000.00), -5 ($247000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 8 cargos | 3 pagos exclusivos
+
+#16501 CABRERA, ROMERO IVAN
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#16562 AGNESI, ZALAZAR SIMON
+  Cargos: +1 ($30300.00), -1 ($25500.00)  →  Caso B: saldo vigente $4800.00 → crear SaldoFavor
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#16634 GONZALEZ, ALAN GABRIEL
+  Cargos: +2 ($45000.00), -2 ($45000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#16637 PONCE, JUAN
+  Cargos: +1 ($31000.00), -1 ($31000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#16741 CHAVARRIA, LEANDRO ADRIAN
+  Cargos: +1 ($50500.00), -3 ($58500.00)  →  Caso C: positivos antes del corte $8000.00 (no se tocan)
+  Anular: 3 cargos | 0 pagos exclusivos
+
+#16897 VAZQUEZ, MARIELA LAURA
+  Cargos: +2 ($107000.00), -2 ($107000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#17095 URBIETA, IGNACIO
+  Cargos: +1 ($35000.00), -1 ($35000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17143 POMBO, MELANY ABIGAIL
+  Cargos: +1 ($10000.00), -1 ($10000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17155 MEDINA, IGNACIO JOAQUIN
+  Cargos: +3 ($162500.00), -2 ($197500.00)  →  Caso C: positivos antes del corte $35000.00 (no se tocan)
+  Anular: 2 cargos | 0 pagos exclusivos
+
+#17182 PANESI, MIGUEL ANGEL
+  Cargos: +1 ($95000.00), -2 ($95000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#17207 SCHAAB, BENICIO
+  Cargos: +0 ($0.00), -1 ($1275.00)  →  Caso C: positivos antes del corte $1275.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#17217 MAGALLAN, BORJA
+  Cargos: +2 ($72000.00), -2 ($72000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#17221 RODRIGUEZ, RENZO
+  Cargos: +1 ($80000.00), -1 ($43000.00)  →  Caso B: saldo vigente $37000.00 → crear SaldoFavor
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17264 KONIG, CARLOS DAMIAN
+  Cargos: +1 ($65000.00), -1 ($65000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17332 NADRICHNY, URQUIJO NICOLAS
+  Cargos: +1 ($30000.00), -2 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#17352 GODOY, CAROLA
+  Cargos: +2 ($47000.00), -2 ($47000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#17365 GOMEZ, GRICELDA SOLEDAD
+  Cargos: +1 ($31000.00), -1 ($31000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17431 GOMEZ, THIAGO BENJAMIN
+  Cargos: +2 ($80000.00), -2 ($80000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#17443 CASTILLO, ANDREA RAQUEL
+  Cargos: +0 ($0.00), -1 ($7000.00)  →  Caso C: positivos antes del corte $7000.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#17698 GAROBI, LUJAN
+  Cargos: +1 ($106000.00), -1 ($106000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17709 BENITEZ, ANALIA VERONICA
+  Cargos: +2 ($280000.00), -3 ($280000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 2 pagos exclusivos
+
+#17724 INSAURALDE, PAVON LUANA VALENTINA
+  Cargos: +1 ($31000.00), -1 ($31000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17736 SOSA, SERGIO OSCAR
+  Cargos: +1 ($109000.00), -1 ($109000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17803 BARRANCO, CATALINA
+  Cargos: +1 ($33000.00), -1 ($33000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17828 MONCLOBA, SEBASTIAN NORBERTO
+  Cargos: +4 ($300000.00), -6 ($301050.00)  →  Caso C: positivos antes del corte $1050.00 (no se tocan)
+  Anular: 6 cargos | 0 pagos exclusivos
+
+#17833 GONZALEZ, SEBASTIAN ARIEL
+  Cargos: +2 ($172000.00), -1 ($22000.00)  →  Caso B: saldo vigente $150000.00 → crear SaldoFavor
+  Anular: 3 cargos | 2 pagos exclusivos
+
+#17841 BORSANI, ELISA NATALIA
+  Cargos: +3 ($254000.00), -4 ($254000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 7 cargos | 3 pagos exclusivos
+
+#17845 ERRUBIDARTE, JUAN CRUZ
+  Cargos: +3 ($120000.00), -3 ($120100.00)  →  Caso C: positivos antes del corte $100.00 (no se tocan)
+  Anular: 3 cargos | 0 pagos exclusivos
+
+#17886 OCAMPOS, RODRIGUEZ DANIELA LUJAN
+  Cargos: +1 ($45000.00), -1 ($45000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17893 FERNANDEZ, LOPEZ MAXIMO
+  Cargos: +1 ($58000.00), -1 ($58000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17910 QUIÑONEZ, LUCIANA DANIELA
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17911 KOROL, KATRINA AILIN ESTHER
+  Cargos: +0 ($0.00), -1 ($240.00)  →  Caso C: positivos antes del corte $240.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#17948 GALEANO, LOPEZ FERNANDO JAVIER
+  Cargos: +1 ($41000.00), -1 ($41000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17968 GONZALEZ DEL, VALLE JULIETA
+  Cargos: +2 ($64000.00), -1 ($64000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 2 pagos exclusivos
+
+#17981 ORTIZ, MATEO
+  Cargos: +1 ($236000.00), -1 ($236000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#17989 KLAS, MARTINA
+  Cargos: +3 ($119000.00), -4 ($119000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 7 cargos | 3 pagos exclusivos
+
+#18022 AYALA, ELISEO LAUREANO
+  Cargos: +3 ($114000.00), -4 ($111000.00)  →  Caso B: saldo vigente $3000.00 → crear SaldoFavor
+  Anular: 7 cargos | 3 pagos exclusivos
+
+#18027 ROJAS, SOTO ENMANUEL GUSTAVO
+  Cargos: +3 ($85000.00), -3 ($85000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 6 cargos | 3 pagos exclusivos
+
+#18050 HERMOSI, LAUTARO
+  Cargos: +3 ($114500.00), -3 ($114500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 6 cargos | 3 pagos exclusivos
+
+#19007 NOVILLO, VIOLETA ELIANA
+  Cargos: +7 ($196000.00), -8 ($196000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 15 cargos | 7 pagos exclusivos
+
+#19017 VASQUEZ, NICANOR
+  Cargos: +1 ($62000.00), -1 ($62000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19058 ACOSTA, BENJAMIN LEON
+  Cargos: +1 ($3000.00), -1 ($3000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19103 PALACIOS, SILVIA ISABEL
+  Cargos: +0 ($0.00), -2 ($107500.00)  →  Caso C: positivos antes del corte $107500.00 (no se tocan)
+  Anular: 2 cargos | 0 pagos exclusivos
+
+#19175 RUIZ, MIA MARTINA
+  Cargos: +1 ($41000.00), -1 ($41000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19200 MONTES, MARIA EUGENIA
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19218 RODRIGUEZ, ACOSTA ELIDA
+  Cargos: +1 ($62000.00), -1 ($62000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19228 MARCONCINI, RADOVICH FRANCO
+  Cargos: +1 ($25275.00), -1 ($29500.00)  →  Caso C: positivos antes del corte $4225.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#19274 CORRADI, DELFINA
+  Cargos: +1 ($45000.00), -1 ($45000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19279 RODRIGUEZ, MICHELLE ANAHI
+  Cargos: +2 ($56000.00), -3 ($56000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 2 pagos exclusivos
+
+#19285 BARRETTA, ANA BELEN
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19300 ALVARENGA, ALEJO LEONEL
+  Cargos: +1 ($10000.00), -1 ($500.00)  →  Caso B: saldo vigente $9500.00 → crear SaldoFavor
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19311 GOMEZ, GABRIEL
+  Cargos: +1 ($60000.00), -1 ($60000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19333 ZARATE, LUCAS
+  Cargos: +1 ($28000.00), -1 ($28000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19338 GODOY, MARIA DE LOS ANGELES
+  Cargos: +2 ($91000.00), -3 ($91000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 2 pagos exclusivos
+
+#19345 LEDESMA, ALVARO FRANCISCO
+  Cargos: +1 ($50000.00), -2 ($50000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#19351 SAINZ, MIRKO
+  Cargos: +2 ($90000.00), -2 ($90000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#19390 DAMBROS, GUSTAVO EZEQUIEL
+  Cargos: +3 ($75500.00), -2 ($75500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 3 pagos exclusivos
+
+#19400 CARAFENCHOS, TOBIAS
+  Cargos: +4 ($250000.00), -4 ($250000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 8 cargos | 4 pagos exclusivos
+
+#19424 COSSO, BENICIO
+  Cargos: +3 ($120000.00), -3 ($115000.00)  →  Caso B: saldo vigente $5000.00 → crear SaldoFavor
+  Anular: 6 cargos | 3 pagos exclusivos
+
+#19432 CAFETZOGLUS, LORENA
+  Cargos: +0 ($0.00), -1 ($200.00)  →  Caso C: positivos antes del corte $200.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#19450 GAIG, AUGUSTO
+  Cargos: +1 ($31000.00), -1 ($31000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19455 SANTO, RINGO
+  Cargos: +1 ($28000.00), -1 ($28000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19457 LAUGAS, STEFANO TADEO
+  Cargos: +1 ($4000.00), -1 ($4000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19472 MARTINEZ, LORENZO
+  Cargos: +1 ($58600.00), -1 ($59000.00)  →  Caso C: positivos antes del corte $400.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#19478 LOVERA, CIRO LIONEL
+  Cargos: +3 ($113500.00), -4 ($113500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 7 cargos | 3 pagos exclusivos
+
+#19498 SOSA, YAQUELINE
+  Cargos: +11 ($654000.00), -9 ($654000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 20 cargos | 11 pagos exclusivos
+
+#19504 BUSTOS, BENJAMIN CRISTIAN
+  Cargos: +0 ($0.00), -1 ($10175.00)  →  Caso C: positivos antes del corte $10175.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#19506 SILVA, DARIO DAMIAN
+  Cargos: +1 ($29500.00), -2 ($29500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#19524 BAEZ, DELFINA
+  Cargos: +1 ($25000.00), -1 ($25000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19527 BOTTANI, JUAN IGNACIO
+  Cargos: +1 ($60000.00), -1 ($60000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19548 DORCH, FIORELLA AGUSTINA
+  Cargos: +0 ($0.00), -1 ($26775.00)  →  Caso C: positivos antes del corte $26775.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#19550 TORRES, MATIAS EDUARDO
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19558 LEGUIZAMON, LEDEZMA ROQUE JONATAN ARIEL
+  Cargos: +0 ($0.00), -1 ($4500.00)  →  Caso C: positivos antes del corte $4500.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#19586 VILLAVERDE, POSDELEY MARTINA LOANA
+  Cargos: +1 ($43000.00), -1 ($43000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19599 YAQUES, SOFIA VERONICA
+  Cargos: +0 ($0.00), -1 ($25000.00)  →  Caso C: positivos antes del corte $25000.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#19613 MORENO, GONZALO
+  Cargos: +1 ($25000.00), -1 ($25000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19617 GALLUCCIO, JORGE LUIS
+  Cargos: +1 ($140000.00), -2 ($140000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#19621 NIETO, CAROLINA DANIELA
+  Cargos: +1 ($21000.00), -1 ($21000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19623 CAJAL, LAUTARO VALENTIN
+  Cargos: +4 ($184000.00), -5 ($184000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 9 cargos | 4 pagos exclusivos
+
+#19655 FRANCO, CARDOZO FREDY RUBEN
+  Cargos: +2 ($42000.00), -2 ($42000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#19669 GAYOSO, BOLAñOS ALCIDES
+  Cargos: +4 ($310000.00), -4 ($310000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 8 cargos | 4 pagos exclusivos
+
+#19684 SOSA, ABIGAIL
+  Cargos: +2 ($74000.00), -3 ($74000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 2 pagos exclusivos
+
+#19711 DE, LOS SANTOS ADRIAN CARLOS
+  Cargos: +1 ($60000.00), -0 ($0.00)  →  Caso B: saldo vigente $60000.00 → crear SaldoFavor
+  Anular: 1 cargos | 1 pagos exclusivos
+
+#19720 SARATE, CAMILA
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19734 FIORDALISI, MATEO
+  Cargos: +1 ($20000.00), -1 ($20000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19745 PEREZ, GABRIEL NICOLAS
+  Cargos: +1 ($60000.00), -1 ($60000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19748 MALDONADO, MENDELLA MELISA RAYEN
+  Cargos: +1 ($40000.00), -1 ($40000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19769 NOGUERA, RUBEN DARIO
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19784 ACEVEDO, LUZ VALENTINA
+  Cargos: +1 ($31000.00), -0 ($0.00)  →  Caso B: saldo vigente $31000.00 → crear SaldoFavor
+  Anular: 1 cargos | 1 pagos exclusivos
+
+#19794 HUMAÑO, EMILCE ROSARIO
+  Cargos: +1 ($2000.00), -1 ($2000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19854 SILVA, SANTIAGO DAMIAN
+  Cargos: +1 ($105000.00), -3 ($105000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 1 pagos exclusivos
+
+#19858 MANDLI, LUCIANO
+  Cargos: +1 ($20000.00), -1 ($20000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19860 GIUSFREDI, SARA CELENE
+  Cargos: +1 ($15000.00), -1 ($15000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19869 FLORES, VALERIA ABRIL
+  Cargos: +2 ($55500.00), -2 ($55500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#19879 ALVAREZ, FLEITAS CHRISTOPHER DANIEL
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19881 BORREGO, PIA VICTORIA
+  Cargos: +3 ($99500.00), -4 ($99500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 7 cargos | 3 pagos exclusivos
+
+#19886 PEREYRA, ENZO SANTINO
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19887 CONSTANCIO, FELIX LORENZO CARMELO
+  Cargos: +0 ($0.00), -1 ($16000.00)  →  Caso C: positivos antes del corte $16000.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#19902 HERRERA, JAVIER ALEJANDRO
+  Cargos: +2 ($65000.00), -1 ($40000.00)  →  Caso B: saldo vigente $25000.00 → crear SaldoFavor
+  Anular: 3 cargos | 2 pagos exclusivos
+
+#19906 MORZOLI, D ALESSANDRO MIA
+  Cargos: +1 ($44000.00), -1 ($44000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19926 SOLIS, DONATO
+  Cargos: +3 ($87000.00), -2 ($87000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 3 pagos exclusivos
+
+#19934 FONTANA, BRIAN TIZIANO
+  Cargos: +6 ($191000.00), -6 ($157500.00)  →  Caso B: saldo vigente $33500.00 → crear SaldoFavor
+  Anular: 12 cargos | 6 pagos exclusivos
+
+#19950 GOMEZ, DEBORA NAHIARA
+  Cargos: +2 ($69000.00), -2 ($69000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#19964 FAJARDO, PABLO EDUARDO
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19966 CUCCARO, EZEQUIEL ALEJANDRO
+  Cargos: +2 ($66000.00), -2 ($66000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#19972 GODOY, CABRAL JEREMIAS EMILIANO
+  Cargos: +2 ($89000.00), -3 ($89000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 2 pagos exclusivos
+
+#19977 IBAÑEZ, IAN DYLAN
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#19984 KRIEGER, MARTIN JULIAN
+  Cargos: +1 ($7500.00), -1 ($7500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20001 ROJAS, IBARRA JAZMIN SARAH
+  Cargos: +3 ($74700.00), -3 ($74700.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 6 cargos | 3 pagos exclusivos
+
+#20005 QUINTEROS, ALMA ASTRID
+  Cargos: +4 ($124000.00), -4 ($124000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 8 cargos | 4 pagos exclusivos
+
+#20034 AGUIRRE, BONIN RODOLFO
+  Cargos: +1 ($60000.00), -1 ($60000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20039 MARCHISONE, BAUTISTA RAMIRO
+  Cargos: +3 ($107500.00), -3 ($107500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 6 cargos | 3 pagos exclusivos
+
+#20040 BURGOS, GATTINONI MORA
+  Cargos: +2 ($53500.00), -3 ($71500.00)  →  Caso C: positivos antes del corte $18000.00 (no se tocan)
+  Anular: 3 cargos | 0 pagos exclusivos
+
+#20047 CASTILLO, LISANDRO
+  Cargos: +3 ($84500.00), -1 ($82000.00)  →  Caso B: saldo vigente $2500.00 → crear SaldoFavor
+  Anular: 4 cargos | 3 pagos exclusivos
+
+#20051 GALVEZ, BASTIAN LIONEL
+  Cargos: +1 ($70000.00), -0 ($0.00)  →  Caso B: saldo vigente $70000.00 → crear SaldoFavor
+  Anular: 1 cargos | 1 pagos exclusivos
+
+#20066 BIEDAK, EMILIA VICTORIA
+  Cargos: +2 ($80000.00), -3 ($80000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 2 pagos exclusivos
+
+#20067 MENDEZ, ZALAZAR BRAIAN EZEQUIEL
+  Cargos: +3 ($85500.00), -3 ($85500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 6 cargos | 3 pagos exclusivos
+
+#20072 GAYA, PEDRO ROMAN
+  Cargos: +1 ($50000.00), -0 ($0.00)  →  Caso B: saldo vigente $50000.00 → crear SaldoFavor
+  Anular: 1 cargos | 1 pagos exclusivos
+
+#20075 GIMENEZ, MAXIMO ADRIANO NICOLAS
+  Cargos: +3 ($105000.00), -4 ($105000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 7 cargos | 3 pagos exclusivos
+
+#20103 SORIANO, LIA CRISTAL
+  Cargos: +5 ($165000.00), -5 ($165000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 10 cargos | 5 pagos exclusivos
+
+#20104 MIRANDA, JANA LUZ
+  Cargos: +4 ($100500.00), -4 ($100500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 8 cargos | 4 pagos exclusivos
+
+#20106 PALLADINO, TOMAS SEBASTIAN
+  Cargos: +2 ($60000.00), -2 ($60000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20108 KAUFFMANN, SILVANA MAGALI
+  Cargos: +2 ($78000.00), -2 ($78000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20113 CARRIZO, ZALAZAR FRANCISCO
+  Cargos: +4 ($95500.00), -3 ($95000.00)  →  Caso B: saldo vigente $500.00 → crear SaldoFavor
+  Anular: 7 cargos | 4 pagos exclusivos
+
+#20115 LAMARQUE, VICENTE GREGORIO
+  Cargos: +1 ($29500.00), -1 ($29500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20119 GONZALEZ, AQUINO ANAHI ADRIANA
+  Cargos: +1 ($36000.00), -2 ($40000.00)  →  Caso C: positivos antes del corte $4000.00 (no se tocan)
+  Anular: 2 cargos | 0 pagos exclusivos
+
+#20123 RODRIGUEZ, EMMA
+  Cargos: +1 ($65000.00), -2 ($65000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#20127 GIUNTA, FELIPE JAVIER
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20129 BUGIA, THOMAS
+  Cargos: +1 ($35000.00), -2 ($35000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#20135 GONZALEZ, UMA JAZMIN
+  Cargos: +1 ($31000.00), -1 ($31000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20142 ROS, ANTONIO
+  Cargos: +1 ($50000.00), -1 ($50000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20160 LOPEZ, CIRO THOMAS
+  Cargos: +1 ($25000.00), -1 ($25000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20163 BENFIELD, ANTONIA
+  Cargos: +4 ($73000.00), -4 ($73000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 8 cargos | 4 pagos exclusivos
+
+#20170 MONZON, LISANDRO IAN
+  Cargos: +1 ($65000.00), -2 ($65000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#20179 ANZE, PAULA ANDREA
+  Cargos: +2 ($82000.00), -2 ($82000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20183 MENDEZ, SANTINO VICENTE
+  Cargos: +1 ($20000.00), -1 ($20000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20184 LOPEZ, CAMELO FRANCISCO
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20191 ELLIFF, LORENZO SANTIAGO
+  Cargos: +1 ($35000.00), -1 ($35000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20197 KLEIST, ELIANA BELEN
+  Cargos: +1 ($136000.00), -3 ($192000.00)  →  Caso C: positivos antes del corte $56000.00 (no se tocan)
+  Anular: 3 cargos | 0 pagos exclusivos
+
+#20198 ORELLANO, DANTE JUAN CRUZ
+  Cargos: +2 ($80000.00), -2 ($80000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20199 DE, ANGELIS MAXIMO TOMAS
+  Cargos: +1 ($53000.00), -1 ($53000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20206 OBREGON, JIMENEZ PAUL JEREMY
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20210 CATALANO, DICIOCCO SUSANA BEATRIZ
+  Cargos: +0 ($0.00), -2 ($27000.00)  →  Caso C: positivos antes del corte $27000.00 (no se tocan)
+  Anular: 2 cargos | 0 pagos exclusivos
+
+#20211 SAUCEDO, ALEXANDER DAMIAN
+  Cargos: +5 ($133000.00), -5 ($133000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 10 cargos | 5 pagos exclusivos
+
+#20215 SILVA, THIAGO BENJAMIN
+  Cargos: +2 ($56500.00), -2 ($56500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20219 BARUA, SANTIAGO ELIAS
+  Cargos: +3 ($75000.00), -2 ($75000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 3 pagos exclusivos
+
+#20226 ROJAS, NAZARENO
+  Cargos: +2 ($57200.00), -2 ($57200.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20227 RAMIREZ, LUCAS JOEL
+  Cargos: +2 ($40000.00), -2 ($40000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20229 MORINIGO, FRANCO
+  Cargos: +1 ($26000.00), -1 ($26000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20244 NIEVA, IVANNA ROSARIO
+  Cargos: +1 ($30000.00), -2 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#20250 BURRIA, UMA
+  Cargos: +2 ($32000.00), -2 ($32000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20252 LOVARA, FRANCISCO
+  Cargos: +3 ($113500.00), -2 ($113500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 3 pagos exclusivos
+
+#20260 TAVARONE, FAMIGLIETTI STEFANO
+  Cargos: +0 ($0.00), -1 ($29500.00)  →  Caso C: positivos antes del corte $29500.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#20265 CUFRE, TIZIANO MAXIMO
+  Cargos: +0 ($0.00), -1 ($30000.00)  →  Caso C: positivos antes del corte $30000.00 (no se tocan)
+  Anular: 1 cargos | 0 pagos exclusivos
+
+#20266 BERNAL, SANTIAGO RAMON
+  Cargos: +1 ($25000.00), -1 ($25000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20268 FLORES, IVAN FRANCO
+  Cargos: +2 ($55350.00), -2 ($55350.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20273 BRITEZ, BELEN CANDELA
+  Cargos: +1 ($31000.00), -1 ($31000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20275 VICECONTE, NICOLAS ALEJANDRO
+  Cargos: +1 ($1000.00), -1 ($1000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20284 MARTINEZ, SANTIAGO ALEJANDRO
+  Cargos: +1 ($25000.00), -1 ($25000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20297 GONZALEZ, GAYA LUPE
+  Cargos: +2 ($83000.00), -2 ($83000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20316 CORDONE, JULIANA
+  Cargos: +2 ($46000.00), -2 ($46000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20318 GONZALEZ, LAGO JULIETA
+  Cargos: +1 ($43000.00), -1 ($43000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20319 MANSILLA, JUAN IGNACIO
+  Cargos: +2 ($78000.00), -3 ($78000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 2 pagos exclusivos
+
+#20320 SANCHEZ, AGUSTIN LEANDRO
+  Cargos: +1 ($25800.00), -1 ($25800.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20322 GRACIETTE, LUCIO
+  Cargos: +3 ($25000.00), -1 ($10000.00)  →  Caso B: saldo vigente $15000.00 → crear SaldoFavor
+  Anular: 4 cargos | 3 pagos exclusivos
+
+#20323 SCHROO, PEDRO
+  Cargos: +1 ($41000.00), -1 ($41000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20324 CRUZ, FERNANDA GABRIELA
+  Cargos: +1 ($68000.00), -1 ($68000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20329 BARREIRO, JERONIMO MATIAS
+  Cargos: +1 ($8000.00), -1 ($8000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20331 NAVARRETE, IAN FRANCO
+  Cargos: +1 ($35000.00), -1 ($35000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20337 QUIROS, THIAGO BENJAMIN
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20345 DONATE, ZAHIRA YASMIN
+  Cargos: +1 ($20000.00), -3 ($55500.00)  →  Caso C: positivos antes del corte $35500.00 (no se tocan)
+  Anular: 3 cargos | 0 pagos exclusivos
+
+#20347 RAMIREZ, DELIA
+  Cargos: +1 ($62000.00), -1 ($62000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20349 MARTINEZ, ANGEL
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20350 ESPEJO, ROCHELLE LUNA JAZMIN
+  Cargos: +2 ($35000.00), -2 ($35000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20351 NIGRO, TIZIANA FRANCESCA
+  Cargos: +2 ($64500.00), -2 ($64500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20363 GONZALEZ, GARRIDO ALMA ELUNEY
+  Cargos: +1 ($37000.00), -1 ($37000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20365 SOLAN, MARCHIONNI JULIETA MARTINA
+  Cargos: +2 ($110000.00), -2 ($106000.00)  →  Caso B: saldo vigente $4000.00 → crear SaldoFavor
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20366 MORALES, NAHIARA VICTORIA
+  Cargos: +2 ($90000.00), -1 ($50000.00)  →  Caso B: saldo vigente $40000.00 → crear SaldoFavor
+  Anular: 3 cargos | 2 pagos exclusivos
+
+#20376 GOETT, AGUSTIN ALEJANDRO
+  Cargos: +1 ($45000.00), -2 ($45000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#20384 FREDES, PINILLA AMBAR NAOMI
+  Cargos: +6 ($205000.00), -6 ($192000.00)  →  Caso B: saldo vigente $13000.00 → crear SaldoFavor
+  Anular: 12 cargos | 6 pagos exclusivos
+
+#20387 GONZALEZ, BENICIO TOBIAS
+  Cargos: +1 ($25000.00), -1 ($25000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20398 LLOPIS, MORA CANDELA
+  Cargos: +2 ($90000.00), -2 ($90000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20405 MACHADO, SANTANDER MELANIE MAILEN
+  Cargos: +3 ($68000.00), -2 ($66000.00)  →  Caso B: saldo vigente $2000.00 → crear SaldoFavor
+  Anular: 5 cargos | 3 pagos exclusivos
+
+#20415 ALDERETE, BAUTISTA DANIEL
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20416 ARAOS, MARTINA DSIREE
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20417 FERNANDEZ, FRANCO JESUS
+  Cargos: +1 ($30000.00), -1 ($30000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20432 CHANGALA, MERLINO PIA MICHELLE
+  Cargos: +2 ($65000.00), -2 ($65000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20435 SIMON, LORENZO
+  Cargos: +1 ($51000.00), -1 ($51000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20438 MONTI, ISABELLA
+  Cargos: +1 ($46000.00), -1 ($46000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20440 MERA, VIEYTES LIHUEL AGUSTIN
+  Cargos: +1 ($45000.00), -2 ($45000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#20447 ZARLENGA, VITTO EZEQUIEL
+  Cargos: +1 ($35000.00), -1 ($35000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20457 ANDRADE, RUBEN GASTON
+  Cargos: +2 ($234000.00), -3 ($234000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 5 cargos | 2 pagos exclusivos
+
+#20459 CAROCA, BARRIENTOS MIA
+  Cargos: +1 ($6000.00), -1 ($6000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20467 SEGOVIA, DELFINA MILAGROS
+  Cargos: +1 ($120000.00), -1 ($98000.00)  →  Caso B: saldo vigente $22000.00 → crear SaldoFavor
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20478 SOLIS, MIA CHIARA
+  Cargos: +1 ($45000.00), -1 ($45000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20497 DOLERA, MICAELA AGUSTINA
+  Cargos: +1 ($40000.00), -1 ($40000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20531 GONZALEZ, ACEVEDO FRANCISCO
+  Cargos: +1 ($60000.00), -0 ($0.00)  →  Caso B: saldo vigente $60000.00 → crear SaldoFavor
+  Anular: 1 cargos | 1 pagos exclusivos
+
+#20536 BURZO, JOAQUIN
+  Cargos: +1 ($45000.00), -1 ($45000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20540 MAIDANA, MAXIMO
+  Cargos: +1 ($4000.00), -1 ($4000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20545 GUZMAN, BAUTISTA EZEQUIEL
+  Cargos: +3 ($117000.00), -5 ($117000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 8 cargos | 3 pagos exclusivos
+
+#20572 DUARTES, JOHANNA MARIA
+  Cargos: +11 ($454500.00), -6 ($454500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 17 cargos | 11 pagos exclusivos
+
+#20590 RODRIGUEZ, GONZALO FEDERICO
+  Cargos: +2 ($40000.00), -2 ($40000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 4 cargos | 2 pagos exclusivos
+
+#20597 RIVERO, THIAGO
+  Cargos: +1 ($53000.00), -1 ($53000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20606 ARGUELLO, MIA MORENA
+  Cargos: +1 ($45000.00), -1 ($45000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20608 MAJANOVSKY, JUANSE
+  Cargos: +1 ($3000.00), -1 ($3000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20614 DE, PABLO BIANCA
+  Cargos: +1 ($28000.00), -1 ($28000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20615 ESPERON, JESICA ROMINA
+  Cargos: +1 ($91000.00), -1 ($91000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20617 SIMONE, VALENTINO
+  Cargos: +1 ($40000.00), -1 ($40000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20618 GOMEZ, BIANCA
+  Cargos: +1 ($10000.00), -1 ($10000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20628 GOMEZ, SOFIA ISABELLA
+  Cargos: +1 ($40000.00), -1 ($40000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20630 GONZALEZ, LORENZO
+  Cargos: +1 ($60000.00), -0 ($0.00)  →  Caso B: saldo vigente $60000.00 → crear SaldoFavor
+  Anular: 1 cargos | 1 pagos exclusivos
+
+#20631 MICHELINI, FEDERICO GABRIEL
+  Cargos: +1 ($50000.00), -1 ($50000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20637 HEFLIN, MANSILLA MAIA LUCIANA
+  Cargos: +1 ($25000.00), -1 ($25000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20650 HEREDIA, MARIO EZEQUIEL
+  Cargos: +1 ($110000.00), -1 ($98000.00)  →  Caso B: saldo vigente $12000.00 → crear SaldoFavor
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20690 CARO, KIARA
+  Cargos: +1 ($76000.00), -2 ($76000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 3 cargos | 1 pagos exclusivos
+
+#20721 ALDECO, AGOSTINA PAZ
+  Cargos: +1 ($29000.00), -1 ($29000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20723 MARQUEZ, BAUTISTA LISANDRO
+  Cargos: +1 ($66000.00), -1 ($61000.00)  →  Caso B: saldo vigente $5000.00 → crear SaldoFavor
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20731 GAVASSA, JUAN
+  Cargos: +1 ($40000.00), -1 ($40000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20736 MAIDANA, ALEJO
+  Cargos: +1 ($18000.00), -1 ($18000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20737 DIAZ, LEZCANO LUNA
+  Cargos: +1 ($60000.00), -1 ($60000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20769 SAIN, FRANCISCO
+  Cargos: +1 ($13000.00), -1 ($13000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20783 QUIROGA, MACARENA
+  Cargos: +1 ($17600.00), -0 ($0.00)  →  Caso B: saldo vigente $17600.00 → crear SaldoFavor
+  Anular: 1 cargos | 1 pagos exclusivos
+
+#20815 MILENS, ALEJO
+  Cargos: +1 ($50000.00), -1 ($50000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20816 LUPO, MAGALI AGOSTINA
+  Cargos: +1 ($33000.00), -1 ($33000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20850 CASTELLI, FERNANDEZ TOMAS
+  Cargos: +1 ($52000.00), -1 ($52000.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#20854 BARRIENTOS, OLIVIA FELICITAS
+  Cargos: +1 ($26500.00), -1 ($26500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+#168393 FLEITA, PATRICIO VALENTINO
+  Cargos: +1 ($25500.00), -1 ($25500.00)  →  Caso A: doble import (anticipo aplicado completamente en Brio)
+  Anular: 2 cargos | 1 pagos exclusivos
+
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+📊 RESUMEN GLOBAL
+
+  Caso A (doble import): 189 socios
+  Caso B (saldo vigente): 27 socios
+  Caso C (positivos antes del corte): 23 socios
+  Pagos compartidos detectados: 0 (no se tocan automáticamente)
+
+  Total cargos a anular: 787
+  Total pagos a anular: 370
+  Total saldos a favor a crear: 27
+     Suma: $744400.00
+
+🟡 DRY-RUN: no se aplicaron cambios. Para ejecutar, usar --apply.
+

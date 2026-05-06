@@ -353,12 +353,11 @@ router.post('/cargos/masivo', authAdmin, asyncHandler(async (req, res) => {
       // Buscar período existente, si no existe crearlo
       let periodo = await req.db.periodo.findFirst({ where: { anio, mes } })
       if (!periodo) {
-        const nombreMes = fv.toLocaleString('es-AR', { month: 'long', timeZone: 'America/Argentina/Buenos_Aires' })
         periodo = await req.db.periodo.create({
           data: {
             anio,
             mes,
-            nombre: `${nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)} ${anio}`,
+            nombre: `${String(mes).padStart(2, '0')}/${anio}`,
             fechaVencimiento: fv,
           }
         })
@@ -598,9 +597,7 @@ router.post('/planes-pago', authAdmin, asyncHandler(async (req, res) => {
       // Buscar o crear el periodo correspondiente a la fecha de vencimiento
       const mes = fechaVenc.getMonth() + 1 // getMonth() es 0-based
       const anio = fechaVenc.getFullYear()
-      const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-      const nombrePeriodo = `${meses[mes]} ${anio}`
+      const nombrePeriodo = `${String(mes).padStart(2, '0')}/${anio}`
 
       let periodo = await tx.periodo.findFirst({
         where: { mes, anio },

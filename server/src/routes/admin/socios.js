@@ -5,44 +5,13 @@ import * as XLSX from 'xlsx'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
 import { resolverPeriodoAlta } from '../../lib/cuotasPeriodoAlta.js'
+import { calcularProximoNroSocio } from '../../lib/nroSocio.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
 // Cache temporal para uploads
 const uploadCache = new Map()
-
-// Calcula el próximo nroSocio. Si están seteadas las claves de configuración
-// SOCIO_NRO_MIN y SOCIO_NRO_MAX, asigna secuencialmente dentro del rango
-// (no rellena huecos). Si no, usa el comportamiento legacy (primer hueco desde el mínimo).
-async function calcularProximoNroSocio(db) {
-  const [cfgMin, cfgMax] = await Promise.all([
-    db.configuracion.findFirst({ where: { clave: 'SOCIO_NRO_MIN' } }),
-    db.configuracion.findFirst({ where: { clave: 'SOCIO_NRO_MAX' } }),
-  ])
-  const min = cfgMin?.valor ? parseInt(cfgMin.valor, 10) : null
-  const max = cfgMax?.valor ? parseInt(cfgMax.valor, 10) : null
-
-  const socios = await db.socio.findMany({ select: { nroSocio: true } })
-  const todos = socios.map(s => parseInt(s.nroSocio, 10)).filter(n => !isNaN(n) && n > 0)
-
-  if (Number.isInteger(min) && Number.isInteger(max) && max >= min) {
-    const enRango = todos.filter(n => n >= min && n <= max)
-    const proximo = enRango.length === 0 ? min : Math.max(...enRango) + 1
-    if (proximo > max) {
-      throw new AppError(`Rango de números de socio agotado (${min}-${max})`, 400, 'RANGO_AGOTADO')
-    }
-    return String(proximo)
-  }
-
-  // Sin rango configurado: comportamiento legacy (primer hueco desde el mínimo).
-  if (todos.length === 0) return '1'
-  const usados = new Set(todos)
-  const minimo = Math.min(...todos)
-  let proximo = minimo
-  while (usados.has(proximo)) proximo++
-  return String(proximo)
-}
 
 // Resuelve estado/categoria/tipoSocio del socio desde IDs (preferido) o strings legacy.
 // Devuelve { estadoSocioId, categoriaSocioId, tipoSocioRelId, estado, categoria, tipoSocio, tipoSocioRecord }
