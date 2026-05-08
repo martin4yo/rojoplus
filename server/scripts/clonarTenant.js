@@ -65,9 +65,18 @@ if (FROM_SLUG === TO_SLUG) {
   process.exit(1)
 }
 
-// Tablas con tenant_id que NO clonamos (los usuarios del tenant destino se mantienen)
+// Tablas con tenant_id que NO clonamos
 const SKIP_TABLES = new Set([
+  // Los usuarios del tenant destino se mantienen
   'tenant_usuarios',
+  // Módulo de accesos físicos: tienen tokens/IDs únicos globales (api_token)
+  // que chocan al clonar. Se saltean — el tenant destino mantiene sus
+  // dispositivos/registros propios (o vacíos).
+  'dispositivos_acceso',
+  'registros_acceso',
+  'intentos_acceso_denegado',
+  'habilitaciones_temporales',
+  'favoritos_acceso',
 ])
 
 const pool = new Pool(

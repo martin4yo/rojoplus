@@ -426,7 +426,7 @@ async function importarCuotas() {
             montoRecargo:     0,
             montoBonificacion,
             montoTotal,
-            estado:           esPagado ? 'PAGADO' : 'PENDIENTE',
+            estado:           esNotaCredito ? 'ANULADO' : (esPagado ? 'PAGADO' : 'PENDIENTE'),
             fechaGeneracion:  fechaGeneracionFinal,
             fechaPago:        fechaPagoFinal,
             origen:           'MIGRACION_BRIO',

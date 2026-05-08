@@ -38,3 +38,6 @@ uploads/*
 # Prisma
 server/prisma/migrations/*
 !server/prisma/migrations/.gitkeep
+
+# Backups (datos sensibles de tenants — dumps DB, CSVs de auditoría)
+backups/

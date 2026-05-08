@@ -51,6 +51,9 @@ const CORTE = new Date(CORTE_STR + 'T00:00:00') // exclusive: importa solo Fecha
 const APPLY = flag('apply')
 const DRY_RUN = !APPLY
 const ORIGEN = 'MIGRACION_BRIO_HISTORICO'
+// Modo incremental: --socios 12345,67890 → solo procesa esos socios y NO borra nada
+const SOCIOS_FILTRO = (arg('socios') || '').split(',').map(s => s.trim()).filter(Boolean)
+const MODO_INCREMENTAL = SOCIOS_FILTRO.length > 0
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -108,6 +111,10 @@ async function main() {
   console.log(`Excel : ${excelPath}`)
   console.log(`Corte : Fecha Gen. < ${CORTE.toISOString().slice(0, 10)} (exclusive)`)
   console.log(`Modo  : ${DRY_RUN ? '🟡 DRY-RUN (no modifica BD)' : '🔴 APPLY (modifica BD)'}`)
+  if (MODO_INCREMENTAL) {
+    console.log(`        ⚙️  INCREMENTAL — solo socios: ${SOCIOS_FILTRO.join(',').slice(0, 200)}${SOCIOS_FILTRO.join(',').length > 200 ? '...' : ''}`)
+    console.log(`        (${SOCIOS_FILTRO.length} socios, NO se borra MIGRACION_BRIO_HISTORICO existente)`)
+  }
   console.log()
 
   // ── Leer Excel ──────────────────────────────────────────────────────────────
@@ -140,6 +147,12 @@ async function main() {
 
     const descCuota = row['Desc. Cuota']?.toString().trim()
     if (esAnticipoSocios(descCuota)) { stats.anticipoSocios++; continue }
+
+    // Filtro incremental: solo procesa los socios indicados
+    if (MODO_INCREMENTAL) {
+      const nro = row['Nro. Socio']?.toString().trim()
+      if (!SOCIOS_FILTRO.includes(nro)) continue
+    }
 
     const estCuota = (row['Est. Cuota'] ?? '').toString().toUpperCase().trim()
     if (estCuota === 'PAGADA') stats.pagada++
@@ -237,15 +250,41 @@ async function main() {
   }
 
   // ── APPLY ───────────────────────────────────────────────────────────────────
-  console.log(`\n🔴 APPLY: borrando importación histórica previa (origen=${ORIGEN})...`)
-  const delMov = await prisma.movimientoCaja.deleteMany({
-    where: { tenantId, pago: { origen: ORIGEN } }
-  })
-  const delPag = await prisma.pago.deleteMany({ where: { tenantId, origen: ORIGEN } })
-  const delCar = await prisma.cargo.deleteMany({ where: { tenantId, origen: ORIGEN } })
-  console.log(`  MovimientosCaja eliminados: ${delMov.count}`)
-  console.log(`  Pagos eliminados:           ${delPag.count}`)
-  console.log(`  Cargos eliminados:          ${delCar.count}`)
+  if (MODO_INCREMENTAL) {
+    console.log(`\n🔴 APPLY (INCREMENTAL): NO se borra nada existente. Solo se agregan filas de los socios indicados.`)
+    // Verificar que los socios filtrados no tengan ya cargos MIGRACION_BRIO_HISTORICO
+    // (si los tienen, fueron parcialmente importados y debemos avisar)
+    const sociosIds = SOCIOS_FILTRO.map(n => socioByNro.get(n)).filter(Boolean)
+    const yaImportados = await prisma.cargo.count({
+      where: { tenantId, origen: ORIGEN, socioId: { in: sociosIds } }
+    })
+    if (yaImportados > 0) {
+      console.log(`  ⚠️  Esos socios YA tienen ${yaImportados} cargos MIGRACION_BRIO_HISTORICO. Se duplicarían.`)
+      console.log(`     Borrando esos cargos primero (solo de los socios filtrados)...`)
+      const delMov = await prisma.movimientoCaja.deleteMany({
+        where: { tenantId, pago: { origen: ORIGEN, socioId: { in: sociosIds } } }
+      })
+      const delPag = await prisma.pago.deleteMany({
+        where: { tenantId, origen: ORIGEN, socioId: { in: sociosIds } }
+      })
+      const delCar = await prisma.cargo.deleteMany({
+        where: { tenantId, origen: ORIGEN, socioId: { in: sociosIds } }
+      })
+      console.log(`     MovimientosCaja eliminados (de filtrados): ${delMov.count}`)
+      console.log(`     Pagos eliminados (de filtrados):           ${delPag.count}`)
+      console.log(`     Cargos eliminados (de filtrados):          ${delCar.count}`)
+    }
+  } else {
+    console.log(`\n🔴 APPLY: borrando importación histórica previa (origen=${ORIGEN})...`)
+    const delMov = await prisma.movimientoCaja.deleteMany({
+      where: { tenantId, pago: { origen: ORIGEN } }
+    })
+    const delPag = await prisma.pago.deleteMany({ where: { tenantId, origen: ORIGEN } })
+    const delCar = await prisma.cargo.deleteMany({ where: { tenantId, origen: ORIGEN } })
+    console.log(`  MovimientosCaja eliminados: ${delMov.count}`)
+    console.log(`  Pagos eliminados:           ${delPag.count}`)
+    console.log(`  Cargos eliminados:          ${delCar.count}`)
+  }
 
   // ── MedioPago/Caja/Admin para pagos históricos ─────────────────────────────
   let medioPagoMig = await prisma.medioPago.findFirst({ where: { tenantId, codigo: 'MIGRACION_BRIO' } })
