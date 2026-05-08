@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Building2, UserCheck, Briefcase, Upload, User } from '
 import { Button } from '../../../components/Button'
 import CentroCostoSelector from '../../../components/CentroCostoSelector'
 import ConceptosFijosEmpleado from '../../../components/ConceptosFijosEmpleado'
+import EntrenadorTab from './EntrenadorTab'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
@@ -51,6 +52,7 @@ export default function EntidadForm({ tipo }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState('datos')
+  const [entidadInfo, setEntidadInfo] = useState({ esEntrenador: false, tieneEntrenador: false })
 
   const [form, setForm] = useState({
     codigo: '',
@@ -107,6 +109,10 @@ export default function EntidadForm({ tipo }) {
         centroCostoId: entidad.centroCostoId || null,
         foto: entidad.foto || '',
         activo: entidad.activo
+      })
+      setEntidadInfo({
+        esEntrenador: entidad.cargoPersonal?.esEntrenador === true,
+        tieneEntrenador: !!entidad.entrenador,
       })
     } catch (err) {
       setError('Error al cargar la entidad')
@@ -219,6 +225,8 @@ export default function EntidadForm({ tipo }) {
               { id: 'bancarios', label: 'Bancarios' },
               { id: 'laborales', label: 'Laborales' },
               ...(isEditing ? [{ id: 'conceptos', label: 'Conceptos Fijos' }] : []),
+              ...(isEditing && (entidadInfo.esEntrenador || entidadInfo.tieneEntrenador)
+                ? [{ id: 'entrenador', label: 'Entrenador' }] : []),
             ].map(t => (
               <button
                 key={t.id}
@@ -554,8 +562,13 @@ export default function EntidadForm({ tipo }) {
           <ConceptosFijosEmpleado entidadId={parseInt(id)} sueldoBasico={form.sueldoBasico} />
         )}
 
-        {/* Botones (ocultos en el tab de conceptos para no confundir — el form de conceptos guarda solo) */}
-        {(!usarTabs || tab !== 'conceptos') && (
+        {/* Tab Entrenador (solo cuando el cargo es de entrenador o ya tiene perfil) */}
+        {tipo === 'PERSONAL' && isEditing && tab === 'entrenador' && (
+          <EntrenadorTab entidadId={parseInt(id)} />
+        )}
+
+        {/* Botones (ocultos en tabs que guardan solos) */}
+        {(!usarTabs || (tab !== 'conceptos' && tab !== 'entrenador')) && (
           <div className="flex justify-end gap-4">
             <Button
               type="button"

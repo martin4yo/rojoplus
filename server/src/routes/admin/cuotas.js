@@ -1907,6 +1907,16 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     console.error('Error generando asiento contable para pago:', err)
   })
 
+  // Recalcular vigencia de la familia (reactivación automática si el pago salda
+  // las cuotas vencidas). No bloquea ni falla el pago.
+  if (pagoCompleto.socioId) {
+    import('../../services/vigenciaService.js').then(({ recalcularFamiliaDeSocio }) =>
+      recalcularFamiliaDeSocio(req.db, req.tenantId, pagoCompleto.socioId, {
+        origen: 'API', usuarioId: req.admin.id,
+      })
+    ).catch(err => console.error('Error recalculando vigencia tras pago:', err))
+  }
+
   // Generar PDF del recibo y disparar email + WhatsApp en background (no debe bloquear ni fallar el pago)
   ;(async () => {
     let pdfBuffer = null

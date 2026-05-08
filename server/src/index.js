@@ -3,6 +3,7 @@ import express from 'express'
 import { createServer } from 'http'
 import cors from 'cors'
 import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import prisma from './lib/prisma.js'
@@ -16,6 +17,7 @@ import comerciosRoutes from './routes/comercios.js'
 import comercioRoutes from './routes/comercio.js'
 import adminRoutes from './routes/admin/index.js'
 import socioRoutes from './routes/socio.js'
+import entrenadorRoutes from './routes/entrenador.js'
 import pagosRoutes from './routes/pagos.js'
 import contabilidadRoutes from './routes/contabilidad.js'
 import tesoreriaRoutes from './routes/tesoreria.js'
@@ -64,6 +66,7 @@ import tiendaRoutes from './routes/tienda/index.js'
 // Services
 import { verificarConexionSMTP } from './services/email.js'
 import { iniciarCronJobs, detenerCronJobs } from './jobs/notificaciones.js'
+import { iniciarCronsVigencia } from './jobs/vigenciaSocios.js'
 import { iniciarCronTienda, detenerCronTienda } from './jobs/tienda.js'
 import { initSocket } from './services/socketService.js'
 
@@ -76,6 +79,37 @@ import rateLimit from 'express-rate-limit'
 const app = express()
 const httpServer = createServer(app)
 const PORT = process.env.PORT || 3000
+
+// Cuando un cliente cierra la conexión durante un res.send/res.end con un buffer
+// grande (ej: descarga de Excel/PDF cancelada), el socket emite 'error' (write EOF/ECONNRESET).
+// Sin listener, Node mata el proceso. Lo capturamos como warning y seguimos.
+httpServer.on('connection', (socket) => {
+  socket.on('error', (err) => {
+    if (['ECONNRESET', 'EPIPE', 'ECANCELED'].includes(err?.code) || err?.message === 'write EOF') {
+      return
+    }
+    console.warn('[httpServer] socket error:', err?.code || err?.message)
+  })
+})
+
+// Red de seguridad global: errores de socket benignos (cliente desconectado,
+// conexiones outgoing de Prisma/SMTP/etc) NO deben matar el proceso.
+process.on('uncaughtException', (err) => {
+  const benigno =
+    ['ECONNRESET', 'EPIPE', 'ECANCELED', 'EOF'].includes(err?.code) ||
+    err?.message === 'write EOF' ||
+    err?.syscall === 'write'
+  if (benigno) {
+    console.warn(`[uncaughtException benigno] ${err?.code || err?.message}`)
+    return
+  }
+  console.error('[uncaughtException]', err)
+  // No exit — dejamos que el proceso siga vivo (los handlers de Express siguen funcionando)
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason)
+})
 
 // Confiar en el primer proxy (nginx/cloudflare) para que req.ip y X-Forwarded-For funcionen bien con express-rate-limit
 app.set('trust proxy', 1)
@@ -105,6 +139,7 @@ app.use(cors({
 }))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ limit: '10mb', extended: true }))
+app.use(cookieParser())
 
 // Servir archivos estáticos (fotos de socios)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
@@ -162,6 +197,10 @@ const registerRateLimit = rateLimit({
 // (El montaje real de las rutas de auth se hace via adminRoutes más abajo.)
 app.post('/api/admin/login', loginRateLimit, (req, res, next) => next())
 app.use('/api/socio/*', extractTenant, (req, res, next) => {
+  req.db = createTenantPrisma(req.tenantId)
+  next()
+})
+app.use('/api/entrenador/*', extractTenant, (req, res, next) => {
   req.db = createTenantPrisma(req.tenantId)
   next()
 })
@@ -245,6 +284,7 @@ app.use('/api/admin/dashboard', dashboardEjecutivoRoutes)
 app.use('/api/admin/reportes/morosidad', reportesMorosidadRoutes)
 app.use('/api/socio', socioRoutes)
 app.use('/api/socio', pushSubscriptionRoutes)
+app.use('/api/entrenador', entrenadorRoutes)
 app.use('/api/admin/debito', debitoAutomaticoRoutes)
 app.use('/api/admin/payway', paywayRoutes)
 app.use('/api/payway', paywayRoutes) // webhook público (sin auth)
@@ -324,6 +364,8 @@ if (process.env.NODE_ENV !== 'test') {
     iniciarCronJobs()
     // Iniciar cron del módulo Tienda
     iniciarCronTienda()
+    // Iniciar crons de vigencia de socios (bloqueo por morosidad + notificación)
+    iniciarCronsVigencia()
   })
 
   // Cerrar conexión de Prisma al salir

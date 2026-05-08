@@ -262,10 +262,20 @@ router.get('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/estados-socio
 router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, orden } = req.body
+  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, rolVigencia, orden } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
+  }
+
+  // Validar rolVigencia
+  const rolValido = rolVigencia == null || rolVigencia === '' || ['AL_DIA', 'BLOQUEADO'].includes(rolVigencia)
+  if (!rolValido) throw new AppError('rolVigencia inválido (AL_DIA, BLOQUEADO o null)', 400, 'VALIDATION_ERROR')
+
+  // Validar unicidad por tenant del rol AL_DIA / BLOQUEADO
+  if (rolVigencia === 'AL_DIA' || rolVigencia === 'BLOQUEADO') {
+    const otro = await req.db.estadoSocio.findFirst({ where: { rolVigencia } })
+    if (otro) throw new AppError(`Ya hay un estado marcado como ${rolVigencia}: "${otro.nombre}"`, 400, 'DUPLICATE_ROL')
   }
 
   const existente = await req.db.estadoSocio.findFirst({ where: { codigo } })
@@ -279,6 +289,7 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
       color,
       permiteDescuentos: permiteDescuentos || false,
       permiteIngresoMolinete: permiteIngresoMolinete || false,
+      rolVigencia: rolVigencia || null,
       orden: orden || 0,
     },
   })
@@ -289,7 +300,7 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/estados-socio/:id
 router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, orden, activo } = req.body
+  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, rolVigencia, orden, activo } = req.body
 
   const existente = await req.db.estadoSocio.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
@@ -297,6 +308,21 @@ router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   if (codigo && codigo !== existente.codigo) {
     const duplicado = await req.db.estadoSocio.findFirst({ where: { codigo } })
     if (duplicado) throw new AppError('Ya existe un estado con ese código', 400, 'DUPLICATE')
+  }
+
+  // Validar rolVigencia y su unicidad por tenant
+  let rolVigenciaFinal = existente.rolVigencia
+  if (rolVigencia !== undefined) {
+    const v = rolVigencia === '' ? null : rolVigencia
+    const rolValido = v == null || ['AL_DIA', 'BLOQUEADO'].includes(v)
+    if (!rolValido) throw new AppError('rolVigencia inválido (AL_DIA, BLOQUEADO o null)', 400, 'VALIDATION_ERROR')
+    if (v === 'AL_DIA' || v === 'BLOQUEADO') {
+      const otro = await req.db.estadoSocio.findFirst({
+        where: { rolVigencia: v, NOT: { id: parseInt(id) } },
+      })
+      if (otro) throw new AppError(`Ya hay un estado marcado como ${v}: "${otro.nombre}"`, 400, 'DUPLICATE_ROL')
+    }
+    rolVigenciaFinal = v
   }
 
   const estado = await req.db.estadoSocio.update({
@@ -308,6 +334,7 @@ router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
       color: color !== undefined ? color : existente.color,
       permiteDescuentos: permiteDescuentos !== undefined ? permiteDescuentos : existente.permiteDescuentos,
       permiteIngresoMolinete: permiteIngresoMolinete !== undefined ? permiteIngresoMolinete : existente.permiteIngresoMolinete,
+      rolVigencia: rolVigenciaFinal,
       orden: orden !== undefined ? orden : existente.orden,
       activo: activo !== undefined ? activo : existente.activo,
     },

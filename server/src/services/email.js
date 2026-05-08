@@ -425,6 +425,48 @@ export async function enviarReciboPago(pago, db, opts = {}) {
 }
 
 // Enviar Magic Link al socio para acceso al portal
+export async function enviarMagicLinkEntrenador(entrenador, token, db, tenantId = null) {
+  const tenantInfo = await getTenantInfo(tenantId ?? entrenador?.tenantId)
+  const linkAcceso = `${tenantInfo.url}/portal-entrenador/${token}`
+  const nombre = entrenador.apellido
+    ? `${entrenador.nombre} ${entrenador.apellido}`
+    : (entrenador.nombre || 'Entrenador')
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #1d4ed8; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">${tenantInfo.nombre || 'Club'}</h1>
+        <p style="color: white; margin: 5px 0 0 0;">Portal del Entrenador</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hola ${nombre}</h2>
+        <p style="color: #4b5563; line-height: 1.6;">
+          Recibiste este email porque solicitaste acceso al <strong>Portal del Entrenador</strong>.
+        </p>
+        <div style="background-color: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+          <p style="color: #1e40af; margin: 0 0 15px 0; font-weight: bold;">Hacé clic para acceder:</p>
+          <a href="${linkAcceso}" style="display: inline-block; background-color: #1d4ed8; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Acceder al Portal
+          </a>
+          <p style="color: #6b7280; font-size: 12px; margin: 15px 0 0 0;">
+            O copiá este link: <br><span style="word-break: break-all;">${linkAcceso}</span>
+          </p>
+        </div>
+        <p style="color: #6b7280; font-size: 12px; line-height: 1.6;">
+          🔒 Este link es válido por 24 horas. Si no lo solicitaste, ignorá este mensaje.
+        </p>
+      </div>
+    </div>
+  `
+
+  return enviarEmail({
+    to: entrenador.email,
+    subject: `Acceso al Portal del Entrenador — ${tenantInfo.nombre || 'Club'}`,
+    html,
+    db,
+  })
+}
+
 export async function enviarMagicLinkSocio(socio, token, db, tenantId = null) {
   // Resolver URL con subdomain del tenant (cae a frontendUrl global si no hay tenant)
   const tenantInfo = await getTenantInfo(tenantId ?? socio?.tenantId)

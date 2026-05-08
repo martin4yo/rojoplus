@@ -295,6 +295,20 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
+  // Auditoría
+  const { registrarEvento: regAuditInsc } = await import('../../services/auditoriaService.js')
+  await regAuditInsc(req.db, {
+    socioId: parseInt(socioId), tenantId: req.tenantId,
+    evento: 'INSCRIPCION_ACT',
+    detalle: {
+      inscripcionId: inscripcion.id,
+      actividad: categoria.actividad?.nombre,
+      categoria: categoria.nombre,
+      cargoGeneradoId: cargoGenerado?.id || null,
+    },
+    origen: 'UI', usuarioId: req.admin.id,
+  })
+
   res.status(201).json({
     success: true,
     message: `${socio.apellidoNombre} inscripto en ${categoria.nombre}${cargoGenerado ? ` — cuota ${cargoGenerado.descripcion} generada` : ''}`,
@@ -382,6 +396,20 @@ router.delete('/inscripciones/:id', authAdmin, asyncHandler(async (req, res) => 
       fechaFin: new Date(),
       observaciones: motivo || 'Baja sin motivo especificado'
     }
+  })
+
+  // Auditoría
+  const { registrarEvento } = await import('../../services/auditoriaService.js')
+  await registrarEvento(req.db, {
+    socioId: inscripcion.socioId, tenantId: req.tenantId,
+    evento: 'BAJA_INSCRIPCION',
+    detalle: {
+      inscripcionId: parseInt(id),
+      actividad: inscripcion.categoriaActividad?.actividad?.nombre,
+      categoria: inscripcion.categoriaActividad?.nombre,
+      motivo: motivo || null,
+    },
+    origen: 'UI', usuarioId: req.admin.id,
   })
 
   res.json({

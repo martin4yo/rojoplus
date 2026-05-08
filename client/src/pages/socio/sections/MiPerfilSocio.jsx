@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
 import {
@@ -306,12 +306,143 @@ export default function MiPerfilSocio({ socio, tokenPortal, onUpdate }) {
         )}
       </div>
 
-      {/* Botón de cerrar sesión */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <button className="w-full py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium">
-          Cerrar Sesión
-        </button>
-      </div>
+      {/* Dispositivos conectados */}
+      <DispositivosConectados tokenPortal={tokenPortal} />
+
+      {/* Cerrar sesión */}
+      <CerrarSesion tokenPortal={tokenPortal} />
+    </div>
+  )
+}
+
+function DispositivosConectados({ tokenPortal }) {
+  const [dispositivos, setDispositivos] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [revocando, setRevocando] = useState(null)
+
+  async function cargar() {
+    setCargando(true)
+    try {
+      const data = await api.get(`/socio/sesion/dispositivos?tokenPortal=${tokenPortal}`)
+      setDispositivos(Array.isArray(data) ? data : [])
+    } catch {
+      setDispositivos([])
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  useEffect(() => { cargar() }, [tokenPortal])
+
+  async function revocar(id) {
+    if (!confirm('¿Cerrar sesión en este dispositivo? El usuario tendrá que volver a iniciar sesión allí.')) return
+    setRevocando(id)
+    try {
+      await api.post(`/socio/sesion/dispositivos/${id}/revocar`, { tokenPortal })
+      toast.success('Dispositivo desconectado')
+      await cargar()
+    } catch (err) {
+      toast.error(err.message || 'Error al revocar')
+    } finally {
+      setRevocando(null)
+    }
+  }
+
+  function descripcionUA(ua) {
+    if (!ua) return 'Dispositivo desconocido'
+    const s = ua.toLowerCase()
+    let dev = 'Desktop'
+    if (s.includes('iphone') || s.includes('ipad')) dev = 'iPhone/iPad'
+    else if (s.includes('android')) dev = 'Android'
+    else if (s.includes('mobile')) dev = 'Mobile'
+    let bro = ''
+    if (s.includes('chrome') && !s.includes('edg')) bro = 'Chrome'
+    else if (s.includes('firefox')) bro = 'Firefox'
+    else if (s.includes('safari')) bro = 'Safari'
+    else if (s.includes('edg')) bro = 'Edge'
+    return `${dev}${bro ? ' · ' + bro : ''}`
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6">
+      <h3 className="text-lg font-bold text-gray-900 mb-4">Dispositivos conectados</h3>
+      <p className="text-sm text-gray-500 mb-4">Estos son los dispositivos que recordaron tu acceso. Si no reconocés alguno, desconectalo.</p>
+      {cargando ? (
+        <div className="text-sm text-gray-500">Cargando…</div>
+      ) : dispositivos.length === 0 ? (
+        <div className="text-sm text-gray-500">No hay dispositivos recordados.</div>
+      ) : (
+        <ul className="divide-y divide-gray-200">
+          {dispositivos.map(d => (
+            <li key={d.id} className="py-3 flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm text-gray-900 flex items-center gap-2">
+                  {descripcionUA(d.userAgent)}
+                  {d.esActual && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Este dispositivo</span>}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Último acceso: {new Date(d.lastUsedAt).toLocaleString('es-AR')}
+                  {d.ip && <> · IP {d.ip}</>}
+                </div>
+              </div>
+              <button
+                onClick={() => revocar(d.id)}
+                disabled={revocando === d.id}
+                className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+              >
+                {revocando === d.id ? 'Cerrando…' : 'Desconectar'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function CerrarSesion({ tokenPortal }) {
+  const [cerrando, setCerrando] = useState(null)
+
+  async function cerrarEsteDispositivo() {
+    if (!confirm('¿Cerrar sesión en este dispositivo?')) return
+    setCerrando('uno')
+    try {
+      await api.post('/socio/sesion/cerrar', {})
+      window.location.href = '/login-socio'
+    } catch (err) {
+      toast.error(err.message || 'Error al cerrar sesión')
+      setCerrando(null)
+    }
+  }
+
+  async function cerrarTodos() {
+    if (!confirm('¿Cerrar sesión en TODOS los dispositivos? Vas a tener que volver a iniciar sesión en cada uno.')) return
+    setCerrando('todos')
+    try {
+      await api.post('/socio/sesion/cerrar-todas', { tokenPortal })
+      window.location.href = '/login-socio'
+    } catch (err) {
+      toast.error(err.message || 'Error al cerrar sesiones')
+      setCerrando(null)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
+      <button
+        onClick={cerrarEsteDispositivo}
+        disabled={cerrando !== null}
+        className="w-full py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium disabled:opacity-50"
+      >
+        {cerrando === 'uno' ? 'Cerrando…' : 'Cerrar sesión'}
+      </button>
+      <button
+        onClick={cerrarTodos}
+        disabled={cerrando !== null}
+        className="w-full py-2 text-sm text-gray-500 hover:text-red-600 rounded-lg transition-colors disabled:opacity-50"
+      >
+        {cerrando === 'todos' ? 'Cerrando…' : 'Cerrar sesión en todos los dispositivos'}
+      </button>
     </div>
   )
 }

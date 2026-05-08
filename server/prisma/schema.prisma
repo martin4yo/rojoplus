@@ -207,6 +207,11 @@ model EstadoSocio {
   color             String?
   permiteDescuentos Boolean  @default(false) @map("permite_descuentos")
   permiteIngresoMolinete Boolean @default(false) @map("permite_ingreso_molinete")
+  // Rol que cumple este estado en la lógica automática de vigencia por morosidad.
+  // 'BLOQUEADO' = el cron de vigencia pasa los socios morosos a este estado
+  // 'AL_DIA'    = el sistema pasa los socios a este estado al cobrar y quedar sin cuotas vencidas
+  // null        = estado normal, no participa de la lógica automática
+  rolVigencia       String?  @map("rol_vigencia")
   orden             Int      @default(0)
   activo            Boolean  @default(true)
   createdAt         DateTime @default(now()) @map("created_at")
@@ -216,7 +221,73 @@ model EstadoSocio {
 
   @@unique([tenantId, codigo])
   @@index([tenantId])
+  @@index([tenantId, rolVigencia])
   @@map("estados_socio")
+}
+
+// Sesión persistente del entrenador en el portal ("recordar dispositivo").
+model EntrenadorSession {
+  id           Int        @id @default(autoincrement())
+  entrenadorId Int        @map("entrenador_id")
+  token        String     @unique
+  ip           String?
+  userAgent    String?    @map("user_agent")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  lastUsedAt   DateTime   @default(now()) @map("last_used_at")
+  expiresAt    DateTime   @map("expires_at")
+  revokedAt    DateTime?  @map("revoked_at")
+  entrenador   Entrenador @relation(fields: [entrenadorId], references: [id], onDelete: Cascade)
+
+  tenantId     Int        @map("tenant_id")
+
+  @@index([entrenadorId, revokedAt, expiresAt])
+  @@index([tenantId])
+  @@map("entrenador_sessions")
+}
+
+// Sesión persistente del socio en el portal ("recordar dispositivo").
+// Cuando un magic link se valida exitosamente, se crea una sesión con un token
+// largo que se persiste vía cookie HttpOnly por 30 días sliding window.
+// Múltiples sesiones simultáneas permitidas (mobile + desktop).
+model SocioSession {
+  id          Int       @id @default(autoincrement())
+  socioId     Int       @map("socio_id")
+  token       String    @unique
+  ip          String?
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime  @default(now()) @map("last_used_at")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  socio       Socio     @relation(fields: [socioId], references: [id])
+
+  tenantId    Int       @map("tenant_id")
+
+  @@index([socioId, revokedAt, expiresAt])
+  @@index([tenantId])
+  @@map("socio_sessions")
+}
+
+// Histórico de eventos del socio (auditoría general).
+// Eventos: BLOQUEADO_MOROSIDAD, ACTIVADO_PAGO, ALTA_SOCIO, BAJA_SOCIO,
+//   TELEFONO_MOD, EMAIL_MOD, CELULAR_MOD, DIRECCION_MOD,
+//   TIPO_SOCIO_MOD, ESTADO_SOCIO_MOD, CATEGORIA_MOD,
+//   INSCRIPCION_ACT, BAJA_INSCRIPCION, etc.
+model AuditoriaSocio {
+  id        Int      @id @default(autoincrement())
+  socioId   Int      @map("socio_id")
+  fecha     DateTime @default(now())
+  evento    String
+  detalle   Json?    // estructura libre: { antes, despues, ... }
+  origen    String?  // 'CRON' | 'API' | 'IMPORT' | 'UI'
+  usuarioId Int?     @map("usuario_id")  // admin que originó el cambio (null si es cron/import)
+  socio     Socio    @relation(fields: [socioId], references: [id])
+
+  tenantId Int @map("tenant_id")
+
+  @@index([socioId, fecha(sort: Desc)])
+  @@index([tenantId, evento])
+  @@map("auditoria_socio")
 }
 
 model CategoriaCargo {
@@ -367,6 +438,8 @@ model Socio {
   registrosAcceso              RegistroAcceso[]
   olvidosDocumento             OlvidoDocumento[]
   saldosFavor                  SaldoFavor[]
+  auditorias                   AuditoriaSocio[]
+  sesiones                     SocioSession[]
   categoriaSocioRel            CategoriaSocio?          @relation(fields: [categoriaSocioId], references: [id])
   cobrador                     Cobrador?                @relation(fields: [cobradorId], references: [id])
   estadoSocioRel               EstadoSocio?             @relation(fields: [estadoSocioId], references: [id])
@@ -607,6 +680,10 @@ model Entrenador {
   conversaciones  Conversacion[]
   entidad         Entidad?              @relation(fields: [entidadId], references: [id])
   categorias      EntrenadorCategoria[]
+  sesiones        EntrenadorSession[]
+  // Token de magic link para acceso al portal (uso similar a Socio.tokenPortal)
+  tokenPortal       String?  @map("token_portal")
+  tokenPortalExpira DateTime? @map("token_portal_expira")
 
   tenantId Int @map("tenant_id")
 
@@ -1815,6 +1892,9 @@ model CargoPersonal {
   nombre      String
   descripcion String?
   activo      Boolean   @default(true)
+  // Si true, los Entidad con este cargo pueden tener registro Entrenador asociado
+  // (activa la solapa "Entrenador" en EntidadForm y permite asignar categorías)
+  esEntrenador Boolean  @default(false) @map("es_entrenador")
   orden       Int       @default(0)
   createdAt   DateTime  @default(now()) @map("created_at")
   entidades   Entidad[]

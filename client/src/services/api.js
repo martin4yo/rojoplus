@@ -52,6 +52,7 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
       ...(!isFormData && { 'Content-Type': 'application/json' }),
       ...restOptions.headers,
     },
+    credentials: 'include', // enviar cookies (sesión persistente del socio)
     ...restOptions,
   }
 

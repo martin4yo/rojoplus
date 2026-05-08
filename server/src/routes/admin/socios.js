@@ -213,8 +213,18 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
     where.formaPagoPref = formaPago
   }
 
-  if (esMenor !== undefined) {
-    where.esMenor = esMenor === 'true'
+  if (esMenor !== undefined && esMenor !== '') {
+    // Filtrar por fecha de nacimiento real (no por el booleano `esMenor` que
+    // queda obsoleto cuando el socio cumple 18). Cutoff: hace 18 años exactos.
+    const hoy = new Date()
+    const cutoff = new Date(hoy.getFullYear() - 18, hoy.getMonth(), hoy.getDate())
+    if (esMenor === 'true') {
+      // Menor: nacido después del cutoff
+      where.fechaNacimiento = { gt: cutoff }
+    } else if (esMenor === 'false') {
+      // Mayor: nacido en o antes del cutoff
+      where.fechaNacimiento = { lte: cutoff }
+    }
   }
 
   if (grupoFamiliarId) {
@@ -671,6 +681,15 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
+  // Auditoría: alta de socio
+  const { registrarEvento: registrarEventoAlta } = await import('../../services/auditoriaService.js')
+  await registrarEventoAlta(req.db, {
+    socioId: socio.id, tenantId: req.tenantId,
+    evento: 'ALTA_SOCIO',
+    detalle: { nroSocio: socio.nroSocio, apellidoNombre: socio.apellidoNombre, cuotaSocialGenerada },
+    origen: 'UI', usuarioId: req.admin.id,
+  })
+
   res.status(201).json({
     success: true,
     data: {
@@ -794,6 +813,17 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
     },
   })
 
+  // Auditoría: registrar cambios en campos críticos
+  const { registrarCambiosSocio } = await import('../../services/auditoriaService.js')
+  await registrarCambiosSocio(req.db, {
+    socioId: parseInt(id),
+    tenantId: req.tenantId,
+    antes: existente,
+    despues: { ...existente, ...updateData },
+    origen: 'UI',
+    usuarioId: req.admin.id,
+  })
+
   res.json({
     success: true,
     data: {
@@ -855,6 +885,15 @@ router.post('/socios/:id/desactivar', authAdmin, asyncHandler(async (req, res) =
     select: { id: true, nroSocio: true, apellidoNombre: true, estado: true },
   })
 
+  // Auditoría
+  const { registrarEvento: regAuditBaja } = await import('../../services/auditoriaService.js')
+  await regAuditBaja(req.db, {
+    socioId: parseInt(id), tenantId: req.tenantId,
+    evento: 'BAJA_SOCIO',
+    detalle: { motivoBaja: motivoBaja || 'Baja solicitada desde administración' },
+    origen: 'UI', usuarioId: req.admin.id,
+  })
+
   res.json({
     success: true,
     data: {
@@ -877,6 +916,14 @@ router.post('/socios/:id/activar', authAdmin, asyncHandler(async (req, res) => {
       actualizadoPor: req.admin.id,
     },
     select: { id: true, nroSocio: true, apellidoNombre: true, estado: true },
+  })
+
+  // Auditoría
+  const { registrarEvento: regAuditAlta } = await import('../../services/auditoriaService.js')
+  await regAuditAlta(req.db, {
+    socioId: parseInt(id), tenantId: req.tenantId,
+    evento: 'REACTIVADO_SOCIO',
+    origen: 'UI', usuarioId: req.admin.id,
   })
 
   res.json({
@@ -1847,6 +1894,98 @@ router.get('/socios/:socioId/cuenta-corriente', authAdmin, asyncHandler(async (r
 }))
 
 // =============================================================================
+// SESIONES PERSISTENTES DEL SOCIO (DISPOSITIVOS RECORDADOS)
+// =============================================================================
+
+// GET /api/admin/socios/:id/sesiones — listar sesiones activas del socio
+router.get('/socios/:id/sesiones', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const ahora = new Date()
+  const sesiones = await req.db.socioSession.findMany({
+    where: { socioId, revokedAt: null, expiresAt: { gt: ahora } },
+    select: { id: true, ip: true, userAgent: true, createdAt: true, lastUsedAt: true, expiresAt: true },
+    orderBy: { lastUsedAt: 'desc' },
+  })
+  res.json({ success: true, data: sesiones })
+}))
+
+// POST /api/admin/socios/:id/sesiones/:sesionId/revocar — revocar sesión específica
+router.post('/socios/:id/sesiones/:sesionId/revocar', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const sesionId = parseInt(req.params.sesionId)
+  const sesion = await req.db.socioSession.findUnique({
+    where: { id: sesionId },
+    select: { socioId: true, revokedAt: true },
+  })
+  if (!sesion || sesion.socioId !== socioId) {
+    throw new AppError('Sesión no encontrada', 404, 'NOT_FOUND')
+  }
+  await req.db.socioSession.update({
+    where: { id: sesionId },
+    data: { revokedAt: new Date() },
+  })
+  res.json({ success: true, message: 'Sesión revocada' })
+}))
+
+// POST /api/admin/socios/:id/sesiones/revocar-todas — revocar todas las sesiones
+router.post('/socios/:id/sesiones/revocar-todas', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const r = await req.db.socioSession.updateMany({
+    where: { socioId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  })
+  res.json({ success: true, data: { revocadas: r.count } })
+}))
+
+// =============================================================================
+// AUDITORÍA / HISTORIAL DEL SOCIO
+// =============================================================================
+
+// GET /api/admin/socios/:id/auditoria — historial de eventos del socio
+router.get('/socios/:id/auditoria', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const limit = Math.min(parseInt(req.query.limit) || 100, 500)
+  const offset = parseInt(req.query.offset) || 0
+  const eventoFiltro = req.query.evento || null
+
+  const where = { socioId, tenantId: req.tenantId }
+  if (eventoFiltro) where.evento = eventoFiltro
+
+  const [items, total] = await Promise.all([
+    req.db.auditoriaSocio.findMany({
+      where,
+      orderBy: { fecha: 'desc' },
+      take: limit,
+      skip: offset,
+    }),
+    req.db.auditoriaSocio.count({ where }),
+  ])
+
+  // Resolver nombres de los admins (sin filtrar por tenantId — admins son globales)
+  const usuarioIds = [...new Set(items.map(i => i.usuarioId).filter(Boolean))]
+  const admins = usuarioIds.length > 0
+    ? await req.db.admin.findMany({
+        where: { id: { in: usuarioIds } },
+        select: { id: true, nombre: true, email: true },
+      })
+    : []
+  const adminById = new Map(admins.map(a => [a.id, a]))
+
+  res.json({
+    success: true,
+    data: {
+      items: items.map(i => ({
+        ...i,
+        usuario: i.usuarioId ? adminById.get(i.usuarioId) || null : null,
+      })),
+      total,
+      limit,
+      offset,
+    },
+  })
+}))
+
+// =============================================================================
 // SEGUIMIENTO MÉDICO
 // =============================================================================
 
@@ -1954,6 +2093,14 @@ router.delete('/socios/:id/lesiones/:lesionId', authAdmin, asyncHandler(async (r
 
 // GET /api/admin/socios/exportar — Exportar padrón de socios a Excel
 router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
+  // Si el cliente se desconecta a mitad de la descarga, el socket emite 'error'
+  // (write EOF) y, sin listener, Node mata todo el proceso. Capturarlo acá.
+  const onSocketError = (err) => {
+    console.warn(`[padron] socket error (${err?.code || 'ERR'}) — cliente desconectado`)
+  }
+  res.on('error', onSocketError)
+  if (req.socket) req.socket.on('error', onSocketError)
+
   const { estado, tipo, categoria, buscar } = req.query
 
   const where = {}
@@ -1964,28 +2111,38 @@ router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
     where,
     orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
     select: {
-      nroSocio: true, apellido: true, nombre: true, dni: true,
-      estado: true, email: true, celular: true, telefono: true,
+      nroSocio: true, apellido: true, nombre: true, documento: true, cuil: true,
+      estado: true, email: true, celular: true, telefonoFijo: true,
       fechaNacimiento: true, fechaAlta: true, fechaBaja: true,
-      direccion: true, localidad: true,
+      domicilio: true, calle: true, numero: true, piso: true, depto: true,
+      barrio: true, ciudad: true, provincia: true,
       tipoSocioRel: { select: { nombre: true } },
-      categoriaSocio: { select: { nombre: true } },
+      categoriaSocioRel: { select: { nombre: true } },
     },
   })
+
+  const armarDireccion = (s) => {
+    const calle = [s.calle, s.numero].filter(Boolean).join(' ')
+    const pisoDepto = [s.piso && `Piso ${s.piso}`, s.depto && `Dpto ${s.depto}`].filter(Boolean).join(' ')
+    return [calle, pisoDepto].filter(Boolean).join(', ') || s.domicilio || ''
+  }
 
   const rows = socios.map(s => ({
     'Nro. Socio': s.nroSocio || '',
     'Apellido': s.apellido || '',
     'Nombre': s.nombre || '',
-    'DNI': s.dni || '',
+    'DNI': s.documento || '',
+    'CUIL': s.cuil || '',
     'Estado': s.estado || '',
     'Tipo': s.tipoSocioRel?.nombre || '',
-    'Categoría': s.categoriaSocio?.nombre || '',
+    'Categoría': s.categoriaSocioRel?.nombre || '',
     'Email': s.email || '',
     'Celular': s.celular || '',
-    'Teléfono': s.telefono || '',
-    'Dirección': s.direccion || '',
-    'Localidad': s.localidad || '',
+    'Teléfono': s.telefonoFijo || '',
+    'Dirección': armarDireccion(s),
+    'Barrio': s.barrio || '',
+    'Ciudad': s.ciudad || '',
+    'Provincia': s.provincia || '',
     'Fecha Nacimiento': s.fechaNacimiento ? new Date(s.fechaNacimiento).toLocaleDateString('es-AR') : '',
     'Fecha Alta': s.fechaAlta ? new Date(s.fechaAlta).toLocaleDateString('es-AR') : '',
     'Fecha Baja': s.fechaBaja ? new Date(s.fechaBaja).toLocaleDateString('es-AR') : '',
@@ -1996,18 +2153,26 @@ router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
 
   // Ancho de columnas
   ws['!cols'] = [
-    { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-    { wch: 15 }, { wch: 15 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
-    { wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 12 },
+    { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 14 },
+    { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 28 }, { wch: 14 },
+    { wch: 14 }, { wch: 28 }, { wch: 18 }, { wch: 18 }, { wch: 18 },
+    { wch: 16 }, { wch: 12 }, { wch: 12 },
   ]
 
   XLSX.utils.book_append_sheet(wb, ws, 'Socios')
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
 
+  // Si el cliente ya se fue, no intentar escribir
+  if (req.aborted || res.writableEnded || res.destroyed) {
+    console.warn(`[padron] cliente abortó antes de enviar (${socios.length} socios)`)
+    return
+  }
+
   const fecha = new Date().toISOString().split('T')[0]
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   res.setHeader('Content-Disposition', `attachment; filename="socios_${fecha}.xlsx"`)
-  res.send(buffer)
+  res.setHeader('Content-Length', buffer.length)
+  res.end(buffer)
 }))
 
 // ---------------------------------------------------------------------------

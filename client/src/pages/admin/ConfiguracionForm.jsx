@@ -69,6 +69,9 @@ export default function ConfiguracionForm() {
     // estados-socio
     permiteDescuentos: true,
     permiteIngresoMolinete: false,
+    rolVigencia: '',
+    // cargos-personal
+    esEntrenador: false,
     // conceptos-tesoreria
     tipo: 'INGRESO',
     usaEnCompras: false,
@@ -138,6 +141,8 @@ export default function ConfiguracionForm() {
         porcentajeDescuento: data.porcentajeDescuento || 0,
         permiteDescuentos: data.permiteDescuentos !== false,
         permiteIngresoMolinete: data.permiteIngresoMolinete === true,
+        rolVigencia: data.rolVigencia || '',
+        esEntrenador: data.esEntrenador === true,
         // conceptos-tesoreria
         tipo: data.tipo || 'INGRESO',
         usaEnCompras: data.usaEnCompras || false,
@@ -193,10 +198,15 @@ export default function ConfiguracionForm() {
         datos.color = form.color
         datos.permiteDescuentos = form.permiteDescuentos
         datos.permiteIngresoMolinete = form.permiteIngresoMolinete
+        datos.rolVigencia = form.rolVigencia || null
       }
 
       if (tabla === 'categorias-cargo') {
         datos.color = form.color
+      }
+
+      if (tabla === 'cargos-personal') {
+        datos.esEntrenador = form.esEntrenador === true
       }
 
       if (tabla === 'conceptos-tesoreria') {
@@ -700,6 +710,23 @@ export default function ConfiguracionForm() {
                   onChange={(v) => setForm({ ...form, permiteIngresoMolinete: v })}
                 />
               </div>
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-2">
+                <label className="block text-sm font-medium text-amber-800">
+                  Rol en vigencia automática por morosidad
+                </label>
+                <select
+                  value={form.rolVigencia || ''}
+                  onChange={(e) => setForm({ ...form, rolVigencia: e.target.value })}
+                  className="input-field w-full"
+                >
+                  <option value="">Sin rol — estado normal</option>
+                  <option value="AL_DIA">Al día (al cobrar y quedar sin cuotas vencidas)</option>
+                  <option value="BLOQUEADO">Bloqueado (cuando el socio se atrasa)</option>
+                </select>
+                <p className="text-xs text-amber-700">
+                  El cron de vigencia mueve socios entre los estados marcados como "Al día" y "Bloqueado". Sólo puede haber un estado por cada rol.
+                </p>
+              </div>
             </div>
           )}
 
@@ -724,6 +751,22 @@ export default function ConfiguracionForm() {
             </div>
           )}
 
+
+          {/* Cargo de Personal — flag esEntrenador */}
+          {tabla === 'cargos-personal' && (
+            <div className="space-y-3 bg-blue-50 border border-blue-200 rounded p-4">
+              <Switch
+                checked={form.esEntrenador === true}
+                onChange={(v) => setForm({ ...form, esEntrenador: v })}
+                label="Cargo de entrenador"
+              />
+              <p className="text-xs text-gray-600 ml-12">
+                Si está activo, el personal con este cargo podrá tener perfil de entrenador
+                (categorías asignadas, plantel, asistencia, partidos, chat con socios) y
+                acceder al portal del entrenador.
+              </p>
+            </div>
+          )}
 
           {/* Color del badge (no para conceptos-tesoreria, descuentos-disponibles, rubros ni medios-pago) */}
           {tabla !== 'conceptos-tesoreria' && tabla !== 'descuentos-disponibles' && tabla !== 'rubros' && tabla !== 'medios-pago' && (

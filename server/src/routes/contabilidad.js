@@ -1468,4 +1468,195 @@ router.get('/proximo-numero/:tipo', asyncHandler(async (req, res) => {
   res.json({ success: true, data: { numero } })
 }))
 
+// ============================================================================
+// PERFIL ENTRENADOR DE UNA ENTIDAD
+// ============================================================================
+
+// GET /admin/entidades/:id/entrenador — datos del rol entrenador de la entidad
+// Devuelve null si la entidad no tiene perfil entrenador
+router.get('/entidades/:id/entrenador', asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const entrenador = await req.db.entrenador.findFirst({
+    where: { tenantId: req.tenantId, entidadId: id },
+    select: {
+      id: true, especialidad: true, observaciones: true, activo: true,
+      mostrarEnWeb: true, fotoStaff: true, biografiaStaff: true,
+      emailPublico: true, telefonoPublico: true, ordenStaff: true,
+      socioId: true,
+    },
+  })
+  res.json({ success: true, data: entrenador })
+}))
+
+// PUT /admin/entidades/:id/entrenador — upsert del perfil entrenador.
+// Si la entidad NO tiene registro Entrenador, se crea (auto-promoción).
+router.put('/entidades/:id/entrenador', asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const entidad = await req.db.entidad.findUnique({
+    where: { id },
+    select: { id: true, tenantId: true, razonSocial: true, documento: true, email: true, telefono: true, foto: true, observaciones: true, activo: true },
+  })
+  if (!entidad || entidad.tenantId !== req.tenantId) {
+    throw new AppError('Entidad no encontrada', 404, 'NOT_FOUND')
+  }
+
+  const data = req.body || {}
+  const fields = {
+    especialidad: data.especialidad ?? null,
+    observaciones: data.observaciones ?? null,
+    activo: data.activo !== false,
+    mostrarEnWeb: data.mostrarEnWeb === true,
+    fotoStaff: data.fotoStaff || null,
+    biografiaStaff: data.biografiaStaff || null,
+    emailPublico: data.emailPublico || null,
+    telefonoPublico: data.telefonoPublico || null,
+    ordenStaff: parseInt(data.ordenStaff) || 0,
+    socioId: data.socioId ? parseInt(data.socioId) : null,
+  }
+
+  const existente = await req.db.entrenador.findFirst({
+    where: { tenantId: req.tenantId, entidadId: id },
+    select: { id: true },
+  })
+
+  let entrenador
+  if (existente) {
+    entrenador = await req.db.entrenador.update({
+      where: { id: existente.id },
+      data: fields,
+    })
+  } else {
+    // Auto-promoción: crear registro Entrenador. Copiamos datos básicos de Entidad
+    // a los campos legacy de Entrenador (todavía no eliminados) por compat.
+    const partes = (entidad.razonSocial || '').trim().split(/\s+/)
+    const apellido = partes.length > 1 ? partes.slice(1).join(' ') : null
+    const nombre = partes[0] || entidad.razonSocial
+    entrenador = await req.db.entrenador.create({
+      data: {
+        tenantId: req.tenantId,
+        entidadId: id,
+        nombre, apellido,
+        documento: entidad.documento || null,
+        email: entidad.email || null,
+        telefono: entidad.telefono || null,
+        ...fields,
+      },
+    })
+  }
+
+  res.json({ success: true, data: entrenador })
+}))
+
+// GET /admin/entidades/:id/entrenador/categorias — categorías asignadas
+router.get('/entidades/:id/entrenador/categorias', asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const entrenador = await req.db.entrenador.findFirst({
+    where: { tenantId: req.tenantId, entidadId: id },
+    select: { id: true },
+  })
+  if (!entrenador) return res.json({ success: true, data: [] })
+
+  const rels = await req.db.entrenadorCategoria.findMany({
+    where: { entrenadorId: entrenador.id, tenantId: req.tenantId },
+    include: {
+      categoriaActividad: {
+        select: {
+          id: true, nombre: true,
+          actividad: { select: { id: true, nombre: true } },
+        },
+      },
+    },
+    orderBy: { fechaDesde: 'desc' },
+  })
+  res.json({ success: true, data: rels })
+}))
+
+// POST /admin/entidades/:id/entrenador/categorias — asignar categoría
+// Body: { categoriaActividadId, rol? }
+// Auto-crea Entrenador si no existe
+router.post('/entidades/:id/entrenador/categorias', asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const { categoriaActividadId, rol = 'ENTRENADOR' } = req.body
+  if (!categoriaActividadId) throw new AppError('categoriaActividadId es requerido', 400, 'VALIDATION_ERROR')
+
+  const entidad = await req.db.entidad.findUnique({
+    where: { id },
+    select: { id: true, tenantId: true, razonSocial: true, documento: true, email: true, telefono: true },
+  })
+  if (!entidad || entidad.tenantId !== req.tenantId) {
+    throw new AppError('Entidad no encontrada', 404, 'NOT_FOUND')
+  }
+
+  // Auto-crear Entrenador si no existe
+  let entrenador = await req.db.entrenador.findFirst({
+    where: { tenantId: req.tenantId, entidadId: id },
+    select: { id: true },
+  })
+  if (!entrenador) {
+    const partes = (entidad.razonSocial || '').trim().split(/\s+/)
+    const apellido = partes.length > 1 ? partes.slice(1).join(' ') : null
+    const nombre = partes[0] || entidad.razonSocial
+    entrenador = await req.db.entrenador.create({
+      data: {
+        tenantId: req.tenantId, entidadId: id,
+        nombre, apellido,
+        documento: entidad.documento || null,
+        email: entidad.email || null,
+        telefono: entidad.telefono || null,
+      },
+      select: { id: true },
+    })
+  }
+
+  // Verificar que no esté ya asignado
+  const existe = await req.db.entrenadorCategoria.findFirst({
+    where: {
+      entrenadorId: entrenador.id,
+      categoriaActividadId: parseInt(categoriaActividadId),
+    },
+  })
+  if (existe) {
+    throw new AppError('Ya está asignado a esa categoría', 400, 'DUPLICATE')
+  }
+
+  const rel = await req.db.entrenadorCategoria.create({
+    data: {
+      tenantId: req.tenantId,
+      entrenadorId: entrenador.id,
+      categoriaActividadId: parseInt(categoriaActividadId),
+      rol,
+    },
+    include: {
+      categoriaActividad: {
+        select: {
+          id: true, nombre: true,
+          actividad: { select: { id: true, nombre: true } },
+        },
+      },
+    },
+  })
+  res.status(201).json({ success: true, data: rel })
+}))
+
+// DELETE /admin/entidades/:id/entrenador/categorias/:relId — desasignar
+router.delete('/entidades/:id/entrenador/categorias/:relId', asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const relId = parseInt(req.params.relId)
+  const entrenador = await req.db.entrenador.findFirst({
+    where: { tenantId: req.tenantId, entidadId: id },
+    select: { id: true },
+  })
+  if (!entrenador) throw new AppError('No tiene perfil entrenador', 404, 'NOT_FOUND')
+
+  const rel = await req.db.entrenadorCategoria.findUnique({
+    where: { id: relId },
+    select: { entrenadorId: true },
+  })
+  if (!rel || rel.entrenadorId !== entrenador.id) {
+    throw new AppError('Relación no encontrada', 404, 'NOT_FOUND')
+  }
+  await req.db.entrenadorCategoria.delete({ where: { id: relId } })
+  res.json({ success: true })
+}))
+
 export default router
