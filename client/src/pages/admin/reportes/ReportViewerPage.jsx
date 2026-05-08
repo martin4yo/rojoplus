@@ -57,6 +57,37 @@ export default function ReportViewerPage() {
     setParams(init)
   }, [template, preset, presetId])
 
+  // Cuando un param padre (referenciado por dependsOn de otro) cambia, limpiar selecciones
+  // hijas que ya no son válidas para evitar resultados incorrectos en backend.
+  useEffect(() => {
+    if (!template?.parameters) return
+    let next = null
+    for (const child of template.parameters) {
+      if (!child.dependsOn?.param || !child.dependsOn?.field) continue
+      const parentRaw = (next || params)[child.dependsOn.param]
+      const parentArr = Array.isArray(parentRaw)
+        ? parentRaw
+        : (typeof parentRaw === 'string' && parentRaw ? parentRaw.split(',').filter(Boolean) : [])
+      if (parentArr.length === 0) continue // sin filtro padre, todo válido
+      const childRaw = (next || params)[child.name]
+      const childArr = Array.isArray(childRaw)
+        ? childRaw
+        : (typeof childRaw === 'string' && childRaw ? childRaw.split(',').filter(Boolean) : [])
+      if (childArr.length === 0) continue
+      const parentSet = new Set(parentArr.map(String))
+      const validValues = new Set(
+        (child.options || [])
+          .filter(o => parentSet.has(String(o[child.dependsOn.field])))
+          .map(o => String(o.value))
+      )
+      const cleaned = childArr.filter(v => validValues.has(String(v)))
+      if (cleaned.length !== childArr.length) {
+        next = { ...(next || params), [child.name]: cleaned }
+      }
+    }
+    if (next) setParams(next)
+  }, [params, template])
+
   const handleRun = async () => {
     setIsRunning(true)
     setError('')
@@ -81,8 +112,58 @@ export default function ReportViewerPage() {
   }
 
   const renderParamInput = (p) => {
-    const value = params[p.name] || ''
+    const rawValue = params[p.name]
+    const value = rawValue == null ? '' : rawValue
     const onChange = (v) => setParams(prev => ({ ...prev, [p.name]: v }))
+
+    if (p.type === 'multiselect' && p.options) {
+      const selected = Array.isArray(value)
+        ? value
+        : (typeof value === 'string' && value ? value.split(',').filter(Boolean) : [])
+
+      // Cascada: si el param tiene `dependsOn`, filtra opciones según el valor del param padre.
+      // Formato esperado: { param: 'actividadIds', field: 'actividadId' }
+      let visibleOptions = p.options
+      if (p.dependsOn && p.dependsOn.param && p.dependsOn.field) {
+        const parentRaw = params[p.dependsOn.param]
+        const parentArr = Array.isArray(parentRaw)
+          ? parentRaw
+          : (typeof parentRaw === 'string' && parentRaw ? parentRaw.split(',').filter(Boolean) : [])
+        if (parentArr.length > 0) {
+          const parentSet = new Set(parentArr.map(String))
+          visibleOptions = p.options.filter(o => parentSet.has(String(o[p.dependsOn.field])))
+        }
+      }
+
+      const toggle = (val) => {
+        const next = selected.includes(val)
+          ? selected.filter(v => v !== val)
+          : [...selected, val]
+        onChange(next)
+      }
+      return (
+        <div className="border border-gray-300 rounded-md p-2 max-h-48 overflow-y-auto bg-white">
+          {visibleOptions.length === 0 && (
+            <span className="text-xs text-gray-400">
+              {p.dependsOn && p.options.length > 0
+                ? `Elegí primero ${p.dependsOn.param} para ver opciones`
+                : 'Sin opciones'}
+            </span>
+          )}
+          {visibleOptions.map(o => (
+            <label key={o.value} className="flex items-center gap-2 py-1 text-sm cursor-pointer hover:bg-gray-50 px-1 rounded">
+              <input
+                type="checkbox"
+                checked={selected.includes(String(o.value))}
+                onChange={() => toggle(String(o.value))}
+                className="rounded border-gray-300"
+              />
+              <span>{o.label}</span>
+            </label>
+          ))}
+        </div>
+      )
+    }
 
     if (p.type === 'date') return (
       <input type="date" value={value} onChange={e => onChange(e.target.value)}

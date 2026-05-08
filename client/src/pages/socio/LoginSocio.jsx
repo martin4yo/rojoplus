@@ -1,36 +1,63 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Mail, IdCard, Send, CheckCircle, Shield, MessageCircle, Smartphone, ArrowUpRight, ArrowLeft } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Mail, MessageCircle, Send, CheckCircle, Shield, Smartphone, ArrowUpRight, ArrowLeft, AlertCircle } from 'lucide-react'
 import api from '../../services/api'
+import { useTenant } from '../../contexts/TenantContext'
 import PublicHero from '../../components/public/PublicHero'
 
-const METODOS = [
-  { id: 'email',    label: 'Email',     icon: Mail,           placeholder: 'socio@ejemplo.com', help: 'Usaremos el email registrado en el club.' },
-  { id: 'dni',      label: 'DNI',       icon: IdCard,         placeholder: '12345678',          help: 'Sin puntos ni espacios.' },
-  { id: 'whatsapp', label: 'WhatsApp',  icon: MessageCircle,  placeholder: '11 1234-5678',      help: 'Con o sin código de área. Buscamos en todos los teléfonos registrados.' },
-]
-
 export default function LoginSocio() {
-  const [metodo, setMetodo] = useState('email')
+  const { tenant } = useTenant()
+  const navigate = useNavigate()
   const [valor, setValor] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [linkEnviado, setLinkEnviado] = useState(false)
+  const [enviando, setEnviando] = useState(null) // 'email' | 'whatsapp' | null
   const [error, setError] = useState(null)
+  const [resultado, setResultado] = useState(null) // { canal, destino }
+  const [chequeandoSesion, setChequeandoSesion] = useState(true)
 
-  const metodoActual = METODOS.find(m => m.id === metodo)
+  const waEnabled = tenant?.waEnabled === true
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  // Auto-login si hay sesión persistente válida (cookie de "recordar dispositivo")
+  useEffect(() => {
+    let cancelado = false
+    async function checkSesion() {
+      try {
+        const data = await api.get('/socio/sesion/check')
+        if (cancelado) return
+        if (data.autenticado && data.tokenPortal) {
+          navigate(`/portal-socio/${data.tokenPortal}`, { replace: true })
+          return
+        }
+      } catch {
+        // Sin sesión válida — mostrar form normal
+      } finally {
+        if (!cancelado) setChequeandoSesion(false)
+      }
+    }
+    checkSesion()
+    return () => { cancelado = true }
+  }, [navigate])
+
+  if (chequeandoSesion) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center" style={{ backgroundColor: 'var(--bg-app)' }}>
+        <div className="text-sm font-mono uppercase tracking-[0.25em]" style={{ color: 'var(--text-muted)' }}>
+          Verificando…
+        </div>
+      </div>
+    )
+  }
+
+  async function enviar(canal) {
     if (!valor.trim()) return
+    setEnviando(canal)
+    setError(null)
     try {
-      setLoading(true)
-      setError(null)
-      await api.post('/socio/enviar-link-acceso', { metodo, valor: valor.trim() })
-      setLinkEnviado(true)
+      const data = await api.post('/socio/enviar-link-acceso', { valor: valor.trim(), canal })
+      setResultado({ canal: data.canal || canal, destino: data.destino || '' })
     } catch (err) {
-      setError(err.message || 'Error al enviar el link. Verificá tus datos.')
+      setError(err.message || 'Error al enviar el link')
     } finally {
-      setLoading(false)
+      setEnviando(null)
     }
   }
 
@@ -46,7 +73,7 @@ export default function LoginSocio() {
 
       <section className="py-16 md:py-24">
         <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
-          {linkEnviado ? (
+          {resultado ? (
             <div className="p-8 md:p-10" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
               <div
                 className="w-14 h-14 mb-6 flex items-center justify-center"
@@ -59,11 +86,21 @@ export default function LoginSocio() {
               <h2 className="font-display-sport mb-4" style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 0.94, color: 'var(--color-text-primary, var(--text))' }}>
                 Link enviado.
               </h2>
-              <p className="mb-6 leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
-                {metodo === 'whatsapp'
-                  ? 'Revisá tu WhatsApp. Te enviamos un link de acceso válido por 24 horas.'
-                  : <>Revisá tu email <span className="font-semibold" style={{ color: 'var(--color-text-primary, var(--text))' }}>{metodo === 'email' ? valor : 'registrado'}</span>. Te enviamos un link de acceso válido por 24 horas.</>}
+              <p className="mb-4 leading-relaxed" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
+                {resultado.canal === 'whatsapp'
+                  ? 'Te enviamos el link de acceso al portal por WhatsApp a:'
+                  : 'Te enviamos el link de acceso al portal a tu email:'}
               </p>
+
+              <div
+                className="inline-flex items-center gap-2 px-4 py-2 mb-6"
+                style={{ backgroundColor: 'var(--bg-surface-hi)', border: '1px solid var(--border)' }}
+              >
+                {resultado.canal === 'whatsapp'
+                  ? <MessageCircle className="w-4 h-4" style={{ color: 'var(--success)' }} />
+                  : <Mail className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
+                <span className="font-medium text-sm" style={{ color: 'var(--color-text-primary, var(--text))' }}>{resultado.destino}</span>
+              </div>
 
               <div className="p-4 mb-6 flex items-start gap-3" style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}>
                 <Shield className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
@@ -72,10 +109,20 @@ export default function LoginSocio() {
                     Link seguro
                   </p>
                   <p className="text-sm" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
-                    Por seguridad, sólo funciona desde el dispositivo donde lo abras.
+                    Por seguridad, sólo funciona desde el dispositivo donde lo abras y dura 24 horas.
                   </p>
                 </div>
               </div>
+
+              {resultado.canal === 'email' && (
+                <div
+                  className="p-4 mb-6 text-sm"
+                  style={{ border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', backgroundColor: 'var(--warning-soft)', color: 'var(--warning)' }}
+                >
+                  <strong className="font-mono text-[10px] uppercase tracking-[0.2em] block mb-1">¿No llega?</strong>
+                  Revisá tu carpeta de spam o correo no deseado.
+                </div>
+              )}
 
               <div className="space-y-2 text-sm mb-8" style={{ color: 'var(--text-muted)' }}>
                 <p className="flex items-center gap-2"><Smartphone className="w-4 h-4" /> Funciona en celular o computadora.</p>
@@ -83,7 +130,7 @@ export default function LoginSocio() {
               </div>
 
               <button
-                onClick={() => { setLinkEnviado(false); setValor('') }}
+                onClick={() => { setResultado(null); setValor('') }}
                 className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] hover:underline"
                 style={{ color: 'var(--color-text-primary, var(--text))' }}
               >
@@ -102,7 +149,7 @@ export default function LoginSocio() {
                 Entrar al portal.
               </h2>
               <p className="mb-8 text-sm" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
-                Elegí cómo querés que te enviemos el link.
+                Ingresá tu nº de socio, DNI o email y elegí cómo querés recibir el link.
               </p>
 
               {error && (
@@ -110,68 +157,76 @@ export default function LoginSocio() {
                   className="mb-6 px-4 py-3 text-sm flex items-start gap-3"
                   style={{ border: '1px solid var(--error)', color: 'var(--error)', backgroundColor: 'var(--error-soft)' }}
                 >
-                  <span className="font-mono text-[11px] mt-0.5">!</span>
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Selector de método — botones cuadrados athletic */}
-                <div className="grid grid-cols-3 gap-px" style={{ backgroundColor: 'var(--border)' }}>
-                  {METODOS.map(m => {
-                    const Icon = m.icon
-                    const activo = metodo === m.id
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setMetodo(m.id)}
-                        className="p-4 flex flex-col items-center gap-2 transition-colors"
-                        style={{
-                          backgroundColor: activo ? 'var(--accent-soft)' : 'var(--bg-app)',
-                          borderTop: activo ? '2px solid var(--accent)' : '2px solid transparent',
-                          color: activo ? 'var(--accent)' : 'var(--text-dim)',
-                        }}
-                      >
-                        <Icon className="w-5 h-5" />
-                        <span className="font-mono text-[10px] uppercase tracking-[0.2em] font-semibold">
-                          {m.label}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-
+              <div className="space-y-5">
                 <div>
                   <label className="font-mono text-[10px] uppercase tracking-[0.25em] block mb-2" style={{ color: 'var(--text-muted)' }}>
-                    Tu {metodoActual.label.toLowerCase()}
+                    Nº de socio, DNI o email
                   </label>
                   <input
-                    type={metodo === 'email' ? 'email' : 'text'}
+                    type="text"
                     value={valor}
-                    onChange={(e) => setValor(e.target.value)}
-                    placeholder={metodoActual.placeholder}
-                    required
-                    autoFocus
+                    onChange={(e) => { setValor(e.target.value); setError(null) }}
+                    placeholder="Ej: 1234, 30123456 o juan@gmail.com"
                     className="input-field"
+                    disabled={enviando !== null}
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && enviar('email')}
                   />
                   <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {metodoActual.help}
+                    Te enviamos el link al email o al WhatsApp registrado en tu cuenta de socio.
                   </p>
                 </div>
 
                 <button
-                  type="submit"
-                  disabled={loading || !valor.trim()}
+                  type="button"
+                  onClick={() => enviar('email')}
+                  disabled={enviando !== null || !valor.trim()}
                   className="pub-cta group w-full"
-                  style={{ opacity: (loading || !valor.trim()) ? 0.6 : 1, cursor: loading ? 'wait' : (!valor.trim() ? 'not-allowed' : 'pointer') }}
+                  style={{ opacity: (enviando !== null || !valor.trim()) ? 0.6 : 1, cursor: enviando ? 'wait' : (!valor.trim() ? 'not-allowed' : 'pointer') }}
                 >
-                  <span>{loading ? 'Enviando…' : 'Enviar link de acceso'}</span>
-                  {loading
+                  <span className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    {enviando === 'email' ? 'Enviando…' : 'Enviar por email'}
+                  </span>
+                  {enviando === 'email'
                     ? <Send className="w-4 h-4 animate-pulse" />
                     : <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
                 </button>
-              </form>
+
+                {waEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => enviar('whatsapp')}
+                    disabled={enviando !== null || !valor.trim()}
+                    className="group inline-flex items-center justify-between gap-6 w-full px-7 py-4 transition-all"
+                    style={{
+                      backgroundColor: '#16A34A',
+                      color: '#fff',
+                      borderRadius: 0,
+                      fontFamily: 'Geist Mono, monospace',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.2em',
+                      opacity: (enviando !== null || !valor.trim()) ? 0.6 : 1,
+                      cursor: enviando ? 'wait' : (!valor.trim() ? 'not-allowed' : 'pointer'),
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4" />
+                      {enviando === 'whatsapp' ? 'Enviando…' : 'Enviar por WhatsApp'}
+                    </span>
+                    {enviando === 'whatsapp'
+                      ? <Send className="w-4 h-4 animate-pulse" />
+                      : <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
+                  </button>
+                )}
+              </div>
 
               <div
                 className="mt-8 px-4 py-3 text-xs flex items-start gap-3"

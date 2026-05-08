@@ -74,6 +74,9 @@ const SocioPortal = lazy(() => import('./pages/socio/SocioPortal'))
 const AccesoSocio = lazy(() => import('./pages/socio/AccesoSocio'))
 const LoginSocio = lazy(() => import('./pages/socio/LoginSocio'))
 const PortalSocioNuevo = lazy(() => import('./pages/socio/PortalSocioNuevo'))
+const LoginEntrenador = lazy(() => import('./pages/entrenador/LoginEntrenador'))
+const ValidarLinkEntrenador = lazy(() => import('./pages/entrenador/ValidarLinkEntrenador'))
+const PortalEntrenador = lazy(() => import('./pages/entrenador/PortalEntrenador'))
 
 // Admin — generales
 const AdminLogin = lazy(() => import('./pages/admin/Login'))
@@ -351,6 +354,7 @@ function App() {
                   <Route path="menu-buffet" element={<MenuBuffet />} />
                   <Route path="buffet/menu" element={<MenuBuffet />} />
                   <Route path="login-socio" element={<LoginSocio />} />
+                  <Route path="login-entrenador" element={<LoginEntrenador />} />
                   <Route path="mi-qr" element={<AccesoSocio />} />
 
                   {/* Tienda Online — Público */}
@@ -385,6 +389,8 @@ function App() {
                 {/* Rutas del socio (login-socio y mi-qr ahora viven dentro de PublicLayout) */}
                 <Route path="/s/:tokenPortal" element={<SocioPortal />} />
                 <Route path="/portal-socio/:tokenPortal" element={<PortalSocioNuevo />} />
+                <Route path="/portal-entrenador/:token" element={<ValidarLinkEntrenador />} />
+                <Route path="/portal-entrenador" element={<PortalEntrenador />} />
 
                 {/* Reservas públicas */}
                 <Route path="/reservas" element={<ReservasPublico />} />

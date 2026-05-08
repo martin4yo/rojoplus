@@ -321,16 +321,280 @@ const QUERY_DEFINITIONS = [
       }
     },
   },
+  {
+    key: 'socios_listado_firma',
+    label: 'Listado de Socios para Firma',
+    category: 'socios',
+    description: 'Listado en grilla con espacio para firma. Filtros por tipo, estado, categoría, mayor/menor.',
+    defaultParams: async (db, tenantId) => {
+      if (!db || !tenantId) {
+        return [
+          { name: 'tipoSocioId', label: 'Tipo de socio', type: 'select', required: false, defaultValue: '', options: [] },
+          { name: 'estadoSocioId', label: 'Estado', type: 'select', required: false, defaultValue: '', options: [] },
+          { name: 'categoriaSocioId', label: 'Categoría', type: 'select', required: false, defaultValue: '', options: [] },
+          { name: 'soloMenores', label: 'Solo menores', type: 'select', required: false, defaultValue: '',
+            options: [{ value: 'menores', label: 'Solo menores' }, { value: 'mayores', label: 'Solo mayores' }] },
+        ]
+      }
+      const [tipos, estados, categorias] = await Promise.all([
+        db.tipoSocio.findMany({ where: { tenantId, activo: true }, select: { id: true, nombre: true }, orderBy: { orden: 'asc' } }),
+        db.estadoSocio.findMany({ where: { tenantId, activo: true }, select: { id: true, nombre: true }, orderBy: { orden: 'asc' } }),
+        db.categoriaSocio.findMany({ where: { tenantId, activo: true }, select: { id: true, nombre: true }, orderBy: { orden: 'asc' } }),
+      ])
+      return [
+        { name: 'tipoSocioId', label: 'Tipo de socio', type: 'multiselect', required: false, defaultValue: [],
+          options: tipos.map(t => ({ value: String(t.id), label: t.nombre })) },
+        { name: 'estadoSocioId', label: 'Estado', type: 'multiselect', required: false, defaultValue: [],
+          options: estados.map(e => ({ value: String(e.id), label: e.nombre })) },
+        { name: 'categoriaSocioId', label: 'Categoría', type: 'multiselect', required: false, defaultValue: [],
+          options: categorias.map(c => ({ value: String(c.id), label: c.nombre })) },
+        { name: 'soloMenores', label: 'Edad', type: 'select', required: false, defaultValue: '',
+          options: [
+            { value: 'menores', label: 'Solo menores' },
+            { value: 'mayores', label: 'Solo mayores' },
+          ] },
+      ]
+    },
+    run: async (db, tenantId, params) => {
+      const where = { tenantId }
+      // Helper: param multiselect → array de ints. Acepta array, csv string o single value.
+      const toIntArr = (v) => {
+        if (v == null || v === '') return []
+        const arr = Array.isArray(v) ? v : String(v).split(',')
+        return arr.map(x => parseInt(x)).filter(n => Number.isFinite(n))
+      }
+      const tipoIds = toIntArr(params.tipoSocioId)
+      const estadoIds = toIntArr(params.estadoSocioId)
+      const categoriaIds = toIntArr(params.categoriaSocioId)
+      if (tipoIds.length === 1) where.tipoSocioRelId = tipoIds[0]
+      else if (tipoIds.length > 1) where.tipoSocioRelId = { in: tipoIds }
+      if (estadoIds.length === 1) where.estadoSocioId = estadoIds[0]
+      else if (estadoIds.length > 1) where.estadoSocioId = { in: estadoIds }
+      if (categoriaIds.length === 1) where.categoriaSocioId = categoriaIds[0]
+      else if (categoriaIds.length > 1) where.categoriaSocioId = { in: categoriaIds }
+      if (params.soloMenores === 'menores' || params.soloMenores === 'mayores') {
+        // Filtrar por fecha real, no por la columna `esMenor` que queda obsoleta.
+        const hoy = new Date()
+        const cutoff = new Date(hoy.getFullYear() - 18, hoy.getMonth(), hoy.getDate())
+        where.fechaNacimiento = params.soloMenores === 'menores'
+          ? { gt: cutoff }
+          : { lte: cutoff }
+      }
+
+      const socios = await db.socio.findMany({
+        where,
+        select: {
+          id: true,
+          nroSocio: true,
+          documento: true,
+          apellidoNombre: true,
+          esMenor: true,
+          categoriaSocioRel: { select: { nombre: true } },
+          tipoSocioRel: { select: { nombre: true } },
+          estadoSocioRel: { select: { nombre: true } },
+        },
+        orderBy: { apellidoNombre: 'asc' },
+      })
+
+      const items = socios.map(s => ({
+        nroSocio: s.nroSocio || '',
+        documento: s.documento || '',
+        apellidoNombre: s.apellidoNombre || '',
+        categoria: s.categoriaSocioRel?.nombre || '',
+        tipoSocio: s.tipoSocioRel?.nombre || '',
+        estado: s.estadoSocioRel?.nombre || '',
+        esMenor: s.esMenor,
+      }))
+
+      return { items, summary: { total: items.length } }
+    },
+  },
+  {
+    key: 'morosos_por_actividad',
+    label: 'Socios morosos por actividad / categoría',
+    category: 'cuotas',
+    description: 'Detalle de socios con cuotas vencidas, agrupado por actividad y categoría con salto de página entre grupos.',
+    defaultParams: async (db, tenantId) => {
+      if (!db || !tenantId) {
+        return [
+          { name: 'actividadIds', label: 'Actividad', type: 'multiselect', defaultValue: [], options: [] },
+          { name: 'categoriaIds', label: 'Categoría', type: 'multiselect', defaultValue: [], options: [] },
+          { name: 'fechaDesde', label: 'Vence desde', type: 'date', defaultValue: '' },
+          { name: 'fechaHasta', label: 'Vence hasta', type: 'date', defaultValue: '' },
+        ]
+      }
+      const [actividades, categorias] = await Promise.all([
+        db.actividad.findMany({
+          where: { tenantId, activo: true },
+          select: { id: true, nombre: true },
+          orderBy: { nombre: 'asc' },
+        }),
+        db.categoriaActividad.findMany({
+          where: { tenantId, activo: true },
+          select: { id: true, nombre: true, actividadId: true, actividad: { select: { nombre: true } } },
+          orderBy: [{ actividad: { nombre: 'asc' } }, { nombre: 'asc' }],
+        }),
+      ])
+      return [
+        { name: 'actividadIds', label: 'Actividad', type: 'multiselect', defaultValue: [],
+          options: actividades.map(a => ({ value: String(a.id), label: a.nombre })) },
+        { name: 'categoriaIds', label: 'Categoría', type: 'multiselect', defaultValue: [],
+          // dependsOn: filtra opciones según selección de actividadIds (campo `actividadId` en cada opción).
+          dependsOn: { param: 'actividadIds', field: 'actividadId' },
+          options: categorias.map(c => ({
+            value: String(c.id),
+            label: `${c.actividad?.nombre || ''} — ${c.nombre}`,
+            actividadId: String(c.actividadId),
+          })) },
+        { name: 'fechaDesde', label: 'Vence desde', type: 'date', defaultValue: '' },
+        { name: 'fechaHasta', label: 'Vence hasta', type: 'date', defaultValue: '' },
+      ]
+    },
+    run: async (db, tenantId, params) => {
+      const toIntArr = (v) => {
+        if (v == null || v === '') return []
+        const arr = Array.isArray(v) ? v : String(v).split(',')
+        return arr.map(x => parseInt(x)).filter(n => Number.isFinite(n))
+      }
+      const actividadIds = toIntArr(params.actividadIds)
+      const categoriaIds = toIntArr(params.categoriaIds)
+      const hoy = new Date()
+
+      // Filtro base: cargos pendientes ASOCIADOS A UNA ACTIVIDAD (no cuota social)
+      const where = {
+        tenantId,
+        estado: 'PENDIENTE',
+        categoriaActividadId: { not: null },
+      }
+
+      // Vencimiento: por defecto vencidas (fechaVencimiento < hoy);
+      // si el usuario especifica un rango lo aplicamos sobre fechaVencimiento.
+      if (params.fechaDesde || params.fechaHasta) {
+        where.fechaVencimiento = {}
+        if (params.fechaDesde) where.fechaVencimiento.gte = new Date(params.fechaDesde)
+        if (params.fechaHasta) where.fechaVencimiento.lte = new Date(params.fechaHasta + 'T23:59:59')
+      } else {
+        where.fechaVencimiento = { lt: hoy }
+      }
+
+      // Si vienen ambos filtros, AND: la categoría debe estar en la lista Y pertenecer
+      // a una de las actividades elegidas.
+      if (categoriaIds.length > 0 && actividadIds.length > 0) {
+        where.categoriaActividadId = { in: categoriaIds }
+        where.categoriaActividad = { actividadId: { in: actividadIds } }
+      } else if (categoriaIds.length > 0) {
+        where.categoriaActividadId = { in: categoriaIds }
+      } else if (actividadIds.length > 0) {
+        where.categoriaActividad = { actividadId: { in: actividadIds } }
+      }
+
+      const cargos = await db.cargo.findMany({
+        where,
+        include: {
+          socio: { select: { nroSocio: true, apellidoNombre: true, documento: true, celular: true, email: true } },
+          periodo: { select: { nombre: true, anio: true, mes: true } },
+          categoriaActividad: {
+            select: {
+              id: true, nombre: true,
+              actividad: { select: { id: true, nombre: true } },
+            },
+          },
+        },
+        orderBy: [
+          { categoriaActividad: { actividad: { nombre: 'asc' } } },
+          { categoriaActividad: { nombre: 'asc' } },
+          { socio: { apellidoNombre: 'asc' } },
+          { fechaVencimiento: 'asc' },
+        ],
+      })
+
+      // Agrupar: actividad → categoría → socio → cuotas
+      const groupsMap = new Map()
+      for (const c of cargos) {
+        const actNombre = c.categoriaActividad?.actividad?.nombre || 'Sin actividad'
+        const catNombre = c.categoriaActividad?.nombre || 'Sin categoría'
+        const groupKey = `${actNombre}::${catNombre}`
+        if (!groupsMap.has(groupKey)) {
+          groupsMap.set(groupKey, {
+            actividad: actNombre,
+            categoria: catNombre,
+            socios: new Map(),
+          })
+        }
+        const g = groupsMap.get(groupKey)
+        const sid = c.socioId
+        if (!g.socios.has(sid)) {
+          g.socios.set(sid, {
+            nroSocio: c.socio?.nroSocio || '',
+            apellidoNombre: c.socio?.apellidoNombre || '',
+            documento: c.socio?.documento || '',
+            celular: c.socio?.celular || '',
+            email: c.socio?.email || '',
+            cuotas: [],
+            totalDeuda: 0,
+            cantCuotas: 0,
+          })
+        }
+        const s = g.socios.get(sid)
+        const diasMora = c.fechaVencimiento
+          ? Math.floor((hoy - new Date(c.fechaVencimiento)) / 86400000)
+          : 0
+        s.cuotas.push({
+          periodo: c.periodo?.nombre || '',
+          descripcion: c.descripcion || '',
+          fechaVencimiento: c.fechaVencimiento,
+          montoTotal: Number(c.montoTotal),
+          diasMora: diasMora > 0 ? diasMora : 0,
+        })
+        s.totalDeuda += Number(c.montoTotal)
+        s.cantCuotas++
+      }
+
+      // Convertir a array final + totales por grupo
+      const groups = []
+      let totalDeudaGeneral = 0
+      let totalCuotasGeneral = 0
+      let totalSociosGeneral = 0
+      for (const g of groupsMap.values()) {
+        const socios = Array.from(g.socios.values())
+        const totalDeuda = socios.reduce((s, x) => s + x.totalDeuda, 0)
+        const cantCuotas = socios.reduce((s, x) => s + x.cantCuotas, 0)
+        groups.push({
+          actividad: g.actividad,
+          categoria: g.categoria,
+          socios,
+          totalDeuda,
+          cantCuotas,
+          cantSocios: socios.length,
+        })
+        totalDeudaGeneral += totalDeuda
+        totalCuotasGeneral += cantCuotas
+        totalSociosGeneral += socios.length
+      }
+
+      return {
+        items: groups,
+        summary: {
+          totalGrupos: groups.length,
+          totalSocios: totalSociosGeneral,
+          totalCuotas: totalCuotasGeneral,
+          totalDeuda: totalDeudaGeneral,
+        },
+      }
+    },
+  },
 ]
 
-export function listQueryDefinitions() {
-  return QUERY_DEFINITIONS.map(d => ({
+export async function listQueryDefinitions(db = null, tenantId = null) {
+  return Promise.all(QUERY_DEFINITIONS.map(async d => ({
     key: d.key,
     label: d.label,
     category: d.category,
     description: d.description,
-    defaultParams: d.defaultParams,
-  }))
+    defaultParams: typeof d.defaultParams === 'function'
+      ? await d.defaultParams(db, tenantId)
+      : d.defaultParams,
+  })))
 }
 
 export function getQueryDefinition(key) {

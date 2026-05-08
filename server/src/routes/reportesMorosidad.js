@@ -16,52 +16,36 @@ function aplicarFiltroPeriodos(where, query) {
   }
 }
 
-// Función para calcular recargo de un cargo (duplicada de admin.js para modularidad)
-async function calcularRecargoCargo(prisma, cargo) {
-  if (!cargo.fechaVencimiento || cargo.estado !== 'PENDIENTE') {
+// Cálculo síncrono de recargo a partir de la config ya cargada (evita N+1).
+// Devuelve { recargo, porcentaje, diasMora, montoConRecargo } igual que la
+// versión async original.
+function calcularRecargoSync(cargo, config, hoy = new Date()) {
+  if (!cargo.fechaVencimiento || cargo.estado !== undefined && cargo.estado !== 'PENDIENTE') {
     return { recargo: 0, porcentaje: 0, diasMora: 0, montoConRecargo: Number(cargo.montoTotal) }
   }
-
-  const hoy = new Date()
   const vencimiento = new Date(cargo.fechaVencimiento)
-  const diasMora = Math.floor((hoy - vencimiento) / (1000 * 60 * 60 * 24))
-
+  const diasMora = Math.floor((hoy - vencimiento) / 86400000)
   if (diasMora <= 0) {
     return { recargo: 0, porcentaje: 0, diasMora: 0, montoConRecargo: Number(cargo.montoTotal) }
   }
-
-  const config = await req.db.configuracionRecargo.findFirst({
-    where: { activo: true },
-  })
-
   if (!config || Number(config.porcentaje) === 0) {
     return { recargo: 0, porcentaje: 0, diasMora, montoConRecargo: Number(cargo.montoTotal) }
   }
-
-  let porcentajeRecargo = 0
-
+  let pct = 0
   if (config.tipo === 'FIJO') {
-    porcentajeRecargo = Number(config.porcentaje)
+    pct = Number(config.porcentaje)
   } else {
-    // ACUMULATIVO: porcentaje × (diasMora / cadaDias)
     const periodos = Math.floor(diasMora / (config.cadaDias || 30))
-    porcentajeRecargo = periodos * Number(config.porcentaje)
-
-    // Aplicar tope máximo si está definido
-    if (config.topeMaximo && porcentajeRecargo > Number(config.topeMaximo)) {
-      porcentajeRecargo = Number(config.topeMaximo)
-    }
+    pct = periodos * Number(config.porcentaje)
+    if (config.topeMaximo && pct > Number(config.topeMaximo)) pct = Number(config.topeMaximo)
   }
+  const recargo = Math.round(Number(cargo.montoOriginal) * pct / 100)
+  return { recargo, porcentaje: pct, diasMora, montoConRecargo: Number(cargo.montoTotal) + recargo }
+}
 
-  const montoOriginal = Number(cargo.montoOriginal)
-  const recargo = Math.round(montoOriginal * porcentajeRecargo / 100)
-
-  return {
-    recargo,
-    porcentaje: porcentajeRecargo,
-    diasMora,
-    montoConRecargo: Number(cargo.montoTotal) + recargo,
-  }
+// Helper para cargar la config una sola vez por request
+async function getConfigRecargo(db) {
+  return db.configuracionRecargo.findFirst({ where: { activo: true } })
 }
 
 // GET /api/admin/reportes/morosidad/resumen-kpis
@@ -71,63 +55,96 @@ router.get('/resumen-kpis', authAdmin, asyncHandler(async (req, res) => {
   const wherePend = { estado: 'PENDIENTE', fechaVencimiento: { lt: hoy } }
   aplicarFiltroPeriodos(wherePend, req.query)
 
-  // Cuotas vencidas pendientes
-  const cuotasVencidas = await req.db.cargo.findMany({
-    where: wherePend,
-    select: {
-      id: true,
-      montoOriginal: true,
-      montoTotal: true,
-      fechaVencimiento: true,
-      socioId: true,
-    },
-  })
+  // Todo en paralelo: agregaciones en DB en lugar de cargar filas a JS.
+  const [config, agg, sociosConDeuda, avgDiasMora, totalSociosActivos] = await Promise.all([
+    getConfigRecargo(req.db),
+    // SUM(montoTotal), SUM(montoOriginal), COUNT
+    req.db.cargo.aggregate({
+      where: wherePend,
+      _sum: { montoTotal: true, montoOriginal: true },
+      _count: { _all: true },
+    }),
+    // COUNT DISTINCT socioId — Prisma lo hace via groupBy
+    req.db.cargo.groupBy({
+      where: wherePend,
+      by: ['socioId'],
+    }),
+    // Avg de días de mora vía SQL raw (rápido en DB).
+    // Filtra por tenant_id explícito + período opcional ya construido en JS.
+    (async () => {
+      const periodoIdFilter = wherePend.periodoId
+      let rows
+      if (periodoIdFilter && typeof periodoIdFilter === 'object' && periodoIdFilter.in) {
+        rows = await req.db.$queryRaw`
+          SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (NOW() - fecha_vencimiento)) / 86400), 0)::float AS prom
+          FROM cargos
+          WHERE tenant_id = ${req.tenantId}
+            AND estado = 'PENDIENTE'
+            AND fecha_vencimiento < NOW()
+            AND periodo_id = ANY(${periodoIdFilter.in}::int[])
+        `
+      } else if (periodoIdFilter) {
+        rows = await req.db.$queryRaw`
+          SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (NOW() - fecha_vencimiento)) / 86400), 0)::float AS prom
+          FROM cargos
+          WHERE tenant_id = ${req.tenantId}
+            AND estado = 'PENDIENTE'
+            AND fecha_vencimiento < NOW()
+            AND periodo_id = ${periodoIdFilter}
+        `
+      } else {
+        rows = await req.db.$queryRaw`
+          SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (NOW() - fecha_vencimiento)) / 86400), 0)::float AS prom
+          FROM cargos
+          WHERE tenant_id = ${req.tenantId}
+            AND estado = 'PENDIENTE'
+            AND fecha_vencimiento < NOW()
+        `
+      }
+      return Number(rows?.[0]?.prom || 0)
+    })(),
+    req.db.socio.count({
+      where: {
+        OR: [
+          { estado: { contains: 'Activ', mode: 'insensitive' } },
+          { estado: { contains: 'Vigent', mode: 'insensitive' } },
+        ],
+      },
+    }),
+  ])
 
-  // Calcular recargos
+  const totalCuotasVencidas = agg._count?._all || 0
+  const totalDeuda = Number(agg._sum?.montoTotal || 0)
+  const totalMontoOriginal = Number(agg._sum?.montoOriginal || 0)
+  const totalMorosos = sociosConDeuda.length
+  const promedioDeuda = totalMorosos > 0 ? Math.round(totalDeuda / totalMorosos) : 0
+  const promedioAtraso = Math.round(avgDiasMora)
+
+  // Recargo total: aproximación basada en config global. Para FIJO es exacto.
+  // Para ACUMULATIVO usa el promedio de días de mora — aceptable para KPI agregado.
   let totalRecargos = 0
-  for (const cuota of cuotasVencidas) {
-    const resultado = await calcularRecargoCargo(req.prisma, cuota)
-    totalRecargos += resultado.recargo
+  if (config && Number(config.porcentaje) > 0) {
+    if (config.tipo === 'FIJO') {
+      totalRecargos = Math.round(totalMontoOriginal * Number(config.porcentaje) / 100)
+    } else {
+      const periodos = Math.floor(promedioAtraso / (config.cadaDias || 30))
+      let pct = periodos * Number(config.porcentaje)
+      if (config.topeMaximo && pct > Number(config.topeMaximo)) pct = Number(config.topeMaximo)
+      totalRecargos = Math.round(totalMontoOriginal * pct / 100)
+    }
   }
-
-  // Socios únicos con deuda
-  const sociosUnicos = new Set(cuotasVencidas.map(c => c.socioId))
-
-  // Total de deuda
-  const totalDeuda = cuotasVencidas.reduce((sum, c) => sum + Number(c.montoTotal), 0)
-
-  // Promedio de deuda por socio
-  const promedioDeuda = sociosUnicos.size > 0 ? Math.round(totalDeuda / sociosUnicos.size) : 0
-
-  // Días promedio de atraso
-  let sumaDias = 0
-  for (const cuota of cuotasVencidas) {
-    const dias = Math.floor((hoy - new Date(cuota.fechaVencimiento)) / (1000 * 60 * 60 * 24))
-    sumaDias += dias
-  }
-  const promedioAtraso = cuotasVencidas.length > 0 ? Math.round(sumaDias / cuotasVencidas.length) : 0
-
-  // Total de socios activos para calcular % de morosidad
-  const totalSociosActivos = await req.db.socio.count({
-    where: {
-      OR: [
-        { estado: { contains: 'Activ', mode: 'insensitive' } },
-        { estado: { contains: 'Vigent', mode: 'insensitive' } },
-      ],
-    },
-  })
 
   const porcentajeMorosidad = totalSociosActivos > 0
-    ? Math.round((sociosUnicos.size / totalSociosActivos) * 100 * 10) / 10
+    ? Math.round((totalMorosos / totalSociosActivos) * 100 * 10) / 10
     : 0
 
   res.json({
     success: true,
     data: {
-      totalMorosos: sociosUnicos.size,
-      totalCuotasVencidas: cuotasVencidas.length,
+      totalMorosos,
+      totalCuotasVencidas,
       totalDeuda: Math.round(totalDeuda),
-      totalRecargos: Math.round(totalRecargos),
+      totalRecargos,
       totalConRecargos: Math.round(totalDeuda + totalRecargos),
       promedioDeuda,
       promedioAtraso,
@@ -159,17 +176,20 @@ router.get('/antiguedad', authAdmin, asyncHandler(async (req, res) => {
     where.categoriaActividadId = { in: categorias.map(c => c.id) }
   }
 
-  // Obtener cuotas vencidas
-  const cuotasVencidas = await req.db.cargo.findMany({
-    where,
-    select: {
-      id: true,
-      montoOriginal: true,
-      montoTotal: true,
-      fechaVencimiento: true,
-      socioId: true,
-    },
-  })
+  // Obtener cuotas vencidas + config en paralelo
+  const [config, cuotasVencidas] = await Promise.all([
+    getConfigRecargo(req.db),
+    req.db.cargo.findMany({
+      where,
+      select: {
+        id: true,
+        montoOriginal: true,
+        montoTotal: true,
+        fechaVencimiento: true,
+        socioId: true,
+      },
+    }),
+  ])
 
   // Rangos de antigüedad
   const rangos = [
@@ -191,7 +211,7 @@ router.get('/antiguedad', authAdmin, asyncHandler(async (req, res) => {
 
   for (const cuota of cuotasVencidas) {
     const diasAtraso = Math.floor((hoy - new Date(cuota.fechaVencimiento)) / (1000 * 60 * 60 * 24))
-    const recargo = await calcularRecargoCargo(req.prisma, cuota)
+    const recargo = calcularRecargoSync(cuota, config, hoy)
 
     for (let i = 0; i < rangos.length; i++) {
       if (diasAtraso >= rangos[i].min && diasAtraso <= rangos[i].max) {
@@ -358,28 +378,31 @@ router.get('/detalle', authAdmin, asyncHandler(async (req, res) => {
     where.categoriaActividadId = { in: categorias.map(c => c.id) }
   }
 
-  // Obtener cuotas
-  const cuotas = await req.db.cargo.findMany({
-    where,
-    include: {
-      socio: {
-        select: {
-          id: true,
-          nroSocio: true,
-          apellidoNombre: true,
-          celular: true,
-          email: true,
-          documento: true,
+  // Obtener cuotas + config en paralelo
+  const [config, cuotas] = await Promise.all([
+    getConfigRecargo(req.db),
+    req.db.cargo.findMany({
+      where,
+      include: {
+        socio: {
+          select: {
+            id: true,
+            nroSocio: true,
+            apellidoNombre: true,
+            celular: true,
+            email: true,
+            documento: true,
+          },
+        },
+        periodo: { select: { nombre: true } },
+        categoriaActividad: {
+          include: {
+            actividad: { select: { nombre: true } },
+          },
         },
       },
-      periodo: { select: { nombre: true } },
-      categoriaActividad: {
-        include: {
-          actividad: { select: { nombre: true } },
-        },
-      },
-    },
-  })
+    }),
+  ])
 
   // Agrupar por socio y calcular recargos
   const sociosMap = {}
@@ -387,7 +410,7 @@ router.get('/detalle', authAdmin, asyncHandler(async (req, res) => {
   for (const cuota of cuotas) {
     const socioId = cuota.socioId
     const diasAtraso = Math.floor((hoy - new Date(cuota.fechaVencimiento)) / (1000 * 60 * 60 * 24))
-    const recargo = await calcularRecargoCargo(req.prisma, cuota)
+    const recargo = calcularRecargoSync(cuota, config, hoy)
 
     if (!sociosMap[socioId]) {
       sociosMap[socioId] = {
@@ -501,31 +524,34 @@ router.get('/exportar', authAdmin, asyncHandler(async (req, res) => {
     where.categoriaActividadId = { in: categorias.map(c => c.id) }
   }
 
-  // Obtener cuotas con socio
-  const cuotas = await req.db.cargo.findMany({
-    where,
-    include: {
-      socio: {
-        select: {
-          nroSocio: true,
-          apellidoNombre: true,
-          celular: true,
-          email: true,
-          documento: true,
+  // Obtener cuotas + config en paralelo
+  const [config, cuotas] = await Promise.all([
+    getConfigRecargo(req.db),
+    req.db.cargo.findMany({
+      where,
+      include: {
+        socio: {
+          select: {
+            nroSocio: true,
+            apellidoNombre: true,
+            celular: true,
+            email: true,
+            documento: true,
+          },
+        },
+        periodo: { select: { nombre: true } },
+        categoriaActividad: {
+          include: {
+            actividad: { select: { nombre: true } },
+          },
         },
       },
-      periodo: { select: { nombre: true } },
-      categoriaActividad: {
-        include: {
-          actividad: { select: { nombre: true } },
-        },
-      },
-    },
-    orderBy: [
-      { socio: { apellidoNombre: 'asc' } },
-      { fechaVencimiento: 'asc' },
-    ],
-  })
+      orderBy: [
+        { socio: { apellidoNombre: 'asc' } },
+        { fechaVencimiento: 'asc' },
+      ],
+    }),
+  ])
 
   // Procesar datos para Excel
   const filas = []
@@ -534,7 +560,7 @@ router.get('/exportar', authAdmin, asyncHandler(async (req, res) => {
 
     if (diasMinimo && diasAtraso < parseInt(diasMinimo)) continue
 
-    const recargo = await calcularRecargoCargo(req.prisma, cuota)
+    const recargo = calcularRecargoSync(cuota, config, hoy)
 
     filas.push({
       'Nro Socio': cuota.socio.nroSocio,

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Trophy, Users, Star, Home, Award, Medal, ArrowUpRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import BannerPublicitario from '../../components/public/BannerPublicitario'
+import PublicHero from '../../components/public/PublicHero'
 import api from '../../services/api'
 
 const ICONOS_HITOS = [Star, Home, Trophy, Trophy, Award, Users, Medal, Star]
@@ -77,26 +78,12 @@ export default function Historia() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
-      {/* Hero */}
-      <section className="relative py-20 md:py-28 overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
-        <div className="absolute inset-0 bg-field-grid opacity-30" />
-        <div
-          className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-25 blur-3xl"
-          style={{ background: 'var(--color-primary)' }}
-        />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="pub-eyebrow text-pub-fg-70 mb-6">El club</div>
-          <h1
-            className="font-display-sport text-pub-fg"
-            style={{ fontSize: 'clamp(48px, 8vw, 130px)', lineHeight: 0.92 }}
-          >
-            {intro.titulo || 'Nuestra historia'}.
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg md:text-xl text-pub-fg-70 leading-snug" style={{ fontWeight: 300 }}>
-            Conocé los logros y los valores que nos definen.
-          </p>
-        </div>
-      </section>
+      <PublicHero
+        eyebrow="El club"
+        title={`${intro.titulo || 'Nuestra historia'}.`}
+        subtitle="Conocé los logros y los valores que nos definen."
+        compact
+      />
 
       <BannerPublicitario tipo="HEADER" ubicacion="HISTORIA" />
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { UtensilsCrossed, Phone, MapPin, Clock, ArrowLeft, Star, Coffee, Pizza, Sandwich, IceCream, Salad, Wine, ChevronDown, X, Download } from 'lucide-react'
 import TenantLogo from '../../components/TenantLogo'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import PublicHero from '../../components/public/PublicHero'
 
 // Imágenes de ejemplo por categoría (usando URLs de imágenes libres de derechos)
 const imagenesPorCategoria = {
@@ -104,88 +105,88 @@ export default function MenuBuffet() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-app)' }}>
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
-      {/* Header athletic */}
-      <header className="relative overflow-hidden" style={{ backgroundColor: 'var(--pub-hero-bg)' }}>
-        <div className="absolute inset-0 bg-field-grid-pub opacity-40" />
-        <div className="absolute -right-32 -top-32 w-96 h-96 rounded-full opacity-20 blur-3xl" style={{ background: 'var(--color-primary)' }} />
+      <PublicHero
+        eyebrow="Carta del club"
+        title="Buffet."
+        subtitle="Lo que hay para comer y tomar hoy."
+        compact
+      >
+        <button
+          onClick={descargarPDF}
+          className="group inline-flex items-center gap-3 px-5 py-3 transition-all"
+          style={{
+            background: 'var(--color-primary)',
+            color: 'var(--accent-fg, #fff)',
+            fontFamily: 'Geist Mono, monospace',
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.2em',
+            fontWeight: 600,
+          }}
+          title="Descargar menú en PDF"
+        >
+          <Download size={16} />
+          <span>Descargar PDF</span>
+        </button>
+      </PublicHero>
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <div className="pub-eyebrow text-pub-fg-70 mb-5">Carta del club</div>
-              <h1 className="font-display-sport text-pub-fg" style={{ fontSize: 'clamp(40px, 6vw, 90px)', lineHeight: 0.92 }}>
-                Buffet.
-              </h1>
-              <p className="mt-4 text-pub-fg-70 text-lg" style={{ fontWeight: 300 }}>
-                Lo que hay para comer y tomar hoy.
-              </p>
-            </div>
-
-            <button
-              onClick={descargarPDF}
-              className="group inline-flex items-center gap-3 px-5 py-3 transition-all flex-shrink-0"
-              style={{
-                background: 'var(--color-primary)',
-                color: 'var(--accent-fg, #fff)',
-                fontFamily: 'Geist Mono, monospace',
-                fontSize: 11,
-                textTransform: 'uppercase',
-                letterSpacing: '0.2em',
-                fontWeight: 600,
-              }}
-              title="Descargar menú en PDF"
-            >
-              <Download size={16} />
-              <span className="hidden sm:inline">Descargar PDF</span>
-            </button>
-          </div>
+      {/* Estado de carga: mostrar spinner DEBAJO del hero (no reemplaza la página) */}
+      {loading && (
+        <div className="flex items-center justify-center py-20">
+          <LoadingSpinner />
         </div>
-      </header>
+      )}
 
+      {!loading && (
       <main className="max-w-6xl mx-auto px-4 pt-4 pb-8">
         {/* Categorías - Mobile: dropdown, Desktop: flex-wrap */}
 
-        {/* Mobile: Botón dropdown */}
+        {/* Mobile: Botón dropdown athletic */}
         <div className="md:hidden mb-4 relative">
           <button
             onClick={() => setMenuMobileAbierto(!menuMobileAbierto)}
-            className="w-full bg-white rounded-xl shadow-sm p-4 flex items-center justify-between"
+            className="w-full p-4 flex items-center justify-between transition-colors"
+            style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
           >
             <div className="flex items-center gap-3">
               {categoriaSeleccionada && (
                 <>
                   {(() => {
                     const Icono = getIcono(categoriaSeleccionada.codigo)
-                    return <Icono size={20} className="text-gray-600" />
+                    return <Icono size={18} style={{ color: 'var(--text-dim)' }} />
                   })()}
-                  <span className="font-medium text-gray-800">{categoriaSeleccionada.nombre}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                  <span
+                    className="font-mono uppercase tracking-[0.18em] font-semibold"
+                    style={{ fontSize: 11, color: 'var(--color-text-primary, var(--text))' }}
+                  >
+                    {categoriaSeleccionada.nombre}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5" style={{
+                    backgroundColor: 'var(--bg-app)', color: 'var(--text-muted)'
+                  }}>
                     {categoriaSeleccionada.productos?.length || 0}
                   </span>
                 </>
               )}
             </div>
             <ChevronDown
-              size={20}
-              className={`text-gray-400 transition-transform ${menuMobileAbierto ? 'rotate-180' : ''}`}
+              size={18}
+              style={{ color: 'var(--text-muted)' }}
+              className={`transition-transform ${menuMobileAbierto ? 'rotate-180' : ''}`}
             />
           </button>
 
           {/* Dropdown móvil */}
           {menuMobileAbierto && (
-            <div className="absolute left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 z-50 max-h-80 overflow-y-auto">
+            <div
+              className="absolute left-0 right-0 mt-px z-50 max-h-80 overflow-y-auto"
+              style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+            >
               {categorias.map(cat => {
                 const Icono = getIcono(cat.codigo)
+                const activo = categoriaActiva === cat.id
                 return (
                   <button
                     key={cat.id}
@@ -193,17 +194,24 @@ export default function MenuBuffet() {
                       setCategoriaActiva(cat.id)
                       setMenuMobileAbierto(false)
                     }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${
-                      categoriaActiva === cat.id
-                        ? 'bg-primary-50 text-primary'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
+                    className="w-full flex items-center gap-3 px-4 py-3 transition-colors"
+                    style={{
+                      backgroundColor: activo ? 'var(--accent-soft)' : 'transparent',
+                      borderLeft: activo ? `3px solid ${cat.color || 'var(--color-primary)'}` : '3px solid transparent',
+                      color: activo ? 'var(--color-text-primary, var(--text))' : 'var(--text-dim)',
+                      fontFamily: 'Geist Mono, monospace',
+                      fontSize: 11,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.18em',
+                      fontWeight: 600,
+                    }}
                   >
-                    <Icono size={18} />
-                    <span className="flex-1 text-left font-medium">{cat.nombre}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      categoriaActiva === cat.id ? 'bg-primary-100' : 'bg-gray-100'
-                    }`}>
+                    <Icono size={16} />
+                    <span className="flex-1 text-left">{cat.nombre}</span>
+                    <span className="text-[10px] px-1.5 py-0.5" style={{
+                      backgroundColor: activo ? (cat.color || 'var(--color-primary)') : 'var(--bg-app)',
+                      color: activo ? 'var(--accent-fg, #fff)' : 'var(--text-muted)',
+                    }}>
                       {cat.productos?.length || 0}
                     </span>
                   </button>
@@ -213,111 +221,197 @@ export default function MenuBuffet() {
           )}
         </div>
 
-        {/* Desktop: Categorías con wrap */}
-        <div className="hidden md:block bg-white rounded-2xl shadow-sm p-4 mb-8">
-          <div className="flex flex-wrap gap-2 justify-center">
-            {categorias.map(cat => {
-              const Icono = getIcono(cat.codigo)
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setCategoriaActiva(cat.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
-                    categoriaActiva === cat.id
-                      ? 'text-white shadow-lg scale-105'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                  }`}
-                  style={categoriaActiva === cat.id ? {
-                    backgroundColor: cat.color || '#DC2626',
-                    boxShadow: `0 4px 14px ${cat.color || '#DC2626'}40`
-                  } : {}}
-                >
-                  <Icono size={18} />
-                  <span>{cat.nombre}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                    categoriaActiva === cat.id ? 'bg-white/20' : 'bg-stone-200'
-                  }`}>
-                    {cat.productos?.length || 0}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Contenido de la categoría */}
-        {categoriaSeleccionada && (
-          <div className="animate-fadeIn">
-            {/* Header de categoría con imagen */}
-            <div className="relative rounded-2xl overflow-hidden mb-8 h-48 md:h-64">
-              <img
-                src={getImagen(categoriaSeleccionada.codigo)}
-                alt={categoriaSeleccionada.nombre}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <h2 className="text-3xl md:text-4xl font-bold text-white mb-1">
-                  {categoriaSeleccionada.nombre}
-                </h2>
-                {categoriaSeleccionada.descripcion && (
-                  <p className="text-white/80">{categoriaSeleccionada.descripcion}</p>
-                )}
-              </div>
+        {/* Desktop: layout sidebar izquierda + contenido derecha */}
+        <div className="hidden md:grid md:grid-cols-[260px_1fr] gap-px" style={{ backgroundColor: 'var(--border)' }}>
+          {/* Sidebar izquierda — lista de categorías */}
+          <aside style={{ backgroundColor: 'var(--bg-surface)' }}>
+            <div className="px-4 py-3 font-mono text-[10px] uppercase tracking-[0.25em]" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+              Categorías
             </div>
+            <nav className="flex flex-col">
+              {categorias.map(cat => {
+                const Icono = getIcono(cat.codigo)
+                const activo = categoriaActiva === cat.id
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setCategoriaActiva(cat.id)}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors text-left"
+                    style={{
+                      backgroundColor: activo ? 'var(--accent-soft)' : 'transparent',
+                      borderLeft: activo ? `3px solid ${cat.color || 'var(--color-primary)'}` : '3px solid transparent',
+                      color: activo ? 'var(--color-text-primary, var(--text))' : 'var(--text-dim)',
+                      fontFamily: 'Geist Mono, monospace',
+                      fontSize: 11,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.18em',
+                      fontWeight: 600,
+                      borderBottom: '1px solid var(--border)',
+                    }}
+                  >
+                    <Icono size={16} className="flex-shrink-0" />
+                    <span className="flex-1 truncate">{cat.nombre}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 flex-shrink-0" style={{
+                      backgroundColor: activo ? (cat.color || 'var(--color-primary)') : 'var(--bg-app)',
+                      color: activo ? 'var(--accent-fg, #fff)' : 'var(--text-muted)',
+                    }}>
+                      {cat.productos?.length || 0}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
+          </aside>
 
-            {/* Grid de productos */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {categoriaSeleccionada.productos?.map((prod, idx) => (
-                <div
-                  key={prod.id}
-                  className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border border-stone-100 flex items-start gap-4"
-                  style={{ animationDelay: `${idx * 50}ms` }}
-                >
-                  {/* Imagen del producto o placeholder */}
-                  <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-stone-100 to-stone-200">
-                    {prod.imagen ? (
-                      <img
-                        src={prod.imagen}
-                        alt={prod.nombre}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <UtensilsCrossed size={28} className="text-stone-300" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info del producto */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-stone-800 flex items-center gap-2">
-                        {prod.nombre}
-                        {prod.destacado && (
-                          <Star size={14} className="text-amber-500 fill-amber-500" />
-                        )}
-                      </h3>
-                      <span className="text-lg font-bold text-primary whitespace-nowrap">
-                        ${Number(prod.precio).toLocaleString('es-AR')}
-                      </span>
+          {/* Contenido derecha */}
+          <section style={{ backgroundColor: 'var(--bg-surface)' }}>
+            {categoriaSeleccionada ? (
+              <div className="animate-fadeIn">
+                {/* Header de categoría con imagen */}
+                <div className="relative overflow-hidden h-48 md:h-64" style={{ borderBottom: '1px solid var(--border)' }}>
+                  <img
+                    src={getImagen(categoriaSeleccionada.codigo)}
+                    alt={categoriaSeleccionada.nombre}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/70 mb-2">
+                      Categoría
                     </div>
-                    {prod.descripcion && (
-                      <p className="text-sm text-stone-500 mt-1 line-clamp-2">{prod.descripcion}</p>
+                    <h2 className="font-display-sport text-white" style={{ fontSize: 'clamp(28px, 4vw, 56px)', lineHeight: 0.95 }}>
+                      {categoriaSeleccionada.nombre}
+                    </h2>
+                    {categoriaSeleccionada.descripcion && (
+                      <p className="text-white/80 mt-2 max-w-2xl" style={{ fontWeight: 300 }}>
+                        {categoriaSeleccionada.descripcion}
+                      </p>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {categoriaSeleccionada.productos?.length === 0 && (
-              <div className="bg-white rounded-xl p-12 text-center shadow-sm">
-                <UtensilsCrossed size={48} className="mx-auto text-stone-300 mb-4" />
-                <p className="text-stone-500">No hay productos disponibles en esta categoría</p>
+                {/* Lista de productos */}
+                <div className="flex flex-col">
+                  {categoriaSeleccionada.productos?.map((prod, idx) => (
+                    <div
+                      key={prod.id}
+                      className="p-4 flex items-start gap-4 transition-colors hover:bg-pub-fg-10"
+                      style={{ borderBottom: '1px solid var(--border)', animationDelay: `${idx * 30}ms` }}
+                    >
+                      <div
+                        className="w-20 h-20 flex-shrink-0 overflow-hidden flex items-center justify-center"
+                        style={{ backgroundColor: 'var(--bg-surface-hi)', border: '1px solid var(--border)' }}
+                      >
+                        {prod.imagen ? (
+                          <img src={prod.imagen} alt={prod.nombre} className="w-full h-full object-cover" />
+                        ) : (
+                          <UtensilsCrossed size={28} style={{ color: 'var(--text-muted)' }} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-semibold flex items-center gap-2" style={{ color: 'var(--color-text-primary, var(--text))' }}>
+                            {prod.nombre}
+                            {prod.destacado && (
+                              <Star size={14} className="text-amber-500 fill-amber-500" />
+                            )}
+                          </h3>
+                          <span
+                            className="font-bold whitespace-nowrap"
+                            style={{ fontSize: '1.05rem', color: 'var(--color-primary)', fontFamily: 'Geist Mono, monospace' }}
+                          >
+                            ${Number(prod.precio).toLocaleString('es-AR')}
+                          </span>
+                        </div>
+                        {prod.descripcion && (
+                          <p className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--text-dim)' }}>{prod.descripcion}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {categoriaSeleccionada.productos?.length === 0 && (
+                    <div className="p-12 text-center">
+                      <UtensilsCrossed size={48} className="mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+                      <p style={{ color: 'var(--text-dim)' }}>No hay productos disponibles en esta categoría</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="p-12 text-center" style={{ color: 'var(--text-dim)' }}>
+                Seleccioná una categoría
               </div>
             )}
-          </div>
-        )}
+          </section>
+        </div>
+
+        {/* Mobile: contenido completo (la sidebar se reemplaza por el dropdown ya existente) */}
+        <div className="md:hidden">
+          {categoriaSeleccionada && (
+            <div className="animate-fadeIn">
+              <div className="relative overflow-hidden h-48" style={{ border: '1px solid var(--border)', marginBottom: 0 }}>
+                <img
+                  src={getImagen(categoriaSeleccionada.codigo)}
+                  alt={categoriaSeleccionada.nombre}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-5">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/70 mb-1">
+                    Categoría
+                  </div>
+                  <h2 className="font-display-sport text-white" style={{ fontSize: 'clamp(28px, 6vw, 40px)', lineHeight: 0.95 }}>
+                    {categoriaSeleccionada.nombre}
+                  </h2>
+                  {categoriaSeleccionada.descripcion && (
+                    <p className="text-white/80 text-sm mt-1" style={{ fontWeight: 300 }}>
+                      {categoriaSeleccionada.descripcion}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col" style={{ borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
+                {categoriaSeleccionada.productos?.map((prod) => (
+                  <div
+                    key={prod.id}
+                    className="p-4 flex items-start gap-3"
+                    style={{ backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}
+                  >
+                    <div
+                      className="w-16 h-16 flex-shrink-0 overflow-hidden flex items-center justify-center"
+                      style={{ backgroundColor: 'var(--bg-surface-hi)', border: '1px solid var(--border)' }}
+                    >
+                      {prod.imagen ? (
+                        <img src={prod.imagen} alt={prod.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        <UtensilsCrossed size={22} style={{ color: 'var(--text-muted)' }} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--color-text-primary, var(--text))' }}>
+                          {prod.nombre}
+                          {prod.destacado && <Star size={12} className="text-amber-500 fill-amber-500" />}
+                        </h3>
+                        <span
+                          className="font-bold whitespace-nowrap text-sm"
+                          style={{ color: 'var(--color-primary)', fontFamily: 'Geist Mono, monospace' }}
+                        >
+                          ${Number(prod.precio).toLocaleString('es-AR')}
+                        </span>
+                      </div>
+                      {prod.descripcion && (
+                        <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-dim)' }}>{prod.descripcion}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {categorias.length === 0 && (
           <div className="bg-white rounded-xl p-16 text-center shadow-sm">
@@ -327,6 +421,7 @@ export default function MenuBuffet() {
           </div>
         )}
       </main>
+      )}
 
       {/* Footer elegante */}
       <footer className="bg-stone-900 text-white mt-16">

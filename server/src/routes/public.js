@@ -396,6 +396,7 @@ router.get('/actividades/:id', asyncHandler(async (req, res) => {
         where: { activo: true },
         include: {
           horariosRecurrentes: {
+            where: { activo: true },
             orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }]
           },
           _count: {
@@ -411,6 +412,15 @@ router.get('/actividades/:id', asyncHandler(async (req, res) => {
   if (!actividad || !actividad.activo) {
     throw new AppError('Actividad no encontrada', 404)
   }
+
+  // Lookup separado de espacios (HorarioRecurrente.espacioId es FK suelta sin relación Prisma)
+  const espacioIds = [...new Set(
+    actividad.categorias.flatMap(c => c.horariosRecurrentes.map(h => h.espacioId).filter(Boolean))
+  )]
+  const espacios = espacioIds.length > 0
+    ? await req.db.espacioDeportivo.findMany({ where: { id: { in: espacioIds } }, select: { id: true, nombre: true } })
+    : []
+  const espacioById = new Map(espacios.map(e => [e.id, e.nombre]))
 
   const totalInscriptos = actividad.categorias.reduce((sum, cat) => sum + cat._count.inscripciones, 0)
 
@@ -430,7 +440,8 @@ router.get('/actividades/:id', asyncHandler(async (req, res) => {
       horarios: cat.horariosRecurrentes.map(h => ({
         diaSemana: h.diaSemana,
         horaInicio: h.horaInicio,
-        horaFin: h.horaFin
+        horaFin: h.horaFin,
+        espacio: h.espacioId ? (espacioById.get(h.espacioId) || null) : null,
       })),
       _count: cat._count
     }))
@@ -846,14 +857,12 @@ router.get('/actividades/:id/staff', asyncHandler(async (req, res) => {
   }
 
   const asignaciones = await req.db.entrenadorCategoria.findMany({
-    where: whereCategoria,
+    where: {
+      ...whereCategoria,
+      entrenador: { mostrarEnWeb: true, activo: true },
+    },
     include: {
-      entrenador: {
-        where: {
-          mostrarEnWeb: true,
-          activo: true
-        }
-      },
+      entrenador: true,
       categoriaActividad: {
         select: {
           id: true,

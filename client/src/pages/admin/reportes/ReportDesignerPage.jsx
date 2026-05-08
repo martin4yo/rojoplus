@@ -12,6 +12,7 @@ const PARAM_TYPES = [
   { value: 'number', label: 'Número' },
   { value: 'boolean', label: 'Booleano' },
   { value: 'select', label: 'Selección' },
+  { value: 'multiselect', label: 'Selección múltiple' },
 ]
 
 const PAGE_FORMATS = ['A4', 'A3', 'Letter', 'Legal']
@@ -429,7 +430,7 @@ export default function ReportDesignerPage() {
                               className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
                           </div>
                         </div>
-                        {p.type === 'select' && (
+                        {(p.type === 'select' || p.type === 'multiselect') && (
                           <div className="mt-3">
                             <label className="block text-xs font-medium text-gray-700 mb-1">
                               Opciones <span className="font-normal text-gray-400">(JSON: [{'{'}value,label{'}'}])</span>

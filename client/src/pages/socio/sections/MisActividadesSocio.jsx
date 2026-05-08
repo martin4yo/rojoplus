@@ -3,6 +3,7 @@ import api from '../../../services/api'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../../hooks/useConfirm'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import { agruparSlots } from '../../../lib/cronograma'
 import {
   TrophyIcon,
   CalendarIcon,
@@ -190,12 +191,19 @@ export default function MisActividadesSocio({ socio, tokenPortal }) {
                       </div>
                     )}
 
-                    {insc.horarios && (
+                    {Array.isArray(insc.horarios) && insc.horarios.length > 0 && (
                       <div className="flex items-start space-x-3">
                         <ClockIcon className="h-5 w-5 mt-0.5" style={{ color: 'var(--text-dim)' }} />
-                        <div>
+                        <div className="flex-1">
                           <p className="text-sm font-medium" style={{ color: 'var(--text-dim)' }}>Horarios</p>
-                          <p className="text-base" style={{ color: 'var(--text)' }}>{insc.horarios}</p>
+                          <div className="space-y-0.5 mt-0.5">
+                            {agruparSlots(insc.horarios).map((g, i) => (
+                              <p key={i} className="text-base" style={{ color: 'var(--text)' }}>
+                                <span className="font-medium">{g.diasLabel}</span> {g.horaInicio}–{g.horaFin}
+                                {g.espacio && <span style={{ color: 'var(--text-dim)' }}> · {g.espacio}</span>}
+                              </p>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}

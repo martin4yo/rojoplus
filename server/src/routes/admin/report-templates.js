@@ -22,8 +22,8 @@ const router = Router()
 
 // ── Query definitions (must be before /:id to avoid route conflict) ─────────
 
-router.get('/report-templates/query-definitions', authAdmin, (req, res) => {
-  res.json(listQueryDefinitions())
+router.get('/report-templates/query-definitions', authAdmin, async (req, res) => {
+  res.json(await listQueryDefinitions(req.db, req.tenantId))
 })
 
 router.get('/report-templates/query-definitions/:key/default-template', authAdmin, (req, res) => {

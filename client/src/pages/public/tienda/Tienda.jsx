@@ -48,7 +48,7 @@ export default function Tienda() {
   if (config && config.habilitada === false) {
     return (
       <div>
-        <PublicHero eyebrow="Tienda" title="Próximamente" subtitle="La tienda online del club abre muy pronto." />
+        <PublicHero eyebrow="Tienda" title="Próximamente" subtitle="La tienda online del club abre muy pronto." compact />
       </div>
     )
   }
@@ -59,6 +59,7 @@ export default function Tienda() {
         eyebrow="Merchandising"
         title={tituloHero}
         subtitle={subHero || 'Indumentaria, accesorios y productos oficiales del club. Retiro en sede.'}
+        compact
       >
         <Link
           to="/tienda/carrito"

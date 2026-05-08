@@ -16,33 +16,71 @@ const router = Router()
 // BÚSQUEDA PÚBLICA (para obtener QR) - DEBE IR PRIMERO
 // ==============================================================================
 
+/**
+ * Busca un socio por nro de socio, DNI o email. Búsqueda SECUENCIAL por
+ * prioridad:
+ *   1) Nro de socio exacto
+ *   2) Documento exacto
+ *   3) Email principal o secundario (si la entrada contiene '@')
+ *
+ * El teléfono ya NO se usa como criterio de búsqueda (decisión de UX para
+ * evitar confusiones). Pero los teléfonos del socio sí se pueden usar como
+ * destino de envío — eso lo decide el flujo de envío post-búsqueda.
+ */
+async function buscarSocioFlexible(db, busqueda) {
+  const trim = (busqueda || '').trim()
+  if (!trim) return null
+
+  const SELECT = {
+    id: true,
+    nroSocio: true,
+    apellidoNombre: true,
+    email: true,
+    emailSecundario: true,
+    celular: true,
+    celularSecundario: true,
+    telefonoFijo: true,
+    tokenPortal: true,
+    estado: true,
+  }
+
+  // 1) Nro de socio exacto
+  let socio = await db.socio.findFirst({ where: { nroSocio: trim }, select: SELECT })
+  if (socio) return socio
+
+  // 2) Documento exacto
+  socio = await db.socio.findFirst({ where: { documento: trim }, select: SELECT })
+  if (socio) return socio
+
+  // 3) Email (principal o secundario), case insensitive
+  if (trim.includes('@')) {
+    socio = await db.socio.findFirst({
+      where: {
+        OR: [
+          { email: { equals: trim, mode: 'insensitive' } },
+          { emailSecundario: { equals: trim, mode: 'insensitive' } },
+        ],
+      },
+      select: SELECT,
+    })
+    if (socio) return socio
+  }
+
+  return null
+}
+
 // POST /api/socio/enviar-qr - Enviar QR por email (seguro)
 router.post('/enviar-qr', asyncHandler(async (req, res) => {
   const { busqueda } = req.body
 
   if (!busqueda || !busqueda.trim()) {
-    throw new AppError('Ingresa tu número de socio o DNI', 400, 'VALIDATION_ERROR')
+    throw new AppError('Ingresa tu número de socio, DNI, email o teléfono', 400, 'VALIDATION_ERROR')
   }
 
-  const socio = await req.db.socio.findFirst({
-    where: {
-      OR: [
-        { nroSocio: busqueda.trim() },
-        { documento: busqueda.trim() },
-      ],
-    },
-    select: {
-      id: true,
-      nroSocio: true,
-      apellidoNombre: true,
-      email: true,
-      tokenPortal: true,
-      estado: true,
-    },
-  })
+  const socio = await buscarSocioFlexible(req.db, busqueda)
 
   if (!socio) {
-    throw new AppError('No se encontró un socio con ese número o DNI', 404, 'SOCIO_NOT_FOUND')
+    throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
   }
 
   // Verificar si está activo
@@ -94,30 +132,13 @@ router.post('/enviar-link-whatsapp', asyncHandler(async (req, res) => {
   const { busqueda } = req.body
 
   if (!busqueda?.trim()) {
-    throw new AppError('Ingresa tu número de socio o DNI', 400, 'VALIDATION_ERROR')
+    throw new AppError('Ingresa tu número de socio, DNI, email o teléfono', 400, 'VALIDATION_ERROR')
   }
 
-  const socio = await req.db.socio.findFirst({
-    where: {
-      OR: [
-        { nroSocio: busqueda.trim() },
-        { documento: busqueda.trim() },
-      ],
-    },
-    select: {
-      id: true,
-      nroSocio: true,
-      apellidoNombre: true,
-      celular: true,
-      celularSecundario: true,
-      telefonoFijo: true,
-      tokenPortal: true,
-      estado: true,
-    },
-  })
+  const socio = await buscarSocioFlexible(req.db, busqueda)
 
   if (!socio) {
-    throw new AppError('No se encontró un socio con ese número o DNI', 404, 'SOCIO_NOT_FOUND')
+    throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
   }
 
   const estadoUpper = socio.estado?.toUpperCase() || ''
@@ -153,8 +174,9 @@ router.post('/enviar-link-whatsapp', asyncHandler(async (req, res) => {
     )
   }
 
-  // Ocultar parte del celular para la respuesta
-  const celularOculto = socio.celular.replace(/(\d{3})\d+(\d{3})/, '$1****$2')
+  // Ocultar parte del teléfono efectivamente usado
+  const telefonoUsado = String(telefono || '')
+  const celularOculto = telefonoUsado.replace(/(\d{3})\d+(\d{3})/, '$1****$2') || telefonoUsado
 
   res.json({
     success: true,
@@ -168,30 +190,13 @@ router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
   const { busqueda } = req.body
 
   if (!busqueda?.trim()) {
-    throw new AppError('Ingresa tu número de socio o DNI', 400, 'VALIDATION_ERROR')
+    throw new AppError('Ingresa tu número de socio, DNI, email o teléfono', 400, 'VALIDATION_ERROR')
   }
 
-  const socio = await req.db.socio.findFirst({
-    where: {
-      OR: [
-        { nroSocio: busqueda.trim() },
-        { documento: busqueda.trim() },
-      ],
-    },
-    select: {
-      id: true,
-      nroSocio: true,
-      apellidoNombre: true,
-      celular: true,
-      celularSecundario: true,
-      telefonoFijo: true,
-      tokenPortal: true,
-      estado: true,
-    },
-  })
+  const socio = await buscarSocioFlexible(req.db, busqueda)
 
   if (!socio) {
-    throw new AppError('No se encontró un socio con ese número o DNI', 404, 'SOCIO_NOT_FOUND')
+    throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
   }
 
   const estadoUpper = socio.estado?.toUpperCase() || ''
@@ -292,89 +297,42 @@ router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
 // ==============================================================================
 
 // POST /api/socio/enviar-link-acceso - Enviar Magic Link al socio
+// Acepta `valor` (DNI, nro de socio, email o teléfono) y `canal` ('email'|'whatsapp')
+// como medio de envío elegido por el usuario, independiente de cómo se identificó.
 router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
-  const { metodo, valor } = req.body // metodo: 'email' | 'dni' | 'whatsapp'
+  const { valor, canal } = req.body
+  // Backwards-compat: el front anterior mandaba `metodo` con valor 'email'|'dni'|'whatsapp'
+  // donde el método indicaba simultáneamente cómo se buscó y cómo se enviaría.
+  // Tras el rediseño, el canal es independiente: aceptamos `canal` o derivamos del legacy.
+  const canalEnvio = canal || (req.body.metodo === 'whatsapp' ? 'whatsapp' : 'email')
 
-  if (!metodo || !valor) {
-    throw new AppError('Método y valor son requeridos', 400, 'VALIDATION_ERROR')
+  if (!valor || !valor.trim()) {
+    throw new AppError('Ingresá tu DNI, email o teléfono', 400, 'VALIDATION_ERROR')
+  }
+  if (canalEnvio !== 'email' && canalEnvio !== 'whatsapp') {
+    throw new AppError('Canal de envío inválido', 400, 'VALIDATION_ERROR')
   }
 
-  // Buscar socio según método
-  let socio = null
-
-  if (metodo === 'email') {
-    socio = await req.db.socio.findFirst({
-      where: { email: valor.trim().toLowerCase() },
-      select: {
-        id: true, nroSocio: true, apellidoNombre: true, email: true,
-        documento: true, estado: true, celular: true, celularSecundario: true,
-        telefonoFijo: true, notifWhatsapp: true,
-      },
-    })
-  } else if (metodo === 'dni') {
-    socio = await req.db.socio.findFirst({
-      where: { documento: valor.trim() },
-      select: {
-        id: true, nroSocio: true, apellidoNombre: true, email: true,
-        documento: true, estado: true, celular: true, celularSecundario: true,
-        telefonoFijo: true, notifWhatsapp: true,
-      },
-    })
-  } else if (metodo === 'whatsapp') {
-    // Normalizar el input a solo dígitos y comparar con los 3 campos
-    // de teléfono también normalizados (regex_replace en SQL ignora guiones,
-    // paréntesis, espacios y prefijos como +54).
-    const tel = valor.trim().replace(/\D/g, '')
-    if (!tel) {
-      throw new AppError('Ingresá un número de teléfono válido', 400, 'VALIDATION_ERROR')
-    }
-    // Para que el match sea más seguro tomamos los últimos 8 dígitos (cubre
-    // cuando el usuario ingresa con o sin código de área/país).
-    const ultimos8 = tel.length > 8 ? tel.slice(-8) : tel
-    const patron = `%${ultimos8}%`
-    const ids = await req.db.$queryRaw`
-      SELECT id FROM socios
-      WHERE tenant_id = ${req.tenantId}
-        AND (
-          regexp_replace(coalesce(celular, ''), '\D', '', 'g') LIKE ${patron}
-          OR regexp_replace(coalesce(celular_secundario, ''), '\D', '', 'g') LIKE ${patron}
-          OR regexp_replace(coalesce(telefono_fijo, ''), '\D', '', 'g') LIKE ${patron}
-        )
-      LIMIT 1
-    `
-    if (ids?.[0]?.id) {
-      socio = await req.db.socio.findUnique({
-        where: { id: ids[0].id },
-        select: {
-          id: true, nroSocio: true, apellidoNombre: true, email: true,
-          documento: true, estado: true, celular: true, celularSecundario: true,
-          telefonoFijo: true, notifWhatsapp: true,
-        },
-      })
-    }
-  } else {
-    throw new AppError('Método inválido', 400, 'VALIDATION_ERROR')
-  }
-
+  // Búsqueda por nro de socio, DNI o email (sin teléfono, evita confusiones)
+  const socio = await buscarSocioFlexible(req.db, valor)
   if (!socio) {
     throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
   }
 
-  if (metodo !== 'whatsapp' && !socio.email) {
-    throw new AppError('Este socio no tiene email registrado. Contactá al club para actualizarlo', 400, 'NO_EMAIL')
+  // Validar que tenga el canal elegido
+  if (canalEnvio === 'email' && !socio.email) {
+    throw new AppError('Este socio no tiene email registrado. Probá con WhatsApp o contactá al club.', 400, 'NO_EMAIL')
   }
-
-  if (metodo === 'whatsapp') {
+  if (canalEnvio === 'whatsapp') {
     const telefono = obtenerTelefonoSocio(socio)
     if (!telefono) {
-      throw new AppError('Este socio no tiene teléfono registrado. Contactá al club.', 400, 'NO_PHONE')
+      throw new AppError('Este socio no tiene teléfono registrado. Probá con email o contactá al club.', 400, 'NO_PHONE')
     }
   }
 
   // Verificar estado activo
   const estadoUpper = socio.estado?.toUpperCase() || ''
   const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-
   if (!esActivo) {
     throw new AppError('Tu membresía no está activa. Contactá al club para regularizar tu situación', 403, 'SOCIO_INACTIVO')
   }
@@ -384,50 +342,31 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   const expiracion = new Date()
   expiracion.setHours(expiracion.getHours() + 24)
 
-  // Guardar token en BD (usaremos tokenPortal + tokenPortalExpira)
   await req.db.socio.update({
     where: { id: socio.id },
-    data: {
-      tokenPortal: token,
-      tokenPortalExpira: expiracion,
-    },
+    data: { tokenPortal: token, tokenPortalExpira: expiracion },
   })
 
   const portalLink = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${token}`
 
-  if (metodo === 'whatsapp') {
-    // Enviar solo por WhatsApp (resolver teléfono con fallback)
+  if (canalEnvio === 'whatsapp') {
     const telefono = obtenerTelefonoSocio(socio)
     await enviarLinkPortal({ db: req.db, socio: { ...socio, celular: telefono }, link: portalLink })
-    const telOculto = telefono.replace(/(\d{3})\d+(\d{3})/, '$1****$2')
-    res.json({
+    const telOculto = telefono.replace(/(\d{3})\d+(\d{3})/, '$1****$2') || telefono
+    return res.json({
       success: true,
       message: 'Link de acceso enviado por WhatsApp',
-      data: { telefonoEnviado: telOculto },
+      data: { canal: 'whatsapp', destino: telOculto },
     })
-    return
   }
 
-  // Enviar email con Magic Link (pasar tenantId para que la URL incluya el subdomain)
+  // Email
   await enviarMagicLinkSocio(socio, token, req.db, req.tenantId)
-
-  // Enviar también por WhatsApp si el socio tiene el canal habilitado.
-  // Importante: chequear los 3 teléfonos (celular, secundario y fijo).
-  const telWA = obtenerTelefonoSocio(socio)
-  if (socio.notifWhatsapp && telWA) {
-    req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_MAGIC_LINK' } })
-      .then(flag => {
-        if (flag?.valor !== 'false') {
-          enviarLinkPortal({ db: req.db, socio: { ...socio, celular: telWA }, link: portalLink })
-            .catch(err => console.error('Error enviando magic link por WA:', err.message))
-        }
-      })
-      .catch(err => console.error('Error leyendo flag WA magic link:', err.message))
-  }
-
-  res.json({
+  const emailOculto = socio.email.replace(/(.{2})(.*)(@.*)/, '$1***$3')
+  return res.json({
     success: true,
     message: 'Link de acceso enviado a tu email',
+    data: { canal: 'email', destino: emailOculto },
   })
 }))
 
@@ -472,6 +411,22 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
   const estadoUpper = socio.estado?.toUpperCase() || ''
   const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
 
+  // Crear sesión persistente ("recordar dispositivo") + setear cookie HttpOnly por 30 días
+  if (esActivo) {
+    try {
+      const { crearSesion, setSesionCookie } = await import('../services/sesionSocioService.js')
+      const ip = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+      const userAgent = req.headers['user-agent'] || null
+      const { token: sessionToken, expiresAt } = await crearSesion(req.db, {
+        socioId: socio.id, tenantId: req.tenantId, ip, userAgent,
+      })
+      setSesionCookie(res, sessionToken, expiresAt)
+    } catch (err) {
+      console.error('[validar-token] Error creando sesión persistente:', err.message)
+      // No bloquea el acceso al portal — la cookie es opcional para "recordar dispositivo"
+    }
+  }
+
   res.json({
     success: true,
     data: {
@@ -493,6 +448,119 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
       titularFamiliaId: socio.titularFamiliaId,
     },
   })
+}))
+
+// ==============================================================================
+// SESIÓN PERSISTENTE (RECORDAR DISPOSITIVO)
+// ==============================================================================
+
+// GET /api/socio/sesion/check
+// Verifica la cookie de sesión. Si es válida, emite un nuevo tokenPortal de 24h
+// y devuelve el link al portal. Sliding expiration de 30 días sobre la sesión.
+router.get('/sesion/check', asyncHandler(async (req, res) => {
+  const { SESSION_COOKIE, validarSesion, clearSesionCookie } = await import('../services/sesionSocioService.js')
+  const cookieToken = req.cookies?.[SESSION_COOKIE]
+  if (!cookieToken) return res.json({ success: true, data: { autenticado: false } })
+
+  const sesion = await validarSesion(req.db, cookieToken)
+  if (!sesion) {
+    clearSesionCookie(res)
+    return res.json({ success: true, data: { autenticado: false } })
+  }
+
+  // Emitir nuevo tokenPortal (24h) y devolver link al portal
+  const socio = await req.db.socio.findUnique({
+    where: { id: sesion.socioId },
+    select: { id: true, nroSocio: true, apellidoNombre: true, estado: true },
+  })
+  if (!socio) {
+    clearSesionCookie(res)
+    return res.json({ success: true, data: { autenticado: false } })
+  }
+  const estadoUpper = socio.estado?.toUpperCase() || ''
+  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
+  if (!esActivo) {
+    clearSesionCookie(res)
+    return res.json({ success: true, data: { autenticado: false, motivo: 'Membresía no activa' } })
+  }
+
+  const nuevoToken = crypto.randomBytes(32).toString('hex')
+  const exp = new Date(); exp.setHours(exp.getHours() + 24)
+  await req.db.socio.update({
+    where: { id: socio.id },
+    data: { tokenPortal: nuevoToken, tokenPortalExpira: exp },
+  })
+
+  return res.json({
+    success: true,
+    data: {
+      autenticado: true,
+      tokenPortal: nuevoToken,
+      nroSocio: socio.nroSocio,
+      apellidoNombre: socio.apellidoNombre,
+    },
+  })
+}))
+
+// POST /api/socio/sesion/cerrar — cerrar sesión actual (este dispositivo)
+router.post('/sesion/cerrar', asyncHandler(async (req, res) => {
+  const { SESSION_COOKIE, revocarSesion, clearSesionCookie } = await import('../services/sesionSocioService.js')
+  const cookieToken = req.cookies?.[SESSION_COOKIE]
+  if (cookieToken) await revocarSesion(req.db, cookieToken)
+  clearSesionCookie(res)
+  return res.json({ success: true, message: 'Sesión cerrada' })
+}))
+
+// POST /api/socio/sesion/cerrar-todas — cerrar sesión en todos los dispositivos
+// Requiere tokenPortal válido en body (auth implícita)
+router.post('/sesion/cerrar-todas', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.body
+  if (!tokenPortal) throw new AppError('Token requerido', 400, 'VALIDATION_ERROR')
+  const socio = await req.db.socio.findFirst({
+    where: { tokenPortal },
+    select: { id: true },
+  })
+  if (!socio) throw new AppError('Token inválido', 401, 'INVALID_TOKEN')
+  const { revocarTodasSesiones, clearSesionCookie } = await import('../services/sesionSocioService.js')
+  const count = await revocarTodasSesiones(req.db, socio.id)
+  clearSesionCookie(res)
+  return res.json({ success: true, message: `${count} sesiones cerradas` })
+}))
+
+// GET /api/socio/sesion/dispositivos — lista las sesiones activas del socio
+// Requiere tokenPortal en query
+router.get('/sesion/dispositivos', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.query
+  if (!tokenPortal) throw new AppError('Token requerido', 400, 'VALIDATION_ERROR')
+  const socio = await req.db.socio.findFirst({ where: { tokenPortal }, select: { id: true } })
+  if (!socio) throw new AppError('Token inválido', 401, 'INVALID_TOKEN')
+  const { listarSesionesActivas, SESSION_COOKIE } = await import('../services/sesionSocioService.js')
+  const sesiones = await listarSesionesActivas(req.db, socio.id)
+  // Marcar la sesión actual (cookie)
+  const cookieToken = req.cookies?.[SESSION_COOKIE]
+  let sesionActualId = null
+  if (cookieToken) {
+    const actual = await req.db.socioSession.findUnique({ where: { token: cookieToken }, select: { id: true } })
+    sesionActualId = actual?.id || null
+  }
+  return res.json({
+    success: true,
+    data: sesiones.map(s => ({ ...s, esActual: s.id === sesionActualId })),
+  })
+}))
+
+// POST /api/socio/sesion/dispositivos/:id/revocar — revocar una sesión específica
+// Body: { tokenPortal }
+router.post('/sesion/dispositivos/:id/revocar', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.body
+  if (!tokenPortal) throw new AppError('Token requerido', 400, 'VALIDATION_ERROR')
+  const sesionId = parseInt(req.params.id)
+  const socio = await req.db.socio.findFirst({ where: { tokenPortal }, select: { id: true } })
+  if (!socio) throw new AppError('Token inválido', 401, 'INVALID_TOKEN')
+  const sesion = await req.db.socioSession.findUnique({ where: { id: sesionId }, select: { socioId: true } })
+  if (!sesion || sesion.socioId !== socio.id) throw new AppError('Sesión no encontrada', 404, 'NOT_FOUND')
+  await req.db.socioSession.update({ where: { id: sesionId }, data: { revokedAt: new Date() } })
+  return res.json({ success: true, message: 'Dispositivo desconectado' })
 }))
 
 // ==============================================================================
@@ -671,6 +739,10 @@ router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
               descripcion: true,
             },
           },
+          horariosRecurrentes: {
+            where: { activo: true },
+            orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }],
+          },
           entrenadores: {
             include: {
               entrenador: {
@@ -691,6 +763,15 @@ router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
     },
   })
 
+  // Lookup separado de espacios
+  const espacioIdsInsc = [...new Set(
+    inscripciones.flatMap(i => i.categoriaActividad.horariosRecurrentes.map(h => h.espacioId).filter(Boolean))
+  )]
+  const espaciosInsc = espacioIdsInsc.length > 0
+    ? await req.db.espacioDeportivo.findMany({ where: { id: { in: espacioIdsInsc } }, select: { id: true, nombre: true } })
+    : []
+  const espacioByIdInsc = new Map(espaciosInsc.map(e => [e.id, e.nombre]))
+
   const result = inscripciones.map(insc => ({
     id: insc.id,
     fechaInscripcion: insc.fechaInscripcion,
@@ -699,7 +780,12 @@ router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
     actividad: insc.categoriaActividad.actividad.nombre,
     categoria: insc.categoriaActividad.nombre,
     descripcion: insc.categoriaActividad.descripcion,
-    horarios: insc.categoriaActividad.horarios,
+    horarios: insc.categoriaActividad.horariosRecurrentes.map(h => ({
+      diaSemana: h.diaSemana,
+      horaInicio: h.horaInicio,
+      horaFin: h.horaFin,
+      espacio: h.espacioId ? (espacioByIdInsc.get(h.espacioId) || null) : null,
+    })),
     cuotaMensual: insc.categoriaActividad.cuotaMensual,
     entrenador: insc.categoriaActividad.entrenadores[0]?.entrenador?.nombre || null,
     entrenadorEmail: insc.categoriaActividad.entrenadores[0]?.entrenador?.email || null,
@@ -767,6 +853,10 @@ router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res
           descripcion: true,
         },
       },
+      horariosRecurrentes: {
+        where: { activo: true },
+        orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }],
+      },
       entrenadores: {
         include: {
           entrenador: {
@@ -792,6 +882,15 @@ router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res
     ],
   })
 
+  // Lookup separado de espacios
+  const espacioIdsDisp = [...new Set(
+    categoriasDisponibles.flatMap(c => c.horariosRecurrentes.map(h => h.espacioId).filter(Boolean))
+  )]
+  const espaciosDisp = espacioIdsDisp.length > 0
+    ? await req.db.espacioDeportivo.findMany({ where: { id: { in: espacioIdsDisp } }, select: { id: true, nombre: true } })
+    : []
+  const espacioByIdDisp = new Map(espaciosDisp.map(e => [e.id, e.nombre]))
+
   const result = categoriasDisponibles
     .filter(cat => {
       // Filtrar las que tienen cupos disponibles
@@ -803,7 +902,12 @@ router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res
       actividad: cat.actividad.nombre,
       categoria: cat.nombre,
       descripcion: cat.descripcion,
-      horarios: cat.horarios,
+      horarios: cat.horariosRecurrentes.map(h => ({
+        diaSemana: h.diaSemana,
+        horaInicio: h.horaInicio,
+        horaFin: h.horaFin,
+        espacio: h.espacioId ? (espacioByIdDisp.get(h.espacioId) || null) : null,
+      })),
       cuotaMensual: cat.cuotaMensual,
       entrenador: cat.entrenadores[0]?.entrenador?.nombre || null,
       cuposDisponibles: cat.cupoMaximo ? cat.cupoMaximo - cat._count.inscripciones : null,

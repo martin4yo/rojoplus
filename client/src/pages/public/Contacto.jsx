@@ -49,6 +49,7 @@ export default function Contacto() {
         eyebrow="Estamos para ayudarte"
         title="Contacto."
         subtitle="Escribinos y te respondemos a la brevedad."
+        compact
       />
 
       {/* Contenido principal */}

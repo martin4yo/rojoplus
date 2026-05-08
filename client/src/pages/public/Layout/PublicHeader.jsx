@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, ChevronDown, ArrowUpRight, ShoppingBag } from 'lucide-react'
 import { useTenant } from '../../../contexts/TenantContext'
@@ -13,6 +13,8 @@ export default function PublicHeader() {
   const [clubMenuOpen, setClubMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
+  const socioMenuRef = useRef(null)
+  const clubMenuRef = useRef(null)
 
   const isActive = (path) => location.pathname === path
 
@@ -22,6 +24,28 @@ export default function PublicHeader() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Click outside para cerrar dropdowns (sin race condition con clicks internos)
+  useEffect(() => {
+    if (!socioMenuOpen && !clubMenuOpen) return
+    const onClickOutside = (e) => {
+      if (socioMenuOpen && socioMenuRef.current && !socioMenuRef.current.contains(e.target)) {
+        setSocioMenuOpen(false)
+      }
+      if (clubMenuOpen && clubMenuRef.current && !clubMenuRef.current.contains(e.target)) {
+        setClubMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [socioMenuOpen, clubMenuOpen])
+
+  // Cerrar dropdowns al cambiar de ruta (cuando se navega desde un Link interno)
+  useEffect(() => {
+    setSocioMenuOpen(false)
+    setClubMenuOpen(false)
+    setMobileMenuOpen(false)
+  }, [location.pathname])
 
   const navLinks = [
     { path: '/', label: 'Inicio' },
@@ -77,10 +101,10 @@ export default function PublicHeader() {
           <nav className="hidden lg:flex items-center gap-1 ml-4">
             {navLinks.map(link => (
               link.submenu ? (
-                <div key={link.path} className="relative">
+                <div key={link.path} ref={clubMenuRef} className="relative">
                   <button
+                    type="button"
                     onClick={() => setClubMenuOpen(!clubMenuOpen)}
-                    onBlur={() => setTimeout(() => setClubMenuOpen(false), 150)}
                     className={`flex items-center gap-1 ${baseLink} ${
                       link.submenu.some(sub => isActive(sub.path)) ? activeLink : inactiveLink
                     }`}
@@ -121,14 +145,14 @@ export default function PublicHeader() {
               )
             ))}
 
-            {/* Dropdown Soy Socio */}
-            <div className="relative ml-2">
+            {/* Dropdown Socio/Staff */}
+            <div ref={socioMenuRef} className="relative ml-2">
               <button
+                type="button"
                 onClick={() => setSocioMenuOpen(!socioMenuOpen)}
-                onBlur={() => setTimeout(() => setSocioMenuOpen(false), 150)}
                 className={`flex items-center gap-1 ${baseLink} ${inactiveLink}`}
               >
-                Soy socio
+                Socio/Staff
                 <ChevronDown className={`w-3 h-3 transition-transform ${socioMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
@@ -145,7 +169,13 @@ export default function PublicHeader() {
                     to="/login-socio"
                     className="block px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg hover:bg-pub-fg-10"
                   >
-                    Portal del socio
+                    Soy socio
+                  </Link>
+                  <Link
+                    to="/login-entrenador"
+                    className="block px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg hover:bg-pub-fg-10"
+                  >
+                    Soy entrenador
                   </Link>
                   <Link
                     to="/mi-qr"
@@ -239,14 +269,21 @@ export default function PublicHeader() {
 
               <div className="border-t border-pub-fg-10 my-2 pt-2">
                 <p className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.25em] text-pub-fg-40">
-                  Soy socio
+                  Socio/Staff
                 </p>
                 <Link
                   to="/login-socio"
                   onClick={() => setMobileMenuOpen(false)}
                   className="block px-6 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg"
                 >
-                  Portal del socio
+                  Soy socio
+                </Link>
+                <Link
+                  to="/login-entrenador"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-6 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-pub-fg-60 hover:text-pub-fg"
+                >
+                  Soy entrenador
                 </Link>
                 <Link
                   to="/mi-qr"

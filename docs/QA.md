@@ -1428,6 +1428,160 @@ Crear 2 tenants distintos con datos independientes (ej: `clubA` y `clubB`).
 
 ---
 
+## NUEVOS — Sesión Mayo 2026
+
+### Vigencia de socios (bloqueo automático por morosidad) ⚙️
+
+**Pre-requisito**: configurar 2 EstadoSocio del tenant: uno con `rolVigencia='AL_DIA'` y `permiteIngresoMolinete=true`; otro con `rolVigencia='BLOQUEADO'` y `permiteIngresoMolinete=false`. Activar `MOROSIDAD_BLOQUEO_AUTO_ACTIVO=true`. Para notificaciones también activar `MOROSIDAD_NOTIFICACION_BLOQUEO_ACTIVO=true` Y `MOROSIDAD_NOTIF_CONFIRMADO=true`.
+
+#### Cron de bloqueo (1:00 AM Argentina)
+- [ ] 🟢 Socio con cuota PENDIENTE + `fechaVencimiento < hoy` → cron lo pasa al estado `BLOQUEADO`
+- [ ] 🟢 Familia: cuota vencida en CUALQUIER miembro (titular o hijos) bloquea a TODA la familia
+- [ ] 🟢 Socio bloqueado que se pone al día → cron lo pasa a `AL_DIA` en la siguiente corrida
+- [ ] 🟡 Si el tenant no configuró estados con `rolVigencia` → cron skipea con warning
+- [ ] 🟡 Cron itera tenants con `MOROSIDAD_BLOQUEO_AUTO_ACTIVO=true` (los que no, no se procesan)
+- [ ] 🟢 Auditoría: cada cambio queda registrado en `auditoria_socio` con evento `BLOQUEADO_MOROSIDAD` o `ACTIVADO_PAGO`
+
+#### Hook reactivación tras cobranza
+- [ ] 🟢 Socio bloqueado, se le cobra una cuota que salda todas las vencidas → pasa a `AL_DIA` automáticamente al confirmar el pago
+- [ ] 🟢 Si la familia entera se pone al día con un solo cobro → todos los miembros se reactivan
+- [ ] 🟡 Si todavía hay cuotas vencidas → no se reactiva (se mantiene en BLOQUEADO)
+
+#### Notificación de bloqueo (cron 9:00–18:00 horarias)
+- [ ] 🟢 **Modo demo**: con `MODO_DEMO=true` y `EMAIL_DEMO`/`WHATSAPP_DEMO_NUMERO` configurados → notificaciones se redirigen al destinatario demo, no al socio real
+- [ ] 🟢 **Cap horario**: nunca envía más de `MOROSIDAD_NOTIF_MAX_POR_HORA` (default 30) en una hora
+- [ ] 🟢 **Cap diario**: nunca envía más de `MOROSIDAD_NOTIF_MAX_POR_DIA` (default 200) en un día
+- [ ] 🟢 **Ventana horaria**: solo envía entre `MOROSIDAD_NOTIF_HORA_INICIO` y `MOROSIDAD_NOTIF_HORA_FIN`
+- [ ] 🟢 **Plantilla rotativa**: el mismo socio recibe siempre la misma variante (4 plantillas)
+- [ ] 🟢 **Throttling**: delay con jitter entre mensajes (`MOROSIDAD_NOTIF_DELAY_MS`)
+- [ ] 🟢 **No duplica**: el evento `BLOQUEADO_MOROSIDAD` se marca con `notificadoEn` para no repetir
+- [ ] 🟢 **Opt-outs**: respeta `Socio.notificarMorosidad`, `Socio.notifEmail`, `Socio.notifWhatsapp`
+- [ ] 🟢 **Kill switch global**: `NOTIFICACIONES_VIGENCIA_KILL_SWITCH=true` en `.env` detiene todo
+
+#### Auditoría de socio
+- [ ] 🟢 Endpoint `GET /admin/socios/:id/auditoria` devuelve historial paginado
+- [ ] 🟡 Eventos registrados: `ALTA_SOCIO`, `BAJA_SOCIO`, `EMAIL_MOD`, `CELULAR_MOD`, `DIRECCION_MOD`, `TIPO_SOCIO_MOD`, `INSCRIPCION_ACT`, `BAJA_INSCRIPCION`, `BLOQUEADO_MOROSIDAD`, `ACTIVADO_PAGO`
+- [ ] 🟡 Cada evento tiene `usuarioId` (admin que originó) y `origen` (UI/CRON/API/IMPORT)
+
+---
+
+### Sesión persistente Socio + Entrenador ("recordar dispositivo")
+
+#### Login Socio
+- [ ] 🟢 Ingresar nº socio / DNI / email → recibir magic link por email o WhatsApp
+- [ ] 🟢 Búsqueda por teléfono fue removida (input solo acepta nro/DNI/email)
+- [ ] 🟢 Click en magic link → portal abre + cookie `socio_sid` se setea (DevTools)
+- [ ] 🟢 Cerrar pestaña, volver a `/login-socio` → auto-login redirige al portal
+- [ ] 🟡 URL del magic link no contiene `www.` (verificar cualquier subdomain)
+- [ ] 🟡 Pestaña "Dispositivos conectados" en el perfil del socio muestra sesión actual
+- [ ] 🟢 "Cerrar sesión" desde el portal → cookie eliminada, no auto-redirect
+- [ ] 🟢 "Cerrar sesión en todos los dispositivos" → ningún device queda con sesión válida
+
+#### Login Entrenador
+- [ ] 🟢 Acceso desde header público → menú "Socio/Staff" → "Soy entrenador"
+- [ ] 🟢 Ingresar email o documento del entrenador → magic link llega
+- [ ] 🟢 Sesión persistente de 30 días (cookie `entrenador_sid`)
+- [ ] 🟢 Entrenador vinculado a Entidad: la búsqueda funciona con email de Entidad
+
+#### Admin: revocar sesiones
+- [ ] 🟢 Tab "Dispositivos" en SocioForm → admin ve sesiones activas con IP/UA/fechas
+- [ ] 🟢 Botón "Desconectar" → revoca esa sesión específica (el socio tiene que loguearse de nuevo en ese device)
+- [ ] 🟢 Botón "Cerrar todas" → revoca todas las sesiones del socio
+
+---
+
+### Portal del Entrenador
+
+**Pre-requisito**: tener Entrenador con email cargado y al menos una `EntrenadorCategoria` asignada activa.
+
+#### Acceso y categorías
+- [ ] 🟢 Login con email → magic link → portal abre con datos personales arriba
+- [ ] 🟢 Selector de categorías muestra solo las asignadas al entrenador (no todas las del club)
+- [ ] 🟢 Cantidad de inscriptos se muestra al lado de cada categoría
+- [ ] 🟢 No accede a categorías de OTROS entrenadores (probar con `?categoriaId=X` ajeno → 403)
+
+#### Tab Plantel
+- [ ] 🟢 Lista todos los socios `Inscripcion.estado=ACTIVA` de la categoría
+- [ ] 🟡 Muestra alerta si la `aptaFisicaVence` está vencida o por vencer en <30 días
+- [ ] 🟡 Botones de teléfono y email funcionan (`tel:` / `mailto:`)
+- [ ] 🟡 Indicador "menor" en socios con `esMenor=true`
+
+#### Tab Entrenamientos
+- [ ] 🟢 Lista entrenamientos de últimos 30 días + próximos 30 días por default
+- [ ] 🟢 Crear entrenamiento extra → se crea con `tipo=EXTRA` y dispara notificación a socios inscriptos
+- [ ] 🟢 Modo demo: notificación de nuevo entrenamiento llega al destinatario demo
+- [ ] 🟢 Cancelar entrenamiento + motivo → estado pasa a `CANCELADO` y se notifica a socios
+- [ ] 🟢 **Asistencia**: marcar 4 estados (PRESENTE / AUSENTE / TARDE / JUSTIFICADO) por jugador
+- [ ] 🟢 Guardar asistencia → bulk upsert (no duplica si se guarda 2 veces)
+- [ ] 🟡 Si el entrenamiento está cancelado, no se permite tomar asistencia
+
+#### Tab Partidos
+- [ ] 🟢 Crear partido (rival, fecha, condición LOCAL/VISITANTE, tipo)
+- [ ] 🟢 Convocar plantel: tocar jugadores → bulk save → notifica a los nuevos convocados
+- [ ] 🟢 Si se desconvoca a alguien → se elimina la convocatoria (sin notificación adversa)
+- [ ] 🟡 Estado de respuesta del jugador (Confirmó / Rechazó / Sin responder) se muestra
+- [ ] 🟢 Modo demo: notificación de convocatoria llega al destinatario demo
+
+#### Tab Chat
+- [ ] 🟢 Lista conversaciones con socios; ordenadas por último mensaje
+- [ ] 🟢 Click → muestra historial; mensajes recibidos se marcan leídos automáticamente
+- [ ] 🟢 Enviar mensaje → llega al socio
+- [ ] 🟡 Indicador de mensajes no leídos en cada conversación
+
+#### Salir
+- [ ] 🟢 Botón "Salir" en header → cookie revocada → redirige a `/login-entrenador`
+
+---
+
+### Tab Entrenador en Personal (refactor Entrenador → Entidad)
+
+**Pre-requisito**: en `/admin/configuracion/cargos-personal`, marcar al menos un Cargo con switch "Cargo de entrenador" activo.
+
+- [ ] 🟢 Edición de Personal con cargo `esEntrenador=true` muestra tab "Entrenador"
+- [ ] 🟡 Edición de Personal con cargo normal NO muestra el tab
+- [ ] 🟢 Datos del rol (especialidad, observaciones, activo) se guardan
+- [ ] 🟢 Datos staff web (mostrarEnWeb, fotoStaff, biografía) se guardan
+- [ ] 🟢 Asignar categoría desde la tab → si no existía registro Entrenador, se auto-crea (auto-promoción)
+- [ ] 🟢 Quitar categoría → solo elimina la relación, mantiene perfil entrenador
+- [ ] 🟡 Migración: script `migrar-entrenadores-a-entidad.js --tenant X --dry-run` muestra qué pasaría
+- [ ] 🟢 Después de migrar: cada Entrenador tiene `entidadId` no null
+- [ ] 🟢 Login entrenador funciona buscando por email tanto en Entrenador.email como en entidad.email (post-migración)
+
+---
+
+### Cronograma — fix portal socio + sitio público
+
+**Pre-requisito**: tener al menos una `CategoriaActividad` con `HorarioRecurrente` cargados desde `/admin/deportes/horarios`.
+
+- [ ] 🟢 Sitio público `/actividades/:id` → tab Cronograma muestra día/hora/espacio correcto
+- [ ] 🟢 Portal socio → "Mis actividades" → muestra horarios estructurados (era bug: no mostraba nada)
+- [ ] 🟡 Helper `agruparSlots` agrupa días con mismo horario+espacio (Lun/Mié/Vie 19:00–20:30 · Cancha 1 en una línea)
+- [ ] 🟡 Form Categoria Actividad ya NO tiene los inputs de texto legacy
+- [ ] 🟡 En su lugar muestra link "Editar horarios →" a `/admin/deportes/horarios?categoriaId=X`
+
+---
+
+### Conciliación Brio → Clubix (sportivopilar)
+
+- [ ] 🟢 Saldo CC global = adeudado global (cuotas pendientes)
+- [ ] 🟢 Por familia: `saldoCC = sum(cuotas PENDIENTES)`
+- [ ] 🟡 Si se necesita revertir ajustes: SQL DELETE por `origen` en cargos:
+  - `AJUSTE_CUOTAS_FALTANTES_BRIO_20260507`
+  - `AJUSTE_COMPENSACION_SALDO_CC_20260507`
+  - `MIGRACION_BRIO_HISTORICO`
+
+---
+
+### Reporte "Listado de Socios para Firma"
+
+- [ ] 🟢 Diseñador de reportes → query "Listado de Socios para Firma" disponible
+- [ ] 🟢 Filtros: tipo de socio, estado, categoría (todos selects con options del tenant)
+- [ ] 🟢 Filtro Edad: "Solo menores" / "Solo mayores"
+- [ ] 🟢 PDF generado tiene grilla con: # / Nº Socio / DNI / Apellido y Nombre / Categoría / espacio firma
+- [ ] 🟡 Filtros aplicados se muestran en el header del PDF
+
+---
+
 ## Defectos detectados
 
 Anotá acá los problemas encontrados durante las pruebas. Formato sugerido:

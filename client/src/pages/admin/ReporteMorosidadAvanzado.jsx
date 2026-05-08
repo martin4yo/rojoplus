@@ -194,8 +194,12 @@ export default function ReporteMorosidadAvanzado() {
 
   const cargarPeriodos = async () => {
     try {
-      const data = await api.get('/admin/periodos')
-      const ordenados = [...(data || [])].sort((a, b) => {
+      const response = await api.get('/admin/periodos')
+      // Defensivo: el endpoint podría devolver array directo o { data: [...] } según el handler que matchee.
+      const arr = Array.isArray(response)
+        ? response
+        : (Array.isArray(response?.data) ? response.data : [])
+      const ordenados = [...arr].sort((a, b) => {
         if (a.anio !== b.anio) return b.anio - a.anio
         return b.mes - a.mes
       })

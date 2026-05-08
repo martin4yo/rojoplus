@@ -61,6 +61,7 @@ export default function Noticias() {
         eyebrow="Novedades"
         title="Noticias."
         subtitle="Enterate de las últimas novedades del club."
+        compact
       />
 
       {/* Filtros */}

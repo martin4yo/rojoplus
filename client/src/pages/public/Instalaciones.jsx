@@ -24,6 +24,7 @@ export default function Instalaciones() {
         eyebrow="Espacios"
         title="Instalaciones."
         subtitle="Donde entrenamos, competimos y compartimos."
+        compact
       />
 
       {/* Banner Header */}

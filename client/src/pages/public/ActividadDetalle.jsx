@@ -286,11 +286,14 @@ export default function ActividadDetalle() {
                           <div className="space-y-4">
                             {actividad.categorias.map(cat => (
                               <div key={cat.id} className="border border-gray-200 rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h3 className="font-semibold text-gray-800">{cat.nombre}</h3>
-                                  <span className="text-sm text-gray-500 flex items-center gap-1">
-                                    <Users className="w-4 h-4" />
-                                    {cat._count?.inscripciones || 0} inscriptos
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <h3 className="font-semibold text-gray-800 min-w-0 flex-1 break-words">{cat.nombre}</h3>
+                                  <span
+                                    className="inline-flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap flex-shrink-0 px-2 py-1 bg-gray-100 rounded-full"
+                                    title={`${cat._count?.inscripciones || 0} inscriptos`}
+                                  >
+                                    <Users className="w-3.5 h-3.5" />
+                                    <span>{cat._count?.inscripciones || 0}</span>
                                   </span>
                                 </div>
 
@@ -312,6 +315,12 @@ export default function ActividadDetalle() {
                                           <span className="font-medium">{diasSemana[h.diaSemana]}</span>
                                           <span className="mx-2">·</span>
                                           <span>{h.horaInicio?.slice(0,5)} - {h.horaFin?.slice(0,5)}</span>
+                                          {h.espacio && (
+                                            <>
+                                              <span className="mx-2">·</span>
+                                              <span className="text-gray-500">{h.espacio}</span>
+                                            </>
+                                          )}
                                         </div>
                                       ))}
                                     </div>

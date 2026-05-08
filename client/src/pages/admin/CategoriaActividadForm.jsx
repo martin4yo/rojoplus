@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save } from 'lucide-react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { ArrowLeft, Save, Calendar, ExternalLink } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import api from '../../services/api'
@@ -23,9 +23,6 @@ export default function CategoriaActividadForm() {
     edadMaxima: '',
     sexo: '',
     cuotaMensual: '',
-    diasEntrenamiento: '',
-    horarioEntrenamiento: '',
-    lugarEntrenamiento: '',
     cupoMaximo: '',
     orden: 0,
     activo: true,
@@ -52,9 +49,6 @@ export default function CategoriaActividadForm() {
           edadMaxima: cat.edadMaxima || '',
           sexo: cat.sexo || '',
           cuotaMensual: cat.cuotaMensual || '',
-          diasEntrenamiento: cat.diasEntrenamiento || '',
-          horarioEntrenamiento: cat.horarioEntrenamiento || '',
-          lugarEntrenamiento: cat.lugarEntrenamiento || '',
           cupoMaximo: cat.cupoMaximo || '',
           orden: cat.orden || 0,
           activo: cat.activo ?? true,
@@ -259,43 +253,25 @@ export default function CategoriaActividadForm() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mt-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Días de Entrenamiento</label>
-            <input
-              type="text"
-              name="diasEntrenamiento"
-              value={form.diasEntrenamiento}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
-              placeholder="Lunes, Miércoles"
-            />
+        {/* Cronograma — se gestiona en /admin/deportes/horarios */}
+        {isEdit && (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <Calendar className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-blue-900">Cronograma de entrenamientos</p>
+                <p className="text-xs text-blue-700 mt-0.5">Los días, horarios y espacios se gestionan en el módulo de Horarios Recurrentes.</p>
+              </div>
+            </div>
+            <Link
+              to={`/admin/deportes/horarios?categoriaId=${catId}`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 whitespace-nowrap"
+            >
+              Editar horarios
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Horario</label>
-            <input
-              type="text"
-              name="horarioEntrenamiento"
-              value={form.horarioEntrenamiento}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
-              placeholder="18:00 - 20:00"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Lugar</label>
-            <input
-              type="text"
-              name="lugarEntrenamiento"
-              value={form.lugarEntrenamiento}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
-              placeholder="Cancha principal"
-            />
-          </div>
-        </div>
+        )}
 
         {isEdit && (
           <div className="mt-4">

@@ -228,6 +228,87 @@ export function getDefaultTemplate(queryKey) {
 <div class="grand-total">Ingresos: \${{formatCurrency data.summary.ingresos}} | Egresos: \${{formatCurrency data.summary.egresos}} | Saldo: \${{formatCurrency data.summary.saldo}}</div>
 </body></html>`,
 
+    morosos_por_actividad: `${BASE_STYLES}
+<style>
+  .group { page-break-before: always; }
+  .group:first-of-type { page-break-before: auto; }
+  .group-header {
+    background: #1f2937; color: white; padding: 10px 14px; margin: 10px 0 8px;
+    border-radius: 4px; font-weight: bold; font-size: 11pt;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .group-header .stats { font-weight: normal; font-size: 9pt; opacity: 0.9; }
+  .socio-block {
+    margin-bottom: 8px; padding: 6px 8px;
+    border-left: 3px solid #DC2626; background: #fafafa;
+    page-break-inside: avoid;
+  }
+  .socio-name { font-weight: bold; font-size: 10pt; color: #1f2937; }
+  .socio-contact { font-size: 8pt; color: #6b7280; margin-bottom: 4px; }
+  .cuotas-table { font-size: 8pt; width: 100%; margin-top: 4px; }
+  .cuotas-table th { background: #f3f4f6; font-size: 7.5pt; padding: 3px 6px; }
+  .cuotas-table td { padding: 3px 6px; }
+  .cuotas-table tfoot td { background: #fef3c7; font-weight: bold; }
+  .group-total {
+    font-weight: bold; padding: 8px 12px; background: #fef3c7;
+    border-radius: 4px; margin-top: 6px; text-align: right; font-size: 10pt;
+  }
+  .grand-total { background: #1f2937; color: white; padding: 12px; }
+</style>
+<div class="header">
+  <div><div class="title">Socios Morosos por Actividad / Categoría</div><div class="subtitle">{{tenant.nombre}}</div></div>
+  <div class="meta">Generado: {{generatedAt}}<br>{{userName}}</div>
+</div>
+<div class="params">{{#each paramLabels}}<span><strong>{{this.label}}:</strong> {{this.value}}</span>&nbsp;{{/each}}</div>
+
+{{#each data.items}}
+<div class="group">
+  <div class="group-header">
+    <span>{{actividad}} — {{categoria}}</span>
+    <span class="stats">{{cantSocios}} socios · {{cantCuotas}} cuotas · $ {{formatCurrency totalDeuda}}</span>
+  </div>
+  {{#each socios}}
+  <div class="socio-block">
+    <div class="socio-name">#{{nroSocio}} — {{apellidoNombre}}{{#if documento}} ({{documento}}){{/if}}</div>
+    <div class="socio-contact">{{#if celular}}📱 {{celular}}{{/if}}{{#if email}} · ✉ {{email}}{{/if}}</div>
+    <table class="cuotas-table">
+      <thead>
+        <tr>
+          <th>Período</th>
+          <th>Descripción</th>
+          <th>Vencimiento</th>
+          <th class="r">Días mora</th>
+          <th class="r">Importe</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each cuotas}}
+        <tr>
+          <td>{{periodo}}</td>
+          <td>{{descripcion}}</td>
+          <td>{{formatDate fechaVencimiento}}</td>
+          <td class="r">{{diasMora}}</td>
+          <td class="r">$ {{formatCurrency montoTotal}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="3" class="r">Subtotal {{apellidoNombre}}:</td><td class="r">{{cantCuotas}}</td><td class="r">$ {{formatCurrency totalDeuda}}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+  {{/each}}
+  <div class="group-total">
+    Total {{actividad}} / {{categoria}}: {{cantSocios}} socios · {{cantCuotas}} cuotas · $ {{formatCurrency totalDeuda}}
+  </div>
+</div>
+{{/each}}
+
+<div class="grand-total" style="margin-top:24px; text-align:center;">
+  TOTAL GENERAL — {{data.summary.totalGrupos}} grupos · {{data.summary.totalSocios}} socios · {{data.summary.totalCuotas}} cuotas · $ {{formatCurrency data.summary.totalDeuda}}
+</div>
+</body></html>`,
+
     recibo_cobro: `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -544,6 +625,49 @@ export function getDefaultTemplate(queryKey) {
 </div>
 {{/with}}
 
+</body></html>`
+
+  templates['socios_listado_firma'] = `${BASE_STYLES}
+<style>
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  th, td { border: 1px solid #999; padding: 6px 5px; vertical-align: middle; }
+  th { background: #1d4ed8; color: white; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.3px; }
+  td.firma { width: 22%; height: 36px; }
+  td.r { text-align: right; }
+  td.c { text-align: center; }
+  tbody tr:nth-child(even) td:not(.firma) { background: #f8fafc; }
+  .params { font-size: 9pt; color: #555; margin-bottom: 6px; }
+</style>
+<div class="header">
+  <div><div class="title">Listado de Socios</div><div class="subtitle">{{tenant.nombre}}</div></div>
+  <div class="meta">Generado: {{generatedAt}}<br>{{userName}}</div>
+</div>
+<div class="params">{{#each paramLabels}}<span><strong>{{this.label}}:</strong> {{this.value}}</span> &nbsp;{{/each}}</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:5%">#</th>
+      <th style="width:10%">Nº Socio</th>
+      <th style="width:12%">DNI</th>
+      <th style="width:33%">Apellido y Nombre</th>
+      <th style="width:18%">Categoría</th>
+      <th style="width:22%">Firma</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.items}}
+    <tr>
+      <td class="c">{{inc @index}}</td>
+      <td class="c">{{nroSocio}}</td>
+      <td>{{documento}}</td>
+      <td>{{apellidoNombre}}</td>
+      <td>{{categoria}}</td>
+      <td class="firma"></td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<div class="grand-total">Total: {{data.summary.total}} socios</div>
 </body></html>`
 
   return templates[queryKey] || `${BASE_STYLES}
