@@ -14,6 +14,7 @@ const defaultImages = {
   'VÓLEY': '/images/club/voley.jpg',
   'VOLLEYBALL': '/images/club/voley.jpg',
   'HOCKEY': '/images/club/hockey.jpg',
+  'RUGBY': '/images/club/rugby.jpg',
   'NATACION': '/images/club/natacion.jpg',
   'NATACIÓN': '/images/club/natacion.jpg',
   'GIMNASIA': '/images/club/gimnasia.jpg',
@@ -118,12 +119,21 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+        <div
+          className={
+            actividades.length === 1
+              ? "grid grid-cols-1 max-w-md mx-auto gap-px"
+              : actividades.length === 2
+                ? "grid grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto gap-px"
+                : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px"
+          }
+          style={{ backgroundColor: 'var(--border)' }}
+        >
           {actividades.map((actividad, idx) => (
             <Link
               to={`/actividades/${actividad.id}`}
               key={actividad.id}
-              className="group block overflow-hidden relative"
+              className="group flex flex-col overflow-hidden relative h-full"
               style={{ backgroundColor: 'var(--bg-surface)' }}
             >
               <div className="relative h-72 overflow-hidden">
@@ -149,12 +159,12 @@ export default function ActividadesGrid({ limit = 6, showTitle = true, fullWidth
                 </h3>
               </div>
 
-              <div className="p-6">
+              <div className="p-6 flex flex-col flex-1">
                 <p className="text-sm leading-relaxed line-clamp-2 mb-5" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
                   {actividad.descripcion || 'Actividad deportiva del club para todas las edades.'}
                 </p>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mt-auto">
                   <div className="flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-muted)' }}>
                     {actividad.inscriptos > 0 && (
                       <span className="flex items-center gap-1.5">

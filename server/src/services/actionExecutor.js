@@ -288,7 +288,7 @@ class ActionExecutor {
         actividad: { select: { nombre: true, descripcion: true } },
         entrenadores: {
           include: {
-            entrenador: { select: { nombre: true } }
+            entrenador: { select: { entidad: { select: { razonSocial: true } } } }
           }
         },
         _count: {
@@ -310,7 +310,7 @@ class ActionExecutor {
       if (cat.descripcion) mensaje += `   ${cat.descripcion}\n`
       if (cat.horarios) mensaje += `   ⏰ ${cat.horarios}\n`
       if (cat.cuotaMensual) mensaje += `   💰 $${cat.cuotaMensual.toLocaleString('es-AR')}/mes\n`
-      if (cat.entrenadores[0]) mensaje += `   👨‍🏫 ${cat.entrenadores[0].entrenador.nombre}\n`
+      if (cat.entrenadores[0]) mensaje += `   👨‍🏫 ${cat.entrenadores[0].entrenador.entidad?.razonSocial || ''}\n`
 
       const cuposDisponibles = cat.cupoMaximo ? cat.cupoMaximo - cat._count.inscripciones : null
       if (cuposDisponibles !== null) {

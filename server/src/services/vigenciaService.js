@@ -7,7 +7,8 @@
  *       'AL_DIA'    = al que pasan los socios cuando se ponen al día
  *   - Una cuota vencida en CUALQUIER miembro del grupo familiar bloquea a
  *     toda la familia (titular + miembros).
- *   - Sin días de gracia: vence la cuota y se bloquea.
+ *   - Días de gracia (`Configuracion.MOROSIDAD_DIAS_GRACIA`, default 0):
+ *     una cuota cuenta como vencida sólo si `fechaVencimiento < hoy - gracia`.
  *
  * El servicio NO consulta `Configuracion.MOROSIDAD_BLOQUEO_AUTO_ACTIVO` —
  * eso lo hace el caller (cron). Si el caller decide ejecutar, el servicio
@@ -15,6 +16,29 @@
  */
 
 import { registrarEvento } from './auditoriaService.js'
+
+/**
+ * Lee MOROSIDAD_DIAS_GRACIA del tenant. Default 0 si no está seteada o es inválida.
+ */
+export async function getDiasGracia(prisma, tenantId) {
+  const cfg = await prisma.configuracion.findFirst({
+    where: { tenantId, clave: 'MOROSIDAD_DIAS_GRACIA' },
+    select: { valor: true },
+  })
+  const n = parseInt(cfg?.valor, 10)
+  return Number.isFinite(n) && n >= 0 ? n : 0
+}
+
+/**
+ * Calcula la fecha de corte efectiva restando los días de gracia.
+ * Una cuota se considera vencida sólo si `fechaVencimiento < cutoff`.
+ */
+function aplicarDiasGracia(fechaCorte, diasGracia) {
+  if (!diasGracia) return fechaCorte
+  const d = new Date(fechaCorte)
+  d.setDate(d.getDate() - diasGracia)
+  return d
+}
 
 /**
  * Obtiene los EstadoSocio especiales (rolVigencia) del tenant.
@@ -39,13 +63,15 @@ export async function getEstadosVigencia(prisma, tenantId) {
  *
  * @returns {Promise<Map<number, { titularId, miembrosIds: number[] }>>}
  */
-export async function getFamiliasConMorosidad(prisma, tenantId, { fechaCorte = new Date() } = {}) {
+export async function getFamiliasConMorosidad(prisma, tenantId, { fechaCorte = new Date(), diasGracia = null } = {}) {
+  const gracia = diasGracia ?? await getDiasGracia(prisma, tenantId)
+  const cutoff = aplicarDiasGracia(fechaCorte, gracia)
   // 1) Socios con cuota vencida
   const cargosVencidos = await prisma.cargo.findMany({
     where: {
       tenantId,
       estado: 'PENDIENTE',
-      fechaVencimiento: { lt: fechaCorte },
+      fechaVencimiento: { lt: cutoff },
       socioId: { not: null },
     },
     select: { socioId: true },
@@ -115,7 +141,7 @@ export async function getSociosEnBloqueado(prisma, tenantId, estadoBloqueadoId) 
  *   skip?: string
  * }>}
  */
-export async function recalcularTenant(prisma, tenantId, { origen = 'CRON', usuarioId = null, fechaCorte = new Date() } = {}) {
+export async function recalcularTenant(prisma, tenantId, { origen = 'CRON', usuarioId = null, fechaCorte = new Date(), diasGracia = null } = {}) {
   const estados = await getEstadosVigencia(prisma, tenantId)
   if (!estados.bloqueado || !estados.alDia) {
     return {
@@ -124,7 +150,8 @@ export async function recalcularTenant(prisma, tenantId, { origen = 'CRON', usua
     }
   }
 
-  const familiasMorosas = await getFamiliasConMorosidad(prisma, tenantId, { fechaCorte })
+  const gracia = diasGracia ?? await getDiasGracia(prisma, tenantId)
+  const familiasMorosas = await getFamiliasConMorosidad(prisma, tenantId, { fechaCorte, diasGracia: gracia })
   const sociosABloquear = new Set()
   for (const f of familiasMorosas.values()) {
     for (const id of f.miembrosIds) sociosABloquear.add(id)
@@ -180,7 +207,7 @@ export async function recalcularTenant(prisma, tenantId, { origen = 'CRON', usua
  * Si la familia ya no tiene cuotas vencidas y está en BLOQUEADO → pasa a AL_DIA.
  * Si tiene cuotas vencidas y NO está en BLOQUEADO → pasa a BLOQUEADO.
  */
-export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { origen = 'API', usuarioId = null, fechaCorte = new Date() } = {}) {
+export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { origen = 'API', usuarioId = null, fechaCorte = new Date(), diasGracia = null } = {}) {
   const estados = await getEstadosVigencia(prisma, tenantId)
   if (!estados.bloqueado || !estados.alDia) {
     return { skip: 'Tenant no tiene EstadoSocio con rolVigencia configurado' }
@@ -202,12 +229,14 @@ export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { orig
   })
   const miembrosIds = miembros.map(m => m.id)
 
+  const gracia = diasGracia ?? await getDiasGracia(prisma, tenantId)
+  const cutoff = aplicarDiasGracia(fechaCorte, gracia)
   const tieneVencidas = await prisma.cargo.count({
     where: {
       tenantId,
       socioId: { in: miembrosIds },
       estado: 'PENDIENTE',
-      fechaVencimiento: { lt: fechaCorte },
+      fechaVencimiento: { lt: cutoff },
     },
   })
 

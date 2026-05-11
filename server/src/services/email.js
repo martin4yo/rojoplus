@@ -428,9 +428,7 @@ export async function enviarReciboPago(pago, db, opts = {}) {
 export async function enviarMagicLinkEntrenador(entrenador, token, db, tenantId = null) {
   const tenantInfo = await getTenantInfo(tenantId ?? entrenador?.tenantId)
   const linkAcceso = `${tenantInfo.url}/portal-entrenador/${token}`
-  const nombre = entrenador.apellido
-    ? `${entrenador.nombre} ${entrenador.apellido}`
-    : (entrenador.nombre || 'Entrenador')
+  const nombre = entrenador.nombre || 'Entrenador'
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

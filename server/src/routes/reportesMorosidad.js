@@ -104,12 +104,7 @@ router.get('/resumen-kpis', authAdmin, asyncHandler(async (req, res) => {
       return Number(rows?.[0]?.prom || 0)
     })(),
     req.db.socio.count({
-      where: {
-        OR: [
-          { estado: { contains: 'Activ', mode: 'insensitive' } },
-          { estado: { contains: 'Vigent', mode: 'insensitive' } },
-        ],
-      },
+      where: { estadoSocioRel: { esSocioActivo: true } },
     }),
   ])
 

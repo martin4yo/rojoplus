@@ -65,7 +65,7 @@ router.post('/solicitud-socio', asyncHandler(async (req, res) => {
   const socioExistente = await req.db.socio.findFirst({
     where: {
       documento,
-      estado: 'ACTIVO'
+      estadoSocioRel: { esSocioActivo: true }
     }
   })
 
@@ -862,7 +862,11 @@ router.get('/actividades/:id/staff', asyncHandler(async (req, res) => {
       entrenador: { mostrarEnWeb: true, activo: true },
     },
     include: {
-      entrenador: true,
+      entrenador: {
+        include: {
+          entidad: { select: { razonSocial: true } },
+        },
+      },
       categoriaActividad: {
         select: {
           id: true,
@@ -873,29 +877,31 @@ router.get('/actividades/:id/staff', asyncHandler(async (req, res) => {
     },
     orderBy: [
       { entrenador: { ordenStaff: 'asc' } },
-      { entrenador: { apellido: 'asc' } }
+      { entrenador: { entidad: { razonSocial: 'asc' } } }
     ]
   })
 
   // Filtrar solo las asignaciones donde el entrenador existe y está visible
   const staffVisible = asignaciones
     .filter(a => a.entrenador && a.entrenador.mostrarEnWeb)
-    .map(a => ({
-      id: a.entrenador.id,
-      nombre: a.entrenador.nombre,
-      apellido: a.entrenador.apellido || '',
-      nombreCompleto: `${a.entrenador.nombre} ${a.entrenador.apellido || ''}`.trim(),
-      rol: a.rol,
-      foto: a.entrenador.fotoStaff,
-      email: a.entrenador.emailPublico,
-      telefono: a.entrenador.telefonoPublico,
-      biografia: a.entrenador.biografiaStaff,
-      categoria: {
-        id: a.categoriaActividad.id,
-        nombre: a.categoriaActividad.nombre,
-        codigo: a.categoriaActividad.codigo
+    .map(a => {
+      const nombre = a.entrenador.entidad?.razonSocial || ''
+      return {
+        id: a.entrenador.id,
+        nombre,
+        nombreCompleto: nombre,
+        rol: a.rol,
+        foto: a.entrenador.fotoStaff,
+        email: a.entrenador.emailPublico,
+        telefono: a.entrenador.telefonoPublico,
+        biografia: a.entrenador.biografiaStaff,
+        categoria: {
+          id: a.categoriaActividad.id,
+          nombre: a.categoriaActividad.nombre,
+          codigo: a.categoriaActividad.codigo
+        }
       }
-    }))
+    })
 
   res.json({
     success: true,

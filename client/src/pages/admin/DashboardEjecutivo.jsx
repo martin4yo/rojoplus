@@ -69,6 +69,25 @@ function formatCurrency(value) {
   }).format(value)
 }
 
+function formatCurrencyCompact(value) {
+  const n = Number(value) || 0
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(abs >= 10_000_000_000 ? 0 : 1).replace('.', ',')} B`
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1).replace('.', ',')} M`
+  if (abs >= 10_000) return `${sign}$${(abs / 1_000).toFixed(0)} K`
+  return formatCurrency(n)
+}
+
+function CurrencyResponsive({ value, className = '' }) {
+  return (
+    <>
+      <span className={`sm:hidden whitespace-nowrap ${className}`}>{formatCurrencyCompact(value)}</span>
+      <span className={`hidden sm:inline whitespace-nowrap ${className}`}>{formatCurrency(value)}</span>
+    </>
+  )
+}
+
 function formatNumber(value) {
   return new Intl.NumberFormat('es-AR').format(value)
 }
@@ -107,10 +126,10 @@ function KPICard({ title, value, subtitle, icon: Icon, trend, trendValue, color 
           </div>
         )}
       </div>
-      <div className="mt-3">
-        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{title}</p>
-        <p className={`${size === 'large' ? 'text-2xl' : 'text-xl'} font-bold ${textClasses[color]} mt-1`}>{value}</p>
-        {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+      <div className="mt-3 min-w-0">
+        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide truncate">{title}</p>
+        <p className={`${size === 'large' ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'} font-bold ${textClasses[color]} mt-1 whitespace-nowrap overflow-hidden text-ellipsis`}>{value}</p>
+        {subtitle && <p className="text-xs text-gray-500 mt-1 truncate">{subtitle}</p>}
       </div>
     </div>
   )
@@ -333,8 +352,8 @@ export default function DashboardEjecutivo() {
               <Wallet className="w-4 h-4" />
               Liquidez Total
             </div>
-            <p className={`text-2xl font-bold ${saldoTotalCajas < 0 ? 'text-red-400' : ''}`}>
-              {formatCurrency(saldoTotalCajas)}
+            <p className={`text-lg sm:text-xl md:text-2xl font-bold ${saldoTotalCajas < 0 ? 'text-red-400' : ''}`}>
+              <CurrencyResponsive value={saldoTotalCajas} />
             </p>
             {cajasNegativas.length > 0 ? (
               <div className="mt-2 space-y-0.5">
@@ -363,8 +382,8 @@ export default function DashboardEjecutivo() {
               <TrendingUp className="w-4 h-4" />
               Cash Flow Neto
             </div>
-            <p className={`text-2xl font-bold ${financiero.resumenFinanciero.cashFlowMes >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {formatCurrency(financiero.resumenFinanciero.cashFlowMes)}
+            <p className={`text-lg sm:text-xl md:text-2xl font-bold ${financiero.resumenFinanciero.cashFlowMes >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <CurrencyResponsive value={financiero.resumenFinanciero.cashFlowMes} />
             </p>
             <p className="text-xs text-slate-400 mt-1">Este mes</p>
           </div>
@@ -374,7 +393,7 @@ export default function DashboardEjecutivo() {
               <Target className="w-4 h-4" />
               Índice Cobranza
             </div>
-            <p className="text-2xl font-bold">{financiero.cobranzaMes.porcentaje}%</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold">{financiero.cobranzaMes.porcentaje}%</p>
             <ProgressBar
               value={financiero.cobranzaMes.porcentaje}
               max={100}
@@ -388,7 +407,7 @@ export default function DashboardEjecutivo() {
               <Clock className="w-4 h-4" />
               Días Cobertura
             </div>
-            <p className={`text-2xl font-bold ${financiero.diasCobertura >= 30 ? 'text-green-400' : financiero.diasCobertura >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+            <p className={`text-lg sm:text-xl md:text-2xl font-bold ${financiero.diasCobertura >= 30 ? 'text-green-400' : financiero.diasCobertura >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
               {financiero.diasCobertura > 999 ? '+999' : financiero.diasCobertura}
             </p>
             <p className="text-xs text-slate-400 mt-1">Con liquidez actual</p>
@@ -481,7 +500,7 @@ export default function DashboardEjecutivo() {
             />
             <KPICard
               title="Morosidad"
-              value={formatCurrency(financiero.morosidadTotal.monto)}
+              value={<CurrencyResponsive value={financiero.morosidadTotal.monto} />}
               subtitle={`${financiero.morosidadTotal.cantSocios} socios`}
               icon={AlertTriangle}
               color="red"
@@ -542,22 +561,22 @@ export default function DashboardEjecutivo() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="font-semibold text-gray-800 mb-4">Resumen Financiero del Mes</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <div className="text-center p-4 bg-gray-50 rounded-lg min-w-0">
                 <p className="text-sm text-gray-500">Saldo en Cajas</p>
-                <p className="text-xl font-bold text-gray-800">{formatCurrency(financiero.resumenFinanciero.saldoCajas)}</p>
+                <p className="text-lg sm:text-xl font-bold text-gray-800"><CurrencyResponsive value={financiero.resumenFinanciero.saldoCajas} /></p>
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-center p-4 bg-green-50 rounded-lg min-w-0">
                 <p className="text-sm text-gray-500">Ingresos Mes</p>
-                <p className="text-xl font-bold text-green-700">{formatCurrency(financiero.resumenFinanciero.ingresosMes)}</p>
+                <p className="text-lg sm:text-xl font-bold text-green-700"><CurrencyResponsive value={financiero.resumenFinanciero.ingresosMes} /></p>
               </div>
-              <div className="text-center p-4 bg-red-50 rounded-lg">
+              <div className="text-center p-4 bg-red-50 rounded-lg min-w-0">
                 <p className="text-sm text-gray-500">Egresos Mes</p>
-                <p className="text-xl font-bold text-red-700">{formatCurrency(financiero.resumenFinanciero.egresosMes)}</p>
+                <p className="text-lg sm:text-xl font-bold text-red-700"><CurrencyResponsive value={financiero.resumenFinanciero.egresosMes} /></p>
               </div>
-              <div className={`text-center p-4 rounded-lg ${financiero.resumenFinanciero.cashFlowMes >= 0 ? 'bg-blue-50' : 'bg-orange-50'}`}>
+              <div className={`text-center p-4 rounded-lg min-w-0 ${financiero.resumenFinanciero.cashFlowMes >= 0 ? 'bg-blue-50' : 'bg-orange-50'}`}>
                 <p className="text-sm text-gray-500">Cash Flow</p>
-                <p className={`text-xl font-bold ${financiero.resumenFinanciero.cashFlowMes >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
-                  {formatCurrency(financiero.resumenFinanciero.cashFlowMes)}
+                <p className={`text-lg sm:text-xl font-bold ${financiero.resumenFinanciero.cashFlowMes >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
+                  <CurrencyResponsive value={financiero.resumenFinanciero.cashFlowMes} />
                 </p>
               </div>
             </div>
@@ -628,21 +647,21 @@ export default function DashboardEjecutivo() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KPICard
               title="Generado Mes"
-              value={formatCurrency(financiero.cobranzaMes.generado)}
+              value={<CurrencyResponsive value={financiero.cobranzaMes.generado} />}
               subtitle={`${(financiero.cobranzaMes.cantCobrado || 0) + (financiero.cobranzaMes.cantPendiente || 0)} cuotas`}
               icon={DollarSign}
               color="blue"
             />
             <KPICard
               title="Cobrado"
-              value={formatCurrency(financiero.cobranzaMes.cobrado)}
+              value={<CurrencyResponsive value={financiero.cobranzaMes.cobrado} />}
               subtitle={`${financiero.cobranzaMes.cantCobrado || 0} cuotas`}
               icon={CheckCircle2}
               color="green"
             />
             <KPICard
               title="Pendiente"
-              value={formatCurrency(financiero.cobranzaMes.pendiente)}
+              value={<CurrencyResponsive value={financiero.cobranzaMes.pendiente} />}
               subtitle={`${financiero.cobranzaMes.cantPendiente || 0} cuotas`}
               icon={AlertTriangle}
               color="yellow"
@@ -675,8 +694,8 @@ export default function DashboardEjecutivo() {
           <div className="bg-red-50 rounded-xl border border-red-200 p-6">
             <h3 className="font-semibold text-red-800 mb-4">Morosidad Acumulada</h3>
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-3xl font-bold text-red-700">{formatCurrency(financiero.morosidadTotal.monto)}</p>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-red-700"><CurrencyResponsive value={financiero.morosidadTotal.monto} /></p>
                 <p className="text-sm text-red-600 mt-1">Monto Total</p>
               </div>
               <div>

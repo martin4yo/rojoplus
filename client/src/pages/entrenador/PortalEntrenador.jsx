@@ -82,7 +82,7 @@ export default function PortalEntrenador() {
           <div className="min-w-0">
             <div className="text-xs text-gray-500 font-mono uppercase tracking-wider">Portal entrenador</div>
             <div className="font-semibold text-gray-900 truncate">
-              {entrenador?.nombre} {entrenador?.apellido || ''}
+              {entrenador?.nombre || ''}
             </div>
           </div>
           <button

@@ -27,37 +27,24 @@ const router = Router()
 // AUTH (público)
 // ════════════════════════════════════════════════════════════════════════════
 
-// Buscar entrenador por email o documento.
-// Matchea contra Entrenador.email/documento (legacy) Y contra Entidad.email/documento
-// (nuevo modelo unificado), así funciona pre y post migración.
+// Buscar entrenador por email o documento (matchea contra Entidad asociada).
 async function buscarEntrenador(db, valor) {
   const trim = (valor || '').trim()
   if (!trim) return null
   const SELECT = {
-    id: true, nombre: true, apellido: true, email: true, telefono: true,
-    documento: true, activo: true,
+    id: true, activo: true,
     entidad: { select: { id: true, razonSocial: true, email: true, telefono: true, documento: true } },
   }
 
   if (trim.includes('@')) {
     return db.entrenador.findFirst({
-      where: {
-        OR: [
-          { email: { equals: trim, mode: 'insensitive' } },
-          { entidad: { email: { equals: trim, mode: 'insensitive' } } },
-        ],
-      },
+      where: { entidad: { email: { equals: trim, mode: 'insensitive' } } },
       select: SELECT,
     })
   }
 
   return db.entrenador.findFirst({
-    where: {
-      OR: [
-        { documento: trim },
-        { entidad: { documento: trim } },
-      ],
-    },
+    where: { entidad: { documento: trim } },
     select: SELECT,
   })
 }
@@ -72,9 +59,8 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   if (!entrenador) throw new AppError('No se encontró un entrenador con esos datos', 404, 'NOT_FOUND')
   if (!entrenador.activo) throw new AppError('El entrenador está inactivo. Contactá al club.', 403, 'INACTIVO')
 
-  // Resolver email/teléfono con fallback a la Entidad asociada
-  const emailEfectivo = entrenador.email || entrenador.entidad?.email
-  const telefonoEfectivo = entrenador.telefono || entrenador.entidad?.telefono
+  const emailEfectivo = entrenador.entidad?.email
+  const telefonoEfectivo = entrenador.entidad?.telefono
 
   if (canal === 'email' && !emailEfectivo) {
     throw new AppError('No tenés email registrado. Probá con WhatsApp o contactá al club.', 400, 'NO_EMAIL')
@@ -91,7 +77,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   })
 
   const portalLink = `${getTenantFrontendUrl(req.tenant)}/portal-entrenador/${token}`
-  const nombreSaludo = entrenador.nombre || entrenador.entidad?.razonSocial?.split(' ')[0] || 'Entrenador'
+  const nombreSaludo = entrenador.entidad?.razonSocial?.split(' ')[0] || 'Entrenador'
 
   if (canal === 'whatsapp') {
     await enviarWhatsApp({
@@ -105,7 +91,12 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   }
 
   await enviarMagicLinkEntrenador(
-    { ...entrenador, email: emailEfectivo, tenantId: req.tenantId },
+    {
+      id: entrenador.id,
+      nombre: entrenador.entidad?.razonSocial || 'Entrenador',
+      email: emailEfectivo,
+      tenantId: req.tenantId,
+    },
     token, req.db, req.tenantId
   )
   const masked = emailEfectivo.replace(/(.{2})(.*)(@.*)/, '$1***$3')
@@ -117,7 +108,10 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
   const { token } = req.params
   const entrenador = await req.db.entrenador.findFirst({
     where: { tokenPortal: token },
-    select: { id: true, nombre: true, apellido: true, email: true, activo: true, tokenPortalExpira: true, fotoStaff: true },
+    select: {
+      id: true, activo: true, tokenPortalExpira: true, fotoStaff: true,
+      entidad: { select: { razonSocial: true, email: true } },
+    },
   })
   if (!entrenador) throw new AppError('Token inválido o expirado', 401, 'INVALID_TOKEN')
   if (entrenador.tokenPortalExpira && entrenador.tokenPortalExpira < new Date()) {
@@ -136,8 +130,10 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      id: entrenador.id, nombre: entrenador.nombre, apellido: entrenador.apellido,
-      email: entrenador.email, fotoStaff: entrenador.fotoStaff,
+      id: entrenador.id,
+      nombre: entrenador.entidad?.razonSocial || '',
+      email: entrenador.entidad?.email || null,
+      fotoStaff: entrenador.fotoStaff,
     },
   })
 }))
@@ -153,13 +149,26 @@ router.get('/sesion/check', asyncHandler(async (req, res) => {
   }
   const entrenador = await req.db.entrenador.findUnique({
     where: { id: sesion.entrenadorId },
-    select: { id: true, nombre: true, apellido: true, activo: true },
+    select: {
+      id: true, activo: true,
+      entidad: { select: { razonSocial: true } },
+    },
   })
   if (!entrenador?.activo) {
     clearSesionCookie(res)
     return res.json({ success: true, data: { autenticado: false } })
   }
-  return res.json({ success: true, data: { autenticado: true, entrenador } })
+  return res.json({
+    success: true,
+    data: {
+      autenticado: true,
+      entrenador: {
+        id: entrenador.id,
+        nombre: entrenador.entidad?.razonSocial || '',
+        activo: entrenador.activo,
+      },
+    },
+  })
 }))
 
 // POST /api/entrenador/sesion/cerrar
@@ -181,11 +190,23 @@ router.get('/me', asyncHandler(async (req, res) => {
   const e = await req.db.entrenador.findUnique({
     where: { id: req.entrenador.id },
     select: {
-      id: true, nombre: true, apellido: true, email: true, telefono: true,
-      documento: true, especialidad: true, fotoStaff: true,
+      id: true, especialidad: true, fotoStaff: true,
+      entidad: { select: { razonSocial: true, email: true, telefono: true, documento: true } },
     },
   })
-  res.json({ success: true, data: e })
+  if (!e) return res.json({ success: true, data: null })
+  res.json({
+    success: true,
+    data: {
+      id: e.id,
+      nombre: e.entidad?.razonSocial || '',
+      email: e.entidad?.email || null,
+      telefono: e.entidad?.telefono || null,
+      documento: e.entidad?.documento || null,
+      especialidad: e.especialidad,
+      fotoStaff: e.fotoStaff,
+    },
+  })
 }))
 
 // GET /api/entrenador/mis-categorias — categorías activas del entrenador con contador de inscriptos

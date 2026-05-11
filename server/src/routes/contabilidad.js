@@ -1526,19 +1526,11 @@ router.put('/entidades/:id/entrenador', asyncHandler(async (req, res) => {
       data: fields,
     })
   } else {
-    // Auto-promoción: crear registro Entrenador. Copiamos datos básicos de Entidad
-    // a los campos legacy de Entrenador (todavía no eliminados) por compat.
-    const partes = (entidad.razonSocial || '').trim().split(/\s+/)
-    const apellido = partes.length > 1 ? partes.slice(1).join(' ') : null
-    const nombre = partes[0] || entidad.razonSocial
+    // Auto-promoción: crear registro Entrenador vinculado a la Entidad.
     entrenador = await req.db.entrenador.create({
       data: {
         tenantId: req.tenantId,
         entidadId: id,
-        nombre, apellido,
-        documento: entidad.documento || null,
-        email: entidad.email || null,
-        telefono: entidad.telefono || null,
         ...fields,
       },
     })
@@ -1593,16 +1585,10 @@ router.post('/entidades/:id/entrenador/categorias', asyncHandler(async (req, res
     select: { id: true },
   })
   if (!entrenador) {
-    const partes = (entidad.razonSocial || '').trim().split(/\s+/)
-    const apellido = partes.length > 1 ? partes.slice(1).join(' ') : null
-    const nombre = partes[0] || entidad.razonSocial
     entrenador = await req.db.entrenador.create({
       data: {
-        tenantId: req.tenantId, entidadId: id,
-        nombre, apellido,
-        documento: entidad.documento || null,
-        email: entidad.email || null,
-        telefono: entidad.telefono || null,
+        tenantId: req.tenantId,
+        entidadId: id,
       },
       select: { id: true },
     })

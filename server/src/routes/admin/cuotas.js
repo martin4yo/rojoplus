@@ -6,6 +6,7 @@ import { generarAsientoPagoCuota } from '../../services/asientosContables.js'
 import { notificarPago as notificarPagoWA, obtenerTelefonoSocio } from '../../services/whatsappService.js'
 import { generarReciboPagoPDF } from '../../services/pdfGenerator.js'
 import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
+import { calcularCuotas, commitCuotas } from '../../services/generarCuotasService.js'
 
 const router = Router()
 
@@ -284,225 +285,66 @@ router.delete('/periodos/:id', authAdmin, asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Periodo eliminado correctamente' })
 }))
 
+// POST /api/admin/periodos/:id/preview - Vista previa de cuotas a generar (sin persistir)
+// body opcional: { socioIds, tipoSocioIds, categoriaSocioIds, actividadIds, categoriaActividadIds,
+//                  soloCuotaSocial, soloCuotaActividad }
+router.post('/periodos/:id/preview', authAdmin, asyncHandler(async (req, res) => {
+  const periodoId = parseInt(req.params.id)
+  const periodo = await req.db.periodo.findUnique({ where: { id: periodoId } })
+  if (!periodo) throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
+
+  const filtros = {
+    socioIds: req.body?.socioIds,
+    tipoSocioIds: req.body?.tipoSocioIds,
+    categoriaSocioIds: req.body?.categoriaSocioIds,
+    actividadIds: req.body?.actividadIds,
+    categoriaActividadIds: req.body?.categoriaActividadIds,
+    soloCuotaSocial: req.body?.soloCuotaSocial,
+    soloCuotaActividad: req.body?.soloCuotaActividad,
+  }
+
+  const { cargos, totales, advertencias } = await calcularCuotas(req.db, periodoId, filtros)
+
+  res.json({
+    success: true,
+    data: { periodo, cargos, totales, advertencias },
+  })
+}))
+
 // POST /api/admin/periodos/:id/generar - Generar cuotas para un periodo
+// body opcional: { claves: string[] } — si se pasa, persiste solo esas; si no, todas (legacy)
 router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) => {
-  const { id } = req.params
+  const periodoId = parseInt(req.params.id)
+  const periodo = await req.db.periodo.findUnique({ where: { id: periodoId } })
+  if (!periodo) throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
 
-  const periodo = await req.db.periodo.findUnique({
-    where: { id: parseInt(id) },
-  })
+  const claves = Array.isArray(req.body?.claves) ? req.body.claves : null
 
-  if (!periodo) {
-    throw new AppError('Periodo no encontrado', 404, 'NOT_FOUND')
-  }
+  const { cuotasGeneradas, clavesNoEncontradas } = await commitCuotas(
+    req.db,
+    periodoId,
+    claves,
+    req.admin.id,
+  )
 
-  // Obtener socios que YA tienen cuota social en este periodo (pueden ser de planes de pago)
-  const sociosConCuotaSocial = await req.db.cargo.findMany({
-    where: {
-      periodoId: periodo.id,
-      categoria: 'CUOTA_SOCIAL'
-    },
-    select: { socioId: true }
-  })
-  const sociosConCuotaSocialIds = new Set(sociosConCuotaSocial.map(c => c.socioId))
-
-  // Obtener cargos de actividad que YA existen en este periodo (socio + categoriaActividad)
-  const cargosActividad = await req.db.cargo.findMany({
-    where: {
-      periodoId: periodo.id,
-      categoria: 'CUOTA_ACTIVIDAD'
-    },
-    select: { socioId: true, categoriaActividadId: true }
-  })
-  const actividadesConCargo = new Set(cargosActividad.map(c => `${c.socioId}-${c.categoriaActividadId}`))
-
-  // Obtener socios activos con sus relaciones
-  const socios = await req.db.socio.findMany({
-    where: {
-      OR: [
-        { estado: { contains: 'Activ', mode: 'insensitive' } },
-        { estado: { contains: 'Vigent', mode: 'insensitive' } },
-      ],
-    },
-    include: {
-      tipoSocioRel: { include: { conceptoTesoreria: true } },
-      categoriaSocioRel: true,
-      inscripciones: {
-        where: { estado: 'ACTIVA' },
-        include: {
-          categoriaActividad: {
-            include: { actividad: { include: { conceptoTesoreria: true } } },
-          },
-        },
-      },
-    },
-  })
-
-  const cargosACrear = []
-  let sociosSaltados = 0
-  let inscripcionesSaltadas = 0
-  let sociosNoTitulares = 0
-  let sociosSinCuotaMensual = 0
-
-  for (const socio of socios) {
-    // Calcular descuento por categoria
-    const descuentoPct = socio.categoriaSocioRel?.porcentajeDescuento
-      ? Number(socio.categoriaSocioRel.porcentajeDescuento)
-      : 0
-
-    // Determinar si debe pagar cuota social
-    // Solo pagan: Titulares de familia (titularFamiliaId === null y tiene miembros)
-    // O socios únicos (no pertenece a ninguna familia)
-    const esTitularOUnico = !socio.titularFamiliaId
-
-    // Verificar si ya tiene cuota social en este periodo (puede ser de plan de pagos)
-    const yaTeníaCuotaSocial = sociosConCuotaSocialIds.has(socio.id)
-
-    // Contar motivos de exclusión para diagnóstico
-    if (!esTitularOUnico) {
-      sociosNoTitulares++
-    }
-    const cuotaSocialMonto = socio.tipoSocioRel?.conceptoTesoreria?.cuotaMensual
-      ? Number(socio.tipoSocioRel.conceptoTesoreria.cuotaMensual)
-      : Number(socio.tipoSocioRel?.cuotaMensual || 0)
-
-    if (!cuotaSocialMonto) {
-      sociosSinCuotaMensual++
-    }
-
-    if (esTitularOUnico && cuotaSocialMonto && !yaTeníaCuotaSocial) {
-      const montoBase = cuotaSocialMonto
-      const montoBonificacion = montoBase * (descuentoPct / 100)
-      const montoTotal = montoBase - montoBonificacion
-
-      if (montoTotal > 0) {
-        const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
-        const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
-
-        cargosACrear.push({
-          periodoId: periodo.id,
-          socioId: socio.id,
-          grupoFamiliarId: socio.titularFamiliaId || socio.id,
-          categoria: 'CUOTA_SOCIAL',
-          tipoCuota,
-          conceptoTesoreriaId: socio.tipoSocioRel?.conceptoTesoreriaId || null,
-          descripcion: `Cuota Social - ${tipoCuota === 'GRUPO_FAMILIAR' ? 'Grupo Familiar' : 'Socio Único'}`,
-          montoOriginal: montoBase,
-          montoBonificacion,
-          montoTotal,
-          estado: 'PENDIENTE',
-          fechaVencimiento: periodo.fechaVencimiento,
-          origen: 'GENERACION_MASIVA',
-          motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
-        })
-      }
-    } else if (yaTeníaCuotaSocial) {
-      sociosSaltados++
-    }
-
-    // Cargos por actividades (inscripciones activas)
-    for (const inscripcion of socio.inscripciones) {
-      // Saltar si está exento de cuota
-      if (inscripcion.exentoCuota) continue
-
-      // Verificar si ya tiene cargo para esta categoría de actividad en este periodo
-      const claveActividad = `${socio.id}-${inscripcion.categoriaActividadId}`
-      if (actividadesConCargo.has(claveActividad)) {
-        inscripcionesSaltadas++
-        continue
-      }
-
-      const categoria = inscripcion.categoriaActividad
-      const actividad = categoria.actividad
-
-      // Determinar monto: concepto de tesorería de la actividad → categoría → actividad (fallbacks)
-      let montoBase = actividad.conceptoTesoreria?.cuotaMensual
-        ? Number(actividad.conceptoTesoreria.cuotaMensual)
-        : (categoria.cuotaMensual ? Number(categoria.cuotaMensual) : (actividad.cuotaMensual ? Number(actividad.cuotaMensual) : 0))
-
-      // Aplicar porcentaje de inscripción si no es 100%
-      if (inscripcion.porcentajeCuota && Number(inscripcion.porcentajeCuota) !== 100) {
-        montoBase = montoBase * (Number(inscripcion.porcentajeCuota) / 100)
-      }
-
-      if (montoBase > 0) {
-        const montoBonificacion = montoBase * (descuentoPct / 100)
-        const montoTotal = montoBase - montoBonificacion
-
-        if (montoTotal > 0) {
-          cargosACrear.push({
-            periodoId: periodo.id,
-            socioId: socio.id,
-            grupoFamiliarId: socio.titularFamiliaId || socio.id,
-            categoria: 'CUOTA_ACTIVIDAD',
-            categoriaActividadId: categoria.id,
-            conceptoTesoreriaId: actividad.conceptoTesoreriaId || null,
-            descripcion: `${actividad.nombre} - ${categoria.nombre}`,
-            montoOriginal: montoBase,
-            montoBonificacion,
-            montoTotal,
-            estado: 'PENDIENTE',
-            fechaVencimiento: periodo.fechaVencimiento,
-            origen: 'GENERACION_MASIVA',
-            motivoBonificacion: descuentoPct > 0 ? `Descuento por categoría: ${descuentoPct}%` : null,
-          })
-        }
-      }
-    }
-  }
-
-  // Crear todos los cargos en batch
-  if (cargosACrear.length > 0) {
-    await req.db.cargo.createMany({ data: cargosACrear })
-  }
-
-  // Actualizar estado del periodo (solo si se generaron nuevas cuotas o es la primera vez)
-  const totalCuotasPeriodo = await req.db.cargo.count({
-    where: { periodoId: periodo.id }
-  })
-
-  if (totalCuotasPeriodo > 0) {
-    await req.db.periodo.update({
-      where: { id: periodo.id },
-      data: {
-        estado: 'GENERADO',
-        fechaGeneracion: new Date(),
-        generadoPor: req.admin.id,
-      },
-    })
-  }
-
-  // Construir mensaje de respuesta
-  let mensaje = ''
-  if (cargosACrear.length === 0) {
-    if (socios.length === 0) {
-      mensaje = 'No hay socios activos para generar cuotas'
-    } else if (sociosSaltados > 0 || inscripcionesSaltadas > 0) {
-      mensaje = `No se generaron cuotas nuevas. ${sociosSaltados} socios y ${inscripcionesSaltadas} inscripciones ya tenían cuotas en este periodo.`
-    } else {
-      const detalles = []
-      if (sociosNoTitulares > 0) detalles.push(`${sociosNoTitulares} son miembros de familia (no titulares)`)
-      if (sociosSinCuotaMensual > 0) detalles.push(`${sociosSinCuotaMensual} tienen tipo de socio sin cuota mensual configurada`)
-      mensaje = `No se generaron cuotas. ${socios.length} socios activos encontrados. ${detalles.length > 0 ? detalles.join(', ') + '.' : ''}`
-    }
+  let mensaje
+  if (cuotasGeneradas === 0) {
+    mensaje = claves
+      ? 'Ninguna de las claves seleccionadas resultó en cuotas a generar (posiblemente ya existen o cambiaron condiciones).'
+      : 'No se generaron cuotas (puede que ya existan o que no haya socios/inscripciones aplicables).'
   } else {
-    mensaje = `Se generaron ${cargosACrear.length} cuotas para ${socios.length} socios`
-    if (sociosSaltados > 0 || inscripcionesSaltadas > 0) {
-      mensaje += ` (${sociosSaltados} socios y ${inscripcionesSaltadas} inscripciones ya tenían cuotas)`
+    mensaje = `Se generaron ${cuotasGeneradas} cuotas`
+    if (clavesNoEncontradas.length > 0) {
+      mensaje += ` (${clavesNoEncontradas.length} claves no se aplicaron por cambios de estado)`
     }
   }
 
   res.json({
     success: true,
-    data: {
-      cuotasGeneradas: cargosACrear.length,
-      sociosActivos: socios.length,
-      sociosSaltados,
-      inscripcionesSaltadas,
-      mensaje,
-    },
+    data: { cuotasGeneradas, clavesNoEncontradas, mensaje },
   })
 }))
+
 
 // ============================================
 // CUOTAS
@@ -886,8 +728,8 @@ function armarCargosParaSocio(socio, periodo) {
     const montoBonificacion = montoBase * (descuentoPct / 100)
     const montoTotal = montoBase - montoBonificacion
     if (montoTotal > 0) {
-      const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
-      const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
+      const esTitularDeFamilia = (socio._count?.miembrosFamilia || 0) > 0
+      const tipoCuota = esTitularDeFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
       cargos.push({
         periodoId: periodo.id,
         socioId: socio.id,
@@ -963,6 +805,7 @@ router.post('/cuotas/adelantar', authAdmin, asyncHandler(async (req, res) => {
     include: {
       tipoSocioRel: { include: { conceptoTesoreria: true } },
       categoriaSocioRel: true,
+      _count: { select: { miembrosFamilia: true } },
       inscripciones: {
         where: { estado: 'ACTIVA' },
         include: {
@@ -1149,6 +992,7 @@ router.post('/cuotas/generar-cuota-social/:socioId', authAdmin, asyncHandler(asy
     include: {
       tipoSocioRel: { include: { conceptoTesoreria: true } },
       categoriaSocioRel: true,
+      _count: { select: { miembrosFamilia: true } },
     },
   })
   if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
@@ -1188,8 +1032,8 @@ router.post('/cuotas/generar-cuota-social/:socioId', authAdmin, asyncHandler(asy
     throw new AppError('El monto resultante es cero', 400, 'MONTO_CERO')
   }
 
-  const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
-  const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
+  const esTitularDeFamilia = (socio._count?.miembrosFamilia || 0) > 0
+  const tipoCuota = esTitularDeFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
 
   const cargo = await req.db.cargo.create({
     data: {
@@ -1311,7 +1155,7 @@ router.get('/pagos/:id/recibo-pdf', authAdmin, asyncHandler(async (req, res) => 
     where: { id: parseInt(id) },
     include: {
       socio: {
-        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true, domicilio: true, ciudad: true, calle: true, codigoPostal: true, estado: true }
+        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true, domicilio: true, ciudad: true, calle: true, codigoPostal: true, estadoSocioRel: { select: { nombre: true } } }
       },
       medioPago: { select: { id: true, nombre: true } },
       caja: { select: { nombre: true } },
@@ -1376,7 +1220,7 @@ router.post('/pagos/:id/enviar-recibo', authAdmin, asyncHandler(async (req, res)
     where: { id: parseInt(id) },
     include: {
       socio: {
-        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true, notifWhatsapp: true, domicilio: true, ciudad: true, calle: true, codigoPostal: true, estado: true }
+        select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true, celularSecundario: true, telefonoFijo: true, notifWhatsapp: true, domicilio: true, ciudad: true, calle: true, codigoPostal: true, estadoSocioRel: { select: { nombre: true } } }
       },
       medioPago: { select: { id: true, nombre: true } },
       caja: { select: { nombre: true } },
@@ -1855,7 +1699,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
             ciudad: true,
             calle: true,
             codigoPostal: true,
-            estado: true,
+            estadoSocioRel: { select: { nombre: true } },
           },
         },
         medioPago: { select: { id: true, nombre: true } },

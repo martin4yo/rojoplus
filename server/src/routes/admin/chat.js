@@ -21,7 +21,7 @@ router.get('/conversaciones', authAdmin, asyncHandler(async (req, res) => {
     where,
     include: {
       socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
-      entrenador: { select: { id: true, nombre: true, apellido: true } },
+      entrenador: { select: { id: true, entidad: { select: { razonSocial: true } } } },
       categoriaActividad: {
         select: { nombre: true, actividad: { select: { nombre: true } } }
       },
@@ -43,7 +43,7 @@ router.get('/conversaciones/:id/mensajes', authAdmin, asyncHandler(async (req, r
     where: { id: parseInt(req.params.id) },
     include: {
       socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
-      entrenador: { select: { id: true, nombre: true, apellido: true } },
+      entrenador: { select: { id: true, entidad: { select: { razonSocial: true } } } },
       categoriaActividad: {
         select: { nombre: true, actividad: { select: { nombre: true } } }
       }
@@ -209,6 +209,7 @@ router.get('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
   const entrenadores = await req.db.entrenador.findMany({
     where: { activo: true },
     include: {
+      entidad: { select: { razonSocial: true, email: true, telefono: true } },
       categorias: {
         where: { activo: true },
         include: {
@@ -218,9 +219,15 @@ router.get('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
         }
       }
     },
-    orderBy: [{ nombre: 'asc' }]
+    orderBy: [{ entidad: { razonSocial: 'asc' } }]
   })
-  res.json({ success: true, data: entrenadores })
+  const data = entrenadores.map(e => ({
+    ...e,
+    nombre: e.entidad?.razonSocial || '',
+    email: e.entidad?.email || null,
+    telefono: e.entidad?.telefono || null,
+  }))
+  res.json({ success: true, data })
 }))
 
 export default router

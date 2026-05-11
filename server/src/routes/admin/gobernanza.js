@@ -232,7 +232,7 @@ router.post('/votaciones/:id/votar', authAdmin, asyncHandler(async (req, res) =>
   if (yaVoto) return res.status(409).json({ error: 'El socio ya registró su voto' })
 
   if (votacion.soloHabilitados) {
-    const socio = await req.db.socio.findFirst({ where: { id: socioId, estado: 'ACTIVO' } })
+    const socio = await req.db.socio.findFirst({ where: { id: socioId, estadoSocioRel: { esSocioActivo: true } } })
     if (!socio) return res.status(403).json({ error: 'El socio no está habilitado para votar' })
   }
 
@@ -255,7 +255,7 @@ router.get('/votaciones/:id/padron', authAdmin, asyncHandler(async (req, res) =>
   const idsYaVotaron = yaVotaron.map(v => v.socioId)
 
   const where = {
-    estado: 'ACTIVO',
+    estadoSocioRel: { esSocioActivo: true },
     id: { notIn: idsYaVotaron.length ? idsYaVotaron : [-1] },
     ...buildSocioSearchFilter(buscar),
   }

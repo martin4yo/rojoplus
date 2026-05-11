@@ -1253,8 +1253,9 @@ export async function generarReciboPagoPDF(pago, adminNombre = '', configMap = {
 
       // Filas derecha (medios de pago)
       let rowYR = TBL_TOP + HDR_ROW_H + 4
+      const estadoLabel = socio.estadoSocioRel?.nombre || 'ACTIVO'
       const leyendaBase = socio.nroSocio
-        ? `(S${socio.nroSocio}) ${socio.apellidoNombre || ''} / ${socio.estado || 'ACTIVO'}`
+        ? `(S${socio.nroSocio}) ${socio.apellidoNombre || ''} / ${estadoLabel}`
         : socio.apellidoNombre || ''
 
       if (mediosPago.length > 0) {

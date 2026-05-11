@@ -325,7 +325,7 @@ export default function AdminSocios() {
       render: (socio) => (
         <div className="text-sm text-gray-600">
           <div>{socio.categoria || '-'}</div>
-          <div className="text-gray-400">{socio.tipoSocio || '-'}</div>
+          <div className="text-gray-400">{socio.tipoSocioRel?.nombre || '-'}</div>
         </div>
       )
     },
@@ -534,7 +534,7 @@ export default function AdminSocios() {
                 </select>
                 <select value={tipoSocioGrupos} onChange={e => { setTipoSocioGrupos(e.target.value); setPageGrupos(1) }} className="input-field">
                   <option value="">Todos los tipos</option>
-                  {filtros.tiposSocio.map(t => <option key={t} value={t}>{t}</option>)}
+                  {filtros.tiposSocio.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                 </select>
               </div>
               {(estadoGrupos || categoriaGrupos || tipoSocioGrupos || terminoBusquedaGrupos) && (
@@ -720,7 +720,7 @@ export default function AdminSocios() {
             >
               <option value="">Todos los tipos</option>
               {filtros.tiposSocio.map(t => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t.id} value={t.id}>{t.nombre}</option>
               ))}
             </select>
             <select

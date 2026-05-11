@@ -108,7 +108,7 @@ router.get('/encuestas-baja', authAdmin, asyncHandler(async (req, res) => {
             apellidoNombre: true,
             email: true,
             celular: true,
-            estado: true
+            estadoSocioRel: { select: { nombre: true } }
           }
         }
       },
@@ -182,7 +182,7 @@ router.get('/encuestas-baja/:id', authAdmin, asyncHandler(async (req, res) => {
           email: true,
           celular: true,
           documento: true,
-          estado: true,
+          estadoSocioRel: { select: { nombre: true } },
           fechaBaja: true
         }
       }

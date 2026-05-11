@@ -69,6 +69,7 @@ export default function ConfiguracionForm() {
     // estados-socio
     permiteDescuentos: true,
     permiteIngresoMolinete: false,
+    esSocioActivo: true,
     rolVigencia: '',
     // cargos-personal
     esEntrenador: false,
@@ -141,6 +142,7 @@ export default function ConfiguracionForm() {
         porcentajeDescuento: data.porcentajeDescuento || 0,
         permiteDescuentos: data.permiteDescuentos !== false,
         permiteIngresoMolinete: data.permiteIngresoMolinete === true,
+        esSocioActivo: data.esSocioActivo !== false,
         rolVigencia: data.rolVigencia || '',
         esEntrenador: data.esEntrenador === true,
         // conceptos-tesoreria
@@ -198,6 +200,7 @@ export default function ConfiguracionForm() {
         datos.color = form.color
         datos.permiteDescuentos = form.permiteDescuentos
         datos.permiteIngresoMolinete = form.permiteIngresoMolinete
+        datos.esSocioActivo = form.esSocioActivo
         datos.rolVigencia = form.rolVigencia || null
       }
 
@@ -692,6 +695,20 @@ export default function ConfiguracionForm() {
           {/* Campos específicos para estados-socio */}
           {tabla === 'estados-socio' && (
             <div className="space-y-3">
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-sm text-purple-800 font-medium">
+                    Cuenta como socio del club
+                  </label>
+                  <Switch
+                    checked={form.esSocioActivo}
+                    onChange={(v) => setForm({ ...form, esSocioActivo: v })}
+                  />
+                </div>
+                <p className="text-xs text-purple-700 mt-1">
+                  Activar para estados como Vigente, Bloqueado por morosidad, etc. Desactivar para Baja, Renuncia, Expulsión. Los reportes de morosidad excluyen a los socios cuyo estado tenga este flag desactivado.
+                </p>
+              </div>
               <div className="flex items-center justify-between gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
                 <label className="text-sm text-green-800">
                   Permite usar descuentos en comercios (Clubix)

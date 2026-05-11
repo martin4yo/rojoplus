@@ -1318,7 +1318,7 @@ export default function SocioForm() {
           {activeTab === 'familia' && isEditing && socioData && (
             <div className="space-y-6">
               {/* Si es Titular de Familia - mostrar miembros */}
-              {(socioData.tipoSocio?.toLowerCase().includes('titular') || socioData.miembrosFamilia?.length > 0) && (
+              {(socioData.miembrosFamilia?.length > 0) && (
                 <div>
                   <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
                     <Users className="w-4 h-4" /> Miembros de la Familia ({socioData.miembrosFamilia?.length || 0})
@@ -1432,7 +1432,7 @@ export default function SocioForm() {
               )}
 
               {/* Buscar y asignar titular (si no es titular y no tiene titular) */}
-              {!socioData.tipoSocio?.toLowerCase().includes('titular') && !socioData.titularFamilia && socioData.miembrosFamilia?.length === 0 && (
+              {!socioData.titularFamilia && socioData.miembrosFamilia?.length === 0 && (
                 <div>
                   <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
                     <Users className="w-4 h-4" /> Asignar a Familia

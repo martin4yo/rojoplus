@@ -7,6 +7,9 @@ import {
 } from 'lucide-react'
 import { useConfirm } from '../../hooks/useConfirm'
 import { useTenant } from '../../contexts/TenantContext'
+import api from '../../services/api'
+
+const SIN_ACTIVIDAD = 'Socio sin actividad'
 
 export default function AgregarFamiliares() {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -23,13 +26,17 @@ export default function AgregarFamiliares() {
     parentesco: '', actividadesSeleccionadas: [],
   })
 
-  const actividades = [
-    'Basquet', 'Futbol 11', 'Futsal', 'Gimnasio', 'Kickboxing',
-    'Liga Argentina de Baby Futbol', 'Natación', 'Socio sin actividad',
-    'Taekwondo', 'Voley',
-  ]
+  const [actividades, setActividades] = useState([SIN_ACTIVIDAD])
 
-  useEffect(() => { cargarDatos() }, [])
+  useEffect(() => {
+    cargarDatos()
+    api.get('/public/actividades')
+      .then(data => {
+        const nombres = (data || []).map(a => a.nombre).filter(Boolean)
+        setActividades([...nombres, SIN_ACTIVIDAD])
+      })
+      .catch(() => setActividades([SIN_ACTIVIDAD]))
+  }, [])
 
   const tenantHeaders = tenant?.subdomain ? { 'X-Tenant-Slug': tenant.subdomain } : {}
 

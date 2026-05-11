@@ -119,6 +119,18 @@ router.delete('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) =
 
 // --- ENTRENADORES ---
 
+// Helper: aplana entrenador devolviendo nombre/documento/email/telefono desde la Entidad asociada.
+function flattenEntrenador(e) {
+  if (!e) return null
+  return {
+    ...e,
+    nombre: e.entidad?.razonSocial || '',
+    documento: e.entidad?.documento || null,
+    email: e.entidad?.email || null,
+    telefono: e.entidad?.telefono || null,
+  }
+}
+
 // GET /api/admin/entrenadores - Listado de entrenadores
 router.get('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
   const { activo } = req.query
@@ -137,13 +149,13 @@ router.get('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
         }
       }
     },
-    orderBy: { nombre: 'asc' },
+    orderBy: { entidad: { razonSocial: 'asc' } },
   })
 
   res.json({
     success: true,
     data: entrenadores.map(e => ({
-      ...e,
+      ...flattenEntrenador(e),
       categoriasActivas: e.categorias.length,
     })),
   })
@@ -172,7 +184,7 @@ router.get('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
 
   if (!entrenador) throw new AppError('Entrenador no encontrado', 404, 'NOT_FOUND')
 
-  res.json({ success: true, data: entrenador })
+  res.json({ success: true, data: flattenEntrenador(entrenador) })
 }))
 
 // Helper: Generar codigo unico para Entidad PERSONAL
@@ -239,11 +251,6 @@ router.post('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
     // 2. Crear Entrenador vinculado a la Entidad
     const nuevoEntrenador = await tx.entrenador.create({
       data: {
-        nombre,
-        apellido,
-        documento,
-        telefono,
-        email,
         socioId: socioId ? parseInt(socioId) : null,
         especialidad,
         observaciones,
@@ -262,7 +269,7 @@ router.post('/entrenadores', authAdmin, asyncHandler(async (req, res) => {
     return nuevoEntrenador
   })
 
-  res.status(201).json({ success: true, data: entrenador })
+  res.status(201).json({ success: true, data: flattenEntrenador(entrenador) })
 }))
 
 // PUT /api/admin/entrenadores/:id - Actualizar entrenador
@@ -286,8 +293,16 @@ router.put('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
   // Actualizar en transaccion
   const entrenador = await req.db.$transaction(async (tx) => {
     // 1. Actualizar o crear Entidad PERSONAL
-    const nombreFinal = nombre ?? existente.nombre
-    const apellidoFinal = apellido !== undefined ? apellido : existente.apellido
+    const razonSocialActual = existente.entidad?.razonSocial || ''
+    // Recomponer razonSocial si cambió nombre/apellido
+    const apellidoActual = razonSocialActual.includes(',')
+      ? razonSocialActual.split(',')[0].trim()
+      : ''
+    const nombreActual = razonSocialActual.includes(',')
+      ? razonSocialActual.split(',').slice(1).join(',').trim()
+      : razonSocialActual
+    const nombreFinal = nombre ?? nombreActual
+    const apellidoFinal = apellido !== undefined ? apellido : apellidoActual
     const razonSocial = apellidoFinal ? `${apellidoFinal}, ${nombreFinal}` : nombreFinal
 
     if (existente.entidadId) {
@@ -315,7 +330,7 @@ router.put('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
         }
       })
     } else {
-      // Crear Entidad si no existe (migracion de entrenadores antiguos)
+      // Crear Entidad si no existe (entrenador legacy sin entidad)
       const codigoEntidad = await generarCodigoEntidadPersonal(tx)
       const entidad = await tx.entidad.create({
         data: {
@@ -323,9 +338,9 @@ router.put('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
           tipo: 'PERSONAL',
           razonSocial,
           tipoDocumento: tipoDocumento || 'DNI',
-          documento: documento !== undefined ? documento : existente.documento,
-          email: email !== undefined ? email : existente.email,
-          telefono: telefono !== undefined ? telefono : existente.telefono,
+          documento: documento ?? null,
+          email: email ?? null,
+          telefono: telefono ?? null,
           direccion,
           ciudad,
           provincia,
@@ -347,15 +362,10 @@ router.put('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
       })
     }
 
-    // 2. Actualizar Entrenador
+    // 2. Actualizar Entrenador (solo campos propios)
     const entrenadorActualizado = await tx.entrenador.update({
       where: { id: parseInt(id) },
       data: {
-        nombre: nombreFinal,
-        apellido: apellidoFinal,
-        documento: documento !== undefined ? documento : existente.documento,
-        telefono: telefono !== undefined ? telefono : existente.telefono,
-        email: email !== undefined ? email : existente.email,
         socioId: socioId !== undefined ? (socioId ? parseInt(socioId) : null) : existente.socioId,
         especialidad: especialidad !== undefined ? especialidad : existente.especialidad,
         observaciones: observaciones !== undefined ? observaciones : existente.observaciones,
@@ -384,7 +394,7 @@ router.put('/entrenadores/:id', authAdmin, asyncHandler(async (req, res) => {
     return entrenadorActualizado
   })
 
-  res.json({ success: true, data: entrenador })
+  res.json({ success: true, data: flattenEntrenador(entrenador) })
 }))
 
 // DELETE /api/admin/entrenadores/:id - Eliminar entrenador

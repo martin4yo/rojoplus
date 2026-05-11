@@ -126,11 +126,9 @@ router.post('/resumen-mensual', authAdmin, asyncHandler(async (req, res) => {
     cuotasPendientes,
     topActividades,
   ] = await Promise.all([
-    db.socio.count({
-      where: { OR: [{ estado: { contains: 'Activ', mode: 'insensitive' } }, { estado: { contains: 'Vigent', mode: 'insensitive' } }] }
-    }),
+    db.socio.count({ where: { estadoSocioRel: { esSocioActivo: true } } }),
     db.socio.count({ where: { fechaAlta: { gte: inicioMes } } }),
-    db.socio.count({ where: { estado: { contains: 'Baja', mode: 'insensitive' }, fechaBaja: { gte: inicioMes } } }),
+    db.socio.count({ where: { estadoSocioRel: { esSocioActivo: false }, fechaBaja: { gte: inicioMes } } }),
     db.inscripcion.count({ where: { estado: 'ACTIVA' } }),
     db.movimientoCaja.aggregate({
       where: { tipo: 'INGRESO', fecha: { gte: inicioMes } },
@@ -223,7 +221,7 @@ router.post('/socios-en-riesgo', authAdmin, asyncHandler(async (req, res) => {
     // Socios activos sin inscripciones en actividades
     db.socio.findMany({
       where: {
-        OR: [{ estado: { contains: 'Activ', mode: 'insensitive' } }, { estado: { contains: 'Vigent', mode: 'insensitive' } }],
+        estadoSocioRel: { esSocioActivo: true },
         inscripciones: { none: { estado: 'ACTIVA' } },
       },
       select: { id: true, nroSocio: true, apellidoNombre: true },

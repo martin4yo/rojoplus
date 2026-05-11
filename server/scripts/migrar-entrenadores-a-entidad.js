@@ -13,6 +13,8 @@
  * Uso:
  *   node server/scripts/migrar-entrenadores-a-entidad.js --tenant sportivopilar --dry-run
  *   node server/scripts/migrar-entrenadores-a-entidad.js --tenant sportivopilar --apply
+ *   node server/scripts/migrar-entrenadores-a-entidad.js --all-tenants --dry-run
+ *   node server/scripts/migrar-entrenadores-a-entidad.js --all-tenants --apply
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -25,16 +27,17 @@ function arg(name) {
 function flag(name) { return process.argv.includes(`--${name}`) }
 
 const TENANT_SLUG = arg('tenant')
+const ALL_TENANTS = flag('all-tenants')
 const APPLY = flag('apply')
 
-async function main() {
-  if (!TENANT_SLUG) throw new Error('Falta --tenant <slug>')
-  const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })
-  if (!tenant) throw new Error(`Tenant '${TENANT_SLUG}' no existe`)
+async function migrarTenant(tenant) {
   const tenantId = tenant.id
+  const slug = tenant.subdomain || tenant.slug || `id=${tenant.id}`
 
-  console.log(`Tenant: ${TENANT_SLUG} (id=${tenantId})`)
-  console.log(`Modo  : ${APPLY ? '🔴 APPLY (modifica BD)' : '🟡 DRY-RUN'}\n`)
+  console.log(`\n${'═'.repeat(60)}`)
+  console.log(`Tenant: ${slug} (id=${tenantId})`)
+  console.log(`Modo  : ${APPLY ? '🔴 APPLY (modifica BD)' : '🟡 DRY-RUN'}`)
+  console.log('═'.repeat(60))
 
   // 1) Asegurar que exista al menos un CargoPersonal con esEntrenador=true
   let cargoEntrenador = await prisma.cargoPersonal.findFirst({
@@ -154,13 +157,46 @@ async function main() {
     }
   }
 
-  console.log(`\n${'═'.repeat(60)}`)
-  console.log(`RESUMEN`)
-  console.log('═'.repeat(60))
-  console.log(`  Entrenadores procesados:    ${entrenadores.length}`)
+  console.log(`\n  RESUMEN ${slug}`)
+  console.log(`  Entrenadores procesados:        ${entrenadores.length}`)
   console.log(`  Vinculados a Entidad existente: ${vinculados}`)
-  console.log(`  Entidades creadas nuevas:   ${creados}`)
-  console.log(`  Errores:                    ${errores}`)
+  console.log(`  Entidades creadas nuevas:       ${creados}`)
+  console.log(`  Errores:                        ${errores}`)
+
+  return { procesados: entrenadores.length, vinculados, creados, errores }
+}
+
+async function main() {
+  if (!TENANT_SLUG && !ALL_TENANTS) {
+    throw new Error('Falta --tenant <slug> o --all-tenants')
+  }
+
+  let tenants = []
+  if (ALL_TENANTS) {
+    tenants = await prisma.tenant.findMany({ where: { activo: true }, orderBy: { id: 'asc' } })
+    console.log(`Procesando ${tenants.length} tenants activos\n`)
+  } else {
+    const tenant = await prisma.tenant.findUnique({ where: { subdomain: TENANT_SLUG } })
+    if (!tenant) throw new Error(`Tenant '${TENANT_SLUG}' no existe`)
+    tenants = [tenant]
+  }
+
+  const totales = { procesados: 0, vinculados: 0, creados: 0, errores: 0 }
+  for (const t of tenants) {
+    const r = await migrarTenant(t)
+    totales.procesados += r.procesados
+    totales.vinculados += r.vinculados
+    totales.creados += r.creados
+    totales.errores += r.errores
+  }
+
+  console.log(`\n${'═'.repeat(60)}`)
+  console.log(`TOTAL (${tenants.length} tenant${tenants.length === 1 ? '' : 's'})`)
+  console.log('═'.repeat(60))
+  console.log(`  Entrenadores procesados:        ${totales.procesados}`)
+  console.log(`  Vinculados a Entidad existente: ${totales.vinculados}`)
+  console.log(`  Entidades creadas nuevas:       ${totales.creados}`)
+  console.log(`  Errores:                        ${totales.errores}`)
   if (!APPLY) console.log(`\n🟡 DRY-RUN — no se modificó la BD. Re-correr con --apply.\n`)
   else console.log(`\n✅ Migración completa.\n`)
 }

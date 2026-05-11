@@ -491,9 +491,9 @@ router.get('/public/stats', async (req, res) => {
       aniosHistoria = Math.max(1, Math.floor(years / 10) * 10)
     }
 
-    // Cantidad de socios activos (estado VIGENTE o ACTIVO)
+    // Cantidad de socios activos (no dados de baja)
     const cantidadSocios = await req.db.socio.count({
-      where: { estado: { in: ['VIGENTE', 'ACTIVO'] } }
+      where: { estadoSocioRel: { esSocioActivo: true } }
     })
 
     // Cantidad de actividades activas

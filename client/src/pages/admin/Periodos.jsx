@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Calendar, Plus, Play, CheckCircle, Clock, AlertCircle, DollarSign, Trash2, RefreshCw, Receipt } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
@@ -15,11 +15,19 @@ const MESES = [
 
 export default function Periodos() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { showModal, ModalComponent } = useModal()
   const [periodos, setPeriodos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(null)
+  const [success, setSuccess] = useState(location.state?.success || null)
+
+  useEffect(() => {
+    if (location.state?.success) {
+      // limpiar el state para que no aparezca de nuevo al refrescar
+      window.history.replaceState({}, document.title)
+    }
+  }, [])
 
   // Filtro de periodo hasta (por defecto mes actual)
   const [periodoHasta, setPeriodoHasta] = useState(() => {
@@ -112,30 +120,7 @@ export default function Periodos() {
   }
 
   function confirmarGenerarCuotas(periodoId) {
-    showModal({
-      type: 'warning',
-      title: 'Generar Cuotas',
-      message: '¿Generar cuotas para este periodo? Esta acción no se puede deshacer.',
-      confirmText: 'Generar',
-      cancelText: 'Cancelar',
-      onConfirm: () => generarCuotas(periodoId),
-    })
-  }
-
-  async function generarCuotas(periodoId) {
-    setGenerando(periodoId)
-    setError(null)
-
-    try {
-      const result = await api.post(`/admin/periodos/${periodoId}/generar`)
-      // Usar mensaje del servidor que incluye info de saltados
-      setSuccess(result.mensaje || `Se generaron ${result.cuotasGeneradas} cuotas`)
-      cargarPeriodos()
-    } catch (err) {
-      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Error al generar cuotas')
-    } finally {
-      setGenerando(null)
-    }
+    navigate(`/admin/periodos/${periodoId}/preview-generacion`)
   }
 
   function confirmarEliminarPeriodo(periodo) {

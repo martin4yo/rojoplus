@@ -747,7 +747,7 @@ export async function verificarMorosidad() {
     // Buscar socios con cuotas vencidas hace más de 15 días
     const sociosConMorosidad = await prisma.socio.findMany({
       where: {
-        estado: 'ACTIVO',
+        estadoSocioRel: { esSocioActivo: true },
         cargos: {
           some: {
             estado: 'PENDIENTE',
@@ -1416,7 +1416,7 @@ async function _enviarCumpleaniosTenant(db) {
   const dia = hoy.getDate()
 
   const socios = await db.socio.findMany({
-    where: { estado: 'ACTIVO', fechaNacimiento: { not: null } },
+    where: { estadoSocioRel: { esSocioActivo: true }, fechaNacimiento: { not: null } },
     select: {
       id: true, apellidoNombre: true, email: true,
       celular: true, celularSecundario: true, telefonoFijo: true,

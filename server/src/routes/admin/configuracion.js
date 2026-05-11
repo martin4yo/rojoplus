@@ -262,7 +262,7 @@ router.get('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/estados-socio
 router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, rolVigencia, orden } = req.body
+  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, esSocioActivo, rolVigencia, orden } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
@@ -289,6 +289,7 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
       color,
       permiteDescuentos: permiteDescuentos || false,
       permiteIngresoMolinete: permiteIngresoMolinete || false,
+      esSocioActivo: esSocioActivo !== undefined ? esSocioActivo : true,
       rolVigencia: rolVigencia || null,
       orden: orden || 0,
     },
@@ -300,7 +301,7 @@ router.post('/estados-socio', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/estados-socio/:id
 router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, rolVigencia, orden, activo } = req.body
+  const { codigo, nombre, descripcion, color, permiteDescuentos, permiteIngresoMolinete, esSocioActivo, rolVigencia, orden, activo } = req.body
 
   const existente = await req.db.estadoSocio.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Estado de socio no encontrado', 404, 'NOT_FOUND')
@@ -334,6 +335,7 @@ router.put('/estados-socio/:id', authAdmin, asyncHandler(async (req, res) => {
       color: color !== undefined ? color : existente.color,
       permiteDescuentos: permiteDescuentos !== undefined ? permiteDescuentos : existente.permiteDescuentos,
       permiteIngresoMolinete: permiteIngresoMolinete !== undefined ? permiteIngresoMolinete : existente.permiteIngresoMolinete,
+      esSocioActivo: esSocioActivo !== undefined ? esSocioActivo : existente.esSocioActivo,
       rolVigencia: rolVigenciaFinal,
       orden: orden !== undefined ? orden : existente.orden,
       activo: activo !== undefined ? activo : existente.activo,
@@ -999,15 +1001,11 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
 
   // Obtener socios activos con sus relaciones
   const socios = await req.db.socio.findMany({
-    where: {
-      OR: [
-        { estado: { contains: 'Activ', mode: 'insensitive' } },
-        { estado: { contains: 'Vigent', mode: 'insensitive' } },
-      ],
-    },
+    where: { estadoSocioRel: { esSocioActivo: true } },
     include: {
       tipoSocioRel: true,
       categoriaSocioRel: true,
+      _count: { select: { miembrosFamilia: true } },
       inscripciones: {
         where: { estado: 'ACTIVA' },
         include: {
@@ -1053,8 +1051,8 @@ router.post('/periodos/:id/generar', authAdmin, asyncHandler(async (req, res) =>
       const montoTotal = montoBase - montoBonificacion
 
       // Determinar tipo de cuota: Grupo Familiar si tiene miembros, sino Socio Único
-      const esFamilia = socio.tipoSocio?.toLowerCase().includes('familia')
-      const tipoCuota = esFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
+      const esTitularDeFamilia = (socio._count?.miembrosFamilia || 0) > 0
+      const tipoCuota = esTitularDeFamilia ? 'GRUPO_FAMILIAR' : 'SOCIO_UNICO'
 
       cargosACrear.push({
         periodoId: periodo.id,

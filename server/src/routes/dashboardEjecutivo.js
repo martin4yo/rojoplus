@@ -22,12 +22,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // Socios activos totales
   const sociosActivos = await req.db.socio.count({
-    where: {
-      OR: [
-        { estado: { contains: 'Activ', mode: 'insensitive' } },
-        { estado: { contains: 'Vigent', mode: 'insensitive' } },
-      ],
-    },
+    where: { estadoSocioRel: { esSocioActivo: true } },
   })
 
   // Socios con inscripciones activas (mismo criterio que inscripcionesActivas:
@@ -64,7 +59,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // Bajas últimos 30 días
   const bajas30Dias = await req.db.socio.count({
     where: {
-      estado: { contains: 'Baja', mode: 'insensitive' },
+      estadoSocioRel: { esSocioActivo: false },
       fechaBaja: { gte: hace30Dias },
     },
   })
@@ -97,7 +92,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
       }),
       req.db.socio.count({
         where: {
-          estado: { contains: 'Baja', mode: 'insensitive' },
+          estadoSocioRel: { esSocioActivo: false },
           fechaBaja: { gte: inicioMes, lte: finMes },
         },
       }),
@@ -154,15 +149,25 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
-  // Morosidad total: cargos vencidos sin pagar.
-  // Incluye estado='VENCIDO' Y estado='PENDIENTE' con fechaVencimiento < hoy.
-  const morosidadResult = await req.db.cargo.aggregate({
-    where: {
+  // Morosidad total: cargos vencidos sin pagar de socios que aún forman parte del club.
+  // Filtro data-driven: solo socios cuyo EstadoSocio tenga esSocioActivo=true (default).
+  // Esto excluye bajas, renuncias, expulsiones, etc., sin hardcodear códigos de estado.
+  // Socios sin estadoSocioId asignado se asumen activos (legacy seguro).
+  const morosidadWhere = {
+    OR: [
+      { estado: 'VENCIDO' },
+      { estado: 'PENDIENTE', fechaVencimiento: { lt: hoy } },
+    ],
+    socio: {
       OR: [
-        { estado: 'VENCIDO' },
-        { estado: 'PENDIENTE', fechaVencimiento: { lt: hoy } },
+        { estadoSocioId: null },
+        { estadoSocioRel: { esSocioActivo: true } },
       ],
     },
+  }
+
+  const morosidadResult = await req.db.cargo.aggregate({
+    where: morosidadWhere,
     _sum: { montoTotal: true },
     _count: true,
   })
@@ -174,12 +179,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
 
   // Socios morosos (únicos)
   const sociosMorosos = await req.db.cargo.findMany({
-    where: {
-      OR: [
-        { estado: 'VENCIDO' },
-        { estado: 'PENDIENTE', fechaVencimiento: { lt: hoy } },
-      ],
-    },
+    where: morosidadWhere,
     select: { socioId: true },
     distinct: ['socioId'],
   })
@@ -741,9 +741,11 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
 
   // Por estado
   const porEstado = await req.db.socio.groupBy({
-    by: ['estado'],
+    by: ['estadoSocioId'],
     _count: true,
   })
+  const estadosInfo = await req.db.estadoSocio.findMany({ select: { id: true, nombre: true } })
+  const estadosMap = Object.fromEntries(estadosInfo.map(e => [e.id, e.nombre]))
 
   // Por categoría de socio
   const porCategoria = await req.db.socio.groupBy({
@@ -759,7 +761,7 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
 
   // Por tipo de socio
   const porTipo = await req.db.socio.groupBy({
-    by: ['tipoSocioId'],
+    by: ['tipoSocioRelId'],
     _count: true,
   })
 
@@ -769,17 +771,19 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
   const tiposMap = {}
   tiposInfo.forEach(t => { tiposMap[t.id] = t.nombre })
 
-  // Grupos familiares
-  const gruposFamiliares = await req.db.grupoFamiliar.count()
+  // Grupos familiares (socios con titularFamilia o titulares con miembros)
   const sociosEnFamilia = await req.db.socio.count({
-    where: { grupoFamiliarId: { not: null } },
+    where: { titularFamiliaId: { not: null } },
+  })
+  const gruposFamiliares = await req.db.socio.count({
+    where: { titularFamiliaId: null, miembrosFamilia: { some: {} } },
   })
 
   res.json({
     success: true,
     data: {
       porEstado: porEstado.map(e => ({
-        estado: e.estado || 'Sin estado',
+        estado: estadosMap[e.estadoSocioId] || 'Sin estado',
         cantidad: e._count,
       })),
       porCategoria: porCategoria.map(c => ({
@@ -787,7 +791,7 @@ router.get('/ejecutivo/socios', authAdmin, asyncHandler(async (req, res) => {
         cantidad: c._count,
       })),
       porTipo: porTipo.map(t => ({
-        tipo: tiposMap[t.tipoSocioId] || 'Sin tipo',
+        tipo: tiposMap[t.tipoSocioRelId] || 'Sin tipo',
         cantidad: t._count,
       })),
       gruposFamiliares: {

@@ -315,7 +315,7 @@ router.get('/estadisticas/aceptacion', checkPermiso('REGLAMENTO_VER'), asyncHand
 
   // Total de socios activos
   const totalSociosActivos = await req.db.socio.count({
-    where: { estado: 'ACTIVO' }
+    where: { estadoSocioRel: { esSocioActivo: true } }
   })
 
   // Aceptaciones por artículo
@@ -392,7 +392,7 @@ router.get('/socios-sin-aceptar', checkPermiso('REGLAMENTO_VER'), asyncHandler(a
 
   // Obtener socios activos que NO tienen aceptación de algún artículo
   const sociosActivos = await req.db.socio.findMany({
-    where: { estado: 'ACTIVO' },
+    where: { estadoSocioRel: { esSocioActivo: true } },
     select: {
       id: true,
       nroSocio: true,

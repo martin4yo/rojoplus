@@ -734,10 +734,11 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
 
     if (socioId) {
       socio = await req.db.socio.findUnique({
-        where: { id: parseInt(socioId) }
+        where: { id: parseInt(socioId) },
+        include: { estadoSocioRel: { select: { esSocioActivo: true, nombre: true } } }
       })
 
-      if (socio && socio.estado === 'ACTIVO') {
+      if (socio && socio.estadoSocioRel?.esSocioActivo === true) {
         // Verificar si tiene deudas
         const cargosImpagos = await req.db.cargo.aggregate({
           where: {
@@ -769,7 +770,7 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
       socio = await req.db.socio.findFirst({
         where: {
           documento: documentoComprador,
-          estado: 'ACTIVO'
+          estadoSocioRel: { esSocioActivo: true }
         }
       })
 
@@ -1076,10 +1077,11 @@ router.post('/venta-kiosco', authAdmin, checkPermiso('BUFFET_COBRAR'), async (re
 
       if (socioId) {
         socio = await req.db.socio.findUnique({
-          where: { id: parseInt(socioId) }
+          where: { id: parseInt(socioId) },
+          include: { estadoSocioRel: { select: { esSocioActivo: true } } }
         })
 
-        if (socio && socio.estado === 'ACTIVO') {
+        if (socio && socio.estadoSocioRel?.esSocioActivo === true) {
           esSocio = true
           precio = categoria.precioSocio
         }

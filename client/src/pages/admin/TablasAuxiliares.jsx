@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Key, Hash } from 'lucide-react'
+import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTriangle, Settings, Table2, Calendar, Percent, Save, Shield, User, BookOpen, Briefcase, Building2, Store, CreditCard, ArrowRight, Calculator, Server, Eye, EyeOff, Bell, MessageCircle, Wifi, WifiOff, Smartphone, CheckCircle, XCircle, Key, Hash, ShieldOff } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
+import Switch from '../../components/Switch'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -50,6 +51,10 @@ export default function TablasAuxiliares() {
   // Configuración de recargos
   const [recargo, setRecargo] = useState({ tipo: 'FIJO', porcentaje: '10', cadaDias: '15', topeMaximo: '' })
   const [guardandoRecargo, setGuardandoRecargo] = useState(false)
+
+  // Configuración de vigencia automática por morosidad
+  const [vigencia, setVigencia] = useState({ bloqueoActivo: false, diasGracia: '0' })
+  const [guardandoVigencia, setGuardandoVigencia] = useState(false)
 
   // Configuración descuento anticipado
   const [descAnticipado, setDescAnticipado] = useState({ activo: false, porcentaje: '0', diasAnticipacion: '0' })
@@ -147,6 +152,7 @@ export default function TablasAuxiliares() {
     cargarModoDemo()
     cargarConfiguracion()
     cargarRecargo()
+    cargarVigencia()
     cargarDescAnticipado()
     cargarBajaAsistencia()
     cargarCumpleanios()
@@ -317,6 +323,53 @@ export default function TablasAuxiliares() {
       }
     } catch (err) {
       console.error('Error cargando configuración de recargo:', err)
+    }
+  }
+
+  async function cargarVigencia() {
+    try {
+      const [bloqueoCfg, graciaCfg] = await Promise.all([
+        api.get('/admin/sistema/configuracion/MOROSIDAD_BLOQUEO_AUTO_ACTIVO').catch(() => null),
+        api.get('/admin/sistema/configuracion/MOROSIDAD_DIAS_GRACIA').catch(() => null),
+      ])
+      setVigencia({
+        bloqueoActivo: bloqueoCfg?.valor === 'true',
+        diasGracia: graciaCfg?.valor ?? '0',
+      })
+    } catch (err) {
+      console.error('Error cargando configuración de vigencia:', err)
+    }
+  }
+
+  async function guardarVigencia() {
+    const dias = parseInt(vigencia.diasGracia, 10)
+    if (!Number.isFinite(dias) || dias < 0) {
+      setError('Los días de gracia deben ser un número >= 0')
+      return
+    }
+    setGuardandoVigencia(true)
+    setError(null)
+    try {
+      await Promise.all([
+        api.put('/admin/sistema/configuracion/MOROSIDAD_BLOQUEO_AUTO_ACTIVO', {
+          valor: vigencia.bloqueoActivo ? 'true' : 'false',
+          tipo: 'BOOLEAN',
+          modulo: 'MOROSIDAD',
+          descripcion: 'Activa el cron diario que bloquea socios con cuotas vencidas',
+        }),
+        api.put('/admin/sistema/configuracion/MOROSIDAD_DIAS_GRACIA', {
+          valor: String(dias),
+          tipo: 'INTEGER',
+          modulo: 'MOROSIDAD',
+          descripcion: 'Días de gracia después del vencimiento antes de bloquear',
+        }),
+      ])
+      setSuccess('Configuración de vigencia guardada')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Error al guardar configuración de vigencia')
+    } finally {
+      setGuardandoVigencia(false)
     }
   }
 
@@ -1222,6 +1275,72 @@ export default function TablasAuxiliares() {
             )}
           </div>
 
+          {/* Vigencia automática por morosidad */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[280px]">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-amber-100">
+                <ShieldOff className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Vigencia automática por morosidad</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  El cron diario bloquea socios con cuotas vencidas y los reactiva al pagar
+                </p>
+
+                <div className="mt-4">
+                  <Switch
+                    checked={vigencia.bloqueoActivo}
+                    onChange={(v) => setVigencia({ ...vigencia, bloqueoActivo: v })}
+                    label="Bloqueo automático activo"
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Días de gracia
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={vigencia.diasGracia}
+                      onChange={(e) => setVigencia({ ...vigencia, diasGracia: e.target.value })}
+                      className="input-field w-20"
+                      min="0"
+                      step="1"
+                    />
+                    <span className="text-gray-500">días</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    No se bloquea hasta que pasen estos días desde el vencimiento
+                  </p>
+                </div>
+
+                <div className="mt-3 p-2 bg-gray-50 rounded-lg mb-8">
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium">Requisito:</span> definir Estados de Socio con rol{' '}
+                    <span className="font-semibold">AL_DIA</span> y{' '}
+                    <span className="font-semibold">BLOQUEADO</span> en{' '}
+                    <span className="font-medium">Tablas Auxiliares → Estados de Socio</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+            {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
+              <button
+                onClick={guardarVigencia}
+                disabled={guardandoVigencia}
+                className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
+                title="Guardar"
+              >
+                {guardandoVigencia ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+              </button>
+            )}
+          </div>
+
           {/* Descuento por Pago Anticipado */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[280px]">
             <div className="flex items-start gap-4">
@@ -1806,7 +1925,7 @@ export default function TablasAuxiliares() {
               {/* Entrenadores */}
               <div
                 className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer w-72"
-                onClick={() => navigate('/admin/entrenadores')}
+                onClick={() => navigate('/admin/egresos/personal')}
               >
                 <div className="p-5">
                   <div className="flex items-start justify-between">
@@ -1815,7 +1934,7 @@ export default function TablasAuxiliares() {
                     </div>
                     <Button
                       size="sm"
-                      onClick={(e) => { e.stopPropagation(); navigate('/admin/entrenadores/nuevo') }}
+                      onClick={(e) => { e.stopPropagation(); navigate('/admin/egresos/personal/nuevo') }}
                       className="flex items-center gap-1"
                     >
                       <Plus className="w-4 h-4" />

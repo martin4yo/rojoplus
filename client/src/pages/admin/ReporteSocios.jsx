@@ -145,7 +145,7 @@ export default function ReporteSocios() {
     // Agrupar por tipo (socios filtrados)
     const porTipo = tipos.map(t => ({
       ...t,
-      cantidad: sociosFiltrados.filter(s => s.tipoSocio === t.nombre || s.tipoSocioRelId === t.id).length
+      cantidad: sociosFiltrados.filter(s => s.tipoSocioRelId === t.id).length
     })).sort((a, b) => b.cantidad - a.cantidad)
 
     // Agrupar por categoría (socios filtrados)

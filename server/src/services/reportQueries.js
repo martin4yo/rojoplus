@@ -10,22 +10,22 @@ const QUERY_DEFINITIONS = [
       { name: 'categoria', label: 'Categoría (opcional)', type: 'text', required: false, defaultValue: '' },
     ],
     run: async (db, tenantId, params) => {
-      const where = { tenantId, activo: true }
+      const where = { tenantId, estadoSocioRel: { esSocioActivo: true } }
       const socios = await db.socio.findMany({
         where,
         select: {
-          id: true, nombre: true, apellido: true, dni: true, email: true, telefono: true,
-          categoria: { select: { nombre: true } },
+          id: true, nombre: true, apellido: true, documento: true, email: true, celular: true,
+          categoriaSocioRel: { select: { nombre: true } },
         },
         orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
       })
       let items = socios.map(s => ({
         nombre: s.nombre || '',
         apellido: s.apellido || '',
-        dni: s.dni || '',
+        dni: s.documento || '',
         email: s.email || '',
-        telefono: s.telefono || '',
-        categoria: s.categoria?.nombre || '',
+        telefono: s.celular || '',
+        categoria: s.categoriaSocioRel?.nombre || '',
       }))
       if (params.categoria) {
         const cat = params.categoria.toLowerCase()

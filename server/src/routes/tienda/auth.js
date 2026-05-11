@@ -64,7 +64,7 @@ router.post('/register', authRateLimit, asyncHandler(async (req, res) => {
 
   // Vincular socio existente con mismo email (si lo hay)
   const socioMatch = await req.db.socio.findFirst({
-    where: { email, estado: { not: 'BAJA' } },
+    where: { email, estadoSocioRel: { esSocioActivo: true } },
     select: { id: true },
   })
 

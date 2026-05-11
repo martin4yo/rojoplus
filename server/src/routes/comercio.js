@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { authComercio } from '../middleware/auth.js'
+import { esSocioActivo, SELECT_ESTADO_SOCIO_REL } from '../lib/socioEstado.js'
 
 const router = Router()
 
@@ -52,7 +53,7 @@ router.get('/:token/socios/buscar', asyncHandler(authComercio), asyncHandler(asy
       id: true,
       nroSocio: true,
       apellidoNombre: true,
-      estado: true,
+      estadoSocioRel: SELECT_ESTADO_SOCIO_REL,
     },
   })
 
@@ -60,18 +61,14 @@ router.get('/:token/socios/buscar', asyncHandler(authComercio), asyncHandler(asy
     return res.json({ success: true, data: null })
   }
 
-  // Determinar si está activo (ACTIVO o VIGENTE)
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-
   res.json({
     success: true,
     data: {
       id: socio.id,
       nroSocio: socio.nroSocio,
       apellidoNombre: socio.apellidoNombre,
-      estado: socio.estado,
-      esActivo,
+      estado: socio.estadoSocioRel?.nombre || '',
+      esActivo: esSocioActivo(socio),
     },
   })
 }))
@@ -90,7 +87,7 @@ router.get('/:token/socios/buscar-qr', asyncHandler(authComercio), asyncHandler(
       id: true,
       nroSocio: true,
       apellidoNombre: true,
-      estado: true,
+      estadoSocioRel: SELECT_ESTADO_SOCIO_REL,
     },
   })
 
@@ -98,18 +95,14 @@ router.get('/:token/socios/buscar-qr', asyncHandler(authComercio), asyncHandler(
     return res.json({ success: true, data: null })
   }
 
-  // Determinar si está activo (ACTIVO o VIGENTE)
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-
   res.json({
     success: true,
     data: {
       id: socio.id,
       nroSocio: socio.nroSocio,
       apellidoNombre: socio.apellidoNombre,
-      estado: socio.estado,
-      esActivo,
+      estado: socio.estadoSocioRel?.nombre || '',
+      esActivo: esSocioActivo(socio),
     },
   })
 }))
@@ -183,15 +176,14 @@ router.post('/:token/ventas', asyncHandler(authComercio), asyncHandler(async (re
   // Verificar que el socio existe y está activo
   const socio = await req.db.socio.findUnique({
     where: { id: socioId },
+    include: { estadoSocioRel: SELECT_ESTADO_SOCIO_REL },
   })
 
   if (!socio) {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-  if (!esActivo) {
+  if (!esSocioActivo(socio)) {
     throw new AppError('El socio no está activo', 422, 'SOCIO_INACTIVO')
   }
 

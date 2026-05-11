@@ -470,7 +470,7 @@ export default function ActividadDetalle() {
                               {miembro.foto ? (
                                 <img
                                   src={miembro.foto}
-                                  alt={`${miembro.nombre} ${miembro.apellido}`}
+                                  alt={miembro.nombre}
                                   className="w-20 h-20 rounded-full object-cover"
                                 />
                               ) : (
@@ -480,7 +480,7 @@ export default function ActividadDetalle() {
                               )}
                               <div className="flex-1">
                                 <h3 className="font-bold text-gray-900">
-                                  {miembro.nombre} {miembro.apellido}
+                                  {miembro.nombre}
                                 </h3>
                                 <p className="text-sm text-primary font-medium">{miembro.rol}</p>
                                 {miembro.biografia && (

@@ -189,7 +189,7 @@ export default function ChatEntrenadores() {
           >
             <option value="">Seleccionar entrenador...</option>
             {entrenadores.map(e => (
-              <option key={e.id} value={e.id}>{e.nombre} {e.apellido || ''}</option>
+              <option key={e.id} value={e.id}>{e.nombre}</option>
             ))}
           </select>
         </div>

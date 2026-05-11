@@ -192,12 +192,12 @@ export default function ReporteActividadDetalle() {
           </div>
         </div>
         <Button
-          onClick={() => navigate('/admin/entrenadores')}
+          onClick={() => navigate('/admin/egresos/personal')}
           variant="secondary"
           className="flex items-center gap-2"
         >
           <UserCheck className="w-4 h-4" />
-          Gestionar Entrenadores
+          Gestionar Personal
         </Button>
       </div>
 
@@ -285,7 +285,7 @@ export default function ReporteActividadDetalle() {
                           key={ent.id}
                           className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-sm"
                         >
-                          {ent.nombre} {ent.apellido || ''}
+                          {ent.nombre}
                           <button
                             onClick={(e) => { e.stopPropagation(); quitarEntrenador(ent.id, categoria.id) }}
                             className="ml-1 p-0.5 hover:bg-teal-200 rounded"
@@ -324,7 +324,7 @@ export default function ReporteActividadDetalle() {
                         <option value="">Seleccionar...</option>
                         {entrenadoresDisponibles(categoria.id).map(ent => (
                           <option key={ent.id} value={ent.id}>
-                            {ent.nombre} {ent.apellido || ''} {ent.especialidad ? `(${ent.especialidad})` : ''}
+                            {ent.nombre} {ent.especialidad ? `(${ent.especialidad})` : ''}
                           </option>
                         ))}
                       </select>

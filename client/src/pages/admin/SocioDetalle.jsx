@@ -477,7 +477,7 @@ export default function SocioDetalle() {
       {/* Estado y badges */}
       <div className="flex flex-wrap gap-2 mb-6">
         <StatusBadge status={socio.estado} type="socio" size="md" />
-        {(socio.tipoSocio?.toLowerCase().includes('titular') || socio.miembrosFamilia?.length > 0) && (
+        {(socio.miembrosFamilia?.length > 0) && (
           <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 flex items-center gap-1">
             <Users className="w-4 h-4" />
             Titular Familia ({socio.miembrosFamilia?.length || 0} miembros)
@@ -583,7 +583,7 @@ export default function SocioDetalle() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Tipo de socio</dt>
-                  <dd className="text-gray-800">{socio.tipoSocio || '-'}</dd>
+                  <dd className="text-gray-800">{socio.tipoSocioRel?.nombre || '-'}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Fecha de alta</dt>
@@ -614,7 +614,7 @@ export default function SocioDetalle() {
         {activeTab === 'familia' && (
           <div className="space-y-6">
             {/* Si es Titular de Familia - mostrar miembros y buscador para agregar */}
-            {(socio.tipoSocio?.toLowerCase().includes('titular') || socio.miembrosFamilia?.length > 0) && (
+            {(socio.miembrosFamilia?.length > 0) && (
               <div>
                 <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
                   <Users className="w-4 h-4" /> Miembros de la Familia ({socio.miembrosFamilia?.length || 0})
@@ -755,7 +755,7 @@ export default function SocioDetalle() {
             )}
 
             {/* Buscar y asignar titular (solo si no es titular y no tiene titular asignado) */}
-            {!socio.tipoSocio?.toLowerCase().includes('titular') && !socio.titularFamilia && socio.miembrosFamilia?.length === 0 && (
+            {!socio.titularFamilia && socio.miembrosFamilia?.length === 0 && (
               <div>
                 <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
                   <Users className="w-4 h-4" /> Asignar a Familia
@@ -1199,7 +1199,7 @@ export default function SocioDetalle() {
             {mostrarCtaCte && (
               <div>
                 {/* Opciones */}
-                {(socio.tipoSocio?.toLowerCase().includes('titular') || socio.miembrosFamilia?.length > 0) && (
+                {(socio.miembrosFamilia?.length > 0) && (
                   <div className="flex items-center gap-2 mb-4">
                     <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                       <input

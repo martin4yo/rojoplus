@@ -66,9 +66,9 @@ router.post('/validar', authDispositivo, async (req, res) => {
           nroSocio: true,
           apellidoNombre: true,
           documento: true,
-          estado: true,
           rfidUid: true,
-          tokenPortal: true
+          tokenPortal: true,
+          estadoSocioRel: { select: { permiteIngresoMolinete: true, nombre: true } }
         }
       })
 
@@ -98,9 +98,9 @@ router.post('/validar', authDispositivo, async (req, res) => {
           nroSocio: true,
           apellidoNombre: true,
           documento: true,
-          estado: true,
           rfidUid: true,
-          tokenPortal: true
+          tokenPortal: true,
+          estadoSocioRel: { select: { permiteIngresoMolinete: true, nombre: true } }
         }
       })
 
@@ -138,7 +138,6 @@ router.post('/validar', authDispositivo, async (req, res) => {
           nroSocio: true,
           apellidoNombre: true,
           documento: true,
-          estado: true,
           rfidUid: true,
           tokenPortal: true,
           estadoSocioRel: { select: { permiteIngresoMolinete: true, nombre: true } }
@@ -222,13 +221,8 @@ router.post('/validar', authDispositivo, async (req, res) => {
       }
     } else
     if (tipo === 'SOCIO') {
-      // Flag FK explícito en true → permite.
-      // Si el flag está en false pero el estado legacy es 'VIGENTE'/'ACTIVO',
-      // permite igual (compat con datos previos al flag). Si querés que
-      // un socio VIGENTE no entre, marcá su estado distinto.
-      const flagFK = persona.estadoSocioRel?.permiteIngresoMolinete === true
-      const estadoLegacyOK = ['VIGENTE', 'ACTIVO'].includes((persona.estado || '').toUpperCase())
-      const puedeIngresar = flagFK || estadoLegacyOK
+      // El permiso de molinete depende del flag explícito del EstadoSocio.
+      const puedeIngresar = persona.estadoSocioRel?.permiteIngresoMolinete === true
 
       if (puedeIngresar) {
         permitido = true
@@ -237,7 +231,7 @@ router.post('/validar', authDispositivo, async (req, res) => {
       } else {
         permitido = false
         motivo = 'NO_VIGENTE'
-        const nombreEstado = persona.estadoSocioRel?.nombre || persona.estado || 'sin estado'
+        const nombreEstado = persona.estadoSocioRel?.nombre || 'sin estado'
         mensaje = `Socio ${nombreEstado} - Diríjase a Secretaría`
       }
     } else if (tipo === 'HABILITACION') {
@@ -282,7 +276,7 @@ router.post('/validar', authDispositivo, async (req, res) => {
           nombre: persona.apellidoNombre,
           nroSocio: persona.nroSocio,
           documento: persona.documento,
-          estado: persona.estado
+          estado: persona.estadoSocioRel?.nombre || ''
         }
       : {
           id: persona.id,
@@ -442,29 +436,23 @@ router.get('/cache-socios', authDispositivo, async (req, res) => {
         nroSocio: true,
         apellidoNombre: true,
         documento: true,
-        estado: true,
         tokenPortal: true,
         rfidUid: true,
         estadoSocioRel: { select: { permiteIngresoMolinete: true, nombre: true } }
       }
     })
 
-    const socios = sociosRaw.map(s => {
-      // Mismo criterio que /validar: flag explícito O estado legacy VIGENTE/ACTIVO
-      const flagFK = s.estadoSocioRel?.permiteIngresoMolinete === true
-      const estadoLegacyOK = ['VIGENTE', 'ACTIVO'].includes((s.estado || '').toUpperCase())
-      return {
-        id: s.id,
-        nroSocio: s.nroSocio,
-        apellidoNombre: s.apellidoNombre,
-        documento: s.documento,
-        estado: s.estado,
-        tokenPortal: s.tokenPortal,
-        rfidUid: s.rfidUid,
-        permiteIngresoMolinete: flagFK || estadoLegacyOK,
-        estadoNombre: s.estadoSocioRel?.nombre || s.estado || null
-      }
-    })
+    const socios = sociosRaw.map(s => ({
+      id: s.id,
+      nroSocio: s.nroSocio,
+      apellidoNombre: s.apellidoNombre,
+      documento: s.documento,
+      estado: s.estadoSocioRel?.nombre || null,
+      tokenPortal: s.tokenPortal,
+      rfidUid: s.rfidUid,
+      permiteIngresoMolinete: s.estadoSocioRel?.permiteIngresoMolinete === true,
+      estadoNombre: s.estadoSocioRel?.nombre || null
+    }))
 
     // Obtener habilitaciones vigentes
     const ahora = new Date()
@@ -1013,7 +1001,7 @@ router.get('/buscar-socio', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GES
         nroSocio: true,
         apellidoNombre: true,
         documento: true,
-        estado: true,
+        estadoSocioRel: { select: { nombre: true } },
         fotoUrl: true,
       },
       take: 15,
@@ -1024,19 +1012,28 @@ router.get('/buscar-socio', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GES
     // intentar con SQL raw normalizando el documento en la DB (por si está cargado con puntos).
     const pareceDni = /^[\d.\s-]+$/.test(term) && termClean.length >= 4
     if (socios.length === 0 && pareceDni) {
-      socios = await req.db.$queryRaw`
-        SELECT id,
-               nro_socio        AS "nroSocio",
-               apellido_nombre  AS "apellidoNombre",
-               documento,
-               estado,
-               foto_url         AS "fotoUrl"
-        FROM socios
-        WHERE tenant_id = ${req.tenantId}
-          AND regexp_replace(coalesce(documento, ''), '[.\s-]', '', 'g') ILIKE ${'%' + termClean + '%'}
-        ORDER BY apellido_nombre ASC
+      const raw = await req.db.$queryRaw`
+        SELECT s.id,
+               s.nro_socio        AS "nroSocio",
+               s.apellido_nombre  AS "apellidoNombre",
+               s.documento,
+               es.nombre           AS "estadoNombre",
+               s.foto_url         AS "fotoUrl"
+        FROM socios s
+        LEFT JOIN estados_socio es ON es.id = s.estado_socio_id
+        WHERE s.tenant_id = ${req.tenantId}
+          AND regexp_replace(coalesce(s.documento, ''), '[.\s-]', '', 'g') ILIKE ${'%' + termClean + '%'}
+        ORDER BY s.apellido_nombre ASC
         LIMIT 15
       `
+      socios = raw.map(r => ({
+        id: r.id,
+        nroSocio: r.nroSocio,
+        apellidoNombre: r.apellidoNombre,
+        documento: r.documento,
+        fotoUrl: r.fotoUrl,
+        estadoSocioRel: r.estadoNombre ? { nombre: r.estadoNombre } : null,
+      }))
     }
 
     // Para cada socio, contar olvidos en los últimos 30 días
@@ -1045,7 +1042,7 @@ router.get('/buscar-socio', tenantForAdmin, authAdmin, checkPermiso('ACCESOS_GES
       const olvidosUltimos30 = await req.db.olvidoDocumento.count({
         where: { socioId: s.id, fecha: { gte: hace30Dias } }
       })
-      return { ...s, olvidosUltimos30 }
+      return { ...s, estado: s.estadoSocioRel?.nombre || '', olvidosUltimos30 }
     }))
 
     res.json({ success: true, data: sociosConOlvidos })
@@ -1071,17 +1068,22 @@ router.post('/permitir-manual', tenantForAdmin, authAdmin, checkPermiso('ACCESOS
 
     const socio = await req.db.socio.findUnique({
       where: { id: parseInt(socioId) },
-      select: { id: true, apellidoNombre: true, nroSocio: true, estado: true }
+      select: {
+        id: true,
+        apellidoNombre: true,
+        nroSocio: true,
+        estadoSocioRel: { select: { nombre: true, esSocioActivo: true, permiteIngresoMolinete: true } }
+      }
     })
     if (!socio) return res.status(404).json({ success: false, error: 'Socio no encontrado' })
 
     // Bloqueo: socio NO vigente no puede pasar
-    const estadoUp = socio.estado?.toUpperCase() || ''
-    const esVigente = estadoUp.includes('VIGENT') || estadoUp.includes('ACTIV')
-    if (!esVigente) {
+    const puedeIngresar = socio.estadoSocioRel?.permiteIngresoMolinete === true
+    if (!puedeIngresar) {
+      const nombreEstado = socio.estadoSocioRel?.nombre || 'sin estado'
       return res.status(403).json({
         success: false,
-        error: `Socio ${socio.estado} — no se puede permitir el acceso. Debe pasar por Secretaría.`,
+        error: `Socio ${nombreEstado} — no se puede permitir el acceso. Debe pasar por Secretaría.`,
         code: 'SOCIO_NO_VIGENTE'
       })
     }

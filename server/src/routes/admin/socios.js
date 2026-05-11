@@ -7,6 +7,7 @@ import { authAdmin } from '../../middleware/auth.js'
 import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
 import { resolverPeriodoAlta } from '../../lib/cuotasPeriodoAlta.js'
 import { calcularProximoNroSocio } from '../../lib/nroSocio.js'
+import { getTipoSocioMiembroFamilia, getTipoSocioTitularFamilia } from '../../lib/tipoSocioFamilia.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -15,8 +16,9 @@ const upload = multer({ storage: multer.memoryStorage() })
 const uploadCache = new Map()
 
 // Resuelve estado/categoria/tipoSocio del socio desde IDs (preferido) o strings legacy.
-// Devuelve { estadoSocioId, categoriaSocioId, tipoSocioRelId, estado, categoria, tipoSocio, tipoSocioRecord }
-// con sólo las claves que el body proveyó. Permite mantener sincronizados FK + string legacy.
+// Sólo persiste FKs (estadoSocioId, categoriaSocioId, tipoSocioRelId). Si llegan strings
+// legacy del Excel o de UIs viejas, los mapea a su FK y descarta el string.
+// Devuelve { estadoSocioId?, categoriaSocioId?, tipoSocioRelId?, tipoSocioRecord }
 async function resolverRelacionesSocio(db, tenantId, data) {
   const out = {}
   let tipoSocioRecord = null
@@ -28,9 +30,7 @@ async function resolverRelacionesSocio(db, tenantId, data) {
     })
     if (!est) throw new AppError('Estado de socio no encontrado', 400, 'INVALID_FK')
     out.estadoSocioId = est.id
-    out.estado = est.nombre
   } else if (data.estado !== undefined) {
-    out.estado = data.estado || null
     if (data.estado) {
       const est = await db.estadoSocio.findFirst({ where: { tenantId, nombre: data.estado } })
       out.estadoSocioId = est?.id || null
@@ -46,9 +46,7 @@ async function resolverRelacionesSocio(db, tenantId, data) {
     })
     if (!cat) throw new AppError('Categoría de socio no encontrada', 400, 'INVALID_FK')
     out.categoriaSocioId = cat.id
-    out.categoria = cat.nombre
   } else if (data.categoria !== undefined) {
-    out.categoria = data.categoria || null
     if (data.categoria) {
       const cat = await db.categoriaSocio.findFirst({ where: { tenantId, nombre: data.categoria } })
       out.categoriaSocioId = cat?.id || null
@@ -64,11 +62,11 @@ async function resolverRelacionesSocio(db, tenantId, data) {
     })
     if (!tipoSocioRecord) throw new AppError('Tipo de socio no encontrado', 400, 'INVALID_FK')
     out.tipoSocioRelId = tipoSocioRecord.id
-    out.tipoSocio = tipoSocioRecord.nombre
   } else if (data.tipoSocio !== undefined) {
-    out.tipoSocio = data.tipoSocio || null
     if (data.tipoSocio) {
-      tipoSocioRecord = await db.tipoSocio.findFirst({ where: { tenantId, nombre: data.tipoSocio } })
+      tipoSocioRecord = await db.tipoSocio.findFirst({
+        where: { tenantId, OR: [{ nombre: data.tipoSocio }, { codigo: data.tipoSocio }] },
+      })
       out.tipoSocioRelId = tipoSocioRecord?.id || null
     } else {
       out.tipoSocioRelId = null
@@ -192,17 +190,23 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   // Filtrar por múltiples estados válidos (ej: estadosValidos=ACTIVO,VIGENTE)
   if (estadosValidos) {
     const estados = estadosValidos.split(',').map(e => e.trim())
-    where.estado = { in: estados }
+    where.estadoSocioRel = { nombre: { in: estados } }
   } else if (estado) {
-    where.estado = { contains: estado, mode: 'insensitive' }
+    where.estadoSocioRel = { nombre: { contains: estado, mode: 'insensitive' } }
   }
 
   if (categoria) {
-    where.categoria = { contains: categoria, mode: 'insensitive' }
+    where.categoriaSocioRel = { nombre: { contains: categoria, mode: 'insensitive' } }
   }
 
   if (tipoSocio) {
-    where.tipoSocio = { contains: tipoSocio, mode: 'insensitive' }
+    // Acepta id numérico (tipoSocioRelId) o código del TipoSocio
+    const idNum = parseInt(tipoSocio)
+    if (!Number.isNaN(idNum) && String(idNum) === String(tipoSocio)) {
+      where.tipoSocioRelId = idNum
+    } else {
+      where.tipoSocioRel = { codigo: tipoSocio }
+    }
   }
 
   if (zona) {
@@ -255,9 +259,9 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
         apellidoNombre: true,
         email: true,
         celular: true,
-        estado: true,
-        categoria: true,
-        tipoSocio: true,
+        estadoSocioRel: { select: { id: true, codigo: true, nombre: true } },
+        categoriaSocioRel: { select: { id: true, codigo: true, nombre: true } },
+        tipoSocioRel: { select: { id: true, codigo: true, nombre: true } },
         esMenor: true,
         fechaNacimiento: true,
         fotoUrl: true,
@@ -270,9 +274,13 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
       },
     }),
     req.db.socio.count({ where }),
-    req.db.socio.groupBy({ by: ['estado'], _count: true }),
-    req.db.socio.groupBy({ by: ['categoria'], _count: true }),
-    req.db.socio.groupBy({ by: ['tipoSocio'], _count: true }),
+    req.db.estadoSocio.findMany({ where: { activo: true }, select: { nombre: true }, orderBy: { orden: 'asc' } }),
+    req.db.categoriaSocio.findMany({ where: { activo: true }, select: { nombre: true }, orderBy: { orden: 'asc' } }),
+    req.db.tipoSocio.findMany({
+      where: { activo: true },
+      select: { id: true, codigo: true, nombre: true },
+      orderBy: { orden: 'asc' },
+    }),
     req.db.socio.groupBy({ by: ['zona'], _count: true }),
   ])
 
@@ -295,6 +303,8 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
   }
   const sociosConSaldo = socios.map(s => ({
     ...s,
+    estado: s.estadoSocioRel?.nombre || '',
+    categoria: s.categoriaSocioRel?.nombre || '',
     saldoPendiente: saldoPorSocio[s.id]?.saldoPendiente || 0,
     cuotasPendientes: saldoPorSocio[s.id]?.cuotasPendientes || 0,
   }))
@@ -317,9 +327,9 @@ router.get('/socios', authAdmin, asyncHandler(async (req, res) => {
         to,
       },
       filtros: {
-        estados: estados.map(e => e.estado).filter(Boolean).sort(),
-        categorias: categorias.map(c => c.categoria).filter(Boolean).sort(),
-        tiposSocio: tiposSocio.map(t => t.tipoSocio).filter(Boolean).sort(),
+        estados: estados.map(e => e.nombre).filter(Boolean),
+        categorias: categorias.map(c => c.nombre).filter(Boolean),
+        tiposSocio,
         zonas: zonas.map(z => z.zona).filter(Boolean).sort(),
       },
     },
@@ -351,9 +361,16 @@ router.get('/socios/grupos-familiares', authAdmin, asyncHandler(async (req, res)
     }
   }
 
-  if (estado) where.estado = { contains: estado, mode: 'insensitive' }
-  if (categoria) where.categoria = { contains: categoria, mode: 'insensitive' }
-  if (tipoSocio) where.tipoSocio = { contains: tipoSocio, mode: 'insensitive' }
+  if (estado) where.estadoSocioRel = { nombre: { contains: estado, mode: 'insensitive' } }
+  if (categoria) where.categoriaSocioRel = { nombre: { contains: categoria, mode: 'insensitive' } }
+  if (tipoSocio) {
+    const idNum = parseInt(tipoSocio)
+    if (!Number.isNaN(idNum) && String(idNum) === String(tipoSocio)) {
+      where.tipoSocioRelId = idNum
+    } else {
+      where.tipoSocioRel = { codigo: tipoSocio }
+    }
+  }
   if (zona) where.zona = zona
 
   const [titulares, total] = await Promise.all([
@@ -367,9 +384,9 @@ router.get('/socios/grupos-familiares', authAdmin, asyncHandler(async (req, res)
         nroSocio: true,
         apellidoNombre: true,
         documento: true,
-        estado: true,
-        categoria: true,
-        tipoSocio: true,
+        estadoSocioRel: { select: { id: true, codigo: true, nombre: true } },
+        categoriaSocioRel: { select: { id: true, codigo: true, nombre: true } },
+        tipoSocioRel: { select: { id: true, codigo: true, nombre: true } },
         fotoUrl: true,
         email: true,
         celular: true,
@@ -379,9 +396,9 @@ router.get('/socios/grupos-familiares', authAdmin, asyncHandler(async (req, res)
             nroSocio: true,
             apellidoNombre: true,
             parentescoTitular: true,
-            estado: true,
-            categoria: true,
-            tipoSocio: true,
+            estadoSocioRel: { select: { id: true, codigo: true, nombre: true } },
+            categoriaSocioRel: { select: { id: true, codigo: true, nombre: true } },
+            tipoSocioRel: { select: { id: true, codigo: true, nombre: true } },
             esMenor: true,
             fechaNacimiento: true,
             fotoUrl: true,
@@ -434,10 +451,10 @@ router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
         select: { id: true, nroSocio: true, apellidoNombre: true, fechaNacimiento: true }
       },
       titularFamilia: {
-        select: { id: true, nroSocio: true, apellidoNombre: true, tipoSocio: true }
+        select: { id: true, nroSocio: true, apellidoNombre: true, tipoSocioRel: { select: { id: true, codigo: true, nombre: true } } }
       },
       miembrosFamilia: {
-        select: { id: true, nroSocio: true, apellidoNombre: true, parentescoTitular: true, tipoSocio: true }
+        select: { id: true, nroSocio: true, apellidoNombre: true, parentescoTitular: true, tipoSocioRel: { select: { id: true, codigo: true, nombre: true } } }
       },
       cobrador: {
         select: { id: true, codigo: true, nombre: true }
@@ -453,9 +470,9 @@ router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
       autorizaciones: {
         where: { activa: true }
       },
-      estadoSocioRel: { select: { id: true, nombre: true, activo: true } },
-      categoriaSocioRel: { select: { id: true, nombre: true, activo: true } },
-      tipoSocioRel: { select: { id: true, nombre: true, activo: true } },
+      estadoSocioRel: { select: { id: true, codigo: true, nombre: true, activo: true, esSocioActivo: true, rolVigencia: true } },
+      categoriaSocioRel: { select: { id: true, codigo: true, nombre: true, activo: true } },
+      tipoSocioRel: { select: { id: true, codigo: true, nombre: true, activo: true } },
     },
   })
 
@@ -492,6 +509,8 @@ router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
   // Ocultar datos sensibles parcialmente (mostrar últimos 4 de tarjeta)
   const socioData = {
     ...socio,
+    estado: socio.estadoSocioRel?.nombre || '',
+    categoria: socio.categoriaSocioRel?.nombre || '',
     tarjetaNumero: socio.tarjetaNumero ? `****-****-****-${socio.tarjetaUltimos4 || socio.tarjetaNumero.slice(-4)}` : null,
     tarjetaCvv: socio.tarjetaCvv ? '***' : null,
     cbuDebito: socio.cbuDebito ? `${socio.cbuDebito.slice(0, 4)}...${socio.cbuDebito.slice(-4)}` : null,
@@ -573,9 +592,6 @@ router.post('/socios', authAdmin, asyncHandler(async (req, res) => {
     provincia: data.provincia || 'Buenos Aires',
     // Club
     fechaAlta: data.fechaAlta ? new Date(data.fechaAlta) : new Date(),
-    estado: rel.estado || 'ACTIVO',
-    categoria: rel.categoria !== undefined ? rel.categoria : null,
-    tipoSocio: rel.tipoSocio !== undefined ? rel.tipoSocio : null,
     estadoSocioId: rel.estadoSocioId ?? null,
     categoriaSocioId: rel.categoriaSocioId ?? null,
     tipoSocioRelId: rel.tipoSocioRelId ?? null,
@@ -753,11 +769,8 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
     }
   })
 
-  // Resolver FK + string legacy de estado/categoria/tipoSocio
+  // Resolver FK + string legacy de estado/categoria
   const rel = await resolverRelacionesSocio(req.db, req.tenantId, data)
-  if ('estado' in rel) updateData.estado = rel.estado
-  if ('categoria' in rel) updateData.categoria = rel.categoria
-  if ('tipoSocio' in rel) updateData.tipoSocio = rel.tipoSocio
   if ('estadoSocioId' in rel) updateData.estadoSocioId = rel.estadoSocioId
   if ('categoriaSocioId' in rel) updateData.categoriaSocioId = rel.categoriaSocioId
   if ('tipoSocioRelId' in rel) updateData.tipoSocioRelId = rel.tipoSocioRelId
@@ -809,7 +822,7 @@ router.put('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
       id: true,
       nroSocio: true,
       apellidoNombre: true,
-      estado: true,
+      estadoSocioRel: { select: { id: true, nombre: true } },
     },
   })
 
@@ -874,15 +887,28 @@ router.post('/socios/:id/desactivar', authAdmin, asyncHandler(async (req, res) =
   const { id } = req.params
   const { motivoBaja } = req.body
 
+  // Buscar un EstadoSocio que represente "baja" (esSocioActivo=false).
+  // Si no hay ninguno configurado en el tenant, no se puede desactivar.
+  const estadoBaja = await req.db.estadoSocio.findFirst({
+    where: { tenantId: req.tenantId, esSocioActivo: false },
+    orderBy: { orden: 'asc' },
+  })
+  if (!estadoBaja) {
+    throw new AppError(
+      'No hay ningún Estado de Socio configurado como baja (esSocioActivo=false). Configurálo en Tablas Auxiliares.',
+      400, 'NO_ESTADO_BAJA'
+    )
+  }
+
   const socio = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: {
-      estado: 'INACTIVO',
+      estadoSocioId: estadoBaja.id,
       fechaBaja: new Date(),
       motivoBaja: motivoBaja || 'Baja solicitada desde administración',
       actualizadoPor: req.admin.id,
     },
-    select: { id: true, nroSocio: true, apellidoNombre: true, estado: true },
+    select: { id: true, nroSocio: true, apellidoNombre: true, estadoSocioRel: { select: { id: true, nombre: true } } },
   })
 
   // Auditoría
@@ -907,15 +933,26 @@ router.post('/socios/:id/desactivar', authAdmin, asyncHandler(async (req, res) =
 router.post('/socios/:id/activar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
+  // Buscar el estado "al día" (AL_DIA) configurado en el tenant.
+  const estadoAlDia = await req.db.estadoSocio.findFirst({
+    where: { tenantId: req.tenantId, rolVigencia: 'AL_DIA' },
+  })
+  if (!estadoAlDia) {
+    throw new AppError(
+      'No hay Estado de Socio configurado con rol AL_DIA. Configurálo en Tablas Auxiliares.',
+      400, 'NO_ESTADO_AL_DIA'
+    )
+  }
+
   const socio = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: {
-      estado: 'ACTIVO',
+      estadoSocioId: estadoAlDia.id,
       fechaBaja: null,
       motivoBaja: null,
       actualizadoPor: req.admin.id,
     },
-    select: { id: true, nroSocio: true, apellidoNombre: true, estado: true },
+    select: { id: true, nroSocio: true, apellidoNombre: true, estadoSocioRel: { select: { id: true, nombre: true } } },
   })
 
   // Auditoría
@@ -963,7 +1000,7 @@ router.post('/socios/:id/enviar-portal-whatsapp', authAdmin, asyncHandler(async 
   const socio = await req.db.socio.findUnique({
     where: { id: parseInt(id) },
     select: {
-      id: true, apellidoNombre: true, tokenPortal: true, estado: true,
+      id: true, apellidoNombre: true, tokenPortal: true,
       celular: true, celularSecundario: true, telefonoFijo: true,
     },
   })
@@ -1022,17 +1059,22 @@ router.put('/socios/:id/familia', authAdmin, asyncHandler(async (req, res) => {
     }
 
     // Verificar que no sea titular de otra familia
-    if (socio.tipoSocio?.toLowerCase().includes('titular') && socio.miembrosFamilia?.length > 0) {
+    if (socio.miembrosFamilia?.length > 0) {
       throw new AppError('Este socio es titular de otra familia', 400, 'IS_TITULAR')
     }
   }
+
+  // El tipo de socio depende de si está siendo asignado como miembro de familia.
+  const tipoSocioFamiliaRec = titularFamiliaId
+    ? await getTipoSocioMiembroFamilia(req.db)
+    : await getTipoSocioTitularFamilia(req.db)
 
   const updated = await req.db.socio.update({
     where: { id: parseInt(id) },
     data: {
       titularFamiliaId: titularFamiliaId ? parseInt(titularFamiliaId) : null,
       parentescoTitular: titularFamiliaId ? (parentescoTitular || null) : null,
-      tipoSocio: titularFamiliaId ? 'Miembro Familia' : 'Socio Unico',  // Cambiar tipoSocio
+      tipoSocioRelId: tipoSocioFamiliaRec?.id || null,
       actualizadoPor: req.admin.id,
     },
     include: {
@@ -1048,7 +1090,7 @@ router.put('/socios/:id/familia', authAdmin, asyncHandler(async (req, res) => {
       id: updated.id,
       titularFamilia: updated.titularFamilia,
       parentescoTitular: updated.parentescoTitular,
-      tipoSocio: updated.tipoSocio,
+      tipoSocioRel: updated.tipoSocioRel,
       mensaje: titularFamiliaId ? 'Titular de familia asignado' : 'Socio desvinculado de familia',
     },
   })
@@ -1073,7 +1115,9 @@ router.post('/socios/:id/familia/desarmar', authAdmin, asyncHandler(async (req, 
     throw new AppError('Este socio no tiene miembros en su familia', 400, 'NO_MEMBERS')
   }
 
-  // Actualizar todos los miembros a Socio Unico
+  // Al desarmar la familia, los miembros y el titular pasan a ser "Socio Único":
+  // simplemente quitamos los vínculos y el FK al tipo de socio queda como estaba
+  // (el cliente puede asignarles el tipo correcto desde la pantalla de socio).
   const miembrosIds = titular.miembrosFamilia.map(m => m.id)
 
   await req.db.socio.updateMany({
@@ -1081,15 +1125,14 @@ router.post('/socios/:id/familia/desarmar', authAdmin, asyncHandler(async (req, 
     data: {
       titularFamiliaId: null,
       parentescoTitular: null,
-      tipoSocio: 'Socio Unico',
+      tipoSocioRelId: null,
     }
   })
 
-  // Cambiar el titular a Socio Unico
   await req.db.socio.update({
     where: { id: parseInt(id) },
     data: {
-      tipoSocio: 'Socio Unico',
+      tipoSocioRelId: null,
       actualizadoPor: req.admin.id,
     }
   })
@@ -1113,14 +1156,14 @@ router.get('/socios/titulares/buscar', authAdmin, asyncHandler(async (req, res) 
 
   const titulares = await req.db.socio.findMany({
     where: {
-      tipoSocio: { contains: 'Titular', mode: 'insensitive' },
+      miembrosFamilia: { some: {} },
       ...buildSocioSearchFilter(q),
     },
     select: {
       id: true,
       nroSocio: true,
       apellidoNombre: true,
-      tipoSocio: true,
+      tipoSocioRel: { select: { id: true, codigo: true, nombre: true } },
       _count: {
         select: { miembrosFamilia: true }
       }
@@ -1159,7 +1202,7 @@ router.get('/socios/miembros/buscar', authAdmin, asyncHandler(async (req, res) =
       id: true,
       nroSocio: true,
       apellidoNombre: true,
-      tipoSocio: true,
+      tipoSocioRel: { select: { id: true, codigo: true, nombre: true } },
     },
     take: 10,
     orderBy: { apellidoNombre: 'asc' },
@@ -1190,7 +1233,7 @@ router.delete('/socios/:id/familia/miembro/:miembroId', authAdmin, asyncHandler(
     data: {
       titularFamiliaId: null,
       parentescoTitular: null,
-      tipoSocio: 'Socio Unico',  // Cambiar a Socio Unico al salir de familia
+      tipoSocioRelId: null, // Al salir de la familia queda sin tipo asignado
       actualizadoPor: req.admin.id,
     },
   })
@@ -1231,8 +1274,19 @@ router.post('/socios/:id/familia/miembro', authAdmin, asyncHandler(async (req, r
     throw new AppError('Este socio ya pertenece a otra familia', 400, 'ALREADY_HAS_FAMILY')
   }
 
-  if (socio.tipoSocio?.toLowerCase().includes('titular') && socio.miembrosFamilia?.length > 0) {
+  if (socio.miembrosFamilia?.length > 0) {
     throw new AppError('Este socio es titular de otra familia', 400, 'IS_TITULAR')
+  }
+
+  // Asegurar que el titular tenga tipo "Titular Familia" y el nuevo miembro "Miembro Familia"
+  const tipoSocioTitular = await getTipoSocioTitularFamilia(req.db)
+  const tipoSocioMiembro = await getTipoSocioMiembroFamilia(req.db)
+
+  if (titular.tipoSocioRelId !== tipoSocioTitular.id) {
+    await req.db.socio.update({
+      where: { id: parseInt(id) },
+      data: { tipoSocioRelId: tipoSocioTitular.id, actualizadoPor: req.admin.id },
+    })
   }
 
   const updated = await req.db.socio.update({
@@ -1240,10 +1294,10 @@ router.post('/socios/:id/familia/miembro', authAdmin, asyncHandler(async (req, r
     data: {
       titularFamiliaId: parseInt(id),
       parentescoTitular: parentesco || null,
-      tipoSocio: 'Miembro Familia',  // Cambiar a Miembro Familia
+      tipoSocioRelId: tipoSocioMiembro.id,
       actualizadoPor: req.admin.id,
     },
-    select: { id: true, nroSocio: true, apellidoNombre: true, parentescoTitular: true, tipoSocio: true },
+    select: { id: true, nroSocio: true, apellidoNombre: true, parentescoTitular: true, tipoSocioRel: { select: { id: true, codigo: true, nombre: true } } },
   })
 
   res.json({
@@ -1613,19 +1667,26 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
     mapeoEstadoSocio[est.codigo] = est.id
   }
 
-  // Función para limpiar campos temporales y agregar IDs de relación
+  // Función para limpiar campos temporales y mapear strings de Excel a FKs.
+  // Los strings legacy (estado, categoria, tipoSocio) vienen del Excel y se descartan
+  // tras mapearlos a sus FKs: la BD ya no los persiste como columnas.
   const limpiarCamposTemporales = (socio) => {
-    const { _grupoFamiliar, _esTitular, _cobrador, id, ...datosLimpios } = socio
+    const {
+      _grupoFamiliar, _esTitular, _cobrador, id,
+      tipoSocio: tipoSocioStr,
+      categoria: categoriaStr,
+      estado: estadoStr,
+      ...datosLimpios
+    } = socio
 
-    // Agregar IDs de relación basándose en los campos texto (sin normalizar — se respeta el valor del Excel)
-    if (datosLimpios.tipoSocio && mapeoTipoSocio[datosLimpios.tipoSocio]) {
-      datosLimpios.tipoSocioRelId = mapeoTipoSocio[datosLimpios.tipoSocio]
+    if (tipoSocioStr && mapeoTipoSocio[tipoSocioStr]) {
+      datosLimpios.tipoSocioRelId = mapeoTipoSocio[tipoSocioStr]
     }
-    if (datosLimpios.categoria && mapeoCategoriaSocio[datosLimpios.categoria]) {
-      datosLimpios.categoriaSocioId = mapeoCategoriaSocio[datosLimpios.categoria]
+    if (categoriaStr && mapeoCategoriaSocio[categoriaStr]) {
+      datosLimpios.categoriaSocioId = mapeoCategoriaSocio[categoriaStr]
     }
-    if (datosLimpios.estado && mapeoEstadoSocio[datosLimpios.estado]) {
-      datosLimpios.estadoSocioId = mapeoEstadoSocio[datosLimpios.estado]
+    if (estadoStr && mapeoEstadoSocio[estadoStr]) {
+      datosLimpios.estadoSocioId = mapeoEstadoSocio[estadoStr]
     }
 
     // tenantId requerido para createMany (no se inyecta automáticamente)
@@ -1665,9 +1726,9 @@ router.post('/socios/upload/:uploadId/confirmar', authAdmin, asyncHandler(async 
         // Club - FECHAS IMPORTANTES
         fechaAlta: datosLimpios.fechaAlta,
         fechaBaja: datosLimpios.fechaBaja,
-        estado: datosLimpios.estado,
-        categoria: datosLimpios.categoria,
-        tipoSocio: datosLimpios.tipoSocio,
+        estadoSocioId: datosLimpios.estadoSocioId,
+        categoriaSocioId: datosLimpios.categoriaSocioId,
+        tipoSocioRelId: datosLimpios.tipoSocioRelId,
         zona: datosLimpios.zona,
         antiguedadEstatutaria: datosLimpios.antiguedadEstatutaria,
         libro: datosLimpios.libro,
@@ -2104,7 +2165,7 @@ router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
   const { estado, tipo, categoria, buscar } = req.query
 
   const where = {}
-  if (estado) where.estado = estado
+  if (estado) where.estadoSocioRel = { nombre: estado }
   Object.assign(where, buildSocioSearchFilter(buscar) || {})
 
   const socios = await req.db.socio.findMany({
@@ -2112,10 +2173,11 @@ router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
     orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
     select: {
       nroSocio: true, apellido: true, nombre: true, documento: true, cuil: true,
-      estado: true, email: true, celular: true, telefonoFijo: true,
+      email: true, celular: true, telefonoFijo: true,
       fechaNacimiento: true, fechaAlta: true, fechaBaja: true,
       domicilio: true, calle: true, numero: true, piso: true, depto: true,
       barrio: true, ciudad: true, provincia: true,
+      estadoSocioRel: { select: { nombre: true } },
       tipoSocioRel: { select: { nombre: true } },
       categoriaSocioRel: { select: { nombre: true } },
     },
@@ -2133,7 +2195,7 @@ router.get('/socios/exportar', authAdmin, asyncHandler(async (req, res) => {
     'Nombre': s.nombre || '',
     'DNI': s.documento || '',
     'CUIL': s.cuil || '',
-    'Estado': s.estado || '',
+    'Estado': s.estadoSocioRel?.nombre || '',
     'Tipo': s.tipoSocioRel?.nombre || '',
     'Categoría': s.categoriaSocioRel?.nombre || '',
     'Email': s.email || '',

@@ -207,6 +207,10 @@ model EstadoSocio {
   color             String?
   permiteDescuentos Boolean  @default(false) @map("permite_descuentos")
   permiteIngresoMolinete Boolean @default(false) @map("permite_ingreso_molinete")
+  // Marca si este estado representa a un socio que sigue siendo parte del club
+  // (true = activo/vigente/bloqueado por morosidad, false = baja/renuncia/expulsión).
+  // Reportes de morosidad y similares filtran por este flag para excluir ex-socios.
+  esSocioActivo     Boolean  @default(true) @map("es_socio_activo")
   // Rol que cumple este estado en la lógica automática de vigencia por morosidad.
   // 'BLOQUEADO' = el cron de vigencia pasa los socios morosos a este estado
   // 'AL_DIA'    = el sistema pasa los socios a este estado al cobrar y quedar sin cuotas vencidas
@@ -311,13 +315,10 @@ model Socio {
   nroSocio                     String                   @map("nro_socio")
   documento                    String?
   apellidoNombre               String                   @map("apellido_nombre")
-  estado                       String                   @default("VIGENTE")
   email                        String?
   celular                      String?
   rfidUid                      String?                  @map("rfid_uid")
   fechaNacimiento              DateTime?                @map("fecha_nacimiento")
-  categoria                    String?
-  tipoSocio                    String?                  @map("tipo_socio")
   domicilio                    String?
   ciudad                       String?
   createdAt                    DateTime                 @default(now()) @map("created_at")
@@ -467,7 +468,6 @@ model Socio {
   @@unique([tenantId, nroSocio])
   @@index([documento])
   @@index([apellidoNombre])
-  @@index([estado])
   @@index([estadoSocioId])
   @@index([categoriaSocioId])
   @@index([tipoSocioRelId])
@@ -658,18 +658,13 @@ model Inscripcion {
 
 model Entrenador {
   id              Int                   @id @default(autoincrement())
-  nombre          String
-  apellido        String?
-  documento       String?
-  telefono        String?
-  email           String?
   socioId         Int?                  @map("socio_id")
   especialidad    String?
   observaciones   String?
   activo          Boolean               @default(true)
   createdAt       DateTime              @default(now()) @map("created_at")
   updatedAt       DateTime              @updatedAt @map("updated_at")
-  entidadId       Int?                  @unique @map("entidad_id")
+  entidadId       Int                   @unique @map("entidad_id")
   // Datos públicos para Staff Web
   mostrarEnWeb    Boolean               @default(false) @map("mostrar_en_web")
   fotoStaff       String?               @map("foto_staff")
@@ -678,7 +673,7 @@ model Entrenador {
   telefonoPublico String?               @map("telefono_publico")
   ordenStaff      Int                   @default(0) @map("orden_staff")
   conversaciones  Conversacion[]
-  entidad         Entidad?              @relation(fields: [entidadId], references: [id])
+  entidad         Entidad               @relation(fields: [entidadId], references: [id])
   categorias      EntrenadorCategoria[]
   sesiones        EntrenadorSession[]
   // Token de magic link para acceso al portal (uso similar a Socio.tokenPortal)

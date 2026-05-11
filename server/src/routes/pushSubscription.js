@@ -50,7 +50,7 @@ router.post('/:token/push/subscribe', async (req, res) => {
     const socio = await req.db.socio.findFirst({
       where: {
         tokenPortal: token,
-        estado: 'ACTIVO'
+        estadoSocioRel: { esSocioActivo: true }
       }
     })
 

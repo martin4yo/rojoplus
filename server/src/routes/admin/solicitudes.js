@@ -5,6 +5,7 @@ import { authAdmin, generateToken } from '../../middleware/auth.js'
 import { enviarEmailConTemplate } from '../../services/notificacionService.js'
 import { getTenantFrontendUrl } from '../../lib/tenantUrl.js'
 import { calcularProximoNroSocio } from '../../lib/nroSocio.js'
+import { getTipoSocioTitularFamilia, getTipoSocioMiembroFamilia } from '../../lib/tipoSocioFamilia.js'
 
 const router = Router()
 
@@ -189,6 +190,14 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
 
   // PASO 1: Crear el socio titular
   // Usa la lógica de rangos (SOCIO_NRO_MIN/MAX) o legacy según configuración
+  const tieneFamiliares = (solicitud.familiares?.length || 0) > 0
+  const tipoSocioTitular = tieneFamiliares
+    ? await getTipoSocioTitularFamilia(req.db)
+    : null
+  const tipoSocioMiembro = tieneFamiliares
+    ? await getTipoSocioMiembroFamilia(req.db)
+    : null
+
   const nroTitular = await calcularProximoNroSocio(req.db)
   const nuevoSocio = await req.db.socio.create({
     data: {
@@ -205,11 +214,14 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
       email: solicitud.email,
       condicionesMedicas: solicitud.detalleEnfermedades,
       esMenor: esMenorTitular,
-      tipoSocioRelId: tipoSocioId ? parseInt(tipoSocioId) : null,
+      // Si la solicitud trae familiares, el titular es "Titular Familia"; si no, queda con
+      // el tipo seleccionado en el formulario público (o null)
+      tipoSocioRelId: tieneFamiliares
+        ? tipoSocioTitular.id
+        : (tipoSocioId ? parseInt(tipoSocioId) : null),
       categoriaSocioId: categoriaSocioId ? parseInt(categoriaSocioId) : null,
       estado: 'ACTIVO',
       fechaAlta: new Date(),
-      tipoSocio: 'GRUPO_FAMILIAR' // Si tiene familiares, es grupo familiar
     }
   })
 
@@ -243,7 +255,8 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
         email: solicitud.email, // Mismo email
         esMenor: esMenorFamiliar,
         parentescoTitular: familiar.parentesco,
-        tipoSocioRelId: tipoSocioId ? parseInt(tipoSocioId) : null,
+        // Los miembros del grupo familiar siempre van con tipo "Miembro Familia"
+        tipoSocioRelId: tipoSocioMiembro.id,
         categoriaSocioId: categoriaSocioId ? parseInt(categoriaSocioId) : null,
         estado: 'ACTIVO',
         fechaAlta: new Date(),

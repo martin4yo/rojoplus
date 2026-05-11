@@ -4,6 +4,7 @@ import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
 import { resolverPeriodoAlta } from '../../lib/cuotasPeriodoAlta.js'
 import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
+import { esSocioActivo, SELECT_ESTADO_SOCIO_REL } from '../../lib/socioEstado.js'
 
 const router = Router()
 
@@ -136,16 +137,15 @@ router.post('/inscripciones', authAdmin, asyncHandler(async (req, res) => {
   // Verificar que el socio existe y está activo
   const socio = await req.db.socio.findUnique({
     where: { id: parseInt(socioId) },
-    include: { categoriaSocioRel: true }
+    include: { categoriaSocioRel: true, estadoSocioRel: SELECT_ESTADO_SOCIO_REL }
   })
 
   if (!socio) {
     throw new AppError('Socio no encontrado', 404)
   }
 
-  const estadosValidos = ['ACTIVO', 'VIGENTE']
-  if (!estadosValidos.includes(socio.estado)) {
-    throw new AppError(`El socio no está activo (estado: ${socio.estado})`, 400)
+  if (!esSocioActivo(socio)) {
+    throw new AppError(`El socio no está activo (estado: ${socio.estadoSocioRel?.nombre || 'sin estado'})`, 400)
   }
 
   // Verificar que la categoría existe y está activa
@@ -486,7 +486,9 @@ router.get('/categorias-actividad/:id/plantel', authAdmin, asyncHandler(async (r
       categoriaActividadId: parseInt(id)
     },
     include: {
-      entrenador: true
+      entrenador: {
+        include: { entidad: { select: { razonSocial: true, email: true, telefono: true } } }
+      }
     }
   })
 
@@ -503,7 +505,12 @@ router.get('/categorias-actividad/:id/plantel', authAdmin, asyncHandler(async (r
         cuotaMensual: categoria.cuotaMensual
       },
       plantel,
-      entrenadores: entrenadores.map(ec => ec.entrenador),
+      entrenadores: entrenadores.map(ec => ({
+        ...ec.entrenador,
+        nombre: ec.entrenador.entidad?.razonSocial || '',
+        email: ec.entrenador.entidad?.email || null,
+        telefono: ec.entrenador.entidad?.telefono || null,
+      })),
       estadisticas: {
         totalInscriptos: plantel.length,
         activos: plantel.filter(p => p.estado === 'ACTIVA').length,

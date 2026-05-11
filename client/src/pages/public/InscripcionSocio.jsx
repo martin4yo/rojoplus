@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, User, MapPin, Trophy, HeartPulse, UserCog,
@@ -6,6 +6,9 @@ import {
 } from 'lucide-react'
 import TenantLogo from '../../components/TenantLogo'
 import { useTenant } from '../../contexts/TenantContext'
+import api from '../../services/api'
+
+const SIN_ACTIVIDAD = 'Socio sin actividad'
 
 export default function InscripcionSocio() {
   const navigate = useNavigate()
@@ -32,11 +35,16 @@ export default function InscripcionSocio() {
     tutorTelefono: '',
   })
 
-  const actividades = [
-    'Basquet', 'Futbol 11', 'Futsal', 'Gimnasio', 'Kickboxing',
-    'Liga Argentina de Baby Futbol', 'Natación', 'Socio sin actividad',
-    'Taekwondo', 'Voley',
-  ]
+  const [actividades, setActividades] = useState([SIN_ACTIVIDAD])
+
+  useEffect(() => {
+    api.get('/public/actividades')
+      .then(data => {
+        const nombres = (data || []).map(a => a.nombre).filter(Boolean)
+        setActividades([...nombres, SIN_ACTIVIDAD])
+      })
+      .catch(() => setActividades([SIN_ACTIVIDAD]))
+  }, [])
 
   const calcularEdad = (fechaNac) => {
     if (!fechaNac) return null

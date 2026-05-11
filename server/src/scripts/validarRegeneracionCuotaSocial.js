@@ -105,8 +105,8 @@ async function modoPreview({ tenant, periodo }) {
       id: s.id,
       nroSocio: s.nroSocio,
       apellidoNombre: s.apellidoNombre,
-      tipoSocio: s.tipoSocioRel?.nombre ?? s.tipoSocio,
-      estado: s.estadoSocioRel?.nombre ?? s.estado,
+      tipoSocio: s.tipoSocioRel?.nombre || '',
+      estado: s.estadoSocioRel?.nombre || '',
       cuotaMensual,
       descuentoPct: desc,
       montoTotal,
@@ -328,7 +328,9 @@ async function modoDebug({ tenant, periodo }) {
     where,
     select: {
       id: true, tenantId: true, nroSocio: true, apellidoNombre: true,
-      estado: true, tipoSocio: true, titularFamiliaId: true,
+      estadoSocioRel: { select: { nombre: true } },
+      tipoSocioRel: { select: { nombre: true } },
+      titularFamiliaId: true,
     },
   })
 
@@ -344,7 +346,7 @@ async function modoDebug({ tenant, periodo }) {
   console.log(`Coincidencias en BD (todos los tenants): ${sociosCualquierTenant.length}`)
   for (const s of sociosCualquierTenant) {
     const t = await prisma.tenant.findUnique({ where: { id: s.tenantId }, select: { slug: true, nombre: true } })
-    console.log(`  socioId=${s.id} tenantId=${s.tenantId} (${t?.slug}) nro=${s.nroSocio} ${s.apellidoNombre} estado=${s.estado} tipo=${s.tipoSocio} titFamId=${s.titularFamiliaId ?? '-'}`)
+    console.log(`  socioId=${s.id} tenantId=${s.tenantId} (${t?.slug}) nro=${s.nroSocio} ${s.apellidoNombre} estado=${s.estadoSocioRel?.nombre || ''} tipo=${s.tipoSocioRel?.nombre || ''} titFamId=${s.titularFamiliaId ?? '-'}`)
   }
   console.log()
 

@@ -9,6 +9,7 @@ import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.j
 import { generatePDF } from '../services/pdfGenerator.js'
 import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 import { getVapidPublicKey, enviarNotificacionPush } from '../services/webPush.js'
+import { esSocioActivo, SELECT_ESTADO_SOCIO_REL } from '../lib/socioEstado.js'
 
 const router = Router()
 
@@ -41,7 +42,7 @@ async function buscarSocioFlexible(db, busqueda) {
     celularSecundario: true,
     telefonoFijo: true,
     tokenPortal: true,
-    estado: true,
+    estadoSocioRel: SELECT_ESTADO_SOCIO_REL,
   }
 
   // 1) Nro de socio exacto
@@ -83,11 +84,7 @@ router.post('/enviar-qr', asyncHandler(async (req, res) => {
     throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
   }
 
-  // Verificar si está activo
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-
-  if (!esActivo) {
+  if (!esSocioActivo(socio)) {
     throw new AppError('Tu membresía no está activa. Regulariza tu situación en el club.', 403, 'SOCIO_INACTIVO')
   }
 
@@ -141,9 +138,7 @@ router.post('/enviar-link-whatsapp', asyncHandler(async (req, res) => {
     throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-  if (!esActivo) {
+  if (!esSocioActivo(socio)) {
     throw new AppError('Tu membresía no está activa. Regulariza tu situación en el club.', 403, 'SOCIO_INACTIVO')
   }
 
@@ -199,9 +194,7 @@ router.post('/enviar-qr-whatsapp', asyncHandler(async (req, res) => {
     throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-  if (!esActivo) {
+  if (!esSocioActivo(socio)) {
     throw new AppError('Tu membresía no está activa. Regularizá tu situación en el club.', 403, 'SOCIO_INACTIVO')
   }
 
@@ -330,10 +323,7 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
     }
   }
 
-  // Verificar estado activo
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-  if (!esActivo) {
+  if (!esSocioActivo(socio)) {
     throw new AppError('Tu membresía no está activa. Contactá al club para regularizar tu situación', 403, 'SOCIO_INACTIVO')
   }
 
@@ -389,9 +379,9 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
       domicilio: true,
       ciudad: true,
       provincia: true,
-      estado: true,
-      categoria: true,
-      tipoSocio: true,
+      estadoSocioRel: SELECT_ESTADO_SOCIO_REL,
+      categoriaSocioRel: { select: { id: true, codigo: true, nombre: true } },
+      tipoSocioRel: { select: { id: true, codigo: true, nombre: true } },
       tokenPortal: true,
       tokenPortalExpira: true,
       titularFamiliaId: true,
@@ -407,9 +397,7 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
     throw new AppError('El link de acceso expiró. Solicitá uno nuevo', 401, 'EXPIRED_TOKEN')
   }
 
-  // Verificar estado activo
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
+  const esActivo = esSocioActivo(socio)
 
   // Crear sesión persistente ("recordar dispositivo") + setear cookie HttpOnly por 30 días
   if (esActivo) {
@@ -440,9 +428,11 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
       domicilio: socio.domicilio,
       ciudad: socio.ciudad,
       provincia: socio.provincia,
-      estado: socio.estado,
-      categoria: socio.categoria,
-      tipoSocio: socio.tipoSocio,
+      estado: socio.estadoSocioRel?.nombre || '',
+      estadoSocioRel: socio.estadoSocioRel,
+      categoria: socio.categoriaSocioRel?.nombre || '',
+      categoriaSocioRel: socio.categoriaSocioRel,
+      tipoSocioRel: socio.tipoSocioRel,
       tokenPortal: socio.tokenPortal,
       esActivo,
       titularFamiliaId: socio.titularFamiliaId,
@@ -471,15 +461,13 @@ router.get('/sesion/check', asyncHandler(async (req, res) => {
   // Emitir nuevo tokenPortal (24h) y devolver link al portal
   const socio = await req.db.socio.findUnique({
     where: { id: sesion.socioId },
-    select: { id: true, nroSocio: true, apellidoNombre: true, estado: true },
+    select: { id: true, nroSocio: true, apellidoNombre: true, estadoSocioRel: SELECT_ESTADO_SOCIO_REL },
   })
   if (!socio) {
     clearSesionCookie(res)
     return res.json({ success: true, data: { autenticado: false } })
   }
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
-  if (!esActivo) {
+  if (!esSocioActivo(socio)) {
     clearSesionCookie(res)
     return res.json({ success: true, data: { autenticado: false, motivo: 'Membresía no activa' } })
   }
@@ -584,9 +572,9 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
       domicilio: true,
       ciudad: true,
       provincia: true,
-      estado: true,
-      categoria: true,
-      tipoSocio: true,
+      estadoSocioRel: SELECT_ESTADO_SOCIO_REL,
+      categoriaSocioRel: { select: { id: true, codigo: true, nombre: true } },
+      tipoSocioRel: { select: { id: true, codigo: true, nombre: true } },
       tokenPortal: true,
       titularFamiliaId: true,
       titularFamilia: {
@@ -604,9 +592,7 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
               fechaNacimiento: true,
             },
             where: {
-              estado: {
-                contains: 'ACTIV',
-              },
+              estadoSocioRel: { esSocioActivo: true },
             },
           },
         },
@@ -620,9 +606,7 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
           fechaNacimiento: true,
         },
         where: {
-          estado: {
-            contains: 'ACTIV',
-          },
+          estadoSocioRel: { esSocioActivo: true },
         },
       },
     },
@@ -632,8 +616,7 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
     throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
   }
 
-  const estadoUpper = socio.estado?.toUpperCase() || ''
-  const esActivo = estadoUpper.includes('ACTIV') || estadoUpper.includes('VIGENT')
+  const esActivo = esSocioActivo(socio)
 
   const branding = req.tenant ? {
     nombre: req.tenant.nombre,
@@ -647,6 +630,8 @@ router.get('/:tokenPortal', asyncHandler(async (req, res) => {
     success: true,
     data: {
       ...socio,
+      estado: socio.estadoSocioRel?.nombre || '',
+      categoria: socio.categoriaSocioRel?.nombre || '',
       esActivo,
       branding,
       grupoFamiliar: socio.titularFamiliaId ? {
@@ -2416,9 +2401,7 @@ router.get('/:token/conversaciones', asyncHandler(async (req, res) => {
       entrenador: {
         select: {
           id: true,
-          nombre: true,
-          apellido: true,
-          email: true
+          entidad: { select: { razonSocial: true, email: true } },
         }
       },
       categoriaActividad: {
@@ -2448,7 +2431,7 @@ router.get('/:token/conversaciones', asyncHandler(async (req, res) => {
     id: conv.id,
     entrenador: {
       id: conv.entrenador.id,
-      nombre: `${conv.entrenador.nombre} ${conv.entrenador.apellido || ''}`.trim()
+      nombre: conv.entrenador.entidad?.razonSocial || ''
     },
     actividad: conv.categoriaActividad?.actividad?.nombre || null,
     categoria: conv.categoriaActividad?.nombre || null,
@@ -2564,8 +2547,7 @@ router.get('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res) 
       entrenador: {
         select: {
           id: true,
-          nombre: true,
-          apellido: true
+          entidad: { select: { razonSocial: true } },
         }
       },
       categoriaActividad: {
@@ -2611,7 +2593,7 @@ router.get('/:token/conversaciones/:id/mensajes', asyncHandler(async (req, res) 
     data: {
       conversacion: {
         id: conversacion.id,
-        entrenador: `${conversacion.entrenador.nombre} ${conversacion.entrenador.apellido || ''}`.trim(),
+        entrenador: conversacion.entrenador.entidad?.razonSocial || '',
         actividad: conversacion.categoriaActividad?.actividad?.nombre,
         categoria: conversacion.categoriaActividad?.nombre,
         asunto: conversacion.asunto
@@ -2751,9 +2733,7 @@ router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => 
       entrenador: {
         select: {
           id: true,
-          nombre: true,
-          apellido: true,
-          email: true
+          entidad: { select: { razonSocial: true, email: true } },
         }
       },
       categoriaActividad: {
@@ -2773,8 +2753,8 @@ router.get('/:token/entrenadores-disponibles', asyncHandler(async (req, res) => 
     if (!entrenadoresMap.has(key)) {
       entrenadoresMap.set(key, {
         id: ec.entrenador.id,
-        nombre: `${ec.entrenador.nombre} ${ec.entrenador.apellido || ''}`.trim(),
-        email: ec.entrenador.email,
+        nombre: ec.entrenador.entidad?.razonSocial || '',
+        email: ec.entrenador.entidad?.email || null,
         categorias: []
       })
     }

@@ -118,7 +118,8 @@ router.post(
     if (tokenPortal) {
       // Es un socio
       const socio = await req.db.socio.findFirst({
-        where: { tokenPortal }
+        where: { tokenPortal },
+        include: { estadoSocioRel: { select: { nombre: true } } }
       })
 
       if (!socio) {
@@ -133,7 +134,7 @@ router.post(
         metadata: {
           nroSocio: socio.nroSocio,
           email: socio.email,
-          estado: socio.estado
+          estado: socio.estadoSocioRel?.nombre || ''
         }
       }
     } else if (role === ROLES.CAMARERO) {

@@ -126,6 +126,7 @@ const AdminReporteMorosidad = lazy(() => import('./pages/admin/ReporteMorosidadA
 const AdminEntrenadoresLista = lazy(() => import('./pages/admin/EntrenadoresLista'))
 const AdminEntrenadorForm = lazy(() => import('./pages/admin/EntrenadorForm'))
 const AdminPeriodos = lazy(() => import('./pages/admin/Periodos'))
+const AdminPreviewGeneracionCuotas = lazy(() => import('./pages/admin/PreviewGeneracionCuotas'))
 const AdminCuotas = lazy(() => import('./pages/admin/Cuotas'))
 const AdminCargosAdicionales = lazy(() => import('./pages/admin/CargosAdicionales'))
 const PlaceholderPage = lazy(() => import('./pages/admin/PlaceholderPage'))
@@ -470,6 +471,7 @@ function App() {
                   <Route path="cuotas" element={<AdminCuotas />} />
                   <Route path="cargos-adicionales" element={<AdminCargosAdicionales />} />
                   <Route path="periodos" element={<AdminPeriodos />} />
+                  <Route path="periodos/:id/preview-generacion" element={<AdminPreviewGeneracionCuotas />} />
 
                   {/* Ingresos */}
                   <Route path="ingresos/clientes" element={<EntidadesLista tipo="CLIENTE" />} />

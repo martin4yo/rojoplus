@@ -231,7 +231,7 @@ router.get('/socios-disponibles', authAdmin, asyncHandler(async (req, res) => {
   const socios = await req.db.socio.findMany({
     where: {
       enviaDebito: true,
-      estado: 'ACTIVO',
+      estadoSocioRel: { esSocioActivo: true },
       tarjetaNumero: { not: null }, // Requiere número de tarjeta
       cargos: {
         some: {
@@ -1125,7 +1125,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
   const sociosConDebito = await req.db.socio.count({
     where: {
       enviaDebito: true,
-      estado: 'ACTIVO',
+      estadoSocioRel: { esSocioActivo: true },
       tarjetaNumero: { not: null }
     }
   })

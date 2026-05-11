@@ -255,7 +255,8 @@ function buildFiltrosSocios(filtros = {}) {
   const where = {}
 
   if (filtros.estado && filtros.estado.length > 0) {
-    where.estado = { in: Array.isArray(filtros.estado) ? filtros.estado : [filtros.estado] }
+    const lista = Array.isArray(filtros.estado) ? filtros.estado : [filtros.estado]
+    where.estadoSocioRel = { nombre: { in: lista } }
   }
 
   if (filtros.actividadId) {
@@ -292,7 +293,7 @@ router.post('/cargos/preview-masivo', authAdmin, asyncHandler(async (req, res) =
       id: true,
       nroSocio: true,
       apellidoNombre: true,
-      estado: true,
+      estadoSocioRel: { select: { nombre: true } },
       inscripciones: {
         where: { estado: 'ACTIVA' },
         select: {
