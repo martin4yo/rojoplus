@@ -733,9 +733,7 @@ router.get('/:tokenPortal/inscripciones', asyncHandler(async (req, res) => {
               entrenador: {
                 select: {
                   id: true,
-                  nombre: true,
-                  email: true,
-                  telefono: true,
+                  entidad: { select: { razonSocial: true, email: true, telefono: true } },
                 },
               },
             },
@@ -846,7 +844,7 @@ router.get('/:tokenPortal/actividades-disponibles', asyncHandler(async (req, res
         include: {
           entrenador: {
             select: {
-              nombre: true,
+              entidad: { select: { razonSocial: true } },
             },
           },
         },

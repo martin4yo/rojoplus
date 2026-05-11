@@ -285,13 +285,36 @@ export default function DashboardEjecutivo() {
   const echeqsEmitidos = tesoreria.echeqsEmitidos || { cantidad: 0, montoTotal: 0, vencidos: 0, proximosAVencer: 0 }
   const ingresosComposicion = graficos.ingresosComposicion || []
   const egresosComposicion = graficos.egresosComposicion || []
-  const cashFlowMensual = graficos.cashFlowMensual || []
+  const cashFlowMensualRaw = graficos.cashFlowMensual || []
+  const cashFlowPorCajaMes = graficos.cashFlowPorCajaMes || {}
 
   const cajasEfectivo = cajas.filter(c => c.tipo === 'EFECTIVO')
   const cajasBanco = cajas.filter(c => c.tipo === 'BANCO')
   const totalEfectivo = cajasEfectivo.filter(c => !cajasExcluidas.has(c.id)).reduce((s, c) => s + Number(c.saldoActual), 0)
   const totalBancos = cajasBanco.filter(c => !cajasExcluidas.has(c.id)).reduce((s, c) => s + Number(c.saldoActual), 0)
   const cajasNegativas = cajas.filter(c => Number(c.saldoActual) < 0)
+
+  // CashFlow filtrado por cajas excluidas (client-side, sin refetch).
+  // Recalcula ingresos/egresos/neto de cada mes sumando sólo las cajas activas,
+  // y reconstruye el saldo acumulado tomando como ancla el saldo actual filtrado.
+  const cashFlowMensual = (() => {
+    if (cajasExcluidas.size === 0 || cashFlowMensualRaw.length === 0) return cashFlowMensualRaw
+    const cajasIncluidas = cajas.filter(c => !cajasExcluidas.has(c.id)).map(c => c.id)
+    const saldoActualFiltrado = totalEfectivo + totalBancos
+    const series = cashFlowMensualRaw.map(p => {
+      const byCaja = cashFlowPorCajaMes[p.mes] || {}
+      let ingresos = 0, egresos = 0
+      for (const cid of cajasIncluidas) {
+        const v = byCaja[cid]
+        if (v) { ingresos += v.ingresos; egresos += v.egresos }
+      }
+      return { mes: p.mes, ingresos: Math.round(ingresos), egresos: Math.round(egresos), neto: Math.round(ingresos - egresos) }
+    })
+    // Saldo acumulado: ancla = saldoActualFiltrado; arrastre = saldoActual - sum(netos 6m)
+    const netoTotal = series.reduce((s, p) => s + p.neto, 0)
+    let saldo = saldoActualFiltrado - netoTotal
+    return series.map(p => { saldo += p.neto; return { ...p, saldo: Math.round(saldo) } })
+  })()
 
   const totalPorCobrar = (financiero.saldoClientes || 0) + (financiero.cobranzaMes.pendiente || 0)
   const totalPorPagar = (financiero.saldoProveedores || 0) + (financiero.sueldosPorPagar || 0)

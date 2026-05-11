@@ -400,9 +400,9 @@ router.get('/entidades/:id', asyncHandler(async (req, res) => {
       entrenador: {
         select: {
           id: true,
-          nombre: true,
-          apellido: true,
-          especialidad: true
+          especialidad: true,
+          activo: true,
+          observaciones: true
         }
       },
       cargoPersonal: true

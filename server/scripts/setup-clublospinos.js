@@ -243,7 +243,7 @@ async function inicializarEstructura(tenantId) {
   await prisma.estadoSocio.createMany({
     data: [
       { tenantId, codigo: 'VIGENTE',     nombre: 'Vigente',                color: '#16a34a', permiteDescuentos: true,  permiteIngresoMolinete: true,  esSocioActivo: true,  rolVigencia: 'AL_DIA',     orden: 1 },
-      { tenantId, codigo: 'BLOQUEADO',   nombre: 'Bloqueado por Morosidad',color: '#9333ea', permiteDescuentos: false, permiteIngresoMolinete: false, esSocioActivo: true,  rolVigencia: 'BLOQUEADO',  orden: 2 },
+      { tenantId, codigo: 'BLOQUEADO',   nombre: 'Bloqueado por Morosidad',color: '#9333ea', permiteDescuentos: false, permiteIngresoMolinete: false, esSocioActivo: false, rolVigencia: 'BLOQUEADO',  orden: 2 },
       { tenantId, codigo: 'SUSPENDIDO',  nombre: 'Suspendido',             color: '#d97706', permiteDescuentos: false, permiteIngresoMolinete: false, esSocioActivo: true,  rolVigencia: null,         orden: 3 },
       { tenantId, codigo: 'BAJA',        nombre: 'Baja',                   color: '#dc2626', permiteDescuentos: false, permiteIngresoMolinete: false, esSocioActivo: false, rolVigencia: null,         orden: 4 },
       { tenantId, codigo: 'BAJA_FALL',   nombre: 'Baja por Fallecimiento', color: '#6b7280', permiteDescuentos: false, permiteIngresoMolinete: false, esSocioActivo: false, rolVigencia: null,         orden: 5 },

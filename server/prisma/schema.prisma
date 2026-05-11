@@ -207,9 +207,10 @@ model EstadoSocio {
   color             String?
   permiteDescuentos Boolean  @default(false) @map("permite_descuentos")
   permiteIngresoMolinete Boolean @default(false) @map("permite_ingreso_molinete")
-  // Marca si este estado representa a un socio que sigue siendo parte del club
-  // (true = activo/vigente/bloqueado por morosidad, false = baja/renuncia/expulsión).
-  // Reportes de morosidad y similares filtran por este flag para excluir ex-socios.
+  // "Cuenta como socio del club" — el socio aparece como activo en stats,
+  // dashboards y reportes. Sólo VIGENTE/AL_DIA debería tenerlo en true.
+  // Las bajas (renuncia/fallecimiento/comisión) y el bloqueado por morosidad
+  // van en false (siguen existiendo en BD pero no se cuentan como activos).
   esSocioActivo     Boolean  @default(true) @map("es_socio_activo")
   // Rol que cumple este estado en la lógica automática de vigencia por morosidad.
   // 'BLOQUEADO' = el cron de vigencia pasa los socios morosos a este estado

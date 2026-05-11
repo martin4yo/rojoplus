@@ -53,6 +53,7 @@ export default function EntidadForm({ tipo }) {
   const [error, setError] = useState(null)
   const [tab, setTab] = useState('datos')
   const [entidadInfo, setEntidadInfo] = useState({ esEntrenador: false, tieneEntrenador: false })
+  const [cargosPersonal, setCargosPersonal] = useState([])
 
   const [form, setForm] = useState({
     codigo: '',
@@ -70,12 +71,19 @@ export default function EntidadForm({ tipo }) {
     alias: '',
     // Solo para PERSONAL
     legajo: '',
-    cargo: '',
+    cargoPersonalId: '',
     sueldoBasico: '',
     centroCostoId: null,
     foto: '',
     activo: true
   })
+
+  useEffect(() => {
+    if (tipo !== 'PERSONAL') return
+    api.get('/admin/cargos-personal')
+      .then(data => setCargosPersonal((data || []).filter(c => c.activo)))
+      .catch(err => console.error('Error cargando cargos personal:', err))
+  }, [tipo])
 
   useEffect(() => {
     if (isEditing) {
@@ -104,7 +112,7 @@ export default function EntidadForm({ tipo }) {
         cbu: entidad.cbu || '',
         alias: entidad.alias || '',
         legajo: entidad.legajo || '',
-        cargo: entidad.cargo || '',
+        cargoPersonalId: entidad.cargoPersonalId ? String(entidad.cargoPersonalId) : '',
         sueldoBasico: entidad.sueldoBasico ? String(entidad.sueldoBasico) : '',
         centroCostoId: entidad.centroCostoId || null,
         foto: entidad.foto || '',
@@ -166,7 +174,10 @@ export default function EntidadForm({ tipo }) {
         ...form,
         tipo,
         sueldoBasico: form.sueldoBasico ? parseFloat(form.sueldoBasico) : null,
-        centroCostoId: form.centroCostoId ? parseInt(form.centroCostoId) : null
+        centroCostoId: form.centroCostoId ? parseInt(form.centroCostoId) : null,
+        cargoPersonalId: form.cargoPersonalId ? parseInt(form.cargoPersonalId) : null,
+        // PERSONAL no usa nombre fantasía
+        nombreFantasia: tipo === 'PERSONAL' ? null : (form.nombreFantasia || null),
       }
 
       if (isEditing) {
@@ -277,18 +288,20 @@ export default function EntidadForm({ tipo }) {
                 required
               />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre Fantasia
-              </label>
-              <input
-                type="text"
-                name="nombreFantasia"
-                value={form.nombreFantasia}
-                onChange={handleChange}
-                className="input-field w-full"
-              />
-            </div>
+            {tipo !== 'PERSONAL' && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre Fantasia
+                </label>
+                <input
+                  type="text"
+                  name="nombreFantasia"
+                  value={form.nombreFantasia}
+                  onChange={handleChange}
+                  className="input-field w-full"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Tipo Documento
@@ -489,13 +502,24 @@ export default function EntidadForm({ tipo }) {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cargo
                 </label>
-                <input
-                  type="text"
-                  name="cargo"
-                  value={form.cargo}
-                  onChange={handleChange}
+                <select
+                  name="cargoPersonalId"
+                  value={form.cargoPersonalId}
+                  onChange={(e) => {
+                    const valor = e.target.value
+                    setForm(prev => ({ ...prev, cargoPersonalId: valor }))
+                    const c = cargosPersonal.find(x => String(x.id) === valor)
+                    setEntidadInfo(prev => ({ ...prev, esEntrenador: c?.esEntrenador === true }))
+                  }}
                   className="input-field w-full"
-                />
+                >
+                  <option value="">— Sin cargo —</option>
+                  {cargosPersonal.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}{c.esEntrenador ? ' (entrenador)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

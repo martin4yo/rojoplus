@@ -533,7 +533,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // Movimientos de caja últimos 6 meses (para cashFlow y composición)
   const movimientosHistoricos = await req.db.movimientoCaja.findMany({
     where: { fecha: { gte: inicio6Meses }, anulado: false },
-    select: { fecha: true, tipo: true, monto: true, concepto: true },
+    select: { fecha: true, tipo: true, monto: true, concepto: true, cajaId: true },
     orderBy: { fecha: 'asc' },
   })
 
@@ -546,12 +546,17 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   let saldoAcumulado = saldoTotalCajas - (totalIngresos6m - totalEgresos6m)
 
   const cashFlowMensual = []
+  // Per-caja breakdown: para que el frontend pueda restar cajas excluidas y
+  // recomputar el saldo acumulado del gráfico sin refetchear.
+  // Estructura: { 'Ene 26': { byCaja: { [cajaId]: { ingresos, egresos } } } }
+  const cashFlowPorCajaMes = {}
   for (let i = 5; i >= 0; i--) {
     const fecha = new Date(anioActual, mesActual - 1 - i, 1)
     const mes = fecha.getMonth()
     const anio = fecha.getFullYear()
     const inicioMesHist = new Date(anio, mes, 1)
     const finMesHist = new Date(anio, mes + 1, 0, 23, 59, 59)
+    const mesLabel = `${mesesNombres[mes]} ${anio.toString().slice(-2)}`
 
     const movsMes = movimientosHistoricos.filter(m => {
       const f = new Date(m.fecha)
@@ -563,8 +568,16 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     const neto = ingresos - egresos
     saldoAcumulado += neto
 
+    // Por caja
+    const byCaja = {}
+    for (const m of movsMes) {
+      if (!byCaja[m.cajaId]) byCaja[m.cajaId] = { ingresos: 0, egresos: 0 }
+      byCaja[m.cajaId][m.tipo === 'INGRESO' ? 'ingresos' : 'egresos'] += Number(m.monto)
+    }
+    cashFlowPorCajaMes[mesLabel] = byCaja
+
     cashFlowMensual.push({
-      mes: `${mesesNombres[mes]} ${anio.toString().slice(-2)}`,
+      mes: mesLabel,
       ingresos: Math.round(ingresos),
       egresos: Math.round(egresos),
       neto: Math.round(neto),
@@ -724,6 +737,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
         crecimientoSocios,
         evolucionCobranza,
         cashFlowMensual,
+        cashFlowPorCajaMes,
         ingresosComposicion,
         egresosComposicion,
       },

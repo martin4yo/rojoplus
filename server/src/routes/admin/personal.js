@@ -47,7 +47,7 @@ router.get('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/cargos-personal - Crear cargo
 router.post('/cargos-personal', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, descripcion, orden } = req.body
+  const { codigo, nombre, descripcion, orden, esEntrenador } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Codigo y nombre son requeridos', 400, 'VALIDATION_ERROR')
@@ -64,6 +64,7 @@ router.post('/cargos-personal', authAdmin, asyncHandler(async (req, res) => {
       nombre,
       descripcion,
       orden: orden || 0,
+      esEntrenador: esEntrenador === true,
     }
   })
 
@@ -73,7 +74,7 @@ router.post('/cargos-personal', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/cargos-personal/:id - Actualizar cargo
 router.put('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, orden, activo } = req.body
+  const { codigo, nombre, descripcion, orden, activo, esEntrenador } = req.body
 
   const existente = await req.db.cargoPersonal.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Cargo no encontrado', 404, 'NOT_FOUND')
@@ -92,6 +93,7 @@ router.put('/cargos-personal/:id', authAdmin, asyncHandler(async (req, res) => {
       descripcion: descripcion !== undefined ? descripcion : existente.descripcion,
       orden: orden !== undefined ? orden : existente.orden,
       activo: activo !== undefined ? activo : existente.activo,
+      esEntrenador: esEntrenador !== undefined ? esEntrenador === true : existente.esEntrenador,
     }
   })
 
