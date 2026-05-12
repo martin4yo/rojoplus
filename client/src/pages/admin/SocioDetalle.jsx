@@ -63,6 +63,54 @@ export default function SocioDetalle() {
   const [mostrarTodasActividades, setMostrarTodasActividades] = useState(false)
   const [descargandoPdf, setDescargandoPdf] = useState(null) // pagoId en descarga
 
+  // Modal de cuota de actividad
+  const [cuotaActModal, setCuotaActModal] = useState({
+    open: false, inscripcionId: null, inscripcionLabel: '',
+    anio: new Date().getFullYear(), mes: new Date().getMonth() + 1,
+    preview: null, loadingPreview: false, generando: false,
+  })
+
+  function abrirCuotaActividadModal(inscripcion) {
+    const ahora = new Date()
+    setCuotaActModal({
+      open: true,
+      inscripcionId: inscripcion.id,
+      inscripcionLabel: `${inscripcion.categoriaActividad?.actividad?.nombre} - ${inscripcion.categoriaActividad?.nombre}`,
+      anio: ahora.getFullYear(),
+      mes: ahora.getMonth() + 1,
+      preview: null,
+      loadingPreview: false,
+      generando: false,
+    })
+  }
+
+  async function cargarPreviewCuotaActividad(inscripcionId, anio, mes) {
+    setCuotaActModal(prev => ({ ...prev, loadingPreview: true, preview: null }))
+    try {
+      const data = await api.get(`/admin/cuotas/preview-cuota-actividad/${inscripcionId}?anio=${anio}&mes=${mes}`)
+      setCuotaActModal(prev => ({ ...prev, preview: data, loadingPreview: false }))
+    } catch (err) {
+      toast.error(err.message || 'Error al obtener preview')
+      setCuotaActModal(prev => ({ ...prev, loadingPreview: false }))
+    }
+  }
+
+  async function generarCuotaActividad() {
+    const { inscripcionId, anio, mes, preview } = cuotaActModal
+    if (!preview || !preview.puedeGenerar || preview.yaExiste) return
+    setCuotaActModal(prev => ({ ...prev, generando: true }))
+    try {
+      await api.post(`/admin/cuotas/generar-cuota-actividad/${inscripcionId}`, { anio, mes })
+      toast.success(`Cuota de actividad generada para ${String(mes).padStart(2, '0')}/${anio}`)
+      setCuotaActModal(prev => ({ ...prev, open: false, generando: false }))
+      cargarSocio()
+    } catch (err) {
+      toast.error(err.message || 'Error al generar la cuota de actividad')
+      setCuotaActModal(prev => ({ ...prev, generando: false }))
+      cargarPreviewCuotaActividad(inscripcionId, anio, mes)
+    }
+  }
+
   // Familia
   const [busquedaTitular, setBusquedaTitular] = useState('')
   const [titularesEncontrados, setTitularesEncontrados] = useState([])
@@ -1101,13 +1149,29 @@ export default function SocioDetalle() {
                           )}
                         </div>
                       </div>
-                      <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
-                        insc.estado === 'ACTIVA'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-200 text-gray-700'
-                      }`}>
-                        {insc.estado}
-                      </span>
+                      <div className="flex flex-col items-end gap-2 ml-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
+                          insc.estado === 'ACTIVA'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-200 text-gray-700'
+                        }`}>
+                          {insc.estado}
+                        </span>
+                        {insc.estado === 'ACTIVA' && !insc.exentoCuota && tienePermiso(PERMISOS.CUOTAS_GENERAR) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              abrirCuotaActividadModal(insc)
+                              cargarPreviewCuotaActividad(insc.id, new Date().getFullYear(), new Date().getMonth() + 1)
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition"
+                            title="Generar cuota de actividad para un período"
+                          >
+                            <PlusCircle className="w-3 h-3" />
+                            Generar cuota
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1170,22 +1234,66 @@ export default function SocioDetalle() {
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Periodo</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tipo</th>
                           <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Monto</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Recargo</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Recargo / Descuento</th>
                           <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {cuotasPendientes.map(cuota => (
-                          <tr key={cuota.id}>
-                            <td className="px-4 py-3 text-gray-800">
-                              {cuota.periodo?.nombre || `${cuota.periodo?.mes}/${cuota.periodo?.anio}`}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">{cuota.tipoCuota?.nombre}</td>
-                            <td className="px-4 py-3 text-right text-gray-800">{formatMonto(cuota.montoOriginal)}</td>
-                            <td className="px-4 py-3 text-right text-red-600">{formatMonto(cuota.montoRecargo)}</td>
-                            <td className="px-4 py-3 text-right font-medium text-gray-800">{formatMonto(cuota.montoTotal)}</td>
-                          </tr>
-                        ))}
+                        {[...cuotasPendientes]
+                          .sort((a, b) => {
+                            const ay = a.periodo?.anio ?? 0, by = b.periodo?.anio ?? 0
+                            if (ay !== by) return by - ay
+                            const am = a.periodo?.mes ?? 0, bm = b.periodo?.mes ?? 0
+                            return bm - am
+                          })
+                          .map(cuota => {
+                            const recargo = Number(cuota.montoRecargo) || 0
+                            const bonif = Number(cuota.montoBonificacion) || 0
+                            const original = Number(cuota.montoOriginal) || 0
+                            const pctDesc = bonif > 0 && original > 0 ? Math.round((bonif / original) * 100) : 0
+                            return (
+                              <tr key={cuota.id}>
+                                <td className="px-4 py-3 text-gray-800">
+                                  {cuota.periodo?.nombre || `${cuota.periodo?.mes}/${cuota.periodo?.anio}`}
+                                </td>
+                                <td className="px-4 py-3 text-gray-600">
+                                  {cuota.categoria === 'CUOTA_SOCIAL' ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                                      Cuota Social
+                                    </span>
+                                  ) : cuota.categoria === 'CUOTA_ACTIVIDAD' ? (
+                                    <div>
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                        Actividad
+                                      </span>
+                                      {cuota.categoriaActividad && (
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          {cuota.categoriaActividad.actividad?.nombre} – {cuota.categoriaActividad.nombre}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-gray-500">
+                                      {cuota.categoria || cuota.descripcion || '-'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-800">{formatMonto(original)}</td>
+                                <td className="px-4 py-3 text-right">
+                                  {recargo > 0 && (
+                                    <div className="text-red-600">+{formatMonto(recargo)}</div>
+                                  )}
+                                  {bonif > 0 && (
+                                    <div className="text-emerald-600">-{formatMonto(bonif)} ({pctDesc}%)</div>
+                                  )}
+                                  {recargo === 0 && bonif === 0 && (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-right font-medium text-gray-800">{formatMonto(cuota.montoTotal)}</td>
+                              </tr>
+                            )
+                          })}
                       </tbody>
                     </table>
                   </div>
@@ -1538,6 +1646,129 @@ export default function SocioDetalle() {
         numeroRecibo={reciboModal?.numeroRecibo}
         variante="simple"
       />
+
+      {/* Modal Generar Cuota de Actividad */}
+      <Modal
+        isOpen={cuotaActModal.open}
+        onClose={() => setCuotaActModal(prev => ({ ...prev, open: false }))}
+        title="Generar Cuota de Actividad"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Seleccione el período para la inscripción:
+            <span className="block font-medium text-gray-800 mt-1">{cuotaActModal.inscripcionLabel}</span>
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+              <select
+                value={cuotaActModal.mes}
+                onChange={(e) => setCuotaActModal(prev => ({ ...prev, mes: parseInt(e.target.value), preview: null }))}
+                className="input-field w-full"
+              >
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
+              <input
+                type="number"
+                value={cuotaActModal.anio}
+                onChange={(e) => setCuotaActModal(prev => ({ ...prev, anio: parseInt(e.target.value) || prev.anio, preview: null }))}
+                className="input-field w-full"
+                min={2000}
+                max={2100}
+              />
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => cargarPreviewCuotaActividad(cuotaActModal.inscripcionId, cuotaActModal.anio, cuotaActModal.mes)}
+            loading={cuotaActModal.loadingPreview}
+            className="w-full"
+          >
+            Calcular importe
+          </Button>
+
+          {cuotaActModal.preview && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
+              {cuotaActModal.preview.yaExiste ? (
+                <div className="flex items-start gap-2 text-red-700">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium">
+                    La cuota de actividad ya está generada para {String(cuotaActModal.mes).padStart(2, '0')}/{cuotaActModal.anio}.
+                  </p>
+                </div>
+              ) : !cuotaActModal.preview.puedeGenerar ? (
+                <div className="flex items-start gap-2 text-amber-700">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm">{cuotaActModal.preview.motivo}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Importe base:</span>
+                    <span className="font-medium text-gray-800">
+                      $ {Number(cuotaActModal.preview.montoBase).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {Number(cuotaActModal.preview.montoBonificacion) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">
+                        Bonificación ({Number(cuotaActModal.preview.descuentoPct)}%):
+                      </span>
+                      <span className="font-medium text-green-700">
+                        - $ {Number(cuotaActModal.preview.montoBonificacion).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-base border-t pt-2">
+                    <span className="font-semibold text-gray-800">Total:</span>
+                    <span className="font-bold text-primary">
+                      $ {Number(cuotaActModal.preview.montoTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-1">
+                    <span className="text-gray-600">Vencimiento:</span>
+                    <span className="font-medium text-gray-800">
+                      {new Date(cuotaActModal.preview.fechaVencimiento).toLocaleDateString('es-AR')}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setCuotaActModal(prev => ({ ...prev, open: false }))}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={generarCuotaActividad}
+              loading={cuotaActModal.generando}
+              disabled={
+                !cuotaActModal.preview ||
+                !cuotaActModal.preview.puedeGenerar ||
+                cuotaActModal.preview.yaExiste ||
+                cuotaActModal.generando
+              }
+            >
+              Generar Cuota
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <ConfirmDialog />
     </div>

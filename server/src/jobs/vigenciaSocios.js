@@ -48,8 +48,14 @@ async function getConfigPorTenant(tenantId, claves) {
 function bool(v) { return String(v ?? '').toLowerCase() === 'true' }
 
 async function getTenantsActivos() {
+  // Excluir tenants con CRONS_PAUSADOS=true
+  const pausados = await prisma.configuracion.findMany({
+    where: { clave: 'CRONS_PAUSADOS', valor: 'true' },
+    select: { tenantId: true },
+  })
+  const pausadosIds = pausados.map(p => p.tenantId)
   return prisma.tenant.findMany({
-    where: { activo: true },
+    where: { activo: true, ...(pausadosIds.length > 0 ? { id: { notIn: pausadosIds } } : {}) },
     select: { id: true, slug: true, nombre: true },
   })
 }

@@ -488,6 +488,12 @@ router.get('/socios/:id', authAdmin, asyncHandler(async (req, res) => {
     },
     include: {
       periodo: true,
+      categoriaActividad: {
+        select: {
+          id: true, nombre: true,
+          actividad: { select: { id: true, nombre: true } },
+        },
+      },
     },
     orderBy: [{ periodo: { anio: 'asc' } }, { periodo: { mes: 'asc' } }],
   })

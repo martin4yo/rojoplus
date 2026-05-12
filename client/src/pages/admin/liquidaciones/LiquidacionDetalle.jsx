@@ -188,22 +188,26 @@ export default function LiquidacionDetalle() {
   }
 
   async function handleAnular() {
+    const itemsPagados = liquidacion?.items?.filter(i => i.estado === 'PAGADO').length || 0
+    const mensajeBase = itemsPagados > 0
+      ? `Esta liquidación tiene ${itemsPagados} pago(s) realizados. Al anular se generarán movimientos inversos en tesorería (devolución del saldo a la caja) y los items volverán a estado PENDIENTE. ¿Continuar?`
+      : '¿Está seguro que desea anular esta liquidación? Los items volverán a estado pendiente.'
     showModal({
       type: 'confirm',
-      title: 'Anular Liquidacion',
-      message: '¿Esta seguro que desea anular esta liquidacion? Esta accion no se puede deshacer.',
+      title: 'Anular Liquidación',
+      message: mensajeBase,
       onConfirm: async () => {
         try {
-          await api.delete(`/admin/liquidaciones/${id}`)
+          const res = await api.post(`/admin/liquidaciones/${id}/anular`, {})
           showModal({
             type: 'success',
-            message: 'Liquidacion anulada correctamente',
+            message: res?.message || 'Liquidación anulada correctamente',
             onConfirm: () => navigate('/admin/liquidaciones')
           })
         } catch (err) {
           showModal({
             type: 'error',
-            message: err.message || 'Error al anular la liquidacion'
+            message: err.message || 'Error al anular la liquidación'
           })
         }
       }
@@ -264,7 +268,7 @@ export default function LiquidacionDetalle() {
           </div>
         </div>
 
-        {liquidacion.estado === 'PENDIENTE' && (
+        {liquidacion.estado !== 'ANULADO' && (
           <Button variant="secondary" onClick={handleAnular}>
             <XCircle className="w-4 h-4 mr-2" />
             Anular

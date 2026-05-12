@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
-import { generarAsientoPagoSueldo } from '../services/asientosContables.js'
+import { generarAsientoPagoSueldo, generarAsientoDevengamientoSueldo, anularAsiento } from '../services/asientosContables.js'
 
 const router = Router()
 
@@ -56,6 +56,33 @@ router.get('/conceptos-liquidacion/:id', authenticateAdmin, async (req, res) => 
   }
 })
 
+// Propagar un concepto fijo a todos los empleados PERSONAL del tenant.
+// Crea ConceptoEmpleado si no existe (idempotente, gracias al @@unique).
+async function propagarConceptoATodos(db, tenantId, conceptoId) {
+  const empleados = await db.entidad.findMany({
+    where: { tenantId, tipo: 'PERSONAL', activo: true },
+    select: { id: true },
+  })
+  let creados = 0
+  for (const e of empleados) {
+    try {
+      await db.conceptoEmpleado.create({
+        data: {
+          entidadId: e.id,
+          conceptoId,
+          activo: true,
+          // valor/esPorcentaje/fechas: null → al generar liquidación se toma del catálogo
+        },
+      })
+      creados++
+    } catch (err) {
+      // P2002 = ya existe → idempotente, lo salteamos
+      if (err.code !== 'P2002') throw err
+    }
+  }
+  return creados
+}
+
 // POST /admin/conceptos-liquidacion
 router.post('/conceptos-liquidacion', authenticateAdmin, async (req, res) => {
   try {
@@ -82,7 +109,13 @@ router.post('/conceptos-liquidacion', authenticateAdmin, async (req, res) => {
       }
     })
 
-    res.status(201).json(concepto)
+    // Si nace marcado como "Automático para todos", crear el ConceptoEmpleado en cada empleado
+    let propagados = 0
+    if (concepto.esFijo) {
+      propagados = await propagarConceptoATodos(req.db, req.tenantId, concepto.id)
+    }
+
+    res.status(201).json({ ...concepto, _propagadosAEmpleados: propagados })
   } catch (error) {
     console.error('Error creando concepto:', error)
     if (error.code === 'P2002') {
@@ -97,6 +130,9 @@ router.put('/conceptos-liquidacion/:id', authenticateAdmin, async (req, res) => 
   try {
     const { id } = req.params
     const { codigo, nombre, tipo, descripcion, esFijo, porcentaje, montoFijo, orden, activo } = req.body
+
+    const anterior = await req.db.conceptoLiquidacion.findUnique({ where: { id: parseInt(id) } })
+    if (!anterior) return res.status(404).json({ error: 'Concepto no encontrado' })
 
     const concepto = await req.db.conceptoLiquidacion.update({
       where: { id: parseInt(id) },
@@ -113,7 +149,14 @@ router.put('/conceptos-liquidacion/:id', authenticateAdmin, async (req, res) => 
       }
     })
 
-    res.json(concepto)
+    // Propagar a empleados si esFijo pasó a true (transición false→true o creación inicial),
+    // o si ya estaba en true y aún no se había propagado (igual es idempotente).
+    let propagados = 0
+    if (concepto.esFijo === true && (anterior.esFijo !== true || esFijo === true)) {
+      propagados = await propagarConceptoATodos(req.db, req.tenantId, concepto.id)
+    }
+
+    res.json({ ...concepto, _propagadosAEmpleados: propagados })
   } catch (error) {
     console.error('Error actualizando concepto:', error)
     if (error.code === 'P2002') {
@@ -408,7 +451,10 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
       }
     })
 
-    // Crear liquidación + marcar novedades como aplicadas en una transacción
+    // Crear liquidación + marcar novedades como aplicadas en una transacción.
+    // El proxy multi-tenant inyecta tenantId en el parent, pero NO en nested creates,
+    // así que hay que ponerlo explícito en cada item.
+    const itemsConTenant = items.map(it => ({ ...it, tenantId: req.tenantId }))
     const liquidacion = await req.db.$transaction(async (tx) => {
       const liq = await tx.liquidacionSueldo.create({
         data: {
@@ -421,7 +467,7 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
           totalNeto,
           observaciones,
           registradoPor: req.admin.id,
-          items: { create: items }
+          items: { create: itemsConTenant }
         },
         include: {
           items: {
@@ -445,6 +491,20 @@ router.post('/liquidaciones', authenticateAdmin, async (req, res) => {
 
       return liq
     })
+
+    // Asiento de devengamiento por cada item (D Gastos Personal / H Sueldos a Pagar)
+    for (const it of liquidacion.items || []) {
+      try {
+        await generarAsientoDevengamientoSueldo(prisma, {
+          itemLiquidacion: it,
+          entidad: it.entidad,
+          liquidacion,
+          registradoPor: req.admin.id,
+        })
+      } catch (e) {
+        console.error('[Liquidacion] Error devengamiento item ' + it.id + ':', e.message)
+      }
+    }
 
     res.status(201).json({ data: liquidacion })
   } catch (error) {
@@ -624,19 +684,27 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
         }
       })
 
-      // Crear movimiento de caja
-      const cuentaContable = await tx.cuentaContable.findFirst({
-        where: { activo: true }
+      // Resolver concepto de Sueldos (SUE) y su cuenta contable asociada.
+      // Si no existe el concepto, caer a la primera cuenta activa (legacy).
+      const conceptoSueldos = await tx.conceptoTesoreria.findFirst({
+        where: { codigo: 'SUE', activo: true },
+        include: { cuentaContable: true }
       })
-
+      const cuentaContable = conceptoSueldos?.cuentaContable
+        || await tx.cuentaContable.findFirst({ where: { activo: true } })
       if (!cuentaContable) {
         throw new Error('No hay cuentas contables configuradas')
       }
 
+      // Resolver medioPagoId desde el código string que llega del frontend
+      const medioPagoRel = await tx.medioPago.findFirst({
+        where: { OR: [{ codigo: medioPago }, { nombre: medioPago }] }
+      })
+
       const mvCount = await tx.movimientoCaja.count()
       const mvNumero = `MV-${year}-${(mvCount + 1).toString().padStart(6, '0')}`
 
-      await tx.movimientoCaja.create({
+      const mvCaja = await tx.movimientoCaja.create({
         data: {
           numero: mvNumero,
           cajaId: parseInt(cajaId),
@@ -648,9 +716,37 @@ router.post('/liquidaciones/:id/pagar', authenticateAdmin, async (req, res) => {
           descripcion: item.entidad.razonSocial,
           movimientoContableId: op.id,
           centroCostoId: ccPago,
+          entidadId: item.entidadId,
+          medioPagoId: medioPagoRel?.id || null,
           registradoPor: req.admin.id
         }
       })
+
+      // Crear ItemMovimientoCaja (concepto detallado) + MedioPagoMovimientoCaja
+      await tx.itemMovimientoCaja.create({
+        data: {
+          tenantId: req.tenantId,
+          movimientoCajaId: mvCaja.id,
+          conceptoTesoreriaId: conceptoSueldos?.id || null,
+          cuentaContableId: cuentaContable.id,
+          centroCostoId: ccPago,
+          monto: item.netoAPagar,
+          descripcion: `Sueldo ${item.entidad.razonSocial} - ${item.liquidacion.periodo}`,
+          orden: 0,
+        }
+      })
+      if (medioPagoRel) {
+        await tx.medioPagoMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: mvCaja.id,
+            medioPagoId: medioPagoRel.id,
+            monto: item.netoAPagar,
+            nroOperacion: nroOperacion || null,
+            orden: 0,
+          }
+        })
+      }
 
       // Actualizar saldo de caja
       await tx.caja.update({
@@ -737,18 +833,30 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
       return res.status(400).json({ error: 'No hay items pendientes de pago' })
     }
 
-    const cuentaContable = await req.db.cuentaContable.findFirst({
-      where: { activo: true }
+    // Concepto SUE + cuenta contable (igual que en /pagar individual)
+    const conceptoSueldos = await req.db.conceptoTesoreria.findFirst({
+      where: { codigo: 'SUE', activo: true },
+      include: { cuentaContable: true }
     })
-
+    const cuentaContable = conceptoSueldos?.cuentaContable
+      || await req.db.cuentaContable.findFirst({ where: { activo: true } })
     if (!cuentaContable) {
       return res.status(400).json({ error: 'No hay cuentas contables configuradas' })
     }
 
-    const cajaBatch = await req.db.caja.findUnique({ where: { id: parseInt(cajaId) } })
+    // Resolver medio de pago FK
+    const medioPagoRel = await req.db.medioPago.findFirst({
+      where: { OR: [{ codigo: medioPago }, { nombre: medioPago }] }
+    })
+
+    const cajaBatch = await req.db.caja.findUnique({
+      where: { id: parseInt(cajaId) },
+      include: { cuentaContable: true }
+    })
 
     const year = new Date().getFullYear()
 
+    const opsCreadas = []
     await req.db.$transaction(async (tx) => {
       let montoTotalPagado = 0
 
@@ -791,11 +899,10 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
           }
         })
 
-        // Crear movimiento de caja
+        // Crear movimiento de caja con todos los datos (entidad, medioPago, items, mediosPago)
         const mvCount = await tx.movimientoCaja.count()
         const mvNumero = `MV-${year}-${(mvCount + 1).toString().padStart(6, '0')}`
-
-        await tx.movimientoCaja.create({
+        const mvCaja = await tx.movimientoCaja.create({
           data: {
             numero: mvNumero,
             cajaId: parseInt(cajaId),
@@ -807,11 +914,38 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
             descripcion: item.entidad.razonSocial,
             movimientoContableId: op.id,
             centroCostoId: ccPagoItem,
+            entidadId: item.entidadId,
+            medioPagoId: medioPagoRel?.id || null,
             registradoPor: req.admin.id
           }
         })
+        await tx.itemMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: mvCaja.id,
+            conceptoTesoreriaId: conceptoSueldos?.id || null,
+            cuentaContableId: cuentaContable.id,
+            centroCostoId: ccPagoItem,
+            monto: item.netoAPagar,
+            descripcion: `Sueldo ${item.entidad.razonSocial} - ${liquidacion.periodo}`,
+            orden: 0,
+          }
+        })
+        if (medioPagoRel) {
+          await tx.medioPagoMovimientoCaja.create({
+            data: {
+              tenantId: req.tenantId,
+              movimientoCajaId: mvCaja.id,
+              medioPagoId: medioPagoRel.id,
+              monto: item.netoAPagar,
+              nroOperacion: nroOperacion || null,
+              orden: 0,
+            }
+          })
+        }
 
         montoTotalPagado += parseFloat(item.netoAPagar)
+        opsCreadas.push({ op, item })
       }
 
       // Actualizar saldo de caja
@@ -830,11 +964,179 @@ router.post('/liquidaciones/:id/pagar-todos', authenticateAdmin, async (req, res
       })
     })
 
+    // Generar asientos contables fuera de la transacción (no fallar el pago si fallan)
+    for (const { op, item } of opsCreadas) {
+      try {
+        await generarAsientoPagoSueldo(prisma, {
+          ordenPago: op,
+          itemLiquidacion: item,
+          entidad: item.entidad,
+          caja: cajaBatch,
+          liquidacion,
+          registradoPor: req.admin.id,
+        })
+      } catch (asientoError) {
+        console.error('[Liquidacion] Error generando asiento masivo:', asientoError)
+      }
+    }
+
     res.json({
       message: `Se pagaron ${liquidacion.items.length} empleados correctamente`
     })
   } catch (error) {
     console.error('Error pagando liquidacion:', error)
+    res.status(500).json({ error: error.message || 'Error interno del servidor' })
+  }
+})
+
+// POST /admin/liquidaciones/:id/anular - Revertir pagos y dejar liquidación pendiente
+// Para cada item PAGADO: genera un MovimientoCaja inverso (INGRESO) en la misma caja,
+// anula el MovimientoCaja original y la OrdenPago, devuelve el saldo a la caja,
+// y deja el item en estado PENDIENTE (para que pueda re-pagarse o editarse).
+router.post('/liquidaciones/:id/anular', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const liquidacion = await req.db.liquidacionSueldo.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        items: { include: { entidad: { select: { razonSocial: true } } } }
+      }
+    })
+    if (!liquidacion) return res.status(404).json({ error: 'Liquidacion no encontrada' })
+
+    const itemsPagados = liquidacion.items.filter(it => it.estado === 'PAGADO')
+    const year = new Date().getFullYear()
+
+    const reversos = []
+    await req.db.$transaction(async (tx) => {
+      for (const item of itemsPagados) {
+        if (!item.movimientoContableId) continue
+        const mvOriginal = await tx.movimientoCaja.findFirst({
+          where: { movimientoContableId: item.movimientoContableId },
+        })
+        if (!mvOriginal) continue
+
+        // Crear movimiento de caja inverso (INGRESO)
+        const mvCount = await tx.movimientoCaja.count()
+        const mvNumero = `MV-${year}-${(mvCount + 1).toString().padStart(6, '0')}`
+        const mvInverso = await tx.movimientoCaja.create({
+          data: {
+            numero: mvNumero,
+            cajaId: mvOriginal.cajaId,
+            fecha: new Date(),
+            tipo: 'INGRESO',
+            cuentaContableId: mvOriginal.cuentaContableId,
+            monto: mvOriginal.monto,
+            concepto: `Reverso pago sueldo ${liquidacion.periodo}`,
+            descripcion: `${item.entidad.razonSocial} — Reverso de ${mvOriginal.numero}`,
+            centroCostoId: mvOriginal.centroCostoId,
+            entidadId: mvOriginal.entidadId,
+            medioPagoId: mvOriginal.medioPagoId,
+            registradoPor: req.admin.id,
+          }
+        })
+
+        // Items del reverso (clonar items del original como INGRESO)
+        const itemsOriginales = await tx.itemMovimientoCaja.findMany({ where: { movimientoCajaId: mvOriginal.id } })
+        for (const it of itemsOriginales) {
+          await tx.itemMovimientoCaja.create({
+            data: {
+              tenantId: it.tenantId,
+              movimientoCajaId: mvInverso.id,
+              conceptoTesoreriaId: it.conceptoTesoreriaId,
+              cuentaContableId: it.cuentaContableId,
+              centroCostoId: it.centroCostoId,
+              monto: it.monto,
+              descripcion: `Reverso · ${it.descripcion || ''}`.trim(),
+              orden: it.orden,
+            }
+          })
+        }
+        // Medios de pago del reverso
+        const mediosOriginales = await tx.medioPagoMovimientoCaja.findMany({ where: { movimientoCajaId: mvOriginal.id } })
+        for (const mp of mediosOriginales) {
+          await tx.medioPagoMovimientoCaja.create({
+            data: {
+              tenantId: mp.tenantId,
+              movimientoCajaId: mvInverso.id,
+              medioPagoId: mp.medioPagoId,
+              monto: mp.monto,
+              nroOperacion: mp.nroOperacion,
+              orden: mp.orden,
+            }
+          })
+        }
+
+        // Anular el MV original
+        await tx.movimientoCaja.update({
+          where: { id: mvOriginal.id },
+          data: { anulado: true, fechaAnulacion: new Date(), motivoAnulacion: `Anulación liquidación ${liquidacion.periodo}` },
+        })
+
+        // Anular la OrdenPago
+        await tx.movimientoContable.update({
+          where: { id: item.movimientoContableId },
+          data: { estado: 'ANULADO' },
+        })
+
+        // Devolver saldo a la caja (la plata "vuelve")
+        await tx.caja.update({
+          where: { id: mvOriginal.cajaId },
+          data: { saldoActual: { increment: Number(mvOriginal.monto) } },
+        })
+
+        // Reset del item a PENDIENTE
+        await tx.itemLiquidacion.update({
+          where: { id: item.id },
+          data: { estado: 'PENDIENTE', fechaPago: null, movimientoContableId: null },
+        })
+
+        reversos.push({ itemId: item.id, mvOriginal: mvOriginal.numero, mvReverso: mvNumero })
+      }
+
+      // Marcar liquidación como PENDIENTE
+      await tx.liquidacionSueldo.update({
+        where: { id: parseInt(id) },
+        data: { estado: 'PENDIENTE', fechaPago: null },
+      })
+    })
+
+    // Anular asientos contables (fuera de la transacción)
+    // 1) Por cada pago revertido: anular asiento PAGO_SUELDO
+    for (const rev of reversos) {
+      const item = itemsPagados.find(it => it.id === rev.itemId)
+      if (!item) continue
+      try {
+        await anularAsiento(
+          prisma,
+          'PAGO_SUELDO',
+          item.movimientoContableId,
+          req.admin.id,
+          `Anulación liquidación ${liquidacion.periodo}`
+        )
+      } catch (e) {
+        console.error('[Liquidacion] Error anulando asiento pago:', e.message)
+      }
+    }
+    // 2) Anular asientos DEVENGAMIENTO_SUELDO de TODOS los items de la liquidación
+    for (const item of liquidacion.items) {
+      try {
+        await anularAsiento(
+          prisma,
+          'DEVENGAMIENTO_SUELDO',
+          item.id,
+          req.admin.id,
+          `Anulación liquidación ${liquidacion.periodo}`
+        )
+      } catch (e) {
+        console.error('[Liquidacion] Error anulando devengamiento:', e.message)
+      }
+    }
+
+    res.json({ success: true, message: `Liquidación anulada. Se revirtieron ${reversos.length} pagos.`, reversos })
+  } catch (error) {
+    console.error('Error anulando liquidacion:', error)
     res.status(500).json({ error: error.message || 'Error interno del servidor' })
   }
 })
@@ -900,7 +1202,7 @@ router.get('/entidades/:entidadId/conceptos-liquidacion', authenticateAdmin, asy
       include: { concepto: true },
       orderBy: [{ activo: 'desc' }, { id: 'asc' }]
     })
-    res.json(conceptos)
+    res.json({ success: true, data: conceptos })
   } catch (error) {
     console.error('Error obteniendo conceptos del empleado:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
@@ -1129,6 +1431,53 @@ router.delete('/novedades-liquidacion/:id', authenticateAdmin, async (req, res) 
     res.json({ message: 'Novedad eliminada' })
   } catch (error) {
     console.error('Error eliminando novedad:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// GET /admin/entidades/:entidadId/liquidaciones
+// Historial de liquidaciones del empleado (items + parent + MV de pago si existe).
+router.get('/entidades/:entidadId/liquidaciones', authenticateAdmin, async (req, res) => {
+  try {
+    const entidadId = parseInt(req.params.entidadId)
+    const items = await req.db.itemLiquidacion.findMany({
+      where: { entidadId },
+      include: {
+        liquidacion: {
+          select: { id: true, numero: true, periodo: true, mes: true, anio: true, estado: true }
+        },
+        // MovimientoContable (orden de pago) → buscamos su MovimientoCaja asociado
+        // a través del backref. Lo hacemos en una segunda query porque el FK está
+        // en MovimientoContable, no en ItemLiquidacion.
+      },
+      orderBy: [{ liquidacion: { anio: 'desc' } }, { liquidacion: { mes: 'desc' } }]
+    })
+
+    // Para los items pagados, obtener el MV de tesorería (vía movimientoContableId)
+    const opIds = items.map(i => i.movimientoContableId).filter(Boolean)
+    let mvByOp = {}
+    if (opIds.length > 0) {
+      const movs = await req.db.movimientoCaja.findMany({
+        where: { movimientoContableId: { in: opIds } },
+        select: {
+          id: true,
+          numero: true,
+          movimientoContableId: true,
+          medioPagoRel: { select: { id: true, nombre: true } },
+          caja: { select: { id: true, nombre: true } }
+        }
+      })
+      mvByOp = Object.fromEntries(movs.map(m => [m.movimientoContableId, m]))
+    }
+
+    const enriched = items.map(it => ({
+      ...it,
+      movimientoCaja: it.movimientoContableId ? (mvByOp[it.movimientoContableId] || null) : null
+    }))
+
+    res.json({ success: true, data: enriched })
+  } catch (error) {
+    console.error('Error obteniendo historial liquidaciones:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
   }
 })

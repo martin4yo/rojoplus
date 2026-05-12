@@ -68,6 +68,10 @@ export default function TablasAuxiliares() {
   const [cumpleanios, setCumpleanios] = useState({ activo: false, mensaje: 'Feliz cumpleaños, {nombre}! El club te desea un excelente día.' })
   const [guardandoCumpleanios, setGuardandoCumpleanios] = useState(false)
 
+  // Pausa de crons automáticos del sistema
+  const [cronsPausados, setCronsPausados] = useState(false)
+  const [guardandoCronsPausa, setGuardandoCronsPausa] = useState(false)
+
   // Configuración recordatorio anticipado
   const [recordatorioAnt, setRecordatorioAnt] = useState({ activo: false, dias: '3' })
   const [guardandoRecordatorioAnt, setGuardandoRecordatorioAnt] = useState(false)
@@ -153,6 +157,7 @@ export default function TablasAuxiliares() {
     cargarConfiguracion()
     cargarRecargo()
     cargarVigencia()
+    cargarCronsPausa()
     cargarDescAnticipado()
     cargarBajaAsistencia()
     cargarCumpleanios()
@@ -370,6 +375,35 @@ export default function TablasAuxiliares() {
       setError('Error al guardar configuración de vigencia')
     } finally {
       setGuardandoVigencia(false)
+    }
+  }
+
+  async function cargarCronsPausa() {
+    try {
+      const cfg = await api.get('/admin/sistema/configuracion/CRONS_PAUSADOS').catch(() => null)
+      setCronsPausados(cfg?.valor === 'true')
+    } catch (err) {
+      console.error('Error cargando estado de crons:', err)
+    }
+  }
+
+  async function toggleCronsPausa(nuevoValor) {
+    setGuardandoCronsPausa(true)
+    setError(null)
+    try {
+      await api.put('/admin/sistema/configuracion/CRONS_PAUSADOS', {
+        valor: nuevoValor ? 'true' : 'false',
+        tipo: 'BOOLEAN',
+        modulo: 'SISTEMA',
+        descripcion: 'Pausa TODOS los crons automáticos (notificaciones + vigencia) para este tenant',
+      })
+      setCronsPausados(nuevoValor)
+      setSuccess(nuevoValor ? 'Crons automáticos PAUSADOS para este tenant' : 'Crons automáticos REACTIVADOS')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Error al actualizar pausa de crons')
+    } finally {
+      setGuardandoCronsPausa(false)
     }
   }
 
@@ -908,7 +942,7 @@ export default function TablasAuxiliares() {
       {activeTab === 'general' && (
         <div className="flex flex-wrap gap-6">
           {/* Configuración de Cuotas */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[280px]">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[360px]">
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-xl bg-blue-100">
                 <Calendar className="w-6 h-6 text-blue-600" />
@@ -958,8 +992,8 @@ export default function TablasAuxiliares() {
                   </select>
                 </div>
 
-                {/* Ejemplo dinámico */}
-                <div className="mt-3 p-2 bg-gray-50 rounded-lg">
+                {/* Ejemplo dinámico — margin-bottom para no chocar con el botón Guardar */}
+                <div className="mt-3 mb-12 p-2 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-600">
                     <span className="font-medium">Ejemplo:</span> Las cuotas de Enero vencerán el{' '}
                     <span className="font-semibold text-primary">
@@ -1339,6 +1373,36 @@ export default function TablasAuxiliares() {
                 )}
               </button>
             )}
+          </div>
+
+          {/* Pausar Crons Automáticos del sistema */}
+          <div className={`bg-white rounded-xl shadow-sm border p-5 w-96 relative min-h-[280px] ${cronsPausados ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-200'}`}>
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${cronsPausados ? 'bg-red-100' : 'bg-violet-100'}`}>
+                <Bell className={`w-6 h-6 ${cronsPausados ? 'text-red-600' : 'text-violet-600'}`} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Crons automáticos del sistema</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Pausa TODAS las notificaciones automáticas para este tenant: cuotas próximas/vencidas, morosidad, cumpleaños, vigencia, recordatorios, partidos, baja asistencia.
+                </p>
+
+                <div className="mt-4">
+                  <Switch
+                    checked={cronsPausados}
+                    onChange={(v) => toggleCronsPausa(v)}
+                    disabled={guardandoCronsPausa || !tienePermiso(PERMISOS.CONFIG_EDITAR)}
+                    label={cronsPausados ? '⏸ Crons PAUSADOS' : '▶ Crons activos'}
+                  />
+                </div>
+
+                <div className={`mt-4 p-3 rounded-lg text-xs ${cronsPausados ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-50 text-gray-600'}`}>
+                  {cronsPausados
+                    ? 'Ningún cron automático va a procesar este tenant hasta que reactives el switch.'
+                    : 'Los crons se ejecutan según su programación (ver horarios en el código). Activar la pausa es útil para testing o mantenimiento.'}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Descuento por Pago Anticipado */}

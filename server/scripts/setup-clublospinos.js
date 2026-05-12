@@ -165,13 +165,21 @@ async function inicializarEstructura(tenantId) {
     prisma.cuentaContable.create({ data: { tenantId, codigo: '5.3', nombre: 'Mantenimiento', tipo: 'EGRESO', nivel: 2, padreId: egresos.id, esImputable: true, orden: 52 } }),
     prisma.cuentaContable.create({ data: { tenantId, codigo: '5.9', nombre: 'Otros Egresos', tipo: 'EGRESO', nivel: 2, padreId: egresos.id, esImputable: true, orden: 59 } }),
   ])
-  const [activoCte] = hijos
+  const [activoCte, pasivoCte] = hijos
   await Promise.all([
     prisma.cuentaContable.create({ data: { tenantId, codigo: '1.1.1', nombre: 'Caja', tipo: 'ACTIVO', nivel: 3, padreId: activoCte.id, esImputable: true, orden: 100 } }),
     prisma.cuentaContable.create({ data: { tenantId, codigo: '1.1.2', nombre: 'Bancos', tipo: 'ACTIVO', nivel: 3, padreId: activoCte.id, esImputable: true, orden: 101 } }),
     prisma.cuentaContable.create({ data: { tenantId, codigo: '1.1.3', nombre: 'Deudores por Cuotas', tipo: 'ACTIVO', nivel: 3, padreId: activoCte.id, esImputable: true, orden: 102 } }),
   ])
-  console.log('  ✓ Cuentas contables (19)')
+  // Deudas sociales (sueldos a pagar / cargas sociales)
+  const deudasSociales = await prisma.cuentaContable.create({
+    data: { tenantId, codigo: '2.1.3', nombre: 'Deudas Sociales', tipo: 'PASIVO', nivel: 3, padreId: pasivoCte.id, esImputable: false, orden: 23 }
+  })
+  await Promise.all([
+    prisma.cuentaContable.create({ data: { tenantId, codigo: '2.1.3.01', nombre: 'Sueldos a Pagar', tipo: 'PASIVO', nivel: 4, padreId: deudasSociales.id, esImputable: true, orden: 230 } }),
+    prisma.cuentaContable.create({ data: { tenantId, codigo: '2.1.3.02', nombre: 'Cargas Sociales a Pagar', tipo: 'PASIVO', nivel: 4, padreId: deudasSociales.id, esImputable: true, orden: 231 } }),
+  ])
+  console.log('  ✓ Cuentas contables (22)')
 
   // Centros de costo (solo Rugby/Hockey + admin/buffet)
   await prisma.centroCosto.createMany({

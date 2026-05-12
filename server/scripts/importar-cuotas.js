@@ -303,7 +303,7 @@ async function importarCuotas() {
 
       let periodo = await prisma.periodo.findFirst({ where: { mes, anio, tenantId } })
       if (!periodo) {
-        const fechaVencimiento = new Date(anio, mes, 10) // día 10 del mes siguiente
+        const fechaVencimiento = new Date(anio, mes - 1, 10) // día 10 del mismo mes del período
         periodo = await prisma.periodo.create({
           data: {
             tenantId,

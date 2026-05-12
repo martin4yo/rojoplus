@@ -27,6 +27,8 @@ const CUENTAS = {
   IVA_DF_21: '2.1.2.01',
   IVA_DF_105: '2.1.2.02',
   IVA_DF_27: '2.1.2.03',
+  SUELDOS_A_PAGAR: '2.1.3.01',
+  CARGAS_SOCIALES_A_PAGAR: '2.1.3.02',
 
   // Ingresos
   CUOTA_SOCIAL: '4.1',       // Cuotas sociales
@@ -618,15 +620,27 @@ async function generarAsientoPagoSueldo(prisma, datos) {
 
     // CC del empleado (prioridad); fallback al CC de la caja
     const ccImputacion = entidad?.centroCostoId ?? caja?.centroCostoId ?? null
+
+    // Si hubo asiento de devengamiento previo (D Gastos Personal / H Sueldos a Pagar),
+    // el pago cancela el pasivo: D Sueldos a Pagar / H Caja.
+    // Si NO hay devengamiento (fallback), va directo D Gastos Personal / H Caja.
+    const devengamiento = await prisma.asiento.findFirst({
+      where: { tipoOrigen: 'DEVENGAMIENTO_SUELDO', origenId: itemLiquidacion.id, estado: 'CONFIRMADO' },
+    })
+    const cuentaDebito = devengamiento ? CUENTAS.SUELDOS_A_PAGAR : CUENTAS.GASTOS_PERSONAL
+    const descDebito = devengamiento
+      ? `Cancela devengamiento ${liquidacion.numero}`
+      : `Liquidación ${liquidacion.numero}`
+
     const asiento = await crearAsiento(prisma, {
       concepto: `Pago sueldo ${liquidacion.periodo} - ${nombreEmpleado}`,
       fecha: ordenPago.fecha,
       tipoOrigen: 'PAGO_SUELDO',
       origenId: ordenPago.id,
       registradoPor,
-      centroCostoId: null, // CC definido por línea
+      centroCostoId: null,
       lineas: [
-        { cuentaCodigo: CUENTAS.GASTOS_PERSONAL, debe: monto, haber: 0, descripcion: `Liquidación ${liquidacion.numero}`, centroCostoId: ccImputacion },
+        { cuentaCodigo: cuentaDebito,   debe: monto, haber: 0, descripcion: descDebito, centroCostoId: ccImputacion },
         { cuentaCodigo: cuentaCajaCodigo, debe: 0, haber: monto, descripcion: `OP ${ordenPago.numero}`, centroCostoId: ccImputacion },
       ],
     })
@@ -635,6 +649,42 @@ async function generarAsientoPagoSueldo(prisma, datos) {
     return asiento
   } catch (error) {
     console.error(`[AsientoContable] Error generando asiento para pago sueldo ${ordenPago.id}:`, error.message)
+    return null
+  }
+}
+
+/**
+ * Asiento de devengamiento de un ItemLiquidacion al generar la liquidación.
+ * Reconoce el gasto y el pasivo antes del pago efectivo.
+ *
+ * Asiento:
+ *   D: Gastos de Personal   $netoAPagar  (imputado al CC del empleado)
+ *   H: Sueldos a Pagar      $netoAPagar
+ */
+async function generarAsientoDevengamientoSueldo(prisma, datos) {
+  const { itemLiquidacion, entidad, liquidacion, registradoPor } = datos
+  try {
+    const monto = Number(itemLiquidacion.netoAPagar)
+    if (!(monto > 0)) return null
+    const nombreEmpleado = entidad?.razonSocial || 'Personal'
+    const ccImputacion = entidad?.centroCostoId ?? null
+
+    const asiento = await crearAsiento(prisma, {
+      concepto: `Devengamiento sueldo ${liquidacion.periodo} - ${nombreEmpleado}`,
+      fecha: liquidacion.fechaGeneracion || new Date(),
+      tipoOrigen: 'DEVENGAMIENTO_SUELDO',
+      origenId: itemLiquidacion.id,
+      registradoPor,
+      centroCostoId: null,
+      lineas: [
+        { cuentaCodigo: CUENTAS.GASTOS_PERSONAL, debe: monto, haber: 0, descripcion: `Liquidación ${liquidacion.numero}`, centroCostoId: ccImputacion },
+        { cuentaCodigo: CUENTAS.SUELDOS_A_PAGAR, debe: 0, haber: monto, descripcion: `Item #${itemLiquidacion.id}`, centroCostoId: ccImputacion },
+      ],
+    })
+    console.log(`[AsientoContable] Creado asiento devengamiento ${asiento.numero} item ${itemLiquidacion.id}`)
+    return asiento
+  } catch (error) {
+    console.error(`[AsientoContable] Error generando devengamiento item ${itemLiquidacion?.id}:`, error.message)
     return null
   }
 }
@@ -716,6 +766,7 @@ export {
   generarAsientoOrdenPago,
   generarAsientoReciboCobro,
   generarAsientoPagoSueldo,
+  generarAsientoDevengamientoSueldo,
   anularAsiento,
   CUENTAS,
 }

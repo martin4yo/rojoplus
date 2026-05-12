@@ -353,6 +353,11 @@ router.get('/movimientos-caja', asyncHandler(async (req, res) => {
           }
         },
         _count: { select: { adjuntos: true } },
+        mediosPago: {
+          select: {
+            medioPago: { select: { id: true, nombre: true } }
+          }
+        },
       }
     }),
     req.db.movimientoCaja.count({ where })

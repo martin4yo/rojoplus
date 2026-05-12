@@ -175,7 +175,7 @@ async function main() {
 
     const key = `${String(parsed.mes).padStart(2, '0')}/${parsed.anio}`
     if (!periodoMap.has(key)) {
-      const fechaVencimiento = new Date(parsed.anio, parsed.mes, 10) // Día 10 del mes siguiente
+      const fechaVencimiento = new Date(parsed.anio, parsed.mes - 1, 10) // Día 10 del mismo mes del período
       const periodo = await prisma.periodo.create({
         data: {
           anio: parsed.anio,

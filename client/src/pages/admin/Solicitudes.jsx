@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
+import { Eye, Check, X } from 'lucide-react'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import api from '../../services/api'
 
 export default function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState([])
@@ -41,30 +43,17 @@ export default function Solicitudes() {
   const cargarDatos = async () => {
     setLoading(true)
     try {
-      const [resSolicitudes, resStats, resTipos, resCategorias] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/admin/solicitudes?${new URLSearchParams(filtros)}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
-        }),
-        fetch(`${import.meta.env.VITE_API_URL}/admin/solicitudes-stats`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
-        }),
-        fetch(`${import.meta.env.VITE_API_URL}/admin/tipos-socio`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
-        }),
-        fetch(`${import.meta.env.VITE_API_URL}/admin/categorias-socio`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
-        })
+      const qs = new URLSearchParams(filtros).toString()
+      const [solicitudes, stats, tipos, categorias] = await Promise.all([
+        api.getFull(`/admin/solicitudes${qs ? '?' + qs : ''}`),
+        api.getFull('/admin/solicitudes-stats'),
+        api.getFull('/admin/tipos-socio'),
+        api.getFull('/admin/categorias-socio'),
       ])
-
-      const dataSolicitudes = await resSolicitudes.json()
-      const dataStats = await resStats.json()
-      const dataTipos = await resTipos.json()
-      const dataCategorias = await resCategorias.json()
-
-      setSolicitudes(dataSolicitudes.data || [])
-      setStats(dataStats.data || {})
-      setTiposSocio(dataTipos.data || [])
-      setCategoriasSocio(dataCategorias.data || [])
+      setSolicitudes(solicitudes?.data || [])
+      setStats(stats?.data || {})
+      setTiposSocio(tipos?.data || [])
+      setCategoriasSocio(categorias?.data || [])
     } catch (error) {
       console.error('Error cargando datos:', error)
       toast.error('Error al cargar las solicitudes')
@@ -75,10 +64,7 @@ export default function Solicitudes() {
 
   const handleVerDetalle = async (id) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/solicitudes/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
-      })
-      const data = await res.json()
+      const data = await api.getFull(`/admin/solicitudes/${id}`)
       setSelectedSolicitud(data.data)
       setShowModalDetalle(true)
     } catch (error) {
@@ -110,22 +96,8 @@ export default function Solicitudes() {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/solicitudes/${selectedSolicitud.id}/aprobar`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('adminToken')}`
-        },
-        body: JSON.stringify(formAprobar)
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error?.message || 'Error al aprobar solicitud')
-      }
-
-      toast.success(`Solicitud aprobada. Socio #${data.data.socioTitular?.nroSocio || 'N/A'} creado`)
+      const data = await api.put(`/admin/solicitudes/${selectedSolicitud.id}/aprobar`, formAprobar)
+      toast.success(`Solicitud aprobada. Socio #${data?.socioTitular?.nroSocio || 'N/A'} creado`)
       setShowModalAprobar(false)
       cargarDatos()
     } catch (error) {
@@ -141,21 +113,7 @@ export default function Solicitudes() {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/solicitudes/${selectedSolicitud.id}/rechazar`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('adminToken')}`
-        },
-        body: JSON.stringify({ motivoRechazo })
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error?.message || 'Error al rechazar solicitud')
-      }
-
+      await api.put(`/admin/solicitudes/${selectedSolicitud.id}/rechazar`, { motivoRechazo })
       toast.success('Solicitud rechazada correctamente')
       setShowModalRechazar(false)
       cargarDatos()
@@ -313,28 +271,33 @@ export default function Solicitudes() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleVerDetalle(sol.id)}
-                        className="text-blue-600 hover:text-blue-900 mr-3"
-                      >
-                        Ver
-                      </button>
-                      {sol.estado === 'PENDIENTE' && tienePermiso(PERMISOS.SOCIOS_CREAR) && (
-                        <>
-                          <button
-                            onClick={() => handleAprobar(sol)}
-                            className="text-green-600 hover:text-green-900 mr-3"
-                          >
-                            Aprobar
-                          </button>
-                          <button
-                            onClick={() => handleRechazar(sol)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Rechazar
-                          </button>
-                        </>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleVerDetalle(sol.id)}
+                          title="Ver detalle"
+                          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-blue-600 transition"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {sol.estado === 'PENDIENTE' && tienePermiso(PERMISOS.SOCIOS_CREAR) && (
+                          <>
+                            <button
+                              onClick={() => handleAprobar(sol)}
+                              title="Aprobar solicitud"
+                              className="p-2 rounded-lg text-gray-500 hover:bg-green-50 hover:text-green-600 transition"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleRechazar(sol)}
+                              title="Rechazar solicitud"
+                              className="p-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 transition"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -1058,6 +1058,184 @@ router.post('/cuotas/generar-cuota-social/:socioId', authAdmin, asyncHandler(asy
 }))
 
 // ============================================
+// CUOTA DE ACTIVIDAD INDIVIDUAL
+// ============================================
+
+// Helper común: calcula monto + valida ventana de vigencia
+function calcularMontoCuotaActividad(inscripcion, socio, anio, mes) {
+  const categoria = inscripcion.categoriaActividad
+  const actividad = categoria?.actividad
+  if (!actividad) return { puedeGenerar: false, motivo: 'La inscripción no tiene actividad asociada' }
+  if (inscripcion.estado !== 'ACTIVA') return { puedeGenerar: false, motivo: `La inscripción está en estado ${inscripcion.estado}` }
+  if (inscripcion.exentoCuota) return { puedeGenerar: false, motivo: 'La inscripción está marcada como exenta de cuota' }
+
+  // Vigencia: el período tiene que estar dentro de fechaInicio/fechaFin
+  const inicioPeriodo = new Date(anio, mes - 1, 1)
+  const finPeriodo = new Date(anio, mes, 0, 23, 59, 59)
+  if (inscripcion.fechaInicio && new Date(inscripcion.fechaInicio) > finPeriodo) {
+    return { puedeGenerar: false, motivo: 'El período es anterior al inicio de la inscripción' }
+  }
+  if (inscripcion.fechaFin && new Date(inscripcion.fechaFin) < inicioPeriodo) {
+    return { puedeGenerar: false, motivo: 'El período es posterior al fin de la inscripción' }
+  }
+
+  // Monto base (orden de prioridad: conceptoTesoreria de la actividad → categoría.cuotaMensual → actividad.cuotaMensual)
+  let montoBase = actividad.conceptoTesoreria?.cuotaMensual
+    ? Number(actividad.conceptoTesoreria.cuotaMensual)
+    : (categoria.cuotaMensual ? Number(categoria.cuotaMensual)
+      : (actividad.cuotaMensual ? Number(actividad.cuotaMensual) : 0))
+  if (inscripcion.porcentajeCuota && Number(inscripcion.porcentajeCuota) !== 100) {
+    montoBase = montoBase * (Number(inscripcion.porcentajeCuota) / 100)
+  }
+  if (!(montoBase > 0)) return { puedeGenerar: false, motivo: 'La categoría/actividad no tiene cuota mensual configurada' }
+
+  const descuentoPct = socio.categoriaSocioRel?.porcentajeDescuento
+    ? Number(socio.categoriaSocioRel.porcentajeDescuento)
+    : 0
+  const montoBonificacion = montoBase * (descuentoPct / 100)
+  const montoTotal = montoBase - montoBonificacion
+  if (!(montoTotal > 0)) return { puedeGenerar: false, motivo: 'El monto resultante es cero' }
+
+  return {
+    puedeGenerar: true,
+    montoBase,
+    montoBonificacion,
+    montoTotal,
+    descuentoPct,
+    actividadNombre: actividad.nombre,
+    categoriaNombre: categoria.nombre,
+    conceptoTesoreriaId: actividad.conceptoTesoreriaId || null,
+  }
+}
+
+// GET /api/admin/cuotas/preview-cuota-actividad/:inscripcionId
+router.get('/cuotas/preview-cuota-actividad/:inscripcionId', authAdmin, asyncHandler(async (req, res) => {
+  const { inscripcionId } = req.params
+  const { anio, mes } = req.query
+  const anioInt = parseInt(anio)
+  const mesInt = parseInt(mes)
+  if (!anioInt || !mesInt || mesInt < 1 || mesInt > 12) {
+    throw new AppError('anio y mes son requeridos (mes entre 1 y 12)', 400, 'VALIDATION_ERROR')
+  }
+
+  const inscripcion = await req.db.inscripcion.findUnique({
+    where: { id: parseInt(inscripcionId) },
+    include: {
+      socio: { include: { categoriaSocioRel: true } },
+      categoriaActividad: { include: { actividad: { include: { conceptoTesoreria: true } } } },
+    },
+  })
+  if (!inscripcion) throw new AppError('Inscripción no encontrada', 404, 'NOT_FOUND')
+
+  const calc = calcularMontoCuotaActividad(inscripcion, inscripcion.socio, anioInt, mesInt)
+
+  // Fecha de vencimiento (sin crear el período)
+  const periodoExistente = await req.db.periodo.findFirst({ where: { anio: anioInt, mes: mesInt } })
+  let fechaVencimiento
+  if (periodoExistente) {
+    fechaVencimiento = periodoExistente.fechaVencimiento
+  } else {
+    const [configDia, configMismoMes] = await Promise.all([
+      req.db.configuracion.findFirst({ where: { clave: 'CUOTA_DIA_VENCIMIENTO' } }),
+      req.db.configuracion.findFirst({ where: { clave: 'CUOTA_VENCE_MISMO_MES' } }),
+    ])
+    const diaVenc = configDia ? parseInt(configDia.valor) : 10
+    const venceMismoMes = configMismoMes ? configMismoMes.valor === 'true' : false
+    let mesV = mesInt, anioV = anioInt
+    if (!venceMismoMes) { mesV++; if (mesV > 12) { mesV = 1; anioV++ } }
+    fechaVencimiento = new Date(anioV, mesV - 1, diaVenc)
+  }
+
+  // ¿Ya existe el cargo?
+  let yaExiste = false
+  if (periodoExistente) {
+    const existente = await req.db.cargo.findFirst({
+      where: {
+        socioId: inscripcion.socioId,
+        periodoId: periodoExistente.id,
+        categoriaActividadId: inscripcion.categoriaActividadId,
+        categoria: 'CUOTA_ACTIVIDAD',
+      },
+    })
+    yaExiste = !!existente
+  }
+
+  res.json({
+    success: true,
+    data: {
+      anio: anioInt,
+      mes: mesInt,
+      fechaVencimiento,
+      yaExiste,
+      ...calc,
+    },
+  })
+}))
+
+// POST /api/admin/cuotas/generar-cuota-actividad/:inscripcionId
+router.post('/cuotas/generar-cuota-actividad/:inscripcionId', authAdmin, asyncHandler(async (req, res) => {
+  const { inscripcionId } = req.params
+  const { anio, mes } = req.body
+  const anioInt = parseInt(anio)
+  const mesInt = parseInt(mes)
+  if (!anioInt || !mesInt || mesInt < 1 || mesInt > 12) {
+    throw new AppError('anio y mes son requeridos (mes entre 1 y 12)', 400, 'VALIDATION_ERROR')
+  }
+
+  const inscripcion = await req.db.inscripcion.findUnique({
+    where: { id: parseInt(inscripcionId) },
+    include: {
+      socio: { include: { categoriaSocioRel: true } },
+      categoriaActividad: { include: { actividad: { include: { conceptoTesoreria: true } } } },
+    },
+  })
+  if (!inscripcion) throw new AppError('Inscripción no encontrada', 404, 'NOT_FOUND')
+
+  const calc = calcularMontoCuotaActividad(inscripcion, inscripcion.socio, anioInt, mesInt)
+  if (!calc.puedeGenerar) {
+    throw new AppError(calc.motivo, 400, 'NO_GENERABLE')
+  }
+
+  const periodo = await obtenerOCrearPeriodo(req.db, anioInt, mesInt, req.admin.id)
+
+  const yaExiste = await req.db.cargo.findFirst({
+    where: {
+      socioId: inscripcion.socioId,
+      periodoId: periodo.id,
+      categoriaActividadId: inscripcion.categoriaActividadId,
+      categoria: 'CUOTA_ACTIVIDAD',
+    },
+  })
+  if (yaExiste) {
+    throw new AppError(
+      `La cuota de actividad ya está generada para ${String(mesInt).padStart(2, '0')}/${anioInt}`,
+      409, 'YA_EXISTE'
+    )
+  }
+
+  const cargo = await req.db.cargo.create({
+    data: {
+      periodoId: periodo.id,
+      socioId: inscripcion.socioId,
+      grupoFamiliarId: inscripcion.socio.titularFamiliaId || inscripcion.socioId,
+      categoria: 'CUOTA_ACTIVIDAD',
+      categoriaActividadId: inscripcion.categoriaActividadId,
+      conceptoTesoreriaId: calc.conceptoTesoreriaId,
+      descripcion: `${calc.actividadNombre} - ${calc.categoriaNombre}`,
+      montoOriginal: calc.montoBase,
+      montoBonificacion: calc.montoBonificacion,
+      montoTotal: calc.montoTotal,
+      estado: 'PENDIENTE',
+      fechaVencimiento: periodo.fechaVencimiento,
+      origen: 'INDIVIDUAL',
+      motivoBonificacion: calc.descuentoPct > 0 ? `Descuento por categoría: ${calc.descuentoPct}%` : null,
+    },
+  })
+
+  res.status(201).json({ success: true, data: cargo })
+}))
+
+// ============================================
 // PAGOS
 // ============================================
 

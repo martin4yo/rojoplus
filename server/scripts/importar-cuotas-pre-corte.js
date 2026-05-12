@@ -326,7 +326,7 @@ async function main() {
     if (periodosCache.has(key)) return periodosCache.get(key)
     let p = await prisma.periodo.findFirst({ where: { mes, anio, tenantId } })
     if (!p) {
-      const fechaVenc = new Date(anio, mes, 10) // día 10 del mes siguiente
+      const fechaVenc = new Date(anio, mes - 1, 10) // día 10 del mismo mes del período
       p = await prisma.periodo.create({
         data: {
           tenantId, mes, anio,

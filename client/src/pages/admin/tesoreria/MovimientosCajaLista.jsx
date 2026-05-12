@@ -211,6 +211,24 @@ export default function MovimientosCajaLista() {
       cellClassName: 'text-right'
     },
     {
+      key: 'medioPago',
+      label: 'Medio de pago',
+      render: (mov) => {
+        // Si tiene múltiples medios (split de pago), mostrarlos separados
+        if (Array.isArray(mov.mediosPago) && mov.mediosPago.length > 0) {
+          return (
+            <div className="text-xs text-gray-700">
+              {mov.mediosPago.map((mp, i) => (
+                <div key={i}>{mp.medioPago?.nombre || '-'}</div>
+              ))}
+            </div>
+          )
+        }
+        return <span className="text-sm text-gray-700">{mov.medioPagoRel?.nombre || mov.medioPago || '-'}</span>
+      },
+      className: 'text-left'
+    },
+    {
       key: 'estado',
       label: 'Estado',
       render: (mov) => (

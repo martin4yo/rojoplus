@@ -167,7 +167,7 @@ export default function ConceptosFijosEmpleado({ entidadId, sueldoBasico }) {
           <p className="text-sm text-gray-500">Se aplican automáticamente cada mes al generar la liquidación.</p>
         </div>
         {!editando && (
-          <Button onClick={nuevo}>
+          <Button type="button" onClick={nuevo}>
             <Plus className="w-4 h-4 mr-2" /> Nuevo concepto
           </Button>
         )}
@@ -267,8 +267,8 @@ export default function ConceptosFijosEmpleado({ entidadId, sueldoBasico }) {
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="secondary" onClick={() => setEditando(null)}>Cancelar</Button>
-            <Button onClick={guardar} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
+            <Button type="button" variant="secondary" onClick={() => setEditando(null)}>Cancelar</Button>
+            <Button type="button" onClick={guardar} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
           </div>
         </div>
       )}
@@ -332,13 +332,13 @@ export default function ConceptosFijosEmpleado({ entidadId, sueldoBasico }) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
-                        <button onClick={() => toggleActivo(c)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600" title={c.activo ? 'Desactivar' : 'Activar'}>
+                        <button type="button" onClick={() => toggleActivo(c)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600" title={c.activo ? 'Desactivar' : 'Activar'}>
                           <Power className="w-4 h-4" />
                         </button>
-                        <button onClick={() => editar(c)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="Editar">
+                        <button type="button" onClick={() => editar(c)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="Editar">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => eliminar(c)} className="p-2 hover:bg-red-50 rounded-lg text-red-600" title="Eliminar">
+                        <button type="button" onClick={() => eliminar(c)} className="p-2 hover:bg-red-50 rounded-lg text-red-600" title="Eliminar">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>

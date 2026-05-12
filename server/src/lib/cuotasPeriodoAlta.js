@@ -44,7 +44,7 @@ export async function resolverPeriodoAlta(db, fechaAlta = new Date()) {
 
   let periodo = await db.periodo.findFirst({ where: { mes, anio } })
   if (!periodo) {
-    const fechaVencimiento = new Date(anio, mes, 10) // día 10 del mes siguiente
+    const fechaVencimiento = new Date(anio, mes - 1, 10) // día 10 del mismo mes del período
     periodo = await db.periodo.create({
       data: {
         mes,

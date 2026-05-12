@@ -16,6 +16,23 @@ async function getTenantUrl(tenantId) {
   return url
 }
 
+/**
+ * Devuelve los IDs de tenants que tienen `Configuracion.CRONS_PAUSADOS=true`.
+ * Los crons del sistema deben omitir esos tenants.
+ */
+export async function getTenantsConCronsPausados() {
+  try {
+    const filas = await prisma.configuracion.findMany({
+      where: { clave: 'CRONS_PAUSADOS', valor: 'true' },
+      select: { tenantId: true },
+    })
+    return filas.map(f => f.tenantId)
+  } catch (err) {
+    console.error('[Crons] Error leyendo tenants pausados:', err.message)
+    return []
+  }
+}
+
 // ============================================================================
 // FUNCIONES AUXILIARES
 // ============================================================================
@@ -645,6 +662,7 @@ export async function verificarCuotasProximasVencer() {
     seisDias.setDate(seisDias.getDate() + 6)
     seisDias.setHours(0, 0, 0, 0)
 
+    const pausados = await getTenantsConCronsPausados()
     const cuotas = await prisma.cargo.findMany({
       where: {
         estado: 'PENDIENTE',
@@ -652,9 +670,8 @@ export async function verificarCuotasProximasVencer() {
           gte: cincoDias,
           lt: seisDias,
         },
-        socioId: {
-          not: null,
-        },
+        socioId: { not: null },
+        ...(pausados.length > 0 ? { tenantId: { notIn: pausados } } : {}),
       },
       include: {
         socio: true,
@@ -697,6 +714,7 @@ export async function verificarCuotasVencidasHoy() {
     manana.setDate(manana.getDate() + 1)
     manana.setHours(0, 0, 0, 0)
 
+    const pausados = await getTenantsConCronsPausados()
     const cuotas = await prisma.cargo.findMany({
       where: {
         estado: 'PENDIENTE',
@@ -704,9 +722,8 @@ export async function verificarCuotasVencidasHoy() {
           gte: hoy,
           lt: manana,
         },
-        socioId: {
-          not: null,
-        },
+        socioId: { not: null },
+        ...(pausados.length > 0 ? { tenantId: { notIn: pausados } } : {}),
       },
       include: {
         socio: true,
@@ -744,6 +761,7 @@ export async function verificarMorosidad() {
     const hace15Dias = new Date()
     hace15Dias.setDate(hace15Dias.getDate() - 15)
 
+    const pausados = await getTenantsConCronsPausados()
     // Buscar socios con cuotas vencidas hace más de 15 días
     const sociosConMorosidad = await prisma.socio.findMany({
       where: {
@@ -756,6 +774,7 @@ export async function verificarMorosidad() {
             },
           },
         },
+        ...(pausados.length > 0 ? { tenantId: { notIn: pausados } } : {}),
       },
       include: {
         cargos: {
@@ -939,6 +958,7 @@ export async function verificarPartidosProximos() {
     pasadoManana.setDate(pasadoManana.getDate() + 2)
     pasadoManana.setHours(0, 0, 0, 0)
 
+    const pausados = await getTenantsConCronsPausados()
     // Buscar partidos de mañana que no estén cancelados
     const partidos = await prisma.partido.findMany({
       where: {
@@ -948,7 +968,8 @@ export async function verificarPartidosProximos() {
         },
         estado: {
           notIn: ['CANCELADO', 'SUSPENDIDO']
-        }
+        },
+        ...(pausados.length > 0 ? { tenantId: { notIn: pausados } } : {}),
       },
       include: {
         convocados: {
@@ -1246,8 +1267,9 @@ export async function notificarPasajeCategoria(socioId, categoriaAnterior, categ
  * Envía un email resumen al EMAIL_CONTACTO de cada tenant con la lista de afectados.
  */
 export async function verificarBajaAsistencia() {
+  const pausados = await getTenantsConCronsPausados()
   const tenants = await prisma.tenant.findMany({
-    where: { estado: 'ACTIVE' },
+    where: { estado: 'ACTIVE', ...(pausados.length > 0 ? { id: { notIn: pausados } } : {}) },
     select: { id: true, nombre: true, subdomain: true, dominioCustom: true }
   })
 
@@ -1395,7 +1417,10 @@ async function _enviarResumenBajaAsistencia(db, tenant, alertas) {
  * Se ejecuta diariamente
  */
 export async function enviarSaludosCumpleanios() {
-  const tenants = await prisma.tenant.findMany({ where: { activo: true } })
+  const pausados = await getTenantsConCronsPausados()
+  const tenants = await prisma.tenant.findMany({
+    where: { activo: true, ...(pausados.length > 0 ? { id: { notIn: pausados } } : {}) }
+  })
   let total = 0
   for (const tenant of tenants) {
     try {
@@ -1503,7 +1528,10 @@ async function _enviarCumpleaniosTenant(db) {
  * Se ejecuta diariamente
  */
 export async function verificarRecordatorioAnticipado() {
-  const tenants = await prisma.tenant.findMany({ where: { activo: true } })
+  const pausados = await getTenantsConCronsPausados()
+  const tenants = await prisma.tenant.findMany({
+    where: { activo: true, ...(pausados.length > 0 ? { id: { notIn: pausados } } : {}) }
+  })
   let total = 0
 
   for (const tenant of tenants) {

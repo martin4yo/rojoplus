@@ -48,22 +48,23 @@ const QUERY_DEFINITIONS = [
     run: async (db, tenantId, params) => {
       const where = { tenantId }
       if (params.fechaDesde || params.fechaHasta) {
-        where.vencimiento = {}
-        if (params.fechaDesde) where.vencimiento.gte = new Date(params.fechaDesde)
-        if (params.fechaHasta) where.vencimiento.lte = new Date(params.fechaHasta + 'T23:59:59')
+        where.fechaVencimiento = {}
+        if (params.fechaDesde) where.fechaVencimiento.gte = new Date(params.fechaDesde)
+        if (params.fechaHasta) where.fechaVencimiento.lte = new Date(params.fechaHasta + 'T23:59:59')
       }
       if (params.estado) where.estado = params.estado
       const cargos = await db.cargo.findMany({
         where,
-        include: { socio: { select: { nombre: true, apellido: true } } },
-        orderBy: { vencimiento: 'asc' },
+        include: { socio: { select: { nroSocio: true, apellidoNombre: true } } },
+        orderBy: { fechaVencimiento: 'asc' },
       })
       const items = cargos.map(c => ({
-        socio: c.socio ? `${c.socio.apellido}, ${c.socio.nombre}` : '—',
+        socio: c.socio?.apellidoNombre || '—',
+        nroSocio: c.socio?.nroSocio || '',
         descripcion: c.descripcion || '',
-        vencimiento: c.vencimiento,
+        vencimiento: c.fechaVencimiento,
         estado: c.estado || '',
-        importe: Number(c.importe) || 0,
+        importe: Number(c.montoTotal) || 0,
       }))
       const total = items.reduce((acc, i) => acc + i.importe, 0)
       return { items, summary: { total, count: items.length } }
@@ -78,9 +79,11 @@ const QUERY_DEFINITIONS = [
     run: async (db, tenantId, params) => {
       const hoy = new Date()
       const cargos = await db.cargo.findMany({
-        where: { tenantId, estado: 'PENDIENTE', vencimiento: { lt: hoy } },
-        include: { socio: { select: { id: true, nombre: true, apellido: true, dni: true, email: true } } },
-        orderBy: [{ socioId: 'asc' }, { vencimiento: 'asc' }],
+        where: { tenantId, estado: 'PENDIENTE', fechaVencimiento: { lt: hoy } },
+        include: {
+          socio: { select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true, celular: true } }
+        },
+        orderBy: [{ socioId: 'asc' }, { fechaVencimiento: 'asc' }],
       })
       const map = new Map()
       for (const c of cargos) {
@@ -88,13 +91,15 @@ const QUERY_DEFINITIONS = [
         const key = c.socioId
         if (!map.has(key)) map.set(key, { socio: c.socio, deuda: 0, cuotas: 0 })
         const entry = map.get(key)
-        entry.deuda += Number(c.importe) || 0
+        entry.deuda += Number(c.montoTotal) || 0
         entry.cuotas += 1
       }
       const items = [...map.values()].map(e => ({
-        nombre: `${e.socio.apellido}, ${e.socio.nombre}`,
-        dni: e.socio.dni || '',
+        nroSocio: e.socio.nroSocio || '',
+        nombre: e.socio.apellidoNombre || '',
+        dni: e.socio.documento || '',
         email: e.socio.email || '',
+        celular: e.socio.celular || '',
         cuotas: e.cuotas,
         deuda: e.deuda,
       })).sort((a, b) => b.deuda - a.deuda)

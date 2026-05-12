@@ -1189,6 +1189,8 @@ router.get('/centros-costo/:id/movimientos', authAdmin, asyncHandler(async (req,
         include: {
           caja: { select: { nombre: true } },
           medioPagoRel: { select: { nombre: true } },
+          socio: { select: { nroSocio: true, apellidoNombre: true } },
+          entidad: { select: { razonSocial: true, tipo: true } },
           pago: { select: { socio: { select: { nroSocio: true, apellidoNombre: true } } } },
           movimientoContable: {
             select: {

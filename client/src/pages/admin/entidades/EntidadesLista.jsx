@@ -1,11 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Building2, UserCheck, Briefcase, Eye, Edit } from 'lucide-react'
+import { Plus, Search, Building2, UserCheck, Briefcase, Eye, Edit, ChevronRight, ChevronDown, Clock, CheckCircle2 } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import { usePagination } from '../../../hooks/usePagination'
 import Pagination from '../../../components/Pagination'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import api from '../../../services/api'
+
+function formatMonto(monto) {
+  if (monto == null) return '$ 0'
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(Number(monto))
+}
+function formatFecha(f) {
+  if (!f) return '-'
+  return new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
 const TIPO_CONFIG = {
   PROVEEDOR: {
@@ -46,6 +56,25 @@ export default function EntidadesLista({ tipo }) {
   const [loading, setLoading] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [soloActivos, setSoloActivos] = useState(true)
+  const [expandedId, setExpandedId] = useState(null)
+  const [historial, setHistorial] = useState({}) // { [entidadId]: { loading, items } }
+
+  async function toggleExpand(entidadId) {
+    if (expandedId === entidadId) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(entidadId)
+    if (historial[entidadId]) return // cached
+    setHistorial(prev => ({ ...prev, [entidadId]: { loading: true, items: [] } }))
+    try {
+      const items = await api.get(`/admin/entidades/${entidadId}/liquidaciones`)
+      setHistorial(prev => ({ ...prev, [entidadId]: { loading: false, items: items || [] } }))
+    } catch (err) {
+      console.error('Error cargando historial:', err)
+      setHistorial(prev => ({ ...prev, [entidadId]: { loading: false, items: [] } }))
+    }
+  }
 
   const { page, limit, pagination, setPagination, goToPage } = usePagination(1, 20)
 
@@ -158,6 +187,7 @@ export default function EntidadesLista({ tipo }) {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
+                    {tipo === 'PERSONAL' && <th className="w-8 px-2 py-3" />}
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Codigo</th>
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Razon Social</th>
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 hidden md:table-cell">Documento</th>
@@ -170,8 +200,25 @@ export default function EntidadesLista({ tipo }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {entidades.map((entidad) => (
-                    <tr key={entidad.id} className="hover:bg-gray-50">
+                  {entidades.map((entidad) => {
+                    const isExpanded = expandedId === entidad.id
+                    const hist = historial[entidad.id]
+                    const totalCols = tipo === 'PERSONAL' ? 8 : 6
+                    return (
+                    <Fragment key={entidad.id}>
+                    <tr className="hover:bg-gray-50">
+                      {tipo === 'PERSONAL' && (
+                        <td className="w-8 px-2 py-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(entidad.id)}
+                            className="p-1 text-gray-400 hover:text-primary"
+                            title={isExpanded ? 'Ocultar liquidaciones' : 'Ver liquidaciones'}
+                          >
+                            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <span className="font-mono text-sm text-gray-600">{entidad.codigo}</span>
                       </td>
@@ -193,7 +240,7 @@ export default function EntidadesLista({ tipo }) {
                       </td>
                       {tipo === 'PERSONAL' && (
                         <td className="px-4 py-3 hidden lg:table-cell">
-                          <span className="text-sm text-gray-600">{entidad.cargo || '-'}</span>
+                          <span className="text-sm text-gray-600">{entidad.cargoPersonal?.nombre || '-'}</span>
                         </td>
                       )}
                       <td className="px-4 py-3 text-center">
@@ -226,7 +273,77 @@ export default function EntidadesLista({ tipo }) {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    {tipo === 'PERSONAL' && isExpanded && (
+                      <tr className="bg-gray-50">
+                        <td colSpan={totalCols} className="px-6 py-4">
+                          {hist?.loading ? (
+                            <p className="text-sm text-gray-500">Cargando historial...</p>
+                          ) : !hist || hist.items.length === 0 ? (
+                            <p className="text-sm text-gray-500">El empleado no tiene liquidaciones registradas.</p>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-left text-gray-600 border-b border-gray-300">
+                                    <th className="py-2 pr-4">Período</th>
+                                    <th className="py-2 pr-4 text-right">Sueldo Base</th>
+                                    <th className="py-2 pr-4 text-right">Haberes</th>
+                                    <th className="py-2 pr-4 text-right">Deducciones</th>
+                                    <th className="py-2 pr-4 text-right">Neto</th>
+                                    <th className="py-2 pr-4 text-center">Estado</th>
+                                    <th className="py-2 pr-4">Fecha pago</th>
+                                    <th className="py-2 pr-4">Medio</th>
+                                    <th className="py-2">Mov. Caja</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                  {hist.items.map(it => {
+                                    const pagado = it.estado === 'PAGADO'
+                                    const mv = it.movimientoCaja
+                                    return (
+                                      <tr key={it.id}>
+                                        <td className="py-2 pr-4 font-medium text-gray-800">{it.liquidacion?.periodo}</td>
+                                        <td className="py-2 pr-4 text-right font-mono text-gray-700">{formatMonto(it.sueldoBasico)}</td>
+                                        <td className="py-2 pr-4 text-right text-green-700">+{formatMonto(it.totalHaberes)}</td>
+                                        <td className="py-2 pr-4 text-right text-red-700">-{formatMonto(it.totalDeducciones)}</td>
+                                        <td className="py-2 pr-4 text-right font-semibold text-purple-700">{formatMonto(it.netoAPagar)}</td>
+                                        <td className="py-2 pr-4 text-center">
+                                          {pagado ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
+                                              <CheckCircle2 className="w-3 h-3" /> Pagado
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">
+                                              <Clock className="w-3 h-3" /> Pendiente
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-2 pr-4 text-gray-600">{pagado ? formatFecha(it.fechaPago) : '-'}</td>
+                                        <td className="py-2 pr-4 text-gray-600">{mv?.medioPagoRel?.nombre || '-'}</td>
+                                        <td className="py-2">
+                                          {mv ? (
+                                            <Link
+                                              to={`/admin/tesoreria/movimientos/${mv.id}`}
+                                              className="text-primary hover:underline font-mono text-xs"
+                                            >
+                                              {mv.numero}
+                                            </Link>
+                                          ) : (
+                                            <span className="text-gray-400 text-xs">-</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                  )})}
                 </tbody>
               </table>
             </div>

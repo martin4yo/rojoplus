@@ -362,7 +362,10 @@ router.get('/entidades', asyncHandler(async (req, res) => {
       where,
       orderBy: { razonSocial: 'asc' },
       skip,
-      take: parseInt(limit)
+      take: parseInt(limit),
+      include: tipo === 'PERSONAL'
+        ? { cargoPersonal: { select: { id: true, nombre: true, esEntrenador: true } } }
+        : undefined
     }),
     req.db.entidad.count({ where })
   ])

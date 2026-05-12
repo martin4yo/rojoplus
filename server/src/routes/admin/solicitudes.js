@@ -198,6 +198,17 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
     ? await getTipoSocioMiembroFamilia(req.db)
     : null
 
+  // Estado VIGENTE/AL_DIA del tenant — fallback al primer estado activo si no hay rolVigencia configurado
+  const estadoVigente = await req.db.estadoSocio.findFirst({
+    where: { rolVigencia: 'AL_DIA' }
+  }) || await req.db.estadoSocio.findFirst({
+    where: { activo: true, esSocioActivo: true },
+    orderBy: { orden: 'asc' }
+  })
+  if (!estadoVigente) {
+    throw new AppError('No hay Estado de Socio configurado (necesita uno con rolVigencia=AL_DIA o esSocioActivo=true)', 400, 'NO_ESTADO_VIGENTE')
+  }
+
   const nroTitular = await calcularProximoNroSocio(req.db)
   const nuevoSocio = await req.db.socio.create({
     data: {
@@ -214,13 +225,11 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
       email: solicitud.email,
       condicionesMedicas: solicitud.detalleEnfermedades,
       esMenor: esMenorTitular,
-      // Si la solicitud trae familiares, el titular es "Titular Familia"; si no, queda con
-      // el tipo seleccionado en el formulario público (o null)
       tipoSocioRelId: tieneFamiliares
         ? tipoSocioTitular.id
         : (tipoSocioId ? parseInt(tipoSocioId) : null),
       categoriaSocioId: categoriaSocioId ? parseInt(categoriaSocioId) : null,
-      estado: 'ACTIVO',
+      estadoSocioId: estadoVigente.id,
       fechaAlta: new Date(),
     }
   })
@@ -248,19 +257,18 @@ router.put('/solicitudes/:id/aprobar', authAdmin, asyncHandler(async (req, res) 
         apellidoNombre: `${familiar.apellidos} ${familiar.nombres}`,
         documento: familiar.documento,
         fechaNacimiento: familiar.fechaNacimiento,
-        calle: solicitud.direccionCalle, // Mismo domicilio que titular
+        calle: solicitud.direccionCalle,
         numero: solicitud.direccionNumero,
         ciudad: solicitud.localidad,
-        celular: solicitud.telefono, // Mismo teléfono
-        email: solicitud.email, // Mismo email
+        celular: solicitud.telefono,
+        email: solicitud.email,
         esMenor: esMenorFamiliar,
         parentescoTitular: familiar.parentesco,
-        // Los miembros del grupo familiar siempre van con tipo "Miembro Familia"
         tipoSocioRelId: tipoSocioMiembro.id,
         categoriaSocioId: categoriaSocioId ? parseInt(categoriaSocioId) : null,
-        estado: 'ACTIVO',
+        estadoSocioId: estadoVigente.id,
         fechaAlta: new Date(),
-        titularFamiliaId: nuevoSocio.id // Establecer relación con titular
+        titularFamiliaId: nuevoSocio.id
       }
     })
 
