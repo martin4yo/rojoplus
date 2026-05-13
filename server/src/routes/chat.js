@@ -184,6 +184,17 @@ router.post(
 
     // ─── Branch A: AXIO Hub (Capa 2.5 SQL + Capa 2.6 tool-calling) ─────────
     if (useHub) {
+      // Sin tenantId no podemos consultar al hub — el hub hashea por tenant
+      // para aislar cache y datos. Falla rápido con mensaje claro.
+      if (!req.tenantId) {
+        console.error('❌ [HUB→] req.tenantId undefined — middleware extractTenant no aplicó')
+        return res.status(500).json({
+          success: false,
+          message: 'No pude resolver el contexto del club. Recargá la página o avisá al administrador.',
+          error: 'TENANT_NOT_RESOLVED',
+        })
+      }
+
       try {
         const tools = getToolsForRole(context.role)
 
@@ -257,10 +268,10 @@ router.post(
           error: 'HUB_EMPTY_RESPONSE',
         })
       } catch (err) {
-        console.error('❌ Error consultando AXIO Hub:', err.message)
+        console.error('Error consultando AXIO Hub:', err.message)
         return res.status(502).json({
           success: false,
-          message: '😅 El asistente no está disponible en este momento. Intentá de nuevo en unos segundos.',
+          message: 'El asistente no está disponible en este momento. Intentá de nuevo en unos segundos.',
           error: err.message,
         })
       }
@@ -404,16 +415,17 @@ router.post(
  * POST /api/chat/feedback
  * Envía feedback al AXIO ML Hub para ajustar el pattern learning
  *
- * Body: { hashInput: string, positive: boolean, correctedResponse?: string }
+ * Body: { hashInput, positive, correctedResponse?, invalidate? }
+ * invalidate=true borra la entrada de cache de inmediato (admin override).
  */
 router.post('/feedback', asyncHandler(async (req, res) => {
-  const { hashInput, positive, correctedResponse } = req.body
+  const { hashInput, positive, correctedResponse, invalidate } = req.body
 
   if (!hashInput || positive === undefined) {
     throw new AppError('hashInput y positive son requeridos', 400, 'MISSING_PARAMS')
   }
 
-  await enviarFeedbackML(hashInput, positive, correctedResponse || null)
+  await enviarFeedbackML(hashInput, positive, correctedResponse || null, !!invalidate)
 
   return res.json({ success: true })
 }))

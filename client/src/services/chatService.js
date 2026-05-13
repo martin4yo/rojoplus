@@ -71,16 +71,15 @@ class ChatService {
   }
 
   /**
-   * Enviar feedback 👍/👎 sobre una respuesta del ML service
-   * @param {string} hashInput - Hash que viene en la respuesta (message.hashInput)
-   * @param {boolean} positive - true = 👍, false = 👎
+   * Enviar feedback 👍/👎 sobre una respuesta del ML service.
+   * Si invalidate=true, la entrada se borra de cache de inmediato (admin override).
    */
-  async sendFeedback(hashInput, positive) {
+  async sendFeedback(hashInput, positive, { invalidate = false } = {}) {
     try {
       const response = await fetch(`${API_URL}/chat/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hashInput, positive })
+        body: JSON.stringify({ hashInput, positive, invalidate })
       })
       if (!response.ok) throw new Error('Error enviando feedback')
       return response.json()

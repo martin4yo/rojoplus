@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Send, Loader2, MessageCircle } from 'lucide-react'
+import { X, Send, Loader2, MessageCircle, AlertTriangle } from 'lucide-react'
 import ChatMessage from './ChatMessage'
 import chatService from '../../services/chatService'
 
@@ -113,7 +113,7 @@ export default function ChatWidget({
       })
 
       const isError = response?.success === false
-      const fallbackError = '😅 Ups, hubo un error al procesar tu mensaje. ¿Podés intentar de nuevo?'
+      const fallbackError = 'Hubo un error al procesar tu mensaje. ¿Podés intentar de nuevo?'
 
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
@@ -139,7 +139,7 @@ export default function ChatWidget({
       console.error('Error enviando mensaje:', error)
       const errorMessage = {
         id: (Date.now() + 1).toString(),
-        content: `⚠️ No pude conectar con el servidor: ${error.message || 'error desconocido'}`,
+        content: `No pude conectar con el servidor: ${error.message || 'error desconocido'}`,
         timestamp: new Date(),
         isUser: false,
         isError: true,
@@ -360,6 +360,7 @@ Puedo ayudarte con:
                 key={message.id}
                 message={message}
                 isUser={message.isUser}
+                role={role}
               />
             ))}
 
@@ -380,8 +381,9 @@ Puedo ayudarte con:
             }`}
           >
             {!isAvailable && (
-              <div className="mb-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 p-2 rounded">
-                ⚠️ El asistente no está disponible en este momento.
+              <div className="mb-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 p-2 rounded flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>El asistente no está disponible en este momento.</span>
               </div>
             )}
 

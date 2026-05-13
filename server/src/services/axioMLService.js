@@ -111,8 +111,9 @@ export async function consultarML(question, context, model = 'phi3:mini', scopeH
  * @param {string} hashInput - Hash SHA-256 de la pregunta (viene en la respuesta)
  * @param {boolean} positive - true = 👍, false = 👎
  * @param {string} [correctedResponse] - Respuesta corregida (opcional)
+ * @param {boolean} [invalidate=false] - Borra pattern+semantic de inmediato (admin override)
  */
-export async function enviarFeedbackML(hashInput, positive, correctedResponse = null) {
+export async function enviarFeedbackML(hashInput, positive, correctedResponse = null, invalidate = false) {
   const response = await fetch(`${ML_SERVICE_URL}/api/ml/feedback`, {
     method: 'POST',
     headers: {
@@ -123,6 +124,7 @@ export async function enviarFeedbackML(hashInput, positive, correctedResponse = 
       hash_input: hashInput,
       positive,
       corrected_response: correctedResponse,
+      invalidate,
     }),
     signal: AbortSignal.timeout(5000),
   })

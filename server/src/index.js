@@ -318,11 +318,15 @@ app.use('/api/admin/facturacion', facturacionRoutes)
 app.use('/api/admin/menu', menuRoutes)
 app.use('/api/tienda', tiendaRoutes)
 app.use('/api/admin/branding', brandingRoutes)
-app.use('/api/chat/*', extractTenantOptional, (req, res, next) => {
+// extractTenantOptional + req.db para TODO /api/chat (incluye POST a /api/chat
+// sin sufijo, no solo subpaths como /api/chat/health). Antes el path tenía un
+// wildcard `/*` que NO matcheaba el path base, dejando req.tenantId=undefined
+// y rompiendo el cache hashing del hub AXIO.
+const ensureChatTenantContext = (req, res, next) => {
   if (req.tenantId) req.db = createTenantPrisma(req.tenantId)
   next()
-})
-app.use('/api/chat', chatRoutes)
+}
+app.use('/api/chat', extractTenantOptional, ensureChatTenantContext, chatRoutes)
 app.use('/api/super-admin', superAdminRoutes)
 
 // WhatsApp webhook (sin autenticación — Evolution API llama directamente)

@@ -1,19 +1,31 @@
 import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { ThumbsUp, ThumbsDown } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Trash2, AlertCircle } from 'lucide-react'
 import chatService from '../../services/chatService'
 
 /**
  * ChatMessage Component
- * Muestra un mensaje del chat (usuario o asistente)
+ * Muestra un mensaje del chat (usuario o asistente).
+ *
+ * Props:
+ *  - message: { ...campos }
+ *  - isUser: boolean
+ *  - role: 'admin' | 'camarero' | 'socio' (controla disponibilidad del invalidar cache)
  */
-export default function ChatMessage({ message, isUser }) {
-  const [feedback, setFeedback] = useState(null) // null | 'up' | 'down'
+export default function ChatMessage({ message, isUser, role }) {
+  const [feedback, setFeedback] = useState(null) // null | 'up' | 'down' | 'invalidated'
 
   const handleFeedback = async (positive) => {
     if (feedback || !message.hashInput) return
     setFeedback(positive ? 'up' : 'down')
     await chatService.sendFeedback(message.hashInput, positive)
+  }
+
+  const handleInvalidate = async () => {
+    if (feedback || !message.hashInput) return
+    if (!window.confirm('Borrar esta respuesta de la caché. La próxima vez que pregunten lo mismo, se procesará desde cero. ¿Confirmás?')) return
+    setFeedback('invalidated')
+    await chatService.sendFeedback(message.hashInput, false, { invalidate: true })
   }
 
   return (
@@ -28,11 +40,15 @@ export default function ChatMessage({ message, isUser }) {
         {/* Avatar */}
         {!isUser && (
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
-              R
-            </div>
+            {message.isError ? (
+              <AlertCircle className="w-5 h-5 text-red-500" />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
+                R
+              </div>
+            )}
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-              Axio
+              {message.isError ? 'Error' : 'Axio'}
             </span>
           </div>
         )}
@@ -116,6 +132,20 @@ export default function ChatMessage({ message, isUser }) {
               >
                 <ThumbsDown className="w-3 h-3" />
               </button>
+              {role === 'admin' && (
+                <button
+                  onClick={handleInvalidate}
+                  disabled={!!feedback}
+                  className={`p-1 rounded transition-colors ${
+                    feedback === 'invalidated'
+                      ? 'text-orange-500'
+                      : 'text-gray-400 hover:text-orange-500 disabled:opacity-40'
+                  }`}
+                  title="Borrar de caché (admin)"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
             </div>
           )}
         </div>
