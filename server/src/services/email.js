@@ -319,14 +319,29 @@ export async function enviarReciboPago(pago, db, opts = {}) {
 
   // Compatibilidad: usar cargos o cuotas (el schema usa "cargos")
   const cargos = pago.cargos || pago.cuotas || []
-  const cuotasHtml = cargos.map(c => `
+  const formatMesAnio = (fecha) => {
+    if (!fecha) return '-'
+    const d = new Date(fecha)
+    if (isNaN(d.getTime())) return '-'
+    return d.toLocaleDateString('es-AR', { month: '2-digit', year: 'numeric' })
+  }
+  const cuotasHtml = cargos.map(c => {
+    const concepto = c.descripcion || c.conceptoTesoreria?.nombre || 'Cuota'
+    const periodo = c.periodo?.nombre || formatMesAnio(c.fechaVencimiento)
+    let actividad = '-'
+    if (c.categoriaActividad) {
+      const actNombre = c.categoriaActividad.actividad?.nombre
+      actividad = actNombre ? `${actNombre} - ${c.categoriaActividad.nombre}` : c.categoriaActividad.nombre
+    }
+    return `
     <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.tipoCuota?.nombre || 'Cuota'}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.periodo?.nombre || '-'}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.categoriaActividad ? c.categoriaActividad.actividad?.nombre + ' - ' + c.categoriaActividad.nombre : '-'}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${concepto}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${periodo}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${actividad}</td>
       <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">$${Number(c.montoTotal).toLocaleString('es-AR')}</td>
     </tr>
-  `).join('')
+  `
+  }).join('')
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -337,16 +352,18 @@ export async function enviarReciboPago(pago, db, opts = {}) {
 
       <div style="padding: 30px; background-color: #f9fafb;">
         <div style="background-color: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; border: 1px solid #e5e7eb;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-            <div>
-              <p style="margin: 0; color: #6b7280; font-size: 12px;">RECIBO Nº</p>
-              <p style="margin: 0; color: #1f2937; font-size: 18px; font-weight: bold;">${pago.numero}</p>
-            </div>
-            <div style="text-align: right;">
-              <p style="margin: 0; color: #6b7280; font-size: 12px;">FECHA</p>
-              <p style="margin: 0; color: #1f2937;">${fechaPago}</p>
-            </div>
-          </div>
+          <table style="width: 100%; margin-bottom: 15px; border-collapse: collapse;">
+            <tr>
+              <td style="vertical-align: top; text-align: left;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px;">RECIBO Nº</p>
+                <p style="margin: 0; color: #1f2937; font-size: 18px; font-weight: bold;">${pago.numero}</p>
+              </td>
+              <td style="vertical-align: top; text-align: right;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px;">FECHA</p>
+                <p style="margin: 0; color: #1f2937;">${fechaPago}</p>
+              </td>
+            </tr>
+          </table>
 
           <div style="border-top: 1px solid #e5e7eb; padding-top: 15px;">
             <p style="margin: 0; color: #6b7280; font-size: 12px;">SOCIO</p>

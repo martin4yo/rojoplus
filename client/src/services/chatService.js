@@ -35,10 +35,10 @@ class ChatService {
       const data = await response.json()
       console.log('📥 Respuesta recibida:', data)
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al procesar el mensaje')
-      }
-
+      // Devolver siempre el data, incluso cuando !response.ok.
+      // El backend ya incluye un message humano describiendo el problema —
+      // el componente decide si mostrar ese message o uno genérico según
+      // si data.success es false.
       return data
     } catch (error) {
       console.error('❌ Error en chatService.sendMessage:', error)

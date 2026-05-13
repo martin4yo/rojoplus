@@ -1984,7 +1984,19 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     }
   })()
 
-  res.status(201).json({ success: true, data: pagoCompleto })
+  // Flags optimistas para que el modal sepa qué se disparó automáticamente
+  // y muestre los botones correspondientes como ya enviados.
+  let autoSentWa = false
+  if (pagoCompleto.socio?.notifWhatsapp && obtenerTelefonoSocio(pagoCompleto.socio)) {
+    const flagWa = await req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_PAGO' } }).catch(() => null)
+    autoSentWa = flagWa?.valor !== 'false'
+  }
+  const autoSent = {
+    email: !!pagoCompleto.socio?.email,
+    whatsapp: autoSentWa,
+  }
+
+  res.status(201).json({ success: true, data: pagoCompleto, autoSent })
 }))
 
 // ============================================

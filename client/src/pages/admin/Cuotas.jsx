@@ -67,6 +67,7 @@ export default function Cuotas() {
   const [showPagoExitosoModal, setShowPagoExitosoModal] = useState(false)
   const [numeroRecibo, setNumeroRecibo] = useState(null)
   const [pagoId, setPagoId] = useState(null)
+  const [autoSent, setAutoSent] = useState(null)
 
   // Edicion de cargo
   const [showEditModal, setShowEditModal] = useState(false)
@@ -499,7 +500,7 @@ export default function Cuotas() {
     setErrorPago(null)
 
     try {
-      const result = await api.post('/admin/pagos', {
+      const resp = await api.postFull('/admin/pagos', {
         socioId: socioIdPago,
         cuotaIds: seleccionadas,
         mediosPago: splits.map(sp => ({
@@ -513,8 +514,10 @@ export default function Cuotas() {
         })),
         saldosAplicados: saldoAAplicar > 0 ? distribuirSaldoFIFO(saldoAAplicar) : [],
       })
+      const result = resp?.data || resp
       setNumeroRecibo(result.numero)
       setPagoId(result.id)
+      setAutoSent(resp?.autoSent || null)
       setSeleccionadas([])
       setShowPagoModal(false)
       setShowPagoExitosoModal(true)
@@ -529,6 +532,7 @@ export default function Cuotas() {
     setShowPagoExitosoModal(false)
     setNumeroRecibo(null)
     setPagoId(null)
+    setAutoSent(null)
 
     // Si vino desde otra página (con cobrarSocioId), volver atrás
     const cobrarSocioId = searchParams.get('cobrarSocioId')
@@ -1153,6 +1157,7 @@ export default function Cuotas() {
           pagoId={pagoId}
           numeroRecibo={numeroRecibo}
           variante="success"
+          resultadoInicial={autoSent}
         />
 
         {/* Modal de plan de pagos */}

@@ -105,40 +105,45 @@ export default function ChatWidget({
     setIsLoading(true)
 
     try {
-      // Llamar al backend
+      // Llamar al backend (siempre devuelve data, incluso ante errores HTTP)
       const response = await chatService.sendMessage({
         message: userMessage.content,
         tokenPortal,
         role
       })
 
-      // Agregar respuesta del asistente
+      const isError = response?.success === false
+      const fallbackError = '😅 Ups, hubo un error al procesar tu mensaje. ¿Podés intentar de nuevo?'
+
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
-        content: response.message,
+        // Usar el message real del backend cuando viene; cae al genérico
+        // solo si el backend mandó success:false sin message.
+        content: response?.message || (isError ? fallbackError : ''),
         timestamp: new Date(),
         isUser: false,
-        data: response.data,
-        hashInput: response.hashInput || null,
+        data: response?.data || null,
+        hashInput: response?.hashInput || null,
+        isError,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
 
       // Si hay acción específica (ej: link de pago), podríamos manejarlo aquí
-      if (response.requiresUserAction === 'payment' && response.data?.linkPago) {
+      if (response?.requiresUserAction === 'payment' && response?.data?.linkPago) {
         // El link ya está en el mensaje como markdown
         console.log('Link de pago disponible:', response.data.linkPago)
       }
     } catch (error) {
+      // Cae acá solo si la fetch en sí falla (red caída, CORS, JSON inválido).
       console.error('Error enviando mensaje:', error)
-
       const errorMessage = {
         id: (Date.now() + 1).toString(),
-        content: '😅 Ups, hubo un error al procesar tu mensaje. ¿Podés intentar de nuevo?',
+        content: `⚠️ No pude conectar con el servidor: ${error.message || 'error desconocido'}`,
         timestamp: new Date(),
-        isUser: false
+        isUser: false,
+        isError: true,
       }
-
       setMessages((prev) => [...prev, errorMessage])
     } finally {
       setIsLoading(false)

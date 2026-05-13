@@ -25,19 +25,32 @@ export default function ReciboAccionesModal({
   numeroRecibo,
   variante = 'simple',
   tituloSimple = 'Acciones del recibo',
+  resultadoInicial,
 }) {
   const [enviando, setEnviando] = useState({})
   const [resultado, setResultado] = useState({})
   const [descargando, setDescargando] = useState(false)
 
-  // Reset al abrir/cerrar
+  // Al abrir: aplicar resultadoInicial (envíos automáticos ya disparados)
+  // Al cerrar: limpiar todo.
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      const inicial = {}
+      if (resultadoInicial?.email) {
+        inicial.email = { ok: true, mensaje: 'Enviado automáticamente al registrar la cobranza' }
+      }
+      if (resultadoInicial?.whatsapp) {
+        inicial.whatsapp = { ok: true, mensaje: 'Enviado automáticamente al registrar la cobranza' }
+      }
+      setResultado(inicial)
+      setEnviando({})
+      setDescargando(false)
+    } else {
       setEnviando({})
       setResultado({})
       setDescargando(false)
     }
-  }, [isOpen])
+  }, [isOpen, resultadoInicial?.email, resultadoInicial?.whatsapp])
 
   async function descargarPDF() {
     if (!pagoId || descargando) return
