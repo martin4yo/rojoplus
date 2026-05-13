@@ -209,23 +209,39 @@ export async function emitirNotificacion({
   mensaje,
   datos = {},
   paraUsuarioId = null,
-  paraDestino = null // COCINA, BARRA, CAJA
+  paraDestino = null, // COCINA, BARRA, CAJA
+  tenantId = null,
 }) {
   try {
     const config = TIPOS_NOTIFICACION[tipo] || { sonido: 'default', titulo: tipo }
 
-    // Guardar en BD
-    const notificacion = await prisma.notificacionBuffet.create({
-      data: {
-        tipo,
-        titulo: config.titulo,
-        mensaje,
-        datos,
-        sonido: config.sonido,
-        paraUsuarioId,
-        paraDestino
-      }
-    })
+    if (!tenantId) {
+      console.warn(`[Notif] emitirNotificacion sin tenantId — no se persiste (tipo=${tipo}, mensaje=${mensaje})`)
+    }
+
+    // Guardar en BD (sólo si tenemos tenantId)
+    const notificacion = tenantId
+      ? await prisma.notificacionBuffet.create({
+          data: {
+            tenantId,
+            tipo,
+            titulo: config.titulo,
+            mensaje,
+            datos,
+            sonido: config.sonido,
+            paraUsuarioId,
+            paraDestino,
+          },
+        })
+      : {
+          id: null,
+          tipo,
+          titulo: config.titulo,
+          mensaje,
+          datos,
+          sonido: config.sonido,
+          createdAt: new Date(),
+        }
 
     // Emitir por socket
     const payload = {
@@ -312,7 +328,8 @@ export async function notificarNuevaComanda(comanda, items) {
           mesaNumero: comanda.mesa?.numero,
           items: itemsDestino
         },
-        paraDestino: destino
+        paraDestino: destino,
+        tenantId: comanda.tenantId || comanda.mesa?.tenantId || null,
       })
     }
   } catch (err) {
@@ -341,7 +358,8 @@ export async function notificarItemListo(item, comanda) {
         mesaNumero: comanda.mesa?.numero,
         itemNombre: item.productoBuffet?.nombre
       },
-      paraUsuarioId: mozoId
+      paraUsuarioId: mozoId,
+      tenantId: comanda.tenantId || comanda.mesa?.tenantId || null,
     })
   } catch (err) {
     console.error('Error notificando item listo:', err)
@@ -360,7 +378,8 @@ export async function notificarCuentaPedida(comanda) {
         mesaNumero: comanda.mesa?.numero,
         total: comanda.total
       },
-      paraDestino: 'CAJA'
+      paraDestino: 'CAJA',
+      tenantId: comanda.tenantId || comanda.mesa?.tenantId || null,
     })
   } catch (err) {
     console.error('Error notificando cuenta pedida:', err)
@@ -384,7 +403,8 @@ export async function notificarMesaCobrada(mesa, comanda) {
         mesaId: mesa.id,
         mesaNumero: mesa.numero
       },
-      paraUsuarioId: mozoId
+      paraUsuarioId: mozoId,
+      tenantId: mesa.tenantId || comanda?.tenantId || null,
     })
   } catch (err) {
     console.error('Error notificando mesa cobrada:', err)
