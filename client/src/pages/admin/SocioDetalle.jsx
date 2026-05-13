@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Edit, QrCode, Users, CreditCard, Activity,
   Phone, Mail, MapPin, Calendar, User, AlertCircle,
-  Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List, PlusCircle, FileDown
+  Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List, PlusCircle, FileDown,
+  UserMinus, UserCheck
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
@@ -18,6 +19,7 @@ import { formatDate } from '../../utils/formatters'
 import StatusBadge from '../../components/StatusBadge'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import ReciboAccionesModal from '../../components/ReciboAccionesModal'
+import BajaActivarSocioModal from '../../components/BajaActivarSocioModal'
 
 export default function SocioDetalle() {
   const { id } = useParams()
@@ -48,13 +50,17 @@ export default function SocioDetalle() {
   const [regenerando, setRegenerando] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  // Modal baja/reactivación
+  const [bajaActivarModo, setBajaActivarModo] = useState(null) // 'baja' | 'activar' | null
+
   // Foto
   const [fotoError, setFotoError] = useState(false)
 
   // Modal Cargo
   const [cargoModal, setCargoModal] = useState(false)
-  const [cargoForm, setCargoForm] = useState({ conceptoTesoreriaId: '', montoOriginal: '', fechaVencimiento: '', observaciones: '' })
+  const [cargoForm, setCargoForm] = useState({ conceptoTesoreriaId: '', centroCostoId: '', montoOriginal: '', fechaVencimiento: '', observaciones: '' })
   const [conceptosCargo, setConceptosCargo] = useState([])
+  const [centrosCostoCargo, setCentrosCostoCargo] = useState([])
   const [showNuevoConceptoCargo, setShowNuevoConceptoCargo] = useState(false)
   const [savingCargo, setSavingCargo] = useState(false)
   const [errorCargo, setErrorCargo] = useState(null)
@@ -392,20 +398,39 @@ export default function SocioDetalle() {
   }
 
   async function abrirCargoModal() {
-    setCargoForm({ conceptoTesoreriaId: '', montoOriginal: '', fechaVencimiento: new Date().toISOString().split('T')[0], observaciones: '' })
+    setCargoForm({ conceptoTesoreriaId: '', centroCostoId: '', montoOriginal: '', fechaVencimiento: new Date().toISOString().split('T')[0], observaciones: '' })
     setErrorCargo(null)
     try {
-      const res = await api.getFull('/admin/conceptos-tesoreria')
-      setConceptosCargo(res.data || [])
+      const [conceptosRes, centrosRes] = await Promise.all([
+        api.getFull('/admin/conceptos-tesoreria'),
+        api.getFull('/admin/centros-costo?activo=true').catch(() => ({ data: [] })),
+      ])
+      setConceptosCargo(conceptosRes.data || [])
+      setCentrosCostoCargo(centrosRes.data || [])
     } catch {
       setConceptosCargo([])
+      setCentrosCostoCargo([])
     }
     setCargoModal(true)
+  }
+
+  function handleConceptoCargoChange(conceptoId) {
+    const concepto = conceptosCargo.find(c => String(c.id) === String(conceptoId))
+    setCargoForm(prev => ({
+      ...prev,
+      conceptoTesoreriaId: conceptoId,
+      // Autocompletar centro de costo del concepto si tiene; el usuario puede ajustarlo después
+      centroCostoId: concepto?.centroCostoId ? String(concepto.centroCostoId) : prev.centroCostoId,
+    }))
   }
 
   async function handleGuardarCargo() {
     if (!cargoForm.conceptoTesoreriaId || !cargoForm.montoOriginal) {
       setErrorCargo('Concepto y monto son requeridos')
+      return
+    }
+    if (!cargoForm.centroCostoId) {
+      setErrorCargo('El Centro de Costo es obligatorio')
       return
     }
     setSavingCargo(true)
@@ -414,6 +439,7 @@ export default function SocioDetalle() {
       await api.post('/admin/cargos', {
         socioId: parseInt(id),
         conceptoTesoreriaId: parseInt(cargoForm.conceptoTesoreriaId),
+        centroCostoId: parseInt(cargoForm.centroCostoId),
         montoOriginal: parseFloat(cargoForm.montoOriginal),
         fechaVencimiento: cargoForm.fechaVencimiento || undefined,
         observaciones: cargoForm.observaciones || undefined,
@@ -514,13 +540,41 @@ export default function SocioDetalle() {
             </Button>
           )}
           {tienePermiso(PERMISOS.SOCIOS_EDITAR) && (
-            <Button onClick={() => navigate(`/admin/socios/${id}/editar`)} className="flex items-center gap-2">
-              <Edit className="w-4 h-4" />
-              Editar
-            </Button>
+            <>
+              {socio.estadoSocioRel?.esSocioActivo !== false ? (
+                <Button
+                  variant="danger"
+                  onClick={() => setBajaActivarModo('baja')}
+                  className="flex items-center gap-2"
+                >
+                  <UserMinus className="w-4 h-4" />
+                  Dar de baja
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => setBajaActivarModo('activar')}
+                  className="flex items-center gap-2"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  Reactivar
+                </Button>
+              )}
+              <Button onClick={() => navigate(`/admin/socios/${id}/editar`)} className="flex items-center gap-2">
+                <Edit className="w-4 h-4" />
+                Editar
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      <BajaActivarSocioModal
+        socio={socio}
+        modo={bajaActivarModo}
+        isOpen={!!bajaActivarModo}
+        onClose={() => setBajaActivarModo(null)}
+        onDone={() => cargarSocio()}
+      />
 
       {/* Estado y badges */}
       <div className="flex flex-wrap gap-2 mb-6">
@@ -1555,7 +1609,11 @@ export default function SocioDetalle() {
         onClose={() => setShowNuevoConceptoCargo(false)}
         onCreated={(c) => {
           setConceptosCargo(prev => [...prev, c])
-          setCargoForm(prev => ({ ...prev, conceptoTesoreriaId: String(c.id) }))
+          setCargoForm(prev => ({
+            ...prev,
+            conceptoTesoreriaId: String(c.id),
+            centroCostoId: c.centroCostoId ? String(c.centroCostoId) : prev.centroCostoId,
+          }))
           setShowNuevoConceptoCargo(false)
         }}
         tipoDefault="INGRESO"
@@ -1577,7 +1635,7 @@ export default function SocioDetalle() {
             <div className="flex gap-2">
               <select
                 value={cargoForm.conceptoTesoreriaId}
-                onChange={(e) => setCargoForm(prev => ({ ...prev, conceptoTesoreriaId: e.target.value }))}
+                onChange={(e) => handleConceptoCargoChange(e.target.value)}
                 className="input-field flex-1"
               >
                 <option value="">Seleccionar concepto...</option>
@@ -1594,6 +1652,24 @@ export default function SocioDetalle() {
                 <PlusCircle className="w-5 h-5" />
               </button>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Centro de Costo *
+              {cargoForm.conceptoTesoreriaId && (
+                <span className="text-xs text-gray-500 font-normal ml-1">(precargado del concepto, podés ajustarlo)</span>
+              )}
+            </label>
+            <select
+              value={cargoForm.centroCostoId}
+              onChange={(e) => setCargoForm(prev => ({ ...prev, centroCostoId: e.target.value }))}
+              className="input-field w-full"
+            >
+              <option value="">Seleccionar centro de costo...</option>
+              {centrosCostoCargo.map(cc => (
+                <option key={cc.id} value={cc.id}>{cc.codigo} - {cc.nombre}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>

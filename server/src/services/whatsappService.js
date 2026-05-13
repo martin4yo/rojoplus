@@ -403,12 +403,19 @@ export async function configurarWebhookEvolution(db) {
 
 /**
  * Templates por defecto. Se usan cuando el tenant no configuró un texto propio.
- * Variables soportadas: {{nombre}}, {{monto}}, {{vencimiento}}, {{total}}, {{link}}
+ * Variables soportadas:
+ *   {{nombre}}          → primer nombre (sin apellido)
+ *   {{apellido}}        → apellido
+ *   {{nombreCompleto}}  → apellidoNombre completo (ej: "GARCIA, JUAN CARLOS")
+ *   {{nroSocio}}        → número de socio
+ *   {{monto}}, {{total}}, {{importe}} → importe formateado
+ *   {{vencimiento}}     → fecha de vencimiento
+ *   {{link}}, {{linkPortal}}, {{linkPago}} → URLs al portal del socio
  */
 const TEMPLATES_DEFAULT = {
   NOTIF_WA_PAGO:        '*{{nombre}}*, registramos tu pago de *{{monto}}*. Gracias!',
-  NOTIF_WA_VENCIMIENTO: '*{{nombre}}*, tu cuota de *{{monto}}* vence el *{{vencimiento}}*. Podés pagar desde el portal del club.',
-  NOTIF_WA_MORA:        '*{{nombre}}*, tenés cuotas vencidas por un total de *{{total}}*. Por favor regularizá tu situación.',
+  NOTIF_WA_VENCIMIENTO: '*{{nombre}}*, tu cuota de *{{monto}}* vence el *{{vencimiento}}*.\nPagá online: {{linkPago}}',
+  NOTIF_WA_MORA:        '*{{nombre}}*, tenés cuotas vencidas por un total de *{{total}}*.\nRegularizá desde el portal: {{linkPago}}',
   NOTIF_WA_PORTAL:      '*{{nombre}}*, acá está tu acceso al portal del club:\n{{link}}\n\nEste link es personal y expira en 7 días.',
 }
 
@@ -420,6 +427,80 @@ async function resolverTemplate(db, clave, variables) {
   const config = await db.configuracion.findFirst({ where: { clave } }).catch(() => null)
   const template = config?.valor || TEMPLATES_DEFAULT[clave] || ''
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? '')
+}
+
+// ─── Helpers: nombre/apellido y link al portal ───────────────────────────────
+
+/**
+ * Parsea `apellidoNombre` (formato "APELLIDO, NOMBRE" o "APELLIDO NOMBRE")
+ * y devuelve nombre, apellido y el nombreCompleto original.
+ */
+export function parseNombreSocio(socio) {
+  const an = (socio?.apellidoNombre || '').trim()
+  if (!an) return { nombre: '', apellido: '', nombreCompleto: '' }
+  if (an.includes(',')) {
+    const [apellido, ...resto] = an.split(',')
+    const nombre = resto.join(',').trim().split(/\s+/)[0] || ''
+    return { nombre, apellido: apellido.trim(), nombreCompleto: an }
+  }
+  const parts = an.split(/\s+/)
+  return {
+    nombre: parts[0] || '',
+    apellido: parts.slice(1).join(' '),
+    nombreCompleto: an,
+  }
+}
+
+/**
+ * Obtiene la URL del frontend del tenant del socio.
+ * Resuelve dominio custom > subdomain > FRONTEND_URL en dev.
+ */
+async function getFrontendUrlForSocio(socio) {
+  try {
+    if (!socio?.tenantId) return process.env.FRONTEND_URL || 'http://localhost:5173'
+    const [{ default: prismaGlobal }, { getTenantFrontendUrl }] = await Promise.all([
+      import('../lib/prisma.js'),
+      import('../lib/tenantUrl.js'),
+    ])
+    const tenant = await prismaGlobal.tenant.findUnique({
+      where: { id: socio.tenantId },
+      select: { subdomain: true, dominioCustom: true },
+    })
+    return getTenantFrontendUrl(tenant)
+  } catch {
+    return process.env.FRONTEND_URL || 'http://localhost:5173'
+  }
+}
+
+/**
+ * Construye el link al portal del socio (usado como linkPago para opción B:
+ * el socio entra al portal y desde ahí elige medio de pago).
+ * Si se pasa cargoId, el portal puede leer ?pagar=X para destacar esa cuota.
+ */
+export async function buildLinkPortal(socio, { cargoId } = {}) {
+  if (!socio?.tokenPortal) return ''
+  const base = await getFrontendUrlForSocio(socio)
+  const query = cargoId ? `?pagar=${cargoId}` : ''
+  return `${base}/portal-socio/${socio.tokenPortal}${query}`
+}
+
+/**
+ * Construye el bag de variables común a todos los templates WA.
+ * `extras` permite agregar/override (monto, vencimiento, total, link, etc.)
+ */
+export async function buildVariablesSocio(socio, extras = {}) {
+  const { nombre, apellido, nombreCompleto } = parseNombreSocio(socio)
+  const linkPortal = await buildLinkPortal(socio, { cargoId: extras.cargoId })
+  return {
+    nombre,
+    apellido,
+    nombreCompleto,
+    nroSocio: socio?.nroSocio ?? '',
+    linkPortal,
+    linkPago: linkPortal, // opción B: linkPago == linkPortal
+    link: extras.link ?? linkPortal,
+    ...extras,
+  }
 }
 
 // ─── Helper: obtener primer teléfono disponible del socio ────────────────────
@@ -449,10 +530,8 @@ export async function notificarPago({ db, socio, pago, pdfBuffer = null, pdfFile
     style: 'currency', currency: 'ARS', maximumFractionDigits: 0
   })
 
-  const texto = await resolverTemplate(db, 'NOTIF_WA_PAGO', {
-    nombre: socio.apellidoNombre,
-    monto,
-  })
+  const variables = await buildVariablesSocio(socio, { monto, total: monto, importe: monto })
+  const texto = await resolverTemplate(db, 'NOTIF_WA_PAGO', variables)
 
   if (pdfBuffer) {
     return enviarWhatsAppDocumento({
@@ -478,11 +557,13 @@ export async function notificarVencimiento({ db, socio, cuota }) {
     style: 'currency', currency: 'ARS', maximumFractionDigits: 0
   })
 
-  const texto = await resolverTemplate(db, 'NOTIF_WA_VENCIMIENTO', {
-    nombre: socio.apellidoNombre,
+  const variables = await buildVariablesSocio(socio, {
     monto,
+    importe: monto,
     vencimiento,
+    cargoId: cuota.id,
   })
+  const texto = await resolverTemplate(db, 'NOTIF_WA_VENCIMIENTO', variables)
   return enviarWhatsApp({ db, telefono, texto })
 }
 
@@ -497,10 +578,8 @@ export async function notificarMora({ db, socio, deuda }) {
     style: 'currency', currency: 'ARS', maximumFractionDigits: 0
   })
 
-  const texto = await resolverTemplate(db, 'NOTIF_WA_MORA', {
-    nombre: socio.apellidoNombre,
-    total,
-  })
+  const variables = await buildVariablesSocio(socio, { total, monto: total, importe: total })
+  const texto = await resolverTemplate(db, 'NOTIF_WA_MORA', variables)
   return enviarWhatsApp({ db, telefono, texto })
 }
 
@@ -511,10 +590,8 @@ export async function enviarLinkPortal({ db, socio, link }) {
   const telefono = obtenerTelefonoSocio(socio)
   if (!telefono) return
 
-  const texto = await resolverTemplate(db, 'NOTIF_WA_PORTAL', {
-    nombre: socio.apellidoNombre,
-    link,
-  })
+  const variables = await buildVariablesSocio(socio, { link })
+  const texto = await resolverTemplate(db, 'NOTIF_WA_PORTAL', variables)
   return enviarWhatsApp({ db, telefono, texto, ignorarHorario: true })
 }
 

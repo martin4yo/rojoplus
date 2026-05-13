@@ -2216,6 +2216,7 @@ model MovimientoContable {
   createdAt         DateTime             @default(now()) @map("created_at")
   pedidoId          Int?                 @map("pedido_id")
   centroCostoId     Int?                 @map("centro_costo_id")
+  puntoVentaId      Int?                 @map("punto_venta_id")
   adjuntos          AdjuntoComprobante[]
   items             ItemMovimiento[]
   movimientosCaja   MovimientoCaja[]
@@ -2227,6 +2228,7 @@ model MovimientoContable {
   movimientosHijos  MovimientoContable[] @relation("MovimientoHijos")
   ordenCompra       OrdenCompra?         @relation(fields: [ordenCompraId], references: [id])
   pedido            Pedido?              @relation(fields: [pedidoId], references: [id])
+  puntoVentaConfig  PuntoVenta?          @relation(fields: [puntoVentaId], references: [id])
   socio             Socio?               @relation(fields: [socioId], references: [id])
   movimientosStock  MovimientoStock[]
 
@@ -2239,6 +2241,7 @@ model MovimientoContable {
   @@index([ordenCompraId])
   @@index([pedidoId])
   @@index([centroCostoId])
+  @@index([puntoVentaId])
   @@index([estado])
   @@index([fecha])
   @@index([tenantId])
@@ -4246,6 +4249,61 @@ model ConfiguracionFiscal {
   @@map("configuracion_fiscal")
 }
 
+// 🔌 CONEXIÓN AFIP — Conexión técnica con cert/key/CUIT/ambiente
+// Inspirado en mini/AfipConnection. Permite múltiples conexiones por tenant
+// (ej: una por razón social) y se vincula a PuntoVenta.
+model AfipConnection {
+  id                 Int       @id @default(autoincrement())
+  nombre             String
+  descripcion        String?
+  cuit               String
+  environment        String    @default("TESTING") // TESTING | PRODUCTION
+  certificadoPath    String?   @map("certificado_path")
+  clavePrivadaPath   String?   @map("clave_privada_path")
+  wsaaUrl            String?   @map("wsaa_url") // null = default por environment
+  wsfeUrl            String?   @map("wsfe_url")
+  timeoutMs          Int       @default(30000) @map("timeout_ms")
+  activo             Boolean   @default(true)
+  esDefault          Boolean   @default(false) @map("es_default")
+  // Cache TA por servicio: { [service]: { token, sign, expirationTime } }
+  taTicketsByService Json      @default("{}") @map("ta_tickets_by_service")
+  lastTest           DateTime? @map("last_test")
+  lastTestStatus     String?   @map("last_test_status") // success | error
+  lastTestMessage    String?   @map("last_test_message")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  tenantId Int @map("tenant_id")
+
+  puntosVenta PuntoVenta[]
+
+  @@index([tenantId])
+  @@map("afip_connections")
+}
+
+// 📊 PUNTO DE VENTA AFIP
+model PuntoVenta {
+  id               Int      @id @default(autoincrement())
+  numero           Int      // Nro AFIP (ej. 1, 4, 10)
+  nombre           String
+  descripcion      String?
+  afipConnectionId Int      @map("afip_connection_id")
+  esDefault        Boolean  @default(false) @map("es_default")
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenantId Int @map("tenant_id")
+
+  afipConnection      AfipConnection       @relation(fields: [afipConnectionId], references: [id])
+  movimientosContables MovimientoContable[]
+
+  @@unique([tenantId, numero])
+  @@index([tenantId])
+  @@index([afipConnectionId])
+  @@map("puntos_venta")
+}
+
 model ComprobanteElectronico {
   id                   Int             @id @default(autoincrement())
   tipo                 String // FACTURA_A, FACTURA_B, FACTURA_C, NOTA_CREDITO_A, etc.
@@ -4512,6 +4570,10 @@ model AccionRecupero {
   fechaProxima  DateTime?           @map("fecha_proxima")
   recordatorio  Boolean             @default(false)
 
+  // Dirección y revisión (para respuestas automáticas entrantes de WA/email)
+  direccion          String?  @default("SALIENTE") // ENTRANTE | SALIENTE
+  pendienteRevision  Boolean  @default(false) @map("pendiente_revision")
+
   // Responsable
   responsableId Int   @map("responsable_id")
   responsable   Admin @relation("AccionesRecupero", fields: [responsableId], references: [id])
@@ -4525,6 +4587,7 @@ model AccionRecupero {
   @@index([campanaId])
   @@index([responsableId])
   @@index([tenantId])
+  @@index([pendienteRevision])
   @@map("acciones_recupero")
 }
 

@@ -25,6 +25,7 @@ import gobernanzaRoutes from './gobernanza.js'
 import aiAnalisisRoutes from './ai-analisis.js'
 import favoritosRoutes from './favoritos.js'
 import tiendaRoutes from './tienda.js'
+import afipConnectionsRoutes from './afipConnections.js'
 
 const router = Router()
 
@@ -53,5 +54,6 @@ router.use('/gobernanza', gobernanzaRoutes)
 router.use('/ai', aiAnalisisRoutes)
 router.use(favoritosRoutes)
 router.use(tiendaRoutes)
+router.use(afipConnectionsRoutes)
 
 export default router

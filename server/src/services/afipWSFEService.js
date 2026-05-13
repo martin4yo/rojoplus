@@ -1,19 +1,27 @@
 import prisma from '../lib/prisma.js'
 import soap from 'soap'
 import { AppError } from '../middleware/errorHandler.js'
-import { getTicketAcceso, getConfiguracionFiscal } from './afipWSAAService.js'
+import { getTicketAcceso, getConfiguracionFiscal, resolverConexionAfip } from './afipWSAAService.js'
+
+function resolverWsfeUrl(conn) {
+  if (conn.wsfeUrl) return conn.wsfeUrl
+  return conn.environment === 'PRODUCTION'
+    ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL'
+    : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL'
+}
 
 /**
  * Obtiene el último número de comprobante autorizado en AFIP
+ * @param {number} puntoVenta
+ * @param {number} tipoComprobante
+ * @param {Object} [opts]
+ * @param {number} [opts.afipConnectionId] - Id de AfipConnection a usar (sino default)
  */
-export async function getLastAuthorizedNumber(puntoVenta, tipoComprobante) {
+export async function getLastAuthorizedNumber(puntoVenta, tipoComprobante, { afipConnectionId } = {}) {
   try {
-    const config = await getConfiguracionFiscal()
-    const ta = await getTicketAcceso()
-
-    const wsfeUrl = config.modoProduccion
-      ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL'
-      : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL'
+    const conn = await resolverConexionAfip({ connectionId: afipConnectionId })
+    const ta = await getTicketAcceso({ connectionId: afipConnectionId })
+    const wsfeUrl = resolverWsfeUrl(conn)
 
     const client = await soap.createClientAsync(wsfeUrl)
 
@@ -21,7 +29,7 @@ export async function getLastAuthorizedNumber(puntoVenta, tipoComprobante) {
       Auth: {
         Token: ta.token,
         Sign: ta.sign,
-        Cuit: config.cuit.replace(/\D/g, '')
+        Cuit: conn.cuit.replace(/\D/g, '')
       },
       PtoVta: puntoVenta,
       CbteTipo: tipoComprobante
@@ -64,13 +72,9 @@ export async function getLastAuthorizedNumber(puntoVenta, tipoComprobante) {
  */
 export async function requestCAE(voucherData) {
   try {
-    const config = await getConfiguracionFiscal()
-    const ta = await getTicketAcceso()
-
-    const wsfeUrl = config.modoProduccion
-      ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL'
-      : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL'
-
+    const conn = await resolverConexionAfip({ connectionId: voucherData.afipConnectionId })
+    const ta = await getTicketAcceso({ connectionId: voucherData.afipConnectionId })
+    const wsfeUrl = resolverWsfeUrl(conn)
     const client = await soap.createClientAsync(wsfeUrl)
 
     // Helper para redondear a 2 decimales
@@ -156,7 +160,7 @@ export async function requestCAE(voucherData) {
       Auth: {
         Token: ta.token,
         Sign: ta.sign,
-        Cuit: config.cuit.replace(/\D/g, '')
+        Cuit: conn.cuit.replace(/\D/g, '')
       },
       FeCAEReq: {
         FeCabReq: {
@@ -219,13 +223,10 @@ export async function requestCAE(voucherData) {
 /**
  * Consulta estado del servidor AFIP (para testing)
  */
-export async function getServerStatus() {
+export async function getServerStatus({ afipConnectionId } = {}) {
   try {
-    const config = await getConfiguracionFiscal()
-
-    const wsfeUrl = config.modoProduccion
-      ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL'
-      : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL'
+    const conn = await resolverConexionAfip({ connectionId: afipConnectionId })
+    const wsfeUrl = resolverWsfeUrl(conn)
 
     const client = await soap.createClientAsync(wsfeUrl)
     const result = await client.FEDummyAsync()
@@ -235,7 +236,7 @@ export async function getServerStatus() {
       appServer: response.AppServer,
       dbServer: response.DbServer,
       authServer: response.AuthServer,
-      ambiente: config.modoProduccion ? 'producción' : 'homologación'
+      ambiente: conn.environment === 'PRODUCTION' ? 'producción' : 'homologación'
     }
   } catch (error) {
     throw new AppError(`Error consultando estado del servidor: ${error.message}`, 500)

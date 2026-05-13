@@ -5,6 +5,8 @@ import AIAssistantService from '../services/aiAssistant.js'
 import ActionExecutor from '../services/actionExecutor.js'
 import { ROLES } from '../services/aiAssistant.js'
 import { enviarFeedbackML } from '../services/axioMLService.js'
+import { callHub } from '../axio/hubClient.js'
+import { getToolsForRole } from '../axio/tools/index.js'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
@@ -159,8 +161,14 @@ router.post(
 
     console.log(`Usuario: ${context.userName} (${context.role})`)
 
-    // Leer config IA del tenant (nombre del bot, modelo, api key)
-    const configClaves = ['WA_AGENT_NOMBRE', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_PROVIDER']
+    // Leer config IA del tenant (nombre del bot, modelo, api key, feature flag)
+    const configClaves = [
+      'WA_AGENT_NOMBRE',
+      'AI_MODEL_TIER',
+      'AI_API_KEY',
+      'AI_PROVIDER',
+      'CHAT_USE_AXIO_HUB',
+    ]
     const configRows = await req.db.configuracion.findMany({
       where: { clave: { in: configClaves } }
     }).catch(() => [])
@@ -170,6 +178,86 @@ router.post(
     context.aiApiKey = cfg.AI_API_KEY || null
     context.aiProvider = cfg.AI_PROVIDER || 'anthropic'
 
+    const useHub = cfg.CHAT_USE_AXIO_HUB === 'true'
+
+    const actionExecutor = new ActionExecutor(req.prisma)
+
+    // ─── Branch A: AXIO Hub (Capa 2.5 SQL + Capa 2.6 tool-calling) ─────────
+    if (useHub) {
+      try {
+        const tools = getToolsForRole(context.role)
+
+        // Defensa por rol:
+        //  - admin/camarero  → tools + Capa 2.5 SQL libre (scope amplio por diseño).
+        //  - socio           → tools_only=true. Sin SQL libre. Si el pedido no matchea
+        //                       un tool, el hub devuelve mensaje neutro. La lógica de
+        //                       filtrado por socioId vive en los handlers locales.
+        const isSocio = context.role === ROLES.SOCIO
+        const scopeHint = isSocio
+          ? `Usuario socio ID=${context.socioId}. Solo podés ejecutar tools — no respondas con datos crudos del club. Si el pedido no matchea un tool, decí que no podés ayudar con eso.`
+          : undefined
+
+        const hubResp = await callHub({
+          question: message,
+          context: '',
+          tenantId: req.tenantId,
+          tools,
+          scopeHint,
+          toolsOnly: isSocio,
+        })
+
+        // Tool-call → mapear a {accion, entidades} y delegar al ActionExecutor.
+        if (hubResp?.tool_call?.name) {
+          const action = {
+            accion: hubResp.tool_call.name,
+            entidades: hubResp.tool_call.args || {},
+          }
+          const executionResult = await actionExecutor.executeAction(action, context)
+          console.log('✅ ===== HUB tool_call EJECUTADO =====\n')
+          return res.status(executionResult.success ? 200 : 400).json({
+            success: executionResult.success,
+            message: executionResult.message,
+            data: executionResult.data,
+            error: executionResult.error,
+            requiresUserAction: executionResult.requiresUserAction,
+            model: hubResp.model,
+            time_ms: hubResp.time_ms,
+            debug: process.env.NODE_ENV === 'development'
+              ? { action, hub: { model: hubResp.model, time_ms: hubResp.time_ms } }
+              : undefined,
+          })
+        }
+
+        // Capa 2.5 / Capa 3 → texto del hub directo al widget.
+        if (hubResp?.answer) {
+          console.log('✅ ===== HUB answer DEVUELTA =====\n')
+          return res.status(200).json({
+            success: true,
+            message: hubResp.answer,
+            data: null,
+            hashInput: hubResp.hash_input || null,
+            model: hubResp.model,
+            time_ms: hubResp.time_ms,
+            from_cache: hubResp.from_cache || false,
+          })
+        }
+
+        return res.status(502).json({
+          success: false,
+          message: 'El hub no devolvió respuesta interpretable.',
+          error: 'HUB_EMPTY_RESPONSE',
+        })
+      } catch (err) {
+        console.error('❌ Error consultando AXIO Hub:', err.message)
+        return res.status(502).json({
+          success: false,
+          message: '😅 El asistente no está disponible en este momento. Intentá de nuevo en unos segundos.',
+          error: err.message,
+        })
+      }
+    }
+
+    // ─── Branch B: Path legacy (AIAssistantService + Anthropic directo) ────
     // Paso 1: Procesar comando con IA
     const aiResponse = await assistant.processCommand(message, context)
 
@@ -192,7 +280,6 @@ router.post(
     }
 
     // Paso 3: Ejecutar acción
-    const actionExecutor = new ActionExecutor(req.prisma)
     const executionResult = await actionExecutor.executeAction(
       aiResponse.action,
       context

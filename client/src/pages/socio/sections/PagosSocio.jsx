@@ -22,7 +22,7 @@ import StatusBadge from '../../../components/StatusBadge'
 import ChatWidget from '../../../components/chat/ChatWidget'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
-export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensajesNoLeidos = 0, onNavigate }) {
+export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensajesNoLeidos = 0, onNavigate, pagarCargoId = null, onPagarHandled }) {
   const esMiembroFamilia = !!socio?.titularFamiliaId
   const titularNombre = socio?.titularFamilia?.apellidoNombre || socio?.grupoFamiliar?.titular?.apellidoNombre
   const [cuotas, setCuotas] = useState([])
@@ -56,6 +56,49 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
       cargarCuentaCorriente()
     }
   }, [tab])
+
+  // Deep-link desde notificación: abre modal de pago si llega ?pagar=<cargoId>
+  useEffect(() => {
+    if (!pagarCargoId || loading || cuotas.length === 0) return
+
+    // Consumir el id de inmediato para no dispararlo dos veces
+    onPagarHandled?.()
+
+    const cuota = cuotas.find(c => c.id === pagarCargoId)
+    if (!cuota) {
+      showModal({
+        type: 'warning',
+        title: 'Cuota no encontrada',
+        message: 'La cuota del link ya no aparece como pendiente. Puede haber sido pagada o cancelada.',
+      })
+      return
+    }
+
+    // Asegurarse de estar en la pestaña de pendientes
+    setTab('pendientes')
+
+    const dueno = cuota.socio && cuota.socio.id !== socio?.id ? cuota.socio.apellidoNombre : null
+    const venc = cuota.fechaVencimiento ? formatDate(cuota.fechaVencimiento) : '-'
+    const monto = formatCurrency(cuota.montoTotal || 0)
+    const detalle = [
+      cuota.concepto || 'Cuota',
+      cuota.periodo ? `Período ${cuota.periodo}` : null,
+      dueno ? `Socio: ${dueno}` : null,
+      `Vencimiento: ${venc}`,
+      `Importe: ${monto}`,
+    ].filter(Boolean).join(' · ')
+
+    showModal({
+      type: 'info',
+      title: '¿Querés pagar esta cuota?',
+      message: detalle,
+      confirmText: 'Pagar con MercadoPago',
+      cancelText: 'Más tarde',
+      onConfirm: () => {
+        pagarCuota(cuota.id, 'MERCADOPAGO')
+      },
+    })
+  }, [pagarCargoId, loading, cuotas])
 
   const cargarDatos = async () => {
     try {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Filter, FileText, Calendar, User, Building2, Eye, Ban } from 'lucide-react'
+import { Plus, Search, Filter, FileText, Calendar, User, Building2, Eye, Ban, CloudUpload } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/Button'
 import { useModal } from '../../../components/Modal'
 import api from '../../../services/api'
@@ -17,8 +18,22 @@ const ESTADOS = [
   { value: 'PENDIENTE', label: 'Pendiente' },
   { value: 'PAGADO', label: 'Pagado' },
   { value: 'CONFIRMADO', label: 'Confirmado' },
+  { value: 'COMPENSADO', label: 'Compensado' },
   { value: 'ANULADO', label: 'Anulado' }
 ]
+
+const TIPOS = [
+  { value: '', label: 'Todos' },
+  { value: 'FACTURA_VENTA', label: 'Factura' },
+  { value: 'NOTA_CREDITO_CLIENTE', label: 'Nota de Crédito' },
+  { value: 'NOTA_DEBITO_CLIENTE', label: 'Nota de Débito' }
+]
+
+const TIPO_BADGE = {
+  FACTURA_VENTA: { label: 'Factura', class: 'bg-green-100 text-green-800' },
+  NOTA_CREDITO_CLIENTE: { label: 'NC', class: 'bg-orange-100 text-orange-800' },
+  NOTA_DEBITO_CLIENTE: { label: 'ND', class: 'bg-red-100 text-red-800' }
+}
 
 export default function FacturasVentaLista() {
   const navigate = useNavigate()
@@ -28,6 +43,7 @@ export default function FacturasVentaLista() {
   const { page, pagination, setPagination, goToPage } = usePagination(1, 20)
 
   const [filtros, setFiltros] = useState({
+    tipo: '',
     estado: '',
     desde: '',
     hasta: '',
@@ -46,6 +62,7 @@ export default function FacturasVentaLista() {
       params.append('page', page)
       params.append('limit', '20')
 
+      if (filtros.tipo) params.append('tipo', filtros.tipo)
       if (filtros.estado) params.append('estado', filtros.estado)
       if (filtros.desde) params.append('desde', filtros.desde)
       if (filtros.hasta) params.append('hasta', filtros.hasta)
@@ -68,6 +85,7 @@ export default function FacturasVentaLista() {
 
   function limpiarFiltros() {
     setFiltros({
+      tipo: '',
       estado: '',
       desde: '',
       hasta: '',
@@ -76,18 +94,44 @@ export default function FacturasVentaLista() {
     goToPage(1)
   }
 
-  async function handleAnular(factura) {
+  async function handleSolicitarCAE(factura) {
     showModal({
-      type: 'confirm',
-      title: 'Anular Factura',
-      message: `¿Está seguro de anular la factura ${factura.numero}?`,
+      type: 'info',
+      title: 'Solicitar CAE',
+      message: `Vamos a pedir CAE a AFIP para la factura ${factura.numero}. Si AFIP responde OK, se va a asignar tipo de comprobante y numeración fiscal.`,
+      confirmText: 'Solicitar CAE',
+      cancelText: 'Cancelar',
       onConfirm: async () => {
         try {
-          await api.post(`/admin/movimientos-contables/${factura.id}/anular`)
-          showModal({ type: 'success', message: 'Factura anulada correctamente' })
+          const r = await api.post(`/admin/movimientos-contables/${factura.id}/solicitar-cae`)
+          toast.success(r?.message || 'CAE emitido correctamente')
           cargarFacturas()
         } catch (err) {
-          showModal({ type: 'error', message: err.message || 'Error al anular' })
+          toast.error(err.message || 'No se pudo emitir el CAE')
+        }
+      }
+    })
+  }
+
+  async function handleAnular(factura) {
+    const esFacturaConCAE = factura.tipo === 'FACTURA_VENTA' && factura.puntoVenta && factura.numeroComprobante
+    const tipoLabel = factura.tipo === 'FACTURA_VENTA' ? 'la factura'
+      : factura.tipo === 'NOTA_CREDITO_CLIENTE' ? 'la nota de crédito'
+      : 'la nota de débito'
+    const mensaje = esFacturaConCAE
+      ? `¿Anular ${tipoLabel} ${factura.numero}? Se emitirá una Nota de Crédito fiscal con CAE para compensarla. Los recibos asociados se anularán y se revertirá la caja.`
+      : `¿Está seguro de anular ${tipoLabel} ${factura.numero}? Se revertirán recibos asociados y stock.`
+    showModal({
+      type: 'confirm',
+      title: esFacturaConCAE ? 'Anular con NC fiscal' : 'Anular movimiento',
+      message: mensaje,
+      onConfirm: async () => {
+        try {
+          const r = await api.post(`/admin/movimientos-contables/${factura.id}/anular`)
+          toast.success(r?.message || 'Anulado correctamente')
+          cargarFacturas()
+        } catch (err) {
+          toast.error(err.message || 'Error al anular')
         }
       }
     })
@@ -113,6 +157,19 @@ export default function FacturasVentaLista() {
 
   const columns = [
     {
+      key: 'tipo',
+      label: 'Tipo',
+      sortable: true,
+      render: (row) => {
+        const b = TIPO_BADGE[row.tipo] || { label: row.tipo, class: 'bg-gray-100 text-gray-800' }
+        return (
+          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${b.class}`}>
+            {b.label}
+          </span>
+        )
+      }
+    },
+    {
       key: 'numero',
       label: 'Número',
       sortable: true,
@@ -137,10 +194,13 @@ export default function FacturasVentaLista() {
       key: 'comprobante',
       label: 'Comprobante',
       render: (row) => {
-        const comprobante = row.tipoComprobante
-          ? `${row.tipoComprobante} ${row.puntoVenta}-${row.numeroComprobante}`
-          : '-'
-        return <span className="text-sm text-gray-600">{comprobante}</span>
+        if (!row.tipoComprobante) {
+          return <span className="text-sm text-gray-400">—</span>
+        }
+        const pv = row.puntoVenta ? String(row.puntoVenta).padStart(4, '0') : null
+        const nro = row.numeroComprobante ? String(row.numeroComprobante).padStart(8, '0') : null
+        const numeracion = pv && nro ? ` ${pv}-${nro}` : ''
+        return <span className="text-sm text-gray-600">{row.tipoComprobante}{numeracion}</span>
       }
     },
     {
@@ -198,32 +258,53 @@ export default function FacturasVentaLista() {
       sortable: false,
       className: 'text-center',
       cellClassName: 'text-center',
-      render: (row) => (
-        <div className="flex items-center justify-center gap-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              navigate(`/admin/ingresos/facturas/${row.id}`)
-            }}
-            className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
-            title="Ver detalle"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          {row.estado !== 'ANULADO' && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
+      render: (row) => {
+        const noModificable = ['ANULADO', 'COMPENSADO'].includes(row.estado)
+        const sinCAE = row.tipo === 'FACTURA_VENTA' && !noModificable && (!row.puntoVenta || !row.numeroComprobante)
+        const tieneCAE = row.tipo === 'FACTURA_VENTA' && row.puntoVenta && row.numeroComprobante
+        const tooltipAnular = tieneCAE
+          ? 'Anular con Nota de Crédito fiscal'
+          : 'Anular'
+        return (
+          <div className="flex items-center justify-center gap-1">
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                handleAnular(row)
+                navigate(`/admin/ingresos/facturas/${row.id}`)
               }}
-              className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
-              title="Anular"
+              className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg"
+              title="Ver detalle"
             >
-              <Ban className="w-4 h-4" />
+              <Eye className="w-4 h-4" />
             </button>
-          )}
-        </div>
-      )
+            {sinCAE && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleSolicitarCAE(row)
+                }}
+                className="p-2 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg"
+                title="Solicitar CAE a AFIP"
+              >
+                <CloudUpload className="w-4 h-4" />
+              </button>
+            )}
+            {!noModificable && tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleAnular(row)
+                }}
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+                title={tooltipAnular}
+              >
+                <Ban className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )
+      }
+
     }
   ]
 
@@ -238,8 +319,8 @@ export default function FacturasVentaLista() {
             <FileText className="w-6 h-6 text-green-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Facturas de Venta</h1>
-            <p className="text-sm text-gray-500">Facturas emitidas a clientes y socios</p>
+            <h1 className="text-2xl font-bold text-gray-800">Facturas y Notas de Venta</h1>
+            <p className="text-sm text-gray-500">Facturas, Notas de Crédito y Notas de Débito a clientes y socios</p>
           </div>
         </div>
         {tienePermiso(PERMISOS.INGRESOS_GESTIONAR) && (
@@ -274,7 +355,22 @@ export default function FacturasVentaLista() {
         </div>
 
         {mostrarFiltros && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-4 border-t border-gray-200">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tipo
+              </label>
+              <select
+                name="tipo"
+                value={filtros.tipo}
+                onChange={handleFiltroChange}
+                className="input-field w-full"
+              >
+                {TIPOS.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Estado

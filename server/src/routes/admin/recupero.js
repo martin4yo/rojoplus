@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import prisma from '../../lib/prisma.js'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
 import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
@@ -288,7 +289,7 @@ router.post('/campanas', authAdmin, asyncHandler(async (req, res) => {
       contactados: 0,
       interesados: 0,
       recuperados: 0,
-      creadoPor: req.user.id
+      creadoPor: req.admin.id
     },
     include: {
       admin: {
@@ -347,21 +348,31 @@ router.put('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
     fechaFin,
     oferta,
     descuento,
-    mesesDescuento
+    mesesDescuento,
+    motivosBaja,
+    tiempoBajaMin,
+    tiempoBajaMax,
+    sinCuotaIngreso,
   } = req.body
+
+  const data = {
+    nombre: nombre || undefined,
+    descripcion: descripcion !== undefined ? (descripcion || null) : undefined,
+    activa: activa !== undefined ? activa : undefined,
+    fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
+    fechaFin: fechaFin ? new Date(fechaFin) : undefined,
+    oferta: oferta || undefined,
+    descuento: descuento !== undefined ? (descuento === '' || descuento === null ? null : parseFloat(descuento)) : undefined,
+    mesesDescuento: mesesDescuento !== undefined ? (mesesDescuento === '' || mesesDescuento === null ? null : parseInt(mesesDescuento)) : undefined,
+    motivosBaja: motivosBaja !== undefined ? (motivosBaja || null) : undefined,
+    tiempoBajaMin: tiempoBajaMin !== undefined ? (tiempoBajaMin === '' || tiempoBajaMin === null ? null : parseInt(tiempoBajaMin)) : undefined,
+    tiempoBajaMax: tiempoBajaMax !== undefined ? (tiempoBajaMax === '' || tiempoBajaMax === null ? null : parseInt(tiempoBajaMax)) : undefined,
+    sinCuotaIngreso: sinCuotaIngreso !== undefined ? !!sinCuotaIngreso : undefined,
+  }
 
   const updated = await req.db.campanaRecupero.update({
     where: { id: parseInt(id) },
-    data: {
-      nombre: nombre || undefined,
-      descripcion: descripcion !== undefined ? descripcion : undefined,
-      activa: activa !== undefined ? activa : undefined,
-      fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
-      fechaFin: fechaFin ? new Date(fechaFin) : undefined,
-      oferta: oferta || undefined,
-      descuento: descuento ? parseFloat(descuento) : undefined,
-      mesesDescuento: mesesDescuento ? parseInt(mesesDescuento) : undefined
-    },
+    data,
     include: {
       admin: {
         select: {
@@ -391,6 +402,116 @@ router.delete('/campanas/:id', authAdmin, asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'Campaña eliminada correctamente'
+  })
+}))
+
+// GET /api/admin/recupero/campanas/:id/socios-elegibles
+// Devuelve los socios dados de baja que cumplen los criterios de la campaña,
+// con la última acción de recupero registrada en esta campaña (si existe).
+router.get('/campanas/:id/socios-elegibles', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { search } = req.query
+
+  const campana = await req.db.campanaRecupero.findUnique({
+    where: { id: parseInt(id) },
+  })
+  if (!campana) throw new AppError('Campaña no encontrada', 404, 'NOT_FOUND')
+
+  // Construir filtros: socios cuyo estado NO permite ingresar al club
+  // (bajas, renuncias, fallecidos, bloqueados, etc.)
+  const where = {
+    estadoSocioRel: { permiteIngresoMolinete: false },
+  }
+
+  // Filtro por estados de baja específicos (CSV de IDs de EstadoSocio en campana.motivosBaja).
+  // Históricamente esta columna guardaba valores del enum MotivoBaja; ahora guarda IDs de
+  // EstadoSocio. El nombre del campo se mantiene por compatibilidad.
+  if (campana.motivosBaja) {
+    const estadoIds = campana.motivosBaja
+      .split(',')
+      .map(s => parseInt(s.trim()))
+      .filter(n => Number.isFinite(n))
+    if (estadoIds.length > 0) {
+      // Se reemplaza el filtro genérico por la lista específica de estados
+      where.estadoSocioId = { in: estadoIds }
+      delete where.estadoSocioRel
+    }
+  }
+
+  // Filtro por tiempo de baja (meses → días)
+  if (campana.tiempoBajaMin != null || campana.tiempoBajaMax != null) {
+    where.fechaBaja = {}
+    const hoy = new Date()
+    if (campana.tiempoBajaMin != null) {
+      const hace = new Date(hoy)
+      hace.setDate(hace.getDate() - campana.tiempoBajaMin * 30)
+      where.fechaBaja.lte = hace // fechaBaja ≤ hoy - tiempoBajaMin meses
+    }
+    if (campana.tiempoBajaMax != null) {
+      const hace = new Date(hoy)
+      hace.setDate(hace.getDate() - campana.tiempoBajaMax * 30)
+      where.fechaBaja.gte = hace // fechaBaja ≥ hoy - tiempoBajaMax meses
+    }
+    // Si solo viene min, fechaBaja también debe existir
+    if (!where.fechaBaja.gte && !where.fechaBaja.lte) {
+      delete where.fechaBaja
+    }
+  }
+
+  // Búsqueda por nombre/nro
+  if (search && String(search).trim()) {
+    const term = String(search).trim()
+    where.OR = [
+      { apellidoNombre: { contains: term, mode: 'insensitive' } },
+      ...(Number.isFinite(parseInt(term)) ? [{ nroSocio: parseInt(term) }] : []),
+    ]
+  }
+
+  const socios = await req.db.socio.findMany({
+    where,
+    select: {
+      id: true,
+      nroSocio: true,
+      apellidoNombre: true,
+      email: true,
+      celular: true,
+      celularSecundario: true,
+      telefonoFijo: true,
+      fechaBaja: true,
+      motivoBaja: true,
+      estadoSocioRel: { select: { nombre: true, color: true } },
+    },
+    orderBy: [{ fechaBaja: 'desc' }, { apellidoNombre: 'asc' }],
+    take: 500,
+  })
+
+  // Buscar última acción de cada socio en esta campaña (si existe)
+  const sociosIds = socios.map(s => s.id)
+  const ultimasAcciones = sociosIds.length > 0
+    ? await req.db.accionRecupero.findMany({
+        where: { campanaId: parseInt(id), socioId: { in: sociosIds } },
+        orderBy: { fecha: 'desc' },
+      })
+    : []
+  const accionPorSocio = new Map()
+  for (const a of ultimasAcciones) {
+    if (!accionPorSocio.has(a.socioId)) accionPorSocio.set(a.socioId, a)
+  }
+
+  const result = socios.map(s => ({
+    ...s,
+    ultimaAccion: accionPorSocio.get(s.id) || null,
+  }))
+
+  res.json({
+    success: true,
+    data: result,
+    total: result.length,
+    criterios: {
+      motivosBaja: campana.motivosBaja,
+      tiempoBajaMin: campana.tiempoBajaMin,
+      tiempoBajaMax: campana.tiempoBajaMax,
+    },
   })
 }))
 
@@ -509,7 +630,7 @@ router.post('/acciones', authAdmin, asyncHandler(async (req, res) => {
       proximaAccion: proximaAccion || null,
       fechaProxima: fechaProxima ? new Date(fechaProxima) : null,
       recordatorio: recordatorio || false,
-      responsableId: req.user.id
+      responsableId: req.admin.id
     },
     include: {
       socio: {
@@ -541,11 +662,11 @@ router.post('/acciones', authAdmin, asyncHandler(async (req, res) => {
       contactados: { increment: 1 }
     }
 
-    if (nivelInteres === 'ALTO' || nivelInteres === 'MEDIO') {
+    if (resultado === 'INTERESADO' || nivelInteres === 'ALTO' || nivelInteres === 'MEDIO') {
       updateData.interesados = { increment: 1 }
     }
 
-    if (resultado === 'REINGRESO') {
+    if (resultado === 'RECUPERADO') {
       updateData.recuperados = { increment: 1 }
     }
 
@@ -560,6 +681,90 @@ router.post('/acciones', authAdmin, asyncHandler(async (req, res) => {
     data: accion,
     message: 'Acción de recupero registrada correctamente'
   })
+}))
+
+// GET /api/admin/recupero/pendientes
+// Listado de acciones entrantes pendientes de revisión (respuestas WA/email
+// que llegan automáticamente y necesitan atención humana).
+router.get('/pendientes', authAdmin, asyncHandler(async (req, res) => {
+  const acciones = await req.db.accionRecupero.findMany({
+    where: { pendienteRevision: true },
+    include: {
+      socio: { select: { id: true, nroSocio: true, apellidoNombre: true, email: true, celular: true } },
+      campana: { select: { id: true, nombre: true } },
+      responsable: { select: { id: true, nombre: true, apellido: true } },
+    },
+    orderBy: { fecha: 'desc' },
+    take: 200,
+  })
+  res.json({ success: true, data: acciones, total: acciones.length })
+}))
+
+// GET /api/admin/recupero/pendientes/count
+// Solo el contador (para el badge del menú)
+router.get('/pendientes/count', authAdmin, asyncHandler(async (req, res) => {
+  const total = await req.db.accionRecupero.count({ where: { pendienteRevision: true } })
+  res.json({ success: true, total })
+}))
+
+// POST /api/admin/recupero/inbox/test
+// Test de conexión IMAP del tenant actual (sin procesar mensajes)
+router.post('/inbox/test', authAdmin, asyncHandler(async (req, res) => {
+  const { ImapFlow } = await import('imapflow')
+  const claves = ['IMAP_HOST', 'IMAP_PORT', 'IMAP_USER', 'IMAP_PASS', 'IMAP_SECURE', 'SMTP_USER', 'SMTP_PASS']
+  const rows = await req.db.configuracion.findMany({ where: { clave: { in: claves } } })
+  const cfg = Object.fromEntries(rows.map(r => [r.clave, r.valor]))
+  if (!cfg.IMAP_HOST) {
+    return res.status(400).json({ success: false, error: { message: 'Falta IMAP_HOST' } })
+  }
+  const client = new ImapFlow({
+    host: cfg.IMAP_HOST,
+    port: parseInt(cfg.IMAP_PORT || '993'),
+    secure: (cfg.IMAP_SECURE ?? 'true') === 'true',
+    auth: {
+      user: cfg.IMAP_USER || cfg.SMTP_USER,
+      pass: cfg.IMAP_PASS || cfg.SMTP_PASS,
+    },
+    logger: false,
+  })
+  try {
+    await client.connect()
+    const mailboxes = await client.list()
+    await client.logout()
+    res.json({ success: true, mensaje: 'Conexión OK', mailboxes: mailboxes.map(m => m.path).slice(0, 10) })
+  } catch (err) {
+    try { await client.logout() } catch {}
+    res.status(400).json({ success: false, error: { message: err.message } })
+  }
+}))
+
+// POST /api/admin/recupero/inbox/run
+// Ejecuta el polling IMAP del tenant actual on-demand
+router.post('/inbox/run', authAdmin, asyncHandler(async (req, res) => {
+  const { procesarInboxRecuperoTenant } = await import('../../services/inboxService.js')
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } })
+  if (!tenant) {
+    return res.status(404).json({ success: false, error: { message: 'Tenant no encontrado' } })
+  }
+  const resultado = await procesarInboxRecuperoTenant(tenant)
+  res.json({ success: true, ...resultado })
+}))
+
+// PATCH /api/admin/recupero/acciones/:id/atender
+// Marca una acción entrante como atendida (saca el flag pendienteRevision).
+// Opcionalmente acepta un nuevo resultado y observaciones de cierre.
+router.patch('/acciones/:id/atender', authAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { resultado, observaciones } = req.body
+  const updated = await req.db.accionRecupero.update({
+    where: { id: parseInt(id) },
+    data: {
+      pendienteRevision: false,
+      ...(resultado ? { resultado } : {}),
+      ...(observaciones != null ? { observaciones } : {}),
+    },
+  })
+  res.json({ success: true, data: updated, message: 'Acción marcada como atendida' })
 }))
 
 // GET /api/admin/recupero/candidatos - Obtener socios candidatos para recupero

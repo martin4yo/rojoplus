@@ -284,6 +284,8 @@ const ConfigReservas = lazy(() => import('./pages/admin/reservas/ConfigReservas'
 const GestionCobranzas = lazy(() => import('./pages/admin/GestionCobranzas'))
 const DetalleGestion = lazy(() => import('./pages/admin/DetalleGestion'))
 const GestionRecupero = lazy(() => import('./pages/admin/GestionRecupero'))
+const RecuperoCampanaDetalle = lazy(() => import('./pages/admin/RecuperoCampanaDetalle'))
+const RecuperoPendientes = lazy(() => import('./pages/admin/RecuperoPendientes'))
 const GestionComunicaciones = lazy(() => import('./pages/admin/GestionComunicaciones'))
 const DetalleCampana = lazy(() => import('./pages/admin/DetalleCampana'))
 const AdminChatEntrenadores = lazy(() => import('./pages/admin/ChatEntrenadores'))
@@ -637,6 +639,8 @@ function App() {
 
                   {/* Gestión de Recupero */}
                   <Route path="recupero" element={<GestionRecupero />} />
+                  <Route path="recupero/pendientes" element={<RecuperoPendientes />} />
+                  <Route path="recupero/campanas/:id" element={<RecuperoCampanaDetalle />} />
 
                   {/* Gestión de Comunicaciones */}
                   <Route path="comunicaciones" element={<GestionComunicaciones />} />

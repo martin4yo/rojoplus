@@ -65,6 +65,7 @@ export default function FacturaCompraForm() {
     tipo: 'FACTURA_COMPRA',
     entidadId: '',
     ordenCompraId: '',
+    movimientoPadreId: '',
     fecha: new Date().toISOString().split('T')[0],
     fechaVencimiento: '',
     tipoComprobante: 'A',
@@ -75,6 +76,10 @@ export default function FacturaCompraForm() {
     centroCostoId: '',
     items: []
   })
+
+  const [facturasProveedor, setFacturasProveedor] = useState([])
+
+  const esNCoND = form.tipo === 'NOTA_CREDITO_PROVEEDOR' || form.tipo === 'NOTA_DEBITO_PROVEEDOR'
 
   // Totales calculados
   const [totales, setTotales] = useState({
@@ -227,6 +232,29 @@ export default function FacturaCompraForm() {
       setForm(prev => ({ ...prev, ordenCompraId: '' }))
     }
   }, [form.entidadId])
+
+  // Cargar facturas del proveedor cuando es NC/ND
+  useEffect(() => {
+    if (esNCoND && form.entidadId) {
+      cargarFacturasProveedor(form.entidadId)
+    } else {
+      setFacturasProveedor([])
+      setForm(prev => ({ ...prev, movimientoPadreId: '' }))
+    }
+  }, [esNCoND, form.entidadId])
+
+  async function cargarFacturasProveedor(entidadId) {
+    try {
+      const response = await api.getFull(`/admin/facturas-compra?entidadId=${entidadId}&limit=200`)
+      const facturas = (response.data || []).filter(f =>
+        f.tipo === 'FACTURA_COMPRA' && f.estado !== 'ANULADO'
+      )
+      setFacturasProveedor(facturas)
+    } catch (err) {
+      console.error('Error cargando facturas del proveedor:', err)
+      setFacturasProveedor([])
+    }
+  }
 
   async function cargarOrdenesCompra(entidadId) {
     setCargandoOC(true)
@@ -526,6 +554,7 @@ export default function FacturaCompraForm() {
         tipo: form.tipo,
         entidadId: parseInt(form.entidadId),
         ordenCompraId: form.ordenCompraId ? parseInt(form.ordenCompraId) : null,
+        movimientoPadreId: esNCoND && form.movimientoPadreId ? parseInt(form.movimientoPadreId) : null,
         fecha: form.fecha,
         fechaVencimiento: form.fechaVencimiento || null,
         tipoComprobante: tipoComprobanteCalculado,
@@ -697,8 +726,46 @@ export default function FacturaCompraForm() {
             </div>
           </div>
 
+          {/* Selector de Factura asociada (solo NC/ND) */}
+          {esNCoND && form.entidadId && (
+            <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-5 h-5 text-amber-600" />
+                <span className="font-medium text-amber-800">Factura asociada (opcional)</span>
+              </div>
+              {facturasProveedor.length === 0 ? (
+                <p className="text-sm text-gray-600">No hay facturas registradas para este proveedor</p>
+              ) : (
+                <>
+                  <select
+                    name="movimientoPadreId"
+                    value={form.movimientoPadreId}
+                    onChange={handleChange}
+                    className="input-field w-full md:w-2/3"
+                  >
+                    <option value="">{form.tipo === 'NOTA_CREDITO_PROVEEDOR' ? 'Suelta (genera saldo a favor)' : 'Suelta (sin factura)'}</option>
+                    {facturasProveedor.map(f => (
+                      <option key={f.id} value={f.id}>
+                        {f.numero}
+                        {f.tipoComprobante && f.puntoVenta && f.numeroComprobante
+                          ? ` (${f.tipoComprobante} ${String(f.puntoVenta).padStart(4, '0')}-${String(f.numeroComprobante).padStart(8, '0')})`
+                          : ''}
+                        {' - '}{formatCurrency(f.montoTotal)} | Saldo: {formatCurrency(f.saldoPendiente)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-600 mt-1">
+                    {form.tipo === 'NOTA_CREDITO_PROVEEDOR'
+                      ? 'Si se asocia, descuenta el saldo a pagar de esa factura.'
+                      : 'Si se asocia, aumenta el saldo a pagar de esa factura.'}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Selector de Orden de Compra */}
-          {form.entidadId && (
+          {!esNCoND && form.entidadId && (
             <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center gap-2 mb-2">
                 <ClipboardList className="w-5 h-5 text-blue-600" />

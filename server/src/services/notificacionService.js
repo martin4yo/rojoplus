@@ -3,7 +3,7 @@ import Handlebars from 'handlebars'
 import { enviarNotificacionPush } from './webPush.js'
 import { getMailConfig } from './email.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
-import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora, obtenerTelefonoSocio, enviarWhatsApp, getWhatsAppConfig } from './whatsappService.js'
+import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora, obtenerTelefonoSocio, enviarWhatsApp, getWhatsAppConfig, buildVariablesSocio } from './whatsappService.js'
 import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 
 // Caché simple de URLs por tenantId para no repetir queries en el mismo ciclo de jobs
@@ -30,6 +30,20 @@ export async function getTenantsConCronsPausados() {
   } catch (err) {
     console.error('[Crons] Error leyendo tenants pausados:', err.message)
     return []
+  }
+}
+
+/**
+ * Combina master pause + switch individual del cron. Devuelve tenantIds donde
+ * el cron específico está deshabilitado.
+ */
+export async function getTenantsBloqueadosPorCron(cronKey) {
+  try {
+    const { tenantsBloqueadosPorCron } = await import('../lib/cronsCatalogo.js')
+    return await tenantsBloqueadosPorCron(prisma, cronKey)
+  } catch (err) {
+    console.error('[Crons] Error obteniendo tenants bloqueados:', err.message)
+    return await getTenantsConCronsPausados()
   }
 }
 
@@ -359,6 +373,7 @@ export async function notificarCuotaProximaVencer(cargo) {
       include: {
         categoriaSocioRel: true,
         tipoSocioRel: true,
+        titularFamilia: true,
       },
     })
 
@@ -366,51 +381,59 @@ export async function notificarCuotaProximaVencer(cargo) {
       return
     }
 
+    // Si el cargo es de un miembro del grupo familiar, el aviso va al titular.
+    const destinatario = socio.titularFamilia || socio
+
     const fechaVencimiento = new Date(cargo.fechaVencimiento)
     const diasRestantes = Math.ceil((fechaVencimiento - new Date()) / (1000 * 60 * 60 * 24))
 
     const metadata = {
-      socioNombre: socio.apellidoNombre,
-      nroSocio: socio.nroSocio,
+      socioNombre: destinatario.apellidoNombre,
+      nroSocio: destinatario.nroSocio,
       cargoDescripcion: cargo.descripcion || 'Cuota mensual',
       montoTotal: cargo.montoTotal.toString(),
       fechaVencimiento: fechaVencimiento.toLocaleDateString('es-AR'),
       diasRestantes: diasRestantes.toString(),
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${destinatario.tokenPortal}?pagar=${cargo.id}`,
+      // Si la cuota es de un miembro de la familia, incluimos su nombre
+      socioCuota: destinatario.id !== socio.id ? socio.apellidoNombre : null,
     }
 
-    // Email
-    if (socio.email && socio.notifEmail !== false) {
+    // Email (al titular si aplica)
+    if (destinatario.email && destinatario.notifEmail !== false) {
       await programarNotificacion({
         tipo: 'EMAIL',
         eventType: 'CUOTA_PROX_VENCER',
-        destinatario: socio.email,
-        socioId: socio.id,
+        destinatario: destinatario.email,
+        socioId: destinatario.id,
         cargoId: cargo.id,
-        asunto: `Recordatorio: Tu cuota vence en ${diasRestantes} días`,
+        asunto: `Recordatorio: ${destinatario.id !== socio.id ? `cuota de ${socio.apellidoNombre} ` : 'Tu cuota '}vence en ${diasRestantes} días`,
         cuerpo: null,
         fechaProgramado: new Date(),
         metadata,
       })
     }
 
-    // WhatsApp
-    if (socio.notifWhatsapp && obtenerTelefonoSocio(socio)) {
-      const db = createTenantPrisma(socio.tenantId)
+    // WhatsApp (al titular si aplica)
+    if (destinatario.notifWhatsapp && obtenerTelefonoSocio(destinatario)) {
+      const db = createTenantPrisma(destinatario.tenantId)
       db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_VENCIMIENTO' } })
         .then(flag => {
           if (flag?.valor !== 'false') {
             notifWaVencimiento({
               db,
-              socio,
-              cuota: { vencimiento: cargo.fechaVencimiento, importe: cargo.montoTotal },
+              socio: destinatario,
+              cuota: { id: cargo.id, vencimiento: cargo.fechaVencimiento, importe: cargo.montoTotal },
             }).catch(err => console.error('Error WA cuota próx. vencer:', err.message))
           }
         })
         .catch(err => console.error('Error leyendo flag WA vencimiento:', err.message))
     }
 
-    console.log(`Notificado: Cuota próxima a vencer para ${socio.apellidoNombre}`)
+    const etiqueta = destinatario.id !== socio.id
+      ? `${destinatario.apellidoNombre} (titular de ${socio.apellidoNombre})`
+      : socio.apellidoNombre
+    console.log(`Notificado: Cuota próxima a vencer para ${etiqueta}`)
   } catch (error) {
     console.error('Error notificando cuota próxima a vencer:', error.message)
   }
@@ -423,53 +446,61 @@ export async function notificarCuotaVencida(cargo) {
   try {
     const socio = await prisma.socio.findUnique({
       where: { id: cargo.socioId },
+      include: { titularFamilia: true },
     })
 
     if (!socio || !socio.notificarCuotaVencida) {
       return
     }
 
+    // Si el cargo es de un miembro del grupo familiar, el aviso va al titular.
+    const destinatario = socio.titularFamilia || socio
+
     const metadata = {
-      socioNombre: socio.apellidoNombre,
-      nroSocio: socio.nroSocio,
+      socioNombre: destinatario.apellidoNombre,
+      nroSocio: destinatario.nroSocio,
       cargoDescripcion: cargo.descripcion || 'Cuota mensual',
       montoTotal: cargo.montoTotal.toString(),
       fechaVencimiento: new Date(cargo.fechaVencimiento).toLocaleDateString('es-AR'),
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${destinatario.tokenPortal}?pagar=${cargo.id}`,
+      socioCuota: destinatario.id !== socio.id ? socio.apellidoNombre : null,
     }
 
-    // Email
-    if (socio.email && socio.notifEmail !== false) {
+    // Email (al titular si aplica)
+    if (destinatario.email && destinatario.notifEmail !== false) {
       await programarNotificacion({
         tipo: 'EMAIL',
         eventType: 'CUOTA_VENCIDA',
-        destinatario: socio.email,
-        socioId: socio.id,
+        destinatario: destinatario.email,
+        socioId: destinatario.id,
         cargoId: cargo.id,
-        asunto: 'Tu cuota ha vencido',
+        asunto: destinatario.id !== socio.id ? `La cuota de ${socio.apellidoNombre} ha vencido` : 'Tu cuota ha vencido',
         cuerpo: null,
         fechaProgramado: new Date(),
         metadata,
       })
     }
 
-    // WhatsApp
-    if (socio.notifWhatsapp && obtenerTelefonoSocio(socio)) {
-      const db = createTenantPrisma(socio.tenantId)
+    // WhatsApp (al titular si aplica)
+    if (destinatario.notifWhatsapp && obtenerTelefonoSocio(destinatario)) {
+      const db = createTenantPrisma(destinatario.tenantId)
       db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_VENCIMIENTO' } })
         .then(flag => {
           if (flag?.valor !== 'false') {
             notifWaVencimiento({
               db,
-              socio,
-              cuota: { vencimiento: cargo.fechaVencimiento, importe: cargo.montoTotal },
+              socio: destinatario,
+              cuota: { id: cargo.id, vencimiento: cargo.fechaVencimiento, importe: cargo.montoTotal },
             }).catch(err => console.error('Error WA cuota vencida:', err.message))
           }
         })
         .catch(err => console.error('Error leyendo flag WA vencimiento:', err.message))
     }
 
-    console.log(`Notificado: Cuota vencida para ${socio.apellidoNombre}`)
+    const etiqueta = destinatario.id !== socio.id
+      ? `${destinatario.apellidoNombre} (titular de ${socio.apellidoNombre})`
+      : socio.apellidoNombre
+    console.log(`Notificado: Cuota vencida para ${etiqueta}`)
   } catch (error) {
     console.error('Error notificando cuota vencida:', error.message)
   }
@@ -482,16 +513,38 @@ export async function notificarMorosidad(socioId) {
   try {
     const socio = await prisma.socio.findUnique({
       where: { id: socioId },
+      include: {
+        titularFamilia: true,
+        miembrosFamilia: { select: { id: true, apellidoNombre: true } },
+      },
     })
 
     if (!socio || !socio.notificarMorosidad) {
       return
     }
 
-    // Obtener todas las cuotas vencidas
+    // Si es miembro de familia, el aviso va al titular.
+    const destinatario = socio.titularFamilia || socio
+
+    // IDs cuyas cuotas vencidas se incluirán: si el destinatario es titular,
+    // se consolida toda la familia (titular + miembros). Si es socio único,
+    // solo el suyo.
+    let socioIdsDeuda = [destinatario.id]
+    if (destinatario.id === socio.id && socio.miembrosFamilia?.length > 0) {
+      socioIdsDeuda = [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
+    } else if (destinatario.id !== socio.id) {
+      // Caso: nos llegó un miembro, pero el destinatario será el titular.
+      // Buscar todos los miembros del grupo del titular para consolidar deuda.
+      const grupo = await prisma.socio.findMany({
+        where: { OR: [{ id: destinatario.id }, { titularFamiliaId: destinatario.id }] },
+        select: { id: true },
+      })
+      socioIdsDeuda = grupo.map(s => s.id)
+    }
+
     const cuotasVencidas = await prisma.cargo.findMany({
       where: {
-        socioId: socio.id,
+        socioId: { in: socioIdsDeuda },
         estado: 'PENDIENTE',
         fechaVencimiento: { lt: new Date() },
       },
@@ -505,11 +558,11 @@ export async function notificarMorosidad(socioId) {
     const totalAdeudado = cuotasVencidas.reduce((sum, c) => sum + Number(c.montoTotal), 0)
 
     const metadata = {
-      socioNombre: socio.apellidoNombre,
-      nroSocio: socio.nroSocio,
+      socioNombre: destinatario.apellidoNombre,
+      nroSocio: destinatario.nroSocio,
       cantidadCuotas: cuotasVencidas.length.toString(),
       totalAdeudado: totalAdeudado.toFixed(2),
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${destinatario.tokenPortal}`,
       cuotas: cuotasVencidas.map((c) => ({
         descripcion: c.descripcion,
         monto: c.montoTotal.toString(),
@@ -517,30 +570,30 @@ export async function notificarMorosidad(socioId) {
       })),
     }
 
-    // Email
-    if (socio.email && socio.notifEmail !== false) {
+    // Email (al titular si aplica)
+    if (destinatario.email && destinatario.notifEmail !== false) {
       await programarNotificacion({
         tipo: 'EMAIL',
         eventType: 'MOROSIDAD',
-        destinatario: socio.email,
-        socioId: socio.id,
+        destinatario: destinatario.email,
+        socioId: destinatario.id,
         cargoId: null,
-        asunto: `Recordatorio de pago - ${cuotasVencidas.length} cuotas pendientes`,
+        asunto: `Recordatorio de pago - ${cuotasVencidas.length} cuota(s) pendiente(s)`,
         cuerpo: null,
         fechaProgramado: new Date(),
         metadata,
       })
     }
 
-    // WhatsApp
-    if (socio.notifWhatsapp && obtenerTelefonoSocio(socio)) {
-      const db = createTenantPrisma(socio.tenantId)
+    // WhatsApp (al titular si aplica)
+    if (destinatario.notifWhatsapp && obtenerTelefonoSocio(destinatario)) {
+      const db = createTenantPrisma(destinatario.tenantId)
       db.configuracion.findFirst({ where: { clave: 'WHATSAPP_NOTIF_MORA' } })
         .then(flag => {
           if (flag?.valor !== 'false') {
             notifWaMora({
               db,
-              socio,
+              socio: destinatario,
               deuda: { total: totalAdeudado },
             }).catch(err => console.error('Error WA morosidad:', err.message))
           }
@@ -548,7 +601,7 @@ export async function notificarMorosidad(socioId) {
         .catch(err => console.error('Error leyendo flag WA mora:', err.message))
     }
 
-    console.log(`Notificado: Morosidad para ${socio.apellidoNombre} (${cuotasVencidas.length} cuotas)`)
+    console.log(`Notificado: Morosidad para ${destinatario.apellidoNombre} (${cuotasVencidas.length} cuotas, grupo de ${socioIdsDeuda.length})`)
   } catch (error) {
     console.error('Error notificando morosidad:', error.message)
   }
@@ -653,53 +706,52 @@ export async function notificarBienvenida(socioId) {
  * Buscar cuotas que vencen en 5 días y notificar
  */
 export async function verificarCuotasProximasVencer() {
-  try {
-    const cincoDias = new Date()
-    cincoDias.setDate(cincoDias.getDate() + 5)
-    cincoDias.setHours(0, 0, 0, 0)
+  const pausados = await getTenantsBloqueadosPorCron('CUOTAS_PROXIMAS')
+  const tenants = await prisma.tenant.findMany({
+    where: { activo: true, ...(pausados.length > 0 ? { id: { notIn: pausados } } : {}) },
+  })
+  let total = 0
 
-    const seisDias = new Date()
-    seisDias.setDate(seisDias.getDate() + 6)
-    seisDias.setHours(0, 0, 0, 0)
+  for (const tenant of tenants) {
+    try {
+      const db = createTenantPrisma(tenant.id)
 
-    const pausados = await getTenantsConCronsPausados()
-    const cuotas = await prisma.cargo.findMany({
-      where: {
-        estado: 'PENDIENTE',
-        fechaVencimiento: {
-          gte: cincoDias,
-          lt: seisDias,
-        },
-        socioId: { not: null },
-        ...(pausados.length > 0 ? { tenantId: { notIn: pausados } } : {}),
-      },
-      include: {
-        socio: true,
-      },
-    })
+      // Días antes del vencimiento, configurable por tenant (default 5)
+      const cfgDias = await db.configuracion.findFirst({ where: { clave: 'CUOTAS_PROXIMAS_DIAS' } })
+      const dias = parseInt(cfgDias?.valor || '5')
 
-    console.log(`🔍 Encontradas ${cuotas.length} cuotas que vencen en 5 días`)
+      const fechaInicio = new Date()
+      fechaInicio.setDate(fechaInicio.getDate() + dias)
+      fechaInicio.setHours(0, 0, 0, 0)
+      const fechaFin = new Date(fechaInicio)
+      fechaFin.setHours(23, 59, 59, 999)
 
-    for (const cargo of cuotas) {
-      // Verificar que no se haya notificado ya
-      const yaNotificado = await prisma.notificacionLog.findFirst({
+      const cuotas = await db.cargo.findMany({
         where: {
-          eventType: 'CUOTA_PROX_VENCER',
-          cargoId: cargo.id,
-          enviado: true,
+          estado: 'PENDIENTE',
+          fechaVencimiento: { gte: fechaInicio, lte: fechaFin },
+          socioId: { not: null },
         },
+        include: { socio: true },
       })
 
-      if (!yaNotificado) {
-        await notificarCuotaProximaVencer(cargo)
-      }
-    }
+      for (const cargo of cuotas) {
+        const yaNotificado = await db.notificacionLog.findFirst({
+          where: { eventType: 'CUOTA_PROX_VENCER', cargoId: cargo.id, enviado: true },
+        })
+        if (yaNotificado) continue
 
-    return cuotas.length
-  } catch (error) {
-    console.error('Error verificando cuotas próximas a vencer:', error.message)
-    throw error
+        await notificarCuotaProximaVencer(cargo)
+        total++
+      }
+
+      console.log(`📬 [Cuotas Próximas] Tenant ${tenant.id}: ${cuotas.length} cuotas en ${dias}d`)
+    } catch (err) {
+      console.error(`[Cuotas Próximas] Error tenant ${tenant.id}:`, err.message)
+    }
   }
+
+  return total
 }
 
 /**
@@ -714,7 +766,7 @@ export async function verificarCuotasVencidasHoy() {
     manana.setDate(manana.getDate() + 1)
     manana.setHours(0, 0, 0, 0)
 
-    const pausados = await getTenantsConCronsPausados()
+    const pausados = await getTenantsBloqueadosPorCron('CUOTAS_VENCIDAS')
     const cuotas = await prisma.cargo.findMany({
       where: {
         estado: 'PENDIENTE',
@@ -761,34 +813,41 @@ export async function verificarMorosidad() {
     const hace15Dias = new Date()
     hace15Dias.setDate(hace15Dias.getDate() - 15)
 
-    const pausados = await getTenantsConCronsPausados()
-    // Buscar socios con cuotas vencidas hace más de 15 días
+    const pausados = await getTenantsBloqueadosPorCron('MOROSIDAD_RECORDATORIO')
+    // Buscar SOLO titulares (o socios únicos) cuyo grupo tenga cuotas vencidas hace más de 15 días.
+    // Excluimos miembros de grupo familiar para no notificar al titular varias veces.
     const sociosConMorosidad = await prisma.socio.findMany({
       where: {
         estadoSocioRel: { esSocioActivo: true },
-        cargos: {
-          some: {
-            estado: 'PENDIENTE',
-            fechaVencimiento: {
-              lt: hace15Dias,
+        titularFamiliaId: null, // solo titulares o socios únicos
+        OR: [
+          {
+            cargos: {
+              some: {
+                estado: 'PENDIENTE',
+                fechaVencimiento: { lt: hace15Dias },
+              },
             },
           },
-        },
+          {
+            miembrosFamilia: {
+              some: {
+                cargos: {
+                  some: {
+                    estado: 'PENDIENTE',
+                    fechaVencimiento: { lt: hace15Dias },
+                  },
+                },
+              },
+            },
+          },
+        ],
         ...(pausados.length > 0 ? { tenantId: { notIn: pausados } } : {}),
       },
-      include: {
-        cargos: {
-          where: {
-            estado: 'PENDIENTE',
-            fechaVencimiento: {
-              lt: new Date(),
-            },
-          },
-        },
-      },
+      select: { id: true },
     })
 
-    console.log(`🔍 Encontrados ${sociosConMorosidad.length} socios con morosidad`)
+    console.log(`🔍 Encontrados ${sociosConMorosidad.length} titulares con morosidad`)
 
     for (const socio of sociosConMorosidad) {
       // Verificar que no se haya notificado en los últimos 15 días
@@ -958,7 +1017,7 @@ export async function verificarPartidosProximos() {
     pasadoManana.setDate(pasadoManana.getDate() + 2)
     pasadoManana.setHours(0, 0, 0, 0)
 
-    const pausados = await getTenantsConCronsPausados()
+    const pausados = await getTenantsBloqueadosPorCron('PARTIDOS_PROXIMOS')
     // Buscar partidos de mañana que no estén cancelados
     const partidos = await prisma.partido.findMany({
       where: {
@@ -1443,7 +1502,8 @@ async function _enviarCumpleaniosTenant(db) {
   const socios = await db.socio.findMany({
     where: { estadoSocioRel: { esSocioActivo: true }, fechaNacimiento: { not: null } },
     select: {
-      id: true, apellidoNombre: true, email: true,
+      id: true, tenantId: true, apellidoNombre: true, nroSocio: true,
+      tokenPortal: true, email: true,
       celular: true, celularSecundario: true, telefonoFijo: true,
       fechaNacimiento: true, notifEmail: true, notifWhatsapp: true,
     }
@@ -1471,10 +1531,11 @@ async function _enviarCumpleaniosTenant(db) {
     })
     if (yaEnviado) continue
 
-    const nombreCorto = socio.apellidoNombre.includes(',')
-      ? socio.apellidoNombre.split(',')[1].trim().split(' ')[0]
-      : socio.apellidoNombre.split(' ')[0]
-    const mensaje = mensajeTpl.replace(/{nombre}/g, nombreCorto)
+    const variables = await buildVariablesSocio(socio)
+    // Soporta tanto {var} como {{var}} (template legacy usaba 1 sola llave)
+    const mensaje = mensajeTpl
+      .replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? '')
+      .replace(/\{(\w+)\}/g, (_, key) => variables[key] ?? '')
     const html = `<p style="font-family:sans-serif;font-size:16px;color:#374151">${mensaje}</p>`
 
     let enviado = false
@@ -1527,118 +1588,6 @@ async function _enviarCumpleaniosTenant(db) {
  * Recordatorio anticipado de cuotas - configurable por tenant (por defecto D-3)
  * Se ejecuta diariamente
  */
-export async function verificarRecordatorioAnticipado() {
-  const pausados = await getTenantsConCronsPausados()
-  const tenants = await prisma.tenant.findMany({
-    where: { activo: true, ...(pausados.length > 0 ? { id: { notIn: pausados } } : {}) }
-  })
-  let total = 0
-
-  for (const tenant of tenants) {
-    try {
-      const db = createTenantPrisma(tenant.id)
-      const cfgActivo = await db.configuracion.findFirst({ where: { clave: 'RECORDATORIO_ANTICIPADO_ACTIVO' } })
-      if (cfgActivo?.valor !== 'true') continue
-
-      const cfgDias = await db.configuracion.findFirst({ where: { clave: 'RECORDATORIO_ANTICIPADO_DIAS' } })
-      const dias = parseInt(cfgDias?.valor || '3')
-
-      const fechaInicio = new Date()
-      fechaInicio.setDate(fechaInicio.getDate() + dias)
-      fechaInicio.setHours(0, 0, 0, 0)
-      const fechaFin = new Date(fechaInicio)
-      fechaFin.setHours(23, 59, 59, 999)
-
-      const cargos = await db.cargo.findMany({
-        where: {
-          estado: 'PENDIENTE',
-          fechaVencimiento: { gte: fechaInicio, lte: fechaFin },
-          socioId: { not: null },
-        },
-        include: { socio: true }
-      })
-
-      for (const cargo of cargos) {
-        const yaNotificado = await db.notificacionLog.findFirst({
-          where: { eventType: 'CUOTA_RECORDATORIO', cargoId: cargo.id, enviado: true }
-        })
-        if (yaNotificado) continue
-
-        await _notificarRecordatorioAnticipado(cargo, dias, db)
-        total++
-      }
-
-      console.log(`📬 [Recordatorio Anticipado] Tenant ${tenant.id}: ${cargos.length} cuotas próximas en ${dias}d`)
-    } catch (err) {
-      console.error(`[Recordatorio Anticipado] Error tenant ${tenant.id}:`, err.message)
-    }
-  }
-
-  return total
-}
-
-async function _notificarRecordatorioAnticipado(cargo, dias, db) {
-  const socio = cargo.socio
-  if (!socio) return
-
-  const { enviarEmail: _enviarEmail } = await import('./email.js')
-  const fechaVenc = new Date(cargo.fechaVencimiento).toLocaleDateString('es-AR')
-  const monto = Number(cargo.montoTotal).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
-  const nombreCorto = socio.apellidoNombre.includes(',')
-    ? socio.apellidoNombre.split(',')[1].trim().split(' ')[0]
-    : socio.apellidoNombre.split(' ')[0]
-
-  const html = `
-    <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-      <h2 style="color:#1f2937">Recordatorio de cuota</h2>
-      <p>Hola ${nombreCorto},</p>
-      <p>Te recordamos que tu cuota <strong>${cargo.descripcion || 'mensual'}</strong> vence en <strong>${dias} día${dias !== 1 ? 's' : ''}</strong> (${fechaVenc}).</p>
-      <p>Importe: <strong>${monto}</strong></p>
-      <p style="color:#6b7280;font-size:13px">Podés abonarla desde el portal del socio.</p>
-    </div>
-  `
-
-  let enviado = false
-
-  if (socio.email && socio.notifEmail !== false) {
-    try {
-      await _enviarEmail({ to: socio.email, subject: `Recordatorio: tu cuota vence en ${dias} días`, html, db })
-      enviado = true
-    } catch (err) {
-      console.error(`[Recordatorio] Error email ${socio.email}:`, err.message)
-    }
-  }
-
-  if (socio.notifWhatsapp !== false) {
-    const tel = obtenerTelefonoSocio(socio)
-    if (tel) {
-      try {
-        await notifWaVencimiento({ db, socio, cuota: { vencimiento: cargo.fechaVencimiento, importe: cargo.montoTotal } })
-        enviado = true
-      } catch (err) {
-        console.error(`[Recordatorio] Error WA ${tel}:`, err.message)
-      }
-    }
-  }
-
-  if (enviado) {
-    await db.notificacionLog.create({
-      data: {
-        tipo: 'EMAIL',
-        eventType: 'CUOTA_RECORDATORIO',
-        destinatario: socio.email || obtenerTelefonoSocio(socio) || '-',
-        socioId: socio.id,
-        cargoId: cargo.id,
-        asunto: `Recordatorio: cuota vence en ${dias} días`,
-        enviado: true,
-        fechaEnvio: new Date(),
-        fechaProgramado: new Date(),
-        intentos: 1,
-      }
-    })
-  }
-}
-
 export default {
   programarNotificacion,
   procesarNotificacionesPendientes,
@@ -1661,5 +1610,4 @@ export default {
   verificarBajaAsistencia,
   // Automatización de comunicaciones
   enviarSaludosCumpleanios,
-  verificarRecordatorioAnticipado,
 }

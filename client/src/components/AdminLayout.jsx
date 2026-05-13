@@ -13,6 +13,8 @@ import { cargarPermisos, limpiarPermisos, getPermisos, esAdmin } from '../servic
 import TenantLogo from './TenantLogo'
 import { useTenant } from '../contexts/TenantContext'
 import FavoritoModal from './FavoritoModal'
+import RecuperoNotifier from './RecuperoNotifier'
+import NotificationBell from './NotificationBell'
 
 // Mapeo de nombres de iconos a componentes
 const ICONOS = {
@@ -619,6 +621,7 @@ export default function AdminLayout() {
             </button>
           </div>
           <div className="hidden md:flex items-center gap-4">
+            <NotificationBell />
             <button
               onClick={abrirFavoritoModal}
               className="flex items-center justify-center w-9 h-9 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
@@ -680,6 +683,7 @@ export default function AdminLayout() {
             <Outlet />
           )}
         </main>
+        <RecuperoNotifier />
       </div>
 
       <FavoritoModal

@@ -1431,37 +1431,6 @@ router.put('/configuracion-cumpleanios', authAdmin, asyncHandler(async (req, res
   res.json({ success: true })
 }))
 
-// GET /api/admin/configuracion-recordatorio-anticipado
-router.get('/configuracion-recordatorio-anticipado', authAdmin, asyncHandler(async (req, res) => {
-  const claves = ['RECORDATORIO_ANTICIPADO_ACTIVO', 'RECORDATORIO_ANTICIPADO_DIAS']
-  const configs = await req.db.configuracion.findMany({ where: { clave: { in: claves } } })
-  const map = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
-  res.json({
-    success: true,
-    data: {
-      activo: map['RECORDATORIO_ANTICIPADO_ACTIVO'] === 'true',
-      dias: parseInt(map['RECORDATORIO_ANTICIPADO_DIAS'] || '3'),
-    }
-  })
-}))
-
-// PUT /api/admin/configuracion-recordatorio-anticipado
-router.put('/configuracion-recordatorio-anticipado', authAdmin, asyncHandler(async (req, res) => {
-  const { activo, dias } = req.body
-  const updates = [
-    { clave: 'RECORDATORIO_ANTICIPADO_ACTIVO', valor: activo ? 'true' : 'false' },
-    { clave: 'RECORDATORIO_ANTICIPADO_DIAS', valor: String(parseInt(dias) || 3) },
-  ]
-  for (const { clave, valor } of updates) {
-    await req.db.configuracion.upsert({
-      where: { tenantId_clave: { tenantId: req.tenantId, clave } },
-      update: { valor },
-      create: { clave, valor, tenantId: req.tenantId },
-    })
-  }
-  res.json({ success: true })
-}))
-
 // Función para calcular recargo de un cargo
 async function calcularRecargoCargo(prisma, cargo) {
   if (!cargo.fechaVencimiento || cargo.estado !== 'PENDIENTE') {
@@ -1588,6 +1557,243 @@ router.post('/sistema/smtp/test', authAdmin, asyncHandler(async (req, res) => {
       usandoFallback,
     })
   }
+}))
+
+// ============================================================================
+// CRONS DEL SISTEMA - listado y switches individuales
+// ============================================================================
+
+// GET /api/admin/sistema/crons - Listar todos los crons con su estado para el tenant
+router.get('/sistema/crons', authAdmin, asyncHandler(async (req, res) => {
+  const { CRONS_CATALOGO } = await import('../../lib/cronsCatalogo.js')
+
+  // Master pause
+  const master = await req.db.configuracion.findFirst({ where: { clave: 'CRONS_PAUSADOS' }, select: { valor: true } })
+  const masterPausado = master?.valor === 'true'
+
+  // Cargar configs individuales
+  const configKeys = CRONS_CATALOGO.map(c => c.configKey)
+  const cfgs = await req.db.configuracion.findMany({
+    where: { clave: { in: configKeys } },
+    select: { clave: true, valor: true },
+  })
+  const cfgMap = Object.fromEntries(cfgs.map(c => [c.clave, c.valor]))
+
+  const items = CRONS_CATALOGO.map(c => {
+    const valor = cfgMap[c.configKey]
+    const activoIndividual = valor != null ? valor === 'true' : c.defaultActivo
+    return {
+      key: c.key,
+      label: c.label,
+      descripcion: c.descripcion,
+      horario: c.horario,
+      configKey: c.configKey,
+      activoIndividual,
+      activoEfectivo: !masterPausado && activoIndividual,
+    }
+  })
+
+  res.json({ success: true, data: { masterPausado, crons: items } })
+}))
+
+// PUT /api/admin/sistema/crons/:cronKey - Activar/desactivar un cron específico
+router.put('/sistema/crons/:cronKey', authAdmin, asyncHandler(async (req, res) => {
+  const { CRONS_CATALOGO } = await import('../../lib/cronsCatalogo.js')
+  const { cronKey } = req.params
+  const { activo } = req.body
+
+  const cron = CRONS_CATALOGO.find(c => c.key === cronKey)
+  if (!cron) return res.status(404).json({ success: false, error: { message: 'Cron no encontrado' } })
+  if (typeof activo !== 'boolean') {
+    return res.status(400).json({ success: false, error: { message: 'activo (boolean) requerido' } })
+  }
+
+  await req.db.configuracion.upsert({
+    where: { tenantId_clave: { tenantId: req.tenantId, clave: cron.configKey } },
+    update: { valor: activo ? 'true' : 'false' },
+    create: {
+      clave: cron.configKey,
+      valor: activo ? 'true' : 'false',
+      tipo: 'BOOLEAN',
+      modulo: 'CRONS',
+      descripcion: cron.label,
+    },
+  })
+
+  res.json({ success: true, data: { cronKey, activo } })
+}))
+
+// POST /api/admin/sistema/crons/:cronKey/test - Disparar el cron manualmente (limitado)
+// Body: { limit: 5, canales: ['email','whatsapp'] }
+router.post('/sistema/crons/:cronKey/test', authAdmin, asyncHandler(async (req, res) => {
+  const { cronKey } = req.params
+  const { limit = 5, canales = ['email', 'whatsapp'] } = req.body || {}
+  const { CRONS_CATALOGO } = await import('../../lib/cronsCatalogo.js')
+  const cron = CRONS_CATALOGO.find(c => c.key === cronKey)
+  if (!cron) return res.status(404).json({ success: false, error: { message: 'Cron no encontrado' } })
+
+  const max = Math.min(parseInt(limit) || 5, 20)
+  const enviarEmail_ = canales.includes('email')
+  const enviarWA_ = canales.includes('whatsapp')
+
+  if (!enviarEmail_ && !enviarWA_) {
+    return res.status(400).json({ success: false, error: { message: 'Debe seleccionar al menos un canal' } })
+  }
+
+  const { enviarEmail } = await import('../../services/email.js')
+  const { enviarWhatsApp, obtenerTelefonoSocio } = await import('../../services/whatsappService.js')
+
+  // 1) Resolver socios afectados según el cron
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const inicio = (n) => { const d = new Date(hoy); d.setDate(d.getDate() + n); return d }
+  const fin = (n) => { const d = inicio(n); d.setHours(23, 59, 59, 999); return d }
+
+  let registros = []
+
+  switch (cronKey) {
+    case 'CUOTAS_PROXIMAS': {
+      const cfgDias = await req.db.configuracion.findFirst({ where: { clave: 'CUOTAS_PROXIMAS_DIAS' } })
+      const dias = parseInt(cfgDias?.valor || '5')
+      const cargos = await req.db.cargo.findMany({
+        where: { estado: 'PENDIENTE', fechaVencimiento: { gte: inicio(dias), lte: fin(dias) }, socioId: { not: null } },
+        include: { socio: true },
+        take: max,
+      })
+      registros = cargos.map(c => ({
+        socio: c.socio,
+        asunto: `Recordatorio: tu cuota vence en ${dias} días`,
+        html: `<p>Hola ${c.socio.apellidoNombre}, tu cuota <strong>${c.descripcion || '#' + c.id}</strong> por $${Number(c.montoTotal).toLocaleString('es-AR')} vence el ${new Date(c.fechaVencimiento).toLocaleDateString('es-AR')}.</p>`,
+        wa: `Hola ${c.socio.apellidoNombre.split(',')[0]}, recordá que tu cuota vence el ${new Date(c.fechaVencimiento).toLocaleDateString('es-AR')} por $${Number(c.montoTotal).toLocaleString('es-AR')}.`,
+      }))
+      break
+    }
+    case 'CUOTAS_VENCIDAS': {
+      const cargos = await req.db.cargo.findMany({
+        where: { estado: 'PENDIENTE', fechaVencimiento: { gte: hoy, lt: inicio(1) }, socioId: { not: null } },
+        include: { socio: true },
+        take: max,
+      })
+      registros = cargos.map(c => ({
+        socio: c.socio,
+        asunto: `Tu cuota vence hoy`,
+        html: `<p>Hola ${c.socio.apellidoNombre}, tu cuota <strong>${c.descripcion || '#' + c.id}</strong> por $${Number(c.montoTotal).toLocaleString('es-AR')} vence hoy.</p>`,
+        wa: `Hola ${c.socio.apellidoNombre.split(',')[0]}, tu cuota vence HOY por $${Number(c.montoTotal).toLocaleString('es-AR')}.`,
+      }))
+      break
+    }
+    case 'MOROSIDAD_RECORDATORIO': {
+      const hace15 = new Date(); hace15.setDate(hace15.getDate() - 15)
+      const socios = await req.db.socio.findMany({
+        where: {
+          estadoSocioRel: { esSocioActivo: true },
+          cargos: { some: { estado: 'PENDIENTE', fechaVencimiento: { lt: hace15 } } },
+        },
+        include: { cargos: { where: { estado: 'PENDIENTE', fechaVencimiento: { lt: new Date() } } } },
+        take: max,
+      })
+      registros = socios.map(s => {
+        const total = s.cargos.reduce((sum, c) => sum + Number(c.montoTotal), 0)
+        return {
+          socio: s,
+          asunto: `Recordatorio: tenés cuotas vencidas`,
+          html: `<p>Hola ${s.apellidoNombre}, tenés ${s.cargos.length} cuota(s) vencida(s) por un total de $${total.toLocaleString('es-AR')}. Por favor regularizá tu situación.</p>`,
+          wa: `Hola ${s.apellidoNombre.split(',')[0]}, tenés ${s.cargos.length} cuota(s) vencida(s) por $${total.toLocaleString('es-AR')}. Regularizá tu situación.`,
+        }
+      })
+      break
+    }
+    case 'CUMPLEANIOS': {
+      const mes = hoy.getMonth() + 1
+      const dia = hoy.getDate()
+      const socios = await req.db.socio.findMany({
+        where: { estadoSocioRel: { esSocioActivo: true }, fechaNacimiento: { not: null } },
+        take: 100,
+      })
+      const cumple = socios.filter(s => {
+        const fn = new Date(s.fechaNacimiento)
+        return fn.getMonth() + 1 === mes && fn.getDate() === dia
+      }).slice(0, max)
+      const cfgMensaje = await req.db.configuracion.findFirst({ where: { clave: 'CUMPLEANIOS_MENSAJE' } })
+      const tpl = cfgMensaje?.valor || 'Feliz cumpleaños, {nombre}! El club te desea un excelente día.'
+      registros = cumple.map(s => {
+        const nombre = (s.nombre || s.apellidoNombre.split(',').pop() || '').trim()
+        const msg = tpl.replace(/\{nombre\}/g, nombre)
+        return {
+          socio: s,
+          asunto: `Feliz cumpleaños!`,
+          html: `<p>${msg}</p>`,
+          wa: msg,
+        }
+      })
+      break
+    }
+    case 'VIGENCIA_NOTIFICACION': {
+      const socios = await req.db.socio.findMany({
+        where: { estadoSocioRel: { rolVigencia: 'BLOQUEADO' } },
+        take: max,
+      })
+      registros = socios.map(s => ({
+        socio: s,
+        asunto: `Tu acceso al club está restringido`,
+        html: `<p>Hola ${s.apellidoNombre}, te informamos que tu acceso al club está temporalmente restringido por cuotas pendientes. Por favor contactanos para regularizar.</p>`,
+        wa: `Hola ${s.apellidoNombre.split(',')[0]}, tu acceso al club está restringido por cuotas pendientes. Comunicate con secretaría.`,
+      }))
+      break
+    }
+    default:
+      return res.status(400).json({
+        success: false,
+        error: { message: `El cron "${cronKey}" no soporta ejecución de test individual (es un proceso interno, no envía mensajes por socio).` }
+      })
+  }
+
+  if (registros.length === 0) {
+    return res.json({ success: true, data: { enviados: [], total: 0, mensaje: 'No se encontraron socios afectados por este cron en este momento.' } })
+  }
+
+  // 2) Enviar a cada uno
+  const enviados = []
+  for (const r of registros) {
+    const item = {
+      socioId: r.socio.id,
+      nroSocio: r.socio.nroSocio,
+      nombre: r.socio.apellidoNombre,
+      email: { intentado: false, ok: false, motivo: null },
+      whatsapp: { intentado: false, ok: false, motivo: null },
+    }
+    if (enviarEmail_) {
+      item.email.intentado = true
+      if (!r.socio.email) {
+        item.email.motivo = 'Sin email'
+      } else {
+        try {
+          await enviarEmail({ to: r.socio.email, subject: r.asunto, html: r.html, db: req.db })
+          item.email.ok = true
+        } catch (e) {
+          item.email.motivo = e.message
+        }
+      }
+    }
+    if (enviarWA_) {
+      item.whatsapp.intentado = true
+      const tel = obtenerTelefonoSocio(r.socio)
+      if (!tel) {
+        item.whatsapp.motivo = 'Sin teléfono'
+      } else {
+        try {
+          const resWA = await enviarWhatsApp({ db: req.db, telefono: tel, texto: r.wa, ignorarHorario: true })
+          item.whatsapp.ok = resWA?.enviado === true
+          if (!item.whatsapp.ok) item.whatsapp.motivo = resWA?.motivo || 'No enviado'
+        } catch (e) {
+          item.whatsapp.motivo = e.message
+        }
+      }
+    }
+    enviados.push(item)
+  }
+
+  res.json({ success: true, data: { total: enviados.length, enviados } })
 }))
 
 export default router

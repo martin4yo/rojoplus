@@ -147,8 +147,9 @@ const STATUS_CONFIGS = {
   // Tipo genérico para casos no específicos
   generic: {
     success: { color: 'green', keywords: ['exito', 'ok', 'correcto', 'activ', 'aprobad', 'pagad', 'cobrad'] },
-    warning: { color: 'yellow', keywords: ['pendiente', 'proceso', 'espera', 'revision'] },
-    error: { color: 'red', keywords: ['error', 'fallid', 'rechazad', 'cancelad', 'vencid'] },
+    compensado: { color: 'purple', keywords: ['compensad'] },
+    warning: { color: 'yellow', keywords: ['pendiente', 'proceso', 'espera', 'revision', 'confirmad'] },
+    error: { color: 'red', keywords: ['error', 'fallid', 'rechazad', 'cancelad', 'vencid', 'anulad'] },
     info: { color: 'blue', keywords: ['info', 'proceso'] },
     default: { color: 'gray' }
   }

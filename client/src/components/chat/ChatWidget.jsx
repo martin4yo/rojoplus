@@ -13,6 +13,7 @@ import chatService from '../../services/chatService'
  * - position: 'bottom-right' | 'bottom-left' | 'sidebar' (default: bottom-right)
  */
 const STORAGE_KEY = 'chat_widget_pos'
+const MOBILE_BREAKPOINT = '(max-width: 640px)'
 
 function loadSavedPos() {
   try {
@@ -20,6 +21,24 @@ function loadSavedPos() {
     if (saved) return JSON.parse(saved)
   } catch {}
   return null
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined'
+      ? window.matchMedia(MOBILE_BREAKPOINT).matches
+      : false
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia(MOBILE_BREAKPOINT)
+    const onChange = (e) => setIsMobile(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  return isMobile
 }
 
 export default function ChatWidget({
@@ -34,6 +53,7 @@ export default function ChatWidget({
   const [isAvailable, setIsAvailable] = useState(null) // null = cargando
   const [agentName, setAgentName] = useState('Axio')
   const [dragPos, setDragPos] = useState(null) // { x, y } desde esquina inferior derecha, null = posición default
+  const isMobile = useIsMobile()
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0, moved: false })
@@ -208,7 +228,7 @@ Puedo ayudarte con:
   }, [])
 
   const handlePointerDown = (e) => {
-    if (position === 'sidebar') return
+    if (position === 'sidebar' || isMobile) return
     e.preventDefault()
     const d = dragRef.current
     d.dragging = true
@@ -222,6 +242,7 @@ Puedo ayudarte con:
   }
 
   const handlePointerMove = (e) => {
+    if (isMobile) return
     const d = dragRef.current
     if (!d.dragging) return
     const dx = e.clientX - d.startX
@@ -234,6 +255,10 @@ Puedo ayudarte con:
   }
 
   const handlePointerUp = (e) => {
+    if (isMobile) {
+      toggleOpen()
+      return
+    }
     const d = dragRef.current
     if (!d.dragging) return
     d.dragging = false
@@ -261,15 +286,30 @@ Puedo ayudarte con:
   // No renderizar hasta confirmar disponibilidad; ocultar si no hay API key
   if (!isAvailable) return null
 
+  // Mobile abierto: ocupar pantalla completa con dvh para respetar el teclado
+  // virtual. Desktop o sidebar: comportamiento previo.
+  const isFullscreenMobile = isOpen && isMobile && position !== 'sidebar'
+  const panelClasses =
+    position === 'sidebar'
+      ? 'w-full h-full rounded-2xl border border-gray-200 dark:border-gray-800'
+      : isFullscreenMobile
+        ? 'fixed inset-0 w-full h-[100dvh] rounded-none border-0'
+        : 'w-80 sm:w-96 h-[500px] sm:h-[580px] rounded-2xl border border-gray-200 dark:border-gray-800'
+
+  const panelStyle =
+    position === 'sidebar' || isFullscreenMobile
+      ? {}
+      : { position: 'fixed', ...getPositionStyle() }
+
   return (
     <div className={getPositionClasses()} style={getPositionStyle()}>
-      {/* Botón flotante — draggable */}
+      {/* Botón flotante — draggable en desktop, tap en mobile */}
       {!isOpen && position !== 'sidebar' && (
         <button
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          className="w-14 h-14 bg-primary hover:bg-primary-dark text-white rounded-full shadow-lg flex items-center justify-center transition-colors touch-none select-none cursor-grab active:cursor-grabbing"
+          className="w-14 h-14 bg-primary hover:bg-primary-dark text-white rounded-full shadow-lg flex items-center justify-center transition-colors touch-none select-none cursor-pointer sm:cursor-grab sm:active:cursor-grabbing"
           aria-label="Abrir chat de IA"
         >
           <MessageCircle className="w-6 h-6" />
@@ -279,15 +319,15 @@ Puedo ayudarte con:
       {/* Panel de chat */}
       {(isOpen || position === 'sidebar') && (
         <div
-          className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col border border-gray-200 dark:border-gray-800 ${
-            position === 'sidebar'
-              ? 'w-full h-full'
-              : 'w-80 sm:w-96 h-[500px] sm:h-[580px]'
-          }`}
-          style={position !== 'sidebar' ? { position: 'fixed', ...getPositionStyle() } : {}}
+          className={`bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${panelClasses}`}
+          style={panelStyle}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-primary to-primary-dark text-white p-4 rounded-t-2xl flex items-center justify-between">
+          <div
+            className={`bg-gradient-to-r from-primary to-primary-dark text-white p-4 flex items-center justify-between ${
+              isFullscreenMobile ? 'rounded-none pt-[max(1rem,env(safe-area-inset-top))]' : 'rounded-t-2xl'
+            }`}
+          >
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <div>
@@ -300,10 +340,10 @@ Puedo ayudarte con:
             {position !== 'sidebar' && (
               <button
                 onClick={toggleOpen}
-                className="hover:bg-white/20 rounded-full p-1 transition-colors"
+                className="hover:bg-white/20 rounded-full w-11 h-11 flex items-center justify-center transition-colors"
                 aria-label="Cerrar chat"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             )}
           </div>
@@ -329,7 +369,11 @@ Puedo ayudarte con:
           </div>
 
           {/* Input area */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+          <div
+            className={`p-4 border-t border-gray-200 dark:border-gray-800 ${
+              isFullscreenMobile ? 'pb-[max(1rem,env(safe-area-inset-bottom))]' : ''
+            }`}
+          >
             {!isAvailable && (
               <div className="mb-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 p-2 rounded">
                 ⚠️ El asistente no está disponible en este momento.
@@ -349,13 +393,14 @@ Puedo ayudarte con:
                     : 'Asistente no disponible'
                 }
                 disabled={isLoading || !isAvailable}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:text-white disabled:opacity-50"
+                /* font-size: 16px en mobile evita el zoom automático de iOS al hacer focus */
+                className="flex-1 px-4 py-2 text-base sm:text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-800 dark:text-white disabled:opacity-50"
               />
 
               <button
                 onClick={handleSend}
                 disabled={!inputValue.trim() || isLoading || !isAvailable}
-                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 min-w-[44px] min-h-[44px] bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 aria-label="Enviar mensaje"
               >
                 {isLoading ? (
@@ -367,7 +412,7 @@ Puedo ayudarte con:
             </div>
 
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-              Powered by Claude AI
+              Powered by AXIO
             </p>
           </div>
         </div>

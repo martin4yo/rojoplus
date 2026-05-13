@@ -64,10 +64,28 @@ export default function PortalSocioNuevo() {
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
   const [cuotasPendientes, setCuotasPendientes] = useState(0)
   const [mostrarMenuMas, setMostrarMenuMas] = useState(false)
+  // Cuota que debe abrirse automáticamente (viene desde un link `?pagar=<cargoId>`)
+  const [pagarCargoId, setPagarCargoId] = useState(null)
 
   useEffect(() => {
     cargarDatosSocio()
   }, [tokenPortal])
+
+  // Deep-link a una cuota desde una notificación (ej. WhatsApp / email)
+  useEffect(() => {
+    const pagarId = searchParams.get('pagar')
+    if (pagarId) {
+      const id = parseInt(pagarId)
+      if (!Number.isNaN(id)) {
+        setPagarCargoId(id)
+        setActiveTab('pagos')
+      }
+      // Limpiar el query param para que no vuelva a dispararse al re-renderizar
+      const next = new URLSearchParams(searchParams)
+      next.delete('pagar')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams])
 
   // Detectar respuesta de MercadoPago
   useEffect(() => {
@@ -295,7 +313,7 @@ export default function PortalSocioNuevo() {
         {activeTab === 'reservas' && <ReservasSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'beneficios' && <BeneficiosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'actividades' && <MisActividadesSocio socio={socio} tokenPortal={tokenPortal} />}
-        {activeTab === 'pagos' && <PagosSocio socio={socio} tokenPortal={tokenPortal} onPagoRealizado={cargarDatosSocio} mensajesNoLeidos={mensajesNoLeidos} onNavigate={setActiveTab} />}
+        {activeTab === 'pagos' && <PagosSocio socio={socio} tokenPortal={tokenPortal} onPagoRealizado={cargarDatosSocio} mensajesNoLeidos={mensajesNoLeidos} onNavigate={setActiveTab} pagarCargoId={pagarCargoId} onPagarHandled={() => setPagarCargoId(null)} />}
         {activeTab === 'notificaciones' && <NotificacionesSocio tokenPortal={tokenPortal} />}
         {activeTab === 'perfil' && <MiPerfilSocio socio={socio} tokenPortal={tokenPortal} onUpdate={cargarDatosSocio} />}
       </main>

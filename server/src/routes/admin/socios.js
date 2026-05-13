@@ -888,56 +888,130 @@ router.put('/socios/:id/rfid', authAdmin, asyncHandler(async (req, res) => {
   res.json({ success: true, data: actualizado })
 }))
 
-// POST /api/admin/socios/:id/desactivar - Desactivar socio
-router.post('/socios/:id/desactivar', authAdmin, asyncHandler(async (req, res) => {
-  const { id } = req.params
-  const { motivoBaja } = req.body
-
-  // Buscar un EstadoSocio que represente "baja" (esSocioActivo=false).
-  // Si no hay ninguno configurado en el tenant, no se puede desactivar.
-  const estadoBaja = await req.db.estadoSocio.findFirst({
-    where: { tenantId: req.tenantId, esSocioActivo: false },
-    orderBy: { orden: 'asc' },
+// GET /api/admin/socios/:id/grupo-familiar-resumen
+// Devuelve { esTitular, integrantes: [{id, nroSocio, apellidoNombre, estadoCodigo, esSocioActivo}] }
+// Usado por el frontend para decidir si mostrar la opción de propagar baja/alta a la familia.
+router.get('/socios/:id/grupo-familiar-resumen', authAdmin, asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const socio = await req.db.socio.findUnique({
+    where: { id },
+    select: { id: true, titularFamiliaId: true },
   })
-  if (!estadoBaja) {
-    throw new AppError(
-      'No hay ningún Estado de Socio configurado como baja (esSocioActivo=false). Configurálo en Tablas Auxiliares.',
-      400, 'NO_ESTADO_BAJA'
-    )
-  }
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
 
-  const socio = await req.db.socio.update({
-    where: { id: parseInt(id) },
-    data: {
-      estadoSocioId: estadoBaja.id,
-      fechaBaja: new Date(),
-      motivoBaja: motivoBaja || 'Baja solicitada desde administración',
-      actualizadoPor: req.admin.id,
-    },
-    select: { id: true, nroSocio: true, apellidoNombre: true, estadoSocioRel: { select: { id: true, nombre: true } } },
-  })
-
-  // Auditoría
-  const { registrarEvento: regAuditBaja } = await import('../../services/auditoriaService.js')
-  await regAuditBaja(req.db, {
-    socioId: parseInt(id), tenantId: req.tenantId,
-    evento: 'BAJA_SOCIO',
-    detalle: { motivoBaja: motivoBaja || 'Baja solicitada desde administración' },
-    origen: 'UI', usuarioId: req.admin.id,
-  })
+  // Es titular si no tiene titularFamiliaId (es la cabeza) Y hay miembros que lo apuntan
+  const miembros = socio.titularFamiliaId
+    ? []
+    : await req.db.socio.findMany({
+        where: { tenantId: req.tenantId, titularFamiliaId: id },
+        select: {
+          id: true, nroSocio: true, apellidoNombre: true,
+          estadoSocioRel: { select: { codigo: true, nombre: true, esSocioActivo: true } },
+        },
+        orderBy: { apellidoNombre: 'asc' },
+      })
 
   res.json({
     success: true,
     data: {
-      ...socio,
-      mensaje: 'Socio desactivado correctamente',
+      esTitular: !socio.titularFamiliaId && miembros.length > 0,
+      integrantes: miembros.map(m => ({
+        id: m.id,
+        nroSocio: m.nroSocio,
+        apellidoNombre: m.apellidoNombre,
+        estadoCodigo: m.estadoSocioRel?.codigo || null,
+        estadoNombre: m.estadoSocioRel?.nombre || null,
+        esSocioActivo: m.estadoSocioRel?.esSocioActivo ?? true,
+      })),
+    },
+  })
+}))
+
+// POST /api/admin/socios/:id/desactivar - Desactivar socio
+// Body: { motivoBaja?: string, fechaBaja?: ISO, estadoBajaId?: number, propagarFamilia?: boolean }
+router.post('/socios/:id/desactivar', authAdmin, asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const { motivoBaja, fechaBaja, estadoBajaId, propagarFamilia } = req.body
+
+  // Resolver estado de baja: si vino estadoBajaId usar ese (validando esSocioActivo=false),
+  // sino el primer EstadoSocio con esSocioActivo=false.
+  let estadoBaja
+  if (estadoBajaId) {
+    estadoBaja = await req.db.estadoSocio.findFirst({
+      where: { id: parseInt(estadoBajaId), tenantId: req.tenantId, esSocioActivo: false },
+    })
+    if (!estadoBaja) throw new AppError('El estado seleccionado no es un estado de baja válido', 400, 'INVALID_ESTADO_BAJA')
+  } else {
+    estadoBaja = await req.db.estadoSocio.findFirst({
+      where: { tenantId: req.tenantId, esSocioActivo: false },
+      orderBy: { orden: 'asc' },
+    })
+    if (!estadoBaja) {
+      throw new AppError(
+        'No hay ningún Estado de Socio configurado como baja (esSocioActivo=false). Configurálo en Tablas Auxiliares.',
+        400, 'NO_ESTADO_BAJA'
+      )
+    }
+  }
+
+  const socioBase = await req.db.socio.findUnique({
+    where: { id },
+    select: { id: true, titularFamiliaId: true },
+  })
+  if (!socioBase) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
+
+  // Resolver socios afectados
+  let socioIds = [id]
+  if (propagarFamilia && !socioBase.titularFamiliaId) {
+    const miembros = await req.db.socio.findMany({
+      where: { tenantId: req.tenantId, titularFamiliaId: id },
+      select: { id: true },
+    })
+    socioIds = [id, ...miembros.map(m => m.id)]
+  }
+
+  const fecha = fechaBaja ? new Date(fechaBaja) : new Date()
+  const motivo = motivoBaja || 'Baja solicitada desde administración'
+
+  await req.db.socio.updateMany({
+    where: { id: { in: socioIds } },
+    data: {
+      estadoSocioId: estadoBaja.id,
+      fechaBaja: fecha,
+      motivoBaja: motivo,
+      actualizadoPor: req.admin.id,
+    },
+  })
+
+  // Auditoría por socio
+  const { registrarEvento: regAuditBaja } = await import('../../services/auditoriaService.js')
+  for (const sid of socioIds) {
+    await regAuditBaja(req.db, {
+      socioId: sid, tenantId: req.tenantId,
+      evento: 'BAJA_SOCIO',
+      detalle: { motivoBaja: motivo, estadoBajaId: estadoBaja.id, propagado: sid !== id },
+      origen: 'UI', usuarioId: req.admin.id,
+    })
+  }
+
+  res.json({
+    success: true,
+    data: {
+      sociosAfectados: socioIds.length,
+      socioIds,
+      estadoBaja: { id: estadoBaja.id, nombre: estadoBaja.nombre, codigo: estadoBaja.codigo },
+      mensaje: socioIds.length === 1
+        ? 'Socio desactivado correctamente'
+        : `Socio y ${socioIds.length - 1} integrante(s) desactivados correctamente`,
     },
   })
 }))
 
 // POST /api/admin/socios/:id/activar - Reactivar socio
+// Body: { propagarFamilia?: boolean, generarCuotas?: boolean }
 router.post('/socios/:id/activar', authAdmin, asyncHandler(async (req, res) => {
-  const { id } = req.params
+  const id = parseInt(req.params.id)
+  const { propagarFamilia, generarCuotas } = req.body
 
   // Buscar el estado "al día" (AL_DIA) configurado en el tenant.
   const estadoAlDia = await req.db.estadoSocio.findFirst({
@@ -950,30 +1024,67 @@ router.post('/socios/:id/activar', authAdmin, asyncHandler(async (req, res) => {
     )
   }
 
-  const socio = await req.db.socio.update({
-    where: { id: parseInt(id) },
+  const socioBase = await req.db.socio.findUnique({
+    where: { id },
+    select: { id: true, titularFamiliaId: true },
+  })
+  if (!socioBase) throw new AppError('Socio no encontrado', 404, 'NOT_FOUND')
+
+  let socioIds = [id]
+  if (propagarFamilia && !socioBase.titularFamiliaId) {
+    const miembros = await req.db.socio.findMany({
+      where: { tenantId: req.tenantId, titularFamiliaId: id },
+      select: { id: true },
+    })
+    socioIds = [id, ...miembros.map(m => m.id)]
+  }
+
+  await req.db.socio.updateMany({
+    where: { id: { in: socioIds } },
     data: {
       estadoSocioId: estadoAlDia.id,
       fechaBaja: null,
       motivoBaja: null,
       actualizadoPor: req.admin.id,
     },
-    select: { id: true, nroSocio: true, apellidoNombre: true, estadoSocioRel: { select: { id: true, nombre: true } } },
   })
 
-  // Auditoría
+  // Auditoría por socio
   const { registrarEvento: regAuditAlta } = await import('../../services/auditoriaService.js')
-  await regAuditAlta(req.db, {
-    socioId: parseInt(id), tenantId: req.tenantId,
-    evento: 'REACTIVADO_SOCIO',
-    origen: 'UI', usuarioId: req.admin.id,
-  })
+  for (const sid of socioIds) {
+    await regAuditAlta(req.db, {
+      socioId: sid, tenantId: req.tenantId,
+      evento: 'REACTIVADO_SOCIO',
+      detalle: { propagado: sid !== id },
+      origen: 'UI', usuarioId: req.admin.id,
+    })
+  }
+
+  // Generación de cuotas del período vigente (opcional)
+  let resumenCuotas = null
+  if (generarCuotas) {
+    const { calcularCuotas, commitCuotas } = await import('../../services/generarCuotasService.js')
+    const periodo = await resolverPeriodoAlta(req.db)
+    const { cargos } = await calcularCuotas(req.db, periodo.id, { socioIds })
+    const clavesNuevas = cargos.filter(c => !c.yaGenerado).map(c => c.clave)
+    const r = await commitCuotas(req.db, periodo.id, clavesNuevas, req.admin.id)
+    resumenCuotas = {
+      periodoId: periodo.id,
+      periodoNombre: periodo.nombre,
+      cuotasGeneradas: r.cuotasGeneradas,
+    }
+  }
 
   res.json({
     success: true,
     data: {
-      ...socio,
-      mensaje: 'Socio reactivado correctamente',
+      sociosAfectados: socioIds.length,
+      socioIds,
+      estadoAlDia: { id: estadoAlDia.id, nombre: estadoAlDia.nombre, codigo: estadoAlDia.codigo },
+      cuotas: resumenCuotas,
+      mensaje: socioIds.length === 1
+        ? 'Socio reactivado correctamente'
+        : `Socio y ${socioIds.length - 1} integrante(s) reactivados correctamente`,
     },
   })
 }))

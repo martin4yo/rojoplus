@@ -155,6 +155,65 @@ router.post('/webhook', async (req, res) => {
     })
     console.log(`[WA webhook] Socio: ${socio ? socio.apellidoNombre : 'no registrado'}`)
 
+    // ─── Detectar si es respuesta a una campaña de recupero ───
+    // Si el socio existe y tiene AccionRecupero saliente en los últimos 30 días,
+    // tratamos este mensaje como respuesta y NO lo pasamos al agente IA.
+    if (socio) {
+      const hace30Dias = new Date()
+      hace30Dias.setDate(hace30Dias.getDate() - 30)
+      const ultimaAccionSaliente = await db.accionRecupero.findFirst({
+        where: {
+          socioId: socio.id,
+          fecha: { gte: hace30Dias },
+          OR: [
+            { direccion: 'SALIENTE' },
+            { direccion: null }, // acciones legacy sin dirección, asumir SALIENTE
+          ],
+        },
+        orderBy: { fecha: 'desc' },
+      })
+
+      if (ultimaAccionSaliente) {
+        console.log(`[WA webhook] Respuesta a campaña de recupero detectada (acción #${ultimaAccionSaliente.id})`)
+
+        // Crear nueva AccionRecupero entrante, pendiente de revisión
+        const nuevaAccion = await db.accionRecupero.create({
+          data: {
+            socioId: socio.id,
+            campanaId: ultimaAccionSaliente.campanaId,
+            tipo: 'WHATSAPP',
+            resultado: 'PENDIENTE_DECISION',
+            observaciones: texto,
+            direccion: 'ENTRANTE',
+            pendienteRevision: true,
+            // Asignar al mismo admin que hizo la última acción saliente
+            responsableId: ultimaAccionSaliente.responsableId,
+          },
+        })
+
+        // Emitir notificación en tiempo real a los admins del tenant
+        try {
+          const { getIO } = await import('../../services/socketService.js')
+          const io = getIO()
+          io.to(`tenant:${tenantId}`).emit('recupero:respuesta-pendiente', {
+            accionId: nuevaAccion.id,
+            socioId: socio.id,
+            socioNombre: socio.apellidoNombre,
+            nroSocio: socio.nroSocio,
+            campanaId: ultimaAccionSaliente.campanaId,
+            tipo: 'WHATSAPP',
+            mensaje: texto,
+            fecha: nuevaAccion.fecha,
+          })
+        } catch (err) {
+          console.error('[WA webhook] Error emitiendo socket:', err.message)
+        }
+
+        console.log(`[WA webhook] Registrada respuesta de ${socio.apellidoNombre} como pendiente. No se deriva al agente.`)
+        return
+      }
+    }
+
     console.log(`[WA webhook] Derivando a agente IA...`)
     // Procesar el mensaje con el agente (importación dinámica para no cargar siempre)
     const { procesarMensajeAgente } = await import('./agente.js')

@@ -7,12 +7,10 @@ import { AppError } from '../middleware/errorHandler.js'
 const require = createRequire(import.meta.url)
 const forge = require('node-forge')
 
-// Cache del Ticket de Acceso en memoria
-let taCache = {
-  token: null,
-  sign: null,
-  expirationTime: null
-}
+// Cache del Ticket de Acceso en memoria, por connectionId (o '__legacy__' para
+// el flujo viejo de ConfiguracionFiscal). Estructura:
+//   { [key]: { token, sign, expirationTime } }
+const taCacheByConnection = new Map()
 
 const SERVICE = 'wsfe' // Servicio al que se solicita acceso
 
@@ -162,96 +160,172 @@ async function requestTA(wsaaUrl, traCMS, timeout = 30000) {
 }
 
 /**
- * Obtiene un TA válido (usa cache si está vigente, o solicita uno nuevo)
+ * Lee un archivo con fallback al directorio local `certs/` si el path
+ * absoluto no existe (típico cuando el cert fue subido en otro entorno).
  */
-export async function getTicketAcceso() {
-  // Verificar cache en memoria (con margen de 5 minutos)
-  const now = new Date()
-  const safetyMargin = 5 * 60 * 1000
+async function leerCertConFallback(absolutePath) {
+  const fs = await import('fs/promises')
+  const path = await import('path')
+  try {
+    return await fs.readFile(absolutePath, 'utf8')
+  } catch (err) {
+    const basename = path.basename(absolutePath)
+    const localPath = path.join(process.cwd(), 'certs', basename)
+    try {
+      const content = await fs.readFile(localPath, 'utf8')
+      console.warn(`[WSAA] Path ${absolutePath} no existe, usando fallback ${localPath}`)
+      return content
+    } catch {
+      throw err
+    }
+  }
+}
 
-  if (
-    taCache.token &&
-    taCache.sign &&
-    taCache.expirationTime &&
-    taCache.expirationTime.getTime() > (now.getTime() + safetyMargin)
-  ) {
-    console.log(`[WSAA] Usando TA en cache, expira: ${taCache.expirationTime}`)
+/**
+ * Resuelve la "conexión AFIP efectiva" — un objeto con cuit/certPath/keyPath/
+ * environment/urls — desde una AfipConnection (nuevo modelo) o desde
+ * ConfiguracionFiscal (legacy).
+ *
+ * @param {Object} [opts]
+ * @param {number} [opts.connectionId]  - Id de AfipConnection específica
+ * @returns {Object} { id, cuit, certificadoPath, clavePrivadaPath, environment, wsaaUrl, wsfeUrl, cacheKey }
+ */
+export async function resolverConexionAfip({ connectionId } = {}) {
+  // 1. Si viene id explícito, usar esa AfipConnection
+  if (connectionId) {
+    const conn = await prisma.afipConnection.findUnique({ where: { id: parseInt(connectionId) } })
+    if (!conn) throw new AppError('Conexión AFIP no encontrada', 404)
+    if (!conn.activo) throw new AppError('Conexión AFIP inactiva', 400)
     return {
-      token: taCache.token,
-      sign: taCache.sign,
-      expirationTime: taCache.expirationTime
+      id: conn.id,
+      cuit: conn.cuit,
+      certificadoPath: conn.certificadoPath,
+      clavePrivadaPath: conn.clavePrivadaPath,
+      environment: conn.environment, // TESTING | PRODUCTION
+      wsaaUrl: conn.wsaaUrl,
+      wsfeUrl: conn.wsfeUrl,
+      cacheKey: `conn:${conn.id}`,
     }
   }
 
-  // Obtener configuración fiscal
-  const config = await prisma.configuracionFiscal.findFirst({
-    where: { activo: true }
-  })
+  // 2. Si no, buscar AfipConnection default activa
+  const conn = await prisma.afipConnection.findFirst({
+    where: { activo: true, esDefault: true },
+  }) || await prisma.afipConnection.findFirst({ where: { activo: true } })
 
-  if (!config) {
-    throw new AppError('Configuración fiscal no encontrada', 404)
+  if (conn) {
+    return {
+      id: conn.id,
+      cuit: conn.cuit,
+      certificadoPath: conn.certificadoPath,
+      clavePrivadaPath: conn.clavePrivadaPath,
+      environment: conn.environment,
+      wsaaUrl: conn.wsaaUrl,
+      wsfeUrl: conn.wsfeUrl,
+      cacheKey: `conn:${conn.id}`,
+    }
   }
 
-  if (!config.certificadoPath || !config.clavePrivadaPath) {
+  // 3. Fallback legacy: ConfiguracionFiscal (un solo registro por tenant)
+  const config = await prisma.configuracionFiscal.findFirst({ where: { activo: true } })
+  if (!config) {
+    throw new AppError('Configuración AFIP no encontrada (sin AfipConnection ni ConfiguracionFiscal activa)', 404)
+  }
+  return {
+    id: null,
+    cuit: config.cuit,
+    certificadoPath: config.certificadoPath,
+    clavePrivadaPath: config.clavePrivadaPath,
+    environment: config.modoProduccion ? 'PRODUCTION' : 'TESTING',
+    wsaaUrl: null,
+    wsfeUrl: null,
+    cacheKey: '__legacy__',
+  }
+}
+
+/**
+ * Obtiene un TA válido para una conexión AFIP (cache por connectionId).
+ */
+export async function getTicketAcceso({ connectionId } = {}) {
+  const conn = await resolverConexionAfip({ connectionId })
+
+  // Cache check (margen 5 min)
+  const now = new Date()
+  const safetyMargin = 5 * 60 * 1000
+  const cached = taCacheByConnection.get(conn.cacheKey)
+  if (cached && cached.expirationTime && cached.expirationTime.getTime() > (now.getTime() + safetyMargin)) {
+    console.log(`[WSAA] Usando TA en cache (${conn.cacheKey}), expira: ${cached.expirationTime}`)
+    return cached
+  }
+
+  if (!conn.certificadoPath || !conn.clavePrivadaPath) {
     throw new AppError('Certificado y clave privada no configurados', 400)
   }
 
-  // Leer certificado y clave privada
-  const fs = await import('fs/promises')
   let certificate, privateKey
-
   try {
-    certificate = await fs.readFile(config.certificadoPath, 'utf8')
-    privateKey = await fs.readFile(config.clavePrivadaPath, 'utf8')
+    certificate = await leerCertConFallback(conn.certificadoPath)
+    privateKey = await leerCertConFallback(conn.clavePrivadaPath)
   } catch (err) {
     throw new AppError(`Error leyendo certificado/clave: ${err.message}`, 500)
   }
 
-  // Determinar URL según ambiente
-  const wsaaUrl = config.modoProduccion
+  const wsaaUrl = conn.wsaaUrl || (conn.environment === 'PRODUCTION'
     ? 'https://wsaa.afip.gov.ar/ws/services/LoginCms?WSDL'
-    : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms?WSDL'
+    : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms?WSDL')
 
-  console.log(`[WSAA] Solicitando nuevo TA (ambiente: ${config.modoProduccion ? 'producción' : 'homologación'})`)
+  console.log(`[WSAA] Solicitando nuevo TA (${conn.cacheKey}, ambiente: ${conn.environment})`)
 
-  // Generar y firmar TRA
   const tra = generateTRA(SERVICE)
   const traCMS = signTRA(tra, certificate, privateKey)
-
-  // Solicitar TA
   const ta = await requestTA(wsaaUrl, traCMS)
 
-  // Guardar en cache
-  taCache = {
+  taCacheByConnection.set(conn.cacheKey, {
     token: ta.token,
     sign: ta.sign,
-    expirationTime: ta.expirationTime
-  }
+    expirationTime: ta.expirationTime,
+  })
 
-  console.log(`[WSAA] TA obtenido exitosamente, expira: ${ta.expirationTime}`)
-
+  console.log(`[WSAA] TA obtenido (${conn.cacheKey}), expira: ${ta.expirationTime}`)
   return ta
 }
 
 /**
- * Invalida el TA en cache
+ * Invalida el TA en cache (todas las conexiones o una específica)
  */
-export function invalidateTicket() {
-  taCache = { token: null, sign: null, expirationTime: null }
-  console.log('[WSAA] TA invalidado')
+export function invalidateTicket({ connectionId } = {}) {
+  if (connectionId) {
+    taCacheByConnection.delete(`conn:${connectionId}`)
+    console.log(`[WSAA] TA invalidado para connection ${connectionId}`)
+  } else {
+    taCacheByConnection.clear()
+    console.log('[WSAA] Todos los TA invalidados')
+  }
 }
 
 /**
- * Obtiene la configuración fiscal activa
+ * Devuelve datos fiscales del tenant (razón social, domicilio, condición IVA, etc.)
+ * Combina ConfiguracionFiscal (datos del club) con la AfipConnection efectiva
+ * para retro-compatibilidad: el resultado incluye cuit/certificadoPath/
+ * clavePrivadaPath/modoProduccion del flujo viejo.
  */
-export async function getConfiguracionFiscal() {
-  const config = await prisma.configuracionFiscal.findFirst({
-    where: { activo: true }
-  })
-
-  if (!config) {
-    throw new AppError('Configuración fiscal no encontrada', 404)
+export async function getConfiguracionFiscal({ connectionId } = {}) {
+  const config = await prisma.configuracionFiscal.findFirst({ where: { activo: true } })
+  // Si hay AfipConnection, mergear cert/cuit/ambiente desde ahí
+  try {
+    const conn = await resolverConexionAfip({ connectionId })
+    return {
+      // Datos del club (si los hay)
+      ...(config || {}),
+      // Datos de la conexión AFIP (pisan los del club)
+      cuit: conn.cuit,
+      certificadoPath: conn.certificadoPath,
+      clavePrivadaPath: conn.clavePrivadaPath,
+      modoProduccion: conn.environment === 'PRODUCTION',
+      afipConnectionId: conn.id,
+    }
+  } catch (err) {
+    if (!config) throw err
+    return config
   }
-
-  return config
 }

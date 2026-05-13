@@ -8,7 +8,6 @@ import {
   verificarPartidosProximos,
   verificarBajaAsistencia,
   enviarSaludosCumpleanios,
-  verificarRecordatorioAnticipado,
 } from '../services/notificacionService.js'
 import {
   enviarRecordatorioReserva,
@@ -230,23 +229,6 @@ const cumpleaniosCron = cron.schedule('0 9 * * *', async () => {
 })
 
 /**
- * Recordatorio anticipado de cuotas (configurable, por defecto D-3)
- * Se ejecuta todos los días a las 8:30 AM
- */
-const recordatorioAnticipadoCron = cron.schedule('30 8 * * *', async () => {
-  try {
-    console.log('\n⏳ [CRON] Verificando recordatorios anticipados de cuotas...')
-    const cantidad = await verificarRecordatorioAnticipado()
-    console.log(`✅ [CRON] Recordatorios anticipados: ${cantidad} enviados\n`)
-  } catch (error) {
-    console.error('❌ [CRON] Error en recordatorio anticipado:', error.message)
-  }
-}, {
-  scheduled: false,
-  timezone: 'America/Argentina/Buenos_Aires',
-})
-
-/**
  * Alerta de baja asistencia
  * Se ejecuta todos los lunes a las 8:00 AM
  */
@@ -257,6 +239,25 @@ const bajaAsistenciaCron = cron.schedule('0 8 * * 1', async () => {
     console.log('✅ [CRON] Verificación de baja asistencia completada\n')
   } catch (error) {
     console.error('❌ [CRON] Error verificando baja asistencia:', error.message)
+  }
+}, {
+  scheduled: false,
+  timezone: 'America/Argentina/Buenos_Aires',
+})
+
+/**
+ * Polling IMAP de respuestas a campañas de recupero
+ * Se ejecuta cada 5 minutos por cada tenant con IMAP habilitado
+ */
+const inboxRecuperoCron = cron.schedule('*/5 * * * *', async () => {
+  try {
+    const { procesarInboxRecuperoTodos } = await import('../services/inboxService.js')
+    const { procesados, errores } = await procesarInboxRecuperoTodos()
+    if (procesados > 0 || errores > 0) {
+      console.log(`📥 [CRON] Inbox Recupero: ${procesados} respuestas registradas, ${errores} errores`)
+    }
+  } catch (error) {
+    console.error('❌ [CRON] Error procesando inbox de recupero:', error.message)
   }
 }, {
   scheduled: false,
@@ -324,7 +325,6 @@ export function iniciarCronJobs() {
   console.log('  ⚽ Recordatorio partidos: Todos los días a las 18:00')
   console.log('  🔄 Sugerir pasajes: 1 de diciembre a las 8:00 AM')
   console.log('  🎂 Cumpleaños: Todos los días a las 9:00 AM')
-  console.log('  ⏳ Recordatorio anticipado cuotas: Todos los días a las 8:30 AM')
   console.log('  📉 Baja asistencia: Todos los lunes a las 8:00 AM')
   console.log('  📅 Recordatorios reservas: Todos los días a las 8:00 AM')
   console.log('  🔒 Cerrar reservas pasadas: Todos los días a las 00:30')
@@ -337,8 +337,8 @@ export function iniciarCronJobs() {
   verificarPartidosCron.start()
   sugerirPasajesCron.start()
   cumpleaniosCron.start()
-  recordatorioAnticipadoCron.start()
   bajaAsistenciaCron.start()
+  inboxRecuperoCron.start()
   recordatoriosReservasCron.start()
   cerrarReservasPasadasCron.start()
 
@@ -358,8 +358,8 @@ export function detenerCronJobs() {
   verificarPartidosCron.stop()
   sugerirPasajesCron.stop()
   cumpleaniosCron.stop()
-  recordatorioAnticipadoCron.stop()
   bajaAsistenciaCron.stop()
+  inboxRecuperoCron.stop()
   recordatoriosReservasCron.stop()
   cerrarReservasPasadasCron.stop()
 
@@ -391,8 +391,6 @@ export async function ejecutarManual(tipo) {
       return await verificarBajaAsistencia()
     case 'cumpleanios':
       return await enviarSaludosCumpleanios()
-    case 'recordatorio-anticipado':
-      return await verificarRecordatorioAnticipado()
     default:
       throw new Error(`Tipo desconocido: ${tipo}`)
   }

@@ -253,9 +253,11 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
     subtotal, iva21, iva105, otrosImpuestos, montoTotal,
     cajaId, medioPago, nroOperacion,
     movimientoPadreId, conceptoId, centroCostoId, observaciones,
-    ordenCompraId, // Vinculo opcional con Orden de Compra
-    pedidoId, // Vinculo opcional con Pedido (ventas)
-    items
+    ordenCompraId,
+    pedidoId,
+    items,
+    condicionIvaCliente,
+    puntoVentaId, // ID de PuntoVenta — obligatorio para tipos fiscales venta
   } = req.body
 
   // Validaciones basicas
@@ -338,11 +340,115 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
   const estadoInicial = tiposConSaldo.includes(tipo) ? 'PENDIENTE' : 'CONFIRMADO'
   const saldoPendienteInicial = tiposConSaldo.includes(tipo) ? montoTotalNum : 0
 
+  // ─── Para tipos de venta fiscales: pedir CAE a AFIP ANTES de crear el movimiento ───
+  // Si AFIP falla, abortamos la operación (no se crea ni el movimiento ni el comprobante).
+  const tiposVentaConCAE = ['FACTURA_VENTA', 'NOTA_CREDITO_CLIENTE', 'NOTA_DEBITO_CLIENTE']
+  let datosCAE = null
+  let puntoVentaResuelto = null  // { id, numero, afipConnectionId }
+
+  if (tiposVentaConCAE.includes(tipo)) {
+    // 1) Resolver punto de venta: explícito → padre (NC asociada) → default
+    if (puntoVentaId) {
+      const pv = await req.db.puntoVenta.findUnique({ where: { id: parseInt(puntoVentaId) } })
+      if (!pv) throw new AppError('Punto de venta no encontrado', 404)
+      if (!pv.activo) throw new AppError('Punto de venta inactivo', 400)
+      puntoVentaResuelto = { id: pv.id, numero: pv.numero, afipConnectionId: pv.afipConnectionId }
+    } else if (movimientoPadreId && (tipo === 'NOTA_CREDITO_CLIENTE' || tipo === 'NOTA_DEBITO_CLIENTE')) {
+      // NC/ND asociada: hereda PV del padre
+      const padre = await req.db.movimientoContable.findUnique({ where: { id: parseInt(movimientoPadreId) } })
+      if (padre?.puntoVentaId) {
+        const pv = await req.db.puntoVenta.findUnique({ where: { id: padre.puntoVentaId } })
+        if (pv) puntoVentaResuelto = { id: pv.id, numero: pv.numero, afipConnectionId: pv.afipConnectionId }
+      }
+    }
+    if (!puntoVentaResuelto) {
+      // Fallback default activo
+      const pv = await req.db.puntoVenta.findFirst({ where: { activo: true, esDefault: true } })
+        || await req.db.puntoVenta.findFirst({ where: { activo: true }, orderBy: { numero: 'asc' } })
+      if (!pv) throw new AppError('No hay punto de venta configurado. Configure uno en Tablas Auxiliares.', 400, 'PV_REQUIRED')
+      puntoVentaResuelto = { id: pv.id, numero: pv.numero, afipConnectionId: pv.afipConnectionId }
+    }
+  }
+
+  if (tiposVentaConCAE.includes(tipo)) {
+    const condIvaEmisorCfg = await req.db.configuracion.findFirst({ where: { clave: 'FISCAL_CONDICION_IVA' } })
+    const condIvaEmisor = condIvaEmisorCfg?.valor || 'INSCRIPTO'
+
+    // Resolver datos del receptor (cliente o socio)
+    let datosCliente = { condicionIva: condicionIvaCliente || 'CONSUMIDOR_FINAL' }
+    if (entidadId) {
+      const ent = await req.db.entidad.findUnique({ where: { id: parseInt(entidadId) } })
+      datosCliente = {
+        condicionIva: condicionIvaCliente || ent?.condicionIva || 'CONSUMIDOR_FINAL',
+        tipoDoc: ent?.tipoDocumento === 'CUIT' ? 80 : ent?.tipoDocumento === 'DNI' ? 96 : 99,
+        documento: ent?.documento || ent?.cuit || '',
+        nombre: ent?.razonSocial || 'Consumidor Final',
+      }
+    } else if (socioId) {
+      const soc = await req.db.socio.findUnique({ where: { id: parseInt(socioId) } })
+      datosCliente = {
+        condicionIva: condicionIvaCliente || soc?.condicionIva || 'CONSUMIDOR_FINAL',
+        tipoDoc: 96, // DNI
+        documento: soc?.documento || '',
+        nombre: soc?.apellidoNombre || 'Consumidor Final',
+      }
+    }
+
+    // Resolver comprobante asociado (si NC/ND tiene factura padre con CAE)
+    let comprobanteOriginal = null
+    if (movimientoPadreId && (tipo === 'NOTA_CREDITO_CLIENTE' || tipo === 'NOTA_DEBITO_CLIENTE')) {
+      comprobanteOriginal = await req.db.comprobanteElectronico.findFirst({
+        where: { movimientoContableId: parseInt(movimientoPadreId), estado: 'EMITIDO' },
+      })
+    }
+
+    const helper = await import('../services/facturaElectronicaHelper.js')
+    const argsCAE = {
+      db: req.db,
+      condIvaEmisor,
+      cliente: datosCliente,
+      totales: {
+        subtotal: subtotalNum,
+        iva21: iva21Num,
+        iva105: iva105Num,
+        total: montoTotalNum,
+      },
+      items: (items || []).map(it => ({
+        descripcion: it.descripcion,
+        cantidad: it.cantidad,
+        precioUnitario: it.precioUnitario,
+        ivaRate: it.iva || 21,
+      })),
+      puntoVentaNumero: puntoVentaResuelto?.numero,
+      afipConnectionId: puntoVentaResuelto?.afipConnectionId,
+      cajaId,
+      emitidoPor: req.admin.id,
+    }
+
+    try {
+      if (tipo === 'FACTURA_VENTA') {
+        datosCAE = await helper.emitirCAEParaFactura(argsCAE)
+      } else if (tipo === 'NOTA_CREDITO_CLIENTE') {
+        datosCAE = await helper.emitirCAENotaCredito({ ...argsCAE, comprobanteOriginal })
+      } else if (tipo === 'NOTA_DEBITO_CLIENTE') {
+        datosCAE = await helper.emitirCAENotaDebito({ ...argsCAE, comprobanteOriginal })
+      }
+    } catch (err) {
+      console.error(`[${tipo}] Error solicitando CAE:`, err)
+      throw new AppError(`No se pudo emitir el comprobante electrónico: ${err.message}`, 502, 'AFIP_ERROR')
+    }
+  }
+
   // Crear movimiento con items en transaccion
   const resultado = await req.db.$transaction(async (tx) => {
     const numero = await generarNumeroMC(tx)
 
     // Crear movimiento sin items (nested create no recibe tenantId del extension)
+    // Si vino CAE de AFIP, usar esos valores; sino los del request.
+    const tipoComprobanteFinal = datosCAE?.tipoComprobante || tipoComprobante
+    const puntoVentaFinal = datosCAE?.puntoVenta || puntoVenta
+    const numeroComprobanteFinal = datosCAE?.numero || numeroComprobante
+
     const movimientoBase = await tx.movimientoContable.create({
       data: {
         numero,
@@ -351,11 +457,12 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
         socioId: socioId ? parseInt(socioId) : null,
         ordenCompraId: ordenCompraId ? parseInt(ordenCompraId) : null,
         pedidoId: pedidoId ? parseInt(pedidoId) : null,
+        puntoVentaId: puntoVentaResuelto?.id || null,
         fecha: fecha ? new Date(fecha) : new Date(),
         fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : null,
-        tipoComprobante,
-        puntoVenta,
-        numeroComprobante,
+        tipoComprobante: tipoComprobanteFinal,
+        puntoVenta: puntoVentaFinal,
+        numeroComprobante: numeroComprobanteFinal,
         subtotal: subtotalNum,
         iva21: iva21Num,
         iva105: iva105Num,
@@ -374,6 +481,14 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
         registradoPor: req.admin.id,
       }
     })
+
+    // Vincular el ComprobanteElectronico (si se emitió CAE) con el movimiento creado
+    if (datosCAE?.comprobanteElectronico?.id) {
+      await tx.comprobanteElectronico.update({
+        where: { id: datosCAE.comprobanteElectronico.id },
+        data: { movimientoContableId: movimientoBase.id },
+      })
+    }
 
     // Items aparte para que el extension inyecte tenantId
     if (items?.length) {
@@ -538,6 +653,46 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
       }
     }
 
+    // Si es NC con factura padre, descontar del saldo pendiente del padre
+    // (no crea movimientoCaja porque la NC no es un pago)
+    if (['NOTA_CREDITO_CLIENTE', 'NOTA_CREDITO_PROVEEDOR'].includes(tipo) && movimientoPadreId) {
+      const padre = await tx.movimientoContable.findUnique({
+        where: { id: parseInt(movimientoPadreId) }
+      })
+      if (padre) {
+        const nuevoMontoPagado = Number(padre.montoPagado) + montoTotalNum
+        const nuevoSaldoPendiente = Math.max(0, Number(padre.montoTotal) - nuevoMontoPagado)
+        const nuevoEstado = nuevoSaldoPendiente <= 0 ? 'PAGADO' : 'PENDIENTE'
+        await tx.movimientoContable.update({
+          where: { id: parseInt(movimientoPadreId) },
+          data: {
+            montoPagado: nuevoMontoPagado,
+            saldoPendiente: nuevoSaldoPendiente,
+            estado: nuevoEstado
+          }
+        })
+      }
+    }
+
+    // Si es ND con factura padre, aumentar el saldo pendiente del padre
+    if (['NOTA_DEBITO_CLIENTE', 'NOTA_DEBITO_PROVEEDOR'].includes(tipo) && movimientoPadreId) {
+      const padre = await tx.movimientoContable.findUnique({
+        where: { id: parseInt(movimientoPadreId) }
+      })
+      if (padre) {
+        const nuevoMontoTotal = Number(padre.montoTotal) + montoTotalNum
+        const nuevoSaldoPendiente = nuevoMontoTotal - Number(padre.montoPagado)
+        await tx.movimientoContable.update({
+          where: { id: parseInt(movimientoPadreId) },
+          data: {
+            montoTotal: nuevoMontoTotal,
+            saldoPendiente: Math.max(0, nuevoSaldoPendiente),
+            estado: nuevoSaldoPendiente <= 0 ? 'PAGADO' : 'PENDIENTE'
+          }
+        })
+      }
+    }
+
     return movimiento
   })
 
@@ -617,7 +772,123 @@ router.post('/movimientos-contables', asyncHandler(async (req, res) => {
   })
 }))
 
+// POST /api/admin/movimientos-contables/:id/solicitar-cae
+// Reintenta la emisión de CAE para una FACTURA_VENTA que no tiene comprobante
+// electrónico (porque AFIP falló al momento de crear la factura, o se creó
+// antes de habilitar la facturación electrónica).
+router.post('/movimientos-contables/:id/solicitar-cae', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { condicionIvaCliente, puntoVentaId } = req.body
+
+  const movimiento = await req.db.movimientoContable.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      items: true,
+      entidad: true,
+      socio: true,
+    },
+  })
+  if (!movimiento) throw new AppError('Factura no encontrada', 404)
+  if (movimiento.tipo !== 'FACTURA_VENTA') {
+    throw new AppError('Solo se puede solicitar CAE para facturas de venta', 400)
+  }
+
+  // ¿Ya tiene un comprobante electrónico emitido?
+  const yaEmitido = await req.db.comprobanteElectronico.findFirst({
+    where: { movimientoContableId: parseInt(id), estado: 'EMITIDO' },
+  })
+  if (yaEmitido) {
+    throw new AppError(`Esta factura ya tiene CAE: ${yaEmitido.cae}`, 400, 'CAE_YA_EMITIDO')
+  }
+
+  // Resolver PV: el del movimiento, o el que viene del body, o el default
+  let pvId = movimiento.puntoVentaId || puntoVentaId
+  let pv = null
+  if (pvId) {
+    pv = await req.db.puntoVenta.findUnique({ where: { id: parseInt(pvId) } })
+  }
+  if (!pv) {
+    pv = await req.db.puntoVenta.findFirst({ where: { activo: true, esDefault: true } })
+      || await req.db.puntoVenta.findFirst({ where: { activo: true }, orderBy: { numero: 'asc' } })
+  }
+  if (!pv) throw new AppError('No hay punto de venta configurado', 400, 'PV_REQUIRED')
+
+  // Construir datos del cliente
+  const ent = movimiento.entidad
+  const soc = movimiento.socio
+  let datosCliente
+  if (ent) {
+    datosCliente = {
+      condicionIva: condicionIvaCliente || ent.condicionIva || 'CONSUMIDOR_FINAL',
+      tipoDoc: ent.tipoDocumento === 'CUIT' ? 80 : ent.tipoDocumento === 'DNI' ? 96 : 99,
+      documento: ent.documento || ent.cuit || '',
+      nombre: ent.razonSocial || 'Consumidor Final',
+    }
+  } else if (soc) {
+    datosCliente = {
+      condicionIva: condicionIvaCliente || soc.condicionIva || 'CONSUMIDOR_FINAL',
+      tipoDoc: 96,
+      documento: soc.documento || '',
+      nombre: soc.apellidoNombre || 'Consumidor Final',
+    }
+  } else {
+    datosCliente = { condicionIva: condicionIvaCliente || 'CONSUMIDOR_FINAL' }
+  }
+
+  const condIvaEmisorCfg = await req.db.configuracion.findFirst({ where: { clave: 'FISCAL_CONDICION_IVA' } })
+  const condIvaEmisor = condIvaEmisorCfg?.valor || 'INSCRIPTO'
+
+  const { emitirCAEParaFactura } = await import('../services/facturaElectronicaHelper.js')
+  const datosCAE = await emitirCAEParaFactura({
+    db: req.db,
+    condIvaEmisor,
+    cliente: datosCliente,
+    totales: {
+      subtotal: parseFloat(movimiento.subtotal),
+      iva21: parseFloat(movimiento.iva21),
+      iva105: parseFloat(movimiento.iva105),
+      total: parseFloat(movimiento.montoTotal),
+    },
+    items: (movimiento.items || []).map(it => ({
+      descripcion: it.descripcion,
+      cantidad: it.cantidad,
+      precioUnitario: it.precioUnitario,
+      ivaRate: 21,
+    })),
+    puntoVentaNumero: pv.numero,
+    afipConnectionId: pv.afipConnectionId,
+    cajaId: movimiento.cajaId,
+    emitidoPor: req.admin.id,
+    movimientoContableId: movimiento.id,
+  })
+
+  // Actualizar el movimiento con la numeración fiscal + puntoVentaId
+  const actualizado = await req.db.movimientoContable.update({
+    where: { id: parseInt(id) },
+    data: {
+      tipoComprobante: datosCAE.tipoComprobante,
+      puntoVenta: datosCAE.puntoVenta,
+      numeroComprobante: datosCAE.numero,
+      puntoVentaId: pv.id,
+    },
+  })
+
+  res.json({
+    success: true,
+    data: actualizado,
+    cae: datosCAE.cae,
+    fechaVtoCae: datosCAE.fechaVtoCae,
+    message: `CAE emitido: ${datosCAE.cae}`,
+  })
+}))
+
 // POST /api/admin/movimientos-contables/:id/anular - Anular movimiento
+// Lógica especial para FACTURA_VENTA con CAE:
+//   - Emite NC fiscal con AFIP (mismo monto, comprobante asociado)
+//   - Crea MovimientoContable NOTA_CREDITO_CLIENTE apuntando a la factura
+//   - La factura queda en estado COMPENSADO (NO ANULADO, sigue siendo válida fiscalmente)
+//   - Recibos asociados se anulan y revierten caja
+// Para el resto: marca ANULADO, revierte stock, recibos y saldo padre.
 router.post('/movimientos-contables/:id/anular', asyncHandler(async (req, res) => {
   const { id } = req.params
 
@@ -626,7 +897,9 @@ router.post('/movimientos-contables/:id/anular', asyncHandler(async (req, res) =
     include: {
       items: true,
       movimientosHijos: true,
-      movimientosCaja: true
+      movimientosCaja: true,
+      entidad: true,
+      socio: true,
     }
   })
 
@@ -634,17 +907,71 @@ router.post('/movimientos-contables/:id/anular', asyncHandler(async (req, res) =
     throw new AppError('Movimiento no encontrado', 404)
   }
 
-  if (movimiento.estado === 'ANULADO') {
-    throw new AppError('El movimiento ya esta anulado', 400)
+  if (movimiento.estado === 'ANULADO' || movimiento.estado === 'COMPENSADO') {
+    throw new AppError(`El movimiento ya esta ${movimiento.estado.toLowerCase()}`, 400)
   }
 
-  // No permitir anular si tiene pagos asociados
-  if (movimiento.movimientosHijos.length > 0) {
-    throw new AppError('No se puede anular un movimiento con pagos/cobros asociados', 400)
+  // ¿La factura de venta tiene CAE emitido?
+  let comprobanteOriginal = null
+  if (movimiento.tipo === 'FACTURA_VENTA') {
+    comprobanteOriginal = await req.db.comprobanteElectronico.findFirst({
+      where: { movimientoContableId: parseInt(id), estado: 'EMITIDO' },
+    })
+  }
+
+  // ─── Si la factura tiene CAE: emitir NC fiscal ANTES de tocar la BD ───
+  let datosNC = null
+  if (comprobanteOriginal) {
+    const condIvaEmisorCfg = await req.db.configuracion.findFirst({ where: { clave: 'FISCAL_CONDICION_IVA' } })
+    const condIvaEmisor = condIvaEmisorCfg?.valor || 'INSCRIPTO'
+
+    let datosCliente = { condicionIva: 'CONSUMIDOR_FINAL' }
+    if (movimiento.entidad) {
+      datosCliente = {
+        condicionIva: movimiento.entidad.condicionIva || 'CONSUMIDOR_FINAL',
+        tipoDoc: movimiento.entidad.tipoDocumento === 'CUIT' ? 80 : movimiento.entidad.tipoDocumento === 'DNI' ? 96 : 99,
+        documento: movimiento.entidad.documento || movimiento.entidad.cuit || '',
+        nombre: movimiento.entidad.razonSocial || 'Consumidor Final',
+      }
+    } else if (movimiento.socio) {
+      datosCliente = {
+        condicionIva: movimiento.socio.condicionIva || 'CONSUMIDOR_FINAL',
+        tipoDoc: 96,
+        documento: movimiento.socio.documento || '',
+        nombre: movimiento.socio.apellidoNombre || 'Consumidor Final',
+      }
+    }
+
+    const { emitirCAENotaCredito } = await import('../services/facturaElectronicaHelper.js')
+    try {
+      datosNC = await emitirCAENotaCredito({
+        db: req.db,
+        comprobanteOriginal,
+        cliente: datosCliente,
+        condIvaEmisor,
+        totales: {
+          subtotal: parseFloat(movimiento.subtotal),
+          iva21: parseFloat(movimiento.iva21),
+          iva105: parseFloat(movimiento.iva105),
+          total: parseFloat(movimiento.montoTotal),
+        },
+        items: (movimiento.items || []).map(it => ({
+          descripcion: it.descripcion,
+          cantidad: it.cantidad,
+          precioUnitario: it.precioUnitario,
+          ivaRate: 21,
+        })),
+        cajaId: movimiento.cajaId,
+        emitidoPor: req.admin.id,
+      })
+    } catch (err) {
+      console.error('[Anular factura] Error emitiendo NC:', err)
+      throw new AppError(`No se pudo emitir la Nota de Crédito: ${err.message}`, 502, 'AFIP_ERROR')
+    }
   }
 
   await req.db.$transaction(async (tx) => {
-    // Revertir stock si tenia items con productos
+    // 1) Revertir stock de los items del movimiento
     if (movimiento.items.length > 0) {
       for (const item of movimiento.items) {
         if (!item.productoVarianteId) continue
@@ -652,21 +979,19 @@ router.post('/movimientos-contables/:id/anular', asyncHandler(async (req, res) =
         const variante = await tx.productoVariante.findUnique({
           where: { id: item.productoVarianteId }
         })
-
         if (!variante) continue
 
         const stockActual = Number(variante.stockActual)
         const cantidad = Number(item.cantidad)
         let nuevoStock
 
-        // Revertir: compras restan, ventas suman
         if (['FACTURA_COMPRA', 'NOTA_DEBITO_PROVEEDOR'].includes(movimiento.tipo)) {
           nuevoStock = stockActual - cantidad
         } else if (['FACTURA_VENTA', 'NOTA_DEBITO_CLIENTE'].includes(movimiento.tipo)) {
           nuevoStock = stockActual + cantidad
-        } else if (['NOTA_CREDITO_PROVEEDOR'].includes(movimiento.tipo)) {
+        } else if (movimiento.tipo === 'NOTA_CREDITO_PROVEEDOR') {
           nuevoStock = stockActual + cantidad
-        } else if (['NOTA_CREDITO_CLIENTE'].includes(movimiento.tipo)) {
+        } else if (movimiento.tipo === 'NOTA_CREDITO_CLIENTE') {
           nuevoStock = stockActual - cantidad
         } else {
           continue
@@ -692,35 +1017,57 @@ router.post('/movimientos-contables/:id/anular', asyncHandler(async (req, res) =
       }
     }
 
-    // Revertir movimientos de caja
+    // 2) Anular recibos/órdenes de pago hijos (revertir caja)
+    const hijosCobrosPagos = movimiento.movimientosHijos.filter(h =>
+      ['RECIBO_COBRO', 'ORDEN_PAGO', 'PAGO'].includes(h.tipo) && h.estado !== 'ANULADO'
+    )
+    for (const hijo of hijosCobrosPagos) {
+      const hijoCompleto = await tx.movimientoContable.findUnique({
+        where: { id: hijo.id },
+        include: { movimientosCaja: true },
+      })
+      // Revertir cada movimientoCaja del hijo
+      for (const movCaja of hijoCompleto.movimientosCaja) {
+        if (movCaja.anulado) continue
+        const incremento = movCaja.tipo === 'INGRESO' ? -Number(movCaja.monto) : Number(movCaja.monto)
+        await tx.caja.update({
+          where: { id: movCaja.cajaId },
+          data: { saldoActual: { increment: incremento } }
+        })
+        await tx.movimientoCaja.update({
+          where: { id: movCaja.id },
+          data: { anulado: true }
+        })
+      }
+      // Marcar el recibo/orden como anulado
+      await tx.movimientoContable.update({
+        where: { id: hijo.id },
+        data: { estado: 'ANULADO' }
+      })
+    }
+
+    // 3) Revertir movimientos de caja propios del movimiento (cobro al momento)
     for (const movCaja of movimiento.movimientosCaja) {
       if (movCaja.anulado) continue
-
-      const incremento = movCaja.tipo === 'INGRESO'
-        ? -Number(movCaja.monto)
-        : Number(movCaja.monto)
-
+      const incremento = movCaja.tipo === 'INGRESO' ? -Number(movCaja.monto) : Number(movCaja.monto)
       await tx.caja.update({
         where: { id: movCaja.cajaId },
         data: { saldoActual: { increment: incremento } }
       })
-
       await tx.movimientoCaja.update({
         where: { id: movCaja.id },
         data: { anulado: true }
       })
     }
 
-    // Revertir saldo de factura padre si existe
+    // 4) Revertir saldo de factura padre si existe (caso anular un recibo/NC asociado)
     if (movimiento.movimientoPadreId) {
       const padre = await tx.movimientoContable.findUnique({
         where: { id: movimiento.movimientoPadreId }
       })
-
       if (padre) {
         const nuevoMontoPagado = Math.max(0, Number(padre.montoPagado) - Number(movimiento.montoTotal))
         const nuevoSaldoPendiente = Number(padre.montoTotal) - nuevoMontoPagado
-
         await tx.movimientoContable.update({
           where: { id: movimiento.movimientoPadreId },
           data: {
@@ -732,14 +1079,67 @@ router.post('/movimientos-contables/:id/anular', asyncHandler(async (req, res) =
       }
     }
 
-    // Marcar como anulado
-    await tx.movimientoContable.update({
-      where: { id: parseInt(id) },
-      data: { estado: 'ANULADO' }
-    })
+    // 5) Estado final del movimiento + NC fiscal si corresponde
+    if (datosNC) {
+      // Factura con CAE: crear MovimientoContable NC vinculado y dejar factura COMPENSADA
+      const numeroNC = await generarNumeroMC(tx)
+      const ncMovimiento = await tx.movimientoContable.create({
+        data: {
+          numero: numeroNC,
+          tipo: 'NOTA_CREDITO_CLIENTE',
+          entidadId: movimiento.entidadId,
+          socioId: movimiento.socioId,
+          fecha: new Date(),
+          tipoComprobante: datosNC.tipoComprobante,
+          puntoVenta: datosNC.puntoVenta,
+          numeroComprobante: datosNC.numero,
+          puntoVentaId: movimiento.puntoVentaId,  // hereda PV de la factura padre
+          subtotal: movimiento.subtotal,
+          iva21: movimiento.iva21,
+          iva105: movimiento.iva105,
+          montoTotal: movimiento.montoTotal,
+          montoPagado: 0,
+          saldoPendiente: 0,
+          movimientoPadreId: movimiento.id,
+          conceptoId: movimiento.conceptoId,
+          centroCostoId: movimiento.centroCostoId,
+          observaciones: `NC automática por anulación de ${movimiento.numero}`,
+          estado: 'CONFIRMADO',
+          registradoPor: req.admin.id,
+        }
+      })
+
+      // Linkear el comprobanteElectronico de la NC con el nuevo movimiento
+      await tx.comprobanteElectronico.update({
+        where: { id: datosNC.comprobanteElectronico.id },
+        data: { movimientoContableId: ncMovimiento.id },
+      })
+
+      // Factura original queda COMPENSADA (saldo 0, totalmente pagada via NC)
+      await tx.movimientoContable.update({
+        where: { id: parseInt(id) },
+        data: {
+          estado: 'COMPENSADO',
+          montoPagado: movimiento.montoTotal,
+          saldoPendiente: 0,
+        }
+      })
+    } else {
+      // Sin CAE o no es factura venta: anulación tradicional
+      await tx.movimientoContable.update({
+        where: { id: parseInt(id) },
+        data: { estado: 'ANULADO' }
+      })
+    }
   })
 
-  res.json({ success: true, message: 'Movimiento anulado correctamente' })
+  res.json({
+    success: true,
+    message: datosNC
+      ? `Factura compensada con NC ${datosNC.tipoComprobante} ${datosNC.puntoVenta}-${datosNC.numero}`
+      : 'Movimiento anulado correctamente',
+    notaCredito: datosNC || null,
+  })
 }))
 
 // =============================================================================
@@ -836,11 +1236,11 @@ router.get('/facturas-compra', asyncHandler(async (req, res) => {
 
 // GET /api/admin/facturas-venta - Alias para facturas de venta
 router.get('/facturas-venta', asyncHandler(async (req, res) => {
-  const { entidadId, socioId, estado, desde, hasta, page = 1, limit = 50 } = req.query
+  const { entidadId, socioId, estado, tipo, desde, hasta, page = 1, limit = 50 } = req.query
 
-  const where = {
-    tipo: { in: ['FACTURA_VENTA', 'NOTA_CREDITO_CLIENTE', 'NOTA_DEBITO_CLIENTE'] }
-  }
+  const where = tipo
+    ? { tipo }
+    : { tipo: { in: ['FACTURA_VENTA', 'NOTA_CREDITO_CLIENTE', 'NOTA_DEBITO_CLIENTE'] } }
   if (entidadId) where.entidadId = parseInt(entidadId)
   if (socioId) where.socioId = parseInt(socioId)
   if (estado) where.estado = estado

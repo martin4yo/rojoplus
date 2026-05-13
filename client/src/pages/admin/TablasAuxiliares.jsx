@@ -4,9 +4,12 @@ import { Plus, Users, Tag, Activity, Dumbbell, UserCheck, Wallet, Mail, AlertTri
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import Switch from '../../components/Switch'
+import Modal from '../../components/Modal'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import InboxRecuperoConfigCard from '../../components/InboxRecuperoConfigCard'
+import FacturacionAfipCard from '../../components/FacturacionAfipCard'
 
 export default function TablasAuxiliares() {
   const navigate = useNavigate()
@@ -71,10 +74,18 @@ export default function TablasAuxiliares() {
   // Pausa de crons automáticos del sistema
   const [cronsPausados, setCronsPausados] = useState(false)
   const [guardandoCronsPausa, setGuardandoCronsPausa] = useState(false)
+  const [cronsLista, setCronsLista] = useState([]) // [{ key, label, descripcion, horario, activoIndividual, activoEfectivo }]
+  const [guardandoCronKey, setGuardandoCronKey] = useState(null)
+  // Modal "Ejecutar ahora"
+  const [cronTestModal, setCronTestModal] = useState({
+    open: false, cronKey: null, cronLabel: '',
+    limit: 5, canalEmail: true, canalWa: false,
+    ejecutando: false, resultado: null,
+  })
 
-  // Configuración recordatorio anticipado
-  const [recordatorioAnt, setRecordatorioAnt] = useState({ activo: false, dias: '3' })
-  const [guardandoRecordatorioAnt, setGuardandoRecordatorioAnt] = useState(false)
+  // Días antes del vencimiento para el cron "Cuotas próximas a vencer"
+  const [cuotasProxDias, setCuotasProxDias] = useState('5')
+  const [guardandoCuotasProxDias, setGuardandoCuotasProxDias] = useState(false)
 
   // Día de corte para alta de cuotas (mes corriente vs siguiente)
   const [diaCorte, setDiaCorte] = useState('20')
@@ -161,7 +172,7 @@ export default function TablasAuxiliares() {
     cargarDescAnticipado()
     cargarBajaAsistencia()
     cargarCumpleanios()
-    cargarRecordatorioAnt()
+    cargarCuotasProxDias()
     cargarDiaCorte()
     cargarConfigFiscal()
     cargarConfigSmtp()
@@ -380,8 +391,9 @@ export default function TablasAuxiliares() {
 
   async function cargarCronsPausa() {
     try {
-      const cfg = await api.get('/admin/sistema/configuracion/CRONS_PAUSADOS').catch(() => null)
-      setCronsPausados(cfg?.valor === 'true')
+      const data = await api.get('/admin/sistema/crons')
+      setCronsPausados(!!data?.masterPausado)
+      setCronsLista(data?.crons || [])
     } catch (err) {
       console.error('Error cargando estado de crons:', err)
     }
@@ -398,12 +410,63 @@ export default function TablasAuxiliares() {
         descripcion: 'Pausa TODOS los crons automáticos (notificaciones + vigencia) para este tenant',
       })
       setCronsPausados(nuevoValor)
+      // Refresca lista para que `activoEfectivo` se actualice
+      cargarCronsPausa()
       setSuccess(nuevoValor ? 'Crons automáticos PAUSADOS para este tenant' : 'Crons automáticos REACTIVADOS')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError('Error al actualizar pausa de crons')
     } finally {
       setGuardandoCronsPausa(false)
+    }
+  }
+
+  async function toggleCronIndividual(cronKey, nuevoValor) {
+    setGuardandoCronKey(cronKey)
+    setError(null)
+    try {
+      await api.put(`/admin/sistema/crons/${cronKey}`, { activo: nuevoValor })
+      setCronsLista(prev => prev.map(c => c.key === cronKey
+        ? { ...c, activoIndividual: nuevoValor, activoEfectivo: !cronsPausados && nuevoValor }
+        : c))
+    } catch (err) {
+      setError('Error al actualizar el cron')
+    } finally {
+      setGuardandoCronKey(null)
+    }
+  }
+
+  function abrirCronTestModal(cron) {
+    setCronTestModal({
+      open: true,
+      cronKey: cron.key,
+      cronLabel: cron.label,
+      limit: 5,
+      canalEmail: true,
+      canalWa: false,
+      ejecutando: false,
+      resultado: null,
+    })
+  }
+
+  async function ejecutarCronTest() {
+    const canales = []
+    if (cronTestModal.canalEmail) canales.push('email')
+    if (cronTestModal.canalWa) canales.push('whatsapp')
+    if (canales.length === 0) {
+      setError('Elegí al menos un canal')
+      return
+    }
+    setCronTestModal(prev => ({ ...prev, ejecutando: true, resultado: null }))
+    try {
+      const data = await api.post(`/admin/sistema/crons/${cronTestModal.cronKey}/test`, {
+        limit: cronTestModal.limit,
+        canales,
+      })
+      setCronTestModal(prev => ({ ...prev, ejecutando: false, resultado: data }))
+    } catch (err) {
+      setCronTestModal(prev => ({ ...prev, ejecutando: false }))
+      setError(err.message || 'Error al ejecutar el cron')
     }
   }
 
@@ -493,25 +556,26 @@ export default function TablasAuxiliares() {
     }
   }
 
-  async function cargarRecordatorioAnt() {
+  async function cargarCuotasProxDias() {
     try {
-      const data = await api.get('/admin/configuracion-recordatorio-anticipado')
-      if (data) setRecordatorioAnt({ activo: !!data.activo, dias: String(data.dias || '3') })
+      const data = await api.get('/admin/sistema/configuracion/CUOTAS_PROXIMAS_DIAS').catch(() => null)
+      if (data?.valor) setCuotasProxDias(String(data.valor))
     } catch (err) {
-      console.error('Error cargando config recordatorio anticipado:', err)
+      console.error('Error cargando días aviso cuotas próximas:', err)
     }
   }
 
-  async function guardarRecordatorioAnt() {
-    setGuardandoRecordatorioAnt(true)
+  async function guardarCuotasProxDias() {
+    setGuardandoCuotasProxDias(true)
     setError(null)
     try {
-      await api.put('/admin/configuracion-recordatorio-anticipado', { activo: recordatorioAnt.activo, dias: parseInt(recordatorioAnt.dias) || 3 })
-      setSuccess('Configuración de recordatorio anticipado actualizada')
+      const dias = parseInt(cuotasProxDias) || 5
+      await api.put('/admin/sistema/configuracion/CUOTAS_PROXIMAS_DIAS', { valor: String(dias) })
+      setSuccess('Días para aviso de cuotas próximas actualizado')
     } catch (err) {
       setError(err.message || 'Error al guardar')
     } finally {
-      setGuardandoRecordatorioAnt(false)
+      setGuardandoCuotasProxDias(false)
     }
   }
 
@@ -933,6 +997,19 @@ export default function TablasAuxiliares() {
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4" />
               Notificaciones
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('procesos')}
+            className={`pb-3 px-1 border-b-2 font-medium text-sm transition ${
+              activeTab === 'procesos'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4" />
+              Procesos automáticos
             </div>
           </button>
         </nav>
@@ -1375,35 +1452,7 @@ export default function TablasAuxiliares() {
             )}
           </div>
 
-          {/* Pausar Crons Automáticos del sistema */}
-          <div className={`bg-white rounded-xl shadow-sm border p-5 w-96 relative min-h-[280px] ${cronsPausados ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-200'}`}>
-            <div className="flex items-start gap-4">
-              <div className={`p-3 rounded-xl ${cronsPausados ? 'bg-red-100' : 'bg-violet-100'}`}>
-                <Bell className={`w-6 h-6 ${cronsPausados ? 'text-red-600' : 'text-violet-600'}`} />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-800">Crons automáticos del sistema</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Pausa TODAS las notificaciones automáticas para este tenant: cuotas próximas/vencidas, morosidad, cumpleaños, vigencia, recordatorios, partidos, baja asistencia.
-                </p>
-
-                <div className="mt-4">
-                  <Switch
-                    checked={cronsPausados}
-                    onChange={(v) => toggleCronsPausa(v)}
-                    disabled={guardandoCronsPausa || !tienePermiso(PERMISOS.CONFIG_EDITAR)}
-                    label={cronsPausados ? '⏸ Crons PAUSADOS' : '▶ Crons activos'}
-                  />
-                </div>
-
-                <div className={`mt-4 p-3 rounded-lg text-xs ${cronsPausados ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-50 text-gray-600'}`}>
-                  {cronsPausados
-                    ? 'Ningún cron automático va a procesar este tenant hasta que reactives el switch.'
-                    : 'Los crons se ejecutan según su programación (ver horarios en el código). Activar la pausa es útil para testing o mantenimiento.'}
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Crons automáticos: ahora en su propia solapa "Procesos automáticos" */}
 
           {/* Descuento por Pago Anticipado */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-96 relative min-h-[280px]">
@@ -1596,7 +1645,7 @@ export default function TablasAuxiliares() {
                 {cumpleanios.activo && (
                   <div className="mt-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Mensaje <span className="text-gray-400 font-normal">(usá {'{nombre}'} para el nombre)</span>
+                      Mensaje
                     </label>
                     <textarea
                       value={cumpleanios.mensaje}
@@ -1604,6 +1653,12 @@ export default function TablasAuxiliares() {
                       className="input-field w-full h-20 resize-none"
                       placeholder="Feliz cumpleaños, {nombre}! El club te desea un excelente día."
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Variables: <span className="font-mono bg-gray-100 px-1 rounded">{'{nombre}'}</span>{' '}
+                      <span className="font-mono bg-gray-100 px-1 rounded">{'{apellido}'}</span>{' '}
+                      <span className="font-mono bg-gray-100 px-1 rounded">{'{nroSocio}'}</span>{' '}
+                      <span className="font-mono bg-gray-100 px-1 rounded">{'{linkPortal}'}</span>
+                    </p>
                     <p className="text-xs text-gray-500 mt-1">Se envía por email y WhatsApp si el socio los tiene configurados</p>
                   </div>
                 )}
@@ -1625,63 +1680,46 @@ export default function TablasAuxiliares() {
             )}
           </div>
 
-          {/* Recordatorio Anticipado de Cuotas */}
+          {/* Días antes del vencimiento para el cron "Cuotas próximas a vencer" */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 w-[500px] relative min-h-[180px]">
             <div className="flex items-start gap-4">
-              <div className={`p-3 rounded-xl ${recordatorioAnt.activo ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                <Bell className={`w-6 h-6 ${recordatorioAnt.activo ? 'text-blue-600' : 'text-gray-500'}`} />
+              <div className="p-3 rounded-xl bg-blue-100">
+                <Bell className="w-6 h-6 text-blue-600" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-800">Recordatorio Anticipado de Cuotas</h3>
+                <h3 className="font-semibold text-gray-800">Aviso de Cuotas Próximas a Vencer</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Notifica al socio X días antes del vencimiento (además del recordatorio a 5 días)
+                  Cuántos días antes del vencimiento se notifica al socio (por email y WhatsApp). Activá/desactivá el cron en la solapa "Procesos automáticos".
                 </p>
 
-                <div className="mt-4 flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="recordatorioAntActivo"
-                    checked={recordatorioAnt.activo}
-                    onChange={e => setRecordatorioAnt({ ...recordatorioAnt, activo: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-primary"
-                  />
-                  <label htmlFor="recordatorioAntActivo" className="text-sm font-medium text-gray-700 cursor-pointer">
-                    Activar recordatorio
-                  </label>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Días antes del vencimiento</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={cuotasProxDias}
+                      onChange={e => setCuotasProxDias(e.target.value)}
+                      className="input-field w-20"
+                      min="1" max="30"
+                    />
+                    <span className="text-sm text-gray-500">días antes</span>
+                  </div>
                 </div>
-
-                {recordatorioAnt.activo && (
-                  <>
-                    <div className="mt-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Días antes del vencimiento</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          value={recordatorioAnt.dias}
-                          onChange={e => setRecordatorioAnt({ ...recordatorioAnt, dias: e.target.value })}
-                          className="input-field w-20"
-                          min="1" max="30"
-                        />
-                        <span className="text-sm text-gray-500">días antes</span>
-                      </div>
-                    </div>
-                    <div className="mt-3 p-2 bg-blue-50 rounded-lg">
-                      <p className="text-xs text-gray-600">
-                        Se enviará un recordatorio <span className="font-semibold text-blue-600">{recordatorioAnt.dias} días antes</span> del vencimiento por email y WhatsApp
-                      </p>
-                    </div>
-                  </>
-                )}
+                <div className="mt-3 p-2 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-gray-600">
+                    Se enviará el aviso <span className="font-semibold text-blue-600">{cuotasProxDias} días antes</span> del vencimiento
+                  </p>
+                </div>
               </div>
             </div>
             {tienePermiso(PERMISOS.CONFIG_EDITAR) && (
               <button
-                onClick={guardarRecordatorioAnt}
-                disabled={guardandoRecordatorioAnt}
+                onClick={guardarCuotasProxDias}
+                disabled={guardandoCuotasProxDias}
                 className="absolute bottom-4 right-4 p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition disabled:opacity-50"
                 title="Guardar"
               >
-                {guardandoRecordatorioAnt ? (
+                {guardandoCuotasProxDias ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Save className="w-5 h-5" />
@@ -2474,6 +2512,12 @@ export default function TablasAuxiliares() {
             </div>
           </div>
 
+          {/* Bandeja IMAP para campañas de recupero */}
+          <InboxRecuperoConfigCard />
+
+          {/* Conexiones AFIP y Puntos de Venta */}
+          <FacturacionAfipCard />
+
           {/* Conexión WhatsApp — solo si el plan lo habilita */}
           {!planFeatures.whatsapp && (
             <div className="w-full py-6 px-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-center text-gray-500">
@@ -2623,9 +2667,28 @@ export default function TablasAuxiliares() {
                 <p className="text-sm text-gray-500 mt-1">
                   Activá cada evento y personalizá el texto. Dejá el texto vacío para usar el mensaje por defecto.
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Variables: <span className="font-mono bg-gray-100 px-1 rounded">{'{{nombre}}'}</span> <span className="font-mono bg-gray-100 px-1 rounded">{'{{monto}}'}</span> <span className="font-mono bg-gray-100 px-1 rounded">{'{{vencimiento}}'}</span> <span className="font-mono bg-gray-100 px-1 rounded">{'{{total}}'}</span> <span className="font-mono bg-gray-100 px-1 rounded">{'{{link}}'}</span>
-                </p>
+                <div className="text-xs text-gray-500 mt-2 space-y-1">
+                  <div>
+                    <span className="font-medium">Socio:</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{nombre}}'}</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{apellido}}'}</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{nombreCompleto}}'}</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{nroSocio}}'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium">Importe:</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{monto}}'}</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{importe}}'}</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{total}}'}</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{vencimiento}}'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium">Links al portal del socio:</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{linkPago}}'}</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{linkPortal}}'}</span>{' '}
+                    <span className="font-mono bg-gray-100 px-1 rounded">{'{{link}}'}</span>
+                  </div>
+                </div>
                 <div className="mt-4 space-y-4">
                   {[
                     {
@@ -2634,23 +2697,23 @@ export default function TablasAuxiliares() {
                       label: 'Confirmación de pago',
                       desc: 'Al registrar un pago del socio',
                       placeholder: '*{{nombre}}*, registramos tu pago de *{{monto}}*. Gracias!',
-                      vars: '{{nombre}}, {{monto}}',
+                      vars: '{{nombre}}, {{apellido}}, {{nroSocio}}, {{monto}}',
                     },
                     {
                       eventoKey: 'WHATSAPP_NOTIF_VENCIMIENTO',
                       textoKey: 'NOTIF_WA_VENCIMIENTO',
                       label: 'Aviso de vencimiento',
                       desc: 'Días antes del vencimiento de cuota',
-                      placeholder: '*{{nombre}}*, tu cuota de *{{monto}}* vence el *{{vencimiento}}*. Podés pagar desde el portal del club.',
-                      vars: '{{nombre}}, {{monto}}, {{vencimiento}}',
+                      placeholder: '*{{nombre}}*, tu cuota de *{{monto}}* vence el *{{vencimiento}}*.\nPagá online: {{linkPago}}',
+                      vars: '{{nombre}}, {{apellido}}, {{nroSocio}}, {{monto}}, {{vencimiento}}, {{linkPago}}',
                     },
                     {
                       eventoKey: 'WHATSAPP_NOTIF_MORA',
                       textoKey: 'NOTIF_WA_MORA',
                       label: 'Aviso de mora',
                       desc: 'Al tener cuotas vencidas',
-                      placeholder: '*{{nombre}}*, tenés cuotas vencidas por un total de *{{total}}*. Por favor regularizá tu situación.',
-                      vars: '{{nombre}}, {{total}}',
+                      placeholder: '*{{nombre}}*, tenés cuotas vencidas por un total de *{{total}}*.\nRegularizá desde el portal: {{linkPago}}',
+                      vars: '{{nombre}}, {{apellido}}, {{nroSocio}}, {{total}}, {{linkPago}}',
                     },
                     {
                       eventoKey: 'WHATSAPP_NOTIF_MAGIC_LINK',
@@ -2658,7 +2721,7 @@ export default function TablasAuxiliares() {
                       label: 'Link del portal',
                       desc: 'Al generar acceso al portal del socio',
                       placeholder: '*{{nombre}}*, acá está tu acceso al portal del club:\n{{link}}\n\nEste link es personal y expira en 7 días.',
-                      vars: '{{nombre}}, {{link}}',
+                      vars: '{{nombre}}, {{apellido}}, {{nroSocio}}, {{link}}',
                     },
                   ].map(({ eventoKey, textoKey, label, desc, placeholder, vars }) => {
                     const activo = notifEventos[eventoKey] === 'true'
@@ -2707,6 +2770,231 @@ export default function TablasAuxiliares() {
 
         </div>
       )}
+
+      {/* Tab: Procesos automáticos (crons) */}
+      {activeTab === 'procesos' && (
+        <div className="flex flex-col gap-6 max-w-3xl">
+          <div className={`bg-white rounded-xl shadow-sm border p-5 ${cronsPausados ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-200'}`}>
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${cronsPausados ? 'bg-red-100' : 'bg-violet-100'}`}>
+                <Server className={`w-6 h-6 ${cronsPausados ? 'text-red-600' : 'text-violet-600'}`} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800">Procesos automáticos del sistema</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Estas tareas se ejecutan periódicamente sin intervención manual: notificaciones automáticas, vigencia de socios, recordatorios, etc.
+                  Usá el master switch para apagar todo, o ajustá cada proceso de forma individual.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Master switch */}
+          <div className={`bg-white rounded-xl shadow-sm border p-5 ${cronsPausados ? 'border-red-300' : 'border-gray-200'}`}>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-base font-semibold text-gray-800">Pausa general</div>
+                <div className="text-sm text-gray-500 mt-0.5">
+                  Apaga TODOS los procesos automáticos del tenant, sin importar los switches individuales de abajo.
+                </div>
+              </div>
+              <Switch
+                size="lg"
+                checked={cronsPausados}
+                onChange={(v) => toggleCronsPausa(v)}
+                disabled={guardandoCronsPausa || !tienePermiso(PERMISOS.CONFIG_EDITAR)}
+                label={cronsPausados ? 'PAUSADOS' : 'Activos'}
+              />
+            </div>
+            {cronsPausados && (
+              <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                ⚠ Todos los procesos automáticos están <strong>pausados</strong> para este tenant. Ningún cron va a procesar socios hasta que reactives el switch.
+              </div>
+            )}
+          </div>
+
+          {/* Lista de crons individuales */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <h4 className="text-base font-semibold text-gray-800 mb-1">Control individual</h4>
+            <p className="text-xs text-gray-500 mb-4">
+              Activá o desactivá cada proceso por separado. Si el master switch está pausado, ninguno de estos se ejecuta.
+            </p>
+            <div className="space-y-2">
+              {cronsLista.length === 0 ? (
+                <div className="text-sm text-gray-500 italic py-4 text-center">Cargando lista de procesos...</div>
+              ) : (
+                cronsLista.map(c => (
+                  <div
+                    key={c.key}
+                    className={`p-4 rounded-lg border flex items-start justify-between gap-4 ${
+                      c.activoEfectivo
+                        ? 'border-emerald-200 bg-emerald-50'
+                        : c.activoIndividual && cronsPausados
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-800">{c.label}</div>
+                      <div className="text-xs text-gray-600 mt-0.5">{c.descripcion}</div>
+                      <div className="text-[11px] text-gray-400 mt-1 font-mono">⏰ {c.horario}</div>
+                      {c.activoIndividual && cronsPausados && (
+                        <div className="text-[11px] text-amber-700 mt-1 font-medium">⚠ Activo individual pero PAUSADO por master</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => abrirCronTestModal(c)}
+                        disabled={!tienePermiso(PERMISOS.CONFIG_EDITAR)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40"
+                        title="Ejecutar ahora con N envíos de prueba"
+                      >
+                        <Activity className="w-3 h-3" />
+                        Ejecutar
+                      </button>
+                      <Switch
+                        checked={c.activoIndividual}
+                        onChange={(v) => toggleCronIndividual(c.key, v)}
+                        disabled={guardandoCronKey === c.key || !tienePermiso(PERMISOS.CONFIG_EDITAR)}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ejecutar Cron de prueba */}
+      <Modal
+        isOpen={cronTestModal.open}
+        onClose={() => setCronTestModal(prev => ({ ...prev, open: false, resultado: null }))}
+        title={`Ejecutar: ${cronTestModal.cronLabel}`}
+        maxWidth="max-w-2xl"
+      >
+        <div className="space-y-4">
+          {!cronTestModal.resultado ? (
+            <>
+              <p className="text-sm text-gray-600">
+                Ejecuta este proceso ahora, limitado a los primeros N socios afectados. Útil para validar contenido / formato del mensaje sin disparar masivamente.
+                Se respetan <code className="text-xs bg-gray-100 px-1 rounded">MODO_DEMO</code> y <code className="text-xs bg-gray-100 px-1 rounded">WHATSAPP_WHITELIST</code>.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad (máx 20)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={cronTestModal.limit}
+                    onChange={(e) => setCronTestModal(prev => ({ ...prev, limit: parseInt(e.target.value) || 1 }))}
+                    className="input-field w-full"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Canales</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cronTestModal.canalEmail}
+                      onChange={(e) => setCronTestModal(prev => ({ ...prev, canalEmail: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">Email</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cronTestModal.canalWa}
+                      onChange={(e) => setCronTestModal(prev => ({ ...prev, canalWa: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <MessageCircle className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">WhatsApp</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setCronTestModal(prev => ({ ...prev, open: false }))}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={ejecutarCronTest}
+                  loading={cronTestModal.ejecutando}
+                  disabled={cronTestModal.ejecutando}
+                >
+                  Ejecutar ahora
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              {cronTestModal.resultado.mensaje ? (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                  {cronTestModal.resultado.mensaje}
+                </div>
+              ) : (
+                <>
+                  <div className="text-sm text-gray-700">
+                    Procesados: <strong>{cronTestModal.resultado.total}</strong> socio(s)
+                  </div>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b text-xs uppercase text-gray-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Socio</th>
+                          <th className="px-3 py-2 text-center">Email</th>
+                          <th className="px-3 py-2 text-center">WhatsApp</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {cronTestModal.resultado.enviados.map(it => (
+                          <tr key={it.socioId}>
+                            <td className="px-3 py-2">
+                              <div className="font-medium text-gray-800">#{it.nroSocio} {it.nombre}</div>
+                            </td>
+                            <td className="px-3 py-2 text-center text-xs">
+                              {!it.email.intentado ? <span className="text-gray-400">—</span>
+                                : it.email.ok ? <span className="text-emerald-700">✓ Enviado</span>
+                                : <span className="text-red-600" title={it.email.motivo}>✗ {it.email.motivo}</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center text-xs">
+                              {!it.whatsapp.intentado ? <span className="text-gray-400">—</span>
+                                : it.whatsapp.ok ? <span className="text-emerald-700">✓ Enviado</span>
+                                : <span className="text-red-600" title={it.whatsapp.motivo}>✗ {it.whatsapp.motivo}</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="secondary" onClick={() => setCronTestModal(prev => ({ ...prev, resultado: null }))}>
+                  Volver
+                </Button>
+                <Button type="button" onClick={() => setCronTestModal(prev => ({ ...prev, open: false, resultado: null }))}>
+                  Cerrar
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
 
     </div>
   )

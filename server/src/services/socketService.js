@@ -85,6 +85,11 @@ export function initSocket(httpServer) {
     // Unir a sala personal
     socket.join(`user:${admin.id}`)
 
+    // Unir a sala del tenant para notificaciones globales (ej: respuestas de recupero)
+    if (admin.tenantId) {
+      socket.join(`tenant:${admin.tenantId}`)
+    }
+
     // Unir a salas según permisos
     const permisos = admin.permisos || []
 

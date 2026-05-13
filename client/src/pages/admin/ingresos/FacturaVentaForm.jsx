@@ -22,6 +22,18 @@ const MEDIOS_PAGO = [
   { value: 'CHEQUE', label: 'Cheque' }
 ]
 
+const TIPOS_MOVIMIENTO = [
+  { value: 'FACTURA_VENTA', label: 'Factura' },
+  { value: 'NOTA_CREDITO_CLIENTE', label: 'Nota de Crédito' },
+  { value: 'NOTA_DEBITO_CLIENTE', label: 'Nota de Débito' }
+]
+
+const TIPO_LABELS = {
+  FACTURA_VENTA: { titulo: 'Nueva Factura de Venta', accion: 'Crear Factura', tipoLabel: 'Factura', color: 'green' },
+  NOTA_CREDITO_CLIENTE: { titulo: 'Nueva Nota de Crédito', accion: 'Crear Nota de Crédito', tipoLabel: 'NC', color: 'orange' },
+  NOTA_DEBITO_CLIENTE: { titulo: 'Nueva Nota de Débito', accion: 'Crear Nota de Débito', tipoLabel: 'ND', color: 'red' }
+}
+
 export default function FacturaVentaForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -31,6 +43,15 @@ export default function FacturaVentaForm() {
 
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Tipo de movimiento (Factura / NC / ND)
+  const [tipoMovimiento, setTipoMovimiento] = useState('FACTURA_VENTA')
+  const [movimientoPadreId, setMovimientoPadreId] = useState('')
+  const [facturasCliente, setFacturasCliente] = useState([])
+
+  // Punto de venta
+  const [puntosVenta, setPuntosVenta] = useState([])
+  const [puntoVentaIdSel, setPuntoVentaIdSel] = useState('')
 
   // Datos del formulario
   const [tipoCliente, setTipoCliente] = useState('SOCIO')
@@ -46,6 +67,10 @@ export default function FacturaVentaForm() {
   const [centroCostoId, setCentroCostoId] = useState(null)
   const [observaciones, setObservaciones] = useState('')
   const [items, setItems] = useState([])
+
+  const esFactura = tipoMovimiento === 'FACTURA_VENTA'
+  const esNC = tipoMovimiento === 'NOTA_CREDITO_CLIENTE'
+  const labelInfo = TIPO_LABELS[tipoMovimiento]
 
   // Cobro al momento
   const [cobrarAlMomento, setCobrarAlMomento] = useState(false)
@@ -86,6 +111,10 @@ export default function FacturaVentaForm() {
   }, [pedidoIdParam])
 
   useEffect(() => {
+    if (!esFactura) {
+      setPedidos([])
+      return
+    }
     if (tipoCliente === 'CLIENTE' && entidadId) {
       cargarPedidosCliente(entidadId)
     } else if (tipoCliente === 'SOCIO' && socioId) {
@@ -93,25 +122,67 @@ export default function FacturaVentaForm() {
     } else {
       setPedidos([])
     }
-  }, [tipoCliente, entidadId, socioId])
+  }, [tipoCliente, entidadId, socioId, esFactura])
+
+  useEffect(() => {
+    if (!esNC) {
+      setFacturasCliente([])
+      setMovimientoPadreId('')
+      return
+    }
+    if (tipoCliente === 'CLIENTE' && entidadId) {
+      cargarFacturasCliente({ entidadId })
+    } else if (tipoCliente === 'SOCIO' && socioId) {
+      cargarFacturasCliente({ socioId })
+    } else {
+      setFacturasCliente([])
+    }
+  }, [esNC, tipoCliente, entidadId, socioId])
+
+  useEffect(() => {
+    setMovimientoPadreId('')
+  }, [tipoMovimiento])
+
+  async function cargarFacturasCliente({ entidadId, socioId }) {
+    try {
+      const params = new URLSearchParams()
+      if (entidadId) params.append('entidadId', entidadId)
+      if (socioId) params.append('socioId', socioId)
+      const response = await api.getFull(`/admin/facturas-venta?${params}&limit=100`)
+      const facturas = (response.data || []).filter(f =>
+        f.tipo === 'FACTURA_VENTA' && f.estado !== 'ANULADO' && f.estado !== 'COMPENSADO'
+      )
+      setFacturasCliente(facturas)
+    } catch (err) {
+      console.error('Error cargando facturas del cliente:', err)
+      setFacturasCliente([])
+    }
+  }
 
   async function cargarDatosIniciales() {
     setLoading(true)
     try {
-      const [clientesRes, productosRes, conceptosRes, cajasRes, configCondIva, configCuit, configRazonSocial] = await Promise.all([
+      const [clientesRes, productosRes, conceptosRes, cajasRes, configCondIva, configCuit, configRazonSocial, pvRes] = await Promise.all([
         api.getFull('/admin/entidades?tipo=CLIENTE&limit=1000'),
         api.getFull('/admin/productos?activo=true'),
         api.getFull('/admin/conceptos?tipo=INGRESO'),
         api.getFull('/admin/cajas?activo=true'),
         api.get('/admin/sistema/configuracion/FISCAL_CONDICION_IVA').catch(() => null),
         api.get('/admin/sistema/configuracion/FISCAL_CUIT').catch(() => null),
-        api.get('/admin/sistema/configuracion/FISCAL_RAZON_SOCIAL').catch(() => null)
+        api.get('/admin/sistema/configuracion/FISCAL_RAZON_SOCIAL').catch(() => null),
+        api.getFull('/admin/puntos-venta?activo=true').catch(() => ({ data: [] }))
       ])
 
       setClientes(clientesRes.data || [])
       setProductos(productosRes.data || [])
       setConceptos(conceptosRes.data || [])
       setCajas(cajasRes.data || [])
+
+      const pvs = pvRes.data || []
+      setPuntosVenta(pvs)
+      // Preseleccionar default o el primero
+      const pvDefault = pvs.find(p => p.esDefault) || pvs[0]
+      if (pvDefault) setPuntoVentaIdSel(pvDefault.id)
 
       // Configuración fiscal del emisor
       setConfigFiscal({
@@ -215,6 +286,12 @@ export default function FacturaVentaForm() {
     setPedidoId('')
     setPedidoSeleccionado(null)
     setItems([])
+    // Autocompletar la condición IVA con la del socio (default Consumidor Final)
+    if (socio.condicionIva) {
+      setCondicionIvaCliente(socio.condicionIva)
+    } else {
+      setCondicionIvaCliente('CONSUMIDOR_FINAL')
+    }
   }
 
   async function buscarClientes(query) {
@@ -241,6 +318,12 @@ export default function FacturaVentaForm() {
     setPedidoId('')
     setPedidoSeleccionado(null)
     setItems([])
+    // Autocompletar la condición IVA con la del cliente (default Consumidor Final)
+    if (cliente.condicionIva) {
+      setCondicionIvaCliente(cliente.condicionIva)
+    } else {
+      setCondicionIvaCliente('CONSUMIDOR_FINAL')
+    }
   }
 
   function handleSelectPedido(e) {
@@ -341,8 +424,8 @@ export default function FacturaVentaForm() {
       }
     }
 
-    // Validar cobro al momento
-    if (cobrarAlMomento && !cajaId) {
+    // Validar cobro al momento (solo factura)
+    if (esFactura && cobrarAlMomento && !cajaId) {
       showModal({ type: 'error', message: 'Debe seleccionar una caja para el cobro' })
       return
     }
@@ -352,20 +435,30 @@ export default function FacturaVentaForm() {
       return
     }
 
+    // Validar PV (excepto NC asociada que hereda del padre)
+    const ncAsociada = esNC && movimientoPadreId
+    if (!ncAsociada && !puntoVentaIdSel) {
+      showModal({ type: 'error', message: 'Debe seleccionar un Punto de Venta. Configure uno en Tablas Auxiliares.' })
+      return
+    }
+
     setSaving(true)
     try {
       const totales = calcularTotales()
 
       const payload = {
-        tipo: 'FACTURA_VENTA',
+        tipo: tipoMovimiento,
         socioId: tipoCliente === 'SOCIO' ? parseInt(socioId) : null,
         entidadId: tipoCliente === 'CLIENTE' ? parseInt(entidadId) : null,
-        pedidoId: pedidoId ? parseInt(pedidoId) : null,
+        pedidoId: esFactura && pedidoId ? parseInt(pedidoId) : null,
+        movimientoPadreId: esNC && movimientoPadreId ? parseInt(movimientoPadreId) : null,
+        puntoVentaId: puntoVentaIdSel ? parseInt(puntoVentaIdSel) : null,
+        condicionIvaCliente,
         fecha,
         fechaVencimiento: fechaVencimiento || null,
         tipoComprobante: tipoComprobanteCalculado || null,
-        puntoVenta: puntoVenta || null,
-        numeroComprobante: numeroComprobante || null,
+        puntoVenta: null,  // lo setea el backend desde AFIP
+        numeroComprobante: null,
         conceptoId: conceptoId ? parseInt(conceptoId) : null,
         centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
         observaciones: observaciones || null,
@@ -375,7 +468,7 @@ export default function FacturaVentaForm() {
         montoTotal: totales.total,
         items: items.map(item => ({
           productoVarianteId: item.productoVarianteId ? parseInt(item.productoVarianteId) : null,
-          itemPedidoId: item.itemPedidoId ? parseInt(item.itemPedidoId) : null,
+          itemPedidoId: esFactura && item.itemPedidoId ? parseInt(item.itemPedidoId) : null,
           descripcion: item.descripcion,
           cantidad: parseFloat(item.cantidad),
           precioUnitario: parseFloat(item.precioUnitario),
@@ -383,11 +476,11 @@ export default function FacturaVentaForm() {
         }))
       }
 
-      // Crear factura
+      // Crear movimiento
       const facturaResponse = await api.post('/admin/movimientos-contables', payload)
 
-      // Si cobra al momento, crear recibo de cobro
-      if (cobrarAlMomento) {
+      // Si cobra al momento (solo factura), crear recibo de cobro
+      if (esFactura && cobrarAlMomento) {
         const reciboPayload = {
           socioId: tipoCliente === 'SOCIO' ? parseInt(socioId) : null,
           entidadId: tipoCliente === 'CLIENTE' ? parseInt(entidadId) : null,
@@ -408,13 +501,13 @@ export default function FacturaVentaForm() {
 
       showModal({
         type: 'success',
-        message: cobrarAlMomento
-          ? 'Factura creada y cobrada correctamente'
-          : 'Factura creada correctamente',
+        message: esFactura
+          ? (cobrarAlMomento ? 'Factura creada y cobrada correctamente' : 'Factura creada correctamente')
+          : `${labelInfo.tipoLabel === 'NC' ? 'Nota de Crédito' : 'Nota de Débito'} creada correctamente`,
         onConfirm: () => navigate('/admin/ingresos/facturas')
       })
     } catch (err) {
-      showModal({ type: 'error', message: err.message || 'Error al crear la factura' })
+      showModal({ type: 'error', message: err.message || 'Error al crear el movimiento' })
     } finally {
       setSaving(false)
     }
@@ -440,25 +533,40 @@ export default function FacturaVentaForm() {
       {ModalComponent}
 
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <button
-          onClick={() => navigate('/admin/ingresos/facturas')}
-          className="p-2 hover:bg-gray-100 rounded-lg"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-green-100">
-            <FileText className="w-6 h-6 text-green-600" />
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/admin/ingresos/facturas')}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg bg-${labelInfo.color}-100`}>
+              <FileText className={`w-6 h-6 text-${labelInfo.color}-600`} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">{labelInfo.titulo}</h1>
+              <p className="text-sm text-gray-500">
+                {esFactura
+                  ? (pedidoSeleccionado ? `Desde pedido ${pedidoSeleccionado.numero}` : 'Factura directa')
+                  : (esNC ? 'Reduce deuda o crea saldo a favor del cliente' : 'Aumenta deuda del cliente')}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              Nueva Factura de Venta
-            </h1>
-            <p className="text-sm text-gray-500">
-              {pedidoSeleccionado ? `Desde pedido ${pedidoSeleccionado.numero}` : 'Factura directa'}
-            </p>
-          </div>
+        </div>
+        {/* Selector tipo */}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de movimiento</label>
+          <select
+            value={tipoMovimiento}
+            onChange={(e) => setTipoMovimiento(e.target.value)}
+            className="input-field"
+          >
+            {TIPOS_MOVIMIENTO.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -576,8 +684,8 @@ export default function FacturaVentaForm() {
                   </div>
                 )}
 
-                {/* Selector de pedido (si hay pedidos pendientes) */}
-                {pedidos.length > 0 && (
+                {/* Selector de pedido (solo factura) */}
+                {esFactura && pedidos.length > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <ShoppingCart className="inline w-4 h-4 mr-1" />
@@ -597,6 +705,35 @@ export default function FacturaVentaForm() {
                     </select>
                   </div>
                 )}
+
+                {/* Selector de factura asociada (solo NC) */}
+                {esNC && (socioId || entidadId) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <FileText className="inline w-4 h-4 mr-1" />
+                      Factura asociada (opcional)
+                    </label>
+                    <select
+                      value={movimientoPadreId}
+                      onChange={(e) => setMovimientoPadreId(e.target.value)}
+                      className="input-field w-full"
+                    >
+                      <option value="">NC suelta (genera saldo a favor)</option>
+                      {facturasCliente.map(f => (
+                        <option key={f.id} value={f.id}>
+                          {f.numero}
+                          {f.tipoComprobante && f.puntoVenta && f.numeroComprobante
+                            ? ` (${f.tipoComprobante} ${String(f.puntoVenta).padStart(4, '0')}-${String(f.numeroComprobante).padStart(8, '0')})`
+                            : ''}
+                          {' - '}{formatMonto(f.montoTotal)} | Saldo: {formatMonto(f.saldoPendiente)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Si elige una factura, la NC se asocia fiscalmente y descuenta su saldo. Sino, queda como saldo a favor del cliente.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -611,7 +748,7 @@ export default function FacturaVentaForm() {
                     <Info className="w-4 h-4 text-gray-500" />
                     <span className="text-sm text-gray-600">Tipo de comprobante:</span>
                     <span className={`px-2 py-1 rounded-full text-sm font-semibold ${getColorComprobante(tipoComprobanteCalculado)}`}>
-                      Factura {tipoComprobanteCalculado}
+                      {labelInfo.tipoLabel} {tipoComprobanteCalculado}
                     </span>
                   </div>
                   <span className="text-xs text-gray-500">
@@ -695,30 +832,31 @@ export default function FacturaVentaForm() {
                   />
                 </div>
 
-                <div>
+                <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Punto de Venta
+                    Punto de Venta {esNC && movimientoPadreId ? <span className="text-xs text-gray-500">(hereda del padre)</span> : '*'}
                   </label>
-                  <input
-                    type="text"
-                    value={puntoVenta}
-                    onChange={(e) => setPuntoVenta(e.target.value)}
-                    placeholder="0001"
+                  <select
+                    value={puntoVentaIdSel}
+                    onChange={(e) => setPuntoVentaIdSel(e.target.value)}
                     className="input-field w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nro. Comprobante
-                  </label>
-                  <input
-                    type="text"
-                    value={numeroComprobante}
-                    onChange={(e) => setNumeroComprobante(e.target.value)}
-                    placeholder="00000001"
-                    className="input-field w-full"
-                  />
+                    disabled={esNC && !!movimientoPadreId}
+                    required={!(esNC && movimientoPadreId)}
+                  >
+                    <option value="">Seleccionar punto de venta...</option>
+                    {puntosVenta.map(pv => (
+                      <option key={pv.id} value={pv.id}>
+                        {String(pv.numero).padStart(4, '0')} — {pv.nombre}
+                        {pv.afipConnection?.environment === 'TESTING' ? ' (TEST)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {puntosVenta.length === 0 && (
+                    <p className="text-xs text-red-600 mt-1">No hay puntos de venta. Configure uno en Tablas Auxiliares.</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    El número de comprobante lo asigna AFIP al pedir CAE.
+                  </p>
                 </div>
               </div>
 
@@ -736,7 +874,8 @@ export default function FacturaVentaForm() {
               </div>
             </div>
 
-            {/* Cobro al momento */}
+            {/* Cobro al momento (solo factura) */}
+            {esFactura && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
@@ -812,6 +951,7 @@ export default function FacturaVentaForm() {
                 </p>
               )}
             </div>
+            )}
 
             {/* Items */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -1016,7 +1156,7 @@ export default function FacturaVentaForm() {
                   className="w-full"
                   disabled={saving || items.length === 0}
                 >
-                  {saving ? 'Guardando...' : 'Crear Factura'}
+                  {saving ? 'Guardando...' : labelInfo.accion}
                 </Button>
                 <Button
                   type="button"
