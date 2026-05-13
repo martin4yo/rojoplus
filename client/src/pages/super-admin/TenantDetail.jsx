@@ -17,7 +17,7 @@ export default function TenantDetail() {
   const [guardandoParseKey, setGuardandoParseKey] = useState(false)
   const [mostrarParseKey, setMostrarParseKey] = useState(false)
   const [configIA, setConfigIA] = useState({
-    enabled: 'false', chatEnabled: 'true',
+    enabled: 'false', chatEnabled: 'true', useAxioHub: 'false',
     horarioInicio: '7', horarioFin: '23', msgFueraHorario: '', whitelist: '',
     nombre: '', promptExtra: '', prompt: '',
     provider: 'anthropic', tier: 'rapido', apiKey: '', modelOverride: '',
@@ -99,7 +99,7 @@ export default function TenantDetail() {
   async function cargarConfigIA() {
     try {
       const claves = [
-        'WA_AGENT_ENABLED', 'CHAT_AGENT_ENABLED',
+        'WA_AGENT_ENABLED', 'CHAT_AGENT_ENABLED', 'CHAT_USE_AXIO_HUB',
         'WA_AGENT_HORARIO_INICIO', 'WA_AGENT_HORARIO_FIN', 'WA_AGENT_MSG_FUERA_HORARIO',
         'WA_AGENT_WHITELIST', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA', 'WA_AGENT_SYSTEM_PROMPT',
         'AI_PROVIDER', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_MODEL_OVERRIDE', 'AI_ANALISIS_PROVIDER'
@@ -111,6 +111,7 @@ export default function TenantDetail() {
       setConfigIA({
         enabled: cfg.WA_AGENT_ENABLED || 'false',
         chatEnabled: cfg.CHAT_AGENT_ENABLED !== '' ? cfg.CHAT_AGENT_ENABLED : 'true',
+        useAxioHub: cfg.CHAT_USE_AXIO_HUB || 'false',
         horarioInicio: cfg.WA_AGENT_HORARIO_INICIO || '7',
         horarioFin: cfg.WA_AGENT_HORARIO_FIN || '23',
         msgFueraHorario: cfg.WA_AGENT_MSG_FUERA_HORARIO || '',
@@ -135,6 +136,7 @@ export default function TenantDetail() {
       const campos = [
         { clave: 'WA_AGENT_ENABLED', valor: configIA.enabled, descripcion: 'Agente IA WhatsApp habilitado', modulo: 'IA' },
         { clave: 'CHAT_AGENT_ENABLED', valor: configIA.chatEnabled, descripcion: 'Asistente de chat interno habilitado', modulo: 'IA' },
+        { clave: 'CHAT_USE_AXIO_HUB', valor: configIA.useAxioHub, descripcion: 'Usar AXIO Hub en lugar del motor IA local (Anthropic directo)', modulo: 'IA' },
         { clave: 'WA_AGENT_HORARIO_INICIO', valor: configIA.horarioInicio, descripcion: 'Hora inicio agente', modulo: 'IA' },
         { clave: 'WA_AGENT_HORARIO_FIN', valor: configIA.horarioFin, descripcion: 'Hora fin agente', modulo: 'IA' },
         { clave: 'WA_AGENT_MSG_FUERA_HORARIO', valor: configIA.msgFueraHorario, descripcion: 'Mensaje fuera de horario', modulo: 'IA' },
@@ -493,6 +495,29 @@ export default function TenantDetail() {
                     className={`relative w-12 h-6 rounded-full transition-colors ${configIA.chatEnabled === 'true' ? 'bg-blue-500' : 'bg-gray-300'}`}
                   >
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configIA.chatEnabled === 'true' ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Motor del chat: AXIO Hub vs motor local */}
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg"><Cpu className="w-5 h-5 text-emerald-600" /></div>
+                    <div>
+                      <p className="font-medium">Motor del asistente: AXIO Hub</p>
+                      <p className="text-sm text-gray-500">
+                        Si está activado, el chat usa AXIO Hub (caché, anonymizer, billing centralizado).
+                        Si está apagado, usa el motor IA local con conexión directa a Anthropic.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigIA({ ...configIA, useAxioHub: configIA.useAxioHub === 'true' ? 'false' : 'true' })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${configIA.useAxioHub === 'true' ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configIA.useAxioHub === 'true' ? 'translate-x-6' : ''}`} />
                   </button>
                 </div>
               </div>
