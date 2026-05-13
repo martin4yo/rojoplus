@@ -197,6 +197,9 @@ router.post(
           ? `Usuario socio ID=${context.socioId}. Solo podés ejecutar tools — no respondas con datos crudos del club. Si el pedido no matchea un tool, decí que no podés ayudar con eso.`
           : undefined
 
+        console.log(`📡 [HUB→] tenant=${req.tenantId} role=${context.role} toolsOnly=${!!isSocio} toolsCount=${tools.length}`)
+        console.log(`   question: "${message}"`)
+
         const hubResp = await callHub({
           question: message,
           context: '',
@@ -212,8 +215,11 @@ router.post(
             accion: hubResp.tool_call.name,
             entidades: hubResp.tool_call.args || {},
           }
+          console.log(`✅ [HUB←] tool_call=${action.accion} model=${hubResp.model} time_ms=${hubResp.time_ms}`)
+          console.log(`   args: ${JSON.stringify(action.entidades).slice(0, 300)}`)
           const executionResult = await actionExecutor.executeAction(action, context)
-          console.log('✅ ===== HUB tool_call EJECUTADO =====\n')
+          console.log(`🎬 [Action] ${action.accion} → success=${executionResult.success}`)
+          console.log(`   message: ${(executionResult.message || '').slice(0, 200)}`)
           return res.status(executionResult.success ? 200 : 400).json({
             success: executionResult.success,
             message: executionResult.message,
@@ -229,8 +235,10 @@ router.post(
         }
 
         // Capa 2.5 / Capa 3 → texto del hub directo al widget.
-        if (hubResp?.answer) {
-          console.log('✅ ===== HUB answer DEVUELTA =====\n')
+        if (hubResp?.answer !== undefined) {
+          const answerPreview = (hubResp.answer || '').replace(/\s+/g, ' ').slice(0, 300)
+          console.log(`✅ [HUB←] answer model=${hubResp.model} time_ms=${hubResp.time_ms} from_cache=${hubResp.from_cache || false} len=${(hubResp.answer || '').length}`)
+          console.log(`   preview: ${answerPreview}${(hubResp.answer || '').length > 300 ? '…' : ''}`)
           return res.status(200).json({
             success: true,
             message: hubResp.answer,
@@ -242,6 +250,7 @@ router.post(
           })
         }
 
+        console.warn('⚠️  [HUB←] respuesta sin tool_call ni answer:', JSON.stringify(hubResp).slice(0, 300))
         return res.status(502).json({
           success: false,
           message: 'El hub no devolvió respuesta interpretable.',
