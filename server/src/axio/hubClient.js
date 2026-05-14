@@ -36,10 +36,12 @@ export async function callHub({ question, context, tenantId, tools, scopeHint, t
     throw new Error('AXIO_ML_API_KEY no configurada en el servidor')
   }
 
+  // El hub valida tenant_id como string (Pydantic strict). Apps con tenantId
+  // numérico (clubix usa Int) o cuid (mini) caen al mismo string acá.
   const body = {
     question,
     context: context || '',
-    tenant_id: tenantId,
+    tenant_id: tenantId != null ? String(tenantId) : null,
   }
   if (tools && tools.length > 0) body.tools = tools
   if (scopeHint) body.scope_hint = scopeHint
