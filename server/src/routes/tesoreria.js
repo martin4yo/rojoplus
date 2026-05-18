@@ -103,7 +103,8 @@ router.get('/cajas/:id', asyncHandler(async (req, res) => {
   }
 
   const caja = await req.db.caja.findUnique({
-    where: { id: parseInt(id) }
+    where: { id: parseInt(id) },
+    include: { cuentaBancaria: true },
   })
 
   if (!caja) {
@@ -191,7 +192,8 @@ router.put('/cajas/:id', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (r
   const {
     codigo, nombre, tipo, descripcion, activo, cuentaContableId, centroCostoId,
     requiereConciliacion, mediosPagoPermitidos,
-    puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja
+    puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja,
+    cuentaBancaria, // { banco, tipoCuenta, numeroCuenta, cbu, alias, titular, cuit, sucursal } — opcional
   } = req.body
 
   const existente = await req.db.caja.findUnique({ where: { id: parseInt(id) } })

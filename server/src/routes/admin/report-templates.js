@@ -19,13 +19,18 @@ async function runCustomScript(script, db, tenantId, params) {
 }
 
 /**
- * Rehidrata `template.parameters` para evitar IDs hardcodeados.
- * Si el template tiene queryKey con `defaultParams` async, reemplaza las `options`
- * de cada parámetro con las del tenant actual. Mantiene `name`, `label`, `type`,
- * `defaultValue` y `dependsOn` del template (preservando ediciones del diseñador).
+ * Rehidrata `template.parameters` para evitar IDs hardcodeados Y agregar
+ * parámetros nuevos que el query def haya incorporado después de que el
+ * reporte fue diseñado.
  *
- * Esto soluciona el caso típico de "el reporte fue clonado/diseñado en otro tenant
- * y los IDs de actividades/categorías/tipos no existen en el tenant actual".
+ * Algoritmo:
+ *   - Toma la lista de `fresh` (defaultParams del query actual) como autoridad
+ *     de QUÉ parámetros existen y QUÉ opciones tienen.
+ *   - Para cada uno, si el template tiene una versión guardada con el mismo
+ *     `name`, usa el `defaultValue` del template (preserva customizaciones del
+ *     diseñador) pero las `options` siempre vienen del fresh.
+ *   - Parámetros que estaban en `template.parameters` pero ya NO existen en
+ *     `fresh` se descartan (probablemente fueron removidos del query def).
  */
 async function rehidratarParametros(template, db, tenantId) {
   if (!template?.queryKey) return template
@@ -34,14 +39,13 @@ async function rehidratarParametros(template, db, tenantId) {
 
   try {
     const fresh = await def.defaultParams(db, tenantId)
-    const freshByName = Object.fromEntries((fresh || []).map(p => [p.name, p]))
-    const merged = (template.parameters || fresh || []).map(p => {
-      const f = freshByName[p.name]
-      if (!f) return p
+    const tplByName = Object.fromEntries(((template.parameters) || []).map(p => [p.name, p]))
+    const merged = (fresh || []).map(f => {
+      const tpl = tplByName[f.name]
+      if (!tpl) return f // parámetro nuevo: usar tal cual del query def
       return {
-        ...p,
-        options: f.options ?? p.options ?? [],
-        dependsOn: p.dependsOn ?? f.dependsOn,
+        ...f,                              // base: fresh (label, type, options, dependsOn)
+        defaultValue: tpl.defaultValue ?? f.defaultValue, // preservar customización
       }
     })
     return { ...template, parameters: merged }

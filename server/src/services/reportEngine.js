@@ -15,14 +15,31 @@ Handlebars.registerHelper('formatCurrency', (value) => {
   )
 })
 
+// Las fechas de Prisma vienen en UTC (`2026-05-10T00:00:00.000Z`). Usar toLocaleDateString
+// con timezone Argentina (-3) las muestra como '09/05/2026' porque a las 00:00 UTC en AR
+// son las 21:00 del día anterior. Usamos UTC explícito para mostrar la fecha "real"
+// (la que el usuario guardó cuando creó la cuota).
 Handlebars.registerHelper('formatDate', (value) => {
   if (!value) return '—'
-  try { return new Date(value).toLocaleDateString('es-AR') } catch { return String(value) }
+  try {
+    const d = value instanceof Date ? value : new Date(value)
+    if (isNaN(d.getTime())) return String(value)
+    return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`
+  } catch { return String(value) }
 })
 
 Handlebars.registerHelper('formatDateTime', (value) => {
   if (!value) return '—'
-  try { return new Date(value).toLocaleString('es-AR') } catch { return String(value) }
+  try {
+    const d = value instanceof Date ? value : new Date(value)
+    if (isNaN(d.getTime())) return String(value)
+    const dd = String(d.getUTCDate()).padStart(2, '0')
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+    const yy = d.getUTCFullYear()
+    const hh = String(d.getUTCHours()).padStart(2, '0')
+    const mi = String(d.getUTCMinutes()).padStart(2, '0')
+    return `${dd}/${mm}/${yy} ${hh}:${mi}`
+  } catch { return String(value) }
 })
 
 // sum: {{sum items "field"}} → formatted currency string

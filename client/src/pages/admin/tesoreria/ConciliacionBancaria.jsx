@@ -343,7 +343,7 @@ export default function ConciliacionBancaria() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta/Caja</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Caja bancaria</label>
                 <select
                   value={filtros.cajaId}
                   onChange={(e) => setFiltros(prev => ({ ...prev, cajaId: e.target.value }))}
@@ -543,17 +543,22 @@ export default function ConciliacionBancaria() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta Bancaria *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Caja bancaria a conciliar *
+                </label>
                 <select
                   value={importForm.cajaId}
                   onChange={(e) => setImportForm(prev => ({ ...prev, cajaId: e.target.value }))}
                   className="input-field w-full"
                 >
-                  <option value="">Seleccione...</option>
+                  <option value="">Seleccione la caja...</option>
                   {cajas.filter(c => c.tipo === 'BANCO').map(c => (
                     <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  El extracto se vincula a esta caja. Los movimientos del banco van a matchearse con los movimientos de caja de Clubix.
+                </p>
               </div>
 
               <div>

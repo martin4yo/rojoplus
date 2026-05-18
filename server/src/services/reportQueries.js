@@ -426,6 +426,7 @@ const QUERY_DEFINITIONS = [
           { name: 'categoriaIds', label: 'Categoría', type: 'multiselect', defaultValue: [], options: [] },
           { name: 'fechaDesde', label: 'Vence desde', type: 'date', defaultValue: '' },
           { name: 'fechaHasta', label: 'Vence hasta', type: 'date', defaultValue: '' },
+          { name: 'incluirCuotaSocial', label: 'Incluir cuota social', type: 'boolean', defaultValue: 'false' },
         ]
       }
       const [actividades, categorias] = await Promise.all([
@@ -453,6 +454,7 @@ const QUERY_DEFINITIONS = [
           })) },
         { name: 'fechaDesde', label: 'Vence desde', type: 'date', defaultValue: '' },
         { name: 'fechaHasta', label: 'Vence hasta', type: 'date', defaultValue: '' },
+        { name: 'incluirCuotaSocial', label: 'Incluir cuota social', type: 'boolean', defaultValue: 'false' },
       ]
     },
     run: async (db, tenantId, params) => {
@@ -496,7 +498,7 @@ const QUERY_DEFINITIONS = [
       const cargos = await db.cargo.findMany({
         where,
         include: {
-          socio: { select: { nroSocio: true, apellidoNombre: true, documento: true, celular: true, email: true } },
+          socio: { select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, celular: true, email: true, titularFamiliaId: true } },
           periodo: { select: { nombre: true, anio: true, mes: true } },
           categoriaActividad: {
             select: {
@@ -512,6 +514,14 @@ const QUERY_DEFINITIONS = [
           { fechaVencimiento: 'asc' },
         ],
       })
+
+      // Helper: formato DD/MM/YYYY estable en UTC (evita off-by-one por timezone)
+      const fmtFechaUTC = (d) => {
+        if (!d) return ''
+        const f = d instanceof Date ? d : new Date(d)
+        if (isNaN(f.getTime())) return ''
+        return `${String(f.getUTCDate()).padStart(2, '0')}/${String(f.getUTCMonth() + 1).padStart(2, '0')}/${f.getUTCFullYear()}`
+      }
 
       // Agrupar: actividad → categoría → socio → cuotas
       const groupsMap = new Map()
@@ -530,6 +540,8 @@ const QUERY_DEFINITIONS = [
         const sid = c.socioId
         if (!g.socios.has(sid)) {
           g.socios.set(sid, {
+            socioId: sid,
+            titularFamiliaId: c.socio?.titularFamiliaId || null,
             nroSocio: c.socio?.nroSocio || '',
             apellidoNombre: c.socio?.apellidoNombre || '',
             documento: c.socio?.documento || '',
@@ -545,14 +557,107 @@ const QUERY_DEFINITIONS = [
           ? Math.floor((hoy - new Date(c.fechaVencimiento)) / 86400000)
           : 0
         s.cuotas.push({
+          tipo: 'ACTIVIDAD',
           periodo: c.periodo?.nombre || '',
           descripcion: c.descripcion || '',
           fechaVencimiento: c.fechaVencimiento,
+          fechaVencimientoStr: fmtFechaUTC(c.fechaVencimiento),
           montoTotal: Number(c.montoTotal),
           diasMora: diasMora > 0 ? diasMora : 0,
         })
         s.totalDeuda += Number(c.montoTotal)
         s.cantCuotas++
+      }
+
+      // ── INCLUIR CUOTA SOCIAL (param opcional) ─────────────────────────────
+      // Por cada grupo familiar de socios que aparecen en el reporte, agregar
+      // UNA vez las CUOTA_SOCIAL pendientes del titular del grupo (o del socio
+      // si es titular). Se asignan al primer miembro de ese grupo que aparezca
+      // en cada grupo de actividad/categoría — así se contabiliza una vez por
+      // grupo y queda visible para el cobrador.
+      const incluirCuotaSocial = params.incluirCuotaSocial === true || params.incluirCuotaSocial === 'true'
+      if (incluirCuotaSocial) {
+        // Identificar todos los socios que aparecen en el reporte
+        const sociosIds = new Set()
+        for (const g of groupsMap.values()) {
+          for (const sid of g.socios.keys()) sociosIds.add(sid)
+        }
+        if (sociosIds.size > 0) {
+          // Resolver el "titular efectivo" del grupo familiar de cada socio
+          // (si el socio tiene titularFamiliaId, ese; sino él mismo es el titular).
+          const socios = await db.socio.findMany({
+            where: { id: { in: [...sociosIds] } },
+            select: { id: true, titularFamiliaId: true },
+          })
+          const titularPorSocio = new Map()
+          const titularesUnicos = new Set()
+          for (const s of socios) {
+            const titId = s.titularFamiliaId || s.id
+            titularPorSocio.set(s.id, titId)
+            titularesUnicos.add(titId)
+          }
+
+          // Buscar cuotas sociales PENDIENTE de esos titulares con el mismo filtro de fecha
+          // que usaron las cuotas de actividad.
+          const whereCuotaSocial = {
+            tenantId,
+            estado: 'PENDIENTE',
+            categoria: 'CUOTA_SOCIAL',
+            socioId: { in: [...titularesUnicos] },
+            fechaVencimiento: where.fechaVencimiento, // mismo filtro temporal
+          }
+          const cuotasSociales = await db.cargo.findMany({
+            where: whereCuotaSocial,
+            include: {
+              socio: { select: { id: true, nroSocio: true, apellidoNombre: true } },
+              periodo: { select: { nombre: true } },
+            },
+            orderBy: { fechaVencimiento: 'asc' },
+          })
+
+          // Agrupar cuotas sociales por titularId
+          const csPorTitular = new Map()
+          for (const cs of cuotasSociales) {
+            if (!csPorTitular.has(cs.socioId)) csPorTitular.set(cs.socioId, [])
+            csPorTitular.get(cs.socioId).push(cs)
+          }
+
+          // Asignar cuota social al PRIMER socio de cada grupo (actividad+categoría)
+          // que pertenezca a un grupo familiar — solo 1 vez por grupo familiar dentro
+          // de cada bloque del reporte.
+          for (const g of groupsMap.values()) {
+            const titularesYaUsadosEnEsteGrupo = new Set()
+            // socios.values() respeta el orden de inserción → primer match es el más arriba
+            for (const s of g.socios.values()) {
+              const titId = titularPorSocio.get(s.socioId)
+              if (!titId) continue
+              if (titularesYaUsadosEnEsteGrupo.has(titId)) continue
+              const cuotas = csPorTitular.get(titId) || []
+              if (cuotas.length === 0) continue
+              for (const cs of cuotas) {
+                const diasMora = cs.fechaVencimiento
+                  ? Math.floor((hoy - new Date(cs.fechaVencimiento)) / 86400000)
+                  : 0
+                const titularNombre = cs.socio?.apellidoNombre || ''
+                const esDelMismoSocio = cs.socioId === s.socioId
+                s.cuotas.push({
+                  tipo: 'CUOTA_SOCIAL',
+                  periodo: cs.periodo?.nombre || '',
+                  descripcion: esDelMismoSocio
+                    ? 'Cuota social'
+                    : `Cuota social (titular: ${titularNombre})`,
+                  fechaVencimiento: cs.fechaVencimiento,
+                  fechaVencimientoStr: fmtFechaUTC(cs.fechaVencimiento),
+                  montoTotal: Number(cs.montoTotal),
+                  diasMora: diasMora > 0 ? diasMora : 0,
+                })
+                s.totalDeuda += Number(cs.montoTotal)
+                s.cantCuotas++
+              }
+              titularesYaUsadosEnEsteGrupo.add(titId)
+            }
+          }
+        }
       }
 
       // Convertir a array final + totales por grupo
