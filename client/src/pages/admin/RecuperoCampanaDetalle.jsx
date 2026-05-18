@@ -106,6 +106,10 @@ export default function RecuperoCampanaDetalle() {
 
   useEffect(() => {
     cargarCampana()
+    // Cargamos elegibles al inicio para que la KPI "Socios objetivo" muestre
+    // el conteo real (no el valor persistido en campana.sociosObjetivo).
+    cargarElegibles()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   useEffect(() => {
@@ -317,7 +321,7 @@ export default function RecuperoCampanaDetalle() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <KpiCard icon={Users} label="Socios objetivo" valor={campana.sociosObjetivo || 0} color="text-gray-600" />
+        <KpiCard icon={Users} label="Socios objetivo" valor={elegibles.length || campana.sociosObjetivo || 0} color="text-gray-600" />
         <KpiCard icon={Target} label="Contactados" valor={campana.contactados || 0} color="text-blue-600" />
         <KpiCard icon={UserCheck} label="Interesados" valor={campana.interesados || 0} color="text-yellow-600" />
         <KpiCard icon={CheckCircle} label="Recuperados" valor={campana.recuperados || 0} color="text-green-600" />
@@ -527,7 +531,20 @@ export default function RecuperoCampanaDetalle() {
                     return (
                       <tr key={s.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2">
-                          <div className="font-medium text-gray-900">#{s.nroSocio} {s.apellidoNombre}</div>
+                          <div className="font-medium text-gray-900 flex items-center gap-2 flex-wrap">
+                            <span>#{s.nroSocio} {s.apellidoNombre}</span>
+                            {s.tipoFamilia === 'TITULAR' && (
+                              <span title={`Titular del grupo familiar (${s.cantMiembrosFamilia} miembro${s.cantMiembrosFamilia !== 1 ? 's' : ''})`}
+                                className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">
+                                Titular ({s.cantMiembrosFamilia})
+                              </span>
+                            )}
+                            {s.tipoFamilia === 'SOCIO_UNICO' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-semibold">
+                                Socio único
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2">
                           {s.estadoSocioRel ? (

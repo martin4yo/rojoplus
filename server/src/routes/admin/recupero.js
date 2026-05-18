@@ -418,9 +418,12 @@ router.get('/campanas/:id/socios-elegibles', authAdmin, asyncHandler(async (req,
   if (!campana) throw new AppError('Campaña no encontrada', 404, 'NOT_FOUND')
 
   // Construir filtros: socios cuyo estado NO permite ingresar al club
-  // (bajas, renuncias, fallecidos, bloqueados, etc.)
+  // (bajas, renuncias, fallecidos, bloqueados, etc.).
+  // Excluye miembros de grupos familiares: el recupero se hace al titular del grupo
+  // (que es quien gestiona la cuota familiar).
   const where = {
     estadoSocioRel: { permiteIngresoMolinete: false },
+    titularFamiliaId: null,
   }
 
   // Filtro por estados de baja específicos (CSV de IDs de EstadoSocio en campana.motivosBaja).
@@ -480,6 +483,7 @@ router.get('/campanas/:id/socios-elegibles', authAdmin, asyncHandler(async (req,
       fechaBaja: true,
       motivoBaja: true,
       estadoSocioRel: { select: { nombre: true, color: true } },
+      _count: { select: { miembrosFamilia: true } },
     },
     orderBy: [{ fechaBaja: 'desc' }, { apellidoNombre: 'asc' }],
     take: 500,
@@ -498,10 +502,16 @@ router.get('/campanas/:id/socios-elegibles', authAdmin, asyncHandler(async (req,
     if (!accionPorSocio.has(a.socioId)) accionPorSocio.set(a.socioId, a)
   }
 
-  const result = socios.map(s => ({
-    ...s,
-    ultimaAccion: accionPorSocio.get(s.id) || null,
-  }))
+  const result = socios.map(s => {
+    const cantMiembros = s._count?.miembrosFamilia || 0
+    const { _count, ...rest } = s
+    return {
+      ...rest,
+      tipoFamilia: cantMiembros > 0 ? 'TITULAR' : 'SOCIO_UNICO',
+      cantMiembrosFamilia: cantMiembros,
+      ultimaAccion: accionPorSocio.get(s.id) || null,
+    }
+  })
 
   res.json({
     success: true,

@@ -179,17 +179,27 @@ export async function recalcularTenant(prisma, tenantId, { origen = 'CRON', usua
 
   const gracia = diasGracia ?? await getDiasGracia(prisma, tenantId)
   const familiasMorosas = await getFamiliasConMorosidad(prisma, tenantId, { fechaCorte, diasGracia: gracia })
-  const sociosABloquear = new Set()
+  const sociosABloquearGrupo = new Set()
   for (const f of familiasMorosas.values()) {
-    for (const id of f.miembrosIds) sociosABloquear.add(id)
+    for (const id of f.miembrosIds) sociosABloquearGrupo.add(id)
   }
 
   const sociosBloqueados = await getSociosEnBloqueado(prisma, tenantId, estados.bloqueado.id)
 
-  // A bloquear: socios morosos que NO están ya en BLOQUEADO
-  const aBloquear = [...sociosABloquear].filter(id => !sociosBloqueados.has(id))
+  // A bloquear: socios morosos que NO están ya en BLOQUEADO,
+  //   Y que estén actualmente en un EstadoSocio con esSocioActivo=true.
+  //   Esto evita sobreescribir el estado de socios que ya estaban en BAJA por otro
+  //   motivo (renuncia, fallecimiento, etc.) — preserva su motivoBaja original.
+  let aBloquear = [...sociosABloquearGrupo].filter(id => !sociosBloqueados.has(id))
+  if (aBloquear.length > 0) {
+    const sociosActivos = await prisma.socio.findMany({
+      where: { id: { in: aBloquear }, estadoSocioRel: { esSocioActivo: true } },
+      select: { id: true },
+    })
+    aBloquear = sociosActivos.map(s => s.id)
+  }
   // A reactivar: socios en BLOQUEADO que ya NO están en familias morosas
-  const aReactivar = [...sociosBloqueados].filter(id => !sociosABloquear.has(id))
+  const aReactivar = [...sociosBloqueados].filter(id => !sociosABloquearGrupo.has(id))
 
   // Aplicar cambios
   if (aBloquear.length > 0) {
@@ -252,7 +262,7 @@ export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { orig
       tenantId,
       OR: [{ id: titularId }, { titularFamiliaId: titularId }],
     },
-    select: { id: true, estadoSocioId: true },
+    select: { id: true, estadoSocioId: true, estadoSocioRel: { select: { esSocioActivo: true } } },
   })
   const miembrosIds = miembros.map(m => m.id)
 
@@ -269,8 +279,12 @@ export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { orig
 
   let bloqueados = 0, reactivados = 0
   if (tieneVencidas > 0) {
-    // Bloquear los que NO están bloqueados
-    const aBloquear = miembros.filter(m => m.estadoSocioId !== estados.bloqueado.id).map(m => m.id)
+    // Bloquear: miembros activos que NO están ya bloqueados.
+    // Se excluyen los que tienen esSocioActivo=false (BAJA por otro motivo) para
+    // no sobreescribir su estado original.
+    const aBloquear = miembros
+      .filter(m => m.estadoSocioRel?.esSocioActivo === true && m.estadoSocioId !== estados.bloqueado.id)
+      .map(m => m.id)
     if (aBloquear.length > 0) {
       await prisma.socio.updateMany({ where: { id: { in: aBloquear } }, data: { estadoSocioId: estados.bloqueado.id } })
       for (const sid of aBloquear) {
