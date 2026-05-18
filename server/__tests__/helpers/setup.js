@@ -180,8 +180,7 @@ jest.unstable_mockModule('../../src/services/paywayService.js', () => ({
   verificarWebhook: noop,
 }))
 
-jest.unstable_mockModule('../../src/services/aiAssistant.js', () => ({
-  default: class { async process() { return {} } },
+jest.unstable_mockModule('../../src/services/aiConstants.js', () => ({
   ROLES: {},
   ACCIONES: {},
 }))

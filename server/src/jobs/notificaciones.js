@@ -179,7 +179,7 @@ async function enviarRecordatoriosReservas() {
     where: {
       fecha: { gte: manana, lte: mananaFin },
       estado: 'CONFIRMADA',
-      email: { not: null },
+      NOT: { email: null },
     },
     include: {
       espacio: { select: { nombre: true } },

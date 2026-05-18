@@ -5,8 +5,10 @@
  * Envía consultas al servicio de IA local (Ollama) sin exponer datos al exterior.
  */
 
-const ML_SERVICE_URL = process.env.AXIO_ML_URL || 'http://axiodemo.axiomacloud.com'
-const ML_SERVICE_API_KEY = process.env.AXIO_ML_API_KEY || ''
+// Env vars canónicas (AXIO_HUB_URL / AXIO_API_KEY) con fallback a legacy.
+// HTTPS obligatorio: http:// → 301 redirect, fetch pierde el POST → 405.
+const ML_SERVICE_URL = process.env.AXIO_HUB_URL || process.env.AXIO_ML_URL || 'https://axiodemo.axiomacloud.com'
+const ML_SERVICE_API_KEY = process.env.AXIO_API_KEY || process.env.AXIO_ML_API_KEY || ''
 
 // Módulos disponibles en Clubix y su descripción para el scope del asistente
 const MODULOS_DESCRIPCION = {

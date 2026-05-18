@@ -1,4 +1,6 @@
-import { ACCIONES } from './aiAssistant.js'
+import crypto from 'crypto'
+import prisma from '../lib/prisma.js'
+import { ACCIONES } from './aiConstants.js'
 
 /**
  * Action Executor Service
@@ -28,11 +30,17 @@ class ActionExecutor {
         case ACCIONES.CONSULTAR_DEUDA:
           return await this.consultarDeuda(action.entidades, context)
 
+        case ACCIONES.CONSULTAR_ULTIMOS_MOVIMIENTOS:
+          return await this.consultarUltimosMovimientos(action.entidades, context)
+
         case ACCIONES.GENERAR_LINK_PAGO:
           return await this.generarLinkPago(action.entidades, context)
 
         case ACCIONES.LISTAR_ACTIVIDADES:
           return await this.listarActividades(action.entidades, context)
+
+        case ACCIONES.MIS_ACTIVIDADES:
+          return await this.misActividades(action.entidades, context)
 
         case ACCIONES.INSCRIBIR_ACTIVIDAD:
           return await this.inscribirActividad(action.entidades, context)
@@ -54,6 +62,21 @@ class ActionExecutor {
 
         case ACCIONES.PEDIR_TAKEAWAY:
           return await this.pedirTakeaway(action.entidades, context)
+
+        case ACCIONES.ENVIAR_LINK_PORTAL:
+          return await this.enviarLinkPortal(action.entidades, context)
+
+        case ACCIONES.ENVIAR_QR_COMERCIOS:
+          return await this.enviarQrComercios(action.entidades, context)
+
+        case ACCIONES.ENVIAR_LINK_WEB:
+          return await this.enviarLinkWeb(action.entidades, context)
+
+        case ACCIONES.INFO_CLUB:
+          return await this.infoClub(action.entidades, context)
+
+        case ACCIONES.DERIVAR_HUMANO:
+          return await this.derivarHumano(action.entidades, context)
 
         // ========== ACCIONES DE CAMAREROS ==========
         case ACCIONES.VER_MESAS:
@@ -872,10 +895,87 @@ class ActionExecutor {
   // =============================================================================
 
   async estadisticasSocios(entidades, context) {
-    // TODO: Implementar estadísticas de socios
-    return {
-      success: false,
-      message: '🚧 Esta funcionalidad está en desarrollo'
+    // "Moroso" varía por club: algunos cuentan cualquier cargo vencido,
+    // otros solo cuota social, otros toleran 6 meses de antigüedad, etc.
+    // Los parámetros viven en Configuracion del tenant para que cada admin
+    // ajuste su política sin tocar código:
+    //
+    //   MOROSIDAD_CATEGORIAS  (CSV)
+    //     Categorías de cargo que cuentan como morosidad.
+    //     Default: 'CUOTA_SOCIAL'.
+    //     Valores válidos: CUOTA_SOCIAL, CUOTA_ACTIVIDAD, CARGO_EVENTO, etc.
+    //     Vacío o 'TODAS' → cuenta todas las categorías.
+    //
+    //   MOROSIDAD_MESES_ANTIGUEDAD  (entero)
+    //     Cuántos meses hacia atrás se consideran los cargos vencidos.
+    //     Cargos más viejos se asumen incobrables y no inflan la tasa.
+    //     Default: 12. Poner 0 (o vacío) para "sin límite de antigüedad".
+    //
+    //   MOROSIDAD_SOLO_SOCIOS_ACTIVOS  ('true'/'false')
+    //     Si true, solo cuenta socios con estado ACTIVO (excluye ex-socios
+    //     con deuda histórica). Default: 'true'.
+    const filtro = entidades?.filtro || 'porcentaje_morosidad'
+
+    const cfg = await this._cargarPolicyMorosidad()
+
+    const cargoWhere = {
+      estado: 'PENDIENTE',
+      fechaVencimiento: { lt: new Date() },
+    }
+    if (cfg.categorias.length > 0) {
+      cargoWhere.categoria = { in: cfg.categorias }
+    }
+    if (cfg.fechaMinima) {
+      cargoWhere.fechaVencimiento = { lt: new Date(), gte: cfg.fechaMinima }
+    }
+    if (cfg.soloActivos) {
+      cargoWhere.socio = { estadoSocioRel: { nombre: 'ACTIVO' } }
+    }
+
+    try {
+      const [activos, morosos, total] = await Promise.all([
+        this.prisma.socio.count({
+          where: { estadoSocioRel: { nombre: 'ACTIVO' } },
+        }),
+        this.prisma.cargo.findMany({
+          where: cargoWhere,
+          select: { socioId: true },
+          distinct: ['socioId'],
+        }).then(rows => rows.length),
+        this.prisma.socio.count(),
+      ])
+
+      const porcentaje = activos > 0 ? +(morosos * 100 / activos).toFixed(1) : 0
+
+      let mensaje
+      if (filtro === 'morosos') {
+        mensaje = `📊 Socios morosos (activos con cuotas vencidas): **${morosos}**`
+      } else if (filtro === 'activos') {
+        mensaje = `📊 Socios activos: **${activos}**`
+      } else if (filtro === 'todos') {
+        mensaje = `📊 Socios totales: **${total}** (activos: ${activos}, morosos: ${morosos})`
+      } else {
+        // porcentaje_morosidad (default)
+        mensaje =
+          `📊 **Resumen de socios**\n\n` +
+          `• Padrón total: ${total}\n` +
+          `• Socios activos: ${activos}\n` +
+          `• Morosos (activos con cuotas vencidas): ${morosos}\n` +
+          `• **Porcentaje de morosidad: ${porcentaje}%**`
+      }
+
+      return {
+        success: true,
+        message: mensaje,
+        data: { total, activos, morosos, porcentajeMorosidad: porcentaje },
+      }
+    } catch (err) {
+      console.error('[estadisticasSocios] Error:', err.message)
+      return {
+        success: false,
+        message: 'No pude calcular las estadísticas. Verificá que el módulo de socios esté configurado.',
+        error: err.message,
+      }
     }
   }
 
@@ -888,8 +988,192 @@ class ActionExecutor {
   }
 
   // =============================================================================
+  // ACCIONES DE SOCIO — LINKS, INFO Y DERIVACIÓN
+  // =============================================================================
+  // Devuelven el link/dato dentro del campo `message` para que cada canal
+  // (web chat / WhatsApp) lo muestre o lo mande según corresponda. Antes el
+  // agente WA generaba un envío extra de WhatsApp con el link — eso se elimina
+  // y se unifica acá: el message ES la respuesta al usuario.
+
+  async consultarUltimosMovimientos(entidades, context) {
+    const socio = await this.getSocioFromContext(context)
+    const limite = Math.min(Math.max(parseInt(entidades.limite, 10) || 5, 1), 20)
+
+    const pagos = await this.prisma.pago.findMany({
+      where: { socioId: socio.id },
+      orderBy: { fecha: 'desc' },
+      take: limite,
+    }).catch(() => [])
+
+    if (pagos.length === 0) {
+      return {
+        success: true,
+        message: '📭 No tenés movimientos registrados todavía.',
+        data: { pagos: [] },
+      }
+    }
+
+    let mensaje = `💼 **Últimos movimientos** (${pagos.length})\n\n`
+    pagos.forEach((p, i) => {
+      const fecha = new Date(p.fecha).toLocaleDateString('es-AR')
+      const monto = parseFloat(p.montoTotal || 0).toLocaleString('es-AR')
+      mensaje += `${i + 1}. ${fecha} — ${p.concepto || 'Pago'}: $${monto}\n`
+    })
+
+    return { success: true, message: mensaje, data: { pagos } }
+  }
+
+  async misActividades(entidades, context) {
+    const socio = await this.getSocioFromContext(context)
+    const hoy = new Date()
+
+    const inscripciones = await this.prisma.inscripcion.findMany({
+      where: {
+        socioId: socio.id,
+        estado: 'ACTIVA',
+        OR: [{ fechaFin: null }, { fechaFin: { gte: hoy } }],
+      },
+      include: {
+        categoriaActividad: {
+          include: { actividad: { select: { nombre: true } } },
+        },
+      },
+    }).catch(() => [])
+
+    if (inscripciones.length === 0) {
+      return {
+        success: true,
+        message: '📋 No estás inscripto en ninguna actividad. ¿Querés ver el listado disponible?',
+        data: { inscripciones: [] },
+      }
+    }
+
+    let mensaje = `🏃 **Tus actividades** (${inscripciones.length})\n\n`
+    inscripciones.forEach((i, idx) => {
+      const cat = i.categoriaActividad
+      mensaje += `${idx + 1}. **${cat?.actividad?.nombre || 'Actividad'}** — ${cat?.nombre || ''}\n`
+      if (cat?.diasEntrenamiento) mensaje += `   📅 ${cat.diasEntrenamiento}\n`
+      if (cat?.horarioEntrenamiento) mensaje += `   ⏰ ${cat.horarioEntrenamiento}\n`
+    })
+
+    return { success: true, message: mensaje, data: { inscripciones } }
+  }
+
+  async enviarLinkPortal(entidades, context) {
+    const socio = await this.getSocioFromContext(context)
+
+    const token = crypto.randomBytes(32).toString('hex')
+    const expira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+    await this.prisma.socio.update({
+      where: { id: socio.id },
+      data: { tokenPortal: token, tokenPortalExpira: expira },
+    })
+
+    const baseUrl = await this._getBaseUrlTenant(context)
+    const link = `${baseUrl}/portal-socio/${token}`
+    const venc = expira.toLocaleDateString('es-AR')
+
+    return {
+      success: true,
+      message: `🔗 Acá está tu link de acceso al portal:\n${link}\n\n_Válido hasta el ${venc}. No lo compartas._`,
+      data: { link, expira: expira.toISOString() },
+    }
+  }
+
+  async enviarQrComercios(entidades, context) {
+    const socio = await this.getSocioFromContext(context)
+
+    // Si no tiene token vigente, generamos uno para que el QR funcione.
+    let token = socio.tokenPortal
+    if (!token || (socio.tokenPortalExpira && new Date(socio.tokenPortalExpira) < new Date())) {
+      token = crypto.randomBytes(32).toString('hex')
+      const expira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      await this.prisma.socio.update({
+        where: { id: socio.id },
+        data: { tokenPortal: token, tokenPortalExpira: expira },
+      })
+    }
+
+    const baseUrl = await this._getBaseUrlTenant(context)
+    const link = `${baseUrl}/portal-socio/${token}`
+
+    return {
+      success: true,
+      message: `🎟 Tu QR para usar beneficios en comercios adheridos:\n${link}\n\n_Mostrá este link o el QR en el comercio para acceder a tu descuento._`,
+      data: { link },
+    }
+  }
+
+  async enviarLinkWeb(entidades, context) {
+    const url = await this._getBaseUrlTenant(context)
+    return {
+      success: true,
+      message: `🌐 Sitio web del club:\n${url}`,
+      data: { url },
+    }
+  }
+
+  async infoClub(entidades, context) {
+    const configs = await this.prisma.configuracion.findMany({
+      where: {
+        clave: {
+          in: ['HORARIO_ATENCION', 'TELEFONO_CONTACTO', 'DIRECCION', 'EMAIL_CONTACTO', 'NOMBRE_CLUB', 'nombre'],
+        },
+      },
+    }).catch(() => [])
+    const cfg = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
+
+    const nombre = cfg.NOMBRE_CLUB || cfg.nombre || 'el club'
+    let mensaje = `🏛 **${nombre}**\n\n`
+    if (cfg.DIRECCION) mensaje += `📍 ${cfg.DIRECCION}\n`
+    if (cfg.HORARIO_ATENCION) mensaje += `🕐 ${cfg.HORARIO_ATENCION}\n`
+    if (cfg.TELEFONO_CONTACTO) mensaje += `📞 ${cfg.TELEFONO_CONTACTO}\n`
+    if (cfg.EMAIL_CONTACTO) mensaje += `✉️  ${cfg.EMAIL_CONTACTO}\n`
+
+    if (!cfg.DIRECCION && !cfg.HORARIO_ATENCION && !cfg.TELEFONO_CONTACTO && !cfg.EMAIL_CONTACTO) {
+      mensaje += 'No tengo cargada la información de contacto. Probá consultar en administración.'
+    }
+
+    return { success: true, message: mensaje, data: cfg }
+  }
+
+  async derivarHumano(entidades, context) {
+    const motivo = (entidades.motivo || '').trim() || '(sin motivo especificado)'
+    const tenantId = context.tenantId || context.metadata?.tenantId || null
+
+    // TODO: notificar a administradores (WhatsApp/email/in-app). Por ahora se loguea.
+    console.log(`[ActionExecutor] derivar_humano tenant=${tenantId} usuario=${context.userName || context.userId} motivo="${motivo}"`)
+
+    return {
+      success: true,
+      message: 'Le pasé tu consulta a la administración. Pronto te van a contactar. 🤝',
+      data: { derivado: true, motivo },
+    }
+  }
+
+  // =============================================================================
   // HELPERS
   // =============================================================================
+
+  /**
+   * Resuelve la URL pública del tenant: https://{slug}.{APP_DOMAIN} si hay slug,
+   * o FRONTEND_URL/APP_DOMAIN como fallback. Usa la prisma global porque la
+   * tabla tenant vive fuera del scope tenant-aislado.
+   */
+  async _getBaseUrlTenant(context) {
+    const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
+    const tenantId = context?.tenantId || context?.metadata?.tenantId || null
+    if (!tenantId) return process.env.FRONTEND_URL || `https://${appDomain}`
+
+    const tenant = await prisma.tenant
+      .findUnique({ where: { id: tenantId }, select: { slug: true } })
+      .catch(() => null)
+
+    return tenant?.slug
+      ? `https://${tenant.slug}.${appDomain}`
+      : (process.env.FRONTEND_URL || `https://${appDomain}`)
+  }
 
   async getSocioFromContext(context) {
     if (!context.socioId) {

@@ -4,7 +4,7 @@ import {
   ArrowLeft, Edit, QrCode, Users, CreditCard, Activity,
   Phone, Mail, MapPin, Calendar, User, AlertCircle,
   Heart, Shield, FileText, Clock, DollarSign, Copy, Check, RefreshCw, ExternalLink, List, PlusCircle, FileDown,
-  UserMinus, UserCheck
+  UserMinus, UserCheck, MessageCircle, Send
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
@@ -52,6 +52,19 @@ export default function SocioDetalle() {
 
   // Modal baja/reactivación
   const [bajaActivarModo, setBajaActivarModo] = useState(null) // 'baja' | 'activar' | null
+
+  // Historial (auditoría)
+  const [historial, setHistorial] = useState([])
+  const [historialPagination, setHistorialPagination] = useState({ page: 1, totalPages: 1, total: 0 })
+  const [loadingHistorial, setLoadingHistorial] = useState(false)
+  const [expandedHistorial, setExpandedHistorial] = useState({}) // id -> bool
+
+  // Notificaciones (NotificacionLog)
+  const [notifLogs, setNotifLogs] = useState([])
+  const [notifPagination, setNotifPagination] = useState({ page: 1, totalPages: 1, total: 0 })
+  const [loadingNotifs, setLoadingNotifs] = useState(false)
+  const [expandedNotif, setExpandedNotif] = useState({})
+  const [reintentandoLogId, setReintentandoLogId] = useState(null)
 
   // Foto
   const [fotoError, setFotoError] = useState(false)
@@ -157,6 +170,99 @@ export default function SocioDetalle() {
         .catch(() => {})
     }
   }, [activeTab, socio?.titularFamilia?.id])
+
+  function renderDetalleEvento(ev) {
+    const d = ev.detalle
+    if (!d) return null
+    // EDICION_FICHA: { campos: { campo: { antes, despues } } }
+    // EMAIL_MOD, etc: { campo: { antes, despues } } directo
+    const cambios = d.campos || d
+    const filas = []
+    for (const [campo, val] of Object.entries(cambios)) {
+      if (val && typeof val === 'object' && ('antes' in val || 'despues' in val)) {
+        filas.push({ campo, antes: val.antes, despues: val.despues })
+      }
+    }
+    if (filas.length === 0) {
+      return (
+        <pre className="text-xs text-gray-600 bg-gray-50 rounded p-2 overflow-x-auto">
+{JSON.stringify(d, null, 2)}
+        </pre>
+      )
+    }
+    const fmt = (v) => v === null || v === undefined || v === '' ? <span className="italic text-gray-400">vacío</span> : String(v)
+    return (
+      <table className="text-xs w-full">
+        <thead>
+          <tr className="text-left text-gray-500">
+            <th className="py-1 pr-2 font-medium">Campo</th>
+            <th className="py-1 pr-2 font-medium">Antes</th>
+            <th className="py-1 font-medium">Después</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map(f => (
+            <tr key={f.campo} className="border-t border-gray-100">
+              <td className="py-1 pr-2 font-mono text-gray-700">{f.campo}</td>
+              <td className="py-1 pr-2 text-red-600 line-through">{fmt(f.antes)}</td>
+              <td className="py-1 text-green-700">{fmt(f.despues)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  async function cargarHistorial(page = 1) {
+    if (!id) return
+    setLoadingHistorial(true)
+    try {
+      const data = await api.get(`/admin/socios/${id}/auditoria?page=${page}&limit=50`)
+      setHistorial(data.eventos || [])
+      setHistorialPagination(data.pagination || { page: 1, totalPages: 1, total: 0 })
+    } catch (err) {
+      console.error('Error cargando historial:', err)
+    } finally {
+      setLoadingHistorial(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'historial') cargarHistorial(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, id])
+
+  async function cargarNotifLogs(page = 1) {
+    if (!id) return
+    setLoadingNotifs(true)
+    try {
+      const data = await api.get(`/admin/socios/${id}/notificaciones-log?page=${page}&limit=50`)
+      setNotifLogs(data.logs || [])
+      setNotifPagination(data.pagination || { page: 1, totalPages: 1, total: 0 })
+    } catch (err) {
+      console.error('Error cargando notificaciones:', err)
+    } finally {
+      setLoadingNotifs(false)
+    }
+  }
+
+  async function reintentarNotif(logId) {
+    setReintentandoLogId(logId)
+    try {
+      await api.post(`/admin/socios/${id}/notificaciones-log/${logId}/reintentar`)
+      toast.success('Reencolada para reintento inmediato')
+      await cargarNotifLogs(notifPagination.page)
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Error al reintentar')
+    } finally {
+      setReintentandoLogId(null)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'notificaciones') cargarNotifLogs(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, id])
 
   async function cargarSocio() {
     setLoading(true)
@@ -481,6 +587,8 @@ export default function SocioDetalle() {
     { id: 'actividades', label: 'Actividades', icon: Activity },
     { id: 'cuotas', label: 'Cuotas', icon: DollarSign },
     { id: 'familia', label: 'Familia', icon: Users },
+    { id: 'notificaciones', label: 'Notificaciones', icon: Send },
+    { id: 'historial', label: 'Historial', icon: Clock },
   ]
 
   return (
@@ -1460,6 +1568,240 @@ export default function SocioDetalle() {
                     )}
                   </>
                 ) : null}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab Notificaciones (NotificacionLog) */}
+        {activeTab === 'notificaciones' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-800 flex items-center gap-2">
+                <Send className="w-4 h-4" /> Notificaciones enviadas
+              </h3>
+              <div className="flex items-center gap-3">
+                {notifPagination.total > 0 && (
+                  <span className="text-sm text-gray-500">
+                    {notifPagination.total} {notifPagination.total === 1 ? 'registro' : 'registros'}
+                  </span>
+                )}
+                <Button variant="secondary" onClick={() => cargarNotifLogs(notifPagination.page)} disabled={loadingNotifs}>
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {loadingNotifs && notifLogs.length === 0 ? (
+              <div className="py-8"><LoadingSpinner /></div>
+            ) : notifLogs.length === 0 ? (
+              <div className="bg-gray-50 rounded-lg p-6 text-center">
+                <Send className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">Sin notificaciones registradas</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+                {notifLogs.map(log => {
+                  const expanded = !!expandedNotif[log.id]
+                  const fechaCreado = new Date(log.createdAt).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  const fechaEnvio = log.fechaEnvio ? new Date(log.fechaEnvio).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null
+                  const fechaProx = log.fechaProgramado ? new Date(log.fechaProgramado).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null
+                  const colorEstado = {
+                    ENVIADO: 'bg-green-100 text-green-700',
+                    ENVIADO_CON_ERROR: 'bg-yellow-100 text-yellow-700',
+                    PENDIENTE: 'bg-blue-100 text-blue-700',
+                    REINTENTANDO: 'bg-amber-100 text-amber-700',
+                    FALLIDO_DEFINITIVO: 'bg-red-100 text-red-700',
+                  }[log.estado] || 'bg-gray-100 text-gray-700'
+                  const iconoCanal = log.tipo === 'EMAIL' ? <Mail className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />
+                  return (
+                    <div key={log.id} className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5 text-gray-500">{iconoCanal}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${colorEstado}`}>
+                              {log.estado}
+                            </span>
+                            <span className="text-sm font-medium text-gray-800">{log.eventType}</span>
+                            <span className="text-xs text-gray-500">→ {log.destinatario}</span>
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
+                            <span>Creado: {fechaCreado}</span>
+                            {fechaEnvio && <span>Enviado: {fechaEnvio}</span>}
+                            <span>Intentos: <strong>{log.intentos}</strong>/5</span>
+                            {!log.enviado && fechaProx && new Date(log.fechaProgramado) > new Date() && (
+                              <span className="text-amber-700">Próximo intento: {fechaProx}</span>
+                            )}
+                          </div>
+                          {log.error && (
+                            <div className="mt-1 text-xs text-red-600 bg-red-50 rounded px-2 py-1">
+                              {log.error}
+                            </div>
+                          )}
+                          {log.cuerpo && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedNotif(prev => ({ ...prev, [log.id]: !prev[log.id] }))}
+                              className="mt-2 text-xs text-blue-600 hover:underline"
+                            >
+                              {expanded ? '▼ ocultar contenido' : '▶ ver contenido'}
+                            </button>
+                          )}
+                          {expanded && log.cuerpo && (
+                            <div className="mt-2 bg-gray-50 rounded p-2 text-xs">
+                              {log.asunto && <div className="font-medium mb-1">Asunto: {log.asunto}</div>}
+                              {log.tipo === 'EMAIL' ? (
+                                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: log.cuerpo }} />
+                              ) : (
+                                <pre className="whitespace-pre-wrap font-mono text-xs">{log.cuerpo}</pre>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0">
+                          {(log.estado === 'REINTENTANDO' || log.estado === 'FALLIDO_DEFINITIVO' || log.estado === 'ENVIADO_CON_ERROR') && (
+                            <Button
+                              variant="secondary"
+                              onClick={() => reintentarNotif(log.id)}
+                              disabled={reintentandoLogId === log.id}
+                              className="text-xs"
+                            >
+                              {reintentandoLogId === log.id ? '...' : 'Reintentar'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {notifPagination.totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs text-gray-500">
+                  Página {notifPagination.page} de {notifPagination.totalPages}
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => cargarNotifLogs(notifPagination.page - 1)} disabled={notifPagination.page <= 1 || loadingNotifs}>Anterior</Button>
+                  <Button variant="secondary" onClick={() => cargarNotifLogs(notifPagination.page + 1)} disabled={notifPagination.page >= notifPagination.totalPages || loadingNotifs}>Siguiente</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab Historial (auditoría) */}
+        {activeTab === 'historial' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-800 flex items-center gap-2">
+                <Clock className="w-4 h-4" /> Historial de cambios y eventos
+              </h3>
+              {historialPagination.total > 0 && (
+                <span className="text-sm text-gray-500">
+                  {historialPagination.total} {historialPagination.total === 1 ? 'evento' : 'eventos'}
+                </span>
+              )}
+            </div>
+
+            {loadingHistorial && historial.length === 0 ? (
+              <div className="py-8"><LoadingSpinner /></div>
+            ) : historial.length === 0 ? (
+              <div className="bg-gray-50 rounded-lg p-6 text-center">
+                <Clock className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">Sin eventos registrados</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+                {historial.map(ev => {
+                  const expanded = !!expandedHistorial[ev.id]
+                  const tieneDetalle = ev.detalle && Object.keys(ev.detalle).length > 0
+                  const fecha = new Date(ev.fecha).toLocaleString('es-AR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })
+                  const colorEvento = {
+                    EDICION_FICHA: 'bg-blue-100 text-blue-700',
+                    EMAIL_MOD: 'bg-cyan-100 text-cyan-700',
+                    CELULAR_MOD: 'bg-cyan-100 text-cyan-700',
+                    TELEFONO_MOD: 'bg-cyan-100 text-cyan-700',
+                    DIRECCION_MOD: 'bg-cyan-100 text-cyan-700',
+                    ESTADO_SOCIO_MOD: 'bg-amber-100 text-amber-700',
+                    TIPO_SOCIO_MOD: 'bg-amber-100 text-amber-700',
+                    CATEGORIA_MOD: 'bg-amber-100 text-amber-700',
+                    BLOQUEADO_MOROSIDAD: 'bg-red-100 text-red-700',
+                    BAJA_SOCIO: 'bg-red-100 text-red-700',
+                    ACTIVADO_PAGO: 'bg-green-100 text-green-700',
+                    REACTIVADO_SOCIO: 'bg-green-100 text-green-700',
+                    ALTA_SOCIO: 'bg-green-100 text-green-700',
+                  }[ev.evento] || 'bg-gray-100 text-gray-700'
+                  return (
+                    <div key={ev.id} className="p-3 hover:bg-gray-50">
+                      <button
+                        type="button"
+                        onClick={() => tieneDetalle && setExpandedHistorial(prev => ({ ...prev, [ev.id]: !prev[ev.id] }))}
+                        className={`w-full text-left flex items-start gap-3 ${tieneDetalle ? 'cursor-pointer' : 'cursor-default'}`}
+                      >
+                        <div className="flex-shrink-0 mt-0.5">
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${colorEvento}`}>
+                            {ev.evento}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span>{fecha}</span>
+                            {ev.origen && (
+                              <>
+                                <span>·</span>
+                                <span className="font-mono">{ev.origen}</span>
+                              </>
+                            )}
+                            {ev.usuario && (
+                              <>
+                                <span>·</span>
+                                <span>{ev.usuario.nombre || ev.usuario.email}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {tieneDetalle && (
+                          <span className="text-xs text-gray-400">{expanded ? '▼' : '▶'}</span>
+                        )}
+                      </button>
+                      {tieneDetalle && expanded && (
+                        <div className="mt-2 ml-2 pl-3 border-l-2 border-gray-200 text-sm">
+                          {renderDetalleEvento(ev)}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {historialPagination.totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs text-gray-500">
+                  Página {historialPagination.page} de {historialPagination.totalPages}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => cargarHistorial(historialPagination.page - 1)}
+                    disabled={historialPagination.page <= 1 || loadingHistorial}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => cargarHistorial(historialPagination.page + 1)}
+                    disabled={historialPagination.page >= historialPagination.totalPages || loadingHistorial}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
               </div>
             )}
           </div>

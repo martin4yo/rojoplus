@@ -25,6 +25,20 @@ export const SOCIO_TOOLS = [
     },
   },
   {
+    name: 'consultar_ultimos_movimientos',
+    description:
+      'Consultar los últimos pagos / movimientos de cuenta del socio. Usar cuando pregunta por pagos recientes o historial de movimientos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limite: {
+          type: 'number',
+          description: 'Cantidad de movimientos a traer (default 5, máximo 20).',
+        },
+      },
+    },
+  },
+  {
     name: 'generar_link_pago',
     description:
       'Generar un link de pago (Mercado Pago) para que el socio abone cuotas pendientes.',
@@ -50,7 +64,7 @@ export const SOCIO_TOOLS = [
   {
     name: 'listar_actividades',
     description:
-      'Listar las actividades deportivas/recreativas disponibles en el club.',
+      'Listar TODAS las actividades deportivas/recreativas que ofrece el club (catálogo). NO usar para ver en cuáles está inscripto el socio — para eso usar mis_actividades.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -59,6 +73,15 @@ export const SOCIO_TOOLS = [
           description: 'Filtrar por categoría/edad (opcional).',
         },
       },
+    },
+  },
+  {
+    name: 'mis_actividades',
+    description:
+      'Ver las actividades en las que el SOCIO YA ESTÁ INSCRIPTO (sus inscripciones activas, con horarios). Usar cuando pregunta "¿qué actividades tengo?", "en qué estoy anotado", "mis clases".',
+    inputSchema: {
+      type: 'object',
+      properties: {},
     },
   },
   {
@@ -201,6 +224,57 @@ export const SOCIO_TOOLS = [
         },
       },
       required: ['items'],
+    },
+  },
+  {
+    name: 'enviar_link_portal',
+    description:
+      'Generar y devolver el link de acceso al portal personal del socio (donde ve cuotas, pagos, datos personales). NO confundir con QR de comercios — esto es el portal de gestión.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'enviar_qr_comercios',
+    description:
+      'Devolver al socio su link/QR para presentar en comercios adheridos y acceder a descuentos/beneficios. Distinto al portal personal.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'enviar_link_web',
+    description:
+      'Devolver el link al sitio web público del club. Usar cuando el socio pide la web o información pública.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'info_club',
+    description:
+      'Información general del club: horarios de atención, dirección, teléfono y email de contacto. Usar para preguntas sobre cómo contactar al club, dónde queda o cuándo atienden.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'derivar_humano',
+    description:
+      'Escalar la conversación a un humano cuando el pedido no se puede resolver con las otras tools o cuando el socio pide explícitamente hablar con una persona.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        motivo: {
+          type: 'string',
+          description: 'Breve descripción del motivo de la derivación.',
+        },
+      },
+      required: ['motivo'],
     },
   },
 ]

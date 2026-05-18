@@ -888,6 +888,127 @@ router.put('/socios/:id/rfid', authAdmin, asyncHandler(async (req, res) => {
   res.json({ success: true, data: actualizado })
 }))
 
+// GET /api/admin/socios/:id/notificaciones-log - Historial de envíos de notificaciones
+// Query: ?page=1&limit=50&tipo=EMAIL|WHATSAPP&estado=PENDIENTE|ENVIADO|ERROR
+router.get('/socios/:id/notificaciones-log', authAdmin, asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const page = Math.max(parseInt(req.query.page) || 1, 1)
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200)
+  const skip = (page - 1) * limit
+
+  const where = { socioId: id }
+  if (req.query.tipo) where.tipo = req.query.tipo
+  if (req.query.estado === 'PENDIENTE') where.enviado = false
+  if (req.query.estado === 'ENVIADO') { where.enviado = true; where.error = null }
+  if (req.query.estado === 'ERROR') { where.error = { not: null } }
+
+  const [total, logs] = await Promise.all([
+    req.db.notificacionLog.count({ where }),
+    req.db.notificacionLog.findMany({
+      where,
+      orderBy: [{ id: 'desc' }],
+      skip,
+      take: limit,
+    }),
+  ])
+
+  res.json({
+    success: true,
+    data: {
+      logs: logs.map(l => ({
+        id: l.id,
+        tipo: l.tipo,
+        eventType: l.eventType,
+        destinatario: l.destinatario,
+        asunto: l.asunto,
+        cuerpo: l.cuerpo,
+        enviado: l.enviado,
+        fechaEnvio: l.fechaEnvio,
+        fechaProgramado: l.fechaProgramado,
+        intentos: l.intentos,
+        error: l.error,
+        createdAt: l.createdAt,
+        estado: l.enviado
+          ? (l.error && l.error.startsWith('MAX_INTENTOS_AGOTADO') ? 'FALLIDO_DEFINITIVO'
+              : l.error ? 'ENVIADO_CON_ERROR' : 'ENVIADO')
+          : (l.error ? 'REINTENTANDO' : 'PENDIENTE'),
+      })),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    },
+  })
+}))
+
+// POST /api/admin/socios/:id/notificaciones-log/:logId/reintentar
+// Resetea intentos y fechaProgramado para que el cron lo vuelva a tomar
+router.post('/socios/:id/notificaciones-log/:logId/reintentar', authAdmin, asyncHandler(async (req, res) => {
+  const socioId = parseInt(req.params.id)
+  const logId = parseInt(req.params.logId)
+  const log = await req.db.notificacionLog.findFirst({ where: { id: logId, socioId } })
+  if (!log) throw new AppError('Notificación no encontrada', 404, 'NOT_FOUND')
+
+  const updated = await req.db.notificacionLog.update({
+    where: { id: logId },
+    data: {
+      enviado: false,
+      intentos: 0,
+      error: null,
+      fechaProgramado: new Date(),
+      fechaEnvio: null,
+    },
+  })
+  res.json({ success: true, data: updated, mensaje: 'Reencolada para reintento inmediato' })
+}))
+
+// GET /api/admin/socios/:id/auditoria - Historial de auditoría del socio
+// Query params: ?page=1&limit=50
+router.get('/socios/:id/auditoria', authAdmin, asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const page = Math.max(parseInt(req.query.page) || 1, 1)
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200)
+  const skip = (page - 1) * limit
+
+  const [total, eventos] = await Promise.all([
+    req.db.auditoriaSocio.count({ where: { socioId: id } }),
+    req.db.auditoriaSocio.findMany({
+      where: { socioId: id },
+      orderBy: { fecha: 'desc' },
+      skip,
+      take: limit,
+    }),
+  ])
+
+  // Resolver nombres de admin para los usuarioId distintos (lookup en batch)
+  const userIds = [...new Set(eventos.map(e => e.usuarioId).filter(Boolean))]
+  let adminsMap = {}
+  if (userIds.length > 0) {
+    const admins = await req.db.admin.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, nombre: true, email: true },
+    })
+    adminsMap = Object.fromEntries(admins.map(a => [a.id, a]))
+  }
+
+  res.json({
+    success: true,
+    data: {
+      eventos: eventos.map(e => ({
+        id: e.id,
+        fecha: e.fecha,
+        evento: e.evento,
+        detalle: e.detalle,
+        origen: e.origen,
+        usuario: e.usuarioId ? (adminsMap[e.usuarioId] || { id: e.usuarioId, nombre: `Admin #${e.usuarioId}` }) : null,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    },
+  })
+}))
+
 // GET /api/admin/socios/:id/grupo-familiar-resumen
 // Devuelve { esTitular, integrantes: [{id, nroSocio, apellidoNombre, estadoCodigo, esSocioActivo}] }
 // Usado por el frontend para decidir si mostrar la opción de propagar baja/alta a la familia.

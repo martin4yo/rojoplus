@@ -30,8 +30,8 @@
 import cron from 'node-cron'
 import prisma from '../lib/prisma.js'
 import { recalcularTenant } from '../services/vigenciaService.js'
-import { enviarEmail } from '../services/email.js'
-import { enviarWhatsApp } from '../services/whatsappService.js'
+import { buildVariables, resolverEmailBloqueo, resolverWaBloqueo } from '../services/morosidadTemplates.js'
+import { encolarNotificacion } from '../services/notificacionService.js'
 
 const TIMEZONE = 'America/Argentina/Buenos_Aires'
 
@@ -104,40 +104,9 @@ const cronBloqueo = cron.schedule('0 1 * * *', async () => {
 // CRON 2: Notificación de cuenta bloqueada (cada hora entre 9-18)
 // ════════════════════════════════════════════════════════════════════════════
 
-const PLANTILLAS_EMAIL = [
-  {
-    saludo: (s) => `Estimado/a <strong>${s.apellidoNombre}</strong> (Socio Nº ${s.nroSocio}),`,
-    cuerpo: (club) => `<p>Le informamos que su cuenta de socio ha sido bloqueada por presentar cuotas vencidas pendientes de pago.</p><p>Mientras la cuenta esté bloqueada, no podrá acceder a las instalaciones del club.</p><p>Para regularizar su situación, acerquese a tesorería o realice el pago a través del portal del socio. Una vez registrado el pago, su acceso será restituido automáticamente.</p>`,
-    despedida: (club) => `<p>Saludos,<br/>${club}</p>`,
-  },
-  {
-    saludo: (s) => `Hola <strong>${s.apellidoNombre}</strong>,`,
-    cuerpo: (club) => `<p>Te escribimos para informarte que tu cuenta de socio (Nº ${'{{nroSocio}}'}) fue suspendida porque registramos cuotas vencidas sin pagar.</p><p>Hasta que regularices la deuda no vas a poder ingresar a las instalaciones. Podés pagar desde el portal del socio o pasar por tesorería; el acceso se reactiva automáticamente al confirmarse el pago.</p>`,
-    despedida: (club) => `<p>Cualquier consulta estamos para ayudarte.<br/>${club}</p>`,
-  },
-  {
-    saludo: (s) => `Buenas <strong>${s.apellidoNombre}</strong>,`,
-    cuerpo: (club) => `<p>Queremos avisarte que la cuenta del Socio Nº ${'{{nroSocio}}'} quedó suspendida. Detectamos cuotas vencidas en el grupo familiar pendientes de pago.</p><p>Mientras la cuenta esté suspendida no se permite el ingreso al club. Apenas se registre el pago, el acceso vuelve automáticamente.</p>`,
-    despedida: (club) => `<p>Gracias por tu comprensión.<br/>${club}</p>`,
-  },
-  {
-    saludo: (s) => `${s.apellidoNombre},`,
-    cuerpo: (club) => `<p>Te informamos desde administración que tu cuenta de socio fue bloqueada por cuotas vencidas. Esto impide el ingreso al club hasta regularizar la situación.</p><p>El bloqueo se levanta automáticamente al registrarse el pago. Podés hacerlo desde el portal del socio o en tesorería.</p>`,
-    despedida: (club) => `<p>Saludos cordiales,<br/>${club}</p>`,
-  },
-]
-
-const PLANTILLAS_WHATSAPP = [
-  (s, club) => `*${club}*\n\nHola ${s.apellidoNombre} (Socio Nº ${s.nroSocio}),\n\nTe informamos que tu cuenta fue *bloqueada por cuotas vencidas*. No vas a poder ingresar al club hasta que regularices la deuda.\n\nUna vez que registremos el pago, tu acceso se restituye automáticamente.`,
-  (s, club) => `Buenas ${s.apellidoNombre},\n\n_${club}_ te informa que la cuenta del Socio Nº ${s.nroSocio} fue suspendida por cuotas vencidas. El acceso al club queda inhabilitado hasta el pago.\n\nApenas regularices se reactiva solo. Cualquier consulta avisanos.`,
-  (s, club) => `Hola ${s.apellidoNombre} 👋\n\nTe escribimos desde *${club}*. Tu cuenta (Nº ${s.nroSocio}) fue bloqueada porque hay cuotas vencidas en tu grupo familiar.\n\nPodés pagar desde el portal del socio. Al confirmarse el pago el acceso vuelve automáticamente.`,
-  (s, club) => `${s.apellidoNombre}, te avisamos desde *${club}*: tu cuenta de socio quedó suspendida por mora.\n\nEl ingreso al club no está permitido hasta el pago. Una vez registrado el pago, se reactiva solo.`,
-]
-
-function elegirPlantilla(arr, socioId) {
-  // determinístico por socioId para que un mismo socio reciba siempre la misma variante
-  return arr[socioId % arr.length]
-}
+// Plantillas migradas a `services/morosidadTemplates.js` — ahora editables desde la UI
+// (EmailTemplate eventType=BLOQUEO_MOROSIDAD_1/_2, Configuracion NOTIF_WA_BLOQUEO_MOROSIDAD_1/_2)
+// El cron elige variante por socioId%2 (rotación determinística anti-spam).
 
 async function notificarBloqueoTenant(tenant) {
   const cfg = await getConfigPorTenant(tenant.id, [
@@ -218,35 +187,56 @@ async function notificarBloqueoTenant(tenant) {
     const s = e.socio
     if (s.notificarMorosidad === false) continue
 
+    // Construir variables del template (incluye linkPortal, deuda, etc.)
+    const vars = await buildVariables({
+      socio: s,
+      club,
+      clubUrl: null,
+      cuotasVencidas: 0,
+      deudaTotal: 0,
+      listaCuotas: [],
+    })
+
     let envioEmail = false, envioWa = false
+    // ENCOLAR — el cron `procesarNotificacionesPendientes` los envía con retries y backoff.
     try {
       if (s.notifEmail !== false && s.email) {
-        const tpl = elegirPlantilla(PLANTILLAS_EMAIL, s.id)
-        const html = `${tpl.saludo(s)}\n${tpl.cuerpo(club)}\n${tpl.despedida(club)}`
-          .replace(/{{nroSocio}}/g, s.nroSocio || '')
-        await enviarEmail({
-          to: s.email,
-          subject: `${club}: cuenta suspendida por cuotas vencidas`,
-          html, db: prisma,
+        const { subject, html } = await resolverEmailBloqueo({ tenantId: tenant.id, socioId: s.id, vars })
+        await encolarNotificacion({
+          tenantId: tenant.id,
+          tipo: 'EMAIL',
+          eventType: 'BLOQUEO_MOROSIDAD',
+          destinatario: s.email,
+          socioId: s.id,
+          asunto: subject,
+          cuerpo: html,
+          metadata: { variables: vars, nroSocio: s.nroSocio },
         })
         envioEmail = true
         okEmail++
       }
     } catch (err) {
-      console.error(`    [${s.nroSocio}] email error: ${err.message}`)
+      console.error(`    [${s.nroSocio}] email encolar error: ${err.message}`)
       fail++
     }
 
     try {
       if (s.notifWhatsapp !== false && s.celular) {
-        const tpl = elegirPlantilla(PLANTILLAS_WHATSAPP, s.id)
-        const texto = tpl(s, club)
-        await enviarWhatsApp({ db: prisma, telefono: s.celular, texto })
+        const { texto } = await resolverWaBloqueo({ tenantId: tenant.id, socioId: s.id, vars })
+        await encolarNotificacion({
+          tenantId: tenant.id,
+          tipo: 'WHATSAPP',
+          eventType: 'BLOQUEO_MOROSIDAD',
+          destinatario: s.celular,
+          socioId: s.id,
+          cuerpo: texto,
+          metadata: { variables: vars, nroSocio: s.nroSocio },
+        })
         envioWa = true
         okWa++
       }
     } catch (err) {
-      console.error(`    [${s.nroSocio}] whatsapp error: ${err.message}`)
+      console.error(`    [${s.nroSocio}] whatsapp encolar error: ${err.message}`)
       fail++
     }
 
@@ -272,8 +262,8 @@ async function notificarBloqueoTenant(tenant) {
       },
     })
 
-    // Throttle entre mensajes (con jitter)
-    if (envioEmail || envioWa) await sleepConJitter(delayMs)
+    // Sin throttle aquí: el cron `procesarNotificacionesPendientes` (cada 10 min, take=50)
+    // ya naturalmente espacia los envíos. No tiene sentido dormir entre encolados.
   }
 
   return { procesados: aNotificar.length, okEmail, okWa, fail, presupuesto, modoDemo: bool(cfg.MODO_DEMO) }

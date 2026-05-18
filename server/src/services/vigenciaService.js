@@ -30,6 +30,20 @@ export async function getDiasGracia(prisma, tenantId) {
 }
 
 /**
+ * Lee MOROSIDAD_MIN_CUOTAS_VENCIDAS del tenant.
+ * Default 2: un socio se considera moroso recién con 2 cuotas vencidas o más
+ * (no se bloquea por una sola).
+ */
+export async function getMinCuotasVencidas(prisma, tenantId) {
+  const cfg = await prisma.configuracion.findFirst({
+    where: { tenantId, clave: 'MOROSIDAD_MIN_CUOTAS_VENCIDAS' },
+    select: { valor: true },
+  })
+  const n = parseInt(cfg?.valor, 10)
+  return Number.isFinite(n) && n >= 1 ? n : 2
+}
+
+/**
  * Calcula la fecha de corte efectiva restando los días de gracia.
  * Una cuota se considera vencida sólo si `fechaVencimiento < cutoff`.
  */
@@ -63,21 +77,34 @@ export async function getEstadosVigencia(prisma, tenantId) {
  *
  * @returns {Promise<Map<number, { titularId, miembrosIds: number[] }>>}
  */
-export async function getFamiliasConMorosidad(prisma, tenantId, { fechaCorte = new Date(), diasGracia = null } = {}) {
+export async function getFamiliasConMorosidad(prisma, tenantId, { fechaCorte = new Date(), diasGracia = null, minCuotasVencidas = null } = {}) {
   const gracia = diasGracia ?? await getDiasGracia(prisma, tenantId)
+  const minCuotas = minCuotasVencidas ?? await getMinCuotasVencidas(prisma, tenantId)
   const cutoff = aplicarDiasGracia(fechaCorte, gracia)
-  // 1) Socios con cuota vencida
+  // 1) Socios con N o más cuotas vencidas pendientes DE PERÍODOS DISTINTOS.
+  //    Cargos sin periodoId (manuales/extraordinarios) NO cuentan para el umbral.
+  //    Se considera moroso individual cuando tiene >= minCuotas períodos vencidos.
+  //    Su grupo familiar luego arrastra al resto.
   const cargosVencidos = await prisma.cargo.findMany({
     where: {
       tenantId,
       estado: 'PENDIENTE',
       fechaVencimiento: { lt: cutoff },
       socioId: { not: null },
+      periodoId: { not: null },
     },
-    select: { socioId: true },
-    distinct: ['socioId'],
+    select: { socioId: true, periodoId: true },
   })
-  const morososIndividuales = new Set(cargosVencidos.map(c => c.socioId))
+  // Agrupar: socioId -> Set<periodoId>
+  const periodosPorSocio = new Map()
+  for (const c of cargosVencidos) {
+    if (!periodosPorSocio.has(c.socioId)) periodosPorSocio.set(c.socioId, new Set())
+    periodosPorSocio.get(c.socioId).add(c.periodoId)
+  }
+  const morososIndividuales = new Set()
+  for (const [socioId, periodos] of periodosPorSocio.entries()) {
+    if (periodos.size >= minCuotas) morososIndividuales.add(socioId)
+  }
   if (morososIndividuales.size === 0) return new Map()
 
   // 2) Resolver familia: para cada moroso, obtener su titularFamiliaId (si

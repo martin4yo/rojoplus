@@ -78,8 +78,9 @@ export function diffCampos(antes, despues, campos) {
 }
 
 /**
- * Mapeo de campos críticos del Socio → evento canónico.
- * Si un PUT modifica varios de estos, registra un evento por cada uno.
+ * Mapeo de campos críticos del Socio → evento canónico granular.
+ * Si un PUT modifica varios de estos, registra un evento por cada grupo.
+ * Los campos NO listados acá se agrupan en un único evento EDICION_FICHA.
  */
 export const CAMPOS_AUDITABLES_SOCIO = {
   email: 'EMAIL_MOD',
@@ -101,24 +102,70 @@ export const CAMPOS_AUDITABLES_SOCIO = {
 }
 
 /**
- * A partir del diff de campos, registra los eventos correspondientes
- * agrupando por tipo de evento (DIRECCION_MOD agrupa todos los campos de
- * dirección en un solo registro).
+ * Campos del Socio que NO se auditan (técnicos, sensibles o ruidosos).
+ */
+const CAMPOS_EXCLUIDOS_AUDITORIA = new Set([
+  'id', 'tenantId', 'createdAt', 'updatedAt',
+  'actualizadoPor', 'creadoPor',
+  'tokenPortal', 'tarjetaCvv', 'tarjetaNumero', 'tarjetaUltimos4',
+  'cbuDebito', 'aliasDebito', // se loguean en otros eventos específicos si aplica
+  'fotoUrl', // URL puede cambiar al re-subir; pero el archivo en sí queda con timestamp
+])
+
+/**
+ * Normaliza valores para comparar: convierte Date a ISO, BigInt/Decimal a string.
+ */
+function normalizarValor(v) {
+  if (v === null || v === undefined) return null
+  if (v instanceof Date) return v.toISOString()
+  if (typeof v === 'object' && typeof v.toString === 'function' && !Array.isArray(v)) {
+    // Prisma Decimal, BigInt, etc.
+    const s = v.toString()
+    if (s !== '[object Object]') return s
+  }
+  return v
+}
+
+/**
+ * A partir del diff de campos, registra los eventos correspondientes:
+ *  - Cambios en campos críticos → eventos granulares (EMAIL_MOD, DIRECCION_MOD, etc.).
+ *  - Cambios en otros campos → un único evento EDICION_FICHA con detalle por campo.
  */
 export async function registrarCambiosSocio(db, { socioId, tenantId, antes, despues, origen, usuarioId }) {
-  const campos = Object.keys(CAMPOS_AUDITABLES_SOCIO)
-  const diff = diffCampos(antes, despues, campos)
-  if (!diff) return
+  if (!antes || !despues) return
 
-  // Agrupar por evento
+  // Calcular diff sobre TODOS los campos presentes en `despues` (lo que vino al update)
+  const camposEvaluados = Object.keys(despues).filter(k => !CAMPOS_EXCLUIDOS_AUDITORIA.has(k))
+  const diff = {}
+  for (const c of camposEvaluados) {
+    const a = normalizarValor(antes[c])
+    const d = normalizarValor(despues[c])
+    if (a !== d) diff[c] = { antes: a, despues: d }
+  }
+  if (Object.keys(diff).length === 0) return
+
+  // Separar campos críticos (con evento granular) del resto
   const porEvento = {}
+  const ficha = {}
   for (const [campo, cambio] of Object.entries(diff)) {
-    const ev = CAMPOS_AUDITABLES_SOCIO[campo]
-    if (!porEvento[ev]) porEvento[ev] = {}
-    porEvento[ev][campo] = cambio
+    const eventoGranular = CAMPOS_AUDITABLES_SOCIO[campo]
+    if (eventoGranular) {
+      if (!porEvento[eventoGranular]) porEvento[eventoGranular] = {}
+      porEvento[eventoGranular][campo] = cambio
+    } else {
+      ficha[campo] = cambio
+    }
   }
 
   for (const [evento, detalle] of Object.entries(porEvento)) {
     await registrarEvento(db, { socioId, tenantId, evento, detalle, origen, usuarioId })
+  }
+  if (Object.keys(ficha).length > 0) {
+    await registrarEvento(db, {
+      socioId, tenantId,
+      evento: 'EDICION_FICHA',
+      detalle: { campos: ficha },
+      origen, usuarioId,
+    })
   }
 }

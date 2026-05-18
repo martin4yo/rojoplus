@@ -905,7 +905,9 @@ function parsearXLSX(contenidoBase64, config) {
     hoja = 0,
     primeraFila = 1,
     formatoFecha = 'DD/MM/YYYY',
-    columnas = {}
+    columnas = {},
+    mergearFilasContinuacion = false,  // si una fila no tiene fecha + tiene concepto, append al anterior
+    ordenInvertido = false,            // si el archivo viene DESC por fecha (más reciente arriba)
   } = config
 
   const base64 = contenidoBase64.replace(/^data:[^;]+;base64,/, '')
@@ -943,6 +945,15 @@ function parsearXLSX(contenidoBase64, config) {
       tipo = imp < 0 ? 'DEBITO' : 'CREDITO'
     }
 
+    // Fila de continuación: sin fecha + sin importe pero con texto en concepto.
+    // Si el banco fragmenta el detalle (Credicoop suele poner el nombre del titular en
+    // la fila siguiente), agregamos ese texto al concepto del movimiento anterior.
+    if ((!fechaVal || importe === 0) && mergearFilasContinuacion && concepto && movimientos.length > 0) {
+      const ult = movimientos[movimientos.length - 1]
+      ult.concepto = `${ult.concepto} — ${concepto}`.slice(0, 500)
+      continue
+    }
+
     if (!fechaVal || importe === 0) continue
 
     let fecha
@@ -960,16 +971,29 @@ function parsearXLSX(contenidoBase64, config) {
       fecha,
       tipo,
       importe,
-      concepto: concepto || 'Movimiento',
+      concepto: (concepto || 'Movimiento').replace(/[\r\n]+/g, ' — ').replace(/\s+/g, ' ').trim(),
       descripcion: columnas.descripcion !== undefined ? String(col(columnas.descripcion) || '').trim() : null,
       referencia: columnas.referencia !== undefined ? String(col(columnas.referencia) || '').trim() : null,
       saldo
     })
+  }
 
-    if (movimientos.length === 1 && saldo !== null) {
-      saldoInicial = saldo - (tipo === 'CREDITO' ? importe : -importe)
+  // Si el archivo viene DESC, invertir (opcional — algunos bancos exportan más reciente arriba).
+  if (ordenInvertido) movimientos.reverse()
+
+  // Ordenar por fecha ASC para garantizar orden cronológico,
+  // independiente de cómo venga el archivo. Esto hace el cálculo de
+  // saldoInicial/saldoFinal y el matching contra MovimientoCaja más predecibles.
+  movimientos.sort((a, b) => a.fecha - b.fecha)
+
+  // Saldo inicial/final desde primer y último movimiento (en orden cronológico)
+  if (movimientos.length > 0) {
+    const primero = movimientos[0]
+    if (primero.saldo !== null && primero.saldo !== undefined) {
+      saldoInicial = primero.saldo - (primero.tipo === 'CREDITO' ? primero.importe : -primero.importe)
     }
-    if (saldo !== null) saldoFinal = saldo
+    const ultimo = movimientos[movimientos.length - 1]
+    if (ultimo.saldo !== null && ultimo.saldo !== undefined) saldoFinal = ultimo.saldo
   }
 
   return { movimientos, saldoInicial, saldoFinal }
@@ -1040,6 +1064,27 @@ const PRESETS_BANCOS_AR = [
     descripcion: 'Extracto Banco Provincia en formato Excel',
     configuracion: { hoja: 0, primeraFila: 2, formatoFecha: 'DD/MM/YYYY',
       columnas: { fecha: 0, concepto: 1, descripcion: 2, importe: 3, saldo: 4 } }
+  },
+  {
+    nombre: 'Banco Credicoop - Extracto Excel',
+    banco: 'CREDICOOP',
+    tipoArchivo: 'XLSX',
+    descripcion: 'Extracto Banca Internet Empresaria Credicoop (Excel exportado del home banking)',
+    configuracion: {
+      hoja: 0,
+      primeraFila: 1,
+      formatoFecha: 'DD/MM/YYYY',
+      columnas: {
+        fecha: 0,        // A
+        concepto: 1,     // B
+        referencia: 2,   // C - Nro.Cpbte.
+        debito: 3,       // D
+        credito: 4,      // E
+        saldo: 5         // F
+      },
+      mergearFilasContinuacion: true   // filas sin fecha → append al concepto anterior (nombre titular)
+      // El parser ahora siempre ordena por fecha al final — no hace falta `ordenInvertido`
+    }
   }
 ]
 

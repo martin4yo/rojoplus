@@ -3,13 +3,65 @@
  * Envío de mensajes y gestión de instancias por tenant.
  * La configuración se lee de la tabla Configuracion del tenant.
  */
+import { createTenantPrisma } from '../lib/tenantPrisma.js'
+
+/**
+ * Convierte Markdown estándar al subset que WhatsApp interpreta.
+ *
+ * WhatsApp soporta: *negrita*, _cursiva_, ~tachado~, ```código```.
+ * Markdown estándar usa **negrita** y los links son [texto](url).
+ *
+ * Se aplica al texto antes de enviarlo, así los tool handlers / actionExecutor
+ * pueden seguir devolviendo Markdown estándar (que el web chat renderiza nativo)
+ * sin duplicar la lógica de formato por canal.
+ *
+ * Cubre: headings ATX, bold doble, links inline, listas con asterisco
+ * (cambia a viñeta porque el * choca con el bold de WA), reglas horizontales.
+ * Code blocks (```...```) y código inline (`x`) ya son interpretados por WA.
+ */
+export function mdToWhatsApp(text) {
+  if (!text || typeof text !== 'string') return text
+  return text
+    // Headings ATX (# Title, ## Subtitle) → *Title* en su propia línea.
+    // El número de # no importa — en WA no hay jerarquía visual de headings.
+    .replace(/^[ \t]*#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/gm, '*$1*')
+    // **bold** → *bold* (orden importa: convertir doble antes que simple).
+    .replace(/\*\*(.+?)\*\*/gs, '*$1*')
+    // __bold__ → *bold* (variante GFM).
+    .replace(/__(.+?)__/gs, '*$1*')
+    // Listas con * o + al inicio de línea → viñeta •. El * suelto chocaría
+    // con el marcador de bold de WA y se rompería el render.
+    .replace(/^([ \t]*)[*+][ \t]+/gm, '$1• ')
+    // [texto](url) → texto: url  (WA detecta el URL standalone como clickeable).
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1: $2')
+    // Reglas horizontales (---, ***, ___) → línea en blanco.
+    .replace(/^[ \t]*([-*_])\1{2,}[ \t]*$/gm, '')
+}
+
+/**
+ * Resuelve un cliente Prisma SEGURO para leer config del tenant.
+ * - Si viene `tenantId` → crea cliente tenant-scoped.
+ * - Si viene `db` tenant-scoped y NO tenantId → usa db.
+ * - Sin ninguno → null. Sin contexto, NO se lee config (devuelve null en getWhatsAppConfig
+ *   y por consiguiente los envíos no salen — fail-safe para evitar leer config de otro tenant).
+ */
+function resolverDb({ db, tenantId }) {
+  if (tenantId) return createTenantPrisma(tenantId)
+  if (db) return db
+  return null
+}
 
 /**
  * Obtiene la configuración de WhatsApp del tenant.
+ * Acepta firma legacy `getWhatsAppConfig(db)` o nueva `getWhatsAppConfig({ db, tenantId })`.
  * Claves en tabla configuracion: WHATSAPP_API_URL, WHATSAPP_INSTANCE, WHATSAPP_API_KEY,
  * WHATSAPP_ENABLED, WHATSAPP_DELAY_MS, WHATSAPP_HORA_INICIO, WHATSAPP_HORA_FIN
  */
-export async function getWhatsAppConfig(db) {
+export async function getWhatsAppConfig(dbOrOpts) {
+  const opts = (dbOrOpts && typeof dbOrOpts === 'object' && ('tenantId' in dbOrOpts || 'db' in dbOrOpts))
+    ? dbOrOpts
+    : { db: dbOrOpts }
+  const db = resolverDb(opts)
   if (!db) return null
 
   try {
@@ -112,8 +164,8 @@ export function normalizarNumero(telefono) {
  * @param {string} params.caption - Texto opcional debajo de la imagen
  * @param {boolean} params.ignorarHorario
  */
-export async function enviarWhatsAppImagen({ db, telefono, imagenBase64, caption = '', ignorarHorario = false }) {
-  const cfg = await getWhatsAppConfig(db)
+export async function enviarWhatsAppImagen({ db, tenantId, telefono, imagenBase64, caption = '', ignorarHorario = false }) {
+  const cfg = await getWhatsAppConfig({ db, tenantId })
   if (!cfg) return { enviado: false, motivo: 'WhatsApp no configurado o deshabilitado' }
 
   if (!ignorarHorario && !dentroDelHorario(cfg.horaInicio, cfg.horaFin)) {
@@ -122,6 +174,8 @@ export async function enviarWhatsAppImagen({ db, telefono, imagenBase64, caption
 
   let numero = normalizarNumero(telefono)
   if (!numero) return { enviado: false, motivo: 'Número inválido' }
+
+  caption = mdToWhatsApp(caption)
 
   if (cfg.modoDemo) {
     if (!cfg.numeroDemo) return { enviado: false, motivo: 'Modo demo activo pero sin número de prueba configurado (WHATSAPP_DEMO_NUMERO)' }
@@ -168,8 +222,8 @@ export async function enviarWhatsAppImagen({ db, telefono, imagenBase64, caption
  * Envía un documento (PDF) por WhatsApp.
  * Usa el endpoint sendMedia de Evolution API con mediatype='document'.
  */
-export async function enviarWhatsAppDocumento({ db, telefono, pdfBase64, fileName = 'documento.pdf', caption = '', ignorarHorario = false }) {
-  const cfg = await getWhatsAppConfig(db)
+export async function enviarWhatsAppDocumento({ db, tenantId, telefono, pdfBase64, fileName = 'documento.pdf', caption = '', ignorarHorario = false }) {
+  const cfg = await getWhatsAppConfig({ db, tenantId })
   if (!cfg) return { enviado: false, motivo: 'WhatsApp no configurado o deshabilitado' }
 
   if (!ignorarHorario && !dentroDelHorario(cfg.horaInicio, cfg.horaFin)) {
@@ -178,6 +232,8 @@ export async function enviarWhatsAppDocumento({ db, telefono, pdfBase64, fileNam
 
   let numero = normalizarNumero(telefono)
   if (!numero) return { enviado: false, motivo: 'Número inválido' }
+
+  caption = mdToWhatsApp(caption)
 
   if (cfg.modoDemo) {
     if (!cfg.numeroDemo) return { enviado: false, motivo: 'Modo demo activo pero sin número de prueba configurado (WHATSAPP_DEMO_NUMERO)' }
@@ -233,8 +289,8 @@ export async function enviarWhatsAppDocumento({ db, telefono, pdfBase64, fileNam
  * @param {string} params.texto - Texto del mensaje
  * @param {boolean} params.ignorarHorario - Si true, envía aunque esté fuera de horario
  */
-export async function enviarWhatsApp({ db, telefono, texto, ignorarHorario = false }) {
-  const cfg = await getWhatsAppConfig(db)
+export async function enviarWhatsApp({ db, tenantId, telefono, texto, ignorarHorario = false }) {
+  const cfg = await getWhatsAppConfig({ db, tenantId })
   if (!cfg) return { enviado: false, motivo: 'WhatsApp no configurado o deshabilitado' }
 
   if (!ignorarHorario && !dentroDelHorario(cfg.horaInicio, cfg.horaFin)) {
@@ -243,6 +299,8 @@ export async function enviarWhatsApp({ db, telefono, texto, ignorarHorario = fal
 
   let numero = normalizarNumero(telefono)
   if (!numero) return { enviado: false, motivo: 'Número inválido' }
+
+  texto = mdToWhatsApp(texto)
 
   if (cfg.modoDemo) {
     if (!cfg.numeroDemo) return { enviado: false, motivo: 'Modo demo activo pero sin número de prueba configurado (WHATSAPP_DEMO_NUMERO)' }
@@ -283,14 +341,14 @@ export async function enviarWhatsApp({ db, telefono, texto, ignorarHorario = fal
  * @param {object} params.db
  * @param {Array<{telefono, texto}>} params.mensajes
  */
-export async function enviarWhatsAppMasivo({ db, mensajes }) {
-  const cfg = await getWhatsAppConfig(db)
+export async function enviarWhatsAppMasivo({ db, tenantId, mensajes }) {
+  const cfg = await getWhatsAppConfig({ db, tenantId })
   if (!cfg) return []
 
   const resultados = []
 
   for (const { telefono, texto } of mensajes) {
-    const resultado = await enviarWhatsApp({ db, telefono, texto })
+    const resultado = await enviarWhatsApp({ db, tenantId, telefono, texto })
     resultados.push({ telefono, ...resultado })
 
     // Delay entre mensajes para no ser baneado
@@ -420,13 +478,38 @@ const TEMPLATES_DEFAULT = {
 }
 
 /**
+ * Eventos donde el link al portal es crítico para que el socio resuelva
+ * la acción. Si el template del tenant fue customizado sin incluir el
+ * link, lo appendamos al final automáticamente para no dejar al socio
+ * sin forma de actuar.
+ */
+const _CLAVES_REQUIEREN_LINK = new Set([
+  'NOTIF_WA_VENCIMIENTO',
+  'NOTIF_WA_MORA',
+])
+
+/**
  * Lee el template del tenant (si existe) y sustituye las variables.
  * Si no hay template configurado, usa el default.
+ *
+ * Para eventos financieros (vencimiento/mora): si el template del tenant
+ * no usa {{link}} ni {{linkPago}} ni {{linkPortal}} pero las variables
+ * incluyen una URL, se appendea al final. Evita el caso de templates
+ * customizados que olvidan incluir el link y dejan al socio sin call-to-action.
  */
 async function resolverTemplate(db, clave, variables) {
   const config = await db.configuracion.findFirst({ where: { clave } }).catch(() => null)
   const template = config?.valor || TEMPLATES_DEFAULT[clave] || ''
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? '')
+  const usaLink = /\{\{(link|linkPago|linkPortal)\}\}/.test(template)
+  let rendered = template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? '')
+
+  if (_CLAVES_REQUIEREN_LINK.has(clave) && !usaLink) {
+    const link = variables.linkPago || variables.linkPortal || variables.link
+    if (link) {
+      rendered = `${rendered.trimEnd()}\n\nPortal: ${link}`
+    }
+  }
+  return rendered
 }
 
 // ─── Helpers: nombre/apellido y link al portal ───────────────────────────────
@@ -476,12 +559,17 @@ async function getFrontendUrlForSocio(socio) {
  * Construye el link al portal del socio (usado como linkPago para opción B:
  * el socio entra al portal y desde ahí elige medio de pago).
  * Si se pasa cargoId, el portal puede leer ?pagar=X para destacar esa cuota.
+ *
+ * Asegura que el socio tenga tokenPortal vigente — si no, lo genera y persiste.
  */
 export async function buildLinkPortal(socio, { cargoId } = {}) {
-  if (!socio?.tokenPortal) return ''
+  if (!socio?.id) return ''
+  const { ensurePortalToken } = await import('../lib/portalToken.js')
+  const token = await ensurePortalToken(socio).catch(() => null)
+  if (!token) return ''
   const base = await getFrontendUrlForSocio(socio)
   const query = cargoId ? `?pagar=${cargoId}` : ''
-  return `${base}/portal-socio/${socio.tokenPortal}${query}`
+  return `${base}/portal-socio/${token}${query}`
 }
 
 /**
@@ -522,9 +610,12 @@ export function obtenerTelefonoSocio(socio) {
 /**
  * Notifica a un socio que se registró un pago.
  */
-export async function notificarPago({ db, socio, pago, pdfBuffer = null, pdfFilename = null }) {
+export async function notificarPago({ db, tenantId, socio, pago, pdfBuffer = null, pdfFilename = null }) {
   const telefono = obtenerTelefonoSocio(socio)
   if (!telefono) return
+
+  // Derivar tenantId del pago si no vino explícito (campo del schema)
+  const tid = tenantId || pago?.tenantId || socio?.tenantId || null
 
   const monto = Number(pago.montoTotal || pago.importe || pago.monto || 0).toLocaleString('es-AR', {
     style: 'currency', currency: 'ARS', maximumFractionDigits: 0
@@ -535,20 +626,20 @@ export async function notificarPago({ db, socio, pago, pdfBuffer = null, pdfFile
 
   if (pdfBuffer) {
     return enviarWhatsAppDocumento({
-      db,
+      db, tenantId: tid,
       telefono,
       pdfBase64: pdfBuffer.toString('base64'),
       fileName: pdfFilename || `recibo-${pago.numero}.pdf`,
       caption: texto,
     })
   }
-  return enviarWhatsApp({ db, telefono, texto })
+  return enviarWhatsApp({ db, tenantId: tid, telefono, texto })
 }
 
 /**
  * Notifica a un socio que tiene una cuota próxima a vencer.
  */
-export async function notificarVencimiento({ db, socio, cuota }) {
+export async function notificarVencimiento({ db, tenantId, socio, cuota }) {
   const telefono = obtenerTelefonoSocio(socio)
   if (!telefono) return
 
@@ -564,13 +655,13 @@ export async function notificarVencimiento({ db, socio, cuota }) {
     cargoId: cuota.id,
   })
   const texto = await resolverTemplate(db, 'NOTIF_WA_VENCIMIENTO', variables)
-  return enviarWhatsApp({ db, telefono, texto })
+  return enviarWhatsApp({ db, tenantId, telefono, texto })
 }
 
 /**
  * Notifica a un socio que tiene una cuota vencida.
  */
-export async function notificarMora({ db, socio, deuda }) {
+export async function notificarMora({ db, tenantId, socio, deuda }) {
   const telefono = obtenerTelefonoSocio(socio)
   if (!telefono) return
 
@@ -580,19 +671,19 @@ export async function notificarMora({ db, socio, deuda }) {
 
   const variables = await buildVariablesSocio(socio, { total, monto: total, importe: total })
   const texto = await resolverTemplate(db, 'NOTIF_WA_MORA', variables)
-  return enviarWhatsApp({ db, telefono, texto })
+  return enviarWhatsApp({ db, tenantId, telefono, texto })
 }
 
 /**
  * Envía el link de acceso al portal del socio.
  */
-export async function enviarLinkPortal({ db, socio, link }) {
+export async function enviarLinkPortal({ db, tenantId, socio, link }) {
   const telefono = obtenerTelefonoSocio(socio)
   if (!telefono) return
 
   const variables = await buildVariablesSocio(socio, { link })
   const texto = await resolverTemplate(db, 'NOTIF_WA_PORTAL', variables)
-  return enviarWhatsApp({ db, telefono, texto, ignorarHorario: true })
+  return enviarWhatsApp({ db, tenantId, telefono, texto, ignorarHorario: true })
 }
 
 /**

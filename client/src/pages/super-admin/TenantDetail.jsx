@@ -17,13 +17,12 @@ export default function TenantDetail() {
   const [guardandoParseKey, setGuardandoParseKey] = useState(false)
   const [mostrarParseKey, setMostrarParseKey] = useState(false)
   const [configIA, setConfigIA] = useState({
-    enabled: 'false', chatEnabled: 'true', useAxioHub: 'false',
+    enabled: 'false', chatEnabled: 'true',
     horarioInicio: '7', horarioFin: '23', msgFueraHorario: '', whitelist: '',
-    nombre: '', promptExtra: '', prompt: '',
-    provider: 'anthropic', tier: 'rapido', apiKey: '', modelOverride: '',
+    nombre: '', promptExtra: '',
+    analisisProvider: 'local',
   })
   const [guardandoIA, setGuardandoIA] = useState(false)
-  const [mostrarApiKey, setMostrarApiKey] = useState(false)
 
   useEffect(() => {
     cargarTenant()
@@ -98,11 +97,15 @@ export default function TenantDetail() {
 
   async function cargarConfigIA() {
     try {
+      // Las claves IA legacy (CHAT_USE_AXIO_HUB, WA_AGENT_SYSTEM_PROMPT, AI_PROVIDER,
+      // AI_MODEL_TIER, AI_API_KEY, AI_MODEL_OVERRIDE) ya no se honran — el chat
+      // y el agente WA siempre van por AXIO Hub. Quedan en DB para tenants
+      // pre-existentes pero el código nuevo las ignora.
       const claves = [
-        'WA_AGENT_ENABLED', 'CHAT_AGENT_ENABLED', 'CHAT_USE_AXIO_HUB',
+        'WA_AGENT_ENABLED', 'CHAT_AGENT_ENABLED',
         'WA_AGENT_HORARIO_INICIO', 'WA_AGENT_HORARIO_FIN', 'WA_AGENT_MSG_FUERA_HORARIO',
-        'WA_AGENT_WHITELIST', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA', 'WA_AGENT_SYSTEM_PROMPT',
-        'AI_PROVIDER', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_MODEL_OVERRIDE', 'AI_ANALISIS_PROVIDER'
+        'WA_AGENT_WHITELIST', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA',
+        'AI_ANALISIS_PROVIDER',
       ]
       const results = await Promise.all(
         claves.map(c => api.getFull(`/super-admin/tenants/${id}/configuracion/${c}`).catch(() => ({ valor: null })))
@@ -111,18 +114,12 @@ export default function TenantDetail() {
       setConfigIA({
         enabled: cfg.WA_AGENT_ENABLED || 'false',
         chatEnabled: cfg.CHAT_AGENT_ENABLED !== '' ? cfg.CHAT_AGENT_ENABLED : 'true',
-        useAxioHub: cfg.CHAT_USE_AXIO_HUB || 'false',
         horarioInicio: cfg.WA_AGENT_HORARIO_INICIO || '7',
         horarioFin: cfg.WA_AGENT_HORARIO_FIN || '23',
         msgFueraHorario: cfg.WA_AGENT_MSG_FUERA_HORARIO || '',
         whitelist: cfg.WA_AGENT_WHITELIST || '',
         nombre: cfg.WA_AGENT_NOMBRE || '',
         promptExtra: cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA || '',
-        prompt: cfg.WA_AGENT_SYSTEM_PROMPT || '',
-        provider: cfg.AI_PROVIDER || 'anthropic',
-        tier: cfg.AI_MODEL_TIER || 'rapido',
-        apiKey: cfg.AI_API_KEY || '',
-        modelOverride: cfg.AI_MODEL_OVERRIDE || '',
         analisisProvider: cfg.AI_ANALISIS_PROVIDER || 'local',
       })
     } catch (err) {
@@ -136,18 +133,12 @@ export default function TenantDetail() {
       const campos = [
         { clave: 'WA_AGENT_ENABLED', valor: configIA.enabled, descripcion: 'Agente IA WhatsApp habilitado', modulo: 'IA' },
         { clave: 'CHAT_AGENT_ENABLED', valor: configIA.chatEnabled, descripcion: 'Asistente de chat interno habilitado', modulo: 'IA' },
-        { clave: 'CHAT_USE_AXIO_HUB', valor: configIA.useAxioHub, descripcion: 'Usar AXIO Hub en lugar del motor IA local (Anthropic directo)', modulo: 'IA' },
         { clave: 'WA_AGENT_HORARIO_INICIO', valor: configIA.horarioInicio, descripcion: 'Hora inicio agente', modulo: 'IA' },
         { clave: 'WA_AGENT_HORARIO_FIN', valor: configIA.horarioFin, descripcion: 'Hora fin agente', modulo: 'IA' },
         { clave: 'WA_AGENT_MSG_FUERA_HORARIO', valor: configIA.msgFueraHorario, descripcion: 'Mensaje fuera de horario', modulo: 'IA' },
         { clave: 'WA_AGENT_WHITELIST', valor: configIA.whitelist, descripcion: 'Lista blanca de números', modulo: 'IA' },
         { clave: 'WA_AGENT_NOMBRE', valor: configIA.nombre, descripcion: 'Nombre del asistente virtual', modulo: 'IA' },
-        { clave: 'WA_AGENT_SYSTEM_PROMPT_EXTRA', valor: configIA.promptExtra, descripcion: 'Instrucciones adicionales para el agente', modulo: 'IA' },
-        { clave: 'WA_AGENT_SYSTEM_PROMPT', valor: configIA.prompt, descripcion: 'Prompt completo personalizado', modulo: 'IA' },
-        { clave: 'AI_PROVIDER', valor: configIA.provider, descripcion: 'Proveedor de IA', modulo: 'IA' },
-        { clave: 'AI_MODEL_TIER', valor: configIA.tier, descripcion: 'Tier de modelo IA', modulo: 'IA' },
-        { clave: 'AI_API_KEY', valor: configIA.apiKey, descripcion: 'API key del proveedor de IA', modulo: 'IA' },
-        { clave: 'AI_MODEL_OVERRIDE', valor: configIA.modelOverride, descripcion: 'Modelo exacto (override del tier)', modulo: 'IA' },
+        { clave: 'WA_AGENT_SYSTEM_PROMPT_EXTRA', valor: configIA.promptExtra, descripcion: 'Instrucciones adicionales para el agente (se appendea al system prompt del hub)', modulo: 'IA' },
         { clave: 'AI_ANALISIS_PROVIDER', valor: configIA.analisisProvider, descripcion: 'Motor para análisis de datos del club', modulo: 'IA' },
       ]
       await Promise.all(campos.map(({ clave, valor, descripcion, modulo }) =>
@@ -499,29 +490,6 @@ export default function TenantDetail() {
                 </div>
               </div>
 
-              {/* Motor del chat: AXIO Hub vs motor local */}
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-100 rounded-lg"><Cpu className="w-5 h-5 text-emerald-600" /></div>
-                    <div>
-                      <p className="font-medium">Motor del asistente: AXIO Hub</p>
-                      <p className="text-sm text-gray-500">
-                        Si está activado, el chat usa AXIO Hub (caché, anonymizer, billing centralizado).
-                        Si está apagado, usa el motor IA local con conexión directa a Anthropic.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setConfigIA({ ...configIA, useAxioHub: configIA.useAxioHub === 'true' ? 'false' : 'true' })}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${configIA.useAxioHub === 'true' ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configIA.useAxioHub === 'true' ? 'translate-x-6' : ''}`} />
-                  </button>
-                </div>
-              </div>
-
               {/* Agente WA */}
               <div className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -565,61 +533,9 @@ export default function TenantDetail() {
                   <p className="text-xs text-gray-500 mt-1">Separados por coma. Vacío = responde a todos.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Instrucciones adicionales</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Instrucciones adicionales (tono / persona)</label>
                   <textarea value={configIA.promptExtra} onChange={e => setConfigIA({ ...configIA, promptExtra: e.target.value })} placeholder="Ej: No informes precios. Derivá inscripciones nuevas a administración." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none" rows={3} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Prompt completo personalizado <span className="text-gray-400 font-normal">(reemplaza el comportamiento base)</span></label>
-                  <textarea value={configIA.prompt} onChange={e => setConfigIA({ ...configIA, prompt: e.target.value })} placeholder="Dejá vacío para usar el comportamiento estándar." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none font-mono text-xs" rows={6} />
-                  <p className="text-xs text-amber-600 mt-1">⚠ Si completás este campo, las instrucciones adicionales se ignoran.</p>
-                </div>
-              </div>
-
-              {/* Proveedor de IA */}
-              <div className="border rounded-lg p-4 space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-indigo-100 rounded-lg"><Cpu className="w-5 h-5 text-indigo-600" /></div>
-                  <div>
-                    <p className="font-medium">Proveedor de IA</p>
-                    <p className="text-sm text-gray-500">Modelo y API key. Si no se configura API key, usa la global del servidor.</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor</label>
-                    <select value={configIA.provider} onChange={e => setConfigIA({ ...configIA, provider: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                      <option value="anthropic">Anthropic (Claude)</option>
-                      <option value="openai">OpenAI (GPT)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de modelo</label>
-                    <select value={configIA.tier} onChange={e => setConfigIA({ ...configIA, tier: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                      <option value="rapido">Rápido — Haiku / GPT-4o mini (~$0.001/msg)</option>
-                      <option value="estandar">Estándar — Sonnet / GPT-4o (~$0.012/msg)</option>
-                      <option value="premium">Premium — Opus / GPT-4o (~$0.06/msg)</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">API Key propia</label>
-                  <div className="relative">
-                    <input
-                      type={mostrarApiKey ? 'text' : 'password'}
-                      value={configIA.apiKey}
-                      onChange={e => setConfigIA({ ...configIA, apiKey: e.target.value })}
-                      placeholder="sk-ant-... o sk-..."
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm"
-                    />
-                    <button type="button" onClick={() => setMostrarApiKey(!mostrarApiKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {mostrarApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Modelo exacto (opcional)</label>
-                  <input type="text" value={configIA.modelOverride} onChange={e => setConfigIA({ ...configIA, modelOverride: e.target.value })} placeholder="Dejar vacío para usar el nivel seleccionado" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                  <p className="text-xs text-gray-500 mt-1">Ej: <span className="font-mono">claude-haiku-4-5-20251001</span></p>
+                  <p className="text-xs text-gray-500 mt-1">Se appendea al system prompt del hub. El comportamiento base (tool-calling, idioma) viene del hub — no hace falta repetirlo acá.</p>
                 </div>
               </div>
 

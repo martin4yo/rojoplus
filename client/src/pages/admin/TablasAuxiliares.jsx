@@ -154,6 +154,8 @@ export default function TablasAuxiliares() {
     NOTIF_WA_VENCIMIENTO: '',
     NOTIF_WA_MORA: '',
     NOTIF_WA_PORTAL: '',
+    NOTIF_WA_BLOQUEO_MOROSIDAD_1: '',
+    NOTIF_WA_BLOQUEO_MOROSIDAD_2: '',
   })
   const [guardandoNotifWA, setGuardandoNotifWA] = useState(false)
 
@@ -880,7 +882,7 @@ export default function TablasAuxiliares() {
 
   async function cargarNotifTextos() {
     try {
-      const claves = ['NOTIF_WA_PAGO', 'NOTIF_WA_VENCIMIENTO', 'NOTIF_WA_MORA', 'NOTIF_WA_PORTAL']
+      const claves = ['NOTIF_WA_PAGO', 'NOTIF_WA_VENCIMIENTO', 'NOTIF_WA_MORA', 'NOTIF_WA_PORTAL', 'NOTIF_WA_BLOQUEO_MOROSIDAD_1', 'NOTIF_WA_BLOQUEO_MOROSIDAD_2']
       const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
       const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
       setNotifTextos(cfg)
@@ -2722,6 +2724,22 @@ export default function TablasAuxiliares() {
                       desc: 'Al generar acceso al portal del socio',
                       placeholder: '*{{nombre}}*, acá está tu acceso al portal del club:\n{{link}}\n\nEste link es personal y expira en 7 días.',
                       vars: '{{nombre}}, {{apellido}}, {{nroSocio}}, {{link}}',
+                    },
+                    {
+                      eventoKey: 'MOROSIDAD_NOTIFICACION_BLOQUEO_ACTIVO',
+                      textoKey: 'NOTIF_WA_BLOQUEO_MOROSIDAD_1',
+                      label: 'Bloqueo por morosidad — variante 1',
+                      desc: 'Mensaje WA cuando se bloquea al socio por cuotas vencidas (1 de 2 — rotativo)',
+                      placeholder: '*{{club}}*\n\nHola {{nombre}} (Socio Nº {{nroSocio}}), tu cuenta fue *bloqueada por cuotas vencidas*...\n\nPortal: {{linkPortal}}',
+                      vars: '{{nombre}}, {{apellido}}, {{apellidoNombre}}, {{nroSocio}}, {{club}}, {{deudaTotal}}, {{cuotasVencidas}}, {{linkPortal}}',
+                    },
+                    {
+                      eventoKey: 'MOROSIDAD_NOTIFICACION_BLOQUEO_ACTIVO',
+                      textoKey: 'NOTIF_WA_BLOQUEO_MOROSIDAD_2',
+                      label: 'Bloqueo por morosidad — variante 2',
+                      desc: 'Mensaje WA cuando se bloquea al socio por cuotas vencidas (2 de 2 — rotativo)',
+                      placeholder: 'Buenas {{nombre}},\n\n_{{club}}_ te informa que la cuenta del Socio Nº {{nroSocio}} fue suspendida...\n\nPagá online: {{linkPortal}}',
+                      vars: '{{nombre}}, {{apellido}}, {{apellidoNombre}}, {{nroSocio}}, {{club}}, {{deudaTotal}}, {{cuotasVencidas}}, {{linkPortal}}',
                     },
                   ].map(({ eventoKey, textoKey, label, desc, placeholder, vars }) => {
                     const activo = notifEventos[eventoKey] === 'true'

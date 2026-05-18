@@ -2,7 +2,7 @@
  * Tools admin para AXIO Hub (Capa 2.6).
  *
  * Reglas:
- *  - El `name` matchea EXACTAMENTE el valor de ACCIONES en aiAssistant.js
+ *  - El `name` matchea EXACTAMENTE el valor de ACCIONES en aiConstants.js
  *    para que el dispatcher pueda mapear tool_call → {accion, entidades}
  *    directo a ActionExecutor sin transformación.
  *  - `inputSchema` matchea el formato `entidades` del prompt legacy.
@@ -15,19 +15,22 @@ export const ADMIN_TOOLS = [
   {
     name: 'estadisticas_socios',
     description:
-      'Obtener estadísticas agregadas de socios del club. Usar cuando el admin pide un conteo o resumen (no un listado de filas individuales).',
+      'Devuelve estadísticas agregadas de socios del club: cantidad total, ' +
+      'cantidad de morosos, cantidad de activos, y porcentaje de morosidad. ' +
+      'Usar cuando el admin pide: "porcentaje de morosidad", "tasa de mora", ' +
+      '"% morosos", "cuántos socios morosos hay", "cuántos socios activos", ' +
+      '"cuántos socios tenemos", "ranking de morosidad", "estadísticas de ' +
+      'socios", "resumen de socios". NO usar para listar los socios uno por ' +
+      'uno — para eso necesita Capa 2.5 SQL.',
     inputSchema: {
       type: 'object',
       properties: {
         filtro: {
           type: 'string',
-          enum: ['morosos', 'activos', 'todos'],
-          description: 'Qué subconjunto de socios contar.',
-        },
-        periodo: {
-          type: 'string',
-          enum: ['mes', 'año'],
-          description: 'Ventana temporal opcional.',
+          enum: ['morosos', 'activos', 'todos', 'porcentaje_morosidad'],
+          description:
+            "Qué métrica devolver. 'porcentaje_morosidad' devuelve todo " +
+            'el resumen con el % calculado. Default: porcentaje_morosidad.',
         },
       },
     },

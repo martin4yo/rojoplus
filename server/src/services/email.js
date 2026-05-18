@@ -1,5 +1,21 @@
 import nodemailer from 'nodemailer'
 import prisma from '../lib/prisma.js'
+import { createTenantPrisma } from '../lib/tenantPrisma.js'
+
+/**
+ * Resuelve un cliente Prisma SEGURO para leer config del tenant.
+ * - Si viene `tenantId` numérico → crea cliente tenant-scoped (la opción correcta).
+ * - Si viene `db` (tenant-scoped req.db) y NO tenantId → usa ese db (asume scope correcto).
+ * - Si no viene ni uno ni otro → null. Caller debe manejar como "sin contexto".
+ *
+ * Esta función NO devuelve prisma global jamás: un caller sin tenantId NO debe
+ * poder leer la config DEMO/SMTP, porque podría ser de otro tenant.
+ */
+function resolverDbTenant({ db, tenantId }) {
+  if (tenantId) return createTenantPrisma(tenantId)
+  if (db) return db
+  return null
+}
 
 // Transporter global (fallback desde variables de entorno)
 const _globalSmtpPort = parseInt(process.env.SMTP_PORT) || 587
@@ -49,16 +65,22 @@ const transporterCache = new Map()
  * Claves en tabla configuracion: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
  * SMTP_SECURE, SMTP_FROM, SMTP_FROM_NAME, EMAIL_CONTACTO, NOMBRE_CLUB
  */
-export async function getMailConfig(db) {
+export async function getMailConfig(dbOrOpts) {
   const globalFrom = `"${process.env.SMTP_FROM_NAME || 'Clubix'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`
   const globalEmailContacto = process.env.EMAIL_CONTACTO || process.env.SMTP_USER
 
-  if (!db) {
+  // Compat: aceptar firma legacy `getMailConfig(db)` o nueva `getMailConfig({ db, tenantId })`
+  const opts = (dbOrOpts && typeof dbOrOpts === 'object' && ('tenantId' in dbOrOpts || 'db' in dbOrOpts))
+    ? dbOrOpts
+    : { db: dbOrOpts }
+  const dbT = resolverDbTenant(opts)
+
+  if (!dbT) {
     return { transporter: globalTransporter, from: globalFrom, emailContacto: globalEmailContacto }
   }
 
   try {
-    const configs = await db.configuracion.findMany({
+    const configs = await dbT.configuracion.findMany({
       where: {
         clave: { in: ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_SECURE', 'SMTP_FROM', 'SMTP_FROM_NAME', 'EMAIL_CONTACTO', 'NOMBRE_CLUB'] }
       }
@@ -103,13 +125,20 @@ export async function getMailConfig(db) {
   }
 }
 
-// Verificar si está en modo demo y obtener el email de prueba
-async function getModoDemo(db) {
+// Verificar si está en modo demo y obtener el email de prueba.
+// IMPORTANTE: la config se lee SIEMPRE con scope de tenant — si no se puede
+// resolver el tenant, se asume "modo demo inactivo" para evitar redirigir
+// emails a la dirección DEMO de OTRO tenant.
+async function getModoDemo({ db, tenantId }) {
+  const dbT = resolverDbTenant({ db, tenantId })
+  if (!dbT) {
+    console.warn('[enviarEmail] getModoDemo sin tenantId/db tenant-scoped — asumiendo MODO_DEMO inactivo')
+    return { activo: false, email: '' }
+  }
   try {
-    const dbToUse = db || prisma
     const [modoDemo, emailDemo] = await Promise.all([
-      dbToUse.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
-      dbToUse.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
+      dbT.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
+      dbT.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
     ])
     return {
       activo: modoDemo?.valor === 'true',
@@ -121,11 +150,14 @@ async function getModoDemo(db) {
   }
 }
 
-// Función helper para enviar email (maneja modo demo y SMTP por tenant)
-export async function enviarEmail({ to, subject, html, db, attachments = [] }) {
+// Función helper para enviar email (maneja modo demo y SMTP por tenant).
+// Pasar `tenantId` (preferido) o `db` tenant-scoped (req.db) para que la
+// config se lea con el scope correcto. Sin ninguno de los dos, se usa
+// transporter global y NO se aplica modo demo.
+export async function enviarEmail({ to, subject, html, db, tenantId, attachments = [] }) {
   const [modoDemo, mailConfig] = await Promise.all([
-    getModoDemo(db),
-    getMailConfig(db),
+    getModoDemo({ db, tenantId }),
+    getMailConfig({ db, tenantId }),
   ])
 
   let destinatario = to
@@ -423,7 +455,10 @@ export async function enviarReciboPago(pago, db, opts = {}) {
         contentType: 'application/pdf',
       })
     }
+    // Resolver tenantId desde el pago (campo del schema) para garantizar scope correcto
+    const tenantIdPago = pago.tenantId || pago.socio?.tenantId || null
     const envio = await enviarEmail({
+      tenantId: tenantIdPago,
       to: pago.socio.email,
       subject: `Recibo de Pago #${pago.numero} - Club Sportivo Pilar`,
       html,
@@ -925,8 +960,10 @@ export async function enviarCancelacionReserva(reserva, motivo, db) {
 /**
  * Envía recordatorio 24hs antes de la reserva
  */
-export async function enviarRecordatorioReserva(reserva, db) {
+export async function enviarRecordatorioReserva(reserva, db, tenantId = null) {
   if (!reserva.email) return false
+  // Si no vino tenantId explícito, derivarlo de la reserva (campo del schema)
+  const tid = tenantId || reserva?.tenantId || null
 
   const fecha = new Date(reserva.fecha).toLocaleDateString('es-AR', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
@@ -972,6 +1009,7 @@ export async function enviarRecordatorioReserva(reserva, db) {
       subject: `Recordatorio: ${reserva.espacio?.nombre || 'Reserva'} mañana a las ${reserva.horaInicio} hs`,
       html,
       db,
+      tenantId: tid,
     })
     console.log(`📧 Recordatorio reserva ${reserva.codigo} enviado a ${reserva.email}`)
     return true

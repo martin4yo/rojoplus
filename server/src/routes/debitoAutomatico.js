@@ -232,7 +232,7 @@ router.get('/socios-disponibles', authAdmin, asyncHandler(async (req, res) => {
     where: {
       enviaDebito: true,
       estadoSocioRel: { esSocioActivo: true },
-      tarjetaNumero: { not: null }, // Requiere número de tarjeta
+      NOT: { tarjetaNumero: null }, // Requiere número de tarjeta
       cargos: {
         some: {
           periodoAnio: parseInt(periodoAnio),
@@ -428,7 +428,7 @@ router.post('/archivos/generar', authAdmin, asyncHandler(async (req, res) => {
       id: { in: socioIds.map(id => parseInt(id)) },
       enviaDebito: true,
       estado: 'ACTIVO',
-      tarjetaNumero: { not: null }
+      NOT: { tarjetaNumero: null }
     },
     include: {
       cargos: {
@@ -1126,7 +1126,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
     where: {
       enviaDebito: true,
       estadoSocioRel: { esSocioActivo: true },
-      tarjetaNumero: { not: null }
+      NOT: { tarjetaNumero: null }
     }
   })
 
@@ -1153,7 +1153,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
     by: ['codigoRechazo', 'motivoRechazo'],
     where: {
       estado: 'RECHAZADO',
-      codigoRechazo: { not: null },
+      NOT: { codigoRechazo: null },
       archivo: { periodoAnio: anioActual }
     },
     _count: true,

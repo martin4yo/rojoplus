@@ -1,10 +1,11 @@
 import prisma from '../lib/prisma.js'
 import Handlebars from 'handlebars'
 import { enviarNotificacionPush } from './webPush.js'
-import { getMailConfig } from './email.js'
+import { getMailConfig, enviarEmail } from './email.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
 import { notificarVencimiento as notifWaVencimiento, notificarMora as notifWaMora, obtenerTelefonoSocio, enviarWhatsApp, getWhatsAppConfig, buildVariablesSocio } from './whatsappService.js'
 import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
+import { ensurePortalToken } from '../lib/portalToken.js'
 
 // Caché simple de URLs por tenantId para no repetir queries en el mismo ciclo de jobs
 const _tenantUrlCache = new Map()
@@ -144,11 +145,21 @@ function getPushPayloadForEvent(eventType, notif) {
 }
 
 /**
- * Obtener configuración de modo demo
+ * Obtener configuración de modo demo (con scope de tenant — NUNCA leer global).
+ * Acepta firma legacy `getModoDemo(db)` o nueva `getModoDemo({ db, tenantId })`.
  */
-async function getModoDemo(db) {
+async function getModoDemo(dbOrOpts) {
+  const opts = (dbOrOpts && typeof dbOrOpts === 'object' && ('tenantId' in dbOrOpts || 'db' in dbOrOpts))
+    ? dbOrOpts
+    : { db: dbOrOpts }
+  let client = null
+  if (opts.tenantId) client = createTenantPrisma(opts.tenantId)
+  else if (opts.db) client = opts.db
+  if (!client) {
+    console.warn('[notificacionService] getModoDemo sin tenantId/db — asumiendo inactivo')
+    return { activo: false, email: '' }
+  }
   try {
-    const client = db || prisma
     const [modoDemo, emailDemo] = await Promise.all([
       client.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
       client.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
@@ -174,9 +185,13 @@ function renderTemplate(template, variables) {
 /**
  * Enviar email usando template de la BD
  */
-export async function enviarEmailConTemplate(eventType, to, variables, db = null) {
+export async function enviarEmailConTemplate(eventType, to, variables, db = null, tenantId = null) {
   try {
-    const client = db || prisma
+    // Si viene tenantId, crear cliente tenant-scoped; sino usar db tenant-scoped pasado
+    const client = tenantId ? createTenantPrisma(tenantId) : (db || prisma)
+    if (!tenantId && (!db || db === prisma)) {
+      console.warn(`[enviarEmailConTemplate] sin scope tenant — eventType=${eventType} to=${to}`)
+    }
     // Obtener template de la BD
     const template = await client.emailTemplate.findUnique({
       where: { eventType },
@@ -190,10 +205,10 @@ export async function enviarEmailConTemplate(eventType, to, variables, db = null
     const subject = renderTemplate(template.subject, variables)
     const bodyHtml = renderTemplate(template.bodyHtml, variables)
 
-    // Obtener config SMTP del tenant + modo demo
+    // Obtener config SMTP del tenant + modo demo (scope tenant-safe)
     const [mailConfig, modoDemo] = await Promise.all([
-      getMailConfig(db),
-      getModoDemo(db),
+      getMailConfig({ db, tenantId }),
+      getModoDemo({ db, tenantId }),
     ])
 
     let destinatario = to
@@ -225,9 +240,69 @@ export async function enviarEmailConTemplate(eventType, to, variables, db = null
 // ============================================================================
 
 /**
- * Programar notificación para envío posterior
+ * Constantes de retry/backoff para el procesador de cola.
+ */
+export const NOTIF_MAX_INTENTOS = 5
+const NOTIF_BACKOFF_BASE_MIN = 5  // base del backoff: 5 min
+// Backoff por intento: 5, 10, 20, 40, 80 min — total ~2.5hs antes de marcar FALLIDO_DEFINITIVO
+function calcularProximoIntento(intentos) {
+  const minutos = NOTIF_BACKOFF_BASE_MIN * Math.pow(2, intentos)
+  const d = new Date()
+  d.setMinutes(d.getMinutes() + minutos)
+  return d
+}
+
+/**
+ * Encola una notificación PRE-RENDERIZADA para envío diferido por el cron.
+ * Diferencia con `programarNotificacion`:
+ *   - `programarNotificacion`: solo guarda metadata, el procesador renderiza con template.
+ *   - `encolarNotificacion`: el caller ya renderizó `asunto`/`cuerpo`; el procesador
+ *     solo envía. Útil cuando el template viene de fuentes mixtas (EmailTemplate +
+ *     Configuracion para WA).
+ *
+ * Retorna el NotificacionLog creado.
+ */
+export async function encolarNotificacion({
+  tenantId,
+  tipo,
+  eventType,
+  destinatario,
+  socioId = null,
+  cargoId = null,
+  asunto = null,
+  cuerpo,
+  fechaProgramado = new Date(),
+  metadata = {},
+}) {
+  if (!tenantId) throw new Error(`encolarNotificacion: tenantId requerido (eventType=${eventType})`)
+  if (!tipo || !['EMAIL', 'WHATSAPP'].includes(tipo)) throw new Error(`encolarNotificacion: tipo inválido (${tipo})`)
+  if (!destinatario) throw new Error(`encolarNotificacion: destinatario requerido (eventType=${eventType})`)
+  if (!cuerpo) throw new Error(`encolarNotificacion: cuerpo requerido (eventType=${eventType})`)
+
+  return prisma.notificacionLog.create({
+    data: {
+      tenantId,
+      tipo,
+      eventType: eventType || 'OTRO',
+      destinatario,
+      socioId,
+      cargoId,
+      asunto,
+      cuerpo,
+      fechaProgramado,
+      metadata: JSON.stringify(metadata),
+      enviado: false,
+      intentos: 0,
+    },
+  })
+}
+
+/**
+ * Programar notificación para envío posterior.
+ * IMPORTANTE: `tenantId` es obligatorio (NotificacionLog.tenantId es NOT NULL).
  */
 export async function programarNotificacion({
+  tenantId,
   tipo = 'EMAIL',
   eventType,
   destinatario,
@@ -238,9 +313,13 @@ export async function programarNotificacion({
   fechaProgramado = new Date(),
   metadata = {},
 }) {
+  if (!tenantId) {
+    throw new Error(`programarNotificacion: tenantId requerido (eventType=${eventType}, destinatario=${destinatario})`)
+  }
   try {
     const notificacion = await prisma.notificacionLog.create({
       data: {
+        tenantId,
         tipo,
         eventType,
         destinatario,
@@ -255,7 +334,7 @@ export async function programarNotificacion({
       },
     })
 
-    console.log(`📅 Notificación programada: ${eventType} para ${destinatario} el ${fechaProgramado}`)
+    console.log(`📅 Notificación programada: ${eventType} para ${destinatario} el ${fechaProgramado} (tenant=${tenantId})`)
     return notificacion
   } catch (error) {
     console.error('Error programando notificación:', error.message)
@@ -270,52 +349,79 @@ export async function procesarNotificacionesPendientes() {
   try {
     const ahora = new Date()
 
-    // Buscar notificaciones pendientes cuya fecha programada ya pasó
+    // Buscar notificaciones pendientes cuya fecha programada ya pasó.
+    // Reintentos limitados a NOTIF_MAX_INTENTOS (5).
     const notificacionesPendientes = await prisma.notificacionLog.findMany({
       where: {
         enviado: false,
-        fechaProgramado: {
-          lte: ahora,
-        },
-        intentos: {
-          lt: 3, // Máximo 3 intentos
-        },
+        fechaProgramado: { lte: ahora },
+        intentos: { lt: NOTIF_MAX_INTENTOS },
       },
       include: {
-        socio: true,
+        socio: { select: { id: true, nroSocio: true, apellidoNombre: true, notifEmail: true, notifWhatsapp: true, notificarMorosidad: true } },
         cargo: true,
       },
-      take: 50, // Procesar máximo 50 por ejecución
+      take: 50,
     })
 
     console.log(`📬 Procesando ${notificacionesPendientes.length} notificaciones pendientes...`)
 
     const resultados = await Promise.allSettled(
       notificacionesPendientes.map(async (notif) => {
+        const proximosIntentos = notif.intentos + 1
         try {
-          // Crear cliente scoped al tenant de la notificación
           const tenantDb = notif.tenantId ? createTenantPrisma(notif.tenantId) : null
-          // Intentar enviar email
-          if (notif.tipo === 'EMAIL') {
-            // Respetar preferencia de canal del socio
-            if (notif.socio?.notifEmail === false) {
-              await prisma.notificacionLog.update({
-                where: { id: notif.id },
-                data: { enviado: true, fechaEnvio: new Date(), intentos: notif.intentos + 1, error: 'Canal email deshabilitado por el socio' },
-              })
-              return { success: true, id: notif.id, omitido: true }
-            }
-            const metadata = notif.metadata ? JSON.parse(notif.metadata) : {}
-            await enviarEmailConTemplate(notif.eventType, notif.destinatario, metadata, tenantDb)
+
+          // Respeto de preferencias del socio (opt-out por canal)
+          if (notif.tipo === 'EMAIL' && notif.socio?.notifEmail === false) {
+            await prisma.notificacionLog.update({
+              where: { id: notif.id },
+              data: { enviado: true, fechaEnvio: new Date(), intentos: proximosIntentos, error: 'Canal email deshabilitado por el socio' },
+            })
+            return { success: true, id: notif.id, omitido: true }
+          }
+          if (notif.tipo === 'WHATSAPP' && notif.socio?.notifWhatsapp === false) {
+            await prisma.notificacionLog.update({
+              where: { id: notif.id },
+              data: { enviado: true, fechaEnvio: new Date(), intentos: proximosIntentos, error: 'Canal WhatsApp deshabilitado por el socio' },
+            })
+            return { success: true, id: notif.id, omitido: true }
           }
 
-          // También enviar push notification si el socio tiene suscripción activa
+          // Envío según tipo
+          if (notif.tipo === 'EMAIL') {
+            // Si vino con cuerpo pre-renderizado (encolado por el flujo de morosidad), enviarlo directo.
+            // Si no, fallback al renderizado por template (flujo legacy con metadata).
+            if (notif.cuerpo) {
+              await enviarEmail({
+                tenantId: notif.tenantId,
+                to: notif.destinatario,
+                subject: notif.asunto || '(sin asunto)',
+                html: notif.cuerpo,
+              })
+            } else {
+              const metadata = notif.metadata ? JSON.parse(notif.metadata) : {}
+              await enviarEmailConTemplate(notif.eventType, notif.destinatario, metadata, tenantDb, notif.tenantId)
+            }
+          } else if (notif.tipo === 'WHATSAPP') {
+            const r = await enviarWhatsApp({
+              tenantId: notif.tenantId,
+              telefono: notif.destinatario,
+              texto: notif.cuerpo,
+              ignorarHorario: false,
+            })
+            if (!r || !r.enviado) {
+              throw new Error(r?.motivo || 'WhatsApp no enviado')
+            }
+          } else {
+            throw new Error(`Tipo de notificación no soportado: ${notif.tipo}`)
+          }
+
+          // Push notification adicional (best-effort)
           if (notif.socioId) {
             try {
               const pushPayload = getPushPayloadForEvent(notif.eventType, notif)
-              if (pushPayload) {
-                await enviarNotificacionPush(notif.socioId, pushPayload)
-              }
+              if (pushPayload) await enviarNotificacionPush(notif.socioId, pushPayload)
             } catch (pushError) {
               console.log(`Push notification no enviada para ${notif.socioId}: ${pushError.message}`)
             }
@@ -324,35 +430,47 @@ export async function procesarNotificacionesPendientes() {
           // Marcar como enviado
           await prisma.notificacionLog.update({
             where: { id: notif.id },
-            data: {
-              enviado: true,
-              fechaEnvio: new Date(),
-              intentos: notif.intentos + 1,
-            },
+            data: { enviado: true, fechaEnvio: new Date(), intentos: proximosIntentos, error: null },
           })
 
           return { success: true, id: notif.id }
         } catch (error) {
-          // Registrar error y aumentar contador de intentos
-          await prisma.notificacionLog.update({
-            where: { id: notif.id },
-            data: {
-              error: error.message,
-              intentos: notif.intentos + 1,
-            },
-          })
-
-          return { success: false, id: notif.id, error: error.message }
+          const agotado = proximosIntentos >= NOTIF_MAX_INTENTOS
+          // Si llegó al máximo: marcar como terminal (enviado=true para no volver a intentar,
+          // pero con error visible para reportes).
+          if (agotado) {
+            await prisma.notificacionLog.update({
+              where: { id: notif.id },
+              data: {
+                enviado: true, // terminal: no se vuelve a intentar
+                intentos: proximosIntentos,
+                error: `MAX_INTENTOS_AGOTADO (${proximosIntentos}/${NOTIF_MAX_INTENTOS}): ${error.message}`,
+              },
+            })
+          } else {
+            // Reintento con backoff exponencial: 5min × 2^intentos
+            const proxima = calcularProximoIntento(proximosIntentos)
+            await prisma.notificacionLog.update({
+              where: { id: notif.id },
+              data: {
+                intentos: proximosIntentos,
+                error: error.message,
+                fechaProgramado: proxima,
+              },
+            })
+          }
+          return { success: false, id: notif.id, error: error.message, agotado }
         }
       })
     )
 
     const exitosos = resultados.filter((r) => r.status === 'fulfilled' && r.value.success).length
-    const fallidos = resultados.filter((r) => r.status === 'rejected' || !r.value.success).length
+    const fallidos = resultados.filter((r) => r.status === 'fulfilled' && !r.value.success).length
+    const agotados = resultados.filter((r) => r.status === 'fulfilled' && r.value.agotado).length
 
-    console.log(`✅ Notificaciones enviadas: ${exitosos} exitosas, ${fallidos} fallidas`)
+    console.log(`✅ Notificaciones — enviadas: ${exitosos}, reintento programado: ${fallidos - agotados}, agotaron reintentos: ${agotados}`)
 
-    return { exitosos, fallidos, total: notificacionesPendientes.length }
+    return { exitosos, fallidos, agotados, total: notificacionesPendientes.length }
   } catch (error) {
     console.error('Error procesando notificaciones pendientes:', error.message)
     throw error
@@ -394,7 +512,7 @@ export async function notificarCuotaProximaVencer(cargo) {
       montoTotal: cargo.montoTotal.toString(),
       fechaVencimiento: fechaVencimiento.toLocaleDateString('es-AR'),
       diasRestantes: diasRestantes.toString(),
-      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${destinatario.tokenPortal}?pagar=${cargo.id}`,
+      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${await ensurePortalToken(destinatario)}?pagar=${cargo.id}`,
       // Si la cuota es de un miembro de la familia, incluimos su nombre
       socioCuota: destinatario.id !== socio.id ? socio.apellidoNombre : null,
     }
@@ -402,6 +520,7 @@ export async function notificarCuotaProximaVencer(cargo) {
     // Email (al titular si aplica)
     if (destinatario.email && destinatario.notifEmail !== false) {
       await programarNotificacion({
+        tenantId: destinatario.tenantId,
         tipo: 'EMAIL',
         eventType: 'CUOTA_PROX_VENCER',
         destinatario: destinatario.email,
@@ -462,13 +581,14 @@ export async function notificarCuotaVencida(cargo) {
       cargoDescripcion: cargo.descripcion || 'Cuota mensual',
       montoTotal: cargo.montoTotal.toString(),
       fechaVencimiento: new Date(cargo.fechaVencimiento).toLocaleDateString('es-AR'),
-      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${destinatario.tokenPortal}?pagar=${cargo.id}`,
+      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${await ensurePortalToken(destinatario)}?pagar=${cargo.id}`,
       socioCuota: destinatario.id !== socio.id ? socio.apellidoNombre : null,
     }
 
     // Email (al titular si aplica)
     if (destinatario.email && destinatario.notifEmail !== false) {
       await programarNotificacion({
+        tenantId: destinatario.tenantId,
         tipo: 'EMAIL',
         eventType: 'CUOTA_VENCIDA',
         destinatario: destinatario.email,
@@ -562,7 +682,7 @@ export async function notificarMorosidad(socioId) {
       nroSocio: destinatario.nroSocio,
       cantidadCuotas: cuotasVencidas.length.toString(),
       totalAdeudado: totalAdeudado.toFixed(2),
-      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${destinatario.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(destinatario.tenantId)}/portal-socio/${await ensurePortalToken(destinatario)}`,
       cuotas: cuotasVencidas.map((c) => ({
         descripcion: c.descripcion,
         monto: c.montoTotal.toString(),
@@ -573,6 +693,7 @@ export async function notificarMorosidad(socioId) {
     // Email (al titular si aplica)
     if (destinatario.email && destinatario.notifEmail !== false) {
       await programarNotificacion({
+        tenantId: destinatario.tenantId,
         tipo: 'EMAIL',
         eventType: 'MOROSIDAD',
         destinatario: destinatario.email,
@@ -634,10 +755,11 @@ export async function notificarInscripcionConfirmada(inscripcionId) {
       actividad: inscripcion.categoriaActividad.actividad.nombre,
       categoria: inscripcion.categoriaActividad.nombre,
       fechaInicio: new Date(inscripcion.fechaInicio).toLocaleDateString('es-AR'),
-      linkPortal: `${await getTenantUrl(inscripcion.socio.tenantId)}/portal-socio/${inscripcion.socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(inscripcion.socio.tenantId)}/portal-socio/${await ensurePortalToken(inscripcion.socio)}`,
     }
 
     await programarNotificacion({
+      tenantId: inscripcion.socio.tenantId,
       tipo: 'EMAIL',
       eventType: 'INSCRIPCION_CONFIRMADA',
       destinatario: inscripcion.socio.email,
@@ -676,11 +798,12 @@ export async function notificarBienvenida(socioId) {
       socioNombre: socio.apellidoNombre,
       nroSocio: socio.nroSocio,
       fechaAlta: socio.fechaAlta ? new Date(socio.fechaAlta).toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR'),
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${await ensurePortalToken(socio)}`,
       linkMiQR: `${await getTenantUrl(socio.tenantId)}/mi-qr`,
     }
 
     await programarNotificacion({
+      tenantId: socio.tenantId,
       tipo: 'EMAIL',
       eventType: 'BIENVENIDA',
       destinatario: socio.email,
@@ -925,10 +1048,11 @@ export async function notificarConvocatoriaPartido(partidoId, socioId) {
       hora: partido.hora || '',
       lugar: partido.lugar || '',
       esLocal: partido.esLocal ? 'LOCAL' : 'VISITANTE',
-      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${socio.tokenPortal}`,
+      linkPortal: `${await getTenantUrl(socio.tenantId)}/portal-socio/${await ensurePortalToken(socio)}`,
     }
 
     await programarNotificacion({
+      tenantId: socio.tenantId,
       tipo: 'EMAIL',
       eventType: 'CONVOCATORIA_PARTIDO',
       destinatario: socio.email,
@@ -989,6 +1113,7 @@ export async function notificarRecordatorioPartido(partidoId, socioId) {
     }
 
     await programarNotificacion({
+      tenantId: socio.tenantId,
       tipo: 'EMAIL',
       eventType: 'RECORDATORIO_PARTIDO',
       destinatario: socio.email,
@@ -1131,6 +1256,7 @@ export async function notificarNuevoEntrenamiento(entrenamientoId) {
       }
 
       await programarNotificacion({
+        tenantId: inscripcion.socio.tenantId,
         tipo: 'EMAIL',
         eventType: 'NUEVO_ENTRENAMIENTO',
         destinatario: inscripcion.socio.email,
@@ -1216,6 +1342,7 @@ export async function notificarCancelacionEntrenamiento(entrenamientoId, db) {
       // Email
       if (socio.email) {
         await programarNotificacion({
+          tenantId: socio.tenantId,
           tipo: 'EMAIL',
           eventType: 'CANCELACION_ENTRENAMIENTO',
           destinatario: socio.email,
@@ -1300,6 +1427,7 @@ export async function notificarPasajeCategoria(socioId, categoriaAnterior, categ
     }
 
     await programarNotificacion({
+      tenantId: socio.tenantId,
       tipo: 'EMAIL',
       eventType: 'PASAJE_CATEGORIA',
       destinatario: destinatarioEmail,

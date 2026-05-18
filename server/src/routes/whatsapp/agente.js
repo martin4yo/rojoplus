@@ -1,553 +1,191 @@
 /**
- * Agente de IA para WhatsApp — multi-proveedor (Anthropic / OpenAI)
- * Se invoca desde webhook.js cuando llega un mensaje entrante.
+ * Agente de WhatsApp — proxy al AXIO Hub.
  *
- * Config del tenant (tabla Configuracion):
- *   AI_PROVIDER       — 'anthropic' | 'openai'  (default: 'anthropic')
- *   AI_MODEL_TIER     — 'rapido' | 'estandar' | 'premium'  (default: 'rapido')
- *   AI_API_KEY        — API key propia del tenant (si no, usa process.env.ANTHROPIC_API_KEY)
- *   AI_MODEL_OVERRIDE — Modelo exacto (vacío = usar tier mapping)
+ * Antes este archivo hablaba directo con Anthropic/OpenAI y mantenía sus
+ * propios TOOLS, historial e instrucciones. Ahora delega todo al hub:
+ *  1. El hub elige el tool apropiado (Capa 2.6 tool-calling).
+ *  2. Acá se ejecuta el tool localmente via ActionExecutor.
+ *  3. El message del executor se manda por WhatsApp con formato adaptado
+ *     (la conversión Markdown→WA se hace en whatsappService.enviarWhatsApp).
+ *
+ * Beneficios: observabilidad y billing centralizados en el hub, una sola
+ * fuente de verdad para los tools (axio/tools/socioTools.js), unificación
+ * con el web chat.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import { enviarWhatsApp } from '../../services/whatsappService.js'
-import { resolverModelo } from '../../config/aiModels.js'
-import prisma from '../../lib/prisma.js'
+import { callHub } from '../../axio/hubClient.js'
+import { getToolsForRole } from '../../axio/tools/index.js'
+import { ACCIONES, ROLES } from '../../services/aiConstants.js'
+import ActionExecutor from '../../services/actionExecutor.js'
 
-const MAX_MENSAJES_HISTORIAL = 20
-const MAX_TOOL_ITERATIONS = 5
+// Tools cuyos handlers NO requieren socio registrado. Cuando llega un mensaje
+// de un número no registrado exponemos solo este subset — el resto tira error
+// "No hay socio en el contexto" si se invocara.
+const TOOLS_NO_SOCIO = new Set([
+  ACCIONES.INFO_CLUB,
+  ACCIONES.ENVIAR_LINK_WEB,
+  ACCIONES.DERIVAR_HUMANO,
+])
 
-// ─── Config de IA por tenant ──────────────────────────────────────────────────
-
-async function cargarConfigIA(db) {
-  const claves = ['AI_PROVIDER', 'AI_MODEL_TIER', 'AI_API_KEY', 'AI_MODEL_OVERRIDE']
-  const configs = await db.configuracion.findMany({
-    where: { clave: { in: claves } }
-  }).catch(() => [])
-
-  const cfg = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
-  const provider = cfg.AI_PROVIDER || 'anthropic'
-  const tier = cfg.AI_MODEL_TIER || 'rapido'
-  const override = cfg.AI_MODEL_OVERRIDE || null
-
-  // API key: usa la del tenant, o la global del servidor como fallback
-  const apiKey = cfg.AI_API_KEY ||
-    (provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY) ||
-    null
-
-  return {
-    provider,
-    model: resolverModelo(provider, tier, override),
-    apiKey,
-  }
-}
-
-// ─── Tools disponibles ────────────────────────────────────────────────────────
-
-const TOOLS = [
-  {
-    name: 'consultar_deuda',
-    description: 'Obtiene el resumen de deuda del socio: cuotas impagas, total adeudado y fechas de vencimiento.',
-    input_schema: { type: 'object', properties: {}, required: [] }
-  },
-  {
-    name: 'consultar_ultimos_movimientos',
-    description: 'Obtiene los últimos movimientos de cuenta del socio (pagos y cargos recientes).',
-    input_schema: {
-      type: 'object',
-      properties: {
-        limite: { type: 'number', description: 'Cantidad de movimientos (default 5)' }
-      },
-      required: []
-    }
-  },
-  {
-    name: 'consultar_actividades',
-    description: 'Lista las actividades deportivas y sus horarios en las que el socio está inscripto.',
-    input_schema: { type: 'object', properties: {}, required: [] }
-  },
-  {
-    name: 'enviar_link_portal',
-    description: 'Genera y envía al socio el link de acceso a su portal personal (ver cuotas, pagos, datos). No confundir con el QR de beneficios en comercios.',
-    input_schema: { type: 'object', properties: {}, required: [] }
-  },
-  {
-    name: 'enviar_qr_comercios',
-    description: 'Envía al socio el link/QR para presentar en comercios adheridos y obtener descuentos o beneficios. Es distinto al portal personal.',
-    input_schema: { type: 'object', properties: {}, required: [] }
-  },
-  {
-    name: 'enviar_link_web',
-    description: 'Envía al socio el link al sitio web público del club.',
-    input_schema: { type: 'object', properties: {}, required: [] }
-  },
-  {
-    name: 'info_club',
-    description: 'Obtiene información general del club: horarios de atención, dirección, teléfono de contacto.',
-    input_schema: { type: 'object', properties: {}, required: [] }
-  },
-  {
-    name: 'derivar_humano',
-    description: 'Usá esta tool cuando no podés resolver la consulta del socio y necesita hablar con una persona.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        motivo: { type: 'string', description: 'Breve descripción de la consulta que no pudiste resolver' }
-      },
-      required: ['motivo']
-    }
-  }
-]
-
-// ─── Handlers de tools ────────────────────────────────────────────────────────
-
-async function ejecutarTool(name, input, { db, socio, tenantId, telefono }) {
-  switch (name) {
-
-    case 'consultar_deuda': {
-      if (!socio) return { error: 'No estás registrado como socio del club.' }
-      const cargos = await db.cargo.findMany({
-        where: { socioId: socio.id, estado: { in: ['PENDIENTE', 'VENCIDA'] } },
-        orderBy: { fechaVencimiento: 'asc' },
-        take: 10
-      })
-      const total = cargos.reduce((acc, c) => acc + Number(c.montoTotal), 0)
-      return {
-        cuotasImpagas: cargos.length,
-        totalDeuda: total,
-        cuotas: cargos.map(c => ({
-          descripcion: c.descripcion,
-          importe: Number(c.montoTotal),
-          vencimiento: c.fechaVencimiento ? new Date(c.fechaVencimiento).toLocaleDateString('es-AR') : 'Sin vencimiento',
-          estado: c.estado
-        }))
-      }
-    }
-
-    case 'consultar_ultimos_movimientos': {
-      if (!socio) return { error: 'No estás registrado como socio del club.' }
-      const limite = input.limite || 5
-      const pagos = await db.pago.findMany({
-        where: { socioId: socio.id },
-        orderBy: { fecha: 'desc' },
-        take: limite
-      }).catch(() => [])
-      return {
-        movimientos: pagos.map(p => ({
-          fecha: new Date(p.fecha).toLocaleDateString('es-AR'),
-          concepto: p.concepto || 'Pago',
-          importe: Number(p.montoTotal || 0),
-          tipo: 'PAGO'
-        }))
-      }
-    }
-
-    case 'consultar_actividades': {
-      if (!socio) return { error: 'No estás registrado como socio del club.' }
-      const hoy = new Date()
-      const inscripciones = await db.inscripcion.findMany({
-        where: {
-          socioId: socio.id,
-          estado: 'ACTIVA',
-          OR: [{ fechaFin: null }, { fechaFin: { gte: hoy } }]
-        },
-        include: {
-          categoriaActividad: {
-            include: { actividad: { select: { nombre: true } } }
-          }
-        }
-      }).catch(() => [])
-      return {
-        actividades: inscripciones.map(i => ({
-          actividad: i.categoriaActividad?.actividad?.nombre,
-          categoria: i.categoriaActividad?.nombre,
-          horario: i.categoriaActividad?.horarioEntrenamiento,
-          dias: i.categoriaActividad?.diasEntrenamiento,
-        }))
-      }
-    }
-
-    case 'enviar_link_portal': {
-      if (!socio) return { error: 'No estás registrado como socio del club.' }
-      try {
-        const crypto = await import('crypto')
-        const token = crypto.randomBytes(32).toString('hex')
-        const expira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-
-        await db.socio.update({
-          where: { id: socio.id },
-          data: { tokenPortal: token, tokenPortalExpira: expira }
-        })
-
-        // Construir URL con el subdominio del tenant
-        const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
-        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } }).catch(() => null)
-        const baseUrl = tenant?.slug
-          ? `https://${tenant.slug}.${appDomain}`
-          : (process.env.FRONTEND_URL || `https://${appDomain}`)
-        const link = `${baseUrl}/portal-socio/${token}`
-
-        // Enviar el link por WhatsApp directamente
-        await enviarWhatsApp({
-          db,
-          telefono,
-          texto: `🔗 Acá está tu link de acceso al portal:\n${link}\n\n_Válido hasta el ${expira.toLocaleDateString('es-AR')}. No lo compartas._`,
-          ignorarHorario: true,
-        })
-
-        return { enviado: true, expira: expira.toLocaleDateString('es-AR') }
-      } catch (err) {
-        return { error: 'No se pudo generar el link: ' + err.message }
-      }
-    }
-
-    case 'enviar_qr_comercios': {
-      if (!socio) return { error: 'No estás registrado como socio del club.' }
-      try {
-        const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
-        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } }).catch(() => null)
-        const baseUrl = tenant?.slug
-          ? `https://${tenant.slug}.${appDomain}`
-          : (process.env.FRONTEND_URL || `https://${appDomain}`)
-        const link = `${baseUrl}/portal-socio/${socio.tokenPortal}`
-
-        await enviarWhatsApp({
-          db,
-          telefono,
-          texto: `🎟 Tu QR para usar beneficios en comercios adheridos:\n${link}\n\n_Mostrá este link o el QR en el comercio para acceder a tu descuento._`,
-          ignorarHorario: true,
-        })
-        return { enviado: true }
-      } catch (err) {
-        return { error: 'No se pudo generar el QR: ' + err.message }
-      }
-    }
-
-    case 'enviar_link_web': {
-      try {
-        const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
-        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true, nombre: true } }).catch(() => null)
-        const url = tenant?.slug
-          ? `https://${tenant.slug}.${appDomain}`
-          : (process.env.FRONTEND_URL || `https://${appDomain}`)
-
-        await enviarWhatsApp({
-          db,
-          telefono,
-          texto: `🌐 Sitio web del club:\n${url}`,
-          ignorarHorario: true,
-        })
-        return { enviado: true, url }
-      } catch (err) {
-        return { error: 'No se pudo obtener el link: ' + err.message }
-      }
-    }
-
-    case 'info_club': {
-      const configs = await db.configuracion.findMany({
-        where: {
-          clave: { in: ['HORARIO_ATENCION', 'TELEFONO_CONTACTO', 'DIRECCION', 'EMAIL_CONTACTO', 'NOMBRE_CLUB'] }
-        }
-      })
-      return Object.fromEntries(configs.map(c => [c.clave, c.valor]))
-    }
-
-    case 'derivar_humano': {
-      console.log(`[WhatsApp Agente] Derivación para tenant ${tenantId}:`, input.motivo)
-      return { derivado: true, mensaje: 'Se notificó a la administración. Pronto te contactarán.' }
-    }
-
-    default:
-      return { error: `Tool desconocida: ${name}` }
-  }
-}
-
-// ─── Registro de uso de IA ────────────────────────────────────────────────────
-
-function registrarUsoIA(db, tenantId, provider, model, inputTokens, outputTokens) {
-  if (!db || !tenantId || (!inputTokens && !outputTokens)) return
-  if (!db.aiUsageLog) return
-  db.aiUsageLog.create({
-    data: { tenantId, provider, model, inputTokens, outputTokens }
-  }).catch(err => console.error('[WhatsApp Agente] Error registrando uso IA:', err.message))
-}
-
-// ─── Historial de conversación (en memoria, normalizado) ─────────────────────
-// Se guarda como pares {role, content: string} para compatibilidad entre proveedores.
-// Las tool calls intermedias no se persisten en el historial.
-
-const historiales = new Map()
-
-function getHistorial(tenantId, telefono) {
-  return historiales.get(`${tenantId}:${telefono}`) || []
-}
-
-function guardarHistorial(tenantId, telefono, mensajes) {
-  // Normalizar a pares user/assistant con contenido de texto plano
-  const simples = mensajes
-    .filter(m => m.role === 'user' || m.role === 'assistant')
-    .map(m => {
-      if (typeof m.content === 'string') return m
-      // Anthropic: content es array de blocks → extraer el texto
-      if (m.role === 'assistant' && Array.isArray(m.content)) {
-        const textBlock = m.content.find(b => b.type === 'text')
-        return textBlock ? { role: 'assistant', content: textBlock.text } : null
-      }
-      // User con array (tool_results) → descartar, no es texto del usuario
-      if (m.role === 'user' && Array.isArray(m.content)) return null
-      return null
-    })
-    .filter(Boolean)
-    .slice(-MAX_MENSAJES_HISTORIAL)
-  historiales.set(`${tenantId}:${telefono}`, simples)
-}
-
-// Limpiar historiales cuando el Map crece demasiado
+// Set en memoria de pares (tenantId:telefono) que ya recibieron un saludo
+// en esta sesión del proceso. Se reinicia al reiniciar el server — está bien,
+// el peor caso es saludar dos veces si el server se reinicia mid-conversación.
+const _saludados = new Set()
+// Limpieza preventiva si crece mucho (1k contactos por proceso es razonable).
 setInterval(() => {
-  if (historiales.size > 1000) historiales.clear()
+  if (_saludados.size > 1000) _saludados.clear()
 }, 60 * 60 * 1000)
 
-// ─── System prompt ────────────────────────────────────────────────────────────
+function primerNombre(apellidoNombre) {
+  if (!apellidoNombre) return null
+  // Heurística clubix: "APELLIDO Nombre Otro" — tomamos la primera palabra
+  // que no esté en mayúsculas completas (esa es el apellido).
+  const tokens = apellidoNombre.trim().split(/\s+/)
+  const nombre = tokens.find((t) => t !== t.toUpperCase()) || tokens[1] || tokens[0]
+  // Capitalizar prolijo
+  return nombre.charAt(0).toUpperCase() + nombre.slice(1).toLowerCase()
+}
 
-async function construirSystemPrompt(db, socio, esPrimerMensaje) {
-  const hoy = new Date().toLocaleDateString('es-AR', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  })
-
+async function cargarConfigBot(db) {
   const configs = await db.configuracion.findMany({
     where: {
-      clave: { in: ['NOMBRE_CLUB', 'nombre', 'WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT', 'WA_AGENT_SYSTEM_PROMPT_EXTRA'] }
-    }
-  }).catch(() => [])
-  const cfg = Object.fromEntries(configs.map(c => [c.clave, c.valor]))
-
-  // Si el tenant definió un prompt completo, usarlo directamente (solo append fecha e info socio)
-  if (cfg.WA_AGENT_SYSTEM_PROMPT) {
-    const extra = cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA ? `\n\n${cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA}` : ''
-    return `${cfg.WA_AGENT_SYSTEM_PROMPT}\n\nHoy es ${hoy}.\n${extra}`
-  }
-
-  const nombreClub = cfg.NOMBRE_CLUB || cfg.nombre || 'el club'
-  const nombreBot = cfg.WA_AGENT_NOMBRE || 'Asistente'
-
-  const infoSocio = socio
-    ? `Estás hablando con *${socio.apellidoNombre}*, socio Nº ${socio.nroSocio}${socio.tipoSocioRel ? `, tipo ${socio.tipoSocioRel.nombre}` : ''}.`
-    : `El número no está registrado como socio. Podés dar información general del club pero no datos personales.`
-
-  const instruccionSaludo = esPrimerMensaje
-    ? `- Es el PRIMER mensaje de esta conversación. Saludá al socio por su nombre (si está registrado) o de forma genérica, presentate como ${nombreBot} y luego respondé su consulta en el mismo mensaje.`
-    : `- La conversación ya está en curso. No te presentes de nuevo ni repitas saludos.`
-
-  const promptExtra = cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA
-    ? `\nInstrucciones adicionales del club:\n${cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA}`
-    : ''
-
-  return `Sos *${nombreBot}*, el asistente virtual de *${nombreClub}*, respondés consultas por WhatsApp.
-Hoy es ${hoy}.
-
-${infoSocio}
-
-Instrucciones:
-- Respondés en español rioplatense (vos, dale, etc.), de forma amigable y concisa. No usás "che".
-- Máximo 3 párrafos cortos. Sin markdown complejo (WhatsApp solo soporta *negrita*, _cursiva_).
-- Nunca inventás información. Siempre usás las tools para consultar datos reales.
-- Si no podés resolver algo, usás la tool derivar_humano.
-- Si el socio pide hablar con una persona, usás derivar_humano.
-- No discutís precios ni políticas internas — solo informás lo que está en el sistema.
-${instruccionSaludo}
-
-Temas permitidos (ÚNICAMENTE estos):
-- Deudas, cuotas y pagos del socio
-- Actividades e inscripciones
-- Acceso al portal del socio
-- QR para beneficios en comercios adheridos
-- Información general del club (horarios, dirección, contacto) y link al sitio web
-- Reserva de espacios
-- Derivación a administración
-
-Si el socio pregunta qué podés hacer o en qué podés ayudar, respondé:
-"Puedo ayudarte con:\n• Ver tus cuotas y deudas\n• Consultar tus actividades\n• Enviarte el link de tu portal personal\n• Información del club (horarios, dirección)\n• Conectarte con administración\n\n¿En qué te ayudo?"
-
-Si el mensaje NO tiene relación con la gestión del club (clima, noticias, recetas, chistes, preguntas generales, etc.), respondé EXACTAMENTE esto sin usar ninguna tool:
-"Solo puedo ayudarte con consultas sobre el club. Para eso estoy acá 😊"
-No des explicaciones adicionales ni te disculpes.${promptExtra}`
-}
-
-// ─── Provider: Anthropic ──────────────────────────────────────────────────────
-
-async function procesarConAnthropic({ iaConfig, systemPrompt, historial, texto, context }) {
-  const { tenantId, telefono, db } = context
-  const client = new Anthropic({ apiKey: iaConfig.apiKey })
-
-  let messages = [...historial, { role: 'user', content: texto }]
-  let respuestaFinal = null
-  let totalInputTokens = 0
-  let totalOutputTokens = 0
-
-  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const response = await client.messages.create({
-      model: iaConfig.model,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages,
-      tools: TOOLS,
-    })
-
-    totalInputTokens += response.usage?.input_tokens || 0
-    totalOutputTokens += response.usage?.output_tokens || 0
-
-    if (response.stop_reason === 'end_turn') {
-      const bloque = response.content.find(b => b.type === 'text')
-      respuestaFinal = bloque?.text || 'No pude procesar tu consulta.'
-      messages.push({ role: 'assistant', content: response.content })
-      break
-    }
-
-    if (response.stop_reason === 'tool_use') {
-      const toolUses = response.content.filter(b => b.type === 'tool_use')
-      const toolResults = []
-
-      for (const tu of toolUses) {
-        const resultado = await ejecutarTool(tu.name, tu.input, context)
-        toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(resultado) })
-      }
-
-      messages.push({ role: 'assistant', content: response.content })
-      messages.push({ role: 'user', content: toolResults })
-      continue
-    }
-
-    break
-  }
-
-  // Persistir solo los pares texto user/assistant
-  guardarHistorial(tenantId, telefono, messages)
-
-  // Registrar uso de tokens
-  registrarUsoIA(db, tenantId, iaConfig.provider, iaConfig.model, totalInputTokens, totalOutputTokens)
-
-  return respuestaFinal || 'Tuve un problema procesando tu consulta. Por favor intentá de nuevo.'
-}
-
-// ─── Provider: OpenAI ─────────────────────────────────────────────────────────
-
-async function procesarConOpenAI({ iaConfig, systemPrompt, historial, texto, context }) {
-  const { tenantId, telefono, db } = context
-
-  // OpenAI espera el system prompt dentro del array de mensajes
-  let messages = [
-    { role: 'system', content: systemPrompt },
-    ...historial,
-    { role: 'user', content: texto }
-  ]
-
-  const tools = TOOLS.map(t => ({
-    type: 'function',
-    function: { name: t.name, description: t.description, parameters: t.input_schema }
-  }))
-
-  let respuestaFinal = null
-  let totalInputTokens = 0
-  let totalOutputTokens = 0
-
-  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${iaConfig.apiKey}`,
-        'Content-Type': 'application/json',
+      clave: {
+        in: ['WA_AGENT_NOMBRE', 'WA_AGENT_SYSTEM_PROMPT_EXTRA', 'NOMBRE_CLUB', 'nombre'],
       },
-      body: JSON.stringify({
-        model: iaConfig.model,
-        max_tokens: 1024,
-        messages,
-        tools,
-        tool_choice: 'auto',
-      })
-    })
-
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '')
-      throw new Error(`OpenAI API error ${res.status}: ${errBody}`)
-    }
-
-    const data = await res.json()
-    const choice = data.choices?.[0]
-
-    totalInputTokens += data.usage?.prompt_tokens || 0
-    totalOutputTokens += data.usage?.completion_tokens || 0
-
-    if (choice?.finish_reason === 'stop') {
-      respuestaFinal = choice.message.content
-      messages.push({ role: 'assistant', content: respuestaFinal })
-      break
-    }
-
-    if (choice?.finish_reason === 'tool_calls') {
-      const assistantMsg = choice.message
-      messages.push(assistantMsg)
-
-      for (const tc of (assistantMsg.tool_calls || [])) {
-        let input = {}
-        try { input = JSON.parse(tc.function.arguments) } catch {}
-        const resultado = await ejecutarTool(tc.function.name, input, context)
-        messages.push({
-          role: 'tool',
-          tool_call_id: tc.id,
-          content: JSON.stringify(resultado),
-        })
-      }
-      continue
-    }
-
-    break
+    },
+  }).catch(() => [])
+  const cfg = Object.fromEntries(configs.map((c) => [c.clave, c.valor]))
+  return {
+    botName: cfg.WA_AGENT_NOMBRE || 'Asistente',
+    nombreClub: cfg.NOMBRE_CLUB || cfg.nombre || 'el club',
+    extraInstrucciones: cfg.WA_AGENT_SYSTEM_PROMPT_EXTRA || null,
   }
-
-  // Persistir solo los pares texto user/assistant (excluir tool calls y system)
-  guardarHistorial(tenantId, telefono, messages.filter(m => m.role !== 'system'))
-
-  // Registrar uso de tokens
-  registrarUsoIA(db, tenantId, iaConfig.provider, iaConfig.model, totalInputTokens, totalOutputTokens)
-
-  return respuestaFinal || 'Tuve un problema procesando tu consulta. Por favor intentá de nuevo.'
 }
 
-// ─── Procesamiento principal ──────────────────────────────────────────────────
+/**
+ * Arma el bloque que se appendea al system prompt del hub. Define tono,
+ * formato WA y contexto de quién está hablando (socio o número anónimo).
+ * El prompt base con instrucciones de tool-calling queda intacto en el hub.
+ */
+function buildSystemPromptExtra({ botName, nombreClub, socio, extra }) {
+  const lineas = [
+    `Sos *${botName}*, el asistente virtual de *${nombreClub}* que atiende WhatsApp.`,
+    '',
+    'Tono y formato:',
+    '- Español rioplatense (vos, dale). No uses "che".',
+    '- Respuestas breves, máximo 3 párrafos cortos.',
+    '- WhatsApp solo entiende *negrita*, _cursiva_, ~tachado~. No uses Markdown que no esté en ese set.',
+    '- No inventes información: si el dato no viene del tool, no lo digas.',
+    '',
+  ]
+  if (socio) {
+    const nroSocio = socio.nroSocio ? ` (Nº ${socio.nroSocio})` : ''
+    lineas.push(`Estás hablando con *${socio.apellidoNombre}*${nroSocio}, socio del club.`)
+  } else {
+    lineas.push(
+      'El número NO está registrado como socio del club. Solo podés ayudar con info pública (horarios del club, sitio web) o derivar a un humano.'
+    )
+  }
+  if (extra) {
+    lineas.push('')
+    lineas.push('Instrucciones específicas del club:')
+    lineas.push(extra)
+  }
+  return lineas.join('\n')
+}
 
 export async function procesarMensajeAgente({ db, tenantId, telefono, nombreContacto, texto, socio }) {
   try {
-    const iaConfig = await cargarConfigIA(db)
+    const { botName, nombreClub, extraInstrucciones } = await cargarConfigBot(db)
 
-    if (!iaConfig.apiKey) {
-      console.warn(`[WhatsApp Agente] Tenant ${tenantId}: sin API key de IA configurada`)
-      await enviarWhatsApp({
-        db, telefono,
-        texto: 'El asistente no está disponible en este momento. Por favor contactá a la administración del club.',
-        ignorarHorario: true
-      }).catch(() => {})
-      return
-    }
+    // Tools disponibles según si el número está registrado.
+    const allTools = getToolsForRole(ROLES.SOCIO)
+    const tools = socio
+      ? allTools
+      : allTools.filter((t) => TOOLS_NO_SOCIO.has(t.name))
 
-    const historial = getHistorial(tenantId, telefono)
-    const esPrimerMensaje = historial.length === 0
-    const systemPrompt = await construirSystemPrompt(db, socio, esPrimerMensaje)
-    const context = { db, socio, tenantId, telefono }
+    const scopeHint = socio
+      ? `Usuario socio (id=${socio.id}). Elegí EL tool más apropiado al pedido. No respondas con texto crudo.`
+      : 'Usuario NO registrado como socio. Solo tools de info pública o derivar_humano.'
+
+    const systemPromptExtra = buildSystemPromptExtra({
+      botName,
+      nombreClub,
+      socio,
+      extra: extraInstrucciones,
+    })
 
     let respuestaFinal
-    if (iaConfig.provider === 'openai') {
-      respuestaFinal = await procesarConOpenAI({ iaConfig, systemPrompt, historial, texto, context })
-    } else {
-      respuestaFinal = await procesarConAnthropic({ iaConfig, systemPrompt, historial, texto, context })
+    try {
+      // context: '' es intencional — maximiza el hit del cache del hub.
+      // Si hace falta multi-turno se puede activar después (a costa del cache).
+      const hubResp = await callHub({
+        question: texto,
+        context: '',
+        tenantId,
+        tools,
+        scopeHint,
+        toolsOnly: true,
+        systemPromptExtra,
+      })
+
+      if (hubResp?.tool_call?.name) {
+        const executor = new ActionExecutor(db)
+        const ctx = {
+          role: ROLES.SOCIO,
+          tenantId,
+          userId: socio?.id?.toString() || telefono,
+          socioId: socio?.id || null,
+          userName: socio?.apellidoNombre || nombreContacto || 'usuario',
+          metadata: { telefono, nombreContacto },
+        }
+        const result = await executor.executeAction(
+          {
+            accion: hubResp.tool_call.name,
+            entidades: hubResp.tool_call.args || {},
+          },
+          ctx
+        )
+        console.log(
+          `[WhatsApp Agente] tool=${hubResp.tool_call.name} success=${result.success} model=${hubResp.model} time_ms=${hubResp.time_ms}`
+        )
+        respuestaFinal =
+          result.message || (result.success ? 'Hecho.' : 'No pude procesar tu consulta.')
+      } else if (hubResp?.answer) {
+        console.log(`[WhatsApp Agente] hub answer model=${hubResp.model} time_ms=${hubResp.time_ms}`)
+        respuestaFinal = hubResp.answer
+      } else {
+        console.warn('[WhatsApp Agente] respuesta vacía del hub')
+        respuestaFinal = 'No pude procesar tu consulta. Probá reformularla.'
+      }
+    } catch (e) {
+      console.error('[WhatsApp Agente] Error consultando hub:', e.message)
+      respuestaFinal =
+        'El asistente está temporalmente fuera de servicio. Probá en unos minutos.'
     }
 
-    await enviarWhatsApp({ db, telefono, texto: respuestaFinal, ignorarHorario: true })
+    // Saludo en el primer mensaje de la sesión. Se mantiene hardcoded acá
+    // (no LLM) para ser predecible y no contar como turno cacheable del hub.
+    const saludoKey = `${tenantId}:${telefono}`
+    if (!_saludados.has(saludoKey)) {
+      _saludados.add(saludoKey)
+      const nombre = socio ? primerNombre(socio.apellidoNombre) : null
+      const saludo = nombre
+        ? `¡Hola, ${nombre}! Soy *${botName}* 👋\n\n`
+        : `¡Hola! Soy *${botName}* 👋\n\n`
+      respuestaFinal = saludo + respuestaFinal
+    }
 
+    await enviarWhatsApp({ db, tenantId, telefono, texto: respuestaFinal, ignorarHorario: true })
   } catch (err) {
-    console.error('[WhatsApp Agente] Error:', err.message)
+    console.error('[WhatsApp Agente] Error fatal:', err.message)
     await enviarWhatsApp({
-      db, telefono,
+      db,
+      tenantId,
+      telefono,
       texto: 'Tuve un inconveniente técnico. Por favor contactá a la administración del club.',
-      ignorarHorario: true
+      ignorarHorario: true,
     }).catch(() => {})
   }
 }

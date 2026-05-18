@@ -26,6 +26,7 @@ import aiAnalisisRoutes from './ai-analisis.js'
 import favoritosRoutes from './favoritos.js'
 import tiendaRoutes from './tienda.js'
 import afipConnectionsRoutes from './afipConnections.js'
+import notificacionesLogRoutes from './notificacionesLog.js'
 
 const router = Router()
 
@@ -55,5 +56,6 @@ router.use('/ai', aiAnalisisRoutes)
 router.use(favoritosRoutes)
 router.use(tiendaRoutes)
 router.use(afipConnectionsRoutes)
+router.use(notificacionesLogRoutes)
 
 export default router

@@ -41,3 +41,9 @@ server/prisma/migrations/*
 
 # Backups (datos sensibles de tenants — dumps DB, CSVs de auditoría)
 backups/
+
+# Datos reales de clientes (NO subir extractos bancarios ni CSVs con PII)
+brio/SaldosBanco.xlsx
+brio/SaldosBanco*.xlsx
+server/docs/dry-run/
+server/docs/dry-run-*/

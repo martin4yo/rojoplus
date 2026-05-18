@@ -288,6 +288,7 @@ const RecuperoCampanaDetalle = lazy(() => import('./pages/admin/RecuperoCampanaD
 const RecuperoPendientes = lazy(() => import('./pages/admin/RecuperoPendientes'))
 const GestionComunicaciones = lazy(() => import('./pages/admin/GestionComunicaciones'))
 const DetalleCampana = lazy(() => import('./pages/admin/DetalleCampana'))
+const NotificacionesCola = lazy(() => import('./pages/admin/NotificacionesCola'))
 const AdminChatEntrenadores = lazy(() => import('./pages/admin/ChatEntrenadores'))
 
 // Super-Admin
@@ -644,6 +645,7 @@ function App() {
 
                   {/* Gestión de Comunicaciones */}
                   <Route path="comunicaciones" element={<GestionComunicaciones />} />
+                  <Route path="notificaciones-cola" element={<NotificacionesCola />} />
                   <Route path="comunicaciones/campanas/:id" element={<DetalleCampana />} />
 
                   {/* Chat Entrenadores */}

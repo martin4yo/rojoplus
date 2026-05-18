@@ -29,6 +29,7 @@ export default function Cuotas() {
 
   // Filtros
   const [periodoId, setPeriodoId] = useState(searchParams.get('periodoId') || '')
+  const [periodoIdAutoSeteado, setPeriodoIdAutoSeteado] = useState(false)
   const [estado, setEstado] = useState(searchParams.get('estado') || '')
   const [busquedaTexto, setBusquedaTexto] = useState('')
   const [busquedaTextoDebounced, setBusquedaTextoDebounced] = useState('')
@@ -139,6 +140,17 @@ export default function Cuotas() {
         api.get('/admin/cajas'),
       ])
       setPeriodos(periodosData || [])
+      // Preseleccionar período actual si no vino otro en la URL
+      if (!searchParams.get('periodoId') && !periodoIdAutoSeteado && Array.isArray(periodosData) && periodosData.length > 0) {
+        const ahora = new Date()
+        const mesActual = ahora.getMonth() + 1
+        const anioActual = ahora.getFullYear()
+        const periodoActual = periodosData.find(p => p.mes === mesActual && p.anio === anioActual)
+        if (periodoActual) {
+          setPeriodoId(String(periodoActual.id))
+        }
+        setPeriodoIdAutoSeteado(true)
+      }
       setMediosPago(mediosData || [])
       setCategoriasCargo(categoriasData || [])
       setCajas((cajasData || []).filter(c => c.paraCaja))
