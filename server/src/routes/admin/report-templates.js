@@ -18,6 +18,39 @@ async function runCustomScript(script, db, tenantId, params) {
   }
 }
 
+/**
+ * Rehidrata `template.parameters` para evitar IDs hardcodeados.
+ * Si el template tiene queryKey con `defaultParams` async, reemplaza las `options`
+ * de cada parámetro con las del tenant actual. Mantiene `name`, `label`, `type`,
+ * `defaultValue` y `dependsOn` del template (preservando ediciones del diseñador).
+ *
+ * Esto soluciona el caso típico de "el reporte fue clonado/diseñado en otro tenant
+ * y los IDs de actividades/categorías/tipos no existen en el tenant actual".
+ */
+async function rehidratarParametros(template, db, tenantId) {
+  if (!template?.queryKey) return template
+  const def = getQueryDefinition(template.queryKey)
+  if (!def || typeof def.defaultParams !== 'function') return template
+
+  try {
+    const fresh = await def.defaultParams(db, tenantId)
+    const freshByName = Object.fromEntries((fresh || []).map(p => [p.name, p]))
+    const merged = (template.parameters || fresh || []).map(p => {
+      const f = freshByName[p.name]
+      if (!f) return p
+      return {
+        ...p,
+        options: f.options ?? p.options ?? [],
+        dependsOn: p.dependsOn ?? f.dependsOn,
+      }
+    })
+    return { ...template, parameters: merged }
+  } catch (err) {
+    console.error(`[reports] Error rehidratando parameters de ${template.queryKey}:`, err.message)
+    return template
+  }
+}
+
 const router = Router()
 
 // ── Query definitions (must be before /:id to avoid route conflict) ─────────
@@ -155,8 +188,11 @@ router.get('/report-templates/:id', authAdmin, async (req, res) => {
       where: { id: req.params.id, isActive: true, OR: [{ tenantId }, { isPublic: true }] },
     })
     if (!template) return res.status(404).json({ error: 'Reporte no encontrado' })
-    res.json(template)
+    // Rehidratar options para el tenant actual (evita IDs hardcodeados del tenant origen)
+    const rehidratado = await rehidratarParametros(template, req.db, tenantId)
+    res.json(rehidratado)
   } catch (error) {
+    console.error('Error al obtener reporte:', error)
     res.status(500).json({ error: 'Error al obtener reporte' })
   }
 })

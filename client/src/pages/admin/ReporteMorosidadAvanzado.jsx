@@ -180,10 +180,13 @@ export default function ReporteMorosidadAvanzado() {
         api.get('/admin/actividades'),
       ])
 
-      setKpis(kpisRes.data)
-      setAntiguedad(antiguedadRes.data)
-      setProyeccion(proyeccionRes.data)
-      setActividades(actividadesRes.data || [])
+      // api.get hace unwrap del envoltorio {success, data}, así que las respuestas
+      // vienen directamente como el data. Mantengo fallback a `.data` por si el
+      // helper cambia en el futuro (defensive).
+      setKpis(kpisRes?.data ?? kpisRes)
+      setAntiguedad(antiguedadRes?.data ?? antiguedadRes)
+      setProyeccion(proyeccionRes?.data ?? proyeccionRes)
+      setActividades(actividadesRes?.data ?? actividadesRes ?? [])
     } catch (err) {
       setError('Error al cargar datos de morosidad')
       console.error(err)
@@ -231,7 +234,8 @@ export default function ReporteMorosidadAvanzado() {
       params.append('limit', 20)
 
       const res = await api.get(`/admin/reportes/morosidad/detalle?${params}`)
-      setMorosos(res.data)
+      // api.get hace unwrap del envoltorio {success, data}; res ya es { morosos, pagination, totales }
+      setMorosos(res?.data ?? res)
     } catch (err) {
       console.error('Error al cargar morosos:', err)
     }

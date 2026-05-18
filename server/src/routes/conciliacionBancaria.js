@@ -265,6 +265,9 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
       observaciones,
       movimientos: {
         create: movimientos.map(m => ({
+          // tenantId requerido por el modelo y no inyectado automáticamente
+          // por la extension Prisma en nested creates.
+          tenantId: req.tenantId,
           fecha: m.fecha,
           fechaValor: m.fechaValor,
           concepto: m.concepto,
