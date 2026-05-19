@@ -368,12 +368,17 @@ if (process.env.NODE_ENV !== 'test') {
     // Verificar conexión SMTP
     await verificarConexionSMTP()
 
-    // Iniciar sistema de notificaciones automáticas
-    iniciarCronJobs()
-    // Iniciar cron del módulo Tienda
-    iniciarCronTienda()
-    // Iniciar crons de vigencia de socios (bloqueo por morosidad + notificación)
-    iniciarCronsVigencia()
+    // Kill switch global: DISABLE_ALL_CRONS=true desactiva TODOS los crons
+    if (process.env.DISABLE_ALL_CRONS === 'true') {
+      console.log('⏸️  [CRONS] DISABLE_ALL_CRONS=true — todos los crons desactivados')
+    } else {
+      // Iniciar sistema de notificaciones automáticas
+      iniciarCronJobs()
+      // Iniciar cron del módulo Tienda
+      iniciarCronTienda()
+      // Iniciar crons de vigencia de socios (bloqueo por morosidad + notificación)
+      iniciarCronsVigencia()
+    }
   })
 
   // Cerrar conexión de Prisma al salir
