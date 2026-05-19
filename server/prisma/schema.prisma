@@ -1108,6 +1108,8 @@ model Caja {
   paraTakeaway          Boolean                  @default(true) @map("para_takeaway")
   mediosPagoPermitidos  String[]                 @default(["EFECTIVO", "TRANSFERENCIA", "CHEQUE", "TARJETA"]) @map("medios_pago_permitidos")
   puntoVentaAfip        Int?                     @map("punto_venta_afip")
+  permiteSaldoNegativo  Boolean                  @default(false) @map("permite_saldo_negativo")
+  limiteDescubierto     Decimal?                 @map("limite_descubierto") @db.Decimal(12, 2)
   cuentaContable        CuentaContable?          @relation(fields: [cuentaContableId], references: [id])
   centroCosto           CentroCosto?             @relation(fields: [centroCostoId], references: [id])
   cierres               CierreCaja[]
@@ -1456,16 +1458,19 @@ model MovimientoExtracto {
   fechaConciliacion DateTime?        @map("fecha_conciliacion")
   movimientoCajaId  Int?             @map("movimiento_caja_id")
   numeroComprobante String?          @map("numero_comprobante")
+  hashOrigen        String?          @map("hash_origen")
   conciliacion      Conciliacion?    @relation(fields: [conciliacionId], references: [id])
   extracto          ExtractoBancario @relation(fields: [extractoId], references: [id])
 
   tenantId Int @map("tenant_id")
 
+  @@unique([tenantId, hashOrigen])
   @@index([extractoId])
   @@index([fecha])
   @@index([conciliado])
   @@index([movimientoCajaId])
   @@index([tenantId])
+  @@index([hashOrigen])
   @@map("movimientos_extracto")
 }
 

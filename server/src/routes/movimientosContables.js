@@ -8,6 +8,7 @@ import {
   generarAsientoOrdenPago,
   generarAsientoReciboCobro,
 } from '../services/asientosContables.js'
+import { validarLimiteEgreso, mensajeSaldoInsuficiente } from '../services/saldoCaja.js'
 
 const router = Router()
 
@@ -1377,8 +1378,14 @@ router.post('/ordenes-pago', asyncHandler(async (req, res) => {
     if (!caja.cuentaContableId) {
       throw new AppError(`La caja ${caja.nombre} no tiene cuenta contable asignada`, 400)
     }
-    if (parseFloat(pago.monto) > Number(caja.saldoActual)) {
-      throw new AppError(`Saldo insuficiente en caja ${caja.nombre}`, 400)
+    {
+      const { valido } = validarLimiteEgreso(caja, Number(caja.saldoActual), parseFloat(pago.monto))
+      if (!valido) {
+        throw new AppError(
+          mensajeSaldoInsuficiente({ caja, disponible: Number(caja.saldoActual), requerido: parseFloat(pago.monto) }),
+          400
+        )
+      }
     }
     pago.caja = caja // Guardar para usar después
   }

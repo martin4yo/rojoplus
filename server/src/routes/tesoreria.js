@@ -8,6 +8,7 @@ import { generarAsientoAutomatico } from './asientos.js'
 import { generarComprobanteMovimientoPDF } from '../services/pdfGenerator.js'
 import { enviarComprobanteMovimientoEmail } from '../services/email.js'
 import { enviarComprobanteMovimientoWhatsApp } from '../services/whatsappService.js'
+import { validarLimiteEgreso, mensajeSaldoInsuficiente } from '../services/saldoCaja.js'
 
 const router = Router()
 
@@ -137,7 +138,8 @@ router.post('/cajas', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req,
   const {
     codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId, centroCostoId,
     requiereConciliacion, mediosPagoPermitidos,
-    puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja
+    puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja,
+    permiteSaldoNegativo, limiteDescubierto
   } = req.body
 
   if (!codigo || !nombre || !tipo) {
@@ -171,6 +173,10 @@ router.post('/cajas', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req,
       paraKiosco: paraKiosco !== undefined ? paraKiosco : true,
       paraTakeaway: paraTakeaway !== undefined ? paraTakeaway : true,
       paraCaja: paraCaja !== undefined ? paraCaja : true,
+      permiteSaldoNegativo: permiteSaldoNegativo === true,
+      limiteDescubierto: permiteSaldoNegativo === true && limiteDescubierto != null && limiteDescubierto !== ''
+        ? parseFloat(limiteDescubierto)
+        : null,
       ...(cuentaContableId && {
         cuentaContable: { connect: { id: parseInt(cuentaContableId) } }
       }),
@@ -193,6 +199,7 @@ router.put('/cajas/:id', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (r
     codigo, nombre, tipo, descripcion, activo, cuentaContableId, centroCostoId,
     requiereConciliacion, mediosPagoPermitidos,
     puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja,
+    permiteSaldoNegativo, limiteDescubierto,
     cuentaBancaria, // { banco, tipoCuenta, numeroCuenta, cbu, alias, titular, cuit, sucursal } — opcional
   } = req.body
 
@@ -222,7 +229,11 @@ router.put('/cajas/:id', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (r
     paraBuffet: paraBuffet !== undefined ? paraBuffet : existente.paraBuffet,
     paraKiosco: paraKiosco !== undefined ? paraKiosco : existente.paraKiosco,
     paraTakeaway: paraTakeaway !== undefined ? paraTakeaway : existente.paraTakeaway,
-    paraCaja: paraCaja !== undefined ? paraCaja : existente.paraCaja
+    paraCaja: paraCaja !== undefined ? paraCaja : existente.paraCaja,
+    permiteSaldoNegativo: permiteSaldoNegativo !== undefined ? !!permiteSaldoNegativo : existente.permiteSaldoNegativo,
+    limiteDescubierto: permiteSaldoNegativo !== undefined
+      ? (permiteSaldoNegativo && limiteDescubierto != null && limiteDescubierto !== '' ? parseFloat(limiteDescubierto) : null)
+      : existente.limiteDescubierto
   }
 
   // Manejar la relación con cuenta contable
@@ -693,9 +704,13 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
         req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
       ])
       const saldoMedio = (Number(ingresosAgg._sum.monto) || 0) - (Number(egresosAgg._sum.monto) || 0)
-      if (saldoMedio < mp.monto) {
+      const { valido } = validarLimiteEgreso(caja, saldoMedio, mp.monto)
+      if (!valido) {
         const rec = mediosPagoRecords.find(r => r.id === mp.medioPagoId)
-        throw new AppError(`Saldo insuficiente en ${caja.nombre} para ${rec?.nombre || 'medio'}. Disponible: $${saldoMedio.toLocaleString('es-AR')}, requerido: $${mp.monto.toLocaleString('es-AR')}`, 400)
+        throw new AppError(
+          mensajeSaldoInsuficiente({ caja, disponible: saldoMedio, requerido: mp.monto, contexto: `Medio ${rec?.nombre || mp.medioPagoId}` }),
+          400
+        )
       }
     }
   }
@@ -1096,8 +1111,12 @@ router.post('/transferencias', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(as
       req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
     ])
     const saldoMedio = (Number(ingAgg._sum.monto) || 0) - (Number(egrAgg._sum.monto) || 0)
-    if (saldoMedio < montoNum) {
-      throw new AppError(`Saldo insuficiente en ${cajaOrigen.nombre} para ${medioPagoRecord.nombre}. Disponible: $${saldoMedio.toLocaleString('es-AR')}`, 400)
+    const { valido } = validarLimiteEgreso(cajaOrigen, saldoMedio, montoNum)
+    if (!valido) {
+      throw new AppError(
+        mensajeSaldoInsuficiente({ caja: cajaOrigen, disponible: saldoMedio, requerido: montoNum, contexto: `Medio ${medioPagoRecord.nombre}` }),
+        400
+      )
     }
   }
 
@@ -1256,8 +1275,12 @@ router.post('/transferencias/:id/anular', checkPermiso('CAJA_ANULAR'), asyncHand
 
   // Verificar que caja destino tenga saldo suficiente para revertir
   const montoNum = Number(transferencia.monto)
-  if (Number(transferencia.cajaDestino.saldoActual) < montoNum) {
-    throw new AppError('Saldo insuficiente en caja destino para revertir la transferencia', 400)
+  const { valido: validoReverso } = validarLimiteEgreso(transferencia.cajaDestino, Number(transferencia.cajaDestino.saldoActual), montoNum)
+  if (!validoReverso) {
+    throw new AppError(
+      mensajeSaldoInsuficiente({ caja: transferencia.cajaDestino, disponible: Number(transferencia.cajaDestino.saldoActual), requerido: montoNum, contexto: 'Reverso transferencia' }),
+      400
+    )
   }
 
   // Anular y revertir saldos
@@ -1665,8 +1688,14 @@ router.post('/pendientes-conciliar/transferir', checkPermiso('CAJA_MOVIMIENTOS')
     throw new AppError('Caja origen o destino no encontrada', 404)
   }
 
-  if (Number(cajaOrigen.saldoActual) < montoTotal) {
-    throw new AppError('Saldo insuficiente en la caja origen', 400)
+  {
+    const { valido } = validarLimiteEgreso(cajaOrigen, Number(cajaOrigen.saldoActual), montoTotal)
+    if (!valido) {
+      throw new AppError(
+        mensajeSaldoInsuficiente({ caja: cajaOrigen, disponible: Number(cajaOrigen.saldoActual), requerido: montoTotal, contexto: 'Caja origen' }),
+        400
+      )
+    }
   }
 
   // Crear transferencia

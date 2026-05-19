@@ -36,6 +36,8 @@ export default function ConciliacionBancaria() {
     periodoHasta: ''
   })
   const [importing, setImporting] = useState(false)
+  // Modal de duplicados detectados
+  const [dupesInfo, setDupesInfo] = useState(null)  // { totalMovimientos, duplicados, nuevos, porExtracto, ejemplos }
 
   // Modal formato
   const [showFormatoModal, setShowFormatoModal] = useState(false)
@@ -148,7 +150,7 @@ export default function ConciliacionBancaria() {
     }
   }
 
-  async function handleImportar() {
+  async function handleImportar(omitirDuplicados = false) {
     if (!importForm.cajaId || !importForm.formatoId || !importForm.contenido) {
       setError('Complete todos los campos requeridos')
       return
@@ -157,9 +159,13 @@ export default function ConciliacionBancaria() {
     setImporting(true)
     setError(null)
     try {
-      const response = await api.post('/admin/conciliacion/extractos/importar', importForm)
+      const response = await api.postFull('/admin/conciliacion/extractos/importar', {
+        ...importForm,
+        omitirDuplicados
+      })
       setSuccess(response.message)
       setShowImportModal(false)
+      setDupesInfo(null)
       setImportForm({
         cajaId: '',
         formatoId: '',
@@ -171,7 +177,12 @@ export default function ConciliacionBancaria() {
       cargarExtractos()
       cargarDatos()
     } catch (err) {
-      setError(err.message || 'Error importando extracto')
+      if (err.code === 'DUPLICADOS_DETECTADOS' && err.data) {
+        // Mostrar modal de confirmación con detalle de duplicados
+        setDupesInfo(err.data)
+      } else {
+        setError(err.message || 'Error importando extracto')
+      }
     } finally {
       setImporting(false)
     }
@@ -616,7 +627,7 @@ export default function ConciliacionBancaria() {
                 <Button variant="secondary" onClick={() => setShowImportModal(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleImportar} loading={importing}>
+                <Button onClick={() => handleImportar(false)} loading={importing}>
                   <Upload className="w-4 h-4 mr-2" />
                   Importar
                 </Button>
@@ -784,6 +795,67 @@ export default function ConciliacionBancaria() {
           </div>
         </div>
       )}
+      {/* Modal duplicados detectados */}
+      {dupesInfo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-amber-100 shrink-0">
+                  <AlertCircle className="w-6 h-6 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-800">Movimientos ya importados detectados</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    De los <strong>{dupesInfo.totalMovimientos}</strong> movimientos del archivo,{' '}
+                    <strong>{dupesInfo.duplicados}</strong> ya fueron importados anteriormente y{' '}
+                    <strong>{dupesInfo.nuevos}</strong> son nuevos.
+                  </p>
+                </div>
+              </div>
+
+              {dupesInfo.porExtracto?.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Origen de los duplicados:</p>
+                  <div className="space-y-1">
+                    {dupesInfo.porExtracto.map(e => (
+                      <div key={e.numero} className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                        <span className="font-mono">{e.numero}</span> · {e.caja} · importado {formatDate(e.fechaImportacion)} · <strong>{e.cantidad}</strong> mov(s)
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {dupesInfo.ejemplos?.length > 0 && (
+                <details className="mb-4">
+                  <summary className="text-sm font-medium text-gray-700 cursor-pointer">Ver ejemplos de duplicados ({dupesInfo.ejemplos.length})</summary>
+                  <div className="mt-2 space-y-1 text-xs text-gray-600">
+                    {dupesInfo.ejemplos.map((e, i) => (
+                      <div key={i} className="bg-gray-50 p-2 rounded">
+                        <span className="font-mono">{formatDate(e.fecha)}</span> · {formatCurrency(e.importe)} · {e.concepto}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800 mb-4">
+                Si continuás, se importarán solo los <strong>{dupesInfo.nuevos}</strong> movimientos nuevos. Los duplicados serán omitidos.
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setDupesInfo(null)}>Cancelar</Button>
+                <Button onClick={() => handleImportar(true)} loading={importing} disabled={dupesInfo.nuevos === 0}>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Importar solo nuevos ({dupesInfo.nuevos})
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ConfirmDialog />
     </div>
   )

@@ -109,6 +109,7 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
       const err = new Error(errorMessage)
       err.code = data?.code || data?.error?.code || null
       err.status = response.status
+      err.data = data?.data ?? null
       throw err
     }
 

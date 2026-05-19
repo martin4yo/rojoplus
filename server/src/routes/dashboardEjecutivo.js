@@ -336,7 +336,10 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
   // Saldos de cajas — calculados desde movimientos (no usar campo denormalizado)
   const cajasRaw = await req.db.caja.findMany({
     where: { activo: true },
-    select: { id: true, nombre: true, tipo: true, saldoInicial: true },
+    select: {
+      id: true, nombre: true, tipo: true, saldoInicial: true,
+      permiteSaldoNegativo: true, limiteDescubierto: true,
+    },
     orderBy: { nombre: 'asc' },
   })
   const cajaIds = cajasRaw.map(c => c.id)
@@ -352,13 +355,34 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     if (!movsByCaja[t.cajaId]) movsByCaja[t.cajaId] = { INGRESO: 0, EGRESO: 0 }
     movsByCaja[t.cajaId][t.tipo] = Number(t._sum.monto || 0)
   }
+
+  // Saldo según último extracto importado (solo cajas BANCO).
+  // Toma el extracto con periodoHasta más reciente por caja y devuelve su saldoFinal.
+  const cajasBancoIds = cajasRaw.filter(c => c.tipo === 'BANCO').map(c => c.id)
+  const ultimosExtractos = cajasBancoIds.length
+    ? await req.db.extractoBancario.findMany({
+        where: { cajaId: { in: cajasBancoIds } },
+        orderBy: [{ cajaId: 'asc' }, { periodoHasta: 'desc' }, { fechaImportacion: 'desc' }],
+        distinct: ['cajaId'],
+        select: { cajaId: true, saldoFinal: true, periodoHasta: true, fechaImportacion: true, numero: true },
+      })
+    : []
+  const extractoByCaja = {}
+  for (const e of ultimosExtractos) extractoByCaja[e.cajaId] = e
+
   const cajas = cajasRaw.map(c => {
     const m = movsByCaja[c.id] || { INGRESO: 0, EGRESO: 0 }
+    const ext = extractoByCaja[c.id]
     return {
       id: c.id,
       nombre: c.nombre,
       tipo: c.tipo,
       saldoActual: Number(c.saldoInicial) + m.INGRESO - m.EGRESO,
+      permiteSaldoNegativo: !!c.permiteSaldoNegativo,
+      limiteDescubierto: c.limiteDescubierto != null ? Number(c.limiteDescubierto) : null,
+      saldoExtracto: ext ? Number(ext.saldoFinal) : null,
+      fechaExtracto: ext ? ext.periodoHasta : null,
+      numeroExtracto: ext ? ext.numero : null,
     }
   })
   const saldoTotalCajas = cajas.reduce((sum, c) => sum + c.saldoActual, 0)
@@ -724,6 +748,10 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
       tesoreria: {
         cajas: cajas.map(c => ({ ...c, saldoActual: Number(c.saldoActual) })),
         saldoTotalCajas: Math.round(saldoTotalCajas),
+        saldoTotalBancosExtracto: Math.round(
+          cajas.filter(c => c.tipo === 'BANCO' && c.saldoExtracto != null)
+               .reduce((s, c) => s + c.saldoExtracto, 0)
+        ),
         tarjetasPendientes,
         echeqsRecibidos,
         echeqsEmitidos,

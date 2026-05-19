@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
+import { calcularHashMovimiento } from '../services/hashExtracto.js'
 
 const router = Router()
 
@@ -194,8 +195,14 @@ router.get('/extractos/:id', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/admin/conciliacion/extractos/importar - Importar extracto
+//
+// Flujo de deduplicación:
+//   - Calcula hash determinístico por movimiento (ver services/hashExtracto.js).
+//   - Busca esos hashes en MovimientoExtracto del tenant.
+//   - Si hay duplicados y NO viene omitirDuplicados=true → responde 409 con info para mostrar modal.
+//   - Si omitirDuplicados=true → importa solo los nuevos, devuelve resumen.
 router.post('/extractos/importar', asyncHandler(async (req, res) => {
-  const { cajaId, formatoId, contenido, nombreArchivo, periodoDesde, periodoHasta, observaciones } = req.body
+  const { cajaId, formatoId, contenido, nombreArchivo, periodoDesde, periodoHasta, observaciones, omitirDuplicados } = req.body
 
   if (!cajaId || !formatoId || !contenido) {
     throw new AppError('Caja, formato y contenido son requeridos', 400)
@@ -229,6 +236,57 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
     throw new AppError('No se encontraron movimientos en el archivo', 400)
   }
 
+  // Calcular hash de cada movimiento y detectar duplicados existentes en el tenant
+  movimientos = movimientos.map(m => ({ ...m, hashOrigen: calcularHashMovimiento(m) }))
+  const hashes = movimientos.map(m => m.hashOrigen)
+  const existentes = await req.db.movimientoExtracto.findMany({
+    where: { hashOrigen: { in: hashes } },
+    select: {
+      hashOrigen: true,
+      fecha: true,
+      importe: true,
+      concepto: true,
+      extracto: { select: { id: true, numero: true, fechaImportacion: true, caja: { select: { nombre: true } } } }
+    }
+  })
+  const hashesExistentes = new Set(existentes.map(e => e.hashOrigen))
+
+  if (hashesExistentes.size > 0 && !omitirDuplicados) {
+    // Agrupar duplicados por extracto origen para mostrar en modal
+    const porExtracto = {}
+    for (const e of existentes) {
+      const key = e.extracto.numero
+      if (!porExtracto[key]) porExtracto[key] = { numero: key, caja: e.extracto.caja.nombre, fechaImportacion: e.extracto.fechaImportacion, cantidad: 0 }
+      porExtracto[key].cantidad++
+    }
+    return res.status(409).json({
+      success: false,
+      code: 'DUPLICADOS_DETECTADOS',
+      message: `Se detectaron ${hashesExistentes.size} movimientos ya importados`,
+      data: {
+        totalMovimientos: movimientos.length,
+        duplicados: hashesExistentes.size,
+        nuevos: movimientos.length - hashesExistentes.size,
+        porExtracto: Object.values(porExtracto),
+        ejemplos: existentes.slice(0, 5).map(e => ({
+          fecha: e.fecha,
+          importe: Number(e.importe),
+          concepto: e.concepto?.slice(0, 80),
+          extractoOriginal: e.extracto.numero
+        }))
+      }
+    })
+  }
+
+  // Filtrar duplicados si corresponde
+  const movimientosAImportar = omitirDuplicados
+    ? movimientos.filter(m => !hashesExistentes.has(m.hashOrigen))
+    : movimientos
+
+  if (movimientosAImportar.length === 0) {
+    throw new AppError('Todos los movimientos del archivo ya fueron importados anteriormente', 400, 'TODOS_DUPLICADOS')
+  }
+
   // Generar número de extracto
   const anio = new Date().getFullYear()
   const prefijo = `EXT-${anio}-`
@@ -243,9 +301,16 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
   }
   const numero = `${prefijo}${String(siguiente).padStart(5, '0')}`
 
-  // Calcular totales
-  const totalCreditos = movimientos.filter(m => m.tipo === 'CREDITO').reduce((sum, m) => sum + m.importe, 0)
-  const totalDebitos = movimientos.filter(m => m.tipo === 'DEBITO').reduce((sum, m) => sum + m.importe, 0)
+  // Calcular totales sobre lo que efectivamente vamos a importar
+  const totalCreditos = movimientosAImportar.filter(m => m.tipo === 'CREDITO').reduce((sum, m) => sum + m.importe, 0)
+  const totalDebitos = movimientosAImportar.filter(m => m.tipo === 'DEBITO').reduce((sum, m) => sum + m.importe, 0)
+
+  // Check de balance: si el archivo trae saldoInicial+saldoFinal y se omitieron movimientos,
+  // el balance puede no cerrar. Avisar al cliente sin bloquear.
+  const omitidos = movimientos.length - movimientosAImportar.length
+  const balanceEsperado = Number(saldoInicial) + totalCreditos - totalDebitos
+  const balanceDiff = Math.abs(balanceEsperado - Number(saldoFinal))
+  const balanceCierra = balanceDiff < 0.01
 
   // Crear extracto con movimientos
   const extracto = await req.db.extractoBancario.create({
@@ -253,18 +318,18 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
       cajaId: parseInt(cajaId),
       formatoId: parseInt(formatoId),
       numero,
-      periodoDesde: periodoDesde ? new Date(periodoDesde) : movimientos[0]?.fecha || new Date(),
-      periodoHasta: periodoHasta ? new Date(periodoHasta) : movimientos[movimientos.length - 1]?.fecha || new Date(),
+      periodoDesde: periodoDesde ? new Date(periodoDesde) : movimientosAImportar[0]?.fecha || new Date(),
+      periodoHasta: periodoHasta ? new Date(periodoHasta) : movimientosAImportar[movimientosAImportar.length - 1]?.fecha || new Date(),
       nombreArchivo,
       saldoInicial,
       saldoFinal,
       totalCreditos,
       totalDebitos,
-      cantidadMovimientos: movimientos.length,
+      cantidadMovimientos: movimientosAImportar.length,
       importadoPor: req.admin.id,
       observaciones,
       movimientos: {
-        create: movimientos.map(m => ({
+        create: movimientosAImportar.map(m => ({
           // tenantId requerido por el modelo y no inyectado automáticamente
           // por la extension Prisma en nested creates.
           tenantId: req.tenantId,
@@ -276,7 +341,8 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
           numeroComprobante: m.numeroComprobante,
           tipo: m.tipo,
           importe: m.importe,
-          saldo: m.saldo
+          saldo: m.saldo,
+          hashOrigen: m.hashOrigen
         }))
       }
     },
@@ -287,10 +353,17 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
     }
   })
 
+  let message = `Extracto importado: ${movimientosAImportar.length} movimientos`
+  if (omitidos > 0) message += ` (${omitidos} duplicados omitidos)`
+  if (!balanceCierra) message += `. ⚠ El balance no cierra (dif. $${balanceDiff.toFixed(2)})`
+
   res.status(201).json({
     success: true,
     data: extracto,
-    message: `Extracto importado: ${movimientos.length} movimientos`
+    omitidos,
+    balanceCierra,
+    balanceDiff: balanceCierra ? 0 : Math.round(balanceDiff * 100) / 100,
+    message
   })
 }))
 

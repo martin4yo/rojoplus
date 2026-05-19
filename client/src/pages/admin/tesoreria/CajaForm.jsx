@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Wallet } from 'lucide-react'
 import { Button } from '../../../components/Button'
 import api from '../../../services/api'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import Switch from '../../../components/Switch'
 
 const TIPOS_CAJA = [
   { value: 'EFECTIVO', label: 'Efectivo' },
@@ -42,7 +43,9 @@ export default function CajaForm() {
     paraBuffet: false,
     paraKiosco: false,
     paraTakeaway: false,
-    paraCaja: true
+    paraCaja: true,
+    permiteSaldoNegativo: false,
+    limiteDescubierto: ''
   })
 
   useEffect(() => {
@@ -95,7 +98,9 @@ export default function CajaForm() {
         paraBuffet: caja.paraBuffet || false,
         paraKiosco: caja.paraKiosco || false,
         paraTakeaway: caja.paraTakeaway || false,
-        paraCaja: caja.paraCaja !== false
+        paraCaja: caja.paraCaja !== false,
+        permiteSaldoNegativo: caja.permiteSaldoNegativo || false,
+        limiteDescubierto: caja.limiteDescubierto != null ? String(caja.limiteDescubierto) : ''
       })
     } catch (err) {
       setError('Error al cargar la caja')
@@ -152,7 +157,11 @@ export default function CajaForm() {
         paraBuffet: form.paraBuffet,
         paraKiosco: form.paraKiosco,
         paraTakeaway: form.paraTakeaway,
-        paraCaja: form.paraCaja
+        paraCaja: form.paraCaja,
+        permiteSaldoNegativo: form.permiteSaldoNegativo,
+        limiteDescubierto: form.permiteSaldoNegativo && form.limiteDescubierto !== ''
+          ? parseFloat(form.limiteDescubierto)
+          : null
       }
 
       if (!isEditing && form.saldoInicial) {
@@ -448,6 +457,42 @@ export default function CajaForm() {
               Define donde estará disponible esta caja para registrar ventas
             </p>
           </div>
+        </div>
+
+        {/* Descubierto */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-700 font-medium">Permite saldo negativo (descubierto)</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Útil para cuentas bancarias con acuerdo de descubierto. Si está apagado, la caja no puede ir por debajo de cero.
+              </p>
+            </div>
+            <Switch
+              checked={form.permiteSaldoNegativo}
+              onChange={(v) => setForm(prev => ({ ...prev, permiteSaldoNegativo: v }))}
+            />
+          </div>
+          {form.permiteSaldoNegativo && (
+            <div className="mt-4 max-w-xs">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Límite de descubierto
+              </label>
+              <input
+                type="number"
+                name="limiteDescubierto"
+                value={form.limiteDescubierto}
+                onChange={handleChange}
+                className="input-field w-full"
+                step="0.01"
+                min="0"
+                placeholder="Sin límite"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Monto máximo de descubierto permitido. Dejar vacío para descubierto sin tope.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Conciliación */}

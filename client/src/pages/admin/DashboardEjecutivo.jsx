@@ -918,28 +918,77 @@ export default function DashboardEjecutivo() {
 
             {/* Bancos */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-blue-100">
-                  <CreditCard className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-blue-100 shrink-0">
+                    <CreditCard className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-800">Bancos</h3>
+                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalBancos)}</p>
+                    <p className="text-xs text-gray-500">según movimientos</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Bancos</h3>
-                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalBancos)}</p>
-                </div>
+                {tesoreria.saldoTotalBancosExtracto != null && cajasBanco.some(c => c.saldoExtracto != null) && (
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-indigo-600">{formatCurrency(tesoreria.saldoTotalBancosExtracto)}</p>
+                    <p className="text-xs text-gray-500">según extracto</p>
+                  </div>
+                )}
               </div>
               <div className="space-y-3">
                 {cajasBanco.map(caja => {
                   const saldo = Number(caja.saldoActual) || 0
                   const incluida = !cajasExcluidas.has(caja.id)
+                  const saldoExtracto = caja.saldoExtracto != null ? Number(caja.saldoExtracto) : null
+                  const diff = saldoExtracto != null ? saldo - saldoExtracto : null
+                  // Color: negativo permitido = ámbar; negativo no permitido o excede límite = rojo
+                  const piso = caja.permiteSaldoNegativo
+                    ? (caja.limiteDescubierto != null ? -Number(caja.limiteDescubierto) : Number.NEGATIVE_INFINITY)
+                    : 0
+                  const excedeLimite = saldo < piso
+                  const enDescubierto = saldo < 0 && caja.permiteSaldoNegativo && !excedeLimite
+                  const colorSaldo = !incluida
+                    ? 'text-gray-400 line-through'
+                    : excedeLimite
+                      ? 'text-red-600'
+                      : enDescubierto
+                        ? 'text-amber-600'
+                        : saldo >= 0
+                          ? 'text-blue-600'
+                          : 'text-red-600'
                   return (
-                    <div key={caja.id} className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${incluida ? '' : 'opacity-50'}`}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Switch size="sm" checked={incluida} onChange={() => toggleCajaExcluida(caja.id)} />
-                        <span className="text-sm text-gray-600 truncate">{caja.nombre}</span>
+                    <div key={caja.id} className={`p-3 bg-gray-50 rounded-lg ${incluida ? '' : 'opacity-50'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Switch size="sm" checked={incluida} onChange={() => toggleCajaExcluida(caja.id)} />
+                          <span className="text-sm text-gray-600 truncate">{caja.nombre}</span>
+                          {enDescubierto && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">DESCUBIERTO</span>
+                          )}
+                          {excedeLimite && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-700">EXCEDE LÍMITE</span>
+                          )}
+                        </div>
+                        <span className={`text-sm font-semibold ${colorSaldo}`}>
+                          {formatCurrency(saldo)}
+                        </span>
                       </div>
-                      <span className={`text-sm font-semibold ${incluida ? (saldo >= 0 ? 'text-blue-600' : 'text-red-600') : 'text-gray-400 line-through'}`}>
-                        {formatCurrency(saldo)}
-                      </span>
+                      {saldoExtracto != null && (
+                        <div className="flex items-center justify-between mt-1.5 ml-12 text-xs">
+                          <span className="text-gray-500">
+                            Extracto al {new Date(caja.fechaExtracto).toLocaleDateString('es-AR', { timeZone: 'UTC' })}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-indigo-600 font-medium">{formatCurrency(saldoExtracto)}</span>
+                            {Math.abs(diff) > 0.01 && (
+                              <span className={`${diff > 0 ? 'text-emerald-600' : 'text-orange-600'}`} title="Diferencia (movimientos - extracto)">
+                                {diff > 0 ? '+' : ''}{formatCurrency(diff)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
