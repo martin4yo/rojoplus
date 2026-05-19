@@ -236,8 +236,49 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
     throw new AppError('No se encontraron movimientos en el archivo', 400)
   }
 
-  // Calcular hash de cada movimiento y detectar duplicados existentes en el tenant
+  // Filtro opcional por rango de fechas (campos "Periodo Desde / Hasta" del modal).
+  // Si AMBOS están vacíos → se importa el archivo completo.
+  // Si solo uno está completo → solo aplica ese extremo.
+  const totalParseado = movimientos.length
+  const tieneDesde = periodoDesde != null && periodoDesde !== ''
+  const tieneHasta = periodoHasta != null && periodoHasta !== ''
+  if (tieneDesde) {
+    const desde = new Date(periodoDesde)
+    movimientos = movimientos.filter(m => m.fecha >= desde)
+  }
+  if (tieneHasta) {
+    // Incluir el día completo de la fecha "hasta"
+    const hasta = new Date(periodoHasta)
+    hasta.setHours(23, 59, 59, 999)
+    movimientos = movimientos.filter(m => m.fecha <= hasta)
+  }
+  const filtradosPorFecha = totalParseado - movimientos.length
+
+  if (movimientos.length === 0) {
+    throw new AppError(
+      `El archivo tiene ${totalParseado} movimientos pero ninguno cae dentro del rango ${periodoDesde || '(sin desde)'} → ${periodoHasta || '(sin hasta)'}`,
+      400, 'RANGO_VACIO'
+    )
+  }
+
+  // Calcular hash de cada movimiento
   movimientos = movimientos.map(m => ({ ...m, hashOrigen: calcularHashMovimiento(m) }))
+
+  // Dedup INTRA-archivo: dos filas con mismo hash dentro del mismo archivo se colapsan
+  // (típico de impuestos/comisiones automáticas con concepto idéntico y sin referencia única).
+  // Mantenemos la primera ocurrencia.
+  const vistosEnArchivo = new Set()
+  const duplicadosIntraArchivo = []
+  movimientos = movimientos.filter(m => {
+    if (vistosEnArchivo.has(m.hashOrigen)) {
+      duplicadosIntraArchivo.push(m)
+      return false
+    }
+    vistosEnArchivo.add(m.hashOrigen)
+    return true
+  })
+
+  // Ahora detectar duplicados contra lo ya existente en BD (tenant scope, inyectado por extension Prisma)
   const hashes = movimientos.map(m => m.hashOrigen)
   const existentes = await req.db.movimientoExtracto.findMany({
     where: { hashOrigen: { in: hashes } },
@@ -354,41 +395,87 @@ router.post('/extractos/importar', asyncHandler(async (req, res) => {
   })
 
   let message = `Extracto importado: ${movimientosAImportar.length} movimientos`
+  if (filtradosPorFecha > 0) message += ` (${filtradosPorFecha} fuera del rango de fechas)`
   if (omitidos > 0) message += ` (${omitidos} duplicados omitidos)`
+  if (duplicadosIntraArchivo.length > 0) message += ` (${duplicadosIntraArchivo.length} duplicados internos del archivo colapsados)`
   if (!balanceCierra) message += `. ⚠ El balance no cierra (dif. $${balanceDiff.toFixed(2)})`
 
   res.status(201).json({
     success: true,
     data: extracto,
     omitidos,
+    duplicadosIntraArchivo: duplicadosIntraArchivo.length,
     balanceCierra,
     balanceDiff: balanceCierra ? 0 : Math.round(balanceDiff * 100) / 100,
     message
   })
 }))
 
-// DELETE /api/admin/conciliacion/extractos/:id - Eliminar extracto
+// DELETE /api/admin/conciliacion/extractos/:id - Eliminar lote completo (extracto + movimientos + conciliaciones)
+//
+// Sin ?force=true:
+//   - Si NO tiene conciliaciones → borra directo.
+//   - Si tiene conciliaciones → devuelve 409 con resumen para mostrar modal de confirmación.
+// Con ?force=true:
+//   - Desvincula MovimientoCaja afectados (conciliacionId=null).
+//   - Borra conciliaciones, movimientos del extracto y el extracto.
 router.delete('/extractos/:id', asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id)
+  const force = req.query.force === 'true' || req.query.force === true || req.body?.force === true
 
   const extracto = await req.db.extractoBancario.findUnique({
     where: { id },
-    include: { conciliaciones: true }
+    include: {
+      conciliaciones: { select: { id: true, fecha: true, tipo: true, movimientosConciliados: true } },
+      _count: { select: { movimientos: true } }
+    }
   })
-
   if (!extracto) throw new AppError('Extracto no encontrado', 404)
 
-  if (extracto.conciliaciones.length > 0) {
-    throw new AppError('No se puede eliminar, tiene conciliaciones asociadas', 400)
+  const cantConciliaciones = extracto.conciliaciones.length
+
+  if (cantConciliaciones > 0 && !force) {
+    // Contar MovimientoCaja vinculados (a través de conciliaciones de este extracto)
+    const conciliacionIds = extracto.conciliaciones.map(c => c.id)
+    const cantMovsCaja = await req.db.movimientoCaja.count({
+      where: { conciliacionId: { in: conciliacionIds } }
+    })
+    return res.status(409).json({
+      success: false,
+      code: 'EXTRACTO_CON_CONCILIACIONES',
+      message: `El lote ${extracto.numero} tiene ${cantConciliaciones} conciliacion(es) asociada(s)`,
+      data: {
+        numero: extracto.numero,
+        cantMovimientos: extracto._count.movimientos,
+        cantConciliaciones,
+        cantMovimientosCaja: cantMovsCaja,
+      }
+    })
   }
 
-  // Eliminar movimientos y extracto
-  await req.db.$transaction([
-    req.db.movimientoExtracto.deleteMany({ where: { extractoId: id } }),
-    req.db.extractoBancario.delete({ where: { id } })
-  ])
+  await req.db.$transaction(async (tx) => {
+    if (cantConciliaciones > 0) {
+      const conciliacionIds = extracto.conciliaciones.map(c => c.id)
+      // Desvincular MovimientoCaja (los preserva, no se borran)
+      await tx.movimientoCaja.updateMany({
+        where: { conciliacionId: { in: conciliacionIds } },
+        data: { conciliacionId: null }
+      })
+      // Desvincular movimientos_extracto que apunten a estas conciliaciones (todos los del extracto en principio)
+      await tx.movimientoExtracto.updateMany({
+        where: { conciliacionId: { in: conciliacionIds } },
+        data: { conciliacionId: null, conciliado: false, fechaConciliacion: null, movimientoCajaId: null }
+      })
+      await tx.conciliacion.deleteMany({ where: { id: { in: conciliacionIds } } })
+    }
+    await tx.movimientoExtracto.deleteMany({ where: { extractoId: id } })
+    await tx.extractoBancario.delete({ where: { id } })
+  }, { timeout: 60000 })
 
-  res.json({ success: true, message: 'Extracto eliminado' })
+  res.json({
+    success: true,
+    message: `Lote ${extracto.numero} eliminado: ${extracto._count.movimientos} movs · ${cantConciliaciones} conciliacion(es) revertida(s)`
+  })
 }))
 
 // =============================================================================
@@ -1054,23 +1141,27 @@ function parsearXLSX(contenidoBase64, config) {
     })
   }
 
+  // SaldoInicial / SaldoFinal: usar el valor literal de la PRIMERA y ÚLTIMA fila del archivo
+  // en orden de aparición física (antes de cualquier sort). Esto es lo que el usuario ve
+  // al abrir el Excel y lo que coincide con la realidad reportada por el banco.
+  if (movimientos.length > 0) {
+    const primeraFisica = movimientos[0]
+    if (primeraFisica.saldo != null) {
+      // saldoInicial = saldo de la primera fila MENOS su efecto (para reflejar el saldo previo al primer mov)
+      saldoInicial = Number(primeraFisica.saldo) - (primeraFisica.tipo === 'CREDITO' ? Number(primeraFisica.importe) : -Number(primeraFisica.importe))
+    }
+    const ultimaFisica = movimientos[movimientos.length - 1]
+    if (ultimaFisica.saldo != null) {
+      saldoFinal = Number(ultimaFisica.saldo)
+    }
+  }
+
   // Si el archivo viene DESC, invertir (opcional — algunos bancos exportan más reciente arriba).
   if (ordenInvertido) movimientos.reverse()
 
-  // Ordenar por fecha ASC para garantizar orden cronológico,
-  // independiente de cómo venga el archivo. Esto hace el cálculo de
-  // saldoInicial/saldoFinal y el matching contra MovimientoCaja más predecibles.
+  // Ordenar por fecha ASC para garantizar orden cronológico al guardar.
+  // saldoInicial/saldoFinal ya quedaron tomados ANTES del sort, intencionalmente.
   movimientos.sort((a, b) => a.fecha - b.fecha)
-
-  // Saldo inicial/final desde primer y último movimiento (en orden cronológico)
-  if (movimientos.length > 0) {
-    const primero = movimientos[0]
-    if (primero.saldo !== null && primero.saldo !== undefined) {
-      saldoInicial = primero.saldo - (primero.tipo === 'CREDITO' ? primero.importe : -primero.importe)
-    }
-    const ultimo = movimientos[movimientos.length - 1]
-    if (ultimo.saldo !== null && ultimo.saldo !== undefined) saldoFinal = ultimo.saldo
-  }
 
   return { movimientos, saldoInicial, saldoFinal }
 }

@@ -25,7 +25,7 @@ async function main() {
     where: { hashOrigen: null },
     select: {
       id: true, tenantId: true, fecha: true, importe: true, tipo: true,
-      concepto: true, referencia: true, numeroComprobante: true,
+      concepto: true, referencia: true, numeroComprobante: true, saldo: true,
       extracto: { select: { numero: true, cajaId: true } }
     },
     orderBy: { id: 'asc' }
@@ -49,6 +49,7 @@ async function main() {
       concepto: m.concepto,
       referencia: m.referencia,
       numeroComprobante: m.numeroComprobante,
+      saldo: m.saldo,
     })
     const key = `${m.tenantId}|${hash}`
     if (!grupos.has(key)) grupos.set(key, [])

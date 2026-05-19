@@ -152,18 +152,17 @@ export default function ConciliacionBancaria() {
 
   async function handleImportar(omitirDuplicados = false) {
     if (!importForm.cajaId || !importForm.formatoId || !importForm.contenido) {
-      setError('Complete todos los campos requeridos')
+      toast.error('Complete todos los campos requeridos')
       return
     }
 
     setImporting(true)
-    setError(null)
     try {
       const response = await api.postFull('/admin/conciliacion/extractos/importar', {
         ...importForm,
         omitirDuplicados
       })
-      setSuccess(response.message)
+      toast.success(response.message || 'Extracto importado')
       setShowImportModal(false)
       setDupesInfo(null)
       setImportForm({
@@ -181,22 +180,37 @@ export default function ConciliacionBancaria() {
         // Mostrar modal de confirmación con detalle de duplicados
         setDupesInfo(err.data)
       } else {
-        setError(err.message || 'Error importando extracto')
+        toast.error(err.message || 'Error importando extracto')
       }
     } finally {
       setImporting(false)
     }
   }
 
-  async function handleEliminarExtracto(id) {
-    const confirmed = await confirm('Eliminar Extracto', '¿Eliminar este extracto?', { variant: 'danger', confirmText: 'Eliminar' })
-    if (!confirmed) return
+  async function handleEliminarExtracto(id, force = false) {
+    if (!force) {
+      const confirmed = await confirm('Eliminar Lote', '¿Eliminar este lote de importación? Se borrarán el extracto y todos sus movimientos.', { variant: 'danger', confirmText: 'Eliminar' })
+      if (!confirmed) return
+    }
     try {
-      await api.delete(`/admin/conciliacion/extractos/${id}`)
-      setSuccess('Extracto eliminado')
+      const url = `/admin/conciliacion/extractos/${id}${force ? '?force=true' : ''}`
+      const res = await api.delete(url)
+      toast.success(res?.message || 'Lote eliminado')
       cargarExtractos()
     } catch (err) {
-      toast.error(err.message)
+      if (err.code === 'EXTRACTO_CON_CONCILIACIONES' && err.data) {
+        const d = err.data
+        const confirmed = await confirm(
+          'Lote con conciliaciones',
+          `El lote ${d.numero} tiene ${d.cantConciliaciones} conciliacion(es) que afectan ${d.cantMovimientosCaja} movimiento(s) de caja. ` +
+          `Si continuás, las conciliaciones se revertirán (los movimientos de caja se preservan pero quedan sin conciliar) y se borrarán los ${d.cantMovimientos} movimientos del extracto. ` +
+          `¿Forzar eliminación?`,
+          { variant: 'danger', confirmText: 'Forzar eliminación' }
+        )
+        if (confirmed) await handleEliminarExtracto(id, true)
+      } else {
+        toast.error(err.message)
+      }
     }
   }
 
