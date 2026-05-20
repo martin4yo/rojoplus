@@ -1020,8 +1020,26 @@ function parsearTXT(contenido, config) {
 /**
  * Parsea fecha según formato
  */
+const MESES_ES = {
+  ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6,
+  jul: 7, ago: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12,
+}
+
 function parsearFecha(fechaStr, formato) {
   if (!fechaStr) throw new Error('Fecha vacía')
+
+  // Formato con mes en español (ej: "19-may-2026", "04-abr-2026").
+  // Lo usa Banco Provincia entre otros.
+  if (formato === 'DD-MMM-YYYY-ES') {
+    const m = String(fechaStr).trim().toLowerCase().match(/^(\d{1,2})[-\/\s]([a-z]{3,4})\.?[-\/\s](\d{2,4})$/)
+    if (!m) throw new Error('Formato de fecha no coincide')
+    const dia = parseInt(m[1])
+    const mes = MESES_ES[m[2].slice(0, 3)]
+    if (!mes) throw new Error(`Mes desconocido: ${m[2]}`)
+    let anio = parseInt(m[3])
+    if (anio < 100) anio += 2000
+    return new Date(anio, mes - 1, dia)
+  }
 
   // Formatos comunes
   const formatos = {
@@ -1228,9 +1246,18 @@ const PRESETS_BANCOS_AR = [
     nombre: 'Banco Provincia - Extracto Excel',
     banco: 'PROVINCIA',
     tipoArchivo: 'XLSX',
-    descripcion: 'Extracto Banco Provincia en formato Excel',
-    configuracion: { hoja: 0, primeraFila: 2, formatoFecha: 'DD/MM/YYYY',
-      columnas: { fecha: 0, concepto: 1, descripcion: 2, importe: 3, saldo: 4 } }
+    descripcion: 'Extracto Banco Provincia (BAPRO) — exportación "Detalle de Movimientos" en Excel (.xls/.xlsx). Detecta header "Fecha/Descripción/Importe/Saldo" en col B-E con meses en español (ej: 19-may-2026)',
+    configuracion: {
+      hoja: 0,
+      primeraFila: 7,           // datos arrancan en fila 8 (0-indexed=7); las primeras 7 son metadata/encabezado
+      formatoFecha: 'DD-MMM-YYYY-ES',
+      columnas: {
+        fecha: 1,               // col B
+        concepto: 2,            // col C - "Descripción"
+        importe: 3,             // col D - número con signo (negativo=débito)
+        saldo: 4                // col E
+      }
+    }
   },
   {
     nombre: 'Banco Credicoop - Extracto Excel',

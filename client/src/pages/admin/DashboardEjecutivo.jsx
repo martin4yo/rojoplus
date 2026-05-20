@@ -918,24 +918,31 @@ export default function DashboardEjecutivo() {
 
             {/* Bancos */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 rounded-lg bg-blue-100 shrink-0">
-                    <CreditCard className="w-5 h-5 text-blue-600" />
+              {(() => {
+                const hayExtracto = tesoreria.saldoTotalBancosExtracto != null && cajasBanco.some(c => c.saldoExtracto != null)
+                return (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-lg bg-blue-100 shrink-0">
+                        <CreditCard className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-800">Bancos</h3>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xl font-bold text-blue-600">{formatCurrency(totalBancos)}</p>
+                        <p className="text-xs text-gray-500">según movimientos</p>
+                      </div>
+                      {hayExtracto && (
+                        <div>
+                          <p className="text-xl font-bold text-indigo-600">{formatCurrency(tesoreria.saldoTotalBancosExtracto)}</p>
+                          <p className="text-xs text-gray-500">según extracto</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-800">Bancos</h3>
-                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalBancos)}</p>
-                    <p className="text-xs text-gray-500">según movimientos</p>
-                  </div>
-                </div>
-                {tesoreria.saldoTotalBancosExtracto != null && cajasBanco.some(c => c.saldoExtracto != null) && (
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-indigo-600">{formatCurrency(tesoreria.saldoTotalBancosExtracto)}</p>
-                    <p className="text-xs text-gray-500">según extracto</p>
-                  </div>
-                )}
-              </div>
+                )
+              })()}
               <div className="space-y-3">
                 {cajasBanco.map(caja => {
                   const saldo = Number(caja.saldoActual) || 0
@@ -975,18 +982,21 @@ export default function DashboardEjecutivo() {
                         </span>
                       </div>
                       {saldoExtracto != null && (
-                        <div className="flex items-center justify-between mt-1.5 ml-12 text-xs">
-                          <span className="text-gray-500">
+                        <div className="mt-2 pt-2 border-t border-gray-200 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+                          <span className="text-gray-500 whitespace-nowrap">
                             Extracto al {new Date(caja.fechaExtracto).toLocaleDateString('es-AR', { timeZone: 'UTC' })}
                           </span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-indigo-600 font-medium">{formatCurrency(saldoExtracto)}</span>
-                            {Math.abs(diff) > 0.01 && (
-                              <span className={`${diff > 0 ? 'text-emerald-600' : 'text-orange-600'}`} title="Diferencia (movimientos - extracto)">
+                          <span className="text-indigo-600 font-medium text-right truncate" title={`Saldo extracto: ${formatCurrency(saldoExtracto)}`}>
+                            {formatCurrency(saldoExtracto)}
+                          </span>
+                          {Math.abs(diff) > 0.01 && (
+                            <>
+                              <span className="text-gray-500" title="Diferencia (movimientos - extracto)">Diferencia</span>
+                              <span className={`text-right truncate ${diff > 0 ? 'text-emerald-600' : 'text-orange-600'} font-medium`}>
                                 {diff > 0 ? '+' : ''}{formatCurrency(diff)}
                               </span>
-                            )}
-                          </div>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>

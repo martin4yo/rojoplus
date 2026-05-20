@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { CheckCircle, Download, Mail, MessageCircle, Loader2, Receipt } from 'lucide-react'
+import { CheckCircle, Download, Mail, MessageCircle, Loader2, Receipt, Ban } from 'lucide-react'
 import Modal from './Modal'
 import { Button } from './Button'
 import AdjuntosComprobante from './AdjuntosComprobante'
 import api from '../services/api'
+import { tienePermiso, PERMISOS } from '../services/permisos'
 
 /**
  * Modal de acciones del recibo: descargar PDF, enviar por email, enviar por WhatsApp.
@@ -26,10 +27,16 @@ export default function ReciboAccionesModal({
   variante = 'simple',
   tituloSimple = 'Acciones del recibo',
   resultadoInicial,
+  onAnulado,
 }) {
   const [enviando, setEnviando] = useState({})
   const [resultado, setResultado] = useState({})
   const [descargando, setDescargando] = useState(false)
+  const [mostrarAnular, setMostrarAnular] = useState(false)
+  const [motivoAnular, setMotivoAnular] = useState('')
+  const [anulando, setAnulando] = useState(false)
+  const [errorAnular, setErrorAnular] = useState('')
+  const puedeAnular = variante === 'simple' && tienePermiso(PERMISOS.CAJA_ANULAR)
 
   // Al abrir: aplicar resultadoInicial (envíos automáticos ya disparados)
   // Al cerrar: limpiar todo.
@@ -45,12 +52,40 @@ export default function ReciboAccionesModal({
       setResultado(inicial)
       setEnviando({})
       setDescargando(false)
+      setMostrarAnular(false)
+      setMotivoAnular('')
+      setErrorAnular('')
+      setAnulando(false)
     } else {
       setEnviando({})
       setResultado({})
       setDescargando(false)
+      setMostrarAnular(false)
+      setMotivoAnular('')
+      setErrorAnular('')
+      setAnulando(false)
     }
   }, [isOpen, resultadoInicial?.email, resultadoInicial?.whatsapp])
+
+  async function confirmarAnulacion() {
+    if (!pagoId) return
+    const motivo = motivoAnular.trim()
+    if (!motivo) {
+      setErrorAnular('Indicá el motivo')
+      return
+    }
+    setAnulando(true)
+    setErrorAnular('')
+    try {
+      await api.post(`/admin/pagos/${pagoId}/anular`, { motivo })
+      if (onAnulado) onAnulado()
+      onClose()
+    } catch (err) {
+      setErrorAnular(err?.message || 'Error al anular')
+    } finally {
+      setAnulando(false)
+    }
+  }
 
   async function descargarPDF() {
     if (!pagoId || descargando) return
@@ -177,6 +212,53 @@ export default function ReciboAccionesModal({
         <div className="border-t pt-3">
           <AdjuntosComprobante tipo="pago" comprobanteId={pagoId} />
         </div>
+
+        {puedeAnular && !mostrarAnular && (
+          <div className="border-t pt-3">
+            <button
+              onClick={() => setMostrarAnular(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-red-300 rounded-lg text-red-700 hover:bg-red-50 text-sm font-medium"
+            >
+              <Ban className="w-4 h-4" />
+              Anular Recibo
+            </button>
+          </div>
+        )}
+
+        {puedeAnular && mostrarAnular && (
+          <div className="border-t pt-3 space-y-2">
+            <p className="text-sm text-gray-700 font-medium">Anular este recibo</p>
+            <p className="text-xs text-gray-500">
+              Los cargos vuelven a PENDIENTE, se revierte el saldo de la caja y se anula el asiento contable.
+            </p>
+            <textarea
+              value={motivoAnular}
+              onChange={e => setMotivoAnular(e.target.value)}
+              placeholder="Motivo de la anulación (obligatorio)"
+              rows={2}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              disabled={anulando}
+            />
+            {errorAnular && <p className="text-xs text-red-500">{errorAnular}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setMostrarAnular(false); setMotivoAnular(''); setErrorAnular('') }}
+                disabled={anulando}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarAnulacion}
+                disabled={anulando || !motivoAnular.trim()}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60"
+              >
+                {anulando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                Confirmar anulación
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <Button onClick={onClose} className="w-full flex items-center justify-center gap-2 mt-4">

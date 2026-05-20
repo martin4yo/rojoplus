@@ -2063,6 +2063,7 @@ export default function SocioDetalle() {
         pagoId={reciboModal?.pagoId}
         numeroRecibo={reciboModal?.numeroRecibo}
         variante="simple"
+        onAnulado={() => { cargarSocio(); cargarCuentaCorriente() }}
       />
 
       {/* Modal Generar Cuota de Actividad */}
