@@ -19,6 +19,19 @@ const tenantForAdmin = (req, res, next) => {
   })
 }
 
+// Middleware dual: usa authDispositivo si viene X-Tenant-Slug (molinete-service),
+// sino cae a tenantForAdmin + authAdmin (ControlPWA usando token de admin).
+const authDispositivoOrAdmin = (req, res, next) => {
+  const tieneSlugHeader = !!req.get('X-Tenant-Slug')
+  if (tieneSlugHeader) {
+    return authDispositivo(req, res, next)
+  }
+  tenantForAdmin(req, res, (err) => {
+    if (err) return next(err)
+    authAdmin(req, res, next)
+  })
+}
+
 // ============================================
 // VALIDACIÓN DE ACCESO
 // ============================================
@@ -30,7 +43,7 @@ const tenantForAdmin = (req, res, next) => {
  * Body: { dispositivoId, tipoLectura, valorLeido }
  * Returns: { permitido, motivo, persona, mensaje }
  */
-router.post('/validar', authDispositivo, async (req, res) => {
+router.post('/validar', authDispositivoOrAdmin, async (req, res) => {
   try {
     const { dispositivoId, tipoLectura, valorLeido } = req.body
 
@@ -315,7 +328,7 @@ router.post('/validar', authDispositivo, async (req, res) => {
  *
  * Body: { dispositivoId, tipoLectura, valorLeido, resultado, motivo, socioId?, habilitacionTemporalId?, modoValidacion }
  */
-router.post('/registrar', authDispositivo, async (req, res) => {
+router.post('/registrar', authDispositivoOrAdmin, async (req, res) => {
   try {
     const {
       tipoLectura,
@@ -325,12 +338,14 @@ router.post('/registrar', authDispositivo, async (req, res) => {
       motivoRechazo,
       socioId,
       habilitacionTemporalId,
-      modoValidacion
+      modoValidacion,
+      dispositivoId: dispositivoIdBody,
     } = req.body
 
-    // El dispositivoId lo tomamos del middleware (token autenticado), no del body,
+    // En el flujo dispositivo (molinete-service) usamos el id del token autenticado
     // para evitar que un dispositivo registre accesos como si fuera otro.
-    const dispositivoId = req.dispositivo.id
+    // En el flujo admin (ControlPWA) el dispositivo se elige en la UI y viene en body.
+    const dispositivoId = req.dispositivo?.id || (dispositivoIdBody ? parseInt(dispositivoIdBody) : null)
 
     // Crear registro de acceso
     const registro = await req.db.registroAcceso.create({

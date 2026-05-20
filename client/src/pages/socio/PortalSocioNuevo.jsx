@@ -48,6 +48,7 @@ import BeneficiosSocio from './sections/BeneficiosSocio'
 import DebitoAutomaticoSocio from './sections/DebitoAutomaticoSocio'
 import NotificacionesSocio from './sections/NotificacionesSocio'
 import EventosSocio from './sections/EventosSocio'
+import MisEntradasSocio from './sections/MisEntradasSocio'
 import ReservasSocio from './sections/ReservasSocio'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
@@ -207,6 +208,14 @@ export default function PortalSocioNuevo() {
       descripcion: 'Compra entradas a eventos del club',
     },
     {
+      id: 'mis-entradas',
+      label: 'Mis Entradas',
+      icon: TicketIcon,
+      iconSolid: TicketIconSolid,
+      badge: null,
+      descripcion: 'Ver y usar las entradas que compraste',
+    },
+    {
       id: 'beneficios',
       label: 'Beneficios',
       icon: TagIcon,
@@ -310,6 +319,7 @@ export default function PortalSocioNuevo() {
         {activeTab === 'inicio' && <DashboardSocio socio={socio} tokenPortal={tokenPortal} onNavigate={setActiveTab} mensajesNoLeidos={mensajesNoLeidos} />}
         {activeTab === 'carnet' && <CarnetDigitalSocio socio={socio} tokenPortal={tokenPortal} branding={branding} />}
         {activeTab === 'eventos' && <EventosSocio socio={socio} tokenPortal={tokenPortal} />}
+        {activeTab === 'mis-entradas' && <MisEntradasSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'reservas' && <ReservasSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'beneficios' && <BeneficiosSocio socio={socio} tokenPortal={tokenPortal} />}
         {activeTab === 'actividades' && <MisActividadesSocio socio={socio} tokenPortal={tokenPortal} />}

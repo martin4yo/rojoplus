@@ -126,13 +126,15 @@ export default function EventoDetalle({ eventoId, eventoData, onClose, isModal =
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `entradas-${entrada.nombreComprador.replace(/\s/g, '_')}.pdf`
+      const ext = blob.type === 'application/zip' ? 'zip' : 'pdf'
+      const safeName = (entrada.nombreComprador || 'entradas').replace(/\s/g, '_')
+      link.download = `entradas-${safeName}.${ext}`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
 
-      toast.success('PDF descargado correctamente')
+      toast.success(ext === 'zip' ? 'ZIP con entradas descargado' : 'Entrada descargada')
     } catch (err) {
       toast.error(err.message || 'Error al generar PDF')
     }

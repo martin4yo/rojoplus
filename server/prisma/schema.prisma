@@ -1110,6 +1110,8 @@ model Caja {
   puntoVentaAfip        Int?                     @map("punto_venta_afip")
   permiteSaldoNegativo  Boolean                  @default(false) @map("permite_saldo_negativo")
   limiteDescubierto     Decimal?                 @map("limite_descubierto") @db.Decimal(12, 2)
+  mpStoreId             String?                  @map("mp_store_id")
+  mpPosId               String?                  @map("mp_pos_id")
   cuentaContable        CuentaContable?          @relation(fields: [cuentaContableId], references: [id])
   centroCosto           CentroCosto?             @relation(fields: [centroCostoId], references: [id])
   cierres               CierreCaja[]
@@ -1563,6 +1565,7 @@ model LinkPago {
   paymentId       String?   @map("payment_id")
   paymentStatus   String?   @map("payment_status")
   paymentDetail   String?   @map("payment_detail")
+  cajaId          Int?      @map("caja_id")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   socio           Socio     @relation(fields: [socioId], references: [id])

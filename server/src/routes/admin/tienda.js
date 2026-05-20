@@ -443,11 +443,19 @@ router.get('/pagos/mercadopago', authAdmin, asyncHandler(async (req, res) => {
   const accessToken = map.MP_ACCESS_TOKEN || ''
   const publicKey = map.MP_PUBLIC_KEY || ''
   const modoTest = map.MP_MODO_TEST === 'true' || (accessToken.startsWith('TEST-'))
+  const cajaDefaultId = map.MP_CAJA_DEFAULT_ID ? parseInt(map.MP_CAJA_DEFAULT_ID) : null
 
   // No exponemos el token completo, solo prefijo + últimos chars
   const tokenMasked = accessToken
     ? `${accessToken.slice(0, 8)}…${accessToken.slice(-4)}`
     : ''
+
+  // Listar cajas activas con MP configurado (para el selector)
+  const cajas = await req.db.caja.findMany({
+    where: { activo: true },
+    orderBy: { nombre: 'asc' },
+    select: { id: true, codigo: true, nombre: true, tipo: true, mpStoreId: true, mpPosId: true },
+  })
 
   res.json({
     success: true,
@@ -458,6 +466,8 @@ router.get('/pagos/mercadopago', authAdmin, asyncHandler(async (req, res) => {
       tokenPrefijo: accessToken ? accessToken.split('-')[0] : '', // 'TEST' o 'APP_USR'
       publicKey, // public key se puede mostrar entera (no es secreto)
       tieneFallbackEnv: !!process.env.MERCADOPAGO_ACCESS_TOKEN,
+      cajaDefaultId,
+      cajas,
     },
   })
 }))
@@ -491,6 +501,17 @@ router.put('/pagos/mercadopago', authAdmin, asyncHandler(async (req, res) => {
       where: { tenantId_clave: { tenantId: req.tenantId, clave: 'MP_MODO_TEST' } },
       update: { valor: modoTest ? 'true' : 'false' },
       create: { clave: 'MP_MODO_TEST', valor: modoTest ? 'true' : 'false', modulo: 'PAGOS', tenantId: req.tenantId },
+    })
+  }
+
+  // Caja default para recibir pagos MP (cuotas, etc). Su mpStoreId/mpPosId se mandan
+  // a MP como metadata en cada preference para reconciliación.
+  if (req.body?.cajaDefaultId !== undefined) {
+    const valor = req.body.cajaDefaultId ? String(req.body.cajaDefaultId) : ''
+    await req.db.configuracion.upsert({
+      where: { tenantId_clave: { tenantId: req.tenantId, clave: 'MP_CAJA_DEFAULT_ID' } },
+      update: { valor },
+      create: { clave: 'MP_CAJA_DEFAULT_ID', valor, modulo: 'PAGOS', tenantId: req.tenantId },
     })
   }
 

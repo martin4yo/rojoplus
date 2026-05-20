@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
 import { authAdmin } from '../../middleware/auth.js'
-import { procesarNotificacionesPendientes } from '../../services/notificacionService.js'
+import { procesarNotificacionesPendientes, notificarMorosidad } from '../../services/notificacionService.js'
 
 const router = Router()
 
@@ -133,6 +133,214 @@ router.post('/notificaciones-log/:id/reintentar', authAdmin, asyncHandler(async 
 router.post('/notificaciones-log/procesar-ahora', authAdmin, asyncHandler(async (req, res) => {
   const r = await procesarNotificacionesPendientes()
   res.json({ success: true, data: r })
+}))
+
+// POST /api/admin/notificaciones-log/avisar-cuotas-vencidas
+// Encola UN aviso por socio (al titular del grupo familiar) consolidando sus cuotas
+// vencidas. El filtro define una "ventana de períodos" contada hacia atrás desde el
+// período en curso (mes/año actual): si periodosVentana=3, mira los últimos 3 períodos
+// (ej: mayo + abril + marzo si estamos en mayo). Avisa a los socios que tengan al menos
+// 1 cargo PENDIENTE vencido en alguno de esos períodos.
+// NO filtra por estado del socio.
+//
+// Body: {
+//   dryRun: true|false (default true),
+//   periodosVentana: 3,                // cuántos meses hacia atrás desde el actual
+//   evitarReavisar: true,              // si ya hay MOROSIDAD enviada en últimos 7 días, omitir
+// }
+//
+// Si MODO_DEMO está activo, los envíos van redirigidos a EMAIL_DEMO / WHATSAPP_DEMO_NUMERO.
+router.post('/notificaciones-log/avisar-cuotas-vencidas', authAdmin, asyncHandler(async (req, res) => {
+  const dryRun = req.body?.dryRun !== false   // default true
+  const periodosVentana = Math.max(1, parseInt(req.body?.periodosVentana || 3))
+  const evitarReavisar = req.body?.evitarReavisar !== false  // default true
+
+  const hoy0 = new Date(); hoy0.setHours(0, 0, 0, 0)
+
+  // Config demo (informativa, ya la respeta el servicio de envío)
+  const [modoDemo, emailDemo, waDemo] = await Promise.all([
+    req.db.configuracion.findFirst({ where: { clave: 'MODO_DEMO' } }),
+    req.db.configuracion.findFirst({ where: { clave: 'EMAIL_DEMO' } }),
+    req.db.configuracion.findFirst({ where: { clave: 'WHATSAPP_DEMO_NUMERO' } }),
+  ])
+  const demo = {
+    activo: modoDemo?.valor === 'true',
+    email: emailDemo?.valor || null,
+    whatsapp: waDemo?.valor || null,
+  }
+
+  // Identificar los últimos N períodos contando desde el período actual hacia atrás.
+  // Período actual = año/mes de hoy. Si no existe Periodo para el mes actual,
+  // tomamos los N más recientes que existan.
+  const anioActual = hoy0.getFullYear()
+  const mesActual = hoy0.getMonth() + 1  // 1-12
+  const periodos = await req.db.periodo.findMany({
+    where: {
+      OR: [
+        { anio: { lt: anioActual } },
+        { anio: anioActual, mes: { lte: mesActual } },
+      ],
+    },
+    orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
+    take: periodosVentana,
+    select: { id: true, anio: true, mes: true, nombre: true },
+  })
+
+  if (periodos.length === 0) {
+    return res.json({
+      success: true,
+      data: { dryRun: true, demo, candidatos: 0, yaNotificados: 0, aEncolar: 0, ejemplos: [], periodosEnVentana: [] },
+    })
+  }
+
+  const periodoIds = periodos.map(p => p.id)
+  const periodoLabels = periodos.map(p => p.nombre || `${String(p.mes).padStart(2,'0')}/${p.anio}`)
+
+  // Cargos PENDIENTE vencidos cuyo periodoId esté en la ventana (sin filtro de estado del socio)
+  const cargosCandidatos = await req.db.cargo.findMany({
+    where: {
+      estado: 'PENDIENTE',
+      fechaVencimiento: { lt: hoy0, not: null },
+      socioId: { not: null },
+      periodoId: { in: periodoIds },
+    },
+    select: {
+      id: true,
+      montoTotal: true,
+      fechaVencimiento: true,
+      descripcion: true,
+      socioId: true,
+      socio: {
+        select: {
+          id: true, nroSocio: true, apellidoNombre: true,
+          email: true, celular: true,
+          titularFamiliaId: true,
+          notifEmail: true, notifWhatsapp: true, notificarMorosidad: true,
+          estadoSocioRel: { select: { codigo: true, nombre: true, rolVigencia: true, permiteIngresoMolinete: true } },
+        },
+      },
+    },
+    orderBy: { fechaVencimiento: 'asc' },
+  })
+
+  // Agrupar por socio titular (o socio individual si no tiene familia)
+  // Acumula cuotas y monto adeudado.
+  const porTitular = new Map() // titularId → { socio, cantidadCuotas, totalAdeudado, vencimientoMasViejo }
+  const titularIdsNecesarios = new Set()
+  for (const c of cargosCandidatos) {
+    const tid = c.socio?.titularFamiliaId || c.socioId
+    titularIdsNecesarios.add(tid)
+    if (!porTitular.has(tid)) {
+      porTitular.set(tid, { titularId: tid, socioCualquiera: c.socio, cantidadCuotas: 0, totalAdeudado: 0, vencimientoMasViejo: c.fechaVencimiento })
+    }
+    const g = porTitular.get(tid)
+    g.cantidadCuotas++
+    g.totalAdeudado += Number(c.montoTotal)
+    if (c.fechaVencimiento < g.vencimientoMasViejo) g.vencimientoMasViejo = c.fechaVencimiento
+  }
+
+  // Cargar los titulares reales (puede ser distinto al socio del cargo)
+  const titulares = await req.db.socio.findMany({
+    where: { id: { in: [...titularIdsNecesarios] } },
+    select: {
+      id: true, nroSocio: true, apellidoNombre: true,
+      email: true, celular: true,
+      notifEmail: true, notifWhatsapp: true, notificarMorosidad: true,
+      estadoSocioRel: { select: { codigo: true, nombre: true, rolVigencia: true, permiteIngresoMolinete: true } },
+    },
+  })
+  const titularesMap = new Map(titulares.map(t => [t.id, t]))
+
+  // Todos los socios con al menos 1 cuota vencida en la ventana de períodos
+  let grupos = [...porTitular.values()]
+    .map(g => ({ ...g, titular: titularesMap.get(g.titularId) || g.socioCualquiera }))
+
+  const candidatos = grupos.length
+
+  // Evitar reavisar: si ya hay MOROSIDAD enviada al titular en los últimos 7 días
+  let yaNotificados = 0
+  if (evitarReavisar && grupos.length > 0) {
+    const hace7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const titularIds = grupos.map(g => g.titularId)
+    const previos = await req.db.notificacionLog.findMany({
+      where: {
+        eventType: 'MOROSIDAD',
+        socioId: { in: titularIds },
+        enviado: true,
+        error: null,
+        fechaEnvio: { gte: hace7d },
+      },
+      select: { socioId: true },
+    })
+    const yaSet = new Set(previos.map(p => p.socioId))
+    yaNotificados = grupos.filter(g => yaSet.has(g.titularId)).length
+    grupos = grupos.filter(g => !yaSet.has(g.titularId))
+  }
+
+  // Ordenar: más viejos primero
+  grupos.sort((a, b) => a.vencimientoMasViejo - b.vencimientoMasViejo)
+
+  const ejemplos = grupos.slice(0, 15).map(g => ({
+    socioId: g.titularId,
+    socio: g.titular ? `#${g.titular.nroSocio} ${g.titular.apellidoNombre}` : '-',
+    estado: g.titular?.estadoSocioRel?.codigo,
+    bloqueado: g.titular?.estadoSocioRel?.rolVigencia === 'BLOQUEADO',
+    cantidadCuotas: g.cantidadCuotas,
+    totalAdeudado: g.totalAdeudado,
+    vencimientoMasViejo: g.vencimientoMasViejo,
+    flagSocio: g.titular?.notificarMorosidad !== false,
+    tieneEmail: !!g.titular?.email && g.titular?.notifEmail !== false,
+    tieneWA: !!g.titular?.celular && g.titular?.notifWhatsapp !== false,
+  }))
+
+  if (dryRun) {
+    return res.json({
+      success: true,
+      data: {
+        dryRun: true,
+        demo,
+        candidatos,
+        yaNotificados,
+        aEncolar: grupos.length,
+        ejemplos,
+        periodosEnVentana: periodoLabels,
+      },
+    })
+  }
+
+  // Encolar de verdad: un aviso por titular consolidando toda la deuda del grupo
+  let encolados = 0, omitidos = 0, errores = 0
+  for (const g of grupos) {
+    try {
+      const antes = await req.db.notificacionLog.count({
+        where: { socioId: g.titularId, eventType: 'MOROSIDAD', enviado: false },
+      })
+      await notificarMorosidad(g.titularId)
+      const despues = await req.db.notificacionLog.count({
+        where: { socioId: g.titularId, eventType: 'MOROSIDAD', enviado: false },
+      })
+      if (despues > antes) encolados++
+      else omitidos++  // el titular tenía notificarMorosidad=false u otro opt-out
+    } catch (err) {
+      errores++
+      console.error(`Error encolando morosidad socio ${g.titularId}:`, err.message)
+    }
+  }
+
+  res.json({
+    success: true,
+    data: {
+      dryRun: false,
+      demo,
+      candidatos,
+      yaNotificados,
+      encolados,
+      omitidos,
+      errores,
+      periodosEnVentana: periodoLabels,
+      mensaje: 'Notificaciones encoladas. Andá a la cola y "Procesar ahora" para enviarlas.',
+    },
+  })
 }))
 
 export default router

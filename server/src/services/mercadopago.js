@@ -14,6 +14,7 @@ function buildClient(accessToken) {
  * Crear preferencia de pago en MercadoPago
  * @param {Object} data - Datos del pago
  * @param {string} [data.accessToken] - Token MP del tenant (preferido). Si falta usa .env.
+ * @param {string} [data.tenantNombre] - Nombre del club/tenant (aparece en checkout + resumen tarjeta)
  * @param {string} data.title - Título del pago
  * @param {string} data.description - Descripción del pago
  * @param {number} data.amount - Monto total
@@ -38,11 +39,32 @@ export async function crearPreferenciaPago(data) {
       throw new Error(`URLs requeridos: success=${data.successUrl}, failure=${data.failureUrl}, pending=${data.pendingUrl}`)
     }
 
+    // Anteponer nombre del club al título del item y a la descripción para que
+    // el socio vea claramente a qué club le está pagando en el checkout de MP.
+    const tenantNombre = (data.tenantNombre || '').trim()
+    const titleConClub = tenantNombre ? `${tenantNombre} — ${data.title}` : data.title
+    const descConClub = tenantNombre
+      ? (data.description ? `${data.description} · ${tenantNombre}` : tenantNombre)
+      : (data.description || '')
+
+    // statement_descriptor (resumen de tarjeta): MP Argentina lo trunca a ~22 chars.
+    // Usar el nombre del club si está, sino fallback genérico.
+    const stmtDescRaw = tenantNombre || 'PAGO CLUB'
+    const statementDescriptor = stmtDescRaw.toUpperCase().slice(0, 22)
+
+    // metadata para identificar Store/POS de MP a nivel info adicional.
+    // MP los devuelve en el webhook y aparecen en "Detalles de la operación"
+    // del dashboard MP. No separan el dinero, pero permiten reconciliar luego.
+    const metadata = {}
+    if (data.storeId) metadata.store_id = String(data.storeId)
+    if (data.posId) metadata.pos_id = String(data.posId)
+    if (data.cajaId) metadata.caja_id = String(data.cajaId)
+
     const preferenceBody = {
       items: [
         {
-          title: data.title,
-          description: data.description || '',
+          title: titleConClub,
+          description: descConClub,
           quantity: data.quantity || 1,
           unit_price: Number(data.amount),
           currency_id: 'ARS',
@@ -59,12 +81,13 @@ export async function crearPreferenciaPago(data) {
         failure: data.failureUrl,
         pending: data.pendingUrl,
       },
-      statement_descriptor: 'CLUB SPORTIVO PILAR',
+      statement_descriptor: statementDescriptor,
       payment_methods: {
         excluded_payment_methods: [],
         excluded_payment_types: [],
         installments: 1, // Solo pago en 1 cuota por defecto
       },
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     }
 
     // Solo agregar notification_url si NO es localhost (para desarrollo sin ngrok)

@@ -43,6 +43,9 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
   const [escaneando, setEscaneando] = useState(false)
   const [datosEscaneados, setDatosEscaneados] = useState(null)
   const [montoManual, setMontoManual] = useState('')
+  // Selección de períodos en cascada: índice del último período seleccionado.
+  // -1 = nada seleccionado. Siempre es un prefijo contiguo desde el más viejo.
+  const [periodosHasta, setPeriodosHasta] = useState(-1)
   const fileInputRef = useRef(null)
   const { showModal, ModalComponent } = useModal()
 
@@ -688,104 +691,167 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
                 </>
               )}
 
-              {/* Lista de cuotas — agrupadas por socio (titular + miembros del grupo familiar) */}
+              {/* Cuotas agrupadas por período — selección contigua de atrás hacia adelante */}
               {(() => {
-                // Agrupar por socio. El propio (titular) primero, después miembros por nombre.
-                const grupos = new Map()
+                // Agrupar por periodo (string identificador) + capturar fecha mín y total
+                const mapa = new Map()
                 for (const c of cuotas) {
-                  const key = c.socioId ?? socio.id
-                  if (!grupos.has(key)) {
-                    grupos.set(key, {
-                      socioId: key,
-                      nombre: c.socioApellidoNombre || socio.apellidoNombre,
-                      nroSocio: c.socioNroSocio || socio.nroSocio,
-                      esTitular: !c.esDeOtroMiembro,
+                  const key = c.periodo || c.periodoId || `cargo-${c.id}`
+                  if (!mapa.has(key)) {
+                    mapa.set(key, {
+                      key,
+                      periodo: c.periodo || 'Sin período',
+                      fechaVencMin: c.fechaVencimiento,
                       cuotas: [],
                       total: 0,
+                      tieneRecargo: false,
                     })
                   }
-                  const g = grupos.get(key)
+                  const g = mapa.get(key)
                   g.cuotas.push(c)
                   g.total += Number(c.montoTotal) || 0
+                  if (Number(c.recargo) > 0) g.tieneRecargo = true
+                  if (c.fechaVencimiento && (!g.fechaVencMin || c.fechaVencimiento < g.fechaVencMin)) {
+                    g.fechaVencMin = c.fechaVencimiento
+                  }
                 }
-                const ordenados = [...grupos.values()].sort((a, b) =>
-                  (a.esTitular === b.esTitular) ? a.nombre.localeCompare(b.nombre) : (a.esTitular ? -1 : 1)
-                )
+                // Ordenar por fechaVencMin ASC (más viejo primero)
+                const periodos = [...mapa.values()].sort((a, b) => {
+                  const fa = new Date(a.fechaVencMin || 0).getTime()
+                  const fb = new Date(b.fechaVencMin || 0).getTime()
+                  return fa - fb
+                })
 
-                return ordenados.map((grupo) => (
-                  <div key={grupo.socioId} className="space-y-3">
-                    {/* Header del socio (sólo si hay más de un grupo, para no agregar ruido) */}
-                    {ordenados.length > 1 && (
-                      <div className="flex items-end justify-between border-b pb-2" style={{ borderColor: 'var(--border)' }}>
-                        <div>
-                          <div className="pub-eyebrow" style={{ color: 'var(--text-dim)' }}>
-                            {grupo.esTitular ? 'Tus cuotas' : 'Cuotas de'}
-                          </div>
-                          <p className="font-display-sport mt-1" style={{ fontSize: 22, lineHeight: 1, color: 'var(--text)' }}>
-                            {grupo.nombre} <span className="font-mono text-xs ml-2" style={{ color: 'var(--text-muted)' }}>#{grupo.nroSocio}</span>
-                          </p>
-                        </div>
-                        <p className="font-display-sport" style={{ fontSize: 22, lineHeight: 1, color: 'var(--text)' }}>
-                          {formatCurrency(grupo.total, { minimumFractionDigits: 0 })}
-                        </p>
+                const handleToggle = (i) => {
+                  // Click en período i: si ya está seleccionado, deselecciona desde ahí en adelante
+                  // (lo deja en i-1); si no lo está, marca hasta i (selecciona i y todos los anteriores).
+                  if (i <= periodosHasta) setPeriodosHasta(i - 1)
+                  else setPeriodosHasta(i)
+                }
+
+                const cuotasSeleccionadas = periodos.slice(0, periodosHasta + 1).flatMap(p => p.cuotas)
+                const totalSeleccionado = cuotasSeleccionadas.reduce((s, c) => s + Number(c.montoTotal || 0), 0)
+
+                return (
+                  <>
+                    <div>
+                      <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
+                        Períodos pendientes
                       </div>
-                    )}
+                      <p className="text-sm mb-4" style={{ color: 'var(--text-dim)' }}>
+                        El pago se aplica de atrás hacia adelante. Marcá hasta qué período querés pagar.
+                      </p>
+                    </div>
 
-                    {grupo.cuotas.map((cuota) => (
-                      <div key={cuota.id} className="pub-card overflow-hidden">
-                        <div className="p-6">
-                          <div className="flex items-start justify-between mb-4 gap-4">
-                            <div className="flex-1">
-                              <h3 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{cuota.concepto}</h3>
-                              <p className="mt-1 text-sm" style={{ color: 'var(--text-dim)' }}>
-                                Periodo: {cuota.periodo}
-                              </p>
-                              <div className="mt-2">
-                                <StatusBadge status={cuota.estado} type="cuota" />
+                    {periodos.map((p, i) => {
+                      const seleccionado = i <= periodosHasta
+                      // Bloqueado si hay períodos anteriores sin seleccionar (excepto que el clic
+                      // los seleccione en cascada — pero por UX explícita los marcamos como "bloqueados").
+                      // Nota: como handleToggle siempre selecciona desde 0 hasta i, técnicamente nunca
+                      // queda saltado. Aún así mostramos un hint visual en períodos posteriores al actual.
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          onClick={() => !esMiembroFamilia && handleToggle(i)}
+                          disabled={esMiembroFamilia}
+                          className="pub-card overflow-hidden w-full text-left transition-all"
+                          style={{
+                            cursor: esMiembroFamilia ? 'default' : 'pointer',
+                            borderColor: seleccionado ? 'var(--color-primary)' : 'var(--border)',
+                            borderWidth: seleccionado ? 2 : 1,
+                            backgroundColor: seleccionado ? 'var(--accent-soft)' : 'var(--bg-surface)',
+                          }}
+                        >
+                          <div className="p-5">
+                            <div className="flex items-start gap-4">
+                              {/* Checkbox visual */}
+                              {!esMiembroFamilia && (
+                                <div
+                                  className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded border-2"
+                                  style={{
+                                    borderColor: seleccionado ? 'var(--color-primary)' : 'var(--border)',
+                                    backgroundColor: seleccionado ? 'var(--color-primary)' : 'transparent',
+                                  }}
+                                >
+                                  {seleccionado && (
+                                    <CheckIcon className="h-4 w-4" style={{ color: 'var(--accent-fg)' }} />
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Info del período */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-3 mb-2">
+                                  <div>
+                                    <h3 className="font-display-sport" style={{ fontSize: 22, lineHeight: 1, color: 'var(--text)' }}>
+                                      {p.periodo}
+                                    </h3>
+                                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-1" style={{ color: 'var(--text-muted)' }}>
+                                      {p.cuotas.length} cargo{p.cuotas.length === 1 ? '' : 's'} · Vence {formatDate(p.fechaVencMin, { format: 'long' })}
+                                    </p>
+                                  </div>
+                                  <p className="font-display-sport whitespace-nowrap" style={{ fontSize: 22, lineHeight: 1, color: seleccionado ? 'var(--color-primary)' : 'var(--text)' }}>
+                                    {formatCurrency(p.total, { minimumFractionDigits: 0 })}
+                                  </p>
+                                </div>
+
+                                {/* Detalle de cargos del período */}
+                                <ul className="space-y-1 pl-2" style={{ borderLeft: '2px solid var(--border)' }}>
+                                  {p.cuotas.map(c => (
+                                    <li key={c.id} className="pl-3 flex items-center justify-between gap-2 text-sm">
+                                      <span style={{ color: 'var(--text-dim)' }}>
+                                        {c.concepto}
+                                        {c.esDeOtroMiembro && c.socioApellidoNombre && (
+                                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] ml-2" style={{ color: 'var(--text-muted)' }}>
+                                            · {c.socioApellidoNombre}
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span style={{ color: 'var(--text)' }}>
+                                        {formatCurrency(c.montoTotal, { minimumFractionDigits: 0 })}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+
+                                {p.tieneRecargo && (
+                                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-2" style={{ color: 'var(--color-primary)' }}>
+                                    Incluye recargo por mora
+                                  </p>
+                                )}
                               </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-display-sport" style={{ fontSize: 26, lineHeight: 1, color: 'var(--text)' }}>
-                                {formatCurrency(cuota.montoTotal, { minimumFractionDigits: 0 })}
-                              </p>
-                              <p className="font-mono text-[10px] uppercase tracking-[0.2em] mt-2" style={{ color: 'var(--text-muted)' }}>
-                                Vence {formatDate(cuota.fechaVencimiento, { format: 'long' })}
-                              </p>
-                            </div>
                           </div>
+                        </button>
+                      )
+                    })}
 
-                          {cuota.recargo > 0 && (
-                            <div className="rounded p-3 mb-4" style={{ backgroundColor: 'var(--accent-soft)', borderLeft: '4px solid var(--color-primary)' }}>
-                              <p className="text-sm" style={{ color: 'var(--text)' }}>
-                                Incluye recargo por mora: {formatCurrency(cuota.recargo, { minimumFractionDigits: 0 })}
-                              </p>
-                            </div>
-                          )}
-
-                          {!esMiembroFamilia && (
-                            <div className="flex flex-wrap gap-3">
-                              <button
-                                onClick={() => pagarCuota(cuota.id, 'MERCADOPAGO')}
-                                disabled={procesandoPago}
-                                className="px-4 py-2 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
-                                title="Pagar con MercadoPago"
-                              >
-                                <img src="/images/MP.png" alt="MercadoPago" className="h-6" />
-                              </button>
-                              <button
-                                disabled
-                                className="px-4 py-2 bg-white rounded-lg cursor-not-allowed opacity-60 shadow-lg border-b-4 border-gray-300 border border-gray-200"
-                                title="MODO - Próximamente"
-                              >
-                                <img src="/images/MODO.webp" alt="MODO" className="h-6" />
-                              </button>
-                            </div>
-                          )}
+                    {/* Botón de pago de períodos seleccionados */}
+                    {!esMiembroFamilia && periodosHasta >= 0 && (
+                      <div className="sticky bottom-4 pub-card p-5 shadow-lg" style={{ borderColor: 'var(--color-primary)', borderWidth: 2 }}>
+                        <div className="flex items-center justify-between gap-4 mb-3">
+                          <div>
+                            <p className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: 'var(--text-dim)' }}>
+                              {periodosHasta + 1} período{periodosHasta === 0 ? '' : 's'} seleccionado{periodosHasta === 0 ? '' : 's'}
+                            </p>
+                            <p className="font-display-sport" style={{ fontSize: 26, lineHeight: 1, color: 'var(--color-primary)' }}>
+                              {formatCurrency(totalSeleccionado, { minimumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => pagarVarias(cuotasSeleccionadas.map(c => c.id), 'MERCADOPAGO')}
+                            disabled={procesandoPago}
+                            className="px-6 py-3 bg-[#009EE3] rounded-lg hover:bg-[#0082bd] transition-all disabled:opacity-50 shadow-lg hover:shadow-xl active:shadow-md active:translate-y-0.5 border-b-4 border-[#0082bd]"
+                            title="Pagar con MercadoPago"
+                          >
+                            <img src="/images/MP.png" alt="MercadoPago" className="h-7" />
+                          </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ))
+                    )}
+                  </>
+                )
               })()}
             </>
           )}

@@ -10,8 +10,21 @@ function stripWww(url) {
 }
 
 export function getTenantFrontendUrl(tenant) {
-  if (!tenant || process.env.NODE_ENV !== 'production') {
+  if (!tenant) {
     return stripWww(process.env.FRONTEND_URL || 'http://localhost:5173')
+  }
+
+  // En desarrollo: anteponer subdomain al host de FRONTEND_URL para que matchee
+  // el flujo multi-tenant local (ej: sportivotest.localhost:5173).
+  if (process.env.NODE_ENV !== 'production') {
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    if (!tenant.subdomain) return stripWww(baseUrl)
+    try {
+      const u = new URL(baseUrl)
+      return stripWww(`${u.protocol}//${tenant.subdomain}.${u.host}`)
+    } catch {
+      return stripWww(baseUrl)
+    }
   }
 
   if (tenant.dominioCustom) {

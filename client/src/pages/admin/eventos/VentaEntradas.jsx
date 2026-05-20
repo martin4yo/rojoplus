@@ -378,23 +378,22 @@ export default function VentaEntradas() {
         nombreComprador: nombreComprador
       })
 
-      // Obtener el blob del PDF
       const blob = await response.blob()
 
-      // Crear URL y descargar
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
 
       const evento = entradasGeneradas[0]?.evento || entradasGeneradas[0]?.categoria?.evento
-      link.download = `entradas-${evento?.codigo || 'evento'}.pdf`
+      const ext = blob.type === 'application/zip' ? 'zip' : 'pdf'
+      link.download = `entradas-${evento?.codigo || 'evento'}.${ext}`
 
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
 
-      toast.success('PDF descargado correctamente')
+      toast.success(ext === 'zip' ? 'ZIP con entradas descargado' : 'Entrada descargada')
     } catch (err) {
       toast.error(err.message || 'Error al generar PDF')
     } finally {

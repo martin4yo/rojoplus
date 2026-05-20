@@ -45,7 +45,9 @@ export default function CajaForm() {
     paraTakeaway: false,
     paraCaja: true,
     permiteSaldoNegativo: false,
-    limiteDescubierto: ''
+    limiteDescubierto: '',
+    mpStoreId: '',
+    mpPosId: ''
   })
 
   useEffect(() => {
@@ -100,7 +102,9 @@ export default function CajaForm() {
         paraTakeaway: caja.paraTakeaway || false,
         paraCaja: caja.paraCaja !== false,
         permiteSaldoNegativo: caja.permiteSaldoNegativo || false,
-        limiteDescubierto: caja.limiteDescubierto != null ? String(caja.limiteDescubierto) : ''
+        limiteDescubierto: caja.limiteDescubierto != null ? String(caja.limiteDescubierto) : '',
+        mpStoreId: caja.mpStoreId || '',
+        mpPosId: caja.mpPosId || ''
       })
     } catch (err) {
       setError('Error al cargar la caja')
@@ -161,7 +165,9 @@ export default function CajaForm() {
         permiteSaldoNegativo: form.permiteSaldoNegativo,
         limiteDescubierto: form.permiteSaldoNegativo && form.limiteDescubierto !== ''
           ? parseFloat(form.limiteDescubierto)
-          : null
+          : null,
+        mpStoreId: form.mpStoreId?.trim() || null,
+        mpPosId: form.mpPosId?.trim() || null
       }
 
       if (!isEditing && form.saldoInicial) {
@@ -395,6 +401,41 @@ export default function CajaForm() {
               />
               <p className="text-xs text-gray-500 mt-1">
                 Numero de punto de venta asignado por AFIP para facturación electronica
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pt-4 border-t border-gray-100">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mercado Pago — Store ID
+              </label>
+              <input
+                type="text"
+                name="mpStoreId"
+                value={form.mpStoreId}
+                onChange={handleChange}
+                className="input-field w-full font-mono text-sm"
+                placeholder="Ej: 1234567"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                ID de la Sucursal en MP. Se manda como metadata en cada cobranza para reconciliación.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mercado Pago — POS ID
+              </label>
+              <input
+                type="text"
+                name="mpPosId"
+                value={form.mpPosId}
+                onChange={handleChange}
+                className="input-field w-full font-mono text-sm"
+                placeholder="Ej: 9876"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                ID de la Caja (POS) dentro del Store. Aparece en "Detalles de operación" en el dashboard MP.
               </p>
             </div>
           </div>

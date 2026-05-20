@@ -7,7 +7,14 @@ import { crearPreferenciaPago } from '../services/mercadopago.js'
 import { getMpAccessToken } from '../lib/mercadoPagoConfig.js'
 import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.js'
 import { generatePDF } from '../services/pdfGenerator.js'
+import { generarPDFUnaEntrada } from './eventos.js'
 import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
+import fs from 'fs/promises'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filenameSocio = fileURLToPath(import.meta.url)
+const __dirnameSocio = path.dirname(__filenameSocio)
 import { getVapidPublicKey, enviarNotificacionPush } from '../services/webPush.js'
 import { esSocioActivo, SELECT_ESTADO_SOCIO_REL } from '../lib/socioEstado.js'
 
@@ -1262,6 +1269,107 @@ router.get('/:tokenPortal/cuotas/pendientes', asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/socio/:tokenPortal/entradas - Lista de entradas compradas por el socio
+// Query: ?estado=VALIDA|USADA|ANULADA (opcional, default todas)
+router.get('/:tokenPortal/entradas', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+  const { estado } = req.query
+
+  const socio = await req.db.socio.findFirst({ where: { tokenPortal } })
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+
+  const where = { socioId: socio.id }
+  if (estado && ['VALIDA', 'USADA', 'ANULADA'].includes(estado)) {
+    where.estado = estado
+  }
+
+  const entradas = await req.db.entrada.findMany({
+    where,
+    include: {
+      evento: { select: { id: true, codigo: true, nombre: true, fecha: true, hora: true, ubicacion: true } },
+      categoria: { select: { id: true, nombre: true } },
+      ingreso: { select: { id: true, fechaIngreso: true } },
+    },
+    orderBy: [{ evento: { fecha: 'desc' } }, { fechaVenta: 'desc' }],
+  })
+
+  res.json({
+    success: true,
+    data: entradas.map(e => ({
+      id: e.id,
+      codigo: e.codigo,
+      estado: e.estado,
+      precio: Number(e.precio),
+      esSocio: e.esSocio,
+      fechaVenta: e.fechaVenta,
+      fechaAnulacion: e.fechaAnulacion,
+      motivoAnulacion: e.motivoAnulacion,
+      nombreComprador: e.nombreComprador,
+      evento: e.evento,
+      categoria: e.categoria,
+      fechaIngreso: e.ingreso?.fechaIngreso || null,
+    })),
+  })
+}))
+
+// GET /api/socio/:tokenPortal/entradas/:codigo/estado - Estado actual de una entrada (para polling)
+router.get('/:tokenPortal/entradas/:codigo/estado', asyncHandler(async (req, res) => {
+  const { tokenPortal, codigo } = req.params
+
+  const socio = await req.db.socio.findFirst({ where: { tokenPortal } })
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+
+  const entrada = await req.db.entrada.findFirst({
+    where: { codigo, socioId: socio.id },
+    select: {
+      estado: true,
+      ingreso: { select: { fechaIngreso: true } },
+    },
+  })
+  if (!entrada) throw new AppError('Entrada no encontrada', 404, 'NOT_FOUND')
+
+  res.json({
+    success: true,
+    data: {
+      estado: entrada.estado,
+      fechaIngreso: entrada.ingreso?.fechaIngreso || null,
+    },
+  })
+}))
+
+// GET /api/socio/:tokenPortal/entradas/:codigo/pdf - Descargar PDF de una entrada
+router.get('/:tokenPortal/entradas/:codigo/pdf', asyncHandler(async (req, res) => {
+  const { tokenPortal, codigo } = req.params
+
+  const socio = await req.db.socio.findFirst({ where: { tokenPortal } })
+  if (!socio) throw new AppError('Socio no encontrado', 404, 'SOCIO_NOT_FOUND')
+
+  const entrada = await req.db.entrada.findFirst({
+    where: { codigo, socioId: socio.id },
+    include: {
+      evento: true,
+      categoria: true,
+    },
+  })
+  if (!entrada) throw new AppError('Entrada no encontrada', 404, 'NOT_FOUND')
+
+  // Cargar logo del club
+  let logoPath = null
+  try {
+    logoPath = path.join(__dirnameSocio, '../../../client/public/images/logo.png')
+    await fs.access(logoPath)
+  } catch {
+    logoPath = null
+  }
+
+  const pdfBuffer = await generarPDFUnaEntrada(entrada, entrada.nombreComprador, logoPath)
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="entrada-${entrada.codigo}.pdf"`)
+  res.setHeader('Content-Length', pdfBuffer.length)
+  res.end(pdfBuffer, 'binary')
+}))
+
 // GET /api/socio/:tokenPortal/pagos/historial - Obtener historial de pagos
 router.get('/:tokenPortal/pagos/historial', asyncHandler(async (req, res) => {
   const { tokenPortal } = req.params
@@ -1365,6 +1473,15 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
     throw new AppError('Cuota no encontrada', 404, 'CUOTA_NOT_FOUND')
   }
 
+  // Caja destino MP (config tenant MP_CAJA_DEFAULT_ID). Sus mpStoreId/mpPosId se
+  // pasan a MP como metadata para identificar el origen del cobro en el dashboard.
+  const cajaDefaultCfg = await req.db.configuracion.findFirst({
+    where: { clave: 'MP_CAJA_DEFAULT_ID' },
+  })
+  const cajaMP = cajaDefaultCfg?.valor
+    ? await req.db.caja.findUnique({ where: { id: parseInt(cajaDefaultCfg.valor) } })
+    : null
+
   // Crear registro de link de pago
   const linkPago = await req.db.linkPago.create({
     data: {
@@ -1377,6 +1494,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
       estado: 'PENDIENTE',
       initPoint: '', // Se actualiza después
       fechaExpiracion: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
+      cajaId: cajaMP?.id || null,
     },
   })
 
@@ -1386,10 +1504,19 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
     // Integración con MercadoPago
     const baseUrl = getTenantFrontendUrl(req.tenant)
 
-    const periodo = cargo.periodo ? `${cargo.periodo.nombre}/${cargo.periodo.anio}` : ''
+    // periodo.nombre suele venir ya con año (ej "03/2026"); solo agregar si no lo incluye.
+    const periodo = cargo.periodo
+      ? (String(cargo.periodo.nombre).includes(String(cargo.periodo.anio))
+          ? cargo.periodo.nombre
+          : `${cargo.periodo.nombre}/${cargo.periodo.anio}`)
+      : ''
 
     const preferencia = await crearPreferenciaPago({
       accessToken: await getMpAccessToken(req.db),
+      tenantNombre: req.tenant?.nombre,
+      storeId: cajaMP?.mpStoreId,
+      posId: cajaMP?.mpPosId,
+      cajaId: cajaMP?.id,
       title: cargo.descripcion || cargo.categoria,
       description: periodo ? `Cuota ${periodo}` : (cargo.descripcion || cargo.categoria),
       amount: parseFloat(cargo.montoTotal),
@@ -1469,6 +1596,14 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
 
   const montoTotal = cargos.reduce((sum, c) => sum + parseFloat(c.montoTotal), 0)
 
+  // Caja destino MP (config tenant MP_CAJA_DEFAULT_ID)
+  const cajaDefaultCfg = await req.db.configuracion.findFirst({
+    where: { clave: 'MP_CAJA_DEFAULT_ID' },
+  })
+  const cajaMP = cajaDefaultCfg?.valor
+    ? await req.db.caja.findUnique({ where: { id: parseInt(cajaDefaultCfg.valor) } })
+    : null
+
   // Crear registro de link de pago
   const linkPago = await req.db.linkPago.create({
     data: {
@@ -1481,6 +1616,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
       estado: 'PENDIENTE',
       initPoint: '', // Se actualiza después
       fechaExpiracion: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
+      cajaId: cajaMP?.id || null,
     },
   })
 
@@ -1492,9 +1628,17 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
 
     const preferencia = await crearPreferenciaPago({
       accessToken: await getMpAccessToken(req.db),
+      tenantNombre: req.tenant?.nombre,
+      storeId: cajaMP?.mpStoreId,
+      posId: cajaMP?.mpPosId,
+      cajaId: cajaMP?.id,
       title: `Pago de ${cargos.length} cuota(s)`,
       description: cargos.map(c => {
-        const periodo = c.periodo ? `${c.periodo.nombre}/${c.periodo.anio}` : ''
+        const periodo = c.periodo
+          ? (String(c.periodo.nombre).includes(String(c.periodo.anio))
+              ? c.periodo.nombre
+              : `${c.periodo.nombre}/${c.periodo.anio}`)
+          : ''
         return `${c.descripcion || c.categoria}${periodo ? ' (' + periodo + ')' : ''}`
       }).join(', '),
       amount: montoTotal,

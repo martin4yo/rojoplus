@@ -139,7 +139,8 @@ router.post('/cajas', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req,
     codigo, nombre, tipo, descripcion, saldoInicial, cuentaContableId, centroCostoId,
     requiereConciliacion, mediosPagoPermitidos,
     puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja,
-    permiteSaldoNegativo, limiteDescubierto
+    permiteSaldoNegativo, limiteDescubierto,
+    mpStoreId, mpPosId
   } = req.body
 
   if (!codigo || !nombre || !tipo) {
@@ -177,6 +178,8 @@ router.post('/cajas', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (req,
       limiteDescubierto: permiteSaldoNegativo === true && limiteDescubierto != null && limiteDescubierto !== ''
         ? parseFloat(limiteDescubierto)
         : null,
+      mpStoreId: mpStoreId || null,
+      mpPosId: mpPosId || null,
       ...(cuentaContableId && {
         cuentaContable: { connect: { id: parseInt(cuentaContableId) } }
       }),
@@ -200,6 +203,7 @@ router.put('/cajas/:id', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (r
     requiereConciliacion, mediosPagoPermitidos,
     puntoVentaAfip, paraBuffet, paraKiosco, paraTakeaway, paraCaja,
     permiteSaldoNegativo, limiteDescubierto,
+    mpStoreId, mpPosId,
     cuentaBancaria, // { banco, tipoCuenta, numeroCuenta, cbu, alias, titular, cuit, sucursal } — opcional
   } = req.body
 
@@ -233,7 +237,9 @@ router.put('/cajas/:id', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(async (r
     permiteSaldoNegativo: permiteSaldoNegativo !== undefined ? !!permiteSaldoNegativo : existente.permiteSaldoNegativo,
     limiteDescubierto: permiteSaldoNegativo !== undefined
       ? (permiteSaldoNegativo && limiteDescubierto != null && limiteDescubierto !== '' ? parseFloat(limiteDescubierto) : null)
-      : existente.limiteDescubierto
+      : existente.limiteDescubierto,
+    mpStoreId: mpStoreId !== undefined ? (mpStoreId || null) : existente.mpStoreId,
+    mpPosId: mpPosId !== undefined ? (mpPosId || null) : existente.mpPosId
   }
 
   // Manejar la relación con cuenta contable

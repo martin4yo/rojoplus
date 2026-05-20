@@ -16,6 +16,7 @@ export default function ConfiguracionMercadoPago() {
   const [publicKey, setPublicKey] = useState('')
   const [modoTest, setModoTest] = useState(false)
   const [editandoToken, setEditandoToken] = useState(false)
+  const [cajaDefaultId, setCajaDefaultId] = useState('')
 
   useEffect(() => { cargar() }, [])
 
@@ -26,6 +27,7 @@ export default function ConfiguracionMercadoPago() {
       setConfig(c)
       setPublicKey(c.publicKey || '')
       setModoTest(!!c.modoTest)
+      setCajaDefaultId(c.cajaDefaultId ? String(c.cajaDefaultId) : '')
       setEditandoToken(!c.configurado) // Si no hay token, abrimos el editor por default
     } catch (err) {
       toast.error(err.message || 'Error cargando configuración')
@@ -69,7 +71,11 @@ export default function ConfiguracionMercadoPago() {
   async function guardarOtros() {
     try {
       setSaving(true)
-      await api.put('/admin/pagos/mercadopago', { publicKey, modoTest })
+      await api.put('/admin/pagos/mercadopago', {
+        publicKey,
+        modoTest,
+        cajaDefaultId: cajaDefaultId ? parseInt(cajaDefaultId) : null,
+      })
       toast.success('Configuración guardada')
       cargar()
     } catch (err) {
@@ -190,6 +196,30 @@ export default function ConfiguracionMercadoPago() {
             <strong>Aclaración:</strong> el modo lo determina el token (TEST- vs APP_USR-).
             Esta etiqueta es informativa para que el sistema sepa qué muestra al usuario.
           </div>
+        </div>
+
+        <div className="pt-3 border-t">
+          <label className="block text-sm font-medium mb-1">Caja destino de los pagos MP</label>
+          <select
+            value={cajaDefaultId}
+            onChange={e => setCajaDefaultId(e.target.value)}
+            className="input-field w-full"
+          >
+            <option value="">— Sin asignar —</option>
+            {(config?.cajas || []).map(c => {
+              const ids = [c.mpStoreId, c.mpPosId].filter(Boolean).join('/')
+              return (
+                <option key={c.id} value={c.id}>
+                  {c.nombre} {c.codigo ? `(${c.codigo})` : ''} {ids ? `— MP ${ids}` : '— sin Store/POS'}
+                </option>
+              )
+            })}
+          </select>
+          <p className="text-xs text-muted mt-1">
+            La Caja donde caen los pagos de cuotas por MP. Si la Caja tiene Store ID y POS ID configurados,
+            esos IDs se mandan a MP como metadata para reconciliar después en el dashboard MP.
+            Configurá Store/POS por Caja en <strong>Tesorería → Cajas</strong>.
+          </p>
         </div>
 
         <div className="pt-3 border-t flex justify-end">

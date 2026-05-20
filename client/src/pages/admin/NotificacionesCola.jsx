@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Send, Mail, MessageCircle, AlertTriangle, CheckCircle, Clock, Play } from 'lucide-react'
+import { RefreshCw, Send, Mail, MessageCircle, AlertTriangle, CheckCircle, Clock, Play, Megaphone } from 'lucide-react'
 import { Button } from '../../components/Button'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { Alert } from '../../components/Alert'
+import Modal from '../../components/Modal'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
@@ -38,6 +39,11 @@ export default function NotificacionesCola() {
   const [procesando, setProcesando] = useState(false)
   const [reintentando, setReintentando] = useState(null)
   const [filtros, setFiltros] = useState({ tipo: '', estado: '', eventType: '' })
+  const [avisarOpen, setAvisarOpen] = useState(false)
+  const [avisarVentana, setAvisarVentana] = useState(3)
+  const [avisarEvitarReavisar, setAvisarEvitarReavisar] = useState(true)
+  const [avisarPreview, setAvisarPreview] = useState(null)
+  const [avisarLoading, setAvisarLoading] = useState(false)
 
   async function cargarDashboard() {
     try {
@@ -89,6 +95,49 @@ export default function NotificacionesCola() {
     }
   }
 
+  async function abrirAvisar() {
+    setAvisarOpen(true)
+    setAvisarPreview(null)
+    setAvisarVentana(3)
+    setAvisarEvitarReavisar(true)
+    await cargarPreviewAvisar(3, true)
+  }
+
+  async function cargarPreviewAvisar(ventana = avisarVentana, evitar = avisarEvitarReavisar) {
+    setAvisarLoading(true)
+    try {
+      const r = await api.post('/admin/notificaciones-log/avisar-cuotas-vencidas', {
+        dryRun: true,
+        periodosVentana: ventana,
+        evitarReavisar: evitar,
+      })
+      setAvisarPreview(r)
+    } catch (err) {
+      toast.error(err?.message || 'Error al previsualizar')
+    } finally {
+      setAvisarLoading(false)
+    }
+  }
+
+  async function confirmarAvisar() {
+    if (!avisarPreview || avisarPreview.aEncolar === 0) return
+    setAvisarLoading(true)
+    try {
+      const r = await api.post('/admin/notificaciones-log/avisar-cuotas-vencidas', {
+        dryRun: false,
+        periodosVentana: avisarVentana,
+        evitarReavisar: avisarEvitarReavisar,
+      })
+      toast.success(`Encolados ${r.encolados} · Omitidos ${r.omitidos} · Errores ${r.errores}`)
+      setAvisarOpen(false)
+      await Promise.all([cargarDashboard(), cargarLogs(1)])
+    } catch (err) {
+      toast.error(err?.message || 'Error al encolar')
+    } finally {
+      setAvisarLoading(false)
+    }
+  }
+
   async function reintentar(id) {
     setReintentando(id)
     try {
@@ -125,6 +174,10 @@ export default function NotificacionesCola() {
           <Button variant="secondary" onClick={() => { cargarDashboard(); cargarLogs(pagination.page) }} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refrescar
+          </Button>
+          <Button variant="secondary" onClick={abrirAvisar} className="flex items-center gap-2">
+            <Megaphone className="w-4 h-4" />
+            Avisar cuotas vencidas
           </Button>
           <Button onClick={procesarAhora} disabled={procesando} className="flex items-center gap-2">
             <Play className="w-4 h-4" />
@@ -235,6 +288,116 @@ export default function NotificacionesCola() {
           </table>
         </div>
       )}
+
+      {/* Modal Avisar cuotas vencidas */}
+      <Modal isOpen={avisarOpen} onClose={() => setAvisarOpen(false)} maxWidth="max-w-2xl">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-amber-100">
+              <Megaphone className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Avisar cuotas vencidas</h2>
+              <p className="text-sm text-gray-500">Encola avisos por email y WhatsApp a socios vigentes con cuotas vencidas</p>
+            </div>
+          </div>
+
+          {avisarPreview?.demo?.activo ? (
+            <Alert type="info">
+              <strong>MODO DEMO activo.</strong> Todos los envíos van a redirigir a
+              {avisarPreview.demo.email && <> · email: <code>{avisarPreview.demo.email}</code></>}
+              {avisarPreview.demo.whatsapp && <> · WA: <code>{avisarPreview.demo.whatsapp}</code></>}
+            </Alert>
+          ) : (
+            <Alert type="warning">
+              <strong>MODO DEMO desactivado.</strong> Los avisos se van a enviar a los socios reales. Activá MODO_DEMO en Configuración si esto es una prueba.
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm">
+              <span className="block text-gray-700 mb-1">Períodos hacia atrás</span>
+              <input
+                type="number"
+                min={1}
+                value={avisarVentana}
+                onChange={e => setAvisarVentana(Math.max(1, parseInt(e.target.value) || 1))}
+                onBlur={() => cargarPreviewAvisar()}
+                className="w-full border border-gray-300 rounded px-3 py-2"
+              />
+              <span className="block text-xs text-gray-500 mt-1">Meses contados desde el actual hacia atrás</span>
+            </label>
+            <label className="text-sm flex items-start gap-2 pt-6">
+              <input
+                type="checkbox"
+                checked={avisarEvitarReavisar}
+                onChange={e => { setAvisarEvitarReavisar(e.target.checked); cargarPreviewAvisar(avisarVentana, e.target.checked) }}
+                className="mt-0.5"
+              />
+              <span className="text-gray-700">No reavisar (últimos 7 días)</span>
+            </label>
+          </div>
+
+          {avisarPreview?.periodosEnVentana?.length > 0 && (
+            <div className="text-xs text-gray-600 -mt-2">
+              <span className="font-medium">Períodos en la ventana:</span>{' '}
+              {avisarPreview.periodosEnVentana.map((p, i) => (
+                <span key={i} className="inline-block px-2 py-0.5 mr-1 mb-1 bg-indigo-50 text-indigo-700 rounded border border-indigo-200">{p}</span>
+              ))}
+            </div>
+          )}
+
+          {avisarLoading && !avisarPreview ? (
+            <div className="py-6"><LoadingSpinner /></div>
+          ) : avisarPreview ? (
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-gray-800">{avisarPreview.candidatos}</div>
+                  <div className="text-xs text-gray-500">Candidatos</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-400">{avisarPreview.yaNotificados}</div>
+                  <div className="text-xs text-gray-500">Ya notificados</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-amber-600">{avisarPreview.aEncolar}</div>
+                  <div className="text-xs text-gray-500">A encolar</div>
+                </div>
+              </div>
+              {avisarPreview.ejemplos?.length > 0 && (
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs font-medium text-gray-700 mb-1">Primeros {avisarPreview.ejemplos.length}:</p>
+                  <ul className="text-xs text-gray-600 space-y-0.5 max-h-40 overflow-y-auto">
+                    {avisarPreview.ejemplos.map(e => (
+                      <li key={e.socioId}>
+                        <strong>{e.socio}</strong>{' '}
+                        <span className="text-gray-400">[{e.estado || '?'}]</span>
+                        {e.bloqueado && <span className="ml-1 text-red-600 font-medium">BLOQUEADO</span>}
+                        {' — '}
+                        <strong>{e.cantidadCuotas}</strong> cuota{e.cantidadCuotas === 1 ? '' : 's'} · ${e.totalAdeudado.toLocaleString('es-AR')} · desde {new Date(e.vencimientoMasViejo).toLocaleDateString('es-AR')}
+                        {!e.flagSocio && <span className="text-orange-600"> · opt-out morosidad</span>}
+                        {!e.tieneEmail && !e.tieneWA && <span className="text-red-600"> · sin canales</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="secondary" onClick={() => setAvisarOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={confirmarAvisar}
+              disabled={avisarLoading || !avisarPreview || avisarPreview.aEncolar === 0}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {avisarLoading ? 'Encolando...' : `Encolar ${avisarPreview?.aEncolar || 0} avisos`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between pt-3">
