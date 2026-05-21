@@ -1,6 +1,7 @@
 import { Router } from 'express'
+import prisma from '../../lib/prisma.js'
 import { asyncHandler, AppError } from '../../middleware/errorHandler.js'
-import { authAdmin } from '../../middleware/auth.js'
+import { authAdmin, checkPermiso } from '../../middleware/auth.js'
 import { enviarReciboPago } from '../../services/email.js'
 import { generarAsientoPagoCuota } from '../../services/asientosContables.js'
 import { notificarPago as notificarPagoWA, obtenerTelefonoSocio } from '../../services/whatsappService.js'
@@ -2120,6 +2121,170 @@ router.delete('/medios-pago/:id', authAdmin, asyncHandler(async (req, res) => {
 
   await req.db.medioPago.delete({ where: { id: parseInt(id) } })
   res.json({ success: true, message: 'Medio de pago eliminado' })
+}))
+
+// POST /api/admin/pagos/:id/anular — Anula un pago de cuotas y revierte cargos, caja y asiento contable
+router.post('/pagos/:id/anular', authAdmin, checkPermiso('CAJA_ANULAR'), asyncHandler(async (req, res) => {
+  const pagoId = parseInt(req.params.id)
+  const motivo = (req.body?.motivo || '').toString().trim()
+
+  if (!pagoId) throw new AppError('ID de pago inválido', 400, 'VALIDATION_ERROR')
+  if (!motivo) throw new AppError('Indicá el motivo de la anulación', 400, 'VALIDATION_ERROR')
+
+  const pago = await req.db.pago.findUnique({
+    where: { id: pagoId },
+    include: {
+      cargos: true,
+      movimientos: { include: { caja: { select: { requiereConciliacion: true } } } },
+      saldosGenerados: { include: { aplicaciones: true } },
+      saldosAplicados: { include: { saldoFavor: true } },
+    },
+  })
+  if (!pago) throw new AppError('Pago no encontrado', 404, 'NOT_FOUND')
+  if (pago.estado === 'ANULADO') throw new AppError('El pago ya está anulado', 400, 'YA_ANULADO')
+
+  // Validar acceso del usuario a la caja del pago
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.admin.id },
+    include: { rol: { include: { cajas: { select: { cajaId: true } } } } },
+  })
+  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
+    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+    if (pago.cajaId && !cajasPermitidas.includes(pago.cajaId)) {
+      throw new AppError('No tenés acceso a la caja de este pago', 403, 'FORBIDDEN')
+    }
+  }
+
+  // Bloqueos por estado de los recursos asociados
+  const movConciliado = pago.movimientos.find(m => m.conciliado && !m.anulado)
+  if (movConciliado) {
+    throw new AppError(
+      `El movimiento de caja ${movConciliado.numero} ya está conciliado. Desconciliá antes de anular.`,
+      400, 'MOVIMIENTO_CONCILIADO'
+    )
+  }
+
+  // Saldo a favor generado por este pago: si ya se aplicó a otro pago, bloquear
+  const saldoGenAplicado = pago.saldosGenerados.find(s => s.aplicaciones && s.aplicaciones.length > 0)
+  if (saldoGenAplicado) {
+    throw new AppError(
+      `Este pago generó un saldo a favor que ya fue aplicado a otra cobranza. No se puede anular.`,
+      400, 'SALDO_GENERADO_USADO'
+    )
+  }
+
+  await req.db.$transaction(async (tx) => {
+    // 1) Restaurar saldos a favor que se aplicaron a este pago
+    for (const aplic of pago.saldosAplicados) {
+      await tx.saldoFavor.update({
+        where: { id: aplic.saldoFavorId },
+        data: { montoDisponible: { increment: aplic.monto } },
+      })
+      await tx.aplicacionSaldo.delete({ where: { id: aplic.id } })
+    }
+
+    // 2) Anular saldos a favor generados por este pago (no aplicados — ya validado arriba)
+    for (const saldo of pago.saldosGenerados) {
+      await tx.saldoFavor.update({
+        where: { id: saldo.id },
+        data: { montoDisponible: 0, observaciones: `[ANULADO ${new Date().toISOString()}] ${saldo.observaciones || ''}`.trim() },
+      })
+    }
+
+    // 3) Revertir cargos a PENDIENTE limpiando recargo acumulado por este cobro
+    for (const cargo of pago.cargos) {
+      const montoLimpio = Number(cargo.montoOriginal) - Number(cargo.montoBonificacion)
+      await tx.cargo.update({
+        where: { id: cargo.id },
+        data: {
+          estado: 'PENDIENTE',
+          fechaPago: null,
+          pagoId: null,
+          montoRecargo: 0,
+          montoTotal: montoLimpio,
+        },
+      })
+    }
+
+    // 4) Generar CONTRAMOVIMIENTOS con fecha de anulación (deja los originales intactos
+    //    para preservar la historia contable en su fecha real)
+    const anioMov = new Date().getFullYear()
+    const prefijoMov = `MV-${anioMov}-`
+    const ultimoMovBase = await tx.movimientoCaja.findFirst({
+      where: { numero: { startsWith: prefijoMov } },
+      orderBy: { numero: 'desc' },
+    })
+    let siguienteMov = ultimoMovBase
+      ? (parseInt(ultimoMovBase.numero.split('-').pop()) || 0) + 1
+      : 1
+
+    for (const mov of pago.movimientos) {
+      if (mov.anulado) continue
+      const tipoContra = mov.tipo === 'INGRESO' ? 'EGRESO' : 'INGRESO'
+      const incrementoContra = tipoContra === 'INGRESO' ? Number(mov.monto) : -Number(mov.monto)
+      const numeroContra = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
+      siguienteMov++
+
+      await tx.movimientoCaja.create({
+        data: {
+          numero: numeroContra,
+          cajaId: mov.cajaId,
+          cuentaContableId: mov.cuentaContableId,
+          centroCostoId: mov.centroCostoId,
+          medioPagoId: mov.medioPagoId,
+          socioId: mov.socioId,
+          entidadId: mov.entidadId,
+          pagoId: mov.pagoId,
+          fecha: new Date(),
+          tipo: tipoContra,
+          concepto: `Anulación: ${mov.concepto}`,
+          descripcion: `Anulación pago #${pagoId} (mov. ${mov.numero}) — ${motivo}`,
+          monto: mov.monto,
+          movimientoRelacionadoId: mov.id,
+          registradoPor: req.admin.id,
+          conciliado: !mov.caja.requiereConciliacion,
+        },
+      })
+
+      await tx.caja.update({
+        where: { id: mov.cajaId },
+        data: { saldoActual: { increment: incrementoContra } },
+      })
+    }
+
+    // 5) Marcar el pago como anulado
+    await tx.pago.update({
+      where: { id: pagoId },
+      data: {
+        estado: 'ANULADO',
+        fechaAnulacion: new Date(),
+        motivoAnulacion: motivo,
+        anuladoPor: req.admin.id,
+      },
+    })
+  })
+
+  // 6) Anular asiento contable asociado (fuera de tx — best-effort)
+  try {
+    const asiento = await req.db.asiento.findFirst({
+      where: { tipoOrigen: 'PAGO_CUOTA', origenId: pagoId, estado: { not: 'ANULADO' } },
+    })
+    if (asiento) {
+      await req.db.asiento.update({
+        where: { id: asiento.id },
+        data: {
+          estado: 'ANULADO',
+          fechaAnulacion: new Date(),
+          motivoAnulacion: motivo,
+          anuladoPor: req.admin.id,
+        },
+      })
+    }
+  } catch (err) {
+    console.error(`Error anulando asiento del pago ${pagoId}:`, err.message)
+  }
+
+  res.json({ success: true, message: 'Pago anulado correctamente' })
 }))
 
 export default router
