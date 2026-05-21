@@ -1263,18 +1263,18 @@ const PRESETS_BANCOS_AR = [
     nombre: 'Banco Credicoop - Extracto Excel',
     banco: 'CREDICOOP',
     tipoArchivo: 'XLSX',
-    descripcion: 'Extracto Banca Internet Empresaria Credicoop (Excel exportado del home banking)',
+    descripcion: 'Extracto Banca Internet Empresaria Credicoop. Hoja "saldos_y_movimientos" con primera columna vacía, datos a partir de col B (Fecha, Concepto, Nro.Cpbte., Débito, Crédito, Saldo, Cód.)',
     configuracion: {
       hoja: 0,
       primeraFila: 1,
       formatoFecha: 'DD/MM/YYYY',
       columnas: {
-        fecha: 0,        // A
-        concepto: 1,     // B
-        referencia: 2,   // C - Nro.Cpbte.
-        debito: 3,       // D
-        credito: 4,      // E
-        saldo: 5         // F
+        fecha: 1,        // B
+        concepto: 2,     // C
+        referencia: 3,   // D - Nro.Cpbte.
+        debito: 4,       // E
+        credito: 5,      // F
+        saldo: 6         // G
       },
       mergearFilasContinuacion: true   // filas sin fecha → append al concepto anterior (nombre titular)
       // El parser ahora siempre ordena por fecha al final — no hace falta `ordenInvertido`

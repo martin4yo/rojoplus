@@ -1904,9 +1904,6 @@ router.get('/:token/config-pagos', asyncHandler(async (req, res) => {
 // INFORMAR PAGO MANUAL (transferencia)
 // ==============================================================================
 
-import fs from 'fs/promises'
-import path from 'path'
-
 // POST /api/socio/:token/informar-pago
 router.post('/:token/informar-pago', asyncHandler(async (req, res) => {
   const { token } = req.params
