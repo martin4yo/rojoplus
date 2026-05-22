@@ -2155,11 +2155,14 @@ router.post('/pagos/:id/anular', authAdmin, checkPermiso('CAJA_ANULAR'), asyncHa
     }
   }
 
-  // Bloqueos por estado de los recursos asociados
-  const movConciliado = pago.movimientos.find(m => m.conciliado && !m.anulado)
+  // Bloqueos por estado de los recursos asociados.
+  // Solo bloquear si el movimiento fue conciliado contra un extracto bancario real
+  // (conciliacionId != null). Las cajas que no requieren conciliación crean movimientos
+  // con conciliado=true de fábrica — eso no es un bloqueo válido.
+  const movConciliado = pago.movimientos.find(m => m.conciliacionId && !m.anulado)
   if (movConciliado) {
     throw new AppError(
-      `El movimiento de caja ${movConciliado.numero} ya está conciliado. Desconciliá antes de anular.`,
+      `El movimiento de caja ${movConciliado.numero} está conciliado contra un extracto bancario. Desconciliá antes de anular.`,
       400, 'MOVIMIENTO_CONCILIADO'
     )
   }
