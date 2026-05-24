@@ -3393,6 +3393,7 @@ model CategoriaMenu {
   descripcion       String?
   color             String?
   icono             String?
+  imagen            String?
   orden             Int                @default(0)
   activo            Boolean            @default(true)
   createdAt         DateTime           @default(now()) @map("created_at")

@@ -22,6 +22,20 @@ const imagenesPorCategoria = {
   'GASE': 'https://images.unsplash.com/photo-1581006852262-e4307cf6283a?w=400&h=300&fit=crop',
   'AGJU': 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?w=400&h=300&fit=crop',
   'ALCO': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&h=300&fit=crop',
+  // Códigos usados por el tenant sportivopilar
+  'DESAY': 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&h=300&fit=crop',
+  'COMIDAS': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop',
+  'MINUTAS': 'https://images.unsplash.com/photo-1585325701956-60dd9c8553bc?w=400&h=300&fit=crop',
+  'SANDW': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop',
+  'HAMB': 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400&h=300&fit=crop',
+  'EMP': 'https://images.unsplash.com/photo-1604467794349-0b74285de7e7?w=400&h=300&fit=crop',
+  'PIZZA': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop',
+  'ENSALADAS': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop',
+  'BEBIDAS': 'https://images.unsplash.com/photo-1581006852262-e4307cf6283a?w=400&h=300&fit=crop',
+  'CERVEZA': 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&h=300&fit=crop',
+  'POSTRES': 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&h=300&fit=crop',
+  'HUERTAS': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=300&fit=crop',
+  'KIOSCO': 'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop',
 }
 
 // Iconos por categoría
@@ -41,6 +55,20 @@ const iconosPorCategoria = {
   'GASE': Coffee,
   'AGJU': Coffee,
   'ALCO': Wine,
+  // Códigos usados por el tenant sportivopilar
+  'DESAY': Coffee,
+  'COMIDAS': UtensilsCrossed,
+  'MINUTAS': UtensilsCrossed,
+  'SANDW': Sandwich,
+  'HAMB': Sandwich,
+  'EMP': UtensilsCrossed,
+  'PIZZA': Pizza,
+  'ENSALADAS': Salad,
+  'BEBIDAS': Coffee,
+  'CERVEZA': Wine,
+  'POSTRES': IceCream,
+  'HUERTAS': Salad,
+  'KIOSCO': Star,
 }
 
 export default function MenuBuffet() {
@@ -85,7 +113,8 @@ export default function MenuBuffet() {
 
   const categoriaSeleccionada = categorias.find(c => c.id === categoriaActiva)
   const getIcono = (codigo) => iconosPorCategoria[codigo] || UtensilsCrossed
-  const getImagen = (codigo) => imagenesPorCategoria[codigo] || null
+  // Prioriza la imagen cargada desde el admin; si no hay, usa el mapa genérico por código
+  const getImagen = (categoria) => categoria?.imagen || imagenesPorCategoria[categoria?.codigo] || null
 
   async function descargarPDF() {
     try {
@@ -270,7 +299,7 @@ export default function MenuBuffet() {
                 {/* Header de categoría con imagen */}
                 <div className="relative overflow-hidden h-48 md:h-64" style={{ borderBottom: '1px solid var(--border)' }}>
                   <img
-                    src={getImagen(categoriaSeleccionada.codigo)}
+                    src={getImagen(categoriaSeleccionada)}
                     alt={categoriaSeleccionada.nombre}
                     className="w-full h-full object-cover"
                   />
@@ -352,7 +381,7 @@ export default function MenuBuffet() {
             <div className="animate-fadeIn">
               <div className="relative overflow-hidden h-48" style={{ border: '1px solid var(--border)', marginBottom: 0 }}>
                 <img
-                  src={getImagen(categoriaSeleccionada.codigo)}
+                  src={getImagen(categoriaSeleccionada)}
                   alt={categoriaSeleccionada.nombre}
                   className="w-full h-full object-cover"
                 />

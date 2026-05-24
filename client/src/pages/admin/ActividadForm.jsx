@@ -7,6 +7,7 @@ import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import ImageUpload from '../../components/ImageUpload'
+import toast from 'react-hot-toast'
 
 export default function ActividadForm() {
   const { id } = useParams()
@@ -237,7 +238,7 @@ export default function ActividadForm() {
             returnFile={false}
             maxSize={10 * 1024 * 1024}
             maxDimension={1600}
-            onError={(msg) => setError(typeof msg === 'string' ? msg : 'No se pudo procesar la imagen')}
+            onError={(msg) => toast.error(typeof msg === 'string' ? msg : 'No se pudo procesar la imagen')}
             previewSize="lg"
             placeholder="Subí una foto que represente la actividad"
           />

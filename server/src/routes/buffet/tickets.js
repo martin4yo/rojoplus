@@ -443,6 +443,7 @@ router.get('/menu-publico', async (req, res) => {
         descripcion: true,
         color: true,
         icono: true,
+        imagen: true,
         productos: {
           where: {
             activo: true,

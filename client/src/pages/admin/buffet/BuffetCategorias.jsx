@@ -6,6 +6,7 @@ import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
 import { useConfirm } from '../../../hooks/useConfirm'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import ImageUpload from '../../../components/ImageUpload'
 
 export default function BuffetCategorias() {
   const { confirm, ConfirmDialog } = useConfirm()
@@ -19,6 +20,7 @@ export default function BuffetCategorias() {
     descripcion: '',
     color: '#3B82F6',
     icono: '',
+    imagen: '',
     orden: 0
   })
 
@@ -46,6 +48,7 @@ export default function BuffetCategorias() {
         descripcion: categoria.descripcion || '',
         color: categoria.color || '#3B82F6',
         icono: categoria.icono || '',
+        imagen: categoria.imagen || '',
         orden: categoria.orden || 0
       })
     } else {
@@ -56,6 +59,7 @@ export default function BuffetCategorias() {
         descripcion: '',
         color: '#3B82F6',
         icono: '',
+        imagen: '',
         orden: categorias.length
       })
     }
@@ -140,10 +144,18 @@ export default function BuffetCategorias() {
                   {cat._count?.productos || 0} productos
                 </p>
               </div>
-              <div
-                className="w-8 h-8 rounded-full"
-                style={{ backgroundColor: cat.color || '#3B82F6' }}
-              />
+              {cat.imagen ? (
+                <img
+                  src={cat.imagen}
+                  alt={cat.nombre}
+                  className="w-12 h-12 rounded-lg object-cover border border-gray-200"
+                />
+              ) : (
+                <div
+                  className="w-8 h-8 rounded-full"
+                  style={{ backgroundColor: cat.color || '#3B82F6' }}
+                />
+              )}
             </div>
 
             <div className="flex justify-between items-center mt-4 pt-4 border-t">
@@ -250,6 +262,24 @@ export default function BuffetCategorias() {
                     className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Imagen <span className="text-gray-400 font-normal">(se muestra en el menú público)</span>
+                </label>
+                <ImageUpload
+                  value={formData.imagen}
+                  onChange={(base64) => setFormData(prev => ({ ...prev, imagen: base64 || '' }))}
+                  returnBase64={true}
+                  returnFile={false}
+                  maxSize={10 * 1024 * 1024}
+                  maxDimension={800}
+                  onError={(msg) => toast.error(typeof msg === 'string' ? msg : 'No se pudo procesar la imagen')}
+                  placeholder="Subí una foto para la categoría"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Si no subís una, se usa una imagen genérica según el código.
+                </p>
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <button

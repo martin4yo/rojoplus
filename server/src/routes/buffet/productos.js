@@ -46,10 +46,10 @@ router.get('/categorias', authAdmin, checkPermiso('BUFFET_VER', 'BUFFET_KIOSCO',
  */
 router.post('/categorias', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
-    const { codigo, nombre, descripcion, color, icono, orden } = req.body
+    const { codigo, nombre, descripcion, color, icono, imagen, orden } = req.body
 
     const categoria = await req.db.categoriaMenu.create({
-      data: { codigo, nombre, descripcion, color, icono, orden: orden || 0 }
+      data: { codigo, nombre, descripcion, color, icono, imagen, orden: orden || 0 }
     })
 
     res.status(201).json({ success: true, data: categoria })
@@ -66,11 +66,11 @@ router.post('/categorias', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req,
 router.put('/categorias/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
     const { id } = req.params
-    const { codigo, nombre, descripcion, color, icono, orden, activo } = req.body
+    const { codigo, nombre, descripcion, color, icono, imagen, orden, activo } = req.body
 
     const categoria = await req.db.categoriaMenu.update({
       where: { id: parseInt(id) },
-      data: { codigo, nombre, descripcion, color, icono, orden, activo }
+      data: { codigo, nombre, descripcion, color, icono, imagen, orden, activo }
     })
 
     res.json({ success: true, data: categoria })
