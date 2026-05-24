@@ -1,5 +1,5 @@
 import { Upload, X, Image as ImageIcon } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 
 /**
  * ImageUpload - Componente reutilizable para subir imágenes con preview
@@ -18,6 +18,7 @@ import { useRef, useState } from 'react'
  * @param {string} className - Clases adicionales
  * @param {boolean} returnBase64 - Retornar la imagen como Base64 (default: false)
  * @param {boolean} returnFile - Retornar el objeto File (default: true)
+ * @param {number} maxDimension - Si se define y returnBase64=true, redimensiona la imagen para que su lado mayor no supere este valor en px (reduce el peso del base64)
  *
  * @example
  * // Subida simple con preview
@@ -56,11 +57,17 @@ export default function ImageUpload({
   onError,
   className = '',
   returnBase64 = false,
-  returnFile = true
+  returnFile = true,
+  maxDimension
 }) {
   const [preview, setPreview] = useState(value)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef(null)
+
+  // Re-sincronizar el preview cuando cambia el value externo (ej: datos cargados de forma async al editar)
+  useEffect(() => {
+    setPreview(value)
+  }, [value])
 
   // Tamaños de preview
   const previewSizes = {
@@ -130,6 +137,46 @@ export default function ImageUpload({
     })
   }
 
+  // Redimensiona la imagen en un canvas y devuelve un base64 más liviano
+  const resizeToBase64 = (file, maxDim) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const objectUrl = URL.createObjectURL(file)
+
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl)
+
+        let { width, height } = img
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+
+        // PNG conserva transparencia; el resto se exporta como JPEG (mucho más liviano)
+        const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
+        resolve(canvas.toDataURL(mime, 0.85))
+      }
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        reject('Error al procesar la imagen')
+      }
+
+      img.src = objectUrl
+    })
+  }
+
   const processFile = async (file) => {
     if (!validateFile(file)) return
 
@@ -137,6 +184,18 @@ export default function ImageUpload({
       // Validar dimensiones si es necesario
       if (maxWidth || maxHeight) {
         await validateImageDimensions(file)
+      }
+
+      // Si se pide base64 redimensionado, procesar con canvas en vez de leer el archivo completo
+      if (returnBase64 && maxDimension) {
+        const result = await resizeToBase64(file, maxDimension)
+        setPreview(result)
+        if (returnFile) {
+          onChange({ base64: result, file })
+        } else {
+          onChange(result)
+        }
+        return
       }
 
       // Crear preview

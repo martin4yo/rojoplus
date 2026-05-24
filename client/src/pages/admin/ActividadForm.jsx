@@ -235,7 +235,9 @@ export default function ActividadForm() {
             onChange={(base64) => setForm(prev => ({ ...prev, imagen: base64 || '' }))}
             returnBase64={true}
             returnFile={false}
-            maxSize={2 * 1024 * 1024}
+            maxSize={10 * 1024 * 1024}
+            maxDimension={1600}
+            onError={(msg) => setError(typeof msg === 'string' ? msg : 'No se pudo procesar la imagen')}
             previewSize="lg"
             placeholder="Subí una foto que represente la actividad"
           />

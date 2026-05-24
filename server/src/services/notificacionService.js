@@ -192,8 +192,8 @@ export async function enviarEmailConTemplate(eventType, to, variables, db = null
     if (!tenantId && (!db || db === prisma)) {
       console.warn(`[enviarEmailConTemplate] sin scope tenant — eventType=${eventType} to=${to}`)
     }
-    // Obtener template de la BD
-    const template = await client.emailTemplate.findUnique({
+    // Obtener template de la BD (eventType no es @unique → findFirst, scope tenant lo aplica el cliente)
+    const template = await client.emailTemplate.findFirst({
       where: { eventType },
     })
 

@@ -13,6 +13,7 @@ import {
   enviarRecordatorioReserva,
   enviarCancelacionReserva,
 } from '../services/email.js'
+import { enviarWhatsApp } from '../services/whatsappService.js'
 
 /**
  * Sistema de Notificaciones Automáticas
@@ -175,11 +176,12 @@ async function enviarRecordatoriosReservas() {
   const mananaFin = new Date(manana)
   mananaFin.setHours(23, 59, 59, 999)
 
+  // email es campo requerido en el schema → no se puede filtrar por null.
+  // Traemos todas las confirmadas de mañana y elegimos el canal por reserva.
   const reservas = await prisma.reservaEspacio.findMany({
     where: {
       fecha: { gte: manana, lte: mananaFin },
       estado: 'CONFIRMADA',
-      NOT: { email: null },
     },
     include: {
       espacio: { select: { nombre: true } },
@@ -188,8 +190,36 @@ async function enviarRecordatoriosReservas() {
 
   let enviados = 0
   for (const reserva of reservas) {
-    await enviarRecordatorioReserva(reserva, null)
-    enviados++
+    let notificado = false
+
+    // Email (si tiene email cargado)
+    if (reserva.email) {
+      const okMail = await enviarRecordatorioReserva(reserva, null, reserva.tenantId)
+      if (okMail) notificado = true
+    }
+
+    // WhatsApp (si tiene teléfono) — complementa al email o lo reemplaza cuando no hay
+    if (reserva.telefono) {
+      const fecha = new Date(reserva.fecha).toLocaleDateString('es-AR', {
+        weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+      })
+      const texto = `*Recordatorio de reserva*\n\n` +
+        `Hola ${reserva.nombreReserva}, te recordamos tu reserva en *${reserva.espacio?.nombre || 'el club'}*.\n\n` +
+        `Fecha: ${fecha}\n` +
+        `Horario: ${reserva.horaInicio} - ${reserva.horaFin} hs\n` +
+        `Codigo: ${reserva.codigo}\n\n` +
+        `Te esperamos!`
+      const resWA = await enviarWhatsApp({
+        db: prisma,
+        tenantId: reserva.tenantId,
+        telefono: reserva.telefono,
+        texto,
+        ignorarHorario: true,
+      }).catch(() => ({ enviado: false }))
+      if (resWA?.enviado) notificado = true
+    }
+
+    if (notificado) enviados++
   }
   return enviados
 }

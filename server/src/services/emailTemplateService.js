@@ -40,8 +40,8 @@ export async function sendTemplateEmail(options) {
   const { prisma, eventType, to, data, attachPdf } = options
 
   try {
-    // 1. Obtener el template de email
-    const template = await prisma.emailTemplate.findUnique({
+    // 1. Obtener el template de email (eventType no es @unique → findFirst)
+    const template = await prisma.emailTemplate.findFirst({
       where: { eventType, isActive: true }
     })
 
