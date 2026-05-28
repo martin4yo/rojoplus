@@ -127,6 +127,19 @@ export default function ComprobanteMovimientoModal({ isOpen, onClose, movimiento
               <p className="text-3xl font-bold text-primary">#{numero}</p>
             </div>
           )}
+          {Array.isArray(movimiento.cajasComprobante) && movimiento.cajasComprobante.length > 1 && (
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4 text-left">
+              <p className="text-xs font-medium text-blue-700 mb-1.5">Afectó {movimiento.cajasComprobante.length} cajas:</p>
+              <ul className="space-y-1">
+                {movimiento.cajasComprobante.map(cc => (
+                  <li key={cc.id} className="flex justify-between text-sm text-gray-700">
+                    <span>{cc.cajaNombre} <span className="text-gray-400">({cc.numero})</span></span>
+                    <span className="font-medium">${Number(cc.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       ) : (
         <div className="text-center">

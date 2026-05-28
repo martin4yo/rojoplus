@@ -918,15 +918,21 @@ export default function Cuotas() {
             const saldoAAplicar = aplicarSaldo ? Number(saldoAplicar) || 0 : 0
             const diferencia = Math.round((totalAPagar - sumaSplits - saldoAAplicar) * 100) / 100
 
+            // Medios habilitados para una caja (filtra por mediosPagoPermitidos)
+            function getMediosPermitidos(cajaId) {
+              const caja = cajas.find(c => c.id === parseInt(cajaId))
+              if (!caja || !caja.mediosPagoPermitidos?.length) return mediosPago
+              return mediosPago.filter(mp => caja.mediosPagoPermitidos.includes(mp.codigo))
+            }
             function updateSplit(idx, field, value) {
               setSplits(prev => prev.map((sp, i) => {
                 if (i !== idx) return sp
                 const updated = { ...sp, [field]: value }
-                // Al cambiar medio de pago, auto-seleccionar caja default si tiene
-                if (field === 'medioPagoId' && value) {
-                  const medio = mediosPago.find(m => m.id.toString() === value)
-                  if (medio?.cajaDefaultId) {
-                    updated.cajaId = medio.cajaDefaultId.toString()
+                // Al cambiar la caja, si el medio elegido ya no está habilitado, limpiarlo
+                if (field === 'cajaId' && updated.medioPagoId) {
+                  const permitidos = getMediosPermitidos(value)
+                  if (!permitidos.find(m => m.id.toString() === updated.medioPagoId.toString())) {
+                    updated.medioPagoId = ''
                   }
                 }
                 return updated
@@ -1061,12 +1067,12 @@ export default function Cuotas() {
                         <div key={idx} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
                           <div className="grid grid-cols-[1fr_8rem_auto] gap-2">
                             <select
-                              value={sp.medioPagoId}
-                              onChange={e => updateSplit(idx, 'medioPagoId', e.target.value)}
+                              value={sp.cajaId}
+                              onChange={e => updateSplit(idx, 'cajaId', e.target.value)}
                               className="input-field text-sm"
                             >
-                              <option value="">Medio de pago...</option>
-                              {mediosPago.map(mp => <option key={mp.id} value={mp.id}>{mp.nombre}</option>)}
+                              <option value="">Caja...</option>
+                              {cajas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                             </select>
                             <input
                               type="number"
@@ -1082,12 +1088,14 @@ export default function Cuotas() {
                               : <div />
                             }
                             <select
-                              value={sp.cajaId}
-                              onChange={e => updateSplit(idx, 'cajaId', e.target.value)}
-                              className="input-field text-sm col-span-2 mt-2"
+                              value={sp.medioPagoId}
+                              onChange={e => updateSplit(idx, 'medioPagoId', e.target.value)}
+                              className="input-field text-sm col-span-2 mt-2 disabled:bg-gray-100 disabled:text-gray-400"
+                              disabled={!sp.cajaId}
+                              title={!sp.cajaId ? 'Seleccioná primero la caja' : undefined}
                             >
-                              <option value="">Caja...</option>
-                              {cajas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                              <option value="">{!sp.cajaId ? 'Elegí la caja primero' : 'Medio de pago...'}</option>
+                              {getMediosPermitidos(sp.cajaId).map(mp => <option key={mp.id} value={mp.id}>{mp.nombre}</option>)}
                             </select>
                           </div>
 

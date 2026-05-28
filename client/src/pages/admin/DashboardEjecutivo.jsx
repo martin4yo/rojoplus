@@ -698,6 +698,67 @@ export default function DashboardEjecutivo() {
             />
           </div>
 
+          {/* Cobranza efectiva del mes (todos los períodos, por fecha de pago) */}
+          {(() => {
+            const ce = financiero.cobranzaEfectivaMes || { social: 0, actividad: 0, cuotas: 0, total: 0, cantSocial: 0, cantActividad: 0 }
+            return (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-start justify-between mb-4 gap-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Cobranza Efectiva del Mes</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Cuotas cobradas durante el mes en curso, sin importar a qué período pertenezcan
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Total cuotas</p>
+                    <p className="text-xl sm:text-2xl font-bold text-emerald-700 whitespace-nowrap">
+                      <CurrencyResponsive value={ce.cuotas} />
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200 min-w-0">
+                    <div className="p-2 rounded-lg bg-blue-100 shrink-0">
+                      <DollarSign className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500">Cuotas Sociales</p>
+                      <p className="text-lg font-bold text-blue-700 whitespace-nowrap overflow-hidden text-ellipsis">
+                        <CurrencyResponsive value={ce.social} />
+                      </p>
+                      <p className="text-xs text-gray-400">{ce.cantSocial || 0} cuotas</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-xl border border-purple-200 min-w-0">
+                    <div className="p-2 rounded-lg bg-purple-100 shrink-0">
+                      <Dumbbell className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500">Cuotas de Actividad</p>
+                      <p className="text-lg font-bold text-purple-700 whitespace-nowrap overflow-hidden text-ellipsis">
+                        <CurrencyResponsive value={ce.actividad} />
+                      </p>
+                      <p className="text-xs text-gray-400">{ce.cantActividad || 0} cuotas</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-xl border border-emerald-200 min-w-0">
+                    <div className="p-2 rounded-lg bg-emerald-100 shrink-0">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500">Total Sociales + Actividad</p>
+                      <p className="text-lg font-bold text-emerald-700 whitespace-nowrap overflow-hidden text-ellipsis">
+                        <CurrencyResponsive value={ce.cuotas} />
+                      </p>
+                      <p className="text-xs text-gray-400">{(ce.cantSocial || 0) + (ce.cantActividad || 0)} cuotas</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Progreso cobranza */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-2">

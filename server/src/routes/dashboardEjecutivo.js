@@ -149,6 +149,38 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     }
   }
 
+  // Cobranza EFECTIVA del mes: plata que ingresó por pagos de cuotas DURANTE el mes
+  // calendario en curso, sin importar a qué período pertenece la cuota. A diferencia de
+  // cobranzaMes (que mira sólo cuotas del período actual), acá medimos por fechaPago del
+  // cargo cobrado, agrupado por categoría (social vs actividad).
+  const cobranzaEfectivaRaw = await req.db.cargo.groupBy({
+    by: ['categoria'],
+    where: {
+      estado: 'PAGADO',
+      fechaPago: { gte: inicioMesActual, lte: finMesActual },
+    },
+    _sum: { montoTotal: true },
+    _count: true,
+  })
+  let cobEfSocial = 0, cobEfActividad = 0, cobEfOtros = 0
+  let cantEfSocial = 0, cantEfActividad = 0, cantEfOtros = 0
+  for (const g of cobranzaEfectivaRaw) {
+    const monto = Number(g._sum.montoTotal) || 0
+    if (g.categoria === 'CUOTA_SOCIAL') { cobEfSocial = monto; cantEfSocial = g._count }
+    else if (g.categoria === 'CUOTA_ACTIVIDAD') { cobEfActividad = monto; cantEfActividad = g._count }
+    else { cobEfOtros += monto; cantEfOtros += g._count }
+  }
+  const cobranzaEfectivaMes = {
+    social: Math.round(cobEfSocial),
+    actividad: Math.round(cobEfActividad),
+    otros: Math.round(cobEfOtros),
+    cuotas: Math.round(cobEfSocial + cobEfActividad),
+    total: Math.round(cobEfSocial + cobEfActividad + cobEfOtros),
+    cantSocial: cantEfSocial,
+    cantActividad: cantEfActividad,
+    cantOtros: cantEfOtros,
+  }
+
   // Morosidad total: cargos vencidos sin pagar de socios que aún forman parte del club.
   // Filtro data-driven: solo socios cuyo EstadoSocio tenga esSocioActivo=true (default).
   // Esto excluye bajas, renuncias, expulsiones, etc., sin hardcodear códigos de estado.
@@ -725,6 +757,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
       // Sección Financiera
       financiero: {
         cobranzaMes,
+        cobranzaEfectivaMes,
         morosidadTotal,
         proyeccionCierre,
         resumenFinanciero,

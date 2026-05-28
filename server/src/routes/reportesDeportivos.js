@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import * as XLSX from 'xlsx'
 import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { asyncHandler } from '../middleware/errorHandler.js'
@@ -6,6 +7,159 @@ import { asyncHandler } from '../middleware/errorHandler.js'
 const router = Router()
 
 router.use(authAdmin)
+
+// =============================================================================
+// SOCIOS POR ACTIVIDAD (con saldo deudor)
+// =============================================================================
+// Construye el listado de inscriptos activos por actividad/categoría, anexando
+// el saldo deudor de cada socio (suma de cargos PENDIENTE + VENCIDO). Usado por
+// el reporte "Socios por Actividad".
+async function construirSociosPorActividad(db, query) {
+  const { actividadId, categoriaActividadId, soloDeudores } = query
+  const hoy = new Date()
+
+  // Inscripciones activas = ya iniciadas y no terminadas al día de hoy.
+  const whereInscripcion = {
+    estado: 'ACTIVA',
+    fechaInicio: { lte: hoy },
+    OR: [{ fechaFin: null }, { fechaFin: { gte: hoy } }],
+  }
+  if (categoriaActividadId) {
+    whereInscripcion.categoriaActividadId = parseInt(categoriaActividadId)
+  } else if (actividadId) {
+    whereInscripcion.categoriaActividad = { actividadId: parseInt(actividadId) }
+  }
+
+  const inscripciones = await db.inscripcion.findMany({
+    where: whereInscripcion,
+    include: {
+      socio: {
+        select: {
+          id: true, nroSocio: true, apellidoNombre: true,
+          documento: true, celular: true, email: true,
+        },
+      },
+      categoriaActividad: {
+        select: {
+          id: true, nombre: true,
+          actividad: { select: { id: true, nombre: true } },
+        },
+      },
+    },
+  })
+
+  // Saldo deudor por socio: una sola agregación para todos los socios del listado.
+  const socioIds = [...new Set(inscripciones.map(i => i.socioId))]
+  const deudaPorSocio = {}
+  if (socioIds.length > 0) {
+    const agg = await db.cargo.groupBy({
+      by: ['socioId'],
+      where: { socioId: { in: socioIds }, estado: { in: ['PENDIENTE', 'VENCIDO'] } },
+      _sum: { montoTotal: true },
+      _count: { _all: true },
+    })
+    for (const a of agg) {
+      deudaPorSocio[a.socioId] = {
+        saldoDeudor: Math.round(Number(a._sum.montoTotal) || 0),
+        cantCuotasAdeudadas: a._count?._all || 0,
+      }
+    }
+  }
+
+  let filas = inscripciones.map(i => {
+    const deuda = deudaPorSocio[i.socioId] || { saldoDeudor: 0, cantCuotasAdeudadas: 0 }
+    return {
+      inscripcionId: i.id,
+      socioId: i.socioId,
+      nroSocio: i.socio?.nroSocio || '',
+      apellidoNombre: i.socio?.apellidoNombre || '',
+      documento: i.socio?.documento || '',
+      celular: i.socio?.celular || '',
+      email: i.socio?.email || '',
+      federado: i.federado,
+      actividadId: i.categoriaActividad?.actividad?.id || null,
+      actividad: i.categoriaActividad?.actividad?.nombre || 'Sin actividad',
+      categoriaActividadId: i.categoriaActividad?.id || null,
+      categoria: i.categoriaActividad?.nombre || '',
+      fechaInicio: i.fechaInicio,
+      saldoDeudor: deuda.saldoDeudor,
+      cantCuotasAdeudadas: deuda.cantCuotasAdeudadas,
+      alDia: deuda.saldoDeudor <= 0,
+    }
+  })
+
+  if (soloDeudores === 'true' || soloDeudores === '1') {
+    filas = filas.filter(f => f.saldoDeudor > 0)
+  }
+
+  // Orden: actividad, categoría, apellido y nombre.
+  filas.sort((a, b) =>
+    a.actividad.localeCompare(b.actividad) ||
+    a.categoria.localeCompare(b.categoria) ||
+    a.apellidoNombre.localeCompare(b.apellidoNombre)
+  )
+
+  const totalSaldoDeudor = filas.reduce((s, f) => s + f.saldoDeudor, 0)
+  const sociosDeudores = new Set(filas.filter(f => f.saldoDeudor > 0).map(f => f.socioId)).size
+  const sociosUnicos = new Set(filas.map(f => f.socioId)).size
+
+  return {
+    filas,
+    totales: {
+      totalInscripciones: filas.length,
+      sociosUnicos,
+      sociosDeudores,
+      sociosAlDia: sociosUnicos - sociosDeudores,
+      totalSaldoDeudor: Math.round(totalSaldoDeudor),
+    },
+  }
+}
+
+// GET /api/admin/reportes/deportivos/socios-por-actividad
+router.get('/socios-por-actividad', asyncHandler(async (req, res) => {
+  const data = await construirSociosPorActividad(req.db, req.query)
+  res.json({ success: true, data })
+}))
+
+// GET /api/admin/reportes/deportivos/socios-por-actividad/exportar
+router.get('/socios-por-actividad/exportar', asyncHandler(async (req, res) => {
+  const { filas } = await construirSociosPorActividad(req.db, req.query)
+
+  const datos = filas.map(f => ({
+    'Actividad': f.actividad,
+    'Categoría': f.categoria,
+    'Nro Socio': f.nroSocio,
+    'Apellido y Nombre': f.apellidoNombre,
+    'Documento': f.documento,
+    'Teléfono': f.celular,
+    'Email': f.email,
+    'Saldo Deudor': f.saldoDeudor,
+    'Estado': f.alDia ? 'Al día' : 'Debe',
+    'Observaciones': '',
+  }))
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(datos)
+  ws['!cols'] = [
+    { wch: 22 }, // Actividad
+    { wch: 18 }, // Categoría
+    { wch: 10 }, // Nro Socio
+    { wch: 30 }, // Apellido y Nombre
+    { wch: 12 }, // Documento
+    { wch: 15 }, // Teléfono
+    { wch: 25 }, // Email
+    { wch: 14 }, // Saldo Deudor
+    { wch: 10 }, // Estado
+    { wch: 40 }, // Observaciones
+  ]
+  XLSX.utils.book_append_sheet(wb, ws, 'Socios por Actividad')
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+
+  const fecha = new Date().toISOString().split('T')[0]
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  res.setHeader('Content-Disposition', `attachment; filename=socios_por_actividad_${fecha}.xlsx`)
+  res.send(buffer)
+}))
 
 // =============================================================================
 // REPORTE DE ASISTENCIA A ENTRENAMIENTOS

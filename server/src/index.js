@@ -122,6 +122,30 @@ const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:5173', 'http://localhost:3000']
 
+// Cache de dominios propios (dominioCustom) de los tenants. Se refresca
+// periódicamente para que el alta de un dominio propio funcione sin tocar
+// código ni env (ver docs/PROCEDIMIENTO-DOMINIO-PROPIO-TENANT.md).
+let customDomains = new Set()
+async function refrescarCustomDomains() {
+  try {
+    const tenants = await prisma.tenant.findMany({
+      where: { dominioCustom: { not: null } },
+      select: { dominioCustom: true }
+    })
+    const nuevo = new Set()
+    for (const t of tenants) {
+      const d = t.dominioCustom.trim().toLowerCase()
+      nuevo.add(`https://${d}`)
+      nuevo.add(`https://www.${d}`)
+    }
+    customDomains = nuevo
+  } catch (err) {
+    console.warn('[CORS] no se pudo refrescar dominios propios:', err?.message)
+  }
+}
+refrescarCustomDomains()
+setInterval(refrescarCustomDomains, 5 * 60 * 1000).unref()
+
 app.use(cors({
   origin: (origin, callback) => {
     // Permitir requests sin origin (Postman, curl, etc.)
@@ -130,6 +154,8 @@ app.use(cors({
     if (/^https?:\/\/[^/]*\.localhost(:\d+)?$/.test(origin)) return callback(null, true)
     // Permitir cualquier subdomain de clubix.com.ar (multi-tenant)
     if (/^https:\/\/[^/]*\.clubix\.com\.ar$/.test(origin)) return callback(null, true)
+    // Permitir dominios propios de tenants (dominioCustom, apex y www)
+    if (customDomains.has(origin.toLowerCase())) return callback(null, true)
     // Permitir origins configurados
     if (allowedOrigins.includes(origin)) return callback(null, true)
     callback(new Error(`CORS: origin no permitido: ${origin}`))

@@ -1298,6 +1298,10 @@ model MovimientoCaja {
   medioPagoId             Int?                      @map("medio_pago_id")
   socioId                 Int?                      @map("socio_id")
   entidadId               Int?                      @map("entidad_id")
+  // Agrupa varios MovimientoCaja que forman un mismo comprobante de ingreso/egreso
+  // pero afectan cajas distintas (ej: alquiler cobrado parte efectivo + parte transferencia).
+  // Null = comprobante de una sola caja (caso habitual).
+  grupoComprobante        String?                   @map("grupo_comprobante")
   adjuntos                AdjuntoComprobante[]
   echeq                   ECheq?
   socio                   Socio?                    @relation(fields: [socioId], references: [id])
@@ -1331,6 +1335,7 @@ model MovimientoCaja {
   @@index([conciliado])
   @@index([movimientoContableId])
   @@index([medioPagoId])
+  @@index([grupoComprobante])
   @@index([tenantId])
   @@map("movimientos_caja")
 }

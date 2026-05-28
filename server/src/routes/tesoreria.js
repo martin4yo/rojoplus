@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { randomUUID } from 'node:crypto'
 import prisma from '../lib/prisma.js'
 import * as XLSX from 'xlsx'
 import { authAdmin, checkPermiso } from '../middleware/auth.js'
@@ -468,9 +469,54 @@ router.get('/movimientos-caja/:id', asyncHandler(async (req, res) => {
     }
   }
 
+  // Comprobante multi-caja: traer los movimientos hermanos del grupo. Los
+  // conceptos (items) viven solo en el movimiento principal, así que si este
+  // movimiento no los tiene, se resuelven desde el hermano que sí.
+  let cajasComprobante = null
+  let itemsResueltos = movimiento.items
+  if (movimiento.grupoComprobante) {
+    const hermanos = await req.db.movimientoCaja.findMany({
+      where: { grupoComprobante: movimiento.grupoComprobante },
+      orderBy: { id: 'asc' },
+      include: {
+        caja: { select: { id: true, nombre: true } },
+        mediosPago: {
+          orderBy: { orden: 'asc' },
+          include: { medioPago: { select: { id: true, codigo: true, nombre: true, tipo: true } } }
+        },
+        items: {
+          orderBy: { orden: 'asc' },
+          include: {
+            conceptoTesoreria: { select: { id: true, codigo: true, nombre: true } },
+            cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+            centroCosto: { select: { id: true, codigo: true, nombre: true } },
+          }
+        }
+      }
+    })
+    cajasComprobante = hermanos.map(h => ({
+      id: h.id,
+      cajaId: h.cajaId,
+      cajaNombre: h.caja?.nombre,
+      numero: h.numero,
+      monto: Number(h.monto),
+      anulado: h.anulado,
+      mediosPago: h.mediosPago.map(mp => ({ ...mp, monto: Number(mp.monto) })),
+    }))
+    if (!itemsResueltos?.length) {
+      const conItems = hermanos.find(h => h.items?.length)
+      if (conItems) itemsResueltos = conItems.items
+    }
+  }
+
   res.json({
     success: true,
-    data: { ...movimiento, monto: Number(movimiento.monto) }
+    data: {
+      ...movimiento,
+      monto: Number(movimiento.monto),
+      items: itemsResueltos,
+      cajasComprobante,
+    }
   })
 }))
 
@@ -488,8 +534,8 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
     mediosPago: mediosPagoBody,
   } = req.body
 
-  if (!cajaId || !tipo) {
-    throw new AppError('Caja y tipo son requeridos', 400)
+  if (!tipo) {
+    throw new AppError('El tipo es requerido', 400)
   }
 
   // Verificar si vienen medios múltiples
@@ -497,6 +543,13 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
 
   if (!usaMediosMultiples && !medioPago && !medioPagoIdBody) {
     throw new AppError('El medio de pago es requerido', 400)
+  }
+
+  // La caja puede venir a nivel comprobante (cajaId) y/o por cada medio de pago
+  // (mp.cajaId): un mismo comprobante puede repartir el cobro/pago entre cajas.
+  // Si no hay medios múltiples, la caja del comprobante es obligatoria.
+  if (!cajaId && !usaMediosMultiples) {
+    throw new AppError('La caja es requerida', 400)
   }
 
   if (!['INGRESO', 'EGRESO'].includes(tipo)) {
@@ -569,7 +622,13 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
       if (!m || m <= 0) {
         throw new AppError('Cada medio de pago debe tener monto mayor a 0', 400)
       }
+      // Caja de este medio: la propia (mp.cajaId) o la del comprobante (cajaId)
+      const mpCajaId = mp.cajaId ? parseInt(mp.cajaId) : (cajaId ? parseInt(cajaId) : null)
+      if (!mpCajaId) {
+        throw new AppError('Cada medio de pago debe indicar una caja', 400)
+      }
       mediosNorm.push({
+        cajaId: mpCajaId,
         medioPagoId: parseInt(mp.medioPagoId),
         monto: m,
         nroOperacion: mp.nroOperacion?.trim() || null,
@@ -588,19 +647,26 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
     }
   }
 
-  const caja = await req.db.caja.findUnique({
-    where: { id: parseInt(cajaId) },
+  // Cajas involucradas: una sola (cajaId) o varias si los medios reparten el
+  // cobro/pago entre cajas distintas. En modo single la caja viene del body.
+  const cajaIdsInvolucradas = usaMediosMultiples
+    ? [...new Set(mediosNorm.map(m => m.cajaId))]
+    : [parseInt(cajaId)]
+  const esMultiCaja = cajaIdsInvolucradas.length > 1
+
+  const cajasInvolucradas = await req.db.caja.findMany({
+    where: { id: { in: cajaIdsInvolucradas } },
     include: { cuentaContable: true }
   })
-  if (!caja) {
-    throw new AppError('Caja no encontrada', 404)
+  const cajasById = Object.fromEntries(cajasInvolucradas.map(c => [c.id, c]))
+
+  for (const cid of cajaIdsInvolucradas) {
+    const c = cajasById[cid]
+    if (!c) throw new AppError(`Caja id=${cid} no encontrada`, 404)
+    if (!c.activo) throw new AppError(`La caja "${c.nombre}" no está activa`, 400)
   }
 
-  if (!caja.activo) {
-    throw new AppError('La caja no esta activa', 400)
-  }
-
-  // Verificar acceso del usuario a esta caja
+  // Verificar acceso del usuario a cada caja involucrada
   const admin = await prisma.admin.findUnique({
     where: { id: req.admin.id },
     include: {
@@ -614,8 +680,10 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
 
   if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
     const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
-    if (!cajasPermitidas.includes(parseInt(cajaId))) {
-      throw new AppError('No tenés acceso a esta caja', 403)
+    for (const cid of cajaIdsInvolucradas) {
+      if (!cajasPermitidas.includes(cid)) {
+        throw new AppError(`No tenés acceso a la caja "${cajasById[cid]?.nombre || cid}"`, 403)
+      }
     }
   }
 
@@ -627,13 +695,16 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
     throw new AppError('Cuenta contable no encontrada', 404)
   }
 
-  // Validar que la caja tenga cuenta contable para poder generar el asiento
-  if (!caja.cuentaContable?.codigo) {
-    // Intentar resolver por tipo como fallback
-    const codigoFallback = caja.tipo === 'BANCO' ? '1.1.1.02' : '1.1.1.01'
-    const cuentaCajaExiste = await req.db.cuentaContable.findFirst({ where: { codigo: codigoFallback } })
-    if (!cuentaCajaExiste) {
-      throw new AppError(`La caja no tiene cuenta contable configurada y no existe la cuenta genérica (${codigoFallback}). Asignale una cuenta contable a la caja antes de registrar movimientos.`, 400)
+  // Validar que cada caja tenga cuenta contable para poder generar el asiento
+  for (const cid of cajaIdsInvolucradas) {
+    const c = cajasById[cid]
+    if (!c.cuentaContable?.codigo) {
+      // Intentar resolver por tipo como fallback
+      const codigoFallback = c.tipo === 'BANCO' ? '1.1.1.02' : '1.1.1.01'
+      const cuentaCajaExiste = await req.db.cuentaContable.findFirst({ where: { codigo: codigoFallback } })
+      if (!cuentaCajaExiste) {
+        throw new AppError(`La caja "${c.nombre}" no tiene cuenta contable configurada y no existe la cuenta genérica (${codigoFallback}). Asignale una cuenta contable a la caja antes de registrar movimientos.`, 400)
+      }
     }
   }
 
@@ -664,6 +735,7 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
     }
     // Armar el equivalente single-medio en mediosNorm para uniformar el flow posterior
     mediosNorm.push({
+      cajaId: parseInt(cajaId),
       medioPagoId: medioPagoRecord.id,
       monto: montoTotal,
       nroOperacion: null,
@@ -700,64 +772,91 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
     }
   }
 
-  // Verificar saldo suficiente para egresos — chequea por cada medio de pago
-  const montoNum = montoTotal
+  // Verificar saldo suficiente para egresos — por cada caja + medio de pago
   if (tipo === 'EGRESO') {
     for (const mp of mediosNorm) {
-      const whereBase = { cajaId: parseInt(cajaId), anulado: false, medioPagoId: mp.medioPagoId }
+      const cajaMp = cajasById[mp.cajaId]
+      const whereBase = { cajaId: mp.cajaId, anulado: false, medioPagoId: mp.medioPagoId }
       const [ingresosAgg, egresosAgg] = await Promise.all([
         req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'INGRESO' }, _sum: { monto: true } }),
         req.db.movimientoCaja.aggregate({ where: { ...whereBase, tipo: 'EGRESO'  }, _sum: { monto: true } })
       ])
       const saldoMedio = (Number(ingresosAgg._sum.monto) || 0) - (Number(egresosAgg._sum.monto) || 0)
-      const { valido } = validarLimiteEgreso(caja, saldoMedio, mp.monto)
+      const { valido } = validarLimiteEgreso(cajaMp, saldoMedio, mp.monto)
       if (!valido) {
         const rec = mediosPagoRecords.find(r => r.id === mp.medioPagoId)
         throw new AppError(
-          mensajeSaldoInsuficiente({ caja, disponible: saldoMedio, requerido: mp.monto, contexto: `Medio ${rec?.nombre || mp.medioPagoId}` }),
+          mensajeSaldoInsuficiente({ caja: cajaMp, disponible: saldoMedio, requerido: mp.monto, contexto: `Caja ${cajaMp?.nombre} · Medio ${rec?.nombre || mp.medioPagoId}` }),
           400
         )
       }
     }
   }
 
-  // Crear movimiento y actualizar saldo
-  const numero = await generarNumeroMovimiento(req.db)
-
-  const resultado = await req.db.movimientoCaja.create({
-    data: {
-      numero,
-      cajaId: parseInt(cajaId),
-      fecha: fecha ? new Date(fecha + 'T12:00:00') : new Date(),
-      tipo,
-      monto: montoNum,
-      cuentaContableId: cuentaContableRootId,
-      centroCostoId: centroCostoRootId,
-      concepto: conceptoRoot || cuentaContable.nombre,
-      descripcion: descripcion || null,
-      medioPagoId: medioPagoRecord.id,
-      registradoPor: req.admin.id,
-      socioId: socioId ? parseInt(socioId) : null,
-      entidadId: entidadId ? parseInt(entidadId) : null,
-    },
-    include: {
-      caja: { select: { id: true, codigo: true, nombre: true } },
-      cuentaContable: { select: { id: true, codigo: true, nombre: true } },
-      socio: { select: { id: true, apellidoNombre: true, nroSocio: true } },
-      entidad: { select: { id: true, razonSocial: true, tipo: true } },
+  // ---------------------------------------------------------------------------
+  // Agrupar medios por caja → un MovimientoCaja por caja. Si hay más de una
+  // caja, todos comparten un mismo grupoComprobante y un único asiento contable.
+  // ---------------------------------------------------------------------------
+  const gruposPorCaja = new Map()
+  mediosNorm.forEach((mp, idx) => {
+    if (!gruposPorCaja.has(mp.cajaId)) {
+      gruposPorCaja.set(mp.cajaId, { cajaId: mp.cajaId, medios: [], monto: 0 })
     }
+    const g = gruposPorCaja.get(mp.cajaId)
+    g.medios.push({ ...mp, rec: mediosPagoRecords[idx] })
+    g.monto += mp.monto
   })
 
-  const incremento = tipo === 'INGRESO' ? montoNum : -montoNum
-  await req.db.caja.update({
-    where: { id: parseInt(cajaId) },
-    data: { saldoActual: { increment: incremento } }
-  })
+  const grupoComprobante = esMultiCaja ? randomUUID() : null
+  const fechaMov = fecha ? new Date(fecha + 'T12:00:00') : new Date()
 
-  // Persistir items del movimiento
+  // Crear los movimientos (uno por caja) + sus medios + actualizar saldos
+  const movimientosCreados = []
+  for (const [cid, g] of gruposPorCaja) {
+    const numero = await generarNumeroMovimiento(req.db)
+    const mov = await req.db.movimientoCaja.create({
+      data: {
+        numero,
+        cajaId: cid,
+        fecha: fechaMov,
+        tipo,
+        monto: g.monto,
+        cuentaContableId: cuentaContableRootId,
+        centroCostoId: centroCostoRootId,
+        concepto: conceptoRoot || cuentaContable.nombre,
+        descripcion: descripcion || null,
+        medioPagoId: g.medios[0].medioPagoId,
+        registradoPor: req.admin.id,
+        socioId: socioId ? parseInt(socioId) : null,
+        entidadId: entidadId ? parseInt(entidadId) : null,
+        grupoComprobante,
+      }
+    })
+    await req.db.medioPagoMovimientoCaja.createMany({
+      data: g.medios.map((mp, idx) => ({
+        movimientoCajaId: mov.id,
+        medioPagoId: mp.medioPagoId,
+        monto: mp.monto,
+        nroOperacion: mp.nroOperacion,
+        nroCupon: mp.nroCupon || null,
+        nroLote: mp.nroLote || null,
+        nroAutorizacion: mp.nroAutorizacion || null,
+        descripcion: mp.descripcion,
+        orden: idx,
+      }))
+    })
+    await req.db.caja.update({
+      where: { id: cid },
+      data: { saldoActual: { increment: tipo === 'INGRESO' ? g.monto : -g.monto } }
+    })
+    movimientosCreados.push(mov)
+  }
+
+  // Movimiento principal: lleva los conceptos (items) de todo el comprobante
+  const movimientoPrincipal = movimientosCreados[0]
   await req.db.itemMovimientoCaja.createMany({
     data: itemsNorm.map((it, idx) => ({
-      movimientoCajaId: resultado.id,
+      movimientoCajaId: movimientoPrincipal.id,
       conceptoTesoreriaId: it.conceptoTesoreriaId,
       cuentaContableId: it.cuentaContableId,
       centroCostoId: it.centroCostoId,
@@ -767,75 +866,91 @@ router.post('/movimientos-caja', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(
     }))
   })
 
-  // Persistir medios de pago (siempre — modo single arma 1 medio en mediosNorm)
-  await req.db.medioPagoMovimientoCaja.createMany({
-    data: mediosNorm.map((mp, idx) => ({
-      movimientoCajaId: resultado.id,
-      medioPagoId: mp.medioPagoId,
-      monto: mp.monto,
-      nroOperacion: mp.nroOperacion,
-      nroCupon: mp.nroCupon || null,
-      nroLote: mp.nroLote || null,
-      nroAutorizacion: mp.nroAutorizacion || null,
-      descripcion: mp.descripcion,
-      orden: idx,
-    }))
-  })
-
-  // Generar asiento contable — obligatorio, si falla se revierte el movimiento
+  // Generar asiento contable — uno solo para todo el comprobante. Si falla, se
+  // revierten todos los movimientos creados y los saldos de cada caja.
   try {
     if (usaItems || usaMediosMultiples) {
       // Asiento con N líneas:
-      //   - 1 línea de cash por cada medio de pago (cuenta cash propia)
+      //   - 1 línea de cash por cada medio de pago, con la cuenta de cash de SU caja
       //   - 1 línea de concepto por cada item (cuenta y CC propios)
-      const ccCajaDefault = caja.centroCostoId || itemsNorm[0].centroCostoId
-      const lineasCash = mediosNorm.map((mp, idx) => {
-        const rec = mediosPagoRecords[idx]
-        const cuentaCashId = resolverCuentaCashId(rec, caja)
-        if (!cuentaCashId) {
-          throw new Error(`No se pudo determinar la cuenta de cash para ${rec?.nombre || 'medio'}`)
+      const lineasCash = []
+      for (const [cid, g] of gruposPorCaja) {
+        const cajaG = cajasById[cid]
+        const ccCaja = cajaG.centroCostoId || centroCostoRootId || itemsNorm[0].centroCostoId
+        for (const mp of g.medios) {
+          const cuentaCashId = resolverCuentaCashId(mp.rec, cajaG)
+          if (!cuentaCashId) {
+            throw new Error(`No se pudo determinar la cuenta de cash para ${mp.rec?.nombre || 'medio'} en la caja ${cajaG.nombre}`)
+          }
+          const desc = `${cajaG.nombre} · ${mp.rec?.nombre || ''}${mp.nroOperacion ? ` op. ${mp.nroOperacion}` : ''}`
+          lineasCash.push(tipo === 'INGRESO'
+            ? { cuentaContableId: cuentaCashId, debe: mp.monto, haber: 0, descripcion: desc, centroCostoId: ccCaja }
+            : { cuentaContableId: cuentaCashId, debe: 0, haber: mp.monto, descripcion: desc, centroCostoId: ccCaja })
         }
-        const desc = `${rec?.nombre || ''}${mp.nroOperacion ? ` op. ${mp.nroOperacion}` : ''}`
-        return tipo === 'INGRESO'
-          ? { cuentaContableId: cuentaCashId, debe: mp.monto, haber: 0, descripcion: desc, centroCostoId: ccCajaDefault }
-          : { cuentaContableId: cuentaCashId, debe: 0, haber: mp.monto, descripcion: desc, centroCostoId: ccCajaDefault }
-      })
+      }
       const lineasItems = itemsNorm.map(it => (
         tipo === 'INGRESO'
           ? { cuentaContableId: it.cuentaContableId, debe: 0, haber: it.monto, descripcion: it.descripcion || conceptoRoot, centroCostoId: it.centroCostoId }
           : { cuentaContableId: it.cuentaContableId, debe: it.monto, haber: 0, descripcion: it.descripcion || conceptoRoot, centroCostoId: it.centroCostoId }
       ))
       await generarAsientoAutomatico(req.db, {
-        fecha: resultado.fecha,
+        fecha: movimientoPrincipal.fecha,
         concepto: `${tipo === 'INGRESO' ? 'Ingreso' : 'Egreso'}: ${conceptoRoot}`,
         tipoOrigen: 'MOV_CAJA',
-        origenId: resultado.id,
+        origenId: movimientoPrincipal.id,
         registradoPor: req.admin.id,
         lineas: [...lineasCash, ...lineasItems],
       })
     } else {
       await generarAsientoMovimientoCaja(req.db, {
-        movimiento: resultado,
-        caja,
+        movimiento: movimientoPrincipal,
+        caja: cajasById[movimientoPrincipal.cajaId],
         medioPago: medioPagoRecord,
         registradoPor: req.admin.id,
       })
     }
   } catch (err) {
-    // Revertir: eliminar el movimiento y restaurar el saldo
-    await req.db.itemMovimientoCaja.deleteMany({ where: { movimientoCajaId: resultado.id } })
-    await req.db.medioPagoMovimientoCaja.deleteMany({ where: { movimientoCajaId: resultado.id } })
-    await req.db.movimientoCaja.update({ where: { id: resultado.id }, data: { anulado: true } })
-    await req.db.caja.update({
-      where: { id: parseInt(cajaId) },
-      data: { saldoActual: { increment: -incremento } }
-    })
+    // Revertir todo el comprobante: borrar items/medios, anular y restaurar saldos
+    for (const mov of movimientosCreados) {
+      await req.db.itemMovimientoCaja.deleteMany({ where: { movimientoCajaId: mov.id } })
+      await req.db.medioPagoMovimientoCaja.deleteMany({ where: { movimientoCajaId: mov.id } })
+      await req.db.movimientoCaja.update({ where: { id: mov.id }, data: { anulado: true } })
+      await req.db.caja.update({
+        where: { id: mov.cajaId },
+        data: { saldoActual: { increment: tipo === 'INGRESO' ? -Number(mov.monto) : Number(mov.monto) } }
+      })
+    }
     throw new AppError(`No se pudo generar el asiento contable: ${err.message}`, 400)
   }
 
+  // Recargar el principal con relaciones para el modal/PDF de comprobante
+  const resultado = await req.db.movimientoCaja.findUnique({
+    where: { id: movimientoPrincipal.id },
+    include: {
+      caja: { select: { id: true, codigo: true, nombre: true } },
+      cuentaContable: { select: { id: true, codigo: true, nombre: true } },
+      socio: { select: { id: true, apellidoNombre: true, nroSocio: true } },
+      entidad: { select: { id: true, razonSocial: true, tipo: true } },
+    }
+  })
+
   res.status(201).json({
     success: true,
-    data: { ...resultado, monto: Number(resultado.monto) }
+    data: {
+      ...resultado,
+      monto: Number(resultado.monto),
+      grupoComprobante,
+      // Desglose por caja cuando el comprobante afectó más de una
+      cajasComprobante: esMultiCaja
+        ? movimientosCreados.map(m => ({
+            id: m.id,
+            cajaId: m.cajaId,
+            cajaNombre: cajasById[m.cajaId]?.nombre,
+            numero: m.numero,
+            monto: Number(m.monto),
+          }))
+        : null,
+    }
   })
 }))
 
@@ -880,22 +995,34 @@ router.post('/movimientos-caja/:id/anular', checkPermiso('CAJA_ANULAR'), asyncHa
     throw new AppError('No se puede anular un movimiento vinculado a un pago de cuota', 400)
   }
 
-  // Anular y revertir saldo
-  await req.db.movimientoCaja.update({
-    where: { id: parseInt(id) },
-    data: { anulado: true }
+  // Si el movimiento es parte de un comprobante multi-caja, anular TODOS los
+  // movimientos del grupo (cada uno revierte el saldo de su propia caja).
+  const movimientosAAnular = movimiento.grupoComprobante
+    ? await req.db.movimientoCaja.findMany({
+        where: { grupoComprobante: movimiento.grupoComprobante, anulado: false }
+      })
+    : [movimiento]
+
+  for (const mov of movimientosAAnular) {
+    await req.db.movimientoCaja.update({
+      where: { id: mov.id },
+      data: { anulado: true }
+    })
+    const incremento = mov.tipo === 'INGRESO'
+      ? -Number(mov.monto)
+      : Number(mov.monto)
+    await req.db.caja.update({
+      where: { id: mov.cajaId },
+      data: { saldoActual: { increment: incremento } }
+    })
+  }
+
+  res.json({
+    success: true,
+    message: movimientosAAnular.length > 1
+      ? `Comprobante anulado (${movimientosAAnular.length} movimientos de caja)`
+      : 'Movimiento anulado correctamente'
   })
-
-  const incremento = movimiento.tipo === 'INGRESO'
-    ? -Number(movimiento.monto)
-    : Number(movimiento.monto)
-
-  await req.db.caja.update({
-    where: { id: movimiento.cajaId },
-    data: { saldoActual: { increment: incremento } }
-  })
-
-  res.json({ success: true, message: 'Movimiento anulado correctamente' })
 }))
 
 // =============================================================================

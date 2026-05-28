@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Store, Dumbbell, Receipt, Users, BarChart3, PieChart, AlertTriangle, Pencil, Play } from 'lucide-react'
+import { Store, Dumbbell, Receipt, Users, BarChart3, PieChart, AlertTriangle, Pencil, Play, ClipboardList } from 'lucide-react'
 
 export default function AdminReportes() {
   const navigate = useNavigate()
@@ -101,6 +101,19 @@ export default function AdminReportes() {
           <div className="text-center">
             <p className="font-semibold text-gray-800 text-lg">Presupuesto</p>
             <p className="text-sm text-gray-500">Ejecución presupuestaria</p>
+          </div>
+        </div>
+
+        <div
+          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:shadow-md transition min-h-[160px]"
+          onClick={() => navigate('/admin/reportes/socios-por-actividad')}
+        >
+          <div className="p-4 rounded-full bg-teal-100">
+            <ClipboardList className="w-8 h-8 text-teal-600" />
+          </div>
+          <div className="text-center">
+            <p className="font-semibold text-gray-800 text-lg">Socios por Actividad</p>
+            <p className="text-sm text-gray-500">Inscriptos y saldo deudor</p>
           </div>
         </div>
 

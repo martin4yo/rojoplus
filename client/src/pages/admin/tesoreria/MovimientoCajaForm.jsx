@@ -162,29 +162,33 @@ export default function MovimientoCajaForm() {
             descripcion: it.descripcion || '',
           })))
         }
-        // Cargar medios de pago
-        if (Array.isArray(mov.mediosPago) && mov.mediosPago.length > 0) {
-          setMediosPagoLista(mov.mediosPago.map(mp => ({
-            medioPagoId: String(mp.medioPagoId),
-            medioPagoLabel: mp.medioPago?.nombre || '',
-            monto: String(mp.monto),
-            nroOperacion: mp.nroOperacion || '',
-            nroCupon: mp.nroCupon || '',
-            nroLote: mp.nroLote || '',
-            nroAutorizacion: mp.nroAutorizacion || '',
-            descripcion: mp.descripcion || '',
-          })))
+        // Cargar medios de pago.
+        // Si es un comprobante multi-caja, el detalle trae cajasComprobante con
+        // los medios de cada caja del grupo: los aplanamos para verlos todos.
+        const mapMedio = (mp, cajaId, cajaNombre) => ({
+          cajaId: cajaId ? String(cajaId) : '',
+          cajaLabel: cajaNombre || '',
+          medioPagoId: String(mp.medioPagoId),
+          medioPagoLabel: mp.medioPago?.nombre || '',
+          monto: String(mp.monto),
+          nroOperacion: mp.nroOperacion || '',
+          nroCupon: mp.nroCupon || '',
+          nroLote: mp.nroLote || '',
+          nroAutorizacion: mp.nroAutorizacion || '',
+          descripcion: mp.descripcion || '',
+        })
+        if (Array.isArray(mov.cajasComprobante) && mov.cajasComprobante.length > 0) {
+          const todos = mov.cajasComprobante.flatMap(cc =>
+            (cc.mediosPago || []).map(mp => mapMedio(mp, cc.cajaId, cc.cajaNombre))
+          )
+          setMediosPagoLista(todos)
+        } else if (Array.isArray(mov.mediosPago) && mov.mediosPago.length > 0) {
+          setMediosPagoLista(mov.mediosPago.map(mp => mapMedio(mp, mov.cajaId, mov.caja?.nombre)))
         } else if (mov.medioPagoId) {
-          setMediosPagoLista([{
-            medioPagoId: String(mov.medioPagoId),
-            medioPagoLabel: mov.medioPagoRel?.nombre || '',
-            monto: String(mov.monto),
-            nroOperacion: '',
-            nroCupon: '',
-            nroLote: '',
-            nroAutorizacion: '',
-            descripcion: '',
-          }])
+          setMediosPagoLista([mapMedio(
+            { medioPagoId: mov.medioPagoId, medioPago: mov.medioPagoRel, monto: mov.monto },
+            mov.cajaId, mov.caja?.nombre
+          )])
         }
         setDatosContablesOpen(true)
       }
@@ -303,8 +307,8 @@ export default function MovimientoCajaForm() {
   }
 
   function agregarItem() {
-    // Por defecto el item nuevo hereda CC de la caja seleccionada (si tiene)
-    const cajaActual = cajas.find(c => c.id === parseInt(form.cajaId))
+    // Por defecto el item nuevo hereda CC de la caja del param de URL (si se entró desde una caja)
+    const cajaActual = cajas.find(c => c.id === parseInt(cajaIdParam))
     setItems(prev => [...prev, {
       conceptoId: '',
       cuentaContableId: '',
@@ -322,6 +326,7 @@ export default function MovimientoCajaForm() {
     // Auto-completar el monto con la diferencia faltante para llegar al total de items
     const restante = itemsTotal - mediosTotal
     setMediosPagoLista(prev => [...prev, {
+      cajaId: cajaIdParam || '',  // si se entró desde una caja, se precarga; si no, se elige por fila
       medioPagoId: '',
       monto: restante > 0 ? restante.toFixed(2) : '',
       nroOperacion: '',
@@ -336,8 +341,28 @@ export default function MovimientoCajaForm() {
     setMediosPagoLista(prev => prev.filter((_, i) => i !== idx))
   }
 
+  // Medios de pago habilitados para una caja (filtra por mediosPagoPermitidos)
+  function getMediosPermitidos(cajaId) {
+    const caja = cajas.find(c => c.id === parseInt(cajaId))
+    if (!caja || !caja.mediosPagoPermitidos?.length) {
+      return mediosPago // Sin restricción configurada: mostrar todos
+    }
+    return mediosPago.filter(mp => caja.mediosPagoPermitidos.includes(mp.codigo))
+  }
+
   function handleMedioPagoChange(idx, field, value) {
-    setMediosPagoLista(prev => prev.map((mp, i) => i === idx ? { ...mp, [field]: value } : mp))
+    setMediosPagoLista(prev => prev.map((mp, i) => {
+      if (i !== idx) return mp
+      const updated = { ...mp, [field]: value }
+      // Al cambiar la caja, si el medio ya elegido no está habilitado para la nueva caja, limpiarlo
+      if (field === 'cajaId' && updated.medioPagoId) {
+        const permitidos = getMediosPermitidos(value)
+        if (!permitidos.find(m => m.id.toString() === updated.medioPagoId.toString())) {
+          updated.medioPagoId = ''
+        }
+      }
+      return updated
+    }))
   }
 
   function autocompletarMonto(idx) {
@@ -385,11 +410,6 @@ export default function MovimientoCajaForm() {
     e.preventDefault()
     setError(null)
 
-    if (!form.cajaId) {
-      setError('Caja es requerida')
-      return
-    }
-
     if (items.length === 0) {
       setError('Agregá al menos un concepto')
       return
@@ -422,6 +442,10 @@ export default function MovimientoCajaForm() {
     }
 
     for (const [idx, mp] of mediosPagoLista.entries()) {
+      if (!mp.cajaId) {
+        setError(`Medio de pago ${idx + 1}: seleccioná la caja`)
+        return
+      }
       if (!mp.medioPagoId) {
         setError(`Medio de pago ${idx + 1}: seleccioná el medio`)
         return
@@ -455,7 +479,7 @@ export default function MovimientoCajaForm() {
     setSaving(true)
     try {
       const creado = await api.post('/admin/movimientos-caja', {
-        cajaId: parseInt(form.cajaId),
+        // Sin caja a nivel comprobante: cada medio de pago define su propia caja
         tipo: form.tipo,
         fecha: form.fecha || undefined,
         descripcion: form.descripcion || null,
@@ -469,6 +493,7 @@ export default function MovimientoCajaForm() {
           descripcion: it.descripcion || null,
         })),
         mediosPago: mediosPagoLista.map(mp => ({
+          cajaId: parseInt(mp.cajaId),
           medioPagoId: parseInt(mp.medioPagoId),
           monto: parseFloat(mp.monto),
           nroOperacion: mp.nroOperacion?.trim() || null,
@@ -500,9 +525,6 @@ export default function MovimientoCajaForm() {
       navigate('/admin/tesoreria/movimientos')
     }
   }
-
-  const cajaSeleccionada = cajas.find(c => c.id === parseInt(form.cajaId))
-  const cuentaSeleccionada = cuentasContables.find(c => c.id === parseInt(form.cuentaContableId))
 
   if (loading) {
     return (
@@ -567,9 +589,10 @@ export default function MovimientoCajaForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          {/* Fila: Buscador socio/entidad */}
-          <div className="mb-4">
-            <div className="flex-1 min-w-0">
+          {/* Fila: Socio/Entidad + Fecha + Observación (la caja se elige por cada medio de pago) */}
+          <div className="grid grid-cols-1 md:grid-cols-[2fr_160px_1.5fr] gap-3 items-end">
+            <div className="min-w-0">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Socio / Entidad (opcional)</label>
               {personaSeleccionada ? (
                 <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
                   <span className="flex-1 text-sm text-blue-800 truncate">{personaSeleccionada.label}</span>
@@ -644,28 +667,6 @@ export default function MovimientoCajaForm() {
                   )}
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Fila: Caja + Fecha + Observación */}
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_1.5fr] gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Caja *</label>
-              <select
-                name="cajaId"
-                value={form.cajaId}
-                onChange={handleChange}
-                disabled={isReadOnly}
-                className="input-field w-full disabled:bg-gray-50 disabled:text-gray-700"
-                required
-              >
-                <option value="">Seleccionar caja...</option>
-                {cajas.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre} (${c.saldoActual.toLocaleString()})
-                  </option>
-                ))}
-              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
@@ -842,12 +843,6 @@ export default function MovimientoCajaForm() {
             </div>
           )}
 
-          {/* Preview saldo caja */}
-          {!isReadOnly && form.cajaId && itemsTotal > 0 && cajaSeleccionada && form.tipo === 'EGRESO' && itemsTotal > cajaSeleccionada.saldoActual && (
-            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-              El total excede el saldo disponible de {cajaSeleccionada.nombre} (${cajaSeleccionada.saldoActual.toLocaleString()})
-            </div>
-          )}
         </div>
 
         {/* Medios de Pago */}
@@ -856,7 +851,7 @@ export default function MovimientoCajaForm() {
             <div>
               <h2 className="text-base font-semibold text-gray-800">Medios de Pago</h2>
               <p className="text-xs text-gray-500">
-                Podés combinar varios medios (ej: $5000 efectivo + $3000 transferencia).
+                Podés combinar varios medios y cajas (ej: $5000 efectivo a Caja Chica + $3000 transferencia a Caja Banco).
               </p>
             </div>
             {!isReadOnly && (
@@ -881,6 +876,7 @@ export default function MovimientoCajaForm() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600 w-[180px]">Caja *</th>
                     <th className="text-left px-3 py-2 font-medium text-gray-600">Medio *</th>
                     <th className="text-left px-3 py-2 font-medium text-gray-600">Nro. Operación</th>
                     <th className="text-left px-3 py-2 font-medium text-gray-600">Detalle</th>
@@ -890,6 +886,8 @@ export default function MovimientoCajaForm() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {mediosPagoLista.map((mp, idx) => {
+                    const cajaFila = mp.cajaId || ''
+                    const mediosPermitidos = cajaFila ? getMediosPermitidos(cajaFila) : []
                     const medio = mediosPago.find(m => m.id.toString() === mp.medioPagoId?.toString())
                     const tipoMP = (medio?.tipo || '').toUpperCase()
                     const nombreMP = (medio?.nombre || '').toLowerCase()
@@ -901,16 +899,37 @@ export default function MovimientoCajaForm() {
                     <tr>
                       <td className="px-3 py-2">
                         {isReadOnly ? (
+                          <span className="text-sm">{mp.cajaLabel || cajas.find(c => String(c.id) === String(mp.cajaId))?.nombre || '-'}</span>
+                        ) : (
+                          <select
+                            value={mp.cajaId || ''}
+                            onChange={(e) => handleMedioPagoChange(idx, 'cajaId', e.target.value)}
+                            className="input-field w-full text-sm"
+                            required
+                          >
+                            <option value="">Seleccionar...</option>
+                            {cajas.map(c => (
+                              <option key={c.id} value={c.id}>{c.nombre}</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {isReadOnly ? (
                           <span>{mp.medioPagoLabel || '-'}</span>
                         ) : (
                           <select
                             value={mp.medioPagoId}
                             onChange={(e) => handleMedioPagoChange(idx, 'medioPagoId', e.target.value)}
-                            className="input-field w-full text-sm"
+                            className="input-field w-full text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                            disabled={!cajaFila}
+                            title={!cajaFila ? 'Seleccioná primero la caja' : undefined}
                             required
                           >
-                            <option value="">Seleccionar...</option>
-                            {mediosPago.map(m => (
+                            <option value="">
+                              {!cajaFila ? 'Elegí la caja primero' : 'Seleccionar...'}
+                            </option>
+                            {mediosPermitidos.map(m => (
                               <option key={m.id} value={m.id}>{m.nombre}</option>
                             ))}
                           </select>
@@ -979,7 +998,7 @@ export default function MovimientoCajaForm() {
                     </tr>
                     {requiereExtras && (
                       <tr className="bg-amber-50/40">
-                        <td colSpan={isReadOnly ? 5 : 6} className="px-3 py-2">
+                        <td colSpan={isReadOnly ? 6 : 7} className="px-3 py-2">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                             {esTarjeta && (
                               <>
@@ -1033,7 +1052,7 @@ export default function MovimientoCajaForm() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-50 border-t-2 border-gray-300">
-                    <td colSpan={3} className="px-3 py-3 text-right text-sm text-gray-600">
+                    <td colSpan={4} className="px-3 py-3 text-right text-sm text-gray-600">
                       Total medios:
                     </td>
                     <td className={`px-3 py-3 text-right font-bold text-lg ${balanceaTotal ? 'text-green-600' : 'text-amber-600'}`}>

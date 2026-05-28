@@ -123,6 +123,7 @@ const PresupuestoVsReal = lazy(() => import('./pages/admin/centros-costo/Presupu
 const MovimientosCentroCosto = lazy(() => import('./pages/admin/centros-costo/MovimientosCentroCosto'))
 const ReporteMatrizCentros = lazy(() => import('./pages/admin/centros-costo/ReporteMatriz'))
 const AdminReporteMorosidad = lazy(() => import('./pages/admin/ReporteMorosidadAvanzado'))
+const AdminReporteSociosActividad = lazy(() => import('./pages/admin/ReporteSociosActividad'))
 const AdminEntrenadoresLista = lazy(() => import('./pages/admin/EntrenadoresLista'))
 const AdminEntrenadorForm = lazy(() => import('./pages/admin/EntrenadorForm'))
 const AdminPeriodos = lazy(() => import('./pages/admin/Periodos'))
@@ -442,6 +443,7 @@ function App() {
                   <Route path="reportes/centros-costo/movimientos" element={<MovimientosCentroCosto />} />
                   <Route path="reportes/centros-costo/matriz" element={<ReporteMatrizCentros />} />
                   <Route path="reportes/morosidad" element={<AdminReporteMorosidad />} />
+                  <Route path="reportes/socios-por-actividad" element={<AdminReporteSociosActividad />} />
                   <Route path="configuracion" element={<AdminTablasAuxiliares />} />
                   <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
                   <Route path="configuracion/pagos/mercadopago" element={<ConfiguracionMercadoPago />} />
