@@ -693,6 +693,222 @@ const QUERY_DEFINITIONS = [
       }
     },
   },
+  {
+    key: 'estado_actividades',
+    label: 'Estado de Actividades',
+    category: 'actividades',
+    description: 'Saldo vencido por socio (cuota social y cuota de actividad), agrupado por actividad y categoría, tipo grilla. La cuota social aparece una sola vez, en el primer integrante del grupo familiar.',
+    // Mismos filtros que "morosos_por_actividad". La cuota social es una columna
+    // propia del reporte, por eso "Incluir cuota social" viene activado por defecto.
+    defaultParams: async (db, tenantId) => {
+      if (!db || !tenantId) {
+        return [
+          { name: 'actividadIds', label: 'Actividad', type: 'multiselect', defaultValue: [], options: [] },
+          { name: 'categoriaIds', label: 'Categoría', type: 'multiselect', defaultValue: [], options: [] },
+          { name: 'fechaDesde', label: 'Vence desde', type: 'date', defaultValue: '' },
+          { name: 'fechaHasta', label: 'Vence hasta', type: 'date', defaultValue: '' },
+          { name: 'incluirCuotaSocial', label: 'Incluir cuota social', type: 'boolean', defaultValue: 'true' },
+        ]
+      }
+      const [actividades, categorias] = await Promise.all([
+        db.actividad.findMany({
+          where: { tenantId, activo: true },
+          select: { id: true, nombre: true },
+          orderBy: { nombre: 'asc' },
+        }),
+        db.categoriaActividad.findMany({
+          where: { tenantId, activo: true },
+          select: { id: true, nombre: true, actividadId: true, actividad: { select: { nombre: true } } },
+          orderBy: [{ actividad: { nombre: 'asc' } }, { nombre: 'asc' }],
+        }),
+      ])
+      return [
+        { name: 'actividadIds', label: 'Actividad', type: 'multiselect', defaultValue: [],
+          options: actividades.map(a => ({ value: String(a.id), label: a.nombre })) },
+        { name: 'categoriaIds', label: 'Categoría', type: 'multiselect', defaultValue: [],
+          dependsOn: { param: 'actividadIds', field: 'actividadId' },
+          options: categorias.map(c => ({
+            value: String(c.id),
+            label: `${c.actividad?.nombre || ''} — ${c.nombre}`,
+            actividadId: String(c.actividadId),
+          })) },
+        { name: 'fechaDesde', label: 'Vence desde', type: 'date', defaultValue: '' },
+        { name: 'fechaHasta', label: 'Vence hasta', type: 'date', defaultValue: '' },
+        { name: 'incluirCuotaSocial', label: 'Incluir cuota social', type: 'boolean', defaultValue: 'true' },
+      ]
+    },
+    run: async (db, tenantId, params) => {
+      const toIntArr = (v) => {
+        if (v == null || v === '') return []
+        const arr = Array.isArray(v) ? v : String(v).split(',')
+        return arr.map(x => parseInt(x)).filter(n => Number.isFinite(n))
+      }
+      const actividadIds = toIntArr(params.actividadIds)
+      const categoriaIds = toIntArr(params.categoriaIds)
+      const hoy = new Date()
+
+      // Filtro base: cargos de actividad pendientes (mismo criterio que morosos_por_actividad)
+      const where = {
+        tenantId,
+        estado: 'PENDIENTE',
+        categoriaActividadId: { not: null },
+      }
+      if (params.fechaDesde || params.fechaHasta) {
+        where.fechaVencimiento = {}
+        if (params.fechaDesde) where.fechaVencimiento.gte = new Date(params.fechaDesde)
+        if (params.fechaHasta) where.fechaVencimiento.lte = new Date(params.fechaHasta + 'T23:59:59')
+      } else {
+        where.fechaVencimiento = { lt: hoy }
+      }
+      if (categoriaIds.length > 0 && actividadIds.length > 0) {
+        where.categoriaActividadId = { in: categoriaIds }
+        where.categoriaActividad = { actividadId: { in: actividadIds } }
+      } else if (categoriaIds.length > 0) {
+        where.categoriaActividadId = { in: categoriaIds }
+      } else if (actividadIds.length > 0) {
+        where.categoriaActividad = { actividadId: { in: actividadIds } }
+      }
+
+      const cargos = await db.cargo.findMany({
+        where,
+        include: {
+          socio: { select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, celular: true, titularFamiliaId: true } },
+          categoriaActividad: {
+            select: { id: true, nombre: true, actividad: { select: { id: true, nombre: true } } },
+          },
+        },
+        orderBy: [
+          { categoriaActividad: { actividad: { nombre: 'asc' } } },
+          { categoriaActividad: { nombre: 'asc' } },
+          { socio: { apellidoNombre: 'asc' } },
+        ],
+      })
+
+      // Agrupar actividad → categoría → socio, sumando la cuota de actividad vencida.
+      const groupsMap = new Map()
+      for (const c of cargos) {
+        const actNombre = c.categoriaActividad?.actividad?.nombre || 'Sin actividad'
+        const catNombre = c.categoriaActividad?.nombre || 'Sin categoría'
+        const groupKey = `${actNombre}::${catNombre}`
+        if (!groupsMap.has(groupKey)) {
+          groupsMap.set(groupKey, { actividad: actNombre, categoria: catNombre, socios: new Map() })
+        }
+        const g = groupsMap.get(groupKey)
+        const sid = c.socioId
+        if (!g.socios.has(sid)) {
+          g.socios.set(sid, {
+            socioId: sid,
+            titularFamiliaId: c.socio?.titularFamiliaId || null,
+            nroSocio: c.socio?.nroSocio || '',
+            apellidoNombre: c.socio?.apellidoNombre || '',
+            documento: c.socio?.documento || '',
+            celular: c.socio?.celular || '',
+            saldoSocialVencida: 0,
+            saldoActividadVencida: 0,
+            cantCuotasActividad: 0,
+            cantCuotasSocial: 0,
+            totalVencido: 0,
+          })
+        }
+        const s = g.socios.get(sid)
+        s.saldoActividadVencida += Number(c.montoTotal)
+        s.cantCuotasActividad++
+      }
+
+      // Cuota social: una sola vez por grupo familiar, en el primer integrante que
+      // aparezca en cada bloque actividad/categoría (misma lógica que morosos_por_actividad).
+      const incluirCuotaSocial = params.incluirCuotaSocial === true || params.incluirCuotaSocial === 'true'
+      if (incluirCuotaSocial) {
+        const sociosIds = new Set()
+        for (const g of groupsMap.values()) {
+          for (const sid of g.socios.keys()) sociosIds.add(sid)
+        }
+        if (sociosIds.size > 0) {
+          const socios = await db.socio.findMany({
+            where: { id: { in: [...sociosIds] } },
+            select: { id: true, titularFamiliaId: true },
+          })
+          const titularPorSocio = new Map()
+          const titularesUnicos = new Set()
+          for (const s of socios) {
+            const titId = s.titularFamiliaId || s.id
+            titularPorSocio.set(s.id, titId)
+            titularesUnicos.add(titId)
+          }
+
+          // Saldo de cuota social vencida por titular (mismo filtro temporal que actividad).
+          const socialAgg = await db.cargo.groupBy({
+            by: ['socioId'],
+            where: {
+              tenantId,
+              estado: 'PENDIENTE',
+              categoria: 'CUOTA_SOCIAL',
+              socioId: { in: [...titularesUnicos] },
+              fechaVencimiento: where.fechaVencimiento,
+            },
+            _sum: { montoTotal: true },
+            _count: { _all: true },
+          })
+          const socialPorTitular = new Map()
+          for (const a of socialAgg) {
+            socialPorTitular.set(a.socioId, {
+              saldo: Number(a._sum.montoTotal) || 0,
+              cant: a._count?._all || 0,
+            })
+          }
+
+          for (const g of groupsMap.values()) {
+            const titularesYaUsados = new Set()
+            // socios.values() respeta orden de inserción → primer integrante del grupo familiar
+            for (const s of g.socios.values()) {
+              const titId = titularPorSocio.get(s.socioId)
+              if (!titId || titularesYaUsados.has(titId)) continue
+              titularesYaUsados.add(titId)
+              const cs = socialPorTitular.get(titId)
+              if (!cs || cs.saldo <= 0) continue
+              s.saldoSocialVencida += cs.saldo
+              s.cantCuotasSocial += cs.cant
+            }
+          }
+        }
+      }
+
+      // Totales por grupo + generales.
+      const groups = []
+      let totalSocialGen = 0
+      let totalActividadGen = 0
+      let totalSociosGen = 0
+      for (const g of groupsMap.values()) {
+        const socios = Array.from(g.socios.values())
+        for (const s of socios) s.totalVencido = s.saldoSocialVencida + s.saldoActividadVencida
+        const subtotalSocial = socios.reduce((a, x) => a + x.saldoSocialVencida, 0)
+        const subtotalActividad = socios.reduce((a, x) => a + x.saldoActividadVencida, 0)
+        groups.push({
+          actividad: g.actividad,
+          categoria: g.categoria,
+          socios,
+          subtotalSocial,
+          subtotalActividad,
+          subtotalVencido: subtotalSocial + subtotalActividad,
+          cantSocios: socios.length,
+        })
+        totalSocialGen += subtotalSocial
+        totalActividadGen += subtotalActividad
+        totalSociosGen += socios.length
+      }
+
+      return {
+        items: groups,
+        summary: {
+          totalGrupos: groups.length,
+          totalSocios: totalSociosGen,
+          totalSocialVencida: totalSocialGen,
+          totalActividadVencida: totalActividadGen,
+          totalVencido: totalSocialGen + totalActividadGen,
+        },
+      }
+    },
+  },
 ]
 
 export async function listQueryDefinitions(db = null, tenantId = null) {

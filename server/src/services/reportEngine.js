@@ -326,6 +326,74 @@ export function getDefaultTemplate(queryKey) {
 </div>
 </body></html>`,
 
+    estado_actividades: `${BASE_STYLES}
+<style>
+  .group { page-break-inside: avoid; margin-bottom: 14px; }
+  .group-header {
+    background: #1f2937; color: white; padding: 8px 12px; margin: 10px 0 0;
+    border-radius: 4px 4px 0 0; font-weight: bold; font-size: 11pt;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .group-header .stats { font-weight: normal; font-size: 8.5pt; opacity: 0.9; }
+  table.grid { width: 100%; border-collapse: collapse; }
+  table.grid th { background: #1d4ed8; color: #fff; padding: 5px 6px; font-size: 8pt; text-align: left; }
+  table.grid td { padding: 4px 6px; font-size: 8pt; border-bottom: 1px solid #e5e7eb; }
+  table.grid tr:nth-child(even) td { background: #f8fafc; }
+  table.grid tfoot td { background: #eff6ff; font-weight: bold; }
+  .r { text-align: right; }
+</style>
+<div class="header">
+  <div><div class="title">Estado de Actividades</div><div class="subtitle">{{tenant.nombre}}</div></div>
+  <div class="meta">Generado: {{generatedAt}}<br>{{userName}}</div>
+</div>
+<div class="params">{{#each paramLabels}}<span><strong>{{this.label}}:</strong> {{this.value}}</span>&nbsp;{{/each}}</div>
+
+{{#each data.items}}
+<div class="group">
+  <div class="group-header">
+    <span>{{actividad}} — {{categoria}}</span>
+    <span class="stats">{{cantSocios}} socios · Social $ {{formatCurrency subtotalSocial}} · Actividad $ {{formatCurrency subtotalActividad}}</span>
+  </div>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th style="width:28px">#</th>
+        <th style="width:55px">Nro</th>
+        <th>Apellido y Nombre</th>
+        <th class="r" style="width:110px">Cuota social vencida</th>
+        <th class="r" style="width:110px">Cuota actividad vencida</th>
+        <th class="r" style="width:90px">Total vencido</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each socios}}
+      <tr>
+        <td>{{inc @index}}</td>
+        <td>{{nroSocio}}</td>
+        <td>{{apellidoNombre}}</td>
+        <td class="r">{{#if saldoSocialVencida}}$ {{formatCurrency saldoSocialVencida}}{{else}}—{{/if}}</td>
+        <td class="r">{{#if saldoActividadVencida}}$ {{formatCurrency saldoActividadVencida}}{{else}}—{{/if}}</td>
+        <td class="r">$ {{formatCurrency totalVencido}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3" class="r">Subtotal {{actividad}} / {{categoria}}:</td>
+        <td class="r">$ {{formatCurrency subtotalSocial}}</td>
+        <td class="r">$ {{formatCurrency subtotalActividad}}</td>
+        <td class="r">$ {{formatCurrency subtotalVencido}}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{{/each}}
+
+<div class="grand-total" style="margin-top:18px; text-align:center; background:#1f2937; color:#fff; padding:12px; border-radius:4px;">
+  TOTAL GENERAL — {{data.summary.totalGrupos}} grupos · {{data.summary.totalSocios}} socios · Cuota social $ {{formatCurrency data.summary.totalSocialVencida}} · Cuota actividad $ {{formatCurrency data.summary.totalActividadVencida}} · Total $ {{formatCurrency data.summary.totalVencido}}
+</div>
+</body></html>`,
+
     recibo_cobro: `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
