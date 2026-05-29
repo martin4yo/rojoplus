@@ -610,7 +610,7 @@ server {
     add_header Cross-Origin-Opener-Policy   "same-origin"         always;
     add_header Cross-Origin-Resource-Policy "same-site"           always;
     # CSP: ajustá los hosts que el front realmente consume (MP, reCAPTCHA, etc.)
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://sdk.mercadopago.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://api.mercadopago.com wss: https:; frame-src 'self' blob: https://www.google.com https://www.mercadopago.com; worker-src 'self' blob:; object-src 'self' blob:; base-uri 'self'; form-action 'self';" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://sdk.mercadopago.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://api.mercadopago.com wss: https:; frame-src 'self' blob: https://www.google.com https://www.mercadopago.com; worker-src 'self' blob:; object-src 'self' blob:; base-uri 'self'; form-action 'self';" always;
 
     # Logs
     access_log /var/log/nginx/clubix-access.log;
