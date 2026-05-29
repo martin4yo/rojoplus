@@ -62,6 +62,7 @@ import authRoutes from './routes/admin/auth.js'
 import whatsappRoutes from './routes/whatsapp/webhook.js'
 import webhooksMpRoutes from './routes/webhooksMercadoPago.js'
 import tiendaRoutes from './routes/tienda/index.js'
+import pwaRoutes from './routes/pwa.js'
 
 // Services
 import { verificarConexionSMTP } from './services/email.js'
@@ -250,6 +251,10 @@ app.use('/api/public/*', extractTenantOptional, (req, res, next) => {
   }
   next()
 })
+
+// Manifest PWA dinámico (branded por tenant, resuelto por Host). Tenant opcional:
+// si no resuelve, el endpoint devuelve branding Clubix por defecto.
+app.use('/api/pwa', extractTenantOptional, pwaRoutes)
 
 // Rutas super-admin (sin tenant scope)
 app.use('/api/super-admin/tenants/register', registerRateLimit)

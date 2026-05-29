@@ -397,6 +397,8 @@ model Socio {
   tipoSocioRelId               Int?                     @map("tipo_socio_rel_id")
   titularFamiliaId             Int?                     @map("titular_familia_id")
   tokenPortalExpira            DateTime?                @map("token_portal_expira")
+  loginCodigo                  String?                  @map("login_codigo")
+  loginCodigoExpira            DateTime?                @map("login_codigo_expira")
   notificarCuotaProxVenc       Boolean                  @default(true) @map("notificar_cuota_prox_venc")
   notificarCuotaVencida        Boolean                  @default(true) @map("notificar_cuota_vencida")
   notificarInscripcion         Boolean                  @default(true) @map("notificar_inscripcion")

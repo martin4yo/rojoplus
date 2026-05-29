@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { MapPin, Phone, Mail, Facebook, Instagram, MessageCircle } from 'lucide-react'
 import { useTenant } from '../../contexts/TenantContext'
 import api from '../../services/api'
@@ -54,6 +54,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function PortalSocioNuevo() {
   const { tokenPortal } = useParams()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showModal, ModalComponent } = useModal()
   const { tenant } = useTenant()
@@ -70,6 +71,14 @@ export default function PortalSocioNuevo() {
 
   useEffect(() => {
     cargarDatosSocio()
+  }, [tokenPortal])
+
+  // "Recordar dispositivo": al abrir el link, crear la sesión persistente (cookie
+  // de 30 días, sliding). validar-token NO rota el tokenPortal de la URL y es
+  // idempotente (no duplica sesiones si ya hay una válida). Best-effort.
+  useEffect(() => {
+    if (!tokenPortal) return
+    api.get(`/socio/validar-token/${tokenPortal}`).catch(() => {})
   }, [tokenPortal])
 
   // Deep-link a una cuota desde una notificación (ej. WhatsApp / email)
@@ -151,6 +160,14 @@ export default function PortalSocioNuevo() {
       setError(null)
     } catch (err) {
       console.error('Error cargando datos del socio:', err)
+      // Token de la URL inválido/expirado: si este dispositivo tiene una sesión
+      // persistente válida, /login-socio hará auto-login con un token fresco.
+      // Si no la tiene, /login-socio muestra el form para pedir un nuevo link.
+      const status = err?.status || err?.response?.status
+      if (status === 401 || status === 404) {
+        navigate('/login-socio', { replace: true })
+        return
+      }
       setError(err.message || 'No se pudo cargar la información. Verifica que el link sea válido.')
     } finally {
       setLoading(false)

@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
 import crypto from 'crypto'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
@@ -339,16 +340,26 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   const expiracion = new Date()
   expiracion.setHours(expiracion.getHours() + 24)
 
+  // Código de 6 dígitos para login dentro de la app instalada (PWA). Expira en
+  // 30 min y es de un solo uso. Ver POST /socio/login-codigo.
+  const codigo = String(crypto.randomInt(0, 1000000)).padStart(6, '0')
+  const codigoExpira = new Date(Date.now() + 30 * 60 * 1000)
+
   await req.db.socio.update({
     where: { id: socio.id },
-    data: { tokenPortal: token, tokenPortalExpira: expiracion },
+    data: {
+      tokenPortal: token,
+      tokenPortalExpira: expiracion,
+      loginCodigo: codigo,
+      loginCodigoExpira: codigoExpira,
+    },
   })
 
   const portalLink = `${getTenantFrontendUrl(req.tenant)}/portal-socio/${token}`
 
   if (canalEnvio === 'whatsapp') {
     const telefono = obtenerTelefonoSocio(socio)
-    await enviarLinkPortal({ db: req.db, socio: { ...socio, celular: telefono }, link: portalLink })
+    await enviarLinkPortal({ db: req.db, tenantId: req.tenantId, socio: { ...socio, celular: telefono }, link: portalLink, codigo })
     const telOculto = telefono.replace(/(\d{3})\d+(\d{3})/, '$1****$2') || telefono
     return res.json({
       success: true,
@@ -358,12 +369,93 @@ router.post('/enviar-link-acceso', asyncHandler(async (req, res) => {
   }
 
   // Email
-  await enviarMagicLinkSocio(socio, token, req.db, req.tenantId)
+  await enviarMagicLinkSocio(socio, token, req.db, req.tenantId, codigo)
   const emailOculto = socio.email.replace(/(.{2})(.*)(@.*)/, '$1***$3')
   return res.json({
     success: true,
     message: 'Link de acceso enviado a tu email',
     data: { canal: 'email', destino: emailOculto },
+  })
+}))
+
+// Rate limit para verificación de código: 10 intentos / 15 min por IP.
+// Combinado con requerir identificación + código de 6 díg de un solo uso (expira
+// en 30 min), hace inviable el fuerza bruta.
+const loginCodigoLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Esperá unos minutos.', code: 'RATE_LIMITED' },
+})
+
+// POST /api/socio/login-codigo - Login con código de 6 dígitos (para la app
+// instalada/PWA, sobre todo iPhone donde el magic link abre Safari y no la PWA).
+// Body: { valor, codigo }. Crea la sesión persistente (cookie 30 días) en el
+// contenedor desde donde se llama (o sea, dentro de la PWA) y devuelve un
+// tokenPortal fresco para navegar al portal.
+router.post('/login-codigo', loginCodigoLimiter, asyncHandler(async (req, res) => {
+  const { valor, codigo } = req.body
+  if (!valor || !valor.trim()) {
+    throw new AppError('Ingresá tu DNI, email o nº de socio', 400, 'VALIDATION_ERROR')
+  }
+  const codigoLimpio = String(codigo || '').replace(/\D/g, '')
+  if (codigoLimpio.length !== 6) {
+    throw new AppError('El código debe tener 6 dígitos', 400, 'VALIDATION_ERROR')
+  }
+
+  const socioBasico = await buscarSocioFlexible(req.db, valor)
+  if (!socioBasico) {
+    throw new AppError('No se encontró un socio con esos datos', 404, 'SOCIO_NOT_FOUND')
+  }
+
+  const socio = await req.db.socio.findUnique({
+    where: { id: socioBasico.id },
+    select: {
+      id: true, nroSocio: true, apellidoNombre: true,
+      loginCodigo: true, loginCodigoExpira: true,
+      estadoSocioRel: SELECT_ESTADO_SOCIO_REL,
+    },
+  })
+
+  if (!socio.loginCodigo || !socio.loginCodigoExpira || socio.loginCodigoExpira < new Date()) {
+    throw new AppError('El código expiró. Pedí uno nuevo.', 401, 'EXPIRED_CODE')
+  }
+  if (socio.loginCodigo !== codigoLimpio) {
+    throw new AppError('Código incorrecto', 401, 'INVALID_CODE')
+  }
+  if (!esSocioActivo(socio)) {
+    throw new AppError('Tu membresía no está activa. Contactá al club para regularizar tu situación', 403, 'SOCIO_INACTIVO')
+  }
+
+  // Código de un solo uso + emitir tokenPortal fresco (24h)
+  const nuevoToken = crypto.randomBytes(32).toString('hex')
+  const exp = new Date(); exp.setHours(exp.getHours() + 24)
+  await req.db.socio.update({
+    where: { id: socio.id },
+    data: { tokenPortal: nuevoToken, tokenPortalExpira: exp, loginCodigo: null, loginCodigoExpira: null },
+  })
+
+  // Crear sesión persistente (cookie HttpOnly 30 días, sliding)
+  try {
+    const { crearSesion, setSesionCookie } = await import('../services/sesionSocioService.js')
+    const ip = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+    const userAgent = req.headers['user-agent'] || null
+    const { token: sessionToken, expiresAt } = await crearSesion(req.db, {
+      socioId: socio.id, tenantId: req.tenantId, ip, userAgent,
+    })
+    setSesionCookie(res, sessionToken, expiresAt)
+  } catch (err) {
+    console.error('[login-codigo] Error creando sesión persistente:', err.message)
+  }
+
+  res.json({
+    success: true,
+    data: {
+      tokenPortal: nuevoToken,
+      nroSocio: socio.nroSocio,
+      apellidoNombre: socio.apellidoNombre,
+    },
   })
 }))
 
@@ -406,16 +498,25 @@ router.get('/validar-token/:token', asyncHandler(async (req, res) => {
 
   const esActivo = esSocioActivo(socio)
 
-  // Crear sesión persistente ("recordar dispositivo") + setear cookie HttpOnly por 30 días
+  // Crear sesión persistente ("recordar dispositivo") + setear cookie HttpOnly por 30 días.
+  // Idempotente: si este dispositivo ya tiene una sesión válida para ESTE socio, no
+  // crea otra (evita duplicar entradas en "dispositivos conectados"). validarSesion
+  // ya hace el sliding de la expiración.
   if (esActivo) {
     try {
-      const { crearSesion, setSesionCookie } = await import('../services/sesionSocioService.js')
-      const ip = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
-      const userAgent = req.headers['user-agent'] || null
-      const { token: sessionToken, expiresAt } = await crearSesion(req.db, {
-        socioId: socio.id, tenantId: req.tenantId, ip, userAgent,
-      })
-      setSesionCookie(res, sessionToken, expiresAt)
+      const { crearSesion, setSesionCookie, validarSesion, SESSION_COOKIE } =
+        await import('../services/sesionSocioService.js')
+      const cookieToken = req.cookies?.[SESSION_COOKIE]
+      const sesionActual = cookieToken ? await validarSesion(req.db, cookieToken) : null
+      const yaRecordado = sesionActual && sesionActual.socioId === socio.id
+      if (!yaRecordado) {
+        const ip = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+        const userAgent = req.headers['user-agent'] || null
+        const { token: sessionToken, expiresAt } = await crearSesion(req.db, {
+          socioId: socio.id, tenantId: req.tenantId, ip, userAgent,
+        })
+        setSesionCookie(res, sessionToken, expiresAt)
+      }
     } catch (err) {
       console.error('[validar-token] Error creando sesión persistente:', err.message)
       // No bloquea el acceso al portal — la cookie es opcional para "recordar dispositivo"

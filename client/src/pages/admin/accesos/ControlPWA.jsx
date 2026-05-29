@@ -5,6 +5,7 @@ import { Button } from '../../../components/Button'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../../components/LoadingSpinner'
+import InstallAppButton from '../../../components/InstallAppButton'
 
 export default function ControlPWA() {
   const navigate = useNavigate()
@@ -281,6 +282,8 @@ export default function ControlPWA() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4">
+      {/* Botón/banner para instalar como PWA (administración) */}
+      <InstallAppButton />
       {/* Header */}
       <div className="max-w-md mx-auto">
         <div className="flex items-center justify-between mb-6">

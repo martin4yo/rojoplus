@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import prisma from '../lib/prisma.js'
 import { ACCIONES } from './aiConstants.js'
+import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 
 /**
  * Action Executor Service
@@ -1157,22 +1158,20 @@ class ActionExecutor {
   // =============================================================================
 
   /**
-   * Resuelve la URL pública del tenant: https://{slug}.{APP_DOMAIN} si hay slug,
-   * o FRONTEND_URL/APP_DOMAIN como fallback. Usa la prisma global porque la
+   * Resuelve la URL pública del tenant usando el helper canónico
+   * `getTenantFrontendUrl`, que respeta dominioCustom (dominio propio), normaliza
+   * www y arma <subdomain>.<APP_DOMAIN> en prod. Usa la prisma global porque la
    * tabla tenant vive fuera del scope tenant-aislado.
    */
   async _getBaseUrlTenant(context) {
-    const appDomain = process.env.APP_DOMAIN || 'clubix.com.ar'
     const tenantId = context?.tenantId || context?.metadata?.tenantId || null
-    if (!tenantId) return process.env.FRONTEND_URL || `https://${appDomain}`
+    if (!tenantId) return getTenantFrontendUrl(null)
 
     const tenant = await prisma.tenant
-      .findUnique({ where: { id: tenantId }, select: { slug: true } })
+      .findUnique({ where: { id: tenantId }, select: { subdomain: true, dominioCustom: true } })
       .catch(() => null)
 
-    return tenant?.slug
-      ? `https://${tenant.slug}.${appDomain}`
-      : (process.env.FRONTEND_URL || `https://${appDomain}`)
+    return getTenantFrontendUrl(tenant)
   }
 
   async getSocioFromContext(context) {

@@ -139,19 +139,32 @@ export function normalizarNumero(telefono) {
 
   if (!num || num.length < 8) return null
 
-  // Ya tiene formato completo con 549
-  if (num.startsWith('549') && num.length === 13) return num
+  // Quitar prefijo internacional para trabajar con el número NACIONAL.
+  // (Ningún código de área AR empieza con 54/549, así que es seguro.)
+  if (num.startsWith('549')) num = num.slice(3)
+  else if (num.startsWith('54')) num = num.slice(2)
 
-  // Tiene 54 adelante pero sin el 9
-  if (num.startsWith('54') && num.length === 12) return '54' + '9' + num.slice(2)
-
-  // Empieza con 0 (ej: 0221...)
+  // Quitar 0 inicial de larga distancia (ej: 0230...)
   if (num.startsWith('0')) num = num.slice(1)
 
-  // Empieza con 15 (ej: 15XXXXXXXX — número local viejo)
-  if (num.startsWith('15')) num = num.slice(2)
+  // Quitar el "15" embebido entre el código de área y el abonado.
+  // El número nacional argentino significativo es SIEMPRE de 10 dígitos
+  // (área 2-4 + abonado). Si quedan 12, el "15" (viejo prefijo de celular
+  // local) está embebido tras el código de área: 0{area}15{abonado}.
+  // Ej: 230 15 4346897 → 230 4346897.
+  if (num.length === 12) {
+    if (num.startsWith('11') && num.slice(2, 4) === '15') num = '11' + num.slice(4)      // CABA/GBA (área 2 díg)
+    else if (num.slice(3, 5) === '15') num = num.slice(0, 3) + num.slice(5)              // área 3 díg (interior)
+    else if (num.slice(4, 6) === '15') num = num.slice(0, 4) + num.slice(6)              // área 4 díg
+    else if (num.slice(2, 4) === '15') num = num.slice(0, 2) + num.slice(4)              // fallback área 2 díg
+  }
 
-  // Agregar prefijo completo
+  // "15" al inicio sin código de área (número local viejo, ambiguo)
+  if (num.startsWith('15') && num.length === 10) num = num.slice(2)
+
+  if (num.length < 8) return null
+
+  // Agregar prefijo completo (código país 54 + 9 de celular)
   return '549' + num
 }
 
@@ -677,12 +690,17 @@ export async function notificarMora({ db, tenantId, socio, deuda }) {
 /**
  * Envía el link de acceso al portal del socio.
  */
-export async function enviarLinkPortal({ db, tenantId, socio, link }) {
+export async function enviarLinkPortal({ db, tenantId, socio, link, codigo = null }) {
   const telefono = obtenerTelefonoSocio(socio)
   if (!telefono) return
 
   const variables = await buildVariablesSocio(socio, { link })
-  const texto = await resolverTemplate(db, 'NOTIF_WA_PORTAL', variables)
+  let texto = await resolverTemplate(db, 'NOTIF_WA_PORTAL', variables)
+  // Código para login dentro de la app instalada (clave en iPhone, donde el link
+  // abre Safari y no la PWA).
+  if (codigo) {
+    texto += `\n\n¿Instalaste la app? Ingresá este código: *${codigo}* (válido 30 min)`
+  }
   return enviarWhatsApp({ db, tenantId, telefono, texto, ignorarHorario: true })
 }
 

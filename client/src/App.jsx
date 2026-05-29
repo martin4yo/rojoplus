@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import ConnectionError from './components/ConnectionError'
 import { errorStore, useConnectionError } from './stores/errorStore'
 import TenantStyles from './components/TenantStyles'
+import PwaManifest from './components/PwaManifest'
 import SWUpdateNotifier from './components/SWUpdateNotifier'
 import { TenantProvider } from './contexts/TenantContext'
 import { TicketProvider } from './contexts/TicketContext'
@@ -326,6 +327,7 @@ function App() {
     <ErrorBoundary>
       <TenantProvider>
         <TenantStyles />
+        <PwaManifest />
         <ConnectionErrorOverlay />
         <ShopAuthProvider>
         <ShopCartProvider>

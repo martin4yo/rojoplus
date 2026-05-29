@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import prisma from '../lib/prisma.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
+import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
 
 /**
  * Resuelve un cliente Prisma SEGURO para leer config del tenant.
@@ -40,16 +41,11 @@ async function getTenantInfo(tenantId) {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } })
     if (!tenant) return { nombre: 'Club', slogan: '', color: '#DC2626', url: frontendUrl }
     const color = tenant.colores?.primario || '#DC2626'
-    // Construir URL con subdomain: http://localhost:5173 → http://sub.localhost:5173
-    //                              https://clubix.com   → https://sub.clubix.com
-    let url = frontendUrl
-    if (tenant.subdomain) {
-      if (url.includes('localhost')) {
-        url = url.replace('localhost', `${tenant.subdomain}.localhost`)
-      } else {
-        url = url.replace('://', `://${tenant.subdomain}.`)
-      }
-    }
+    // URL canónica del tenant: respeta dominioCustom (dominio propio) y normaliza
+    // www. Antes se concatenaba el subdomain a FRONTEND_URL a mano, lo que rompía
+    // con FRONTEND_URL=https://www.clubix.com.ar (→ sub.www.clubix.com.ar) e
+    // ignoraba el dominioCustom. Ver lib/tenantUrl.js.
+    const url = getTenantFrontendUrl(tenant)
     return { nombre: tenant.nombre || 'Club', slogan: tenant.slogan || '', color, url }
   } catch (err) {
     console.error('Error obteniendo info del tenant:', err.message)
@@ -517,10 +513,19 @@ export async function enviarMagicLinkEntrenador(entrenador, token, db, tenantId 
   })
 }
 
-export async function enviarMagicLinkSocio(socio, token, db, tenantId = null) {
+export async function enviarMagicLinkSocio(socio, token, db, tenantId = null, codigo = null) {
   // Resolver URL con subdomain del tenant (cae a frontendUrl global si no hay tenant)
   const tenantInfo = await getTenantInfo(tenantId ?? socio?.tenantId)
   const linkAcceso = `${tenantInfo.url}/portal-socio/${token}`
+
+  // Bloque del código de 6 dígitos (para login dentro de la app instalada, sobre
+  // todo en iPhone donde el link abre Safari y no la PWA).
+  const bloqueCodigo = codigo ? `
+        <div style="background-color: #ffffff; border: 1px dashed #d1d5db; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+          <p style="color: #6b7280; margin: 0 0 8px 0; font-size: 13px;">¿Instalaste la app? Ingresá este código:</p>
+          <p style="color: #111827; margin: 0; font-size: 32px; font-weight: bold; letter-spacing: 8px;">${codigo}</p>
+          <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0 0;">Válido por 30 minutos</p>
+        </div>` : ''
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -545,7 +550,7 @@ export async function enviarMagicLinkSocio(socio, token, db, tenantId = null) {
             O copiá este link: <br><span style="word-break: break-all;">${linkAcceso}</span>
           </p>
         </div>
-
+${bloqueCodigo}
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
           <p style="color: #1e40af; margin: 0; font-size: 14px;">
             <strong>🔒 Seguridad:</strong><br>

@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Download, Smartphone, X, Share, PlusSquare, ChevronDown } from 'lucide-react'
+import { useTenant } from '../contexts/TenantContext'
 
 export default function InstallAppButton() {
+  const { tenant } = useTenant()
+  const nombreApp = tenant?.nombre || 'la app'
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [showButton, setShowButton] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
@@ -130,7 +133,7 @@ export default function InstallAppButton() {
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-end justify-center p-4">
           <div className="bg-white rounded-t-2xl w-full max-w-md animate-slide-up">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">Instalar Rojo Plus</h3>
+              <h3 className="font-bold text-gray-900">Instalar {nombreApp}</h3>
               <button onClick={() => setShowIOSInstructions(false)} className="text-gray-400">
                 <X className="w-6 h-6" />
               </button>
@@ -217,7 +220,7 @@ export default function InstallAppButton() {
             </div>
             <div className="flex-1">
               <h3 className="font-bold text-white text-sm">
-                Instala Rojo Plus
+                Instalá {nombreApp}
               </h3>
               <p className="text-white/80 text-xs mt-0.5 mb-3">
                 {isIOS

@@ -8,32 +8,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['images/logo.png', 'images/icon-192.png', 'images/icon-512.png'],
-      manifest: {
-        name: 'Clubix - Gestión Inteligente',
-        short_name: 'Clubix',
-        description: 'Clubix - Gestión Inteligente - Administración de cuotas, actividades y beneficios',
-        theme_color: '#DC2626',
-        background_color: '#F9FAFB',
-        display: 'standalone',
-        scope: '/',
-        start_url: '/',
-        orientation: 'portrait-primary',
-        categories: ['sports', 'lifestyle', 'social'],
-        icons: [
-          {
-            src: '/images/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any maskable'
-          },
-          {
-            src: '/images/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ]
-      },
+      // Manifest deshabilitado: lo servimos dinámicamente y branded por tenant desde
+      // /api/pwa/manifest (ver server/src/routes/pwa.js + client/components/PwaManifest.jsx).
+      // El service worker se sigue generando e inyectando normalmente.
+      manifest: false,
       workbox: {
         clientsClaim: true,
         skipWaiting: true,

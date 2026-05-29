@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, MessageCircle, Send, CheckCircle, Shield, Smartphone, ArrowUpRight, ArrowLeft, AlertCircle } from 'lucide-react'
+import { Mail, MessageCircle, Send, CheckCircle, Shield, Smartphone, ArrowUpRight, ArrowLeft, AlertCircle, KeyRound } from 'lucide-react'
 import api from '../../services/api'
 import { useTenant } from '../../contexts/TenantContext'
 import PublicHero from '../../components/public/PublicHero'
+import InstallAppButton from '../../components/InstallAppButton'
+
+// Detecta navegadores embebidos (in-app) donde no se puede instalar la PWA.
+function esNavegadorInApp() {
+  const ua = navigator.userAgent || ''
+  return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Twitter|WhatsApp|GSA\//i.test(ua)
+}
 
 export default function LoginSocio() {
   const { tenant } = useTenant()
@@ -13,8 +20,31 @@ export default function LoginSocio() {
   const [error, setError] = useState(null)
   const [resultado, setResultado] = useState(null) // { canal, destino }
   const [chequeandoSesion, setChequeandoSesion] = useState(true)
+  const [codigo, setCodigo] = useState('')
+  const [verificando, setVerificando] = useState(false)
+  const [errorCodigo, setErrorCodigo] = useState(null)
+  const [inApp] = useState(() => esNavegadorInApp())
 
   const waEnabled = tenant?.waEnabled === true
+
+  async function verificarCodigo() {
+    const limpio = codigo.replace(/\D/g, '')
+    if (limpio.length !== 6) { setErrorCodigo('Ingresá los 6 dígitos'); return }
+    setVerificando(true)
+    setErrorCodigo(null)
+    try {
+      const data = await api.post('/socio/login-codigo', { valor: valor.trim(), codigo: limpio })
+      if (data?.tokenPortal) {
+        navigate(`/portal-socio/${data.tokenPortal}`, { replace: true })
+      } else {
+        setErrorCodigo('No se pudo validar el código')
+      }
+    } catch (err) {
+      setErrorCodigo(err.message || 'Código inválido')
+    } finally {
+      setVerificando(false)
+    }
+  }
 
   // Auto-login si hay sesión persistente válida (cookie de "recordar dispositivo")
   useEffect(() => {
@@ -63,6 +93,7 @@ export default function LoginSocio() {
 
   return (
     <div style={{ backgroundColor: 'var(--bg-app)' }}>
+      <InstallAppButton />
       <PublicHero
         eyebrow="Tu cuenta"
         title="Acceso"
@@ -73,6 +104,18 @@ export default function LoginSocio() {
 
       <section className="py-16 md:py-24">
         <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
+          {inApp && (
+            <div
+              className="mb-6 px-4 py-3 text-sm flex items-start gap-3"
+              style={{ border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', backgroundColor: 'var(--warning-soft)', color: 'var(--warning)' }}
+            >
+              <Smartphone className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>
+                Para instalar la app en tu teléfono, abrí esta página en tu navegador
+                (Chrome o Safari). Desde acá dentro no se puede instalar.
+              </span>
+            </div>
+          )}
           {resultado ? (
             <div className="p-8 md:p-10" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
               <div
@@ -129,8 +172,57 @@ export default function LoginSocio() {
                 <p className="flex items-center gap-2"><Mail className="w-4 h-4" /> Guardá el link para futuros accesos.</p>
               </div>
 
+              {/* Login con código: clave para la app instalada (iPhone), donde el
+                  link abre Safari y no la PWA. */}
+              <div className="p-5 mb-6" style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-surface-hi)' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <KeyRound className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                  <p className="font-mono text-[10px] uppercase tracking-[0.25em]" style={{ color: 'var(--accent)' }}>
+                    ¿Instalaste la app?
+                  </p>
+                </div>
+                <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
+                  Ingresá el código de 6 dígitos que te enviamos para entrar acá mismo.
+                </p>
+
+                {errorCodigo && (
+                  <div
+                    className="mb-3 px-3 py-2 text-sm flex items-start gap-2"
+                    style={{ border: '1px solid var(--error)', color: 'var(--error)', backgroundColor: 'var(--error-soft)' }}
+                  >
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{errorCodigo}</span>
+                  </div>
+                )}
+
+                <div className="flex items-stretch gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={codigo}
+                    onChange={(e) => { setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6)); setErrorCodigo(null) }}
+                    placeholder="______"
+                    className="input-field text-center tracking-[0.5em] font-mono text-lg"
+                    style={{ flex: 1 }}
+                    disabled={verificando}
+                    onKeyDown={(e) => e.key === 'Enter' && verificarCodigo()}
+                  />
+                  <button
+                    type="button"
+                    onClick={verificarCodigo}
+                    disabled={verificando || codigo.replace(/\D/g, '').length !== 6}
+                    className="pub-cta"
+                    style={{ opacity: (verificando || codigo.replace(/\D/g, '').length !== 6) ? 0.6 : 1, cursor: verificando ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    {verificando ? 'Entrando…' : 'Entrar'}
+                  </button>
+                </div>
+              </div>
+
               <button
-                onClick={() => { setResultado(null); setValor('') }}
+                onClick={() => { setResultado(null); setValor(''); setCodigo(''); setErrorCodigo(null) }}
                 className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] hover:underline"
                 style={{ color: 'var(--color-text-primary, var(--text))' }}
               >
