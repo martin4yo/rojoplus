@@ -336,8 +336,10 @@ export function getDefaultTemplate(queryKey) {
   }
   .group-header .stats { font-weight: normal; font-size: 8.5pt; opacity: 0.9; }
   table.grid { width: 100%; border-collapse: collapse; }
-  table.grid th { background: #1d4ed8; color: #fff; padding: 5px 6px; font-size: 8pt; text-align: left; }
+  table.grid th { background: #1d4ed8; color: #fff; padding: 4px 6px; font-size: 7.5pt; text-align: left; }
+  table.grid th.grp { background: #2563eb; text-align: center; border-left: 1px solid #1e40af; }
   table.grid td { padding: 4px 6px; font-size: 8pt; border-bottom: 1px solid #e5e7eb; }
+  table.grid td.sep { border-left: 1px solid #e5e7eb; }
   table.grid tr:nth-child(even) td { background: #f8fafc; }
   table.grid tfoot td { background: #eff6ff; font-weight: bold; }
   .r { text-align: right; }
@@ -352,17 +354,23 @@ export function getDefaultTemplate(queryKey) {
 <div class="group">
   <div class="group-header">
     <span>{{actividad}} — {{categoria}}</span>
-    <span class="stats">{{cantSocios}} socios · Social $ {{formatCurrency subtotalSocial}} · Actividad $ {{formatCurrency subtotalActividad}}</span>
+    <span class="stats">{{cantSocios}} socios · Adeuda $ {{formatCurrency subTotalDeuda}}</span>
   </div>
   <table class="grid">
     <thead>
       <tr>
-        <th style="width:28px">#</th>
-        <th style="width:55px">Nro</th>
-        <th>Apellido y Nombre</th>
-        <th class="r" style="width:110px">Cuota social vencida</th>
-        <th class="r" style="width:110px">Cuota actividad vencida</th>
-        <th class="r" style="width:90px">Total vencido</th>
+        <th rowspan="2" style="width:28px">#</th>
+        <th rowspan="2" style="width:50px">Nro</th>
+        <th rowspan="2">Apellido y Nombre</th>
+        <th class="grp" colspan="2">Generado</th>
+        <th class="grp" colspan="2">Adeudado</th>
+        <th class="grp r" rowspan="2" style="width:85px">Total deuda</th>
+      </tr>
+      <tr>
+        <th class="r" style="width:90px">Cuota social</th>
+        <th class="r" style="width:90px">Actividad</th>
+        <th class="r" style="width:90px">Cuota social</th>
+        <th class="r" style="width:90px">Actividad</th>
       </tr>
     </thead>
     <tbody>
@@ -371,18 +379,22 @@ export function getDefaultTemplate(queryKey) {
         <td>{{inc @index}}</td>
         <td>{{nroSocio}}</td>
         <td>{{apellidoNombre}}</td>
-        <td class="r">{{#if saldoSocialVencida}}$ {{formatCurrency saldoSocialVencida}}{{else}}—{{/if}}</td>
-        <td class="r">{{#if saldoActividadVencida}}$ {{formatCurrency saldoActividadVencida}}{{else}}—{{/if}}</td>
-        <td class="r">$ {{formatCurrency totalVencido}}</td>
+        <td class="r sep">{{#if generadoSocial}}$ {{formatCurrency generadoSocial}}{{else}}—{{/if}}</td>
+        <td class="r">{{#if generadoActividad}}$ {{formatCurrency generadoActividad}}{{else}}—{{/if}}</td>
+        <td class="r sep">{{#if adeudadoSocial}}$ {{formatCurrency adeudadoSocial}}{{else}}—{{/if}}</td>
+        <td class="r">{{#if adeudadoActividad}}$ {{formatCurrency adeudadoActividad}}{{else}}—{{/if}}</td>
+        <td class="r sep">{{#if totalDeuda}}$ {{formatCurrency totalDeuda}}{{else}}—{{/if}}</td>
       </tr>
       {{/each}}
     </tbody>
     <tfoot>
       <tr>
         <td colspan="3" class="r">Subtotal {{actividad}} / {{categoria}}:</td>
-        <td class="r">$ {{formatCurrency subtotalSocial}}</td>
-        <td class="r">$ {{formatCurrency subtotalActividad}}</td>
-        <td class="r">$ {{formatCurrency subtotalVencido}}</td>
+        <td class="r sep">$ {{formatCurrency subGeneradoSocial}}</td>
+        <td class="r">$ {{formatCurrency subGeneradoActividad}}</td>
+        <td class="r sep">$ {{formatCurrency subAdeudadoSocial}}</td>
+        <td class="r">$ {{formatCurrency subAdeudadoActividad}}</td>
+        <td class="r sep">$ {{formatCurrency subTotalDeuda}}</td>
       </tr>
     </tfoot>
   </table>
@@ -390,7 +402,7 @@ export function getDefaultTemplate(queryKey) {
 {{/each}}
 
 <div class="grand-total" style="margin-top:18px; text-align:center; background:#1f2937; color:#fff; padding:12px; border-radius:4px;">
-  TOTAL GENERAL — {{data.summary.totalGrupos}} grupos · {{data.summary.totalSocios}} socios · Cuota social $ {{formatCurrency data.summary.totalSocialVencida}} · Cuota actividad $ {{formatCurrency data.summary.totalActividadVencida}} · Total $ {{formatCurrency data.summary.totalVencido}}
+  TOTAL GENERAL — {{data.summary.totalGrupos}} grupos · {{data.summary.totalSocios}} socios · Generado $ {{formatCurrency data.summary.totalGeneradoActividad}} act + $ {{formatCurrency data.summary.totalGeneradoSocial}} social · Deuda total $ {{formatCurrency data.summary.totalDeuda}}
 </div>
 </body></html>`,
 

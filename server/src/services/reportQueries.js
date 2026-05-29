@@ -747,16 +747,13 @@ const QUERY_DEFINITIONS = [
       const categoriaIds = toIntArr(params.categoriaIds)
       const hoy = new Date()
 
-      // Rango de vencimiento para considerar "vencido": por defecto < hoy, o el
-      // rango fechaDesde/fechaHasta si el usuario lo especifica. (Mismo criterio
-      // temporal que morosos_por_actividad.)
-      let fechaVencFilter
+      // Scope temporal opcional por vencimiento: si el usuario indica fechas, se
+      // limita a cargos que vencen en ese rango; si no, se consideran todos.
+      let fechaVencScope = null
       if (params.fechaDesde || params.fechaHasta) {
-        fechaVencFilter = {}
-        if (params.fechaDesde) fechaVencFilter.gte = new Date(params.fechaDesde)
-        if (params.fechaHasta) fechaVencFilter.lte = new Date(params.fechaHasta + 'T23:59:59')
-      } else {
-        fechaVencFilter = { lt: hoy }
+        fechaVencScope = {}
+        if (params.fechaDesde) fechaVencScope.gte = new Date(params.fechaDesde)
+        if (params.fechaHasta) fechaVencScope.lte = new Date(params.fechaHasta + 'T23:59:59')
       }
 
       // Base: TODAS las inscripciones activas (así salen también los socios al día),
@@ -790,29 +787,33 @@ const QUERY_DEFINITIONS = [
         ],
       })
 
-      // Saldo de cuota de actividad VENCIDA por (socio, categoríaActividad).
+      // Cuota de actividad por (socio, categoría): GENERADO (cargos no anulados) y
+      // ADEUDADO (cargos pendientes), dentro del scope temporal opcional.
       const socioIds = [...new Set(inscripciones.map(i => i.socioId))]
-      const actividadPorSocioCat = new Map()
+      const actGenerado = new Map()
+      const actAdeudado = new Map()
       if (socioIds.length > 0) {
-        const actAgg = await db.cargo.groupBy({
-          by: ['socioId', 'categoriaActividadId'],
-          where: {
-            tenantId,
-            estado: 'PENDIENTE',
-            categoria: 'CUOTA_ACTIVIDAD',
-            categoriaActividadId: { not: null },
-            socioId: { in: socioIds },
-            fechaVencimiento: fechaVencFilter,
-          },
-          _sum: { montoTotal: true },
-          _count: { _all: true },
-        })
-        for (const a of actAgg) {
-          actividadPorSocioCat.set(`${a.socioId}:${a.categoriaActividadId}`, {
-            saldo: Number(a._sum.montoTotal) || 0,
-            cant: a._count?._all || 0,
-          })
+        const baseAct = {
+          tenantId,
+          categoria: 'CUOTA_ACTIVIDAD',
+          categoriaActividadId: { not: null },
+          socioId: { in: socioIds },
         }
+        if (fechaVencScope) baseAct.fechaVencimiento = fechaVencScope
+        const [genAgg, adeAgg] = await Promise.all([
+          db.cargo.groupBy({
+            by: ['socioId', 'categoriaActividadId'],
+            where: { ...baseAct, estado: { not: 'ANULADO' } },
+            _sum: { montoTotal: true },
+          }),
+          db.cargo.groupBy({
+            by: ['socioId', 'categoriaActividadId'],
+            where: { ...baseAct, estado: 'PENDIENTE' },
+            _sum: { montoTotal: true },
+          }),
+        ])
+        for (const a of genAgg) actGenerado.set(`${a.socioId}:${a.categoriaActividadId}`, Number(a._sum.montoTotal) || 0)
+        for (const a of adeAgg) actAdeudado.set(`${a.socioId}:${a.categoriaActividadId}`, Number(a._sum.montoTotal) || 0)
       }
 
       // Agrupar actividad → categoría → socio desde las inscripciones (todos los inscriptos).
@@ -828,7 +829,7 @@ const QUERY_DEFINITIONS = [
         const sid = i.socioId
         // Un socio puede tener más de una inscripción en la misma categoría: una sola fila.
         if (g.socios.has(sid)) continue
-        const act = actividadPorSocioCat.get(`${sid}:${i.categoriaActividadId}`) || { saldo: 0, cant: 0 }
+        const key = `${sid}:${i.categoriaActividadId}`
         g.socios.set(sid, {
           socioId: sid,
           titularFamiliaId: i.socio?.titularFamiliaId || null,
@@ -836,104 +837,94 @@ const QUERY_DEFINITIONS = [
           apellidoNombre: i.socio?.apellidoNombre || '',
           documento: i.socio?.documento || '',
           celular: i.socio?.celular || '',
-          saldoSocialVencida: 0,
-          saldoActividadVencida: act.saldo,
-          cantCuotasActividad: act.cant,
-          cantCuotasSocial: 0,
-          totalVencido: 0,
+          generadoSocial: 0,
+          generadoActividad: actGenerado.get(key) || 0,
+          adeudadoSocial: 0,
+          adeudadoActividad: actAdeudado.get(key) || 0,
+          totalDeuda: 0,
         })
       }
 
-      // Cuota social: una sola vez por grupo familiar, en el primer integrante que
-      // aparezca en cada bloque actividad/categoría (misma lógica que morosos_por_actividad).
+      // Cuota social: GENERADO y ADEUDADO por titular, imputados una sola vez al
+      // primer integrante del grupo familiar que aparezca en cada bloque.
       const incluirCuotaSocial = params.incluirCuotaSocial === true || params.incluirCuotaSocial === 'true'
-      if (incluirCuotaSocial) {
-        const sociosIds = new Set()
-        for (const g of groupsMap.values()) {
-          for (const sid of g.socios.keys()) sociosIds.add(sid)
+      if (incluirCuotaSocial && socioIds.length > 0) {
+        const socios = await db.socio.findMany({
+          where: { id: { in: socioIds } },
+          select: { id: true, titularFamiliaId: true },
+        })
+        const titularPorSocio = new Map()
+        const titularesUnicos = new Set()
+        for (const s of socios) {
+          const titId = s.titularFamiliaId || s.id
+          titularPorSocio.set(s.id, titId)
+          titularesUnicos.add(titId)
         }
-        if (sociosIds.size > 0) {
-          const socios = await db.socio.findMany({
-            where: { id: { in: [...sociosIds] } },
-            select: { id: true, titularFamiliaId: true },
-          })
-          const titularPorSocio = new Map()
-          const titularesUnicos = new Set()
-          for (const s of socios) {
-            const titId = s.titularFamiliaId || s.id
-            titularPorSocio.set(s.id, titId)
-            titularesUnicos.add(titId)
-          }
 
-          // Saldo de cuota social vencida por titular (mismo filtro temporal que actividad).
-          const socialAgg = await db.cargo.groupBy({
-            by: ['socioId'],
-            where: {
-              tenantId,
-              estado: 'PENDIENTE',
-              categoria: 'CUOTA_SOCIAL',
-              socioId: { in: [...titularesUnicos] },
-              fechaVencimiento: fechaVencFilter,
-            },
-            _sum: { montoTotal: true },
-            _count: { _all: true },
-          })
-          const socialPorTitular = new Map()
-          for (const a of socialAgg) {
-            socialPorTitular.set(a.socioId, {
-              saldo: Number(a._sum.montoTotal) || 0,
-              cant: a._count?._all || 0,
-            })
-          }
+        const baseSocial = {
+          tenantId,
+          categoria: 'CUOTA_SOCIAL',
+          socioId: { in: [...titularesUnicos] },
+        }
+        if (fechaVencScope) baseSocial.fechaVencimiento = fechaVencScope
+        const [genS, adeS] = await Promise.all([
+          db.cargo.groupBy({ by: ['socioId'], where: { ...baseSocial, estado: { not: 'ANULADO' } }, _sum: { montoTotal: true } }),
+          db.cargo.groupBy({ by: ['socioId'], where: { ...baseSocial, estado: 'PENDIENTE' }, _sum: { montoTotal: true } }),
+        ])
+        const genPorTitular = new Map(genS.map(a => [a.socioId, Number(a._sum.montoTotal) || 0]))
+        const adePorTitular = new Map(adeS.map(a => [a.socioId, Number(a._sum.montoTotal) || 0]))
 
-          for (const g of groupsMap.values()) {
-            const titularesYaUsados = new Set()
-            // socios.values() respeta orden de inserción → primer integrante del grupo familiar
-            for (const s of g.socios.values()) {
-              const titId = titularPorSocio.get(s.socioId)
-              if (!titId || titularesYaUsados.has(titId)) continue
-              titularesYaUsados.add(titId)
-              const cs = socialPorTitular.get(titId)
-              if (!cs || cs.saldo <= 0) continue
-              s.saldoSocialVencida += cs.saldo
-              s.cantCuotasSocial += cs.cant
-            }
+        for (const g of groupsMap.values()) {
+          const titularesYaUsados = new Set()
+          // socios.values() respeta orden de inserción → primer integrante del grupo familiar
+          for (const s of g.socios.values()) {
+            const titId = titularPorSocio.get(s.socioId)
+            if (!titId || titularesYaUsados.has(titId)) continue
+            titularesYaUsados.add(titId)
+            s.generadoSocial += genPorTitular.get(titId) || 0
+            s.adeudadoSocial += adePorTitular.get(titId) || 0
           }
         }
       }
 
       // Totales por grupo + generales.
       const groups = []
-      let totalSocialGen = 0
-      let totalActividadGen = 0
-      let totalSociosGen = 0
+      const acc = { genSocial: 0, genActividad: 0, adeSocial: 0, adeActividad: 0, socios: 0 }
       for (const g of groupsMap.values()) {
         const socios = Array.from(g.socios.values())
-        for (const s of socios) s.totalVencido = s.saldoSocialVencida + s.saldoActividadVencida
-        const subtotalSocial = socios.reduce((a, x) => a + x.saldoSocialVencida, 0)
-        const subtotalActividad = socios.reduce((a, x) => a + x.saldoActividadVencida, 0)
+        for (const s of socios) s.totalDeuda = s.adeudadoSocial + s.adeudadoActividad
+        const subGeneradoSocial = socios.reduce((a, x) => a + x.generadoSocial, 0)
+        const subGeneradoActividad = socios.reduce((a, x) => a + x.generadoActividad, 0)
+        const subAdeudadoSocial = socios.reduce((a, x) => a + x.adeudadoSocial, 0)
+        const subAdeudadoActividad = socios.reduce((a, x) => a + x.adeudadoActividad, 0)
         groups.push({
           actividad: g.actividad,
           categoria: g.categoria,
           socios,
-          subtotalSocial,
-          subtotalActividad,
-          subtotalVencido: subtotalSocial + subtotalActividad,
+          subGeneradoSocial,
+          subGeneradoActividad,
+          subAdeudadoSocial,
+          subAdeudadoActividad,
+          subTotalDeuda: subAdeudadoSocial + subAdeudadoActividad,
           cantSocios: socios.length,
         })
-        totalSocialGen += subtotalSocial
-        totalActividadGen += subtotalActividad
-        totalSociosGen += socios.length
+        acc.genSocial += subGeneradoSocial
+        acc.genActividad += subGeneradoActividad
+        acc.adeSocial += subAdeudadoSocial
+        acc.adeActividad += subAdeudadoActividad
+        acc.socios += socios.length
       }
 
       return {
         items: groups,
         summary: {
           totalGrupos: groups.length,
-          totalSocios: totalSociosGen,
-          totalSocialVencida: totalSocialGen,
-          totalActividadVencida: totalActividadGen,
-          totalVencido: totalSocialGen + totalActividadGen,
+          totalSocios: acc.socios,
+          totalGeneradoSocial: acc.genSocial,
+          totalGeneradoActividad: acc.genActividad,
+          totalAdeudadoSocial: acc.adeSocial,
+          totalAdeudadoActividad: acc.adeActividad,
+          totalDeuda: acc.adeSocial + acc.adeActividad,
         },
       }
     },
