@@ -747,30 +747,36 @@ const QUERY_DEFINITIONS = [
       const categoriaIds = toIntArr(params.categoriaIds)
       const hoy = new Date()
 
-      // Filtro base: cargos de actividad pendientes (mismo criterio que morosos_por_actividad)
-      const where = {
-        tenantId,
-        estado: 'PENDIENTE',
-        categoriaActividadId: { not: null },
-      }
+      // Rango de vencimiento para considerar "vencido": por defecto < hoy, o el
+      // rango fechaDesde/fechaHasta si el usuario lo especifica. (Mismo criterio
+      // temporal que morosos_por_actividad.)
+      let fechaVencFilter
       if (params.fechaDesde || params.fechaHasta) {
-        where.fechaVencimiento = {}
-        if (params.fechaDesde) where.fechaVencimiento.gte = new Date(params.fechaDesde)
-        if (params.fechaHasta) where.fechaVencimiento.lte = new Date(params.fechaHasta + 'T23:59:59')
+        fechaVencFilter = {}
+        if (params.fechaDesde) fechaVencFilter.gte = new Date(params.fechaDesde)
+        if (params.fechaHasta) fechaVencFilter.lte = new Date(params.fechaHasta + 'T23:59:59')
       } else {
-        where.fechaVencimiento = { lt: hoy }
-      }
-      if (categoriaIds.length > 0 && actividadIds.length > 0) {
-        where.categoriaActividadId = { in: categoriaIds }
-        where.categoriaActividad = { actividadId: { in: actividadIds } }
-      } else if (categoriaIds.length > 0) {
-        where.categoriaActividadId = { in: categoriaIds }
-      } else if (actividadIds.length > 0) {
-        where.categoriaActividad = { actividadId: { in: actividadIds } }
+        fechaVencFilter = { lt: hoy }
       }
 
-      const cargos = await db.cargo.findMany({
-        where,
+      // Base: TODAS las inscripciones activas (así salen también los socios al día),
+      // filtradas por actividad/categoría.
+      const whereInscripcion = {
+        estado: 'ACTIVA',
+        fechaInicio: { lte: hoy },
+        OR: [{ fechaFin: null }, { fechaFin: { gte: hoy } }],
+      }
+      if (categoriaIds.length > 0) {
+        whereInscripcion.categoriaActividadId = { in: categoriaIds }
+        if (actividadIds.length > 0) {
+          whereInscripcion.categoriaActividad = { actividadId: { in: actividadIds } }
+        }
+      } else if (actividadIds.length > 0) {
+        whereInscripcion.categoriaActividad = { actividadId: { in: actividadIds } }
+      }
+
+      const inscripciones = await db.inscripcion.findMany({
+        where: whereInscripcion,
         include: {
           socio: { select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, celular: true, titularFamiliaId: true } },
           categoriaActividad: {
@@ -784,35 +790,58 @@ const QUERY_DEFINITIONS = [
         ],
       })
 
-      // Agrupar actividad → categoría → socio, sumando la cuota de actividad vencida.
+      // Saldo de cuota de actividad VENCIDA por (socio, categoríaActividad).
+      const socioIds = [...new Set(inscripciones.map(i => i.socioId))]
+      const actividadPorSocioCat = new Map()
+      if (socioIds.length > 0) {
+        const actAgg = await db.cargo.groupBy({
+          by: ['socioId', 'categoriaActividadId'],
+          where: {
+            tenantId,
+            estado: 'PENDIENTE',
+            categoria: 'CUOTA_ACTIVIDAD',
+            categoriaActividadId: { not: null },
+            socioId: { in: socioIds },
+            fechaVencimiento: fechaVencFilter,
+          },
+          _sum: { montoTotal: true },
+          _count: { _all: true },
+        })
+        for (const a of actAgg) {
+          actividadPorSocioCat.set(`${a.socioId}:${a.categoriaActividadId}`, {
+            saldo: Number(a._sum.montoTotal) || 0,
+            cant: a._count?._all || 0,
+          })
+        }
+      }
+
+      // Agrupar actividad → categoría → socio desde las inscripciones (todos los inscriptos).
       const groupsMap = new Map()
-      for (const c of cargos) {
-        const actNombre = c.categoriaActividad?.actividad?.nombre || 'Sin actividad'
-        const catNombre = c.categoriaActividad?.nombre || 'Sin categoría'
+      for (const i of inscripciones) {
+        const actNombre = i.categoriaActividad?.actividad?.nombre || 'Sin actividad'
+        const catNombre = i.categoriaActividad?.nombre || 'Sin categoría'
         const groupKey = `${actNombre}::${catNombre}`
         if (!groupsMap.has(groupKey)) {
           groupsMap.set(groupKey, { actividad: actNombre, categoria: catNombre, socios: new Map() })
         }
         const g = groupsMap.get(groupKey)
-        const sid = c.socioId
-        if (!g.socios.has(sid)) {
-          g.socios.set(sid, {
-            socioId: sid,
-            titularFamiliaId: c.socio?.titularFamiliaId || null,
-            nroSocio: c.socio?.nroSocio || '',
-            apellidoNombre: c.socio?.apellidoNombre || '',
-            documento: c.socio?.documento || '',
-            celular: c.socio?.celular || '',
-            saldoSocialVencida: 0,
-            saldoActividadVencida: 0,
-            cantCuotasActividad: 0,
-            cantCuotasSocial: 0,
-            totalVencido: 0,
-          })
-        }
-        const s = g.socios.get(sid)
-        s.saldoActividadVencida += Number(c.montoTotal)
-        s.cantCuotasActividad++
+        const sid = i.socioId
+        // Un socio puede tener más de una inscripción en la misma categoría: una sola fila.
+        if (g.socios.has(sid)) continue
+        const act = actividadPorSocioCat.get(`${sid}:${i.categoriaActividadId}`) || { saldo: 0, cant: 0 }
+        g.socios.set(sid, {
+          socioId: sid,
+          titularFamiliaId: i.socio?.titularFamiliaId || null,
+          nroSocio: i.socio?.nroSocio || '',
+          apellidoNombre: i.socio?.apellidoNombre || '',
+          documento: i.socio?.documento || '',
+          celular: i.socio?.celular || '',
+          saldoSocialVencida: 0,
+          saldoActividadVencida: act.saldo,
+          cantCuotasActividad: act.cant,
+          cantCuotasSocial: 0,
+          totalVencido: 0,
+        })
       }
 
       // Cuota social: una sola vez por grupo familiar, en el primer integrante que
@@ -844,7 +873,7 @@ const QUERY_DEFINITIONS = [
               estado: 'PENDIENTE',
               categoria: 'CUOTA_SOCIAL',
               socioId: { in: [...titularesUnicos] },
-              fechaVencimiento: where.fechaVencimiento,
+              fechaVencimiento: fechaVencFilter,
             },
             _sum: { montoTotal: true },
             _count: { _all: true },
