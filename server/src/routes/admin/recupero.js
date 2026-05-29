@@ -6,6 +6,49 @@ import { buildSocioSearchFilter } from '../../lib/socioSearch.js'
 
 const router = Router()
 
+// Construye el filtro Prisma de socios elegibles de una campaña (sin búsqueda):
+// socios cuyo estado NO permite ingresar al club (bajas/bloqueados), que sean
+// titulares o socios únicos (no miembros de familia), acotado por los estados de
+// baja y la antigüedad de la baja configurados en la campaña.
+function buildElegiblesWhere(campana) {
+  const where = {
+    estadoSocioRel: { permiteIngresoMolinete: false },
+    titularFamiliaId: null,
+  }
+
+  // Filtro por estados de baja específicos (CSV de IDs de EstadoSocio en
+  // campana.motivosBaja; el nombre del campo se mantiene por compatibilidad).
+  if (campana.motivosBaja) {
+    const estadoIds = campana.motivosBaja
+      .split(',')
+      .map(s => parseInt(s.trim()))
+      .filter(n => Number.isFinite(n))
+    if (estadoIds.length > 0) {
+      where.estadoSocioId = { in: estadoIds }
+      delete where.estadoSocioRel
+    }
+  }
+
+  // Filtro por tiempo de baja (meses → días)
+  if (campana.tiempoBajaMin != null || campana.tiempoBajaMax != null) {
+    where.fechaBaja = {}
+    const hoy = new Date()
+    if (campana.tiempoBajaMin != null) {
+      const hace = new Date(hoy)
+      hace.setDate(hace.getDate() - campana.tiempoBajaMin * 30)
+      where.fechaBaja.lte = hace // fechaBaja ≤ hoy - tiempoBajaMin meses
+    }
+    if (campana.tiempoBajaMax != null) {
+      const hace = new Date(hoy)
+      hace.setDate(hace.getDate() - campana.tiempoBajaMax * 30)
+      where.fechaBaja.gte = hace // fechaBaja ≥ hoy - tiempoBajaMax meses
+    }
+    if (!where.fechaBaja.gte && !where.fechaBaja.lte) delete where.fechaBaja
+  }
+
+  return where
+}
+
 // ============================================
 // ENCUESTAS DE BAJA
 // ============================================
@@ -418,48 +461,9 @@ router.get('/campanas/:id/socios-elegibles', authAdmin, asyncHandler(async (req,
   if (!campana) throw new AppError('Campaña no encontrada', 404, 'NOT_FOUND')
 
   // Construir filtros: socios cuyo estado NO permite ingresar al club
-  // (bajas, renuncias, fallecidos, bloqueados, etc.).
-  // Excluye miembros de grupos familiares: el recupero se hace al titular del grupo
-  // (que es quien gestiona la cuota familiar).
-  const where = {
-    estadoSocioRel: { permiteIngresoMolinete: false },
-    titularFamiliaId: null,
-  }
-
-  // Filtro por estados de baja específicos (CSV de IDs de EstadoSocio en campana.motivosBaja).
-  // Históricamente esta columna guardaba valores del enum MotivoBaja; ahora guarda IDs de
-  // EstadoSocio. El nombre del campo se mantiene por compatibilidad.
-  if (campana.motivosBaja) {
-    const estadoIds = campana.motivosBaja
-      .split(',')
-      .map(s => parseInt(s.trim()))
-      .filter(n => Number.isFinite(n))
-    if (estadoIds.length > 0) {
-      // Se reemplaza el filtro genérico por la lista específica de estados
-      where.estadoSocioId = { in: estadoIds }
-      delete where.estadoSocioRel
-    }
-  }
-
-  // Filtro por tiempo de baja (meses → días)
-  if (campana.tiempoBajaMin != null || campana.tiempoBajaMax != null) {
-    where.fechaBaja = {}
-    const hoy = new Date()
-    if (campana.tiempoBajaMin != null) {
-      const hace = new Date(hoy)
-      hace.setDate(hace.getDate() - campana.tiempoBajaMin * 30)
-      where.fechaBaja.lte = hace // fechaBaja ≤ hoy - tiempoBajaMin meses
-    }
-    if (campana.tiempoBajaMax != null) {
-      const hace = new Date(hoy)
-      hace.setDate(hace.getDate() - campana.tiempoBajaMax * 30)
-      where.fechaBaja.gte = hace // fechaBaja ≥ hoy - tiempoBajaMax meses
-    }
-    // Si solo viene min, fechaBaja también debe existir
-    if (!where.fechaBaja.gte && !where.fechaBaja.lte) {
-      delete where.fechaBaja
-    }
-  }
+  // (bajas, renuncias, fallecidos, bloqueados, etc.), titulares o socios únicos.
+  // El recupero se hace al titular del grupo (que gestiona la cuota familiar).
+  const where = buildElegiblesWhere(campana)
 
   // Búsqueda por nombre/nro
   if (search && String(search).trim()) {
@@ -521,6 +525,181 @@ router.get('/campanas/:id/socios-elegibles', authAdmin, asyncHandler(async (req,
       motivosBaja: campana.motivosBaja,
       tiempoBajaMin: campana.tiempoBajaMin,
       tiempoBajaMax: campana.tiempoBajaMax,
+    },
+  })
+}))
+
+// GET /api/admin/recupero/campanas/:id/efectividad
+// Métricas de efectividad de la campaña, calculadas on-demand (NO usa los
+// contadores incrementales de la campaña, que se inflan al registrar varias
+// acciones por socio). Devuelve:
+//   - embudo de gestión por socios únicos (objetivo → contactados → respondieron
+//     → interesados → recuperados) con sus tasas de conversión
+//   - índices monetarios: deuda histórica impaga, valor recurrente a recuperar,
+//     recuperado efectivo (cuotas pagadas tras la reactivación) y rendimiento
+//     neto del descuento ofrecido
+//
+// "Recuperado" se determina de forma automática: un socio contactado que registra
+// un evento REACTIVADO_SOCIO en AuditoriaSocio posterior a su primer contacto y
+// dentro de la vigencia de la campaña.
+router.get('/campanas/:id/efectividad', authAdmin, asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
+  const campana = await req.db.campanaRecupero.findUnique({ where: { id } })
+  if (!campana) throw new AppError('Campaña no encontrada', 404, 'NOT_FOUND')
+
+  const fechaInicio = new Date(campana.fechaInicio)
+  const fechaFin = new Date(campana.fechaFin)
+  const mesesVigencia = Math.max(1, Math.round((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24 * 30)))
+
+  // 1) Acciones de la campaña → embudo de gestión (contando socios únicos)
+  const acciones = await req.db.accionRecupero.findMany({
+    where: { campanaId: id },
+    select: { socioId: true, tipo: true, resultado: true, nivelInteres: true, direccion: true, fecha: true },
+  })
+
+  const contactados = new Set()      // socios con al menos un contacto saliente
+  const respondieron = new Set()     // socios con al menos una respuesta entrante
+  const interesados = new Set()      // socios con interés declarado
+  const primerContacto = new Map()   // socioId → fecha del primer contacto saliente
+  const porCanal = {}                // tipo de acción → Set de socios contactados
+
+  for (const a of acciones) {
+    if (!a.socioId) continue
+    if (a.direccion === 'ENTRANTE') {
+      respondieron.add(a.socioId)
+    } else {
+      contactados.add(a.socioId)
+      const prev = primerContacto.get(a.socioId)
+      if (!prev || a.fecha < prev) primerContacto.set(a.socioId, a.fecha)
+      if (a.tipo) {
+        if (!porCanal[a.tipo]) porCanal[a.tipo] = new Set()
+        porCanal[a.tipo].add(a.socioId)
+      }
+    }
+    if (a.resultado === 'INTERESADO' || a.nivelInteres === 'ALTO' || a.nivelInteres === 'MEDIO') {
+      interesados.add(a.socioId)
+    }
+  }
+
+  // 2) Universo objetivo = elegibles actuales ∪ socios con acción en la campaña.
+  //    Los recuperados ya no figuran como elegibles (cambió su estado), pero
+  //    siguen siendo parte del objetivo, por eso se suman vía sus acciones.
+  const sociosConAccion = [...new Set(acciones.map(a => a.socioId).filter(Boolean))]
+  const objetivoSocios = await req.db.socio.findMany({
+    where: { OR: [buildElegiblesWhere(campana), { id: { in: sociosConAccion } }] },
+    select: {
+      id: true,
+      tipoSocioRel: { select: { cuotaMensual: true, conceptoTesoreria: { select: { cuotaMensual: true } } } },
+      categoriaSocioRel: { select: { porcentajeDescuento: true } },
+    },
+  })
+  const objetivoIds = objetivoSocios.map(s => s.id)
+
+  // Cuota mensual neta esperada por socio (concepto > tipo, menos descuento de categoría)
+  const cuotaMensualPorSocio = new Map()
+  for (const s of objetivoSocios) {
+    const base = Number(s.tipoSocioRel?.conceptoTesoreria?.cuotaMensual ?? s.tipoSocioRel?.cuotaMensual ?? 0)
+    const desc = Number(s.categoriaSocioRel?.porcentajeDescuento ?? 0)
+    cuotaMensualPorSocio.set(s.id, base * (1 - desc / 100))
+  }
+
+  // 3) Recuperados: contactados que reactivaron tras el primer contacto y dentro de la vigencia
+  const reactivaciones = contactados.size > 0
+    ? await req.db.auditoriaSocio.findMany({
+        where: {
+          socioId: { in: [...contactados] },
+          evento: 'REACTIVADO_SOCIO',
+          fecha: { gte: fechaInicio, lte: fechaFin },
+        },
+        select: { socioId: true, fecha: true },
+        orderBy: { fecha: 'asc' },
+      })
+    : []
+  const fechaReactivacion = new Map()
+  for (const r of reactivaciones) {
+    const fc = primerContacto.get(r.socioId)
+    if (fc && r.fecha < fc) continue // reactivó antes de que lo contactáramos: no se atribuye
+    if (!fechaReactivacion.has(r.socioId)) fechaReactivacion.set(r.socioId, r.fecha)
+  }
+  const recuperadosIds = [...fechaReactivacion.keys()]
+
+  // 4) Índices monetarios
+  // 4a) Deuda histórica impaga: cargos PENDIENTE vencidos antes del inicio de la campaña
+  const deudaAgg = objetivoIds.length > 0
+    ? await req.db.cargo.aggregate({
+        where: { socioId: { in: objetivoIds }, estado: 'PENDIENTE', fechaVencimiento: { lt: fechaInicio } },
+        _sum: { montoTotal: true },
+      })
+    : { _sum: { montoTotal: null } }
+  const deudaVieja = Number(deudaAgg._sum.montoTotal ?? 0)
+
+  // 4b) Valor recurrente proyectado: cuota mensual neta × meses de vigencia, por objetivo
+  let valorRecurrente = 0
+  for (const idSocio of objetivoIds) valorRecurrente += (cuotaMensualPorSocio.get(idSocio) || 0) * mesesVigencia
+
+  // 4c) Recuperado efectivo: pagos confirmados de los recuperados desde su reactivación
+  const pagos = recuperadosIds.length > 0
+    ? await req.db.pago.findMany({
+        where: { socioId: { in: recuperadosIds }, estado: 'CONFIRMADO', fecha: { gte: fechaInicio, lte: fechaFin } },
+        select: { socioId: true, montoRecibido: true, fecha: true },
+      })
+    : []
+  let recuperadoEfectivo = 0
+  for (const p of pagos) {
+    const fr = fechaReactivacion.get(p.socioId)
+    if (fr && p.fecha < fr) continue
+    recuperadoEfectivo += Number(p.montoRecibido || 0)
+  }
+
+  // 4d) Costo de la oferta (solo descuento mensual; se ignora la cuota de ingreso)
+  let costoOferta = 0
+  if (campana.descuento && campana.mesesDescuento) {
+    const pctDesc = Number(campana.descuento) / 100
+    const meses = Number(campana.mesesDescuento)
+    for (const idSocio of recuperadosIds) costoOferta += (cuotaMensualPorSocio.get(idSocio) || 0) * pctDesc * meses
+  }
+  const rendimientoNeto = recuperadoEfectivo - costoOferta
+
+  const objetivo = objetivoIds.length
+  const nContactados = contactados.size
+  const nRecuperados = recuperadosIds.length
+  const tasa = (num, den) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0)
+  const dec2 = n => Math.round(n * 100) / 100
+
+  res.json({
+    success: true,
+    data: {
+      vigencia: { fechaInicio, fechaFin, mesesVigencia },
+      embudo: {
+        objetivo,
+        contactados: nContactados,
+        respondieron: respondieron.size,
+        interesados: interesados.size,
+        recuperados: nRecuperados,
+      },
+      tasas: {
+        contacto: tasa(nContactados, objetivo),
+        respuesta: tasa(respondieron.size, nContactados),
+        interes: tasa(interesados.size, nContactados),
+        recupero: tasa(nRecuperados, nContactados),
+        recuperoSobreObjetivo: tasa(nRecuperados, objetivo),
+      },
+      esfuerzo: {
+        totalAcciones: acciones.length,
+        accionesPorRecuperado: nRecuperados > 0 ? Math.round((acciones.length / nRecuperados) * 10) / 10 : null,
+      },
+      porCanal: Object.entries(porCanal)
+        .map(([tipo, set]) => ({ tipo, socios: set.size }))
+        .sort((a, b) => b.socios - a.socios),
+      monetario: {
+        deudaVieja: dec2(deudaVieja),
+        valorRecurrente: dec2(valorRecurrente),
+        recuperadoEfectivo: dec2(recuperadoEfectivo),
+        costoOferta: dec2(costoOferta),
+        rendimientoNeto: dec2(rendimientoNeto),
+        tasaRecuperoMonetario: tasa(recuperadoEfectivo, valorRecurrente),
+        roi: costoOferta > 0 ? dec2(rendimientoNeto / costoOferta) : null,
+      },
     },
   })
 }))

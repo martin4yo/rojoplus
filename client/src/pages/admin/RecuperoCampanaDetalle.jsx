@@ -20,12 +20,16 @@ import {
   Plus,
   Search,
   RefreshCw,
+  TrendingUp,
+  DollarSign,
+  BarChart3,
+  Reply,
 } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { Alert } from '../../components/Alert'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { useModal } from '../../components/Modal'
-import { formatDate } from '../../utils/formatters'
+import { formatDate, formatCurrency } from '../../utils/formatters'
 import api from '../../services/api'
 import { toast } from 'react-hot-toast'
 import MotivosBajaSelector from '../../components/MotivosBajaSelector'
@@ -101,6 +105,9 @@ export default function RecuperoCampanaDetalle() {
   const [loadingElegibles, setLoadingElegibles] = useState(false)
   const [searchElegibles, setSearchElegibles] = useState('')
 
+  const [efectividad, setEfectividad] = useState(null)
+  const [loadingEfectividad, setLoadingEfectividad] = useState(false)
+
   // Modal de registrar acción
   const [accionModal, setAccionModal] = useState(null) // { socio, tipo? }
 
@@ -115,6 +122,7 @@ export default function RecuperoCampanaDetalle() {
   useEffect(() => {
     if (tab === 'acciones') cargarAcciones()
     if (tab === 'elegibles') cargarElegibles()
+    if (tab === 'efectividad') cargarEfectividad()
   }, [tab])
 
   async function cargarCampana() {
@@ -170,6 +178,19 @@ export default function RecuperoCampanaDetalle() {
       toast.error('Error cargando socios elegibles')
     } finally {
       setLoadingElegibles(false)
+    }
+  }
+
+  async function cargarEfectividad() {
+    try {
+      setLoadingEfectividad(true)
+      const data = await api.get(`/admin/recupero/campanas/${id}/efectividad`)
+      setEfectividad(data)
+    } catch (err) {
+      console.error('Error cargando efectividad:', err)
+      toast.error('Error cargando métricas de efectividad')
+    } finally {
+      setLoadingEfectividad(false)
     }
   }
 
@@ -330,6 +351,7 @@ export default function RecuperoCampanaDetalle() {
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-4 flex gap-1">
         <TabButton active={tab === 'info'} onClick={() => setTab('info')} icon={Info}>Información</TabButton>
+        <TabButton active={tab === 'efectividad'} onClick={() => setTab('efectividad')} icon={TrendingUp}>Efectividad</TabButton>
         <TabButton active={tab === 'elegibles'} onClick={() => setTab('elegibles')} icon={Users}>Socios elegibles</TabButton>
         <TabButton active={tab === 'acciones'} onClick={() => setTab('acciones')} icon={ListChecks}>
           Acciones {acciones.length > 0 && <span className="ml-1 text-xs text-gray-500">({acciones.length})</span>}
@@ -428,6 +450,15 @@ export default function RecuperoCampanaDetalle() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Tab: Efectividad */}
+      {tab === 'efectividad' && (
+        <EfectividadTab
+          data={efectividad}
+          loading={loadingEfectividad}
+          onReload={cargarEfectividad}
+        />
       )}
 
       {/* Tab: Acciones */}
@@ -741,6 +772,143 @@ function AccionModal({ socio, tipoInicial, campana, onClose, onSave }) {
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function EfectividadTab({ data, loading, onReload }) {
+  if (loading && !data) {
+    return <div className="bg-white rounded-lg border border-gray-200 p-8"><LoadingSpinner /></div>
+  }
+  if (!data) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+        <BarChart3 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+        Todavía no hay métricas para mostrar.
+      </div>
+    )
+  }
+
+  const { embudo, tasas, esfuerzo, porCanal = [], monetario, vigencia } = data
+  const pct = (v) => `${(v ?? 0).toLocaleString('es-AR')}%`
+
+  // Pasos del embudo: cada uno con su tasa respecto del paso anterior
+  const pasos = [
+    { label: 'Objetivo', valor: embudo.objetivo, icon: Users, color: 'text-gray-600', tasa: null },
+    { label: 'Contactados', valor: embudo.contactados, icon: Target, color: 'text-blue-600', tasa: tasas.contacto, tasaLabel: 'del objetivo' },
+    { label: 'Respondieron', valor: embudo.respondieron, icon: Reply, color: 'text-indigo-600', tasa: tasas.respuesta, tasaLabel: 'de contactados' },
+    { label: 'Interesados', valor: embudo.interesados, icon: UserCheck, color: 'text-yellow-600', tasa: tasas.interes, tasaLabel: 'de contactados' },
+    { label: 'Recuperados', valor: embudo.recuperados, icon: CheckCircle, color: 'text-green-600', tasa: tasas.recupero, tasaLabel: 'de contactados' },
+  ]
+
+  const maxCanal = Math.max(1, ...porCanal.map(c => c.socios))
+  const rendimientoPositivo = (monetario.rendimientoNeto ?? 0) >= 0
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">
+          Período {formatDate(vigencia.fechaInicio)} – {formatDate(vigencia.fechaFin)} · {vigencia.mesesVigencia} mes{vigencia.mesesVigencia !== 1 ? 'es' : ''} de vigencia
+        </p>
+        <Button variant="secondary" size="sm" onClick={onReload}>
+          <RefreshCw className="w-4 h-4 mr-1" /> Actualizar
+        </Button>
+      </div>
+
+      {/* Embudo de gestión */}
+      <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Embudo de gestión</h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {pasos.map((p, i) => {
+            const Icon = p.icon
+            return (
+              <div key={p.label} className="relative rounded-lg border border-gray-200 p-4">
+                <Icon className={`w-6 h-6 ${p.color} mb-1`} />
+                <p className="text-2xl font-bold text-gray-800">{(p.valor ?? 0).toLocaleString('es-AR')}</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">{p.label}</p>
+                {p.tasa != null && (
+                  <p className="text-xs mt-1 font-medium text-gray-600">{pct(p.tasa)} <span className="text-gray-400 font-normal">{p.tasaLabel}</span></p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
+          <span>Tasa de recupero sobre objetivo: <strong className="text-gray-900">{pct(tasas.recuperoSobreObjetivo)}</strong></span>
+          <span>Acciones totales: <strong className="text-gray-900">{(esfuerzo.totalAcciones ?? 0).toLocaleString('es-AR')}</strong></span>
+          {esfuerzo.accionesPorRecuperado != null && (
+            <span>Esfuerzo: <strong className="text-gray-900">{esfuerzo.accionesPorRecuperado}</strong> acciones por recuperado</span>
+          )}
+        </div>
+      </div>
+
+      {/* Por canal */}
+      {porCanal.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Socios contactados por canal</h3>
+          <div className="space-y-2">
+            {porCanal.map(c => (
+              <div key={c.tipo} className="flex items-center gap-3">
+                <span className="w-28 text-sm text-gray-600 shrink-0">{TIPO_ACCION_LABEL[c.tipo] || c.tipo}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                  <div className="bg-blue-500 h-5 rounded-full" style={{ width: `${(c.socios / maxCanal) * 100}%` }} />
+                </div>
+                <span className="w-10 text-right text-sm font-medium text-gray-800">{c.socios}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Índices monetarios */}
+      <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4 flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-green-600" /> Índices monetarios
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <MoneyCard
+            label="Deuda histórica impaga"
+            valor={monetario.deudaVieja}
+            hint="Cuotas pendientes vencidas antes de la campaña"
+          />
+          <MoneyCard
+            label="Valor recurrente a recuperar"
+            valor={monetario.valorRecurrente}
+            hint={`Cuota mensual × ${vigencia.mesesVigencia} mes(es) de los socios objetivo`}
+          />
+          <MoneyCard
+            label="Recuperado efectivo"
+            valor={monetario.recuperadoEfectivo}
+            hint="Cuotas pagadas tras la reactivación"
+            color="text-green-600"
+            extra={`${pct(monetario.tasaRecuperoMonetario)} del valor recurrente`}
+          />
+          <MoneyCard
+            label="Costo de la oferta"
+            valor={monetario.costoOferta}
+            hint="Descuento bonificado a los recuperados"
+            color="text-amber-600"
+          />
+          <MoneyCard
+            label="Rendimiento neto"
+            valor={monetario.rendimientoNeto}
+            hint="Recuperado − costo de la oferta"
+            color={rendimientoPositivo ? 'text-green-700' : 'text-red-600'}
+            extra={monetario.roi != null ? `ROI ${monetario.roi}×` : null}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MoneyCard({ label, valor, hint, color = 'text-gray-800', extra }) {
+  return (
+    <div className="rounded-lg border border-gray-200 p-4">
+      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className={`text-xl font-bold ${color} mt-1`}>{formatCurrency(valor || 0)}</p>
+      {extra && <p className="text-xs font-medium text-gray-600 mt-0.5">{extra}</p>}
+      {hint && <p className="text-[11px] text-gray-400 mt-1 leading-tight">{hint}</p>}
     </div>
   )
 }
