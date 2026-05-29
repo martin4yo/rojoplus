@@ -30,6 +30,7 @@ jest.unstable_mockModule('../../src/lib/tenantPrisma.js', () => ({
 jest.unstable_mockModule('../../src/jobs/notificaciones.js', () => ({
   iniciarCronJobs: noop,
   detenerCronJobs: noop,
+  ejecutarManual: noopAsync,
 }))
 
 // ===== SERVICES =====
@@ -47,6 +48,12 @@ jest.unstable_mockModule('../../src/services/email.js', () => ({
   enviarConfirmacionReserva: noopAsync,
   enviarCancelacionReserva: noopAsync,
   enviarRecordatorioReserva: noopAsync,
+  enviarComprobanteMovimientoEmail: noopAsync,
+  enviarMagicLinkEntrenador: noopAsync,
+  enviarMagicLinkTienda: noopAsync,
+  enviarVerificacionEmailTienda: noopAsync,
+  enviarPedidoConfirmadoTienda: noopAsync,
+  enviarCambioEstadoTienda: noopAsync,
   verificarConexionSMTP: noopAsync,
 }))
 
@@ -84,6 +91,12 @@ jest.unstable_mockModule('../../src/services/whatsappService.js', () => ({
   notificarVencimiento: noopAsync,
   notificarMora: noopAsync,
   enviarLinkPortal: noopAsync,
+  mdToWhatsApp: jest.fn(t => t),
+  enviarWhatsAppDocumento: noopAsync,
+  parseNombreSocio: jest.fn(() => ({})),
+  buildLinkPortal: jest.fn(() => ''),
+  buildVariablesSocio: jest.fn(async () => ({})),
+  enviarComprobanteMovimientoWhatsApp: noopAsync,
 }))
 
 jest.unstable_mockModule('../../src/services/notificacionService.js', () => ({
@@ -108,6 +121,10 @@ jest.unstable_mockModule('../../src/services/notificacionService.js', () => ({
   verificarBajaAsistencia: noopAsync,
   enviarSaludosCumpleanios: noopAsync,
   verificarRecordatorioAnticipado: noopAsync,
+  getTenantsConCronsPausados: jest.fn(async () => []),
+  getTenantsBloqueadosPorCron: jest.fn(async () => []),
+  encolarNotificacion: noopAsync,
+  NOTIF_MAX_INTENTOS: 3,
 }))
 
 jest.unstable_mockModule('../../src/services/pdfGenerator.js', () => ({
@@ -115,6 +132,7 @@ jest.unstable_mockModule('../../src/services/pdfGenerator.js', () => ({
   generarPDFCierreCaja: noopAsync,
   generateTestPDF: noopAsync,
   generarReciboPagoPDF: noopAsync,
+  generarComprobanteMovimientoPDF: noopAsync,
 }))
 
 jest.unstable_mockModule('../../src/services/thermalPrinter.js', () => ({
@@ -143,12 +161,16 @@ jest.unstable_mockModule('../../src/services/asientosContables.js', () => ({
   generarAsientoReciboCobro: noopAsync,
   generarAsientoFacturaCompra: noopAsync,
   generarAsientoOrdenPago: noopAsync,
+  generarAsientoDevengamientoSueldo: noopAsync,
+  anularAsiento: noopAsync,
+  CUENTAS: {},
 }))
 
 jest.unstable_mockModule('../../src/services/afipWSAAService.js', () => ({
   getTicketAcceso: noopAsync,
   invalidateTicket: noop,
   getConfiguracionFiscal: noopAsync,
+  resolverConexionAfip: noopAsync,
 }))
 
 jest.unstable_mockModule('../../src/services/afipWSFEService.js', () => ({
@@ -178,6 +200,7 @@ jest.unstable_mockModule('../../src/services/paywayService.js', () => ({
   cobrarConToken: noopAsync,
   consultarPago: noopAsync,
   verificarWebhook: noop,
+  PAYMENT_METHOD_IDS: {},
 }))
 
 jest.unstable_mockModule('../../src/services/aiConstants.js', () => ({
@@ -207,11 +230,6 @@ jest.unstable_mockModule('../../src/services/reportQueries.js', () => ({
   listQueryDefinitions: jest.fn(() => []),
   getQueryDefinition: noop,
   runQuery: noopAsync,
-}))
-
-jest.unstable_mockModule('../../src/services/gestionCobranzaService.js', () => ({
-  actualizarGestionesCobranza: noopAsync,
-  enviarRecordatoriosAcciones: noopAsync,
 }))
 
 jest.unstable_mockModule('../../src/services/buffetStockService.js', () => ({

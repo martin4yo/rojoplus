@@ -29,6 +29,14 @@ const models = [
   'comercio', 'entrada', 'evento', 'accesoLog',
   'rubro', 'menuItem', 'menuItemRol', 'cajaRol',
   'importacionCobranza',
+  // Cobros / tesorería
+  'medioPago', 'detallePago', 'movimientoTesoreria', 'pagoMedioPago',
+  'cuentaContable', 'configuracionRecargo', 'saldoFavor',
+  // Control de accesos
+  'registroAcceso', 'intentoAccesoDenegado', 'habilitacionTemporal',
+  'dispositivoAcceso',
+  // Sesión persistente socio
+  'socioSession',
 ]
 
 export function createMockPrisma() {

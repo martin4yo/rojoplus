@@ -11,6 +11,10 @@ export function generateTestToken(admin = {}) {
   const payload = {
     id: admin.id || 1,
     email: admin.email || 'test@clubix.com',
+    // El JWT post multi-tenant debe llevar tenantId (authAdmin lo compara con el
+    // tenant del request) y el flag de super-admin.
+    tenantId: admin.tenantId ?? 1,
+    esSuperAdmin: admin.esSuperAdmin ?? false,
   }
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' })
 }
@@ -19,6 +23,8 @@ export function generateExpiredToken(admin = {}) {
   const payload = {
     id: admin.id || 1,
     email: admin.email || 'test@clubix.com',
+    tenantId: admin.tenantId ?? 1,
+    esSuperAdmin: admin.esSuperAdmin ?? false,
   }
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '-1s' })
 }

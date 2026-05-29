@@ -5,21 +5,30 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 import request from 'supertest'
 import bcrypt from 'bcryptjs'
 import { app, mockPrisma, resetMocks } from './helpers/setup.js'
-import { generateTestToken, generateExpiredToken, TEST_ADMIN } from './helpers/auth.js'
+import { generateTestToken, generateExpiredToken, TEST_ADMIN, TEST_TENANT } from './helpers/auth.js'
 
 describe('POST /api/admin/login', () => {
   beforeEach(() => {
     resetMocks()
   })
 
-  it('debe devolver token con credenciales validas', async () => {
+  it('debe devolver tempToken y tenants con credenciales validas (login paso 1)', async () => {
     const passwordHash = await bcrypt.hash('test123', 10)
     mockPrisma.admin.findUnique.mockResolvedValue({
       ...TEST_ADMIN,
       passwordHash,
-      rol: { esSuperAdmin: false },
+      rol: { id: 1, codigo: 'ADMIN', nombre: 'Admin', esSuperAdmin: false },
     })
     mockPrisma.admin.update.mockResolvedValue({})
+    // Login es en 2 pasos: paso 1 devuelve tempToken + la lista de tenants
+    // accesibles. El token real sale de /api/admin/select-tenant.
+    mockPrisma.tenantUsuario.findMany.mockResolvedValue([
+      {
+        rol: 'ADMIN',
+        activo: true,
+        tenant: { id: 1, slug: 'clubtest', subdomain: 'clubtest', nombre: 'Club Test', logoUrl: null, activo: true },
+      },
+    ])
 
     const res = await request(app)
       .post('/api/admin/login')
@@ -27,8 +36,10 @@ describe('POST /api/admin/login', () => {
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
-    expect(res.body.data.token).toBeDefined()
+    expect(res.body.data.tempToken).toBeDefined()
     expect(res.body.data.admin.email).toBe('admin@test.com')
+    expect(Array.isArray(res.body.data.tenants)).toBe(true)
+    expect(res.body.data.tenants.length).toBeGreaterThan(0)
   })
 
   it('debe rechazar sin email o password', async () => {
@@ -86,11 +97,15 @@ describe('POST /api/admin/login', () => {
 describe('JWT Authentication middleware', () => {
   beforeEach(() => {
     resetMocks()
+    // mis-permisos pasa por extractTenant: hay que resolver el tenant para que el
+    // flujo llegue a authAdmin (sino devolvería 400 TENANT_REQUIRED).
+    mockPrisma.tenant.findUnique.mockResolvedValue(TEST_TENANT)
   })
 
   it('debe rechazar request sin token', async () => {
     const res = await request(app)
       .get('/api/admin/mis-permisos')
+      .set('X-Tenant-Slug', 'clubtest')
 
     expect(res.status).toBe(401)
   })
@@ -101,6 +116,7 @@ describe('JWT Authentication middleware', () => {
     const res = await request(app)
       .get('/api/admin/mis-permisos')
       .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Slug', 'clubtest')
 
     expect(res.status).toBe(401)
   })
@@ -109,6 +125,7 @@ describe('JWT Authentication middleware', () => {
     const res = await request(app)
       .get('/api/admin/mis-permisos')
       .set('Authorization', 'Bearer token-falso-12345')
+      .set('X-Tenant-Slug', 'clubtest')
 
     expect(res.status).toBe(401)
   })
@@ -130,6 +147,7 @@ describe('JWT Authentication middleware', () => {
     const res = await request(app)
       .get('/api/admin/mis-permisos')
       .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Slug', 'clubtest')
 
     expect(res.status).not.toBe(401)
   })

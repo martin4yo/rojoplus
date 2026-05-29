@@ -19,6 +19,10 @@ describe('POST /api/admin/pagos', () => {
     // Setup tenant
     mockPrisma.tenant.findUnique.mockResolvedValue(TEST_TENANT)
     createTenantPrisma.mockReturnValue(mockTenantDb)
+    // checkPermiso() consulta admin + rol; lo dejamos como super-admin para
+    // que el flujo llegue al handler.
+    mockPrisma.admin.findUnique.mockResolvedValue({ id: 1, rolId: 1, activo: true })
+    mockPrisma.rol.findUnique.mockResolvedValue({ id: 1, esSuperAdmin: true, permisos: [] })
   })
 
   it('debe rechazar sin autenticacion', async () => {
