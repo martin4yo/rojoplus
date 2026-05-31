@@ -12,9 +12,9 @@
  */
 export default function PublicHero({ eyebrow, title, accent, subtitle, children, compact = false }) {
   const titleSize = compact
-    ? 'clamp(40px, 6vw, 90px)'
+    ? 'clamp(26px, 3.5vw, 46px)'
     : 'clamp(48px, 8vw, 130px)'
-  const padding = compact ? 'py-16 md:py-20' : 'py-20 md:py-28'
+  const padding = compact ? 'py-6 md:py-9' : 'py-20 md:py-28'
 
   return (
     <section
@@ -28,16 +28,17 @@ export default function PublicHero({ eyebrow, title, accent, subtitle, children,
       />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {eyebrow && (
-          <div className="pub-eyebrow text-pub-fg-70 mb-6">{eyebrow}</div>
+          <div className={`pub-eyebrow text-pub-fg-70 ${compact ? 'mb-2' : 'mb-6'}`}>{eyebrow}</div>
         )}
         <h1
           className="font-display-sport text-pub-fg"
-          style={{ fontSize: titleSize, lineHeight: 0.92 }}
+          style={{ fontSize: titleSize, lineHeight: compact ? 1 : 0.92 }}
         >
           {accent ? (
             <>
               {title}
-              <br />
+              {/* En compact el acento va inline para no ocupar 2 líneas */}
+              {compact ? ' ' : <br />}
               <span style={{ color: 'var(--color-primary)' }}>{accent}</span>
             </>
           ) : (
@@ -46,13 +47,15 @@ export default function PublicHero({ eyebrow, title, accent, subtitle, children,
         </h1>
         {subtitle && (
           <p
-            className="mt-6 max-w-2xl text-lg md:text-xl text-pub-fg-70 leading-snug"
+            className={`max-w-2xl text-pub-fg-70 leading-snug ${
+              compact ? 'mt-2 text-sm md:text-base' : 'mt-6 text-lg md:text-xl'
+            }`}
             style={{ fontWeight: 300, letterSpacing: '-0.01em' }}
           >
             {subtitle}
           </p>
         )}
-        {children && <div className="mt-10">{children}</div>}
+        {children && <div className={compact ? 'mt-5' : 'mt-10'}>{children}</div>}
       </div>
     </section>
   )
