@@ -41,10 +41,12 @@ export default function FacturacionAfipCard() {
   async function testConexion(c) {
     const t = toast.loading(`Probando conexión "${c.nombre}"...`)
     try {
-      const r = await api.post(`/admin/afip-connections/${c.id}/test`)
+      // El endpoint responde { success, mensaje, pasos } en el nivel superior
+      // (no envuelto en { data }), por eso usamos postFull para leerlo directo.
+      const r = await api.postFull(`/admin/afip-connections/${c.id}/test`)
       toast.dismiss(t)
-      if (r.success) toast.success(`OK: ${r.mensaje}`)
-      else toast.error(`Falló: ${r.mensaje}`)
+      if (r?.success) toast.success(`OK: ${r.mensaje}`)
+      else toast.error(`Falló: ${r?.mensaje || 'sin detalle'}`)
       cargar()
     } catch (err) {
       toast.dismiss(t)

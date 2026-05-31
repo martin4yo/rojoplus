@@ -167,22 +167,15 @@ export default function TablasAuxiliares() {
   useEffect(() => {
     cargarDatos()
     cargarModoDemo()
-    cargarConfiguracion()
     cargarRecargo()
-    cargarVigencia()
-    cargarCronsPausa()
     cargarDescAnticipado()
     cargarBajaAsistencia()
     cargarCumpleanios()
-    cargarCuotasProxDias()
-    cargarDiaCorte()
-    cargarConfigFiscal()
-    cargarConfigSmtp()
-    cargarRangoSocios()
-    cargarConfigWa()
-    cargarNotifTextos()
-    cargarNotifEventos()
-    cargarPlanFeatures()
+    cargarCronsPausa()
+    // Toda la config basada en claves (sistema/configuracion) se trae en UNA sola
+    // request y se distribuye a los distintos estados. Antes eran ~39 GET
+    // individuales que, al refrescar, saturaban el rate-limit de nginx (503).
+    cargarConfigSistema()
   }, [])
 
   async function cargarDatos() {
@@ -236,20 +229,95 @@ export default function TablasAuxiliares() {
     }
   }
 
-  async function cargarConfiguracion() {
+  // Trae TODA la configuración del tenant (basada en claves) en una sola request
+  // y la distribuye a los distintos estados. Reemplaza a ~39 GET individuales
+  // (cuotas, vigencia, fiscal, rango socios, SMTP, WhatsApp, notificaciones, plan).
+  async function cargarConfigSistema() {
     try {
-      const [configDia, configMes, configConcepto, configEspacio] = await Promise.all([
-        api.get('/admin/sistema/configuracion/CUOTA_DIA_VENCIMIENTO'),
-        api.get('/admin/sistema/configuracion/CUOTA_VENCE_MISMO_MES'),
-        api.get('/admin/sistema/configuracion/CONCEPTO_COBRANZA_CUOTAS'),
-        api.get('/admin/sistema/configuracion/HORARIO_ESPACIO_OBLIGATORIO').catch(() => null),
-      ])
-      setDiaVencimiento(configDia?.valor || '10')
-      setVenceMismoMes(configMes?.valor === 'true')
-      setConceptoCobranzaCuotas(configConcepto?.valor || '')
-      setEspacioObligatorio(configEspacio?.valor === 'true')
+      const rows = await api.get('/admin/sistema/configuracion')
+      const map = {}
+      for (const r of (rows || [])) map[r.clave] = r.valor
+      const val = (k, def = '') => (map[k] != null ? map[k] : def)
+
+      // Cuotas / vencimiento / corte
+      setDiaVencimiento(val('CUOTA_DIA_VENCIMIENTO', '10'))
+      setVenceMismoMes(map['CUOTA_VENCE_MISMO_MES'] === 'true')
+      setConceptoCobranzaCuotas(val('CONCEPTO_COBRANZA_CUOTAS', ''))
+      setEspacioObligatorio(map['HORARIO_ESPACIO_OBLIGATORIO'] === 'true')
+      if (map['CUOTAS_PROXIMAS_DIAS'] != null) setCuotasProxDias(String(map['CUOTAS_PROXIMAS_DIAS']))
+      if (map['DIA_CORTE_CUOTAS'] != null) setDiaCorte(String(map['DIA_CORTE_CUOTAS']))
+
+      // Vigencia / morosidad
+      setVigencia({
+        bloqueoActivo: map['MOROSIDAD_BLOQUEO_AUTO_ACTIVO'] === 'true',
+        diasGracia: val('MOROSIDAD_DIAS_GRACIA', '0'),
+      })
+
+      // Fiscal
+      setConfigFiscal({
+        cuit: val('FISCAL_CUIT', ''),
+        condicionIva: val('FISCAL_CONDICION_IVA', 'INSCRIPTO'),
+        razonSocial: val('FISCAL_RAZON_SOCIAL', ''),
+        domicilioFiscal: val('FISCAL_DOMICILIO', ''),
+      })
+
+      // Rango de numeración de socios
+      const min = val('SOCIO_NRO_MIN', '')
+      const max = val('SOCIO_NRO_MAX', '')
+      setRangoSocioMin(min)
+      setRangoSocioMax(max)
+      setRangoSocioInicial({ min, max })
+
+      // SMTP / email
+      const smtp = {
+        host: val('SMTP_HOST', ''),
+        port: val('SMTP_PORT', '587'),
+        user: val('SMTP_USER', ''),
+        pass: val('SMTP_PASS', ''),
+        secure: val('SMTP_SECURE', 'false'),
+        from: val('SMTP_FROM', ''),
+        fromName: val('SMTP_FROM_NAME', ''),
+        emailContacto: val('EMAIL_CONTACTO', ''),
+      }
+      setConfigSmtp(smtp)
+      setConfigSmtpInicial(smtp)
+
+      // WhatsApp (Evolution API)
+      setConfigWa({
+        enabled: val('WHATSAPP_ENABLED', 'false'),
+        apiUrl: val('WHATSAPP_API_URL', ''),
+        instance: val('WHATSAPP_INSTANCE', ''),
+        apiKey: val('WHATSAPP_API_KEY', ''),
+        delayMs: val('WHATSAPP_DELAY_MS', '3000'),
+        horaInicio: val('WHATSAPP_HORA_INICIO', '8'),
+        horaFin: val('WHATSAPP_HORA_FIN', '21'),
+      })
+
+      // Templates de notificación WA
+      setNotifTextos({
+        NOTIF_WA_PAGO: val('NOTIF_WA_PAGO', ''),
+        NOTIF_WA_VENCIMIENTO: val('NOTIF_WA_VENCIMIENTO', ''),
+        NOTIF_WA_MORA: val('NOTIF_WA_MORA', ''),
+        NOTIF_WA_PORTAL: val('NOTIF_WA_PORTAL', ''),
+        NOTIF_WA_BLOQUEO_MOROSIDAD_1: val('NOTIF_WA_BLOQUEO_MOROSIDAD_1', ''),
+        NOTIF_WA_BLOQUEO_MOROSIDAD_2: val('NOTIF_WA_BLOQUEO_MOROSIDAD_2', ''),
+      })
+
+      // Eventos de notificación WA (default activado)
+      setNotifEventos({
+        WHATSAPP_NOTIF_PAGO: val('WHATSAPP_NOTIF_PAGO', 'true'),
+        WHATSAPP_NOTIF_VENCIMIENTO: val('WHATSAPP_NOTIF_VENCIMIENTO', 'true'),
+        WHATSAPP_NOTIF_MORA: val('WHATSAPP_NOTIF_MORA', 'true'),
+        WHATSAPP_NOTIF_MAGIC_LINK: val('WHATSAPP_NOTIF_MAGIC_LINK', 'true'),
+      })
+
+      // Features del plan
+      setPlanFeatures({
+        whatsapp: map['PLAN_FEATURE_WHATSAPP'] === 'true',
+        waAgent: map['PLAN_FEATURE_WA_AGENT'] === 'true',
+      })
     } catch (err) {
-      console.error('Error cargando configuración:', err)
+      console.error('Error cargando configuración del sistema:', err)
     }
   }
 
@@ -341,21 +409,6 @@ export default function TablasAuxiliares() {
       }
     } catch (err) {
       console.error('Error cargando configuración de recargo:', err)
-    }
-  }
-
-  async function cargarVigencia() {
-    try {
-      const [bloqueoCfg, graciaCfg] = await Promise.all([
-        api.get('/admin/sistema/configuracion/MOROSIDAD_BLOQUEO_AUTO_ACTIVO').catch(() => null),
-        api.get('/admin/sistema/configuracion/MOROSIDAD_DIAS_GRACIA').catch(() => null),
-      ])
-      setVigencia({
-        bloqueoActivo: bloqueoCfg?.valor === 'true',
-        diasGracia: graciaCfg?.valor ?? '0',
-      })
-    } catch (err) {
-      console.error('Error cargando configuración de vigencia:', err)
     }
   }
 
@@ -558,15 +611,6 @@ export default function TablasAuxiliares() {
     }
   }
 
-  async function cargarCuotasProxDias() {
-    try {
-      const data = await api.get('/admin/sistema/configuracion/CUOTAS_PROXIMAS_DIAS').catch(() => null)
-      if (data?.valor) setCuotasProxDias(String(data.valor))
-    } catch (err) {
-      console.error('Error cargando días aviso cuotas próximas:', err)
-    }
-  }
-
   async function guardarCuotasProxDias() {
     setGuardandoCuotasProxDias(true)
     setError(null)
@@ -578,15 +622,6 @@ export default function TablasAuxiliares() {
       setError(err.message || 'Error al guardar')
     } finally {
       setGuardandoCuotasProxDias(false)
-    }
-  }
-
-  async function cargarDiaCorte() {
-    try {
-      const data = await api.get('/admin/sistema/configuracion/DIA_CORTE_CUOTAS').catch(() => null)
-      if (data?.valor) setDiaCorte(String(data.valor))
-    } catch (err) {
-      console.error('Error cargando día de corte:', err)
     }
   }
 
@@ -631,25 +666,6 @@ export default function TablasAuxiliares() {
     }
   }
 
-  async function cargarConfigFiscal() {
-    try {
-      const [cuit, condicionIva, razonSocial, domicilioFiscal] = await Promise.all([
-        api.get('/admin/sistema/configuracion/FISCAL_CUIT').catch(() => null),
-        api.get('/admin/sistema/configuracion/FISCAL_CONDICION_IVA').catch(() => null),
-        api.get('/admin/sistema/configuracion/FISCAL_RAZON_SOCIAL').catch(() => null),
-        api.get('/admin/sistema/configuracion/FISCAL_DOMICILIO').catch(() => null),
-      ])
-      setConfigFiscal({
-        cuit: cuit?.valor || '',
-        condicionIva: condicionIva?.valor || 'INSCRIPTO',
-        razonSocial: razonSocial?.valor || '',
-        domicilioFiscal: domicilioFiscal?.valor || ''
-      })
-    } catch (err) {
-      console.error('Error cargando configuración fiscal:', err)
-    }
-  }
-
   async function guardarConfigFiscal() {
     setGuardandoFiscal(true)
     setError(null)
@@ -688,22 +704,6 @@ export default function TablasAuxiliares() {
     }
   }
 
-  async function cargarRangoSocios() {
-    try {
-      const [cfgMin, cfgMax] = await Promise.all([
-        api.get('/admin/sistema/configuracion/SOCIO_NRO_MIN').catch(() => null),
-        api.get('/admin/sistema/configuracion/SOCIO_NRO_MAX').catch(() => null),
-      ])
-      const min = cfgMin?.valor || ''
-      const max = cfgMax?.valor || ''
-      setRangoSocioMin(min)
-      setRangoSocioMax(max)
-      setRangoSocioInicial({ min, max })
-    } catch (err) {
-      console.error('Error cargando rango de socios:', err)
-    }
-  }
-
   async function guardarRangoSocios() {
     const min = rangoSocioMin?.toString().trim()
     const max = rangoSocioMax?.toString().trim()
@@ -730,30 +730,6 @@ export default function TablasAuxiliares() {
       setError(err.message || 'Error al guardar rango de socios')
     } finally {
       setGuardandoRangoSocios(false)
-    }
-  }
-
-  async function cargarConfigSmtp() {
-    try {
-      const claves = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_SECURE', 'SMTP_FROM', 'SMTP_FROM_NAME', 'EMAIL_CONTACTO']
-      const results = await Promise.all(
-        claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null))
-      )
-      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
-      const cargado = {
-        host: cfg.SMTP_HOST,
-        port: cfg.SMTP_PORT || '587',
-        user: cfg.SMTP_USER,
-        pass: cfg.SMTP_PASS,
-        secure: cfg.SMTP_SECURE || 'false',
-        from: cfg.SMTP_FROM,
-        fromName: cfg.SMTP_FROM_NAME,
-        emailContacto: cfg.EMAIL_CONTACTO,
-      }
-      setConfigSmtp(cargado)
-      setConfigSmtpInicial(cargado)
-    } catch (err) {
-      console.error('Error cargando configuración SMTP:', err)
     }
   }
 
@@ -812,33 +788,6 @@ export default function TablasAuxiliares() {
     }
   }
 
-  async function cargarPlanFeatures() {
-    try {
-      const [wa, agent] = await Promise.all([
-        api.get('/admin/sistema/configuracion/PLAN_FEATURE_WHATSAPP').catch(() => null),
-        api.get('/admin/sistema/configuracion/PLAN_FEATURE_WA_AGENT').catch(() => null),
-      ])
-      setPlanFeatures({ whatsapp: wa?.valor === 'true', waAgent: agent?.valor === 'true' })
-    } catch (err) { console.error('Error cargando plan features:', err) }
-  }
-
-  async function cargarConfigWa() {
-    try {
-      const claves = ['WHATSAPP_ENABLED', 'WHATSAPP_API_URL', 'WHATSAPP_INSTANCE', 'WHATSAPP_API_KEY', 'WHATSAPP_DELAY_MS', 'WHATSAPP_HORA_INICIO', 'WHATSAPP_HORA_FIN']
-      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
-      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
-      setConfigWa({
-        enabled: cfg.WHATSAPP_ENABLED || 'false',
-        apiUrl: cfg.WHATSAPP_API_URL || '',
-        instance: cfg.WHATSAPP_INSTANCE || '',
-        apiKey: cfg.WHATSAPP_API_KEY || '',
-        delayMs: cfg.WHATSAPP_DELAY_MS || '3000',
-        horaInicio: cfg.WHATSAPP_HORA_INICIO || '8',
-        horaFin: cfg.WHATSAPP_HORA_FIN || '21',
-      })
-    } catch (err) { console.error('Error cargando config WA:', err) }
-  }
-
   async function guardarConfigWa() {
     setGuardandoWa(true)
     setError(null)
@@ -880,15 +829,6 @@ export default function TablasAuxiliares() {
     } finally { setVerificandoWa(false) }
   }
 
-  async function cargarNotifTextos() {
-    try {
-      const claves = ['NOTIF_WA_PAGO', 'NOTIF_WA_VENCIMIENTO', 'NOTIF_WA_MORA', 'NOTIF_WA_PORTAL', 'NOTIF_WA_BLOQUEO_MOROSIDAD_1', 'NOTIF_WA_BLOQUEO_MOROSIDAD_2']
-      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
-      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor || '']))
-      setNotifTextos(cfg)
-    } catch (err) { console.error('Error cargando textos de notificación:', err) }
-  }
-
   async function guardarNotifWA() {
     setGuardandoNotifWA(true)
     setError(null)
@@ -906,16 +846,6 @@ export default function TablasAuxiliares() {
       setError(err.message || 'Error al guardar notificaciones')
     } finally { setGuardandoNotifWA(false) }
   }
-
-  async function cargarNotifEventos() {
-    try {
-      const claves = ['WHATSAPP_NOTIF_PAGO', 'WHATSAPP_NOTIF_VENCIMIENTO', 'WHATSAPP_NOTIF_MORA', 'WHATSAPP_NOTIF_MAGIC_LINK']
-      const results = await Promise.all(claves.map(c => api.get(`/admin/sistema/configuracion/${c}`).catch(() => null)))
-      const cfg = Object.fromEntries(claves.map((c, i) => [c, results[i]?.valor ?? 'true']))
-      setNotifEventos(cfg)
-    } catch (err) { console.error('Error cargando eventos notificacion:', err) }
-  }
-
 
   if (loading) {
     return (
