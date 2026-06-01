@@ -346,25 +346,25 @@ export default function Periodos() {
                     >
                       <Receipt className="w-5 h-5" />
                     </button>
+                    {tienePermiso(PERMISOS.CUOTAS_GENERAR) && (
+                      <button
+                        onClick={() => confirmarGenerarCuotas(periodo.id)}
+                        disabled={generando === periodo.id}
+                        className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition disabled:opacity-50"
+                        title="Completar cuotas faltantes"
+                      >
+                        <RefreshCw className={`w-5 h-5 ${generando === periodo.id ? 'animate-spin' : ''}`} />
+                      </button>
+                    )}
                     {tienePermiso(PERMISOS.CUOTAS_GENERAR) && periodo.cuotasPagadas === 0 && (
-                      <>
-                        <button
-                          onClick={() => confirmarGenerarCuotas(periodo.id)}
-                          disabled={generando === periodo.id}
-                          className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition disabled:opacity-50"
-                          title="Regenerar Cuotas"
-                        >
-                          <RefreshCw className={`w-5 h-5 ${generando === periodo.id ? 'animate-spin' : ''}`} />
-                        </button>
-                        <button
-                          onClick={() => confirmarEliminarPeriodo(periodo)}
-                          disabled={eliminando === periodo.id}
-                          className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition disabled:opacity-50"
-                          title="Eliminar Periodo"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </>
+                      <button
+                        onClick={() => confirmarEliminarPeriodo(periodo)}
+                        disabled={eliminando === periodo.id}
+                        className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition disabled:opacity-50"
+                        title="Eliminar Periodo"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
                     )}
                   </div>
                 </>
