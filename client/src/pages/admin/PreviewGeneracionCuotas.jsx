@@ -180,7 +180,7 @@ export default function PreviewGeneracionCuotas() {
 
   return (
     <div className="space-y-4">
-      <ModalComponent />
+      {ModalComponent}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -242,15 +242,18 @@ export default function PreviewGeneracionCuotas() {
           )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={filtroSocio}
-              onChange={(e) => setFiltroSocio(e.target.value)}
-              placeholder="Buscar socio (nombre o nº)"
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Buscar socio</label>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={filtroSocio}
+                onChange={(e) => setFiltroSocio(e.target.value)}
+                placeholder="Nombre o número"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
           </div>
 
           <Select label="Concepto" value={filtroConcepto} onChange={setFiltroConcepto} options={[
