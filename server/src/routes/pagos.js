@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js'
 import { obtenerPago } from '../services/mercadopago.js'
 import prisma from '../lib/prisma.js'
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
+import { getMpConfig } from '../lib/mercadoPagoConfig.js'
 import { enviarReciboPago, enviarConfirmacionReserva } from '../services/email.js'
 import { generarAsientoAutomatico } from './asientos.js'
 import { v4 as uuidv4 } from 'uuid'
@@ -39,7 +40,21 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
   const paymentId = data.id
 
   try {
-    const payment = await obtenerPago(paymentId)
+    // Resolver el token del tenant ANTES de llamar a MP.
+    // El ref=linkPagoId viene embebido en la notification_url para evitar
+    // el chicken-and-egg entre token y external_reference.
+    let mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || ''
+    const refId = req.query.ref ? parseInt(req.query.ref) : null
+    if (refId) {
+      const linkPagoRef = await prisma.linkPago.findFirst({ where: { id: refId } })
+      if (linkPagoRef?.tenantId) {
+        const dbRef = createTenantPrisma(linkPagoRef.tenantId)
+        const { accessToken: tenantToken } = await getMpConfig(dbRef)
+        if (tenantToken) mpAccessToken = tenantToken
+      }
+    }
+
+    const payment = await obtenerPago(paymentId, mpAccessToken)
 
     console.log('[MercadoPago Pago]', {
       id: payment.id,
