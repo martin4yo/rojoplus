@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
 import { enviarLinkPortal, obtenerTelefonoSocio } from '../services/whatsappService.js'
-import { crearPreferenciaPago } from '../services/mercadopago.js'
+import { crearPreferenciaPago, obtenerPago } from '../services/mercadopago.js'
 import { getMpConfig } from '../lib/mercadoPagoConfig.js'
 import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.js'
 import { generatePDF } from '../services/pdfGenerator.js'
@@ -1536,6 +1536,155 @@ router.get('/:tokenPortal/pagos/historial', asyncHandler(async (req, res) => {
   })
 }))
 
+// POST /api/socio/:tokenPortal/cuotas/verificar-pago-mp
+// Verifica y procesa un pago de MP cuando el socio vuelve al portal con ?pago=exito.
+// Fallback para cuando el webhook no llega (credenciales test, firewall, etc.)
+router.post('/:tokenPortal/cuotas/verificar-pago-mp', asyncHandler(async (req, res) => {
+  const { tokenPortal } = req.params
+  const { linkPagoId } = req.body
+
+  if (!linkPagoId) throw new AppError('linkPagoId requerido', 400)
+
+  const socio = await req.db.socio.findFirst({ where: { tokenPortal } })
+  if (!socio) throw new AppError('Socio no encontrado', 404)
+
+  const linkPago = await req.db.linkPago.findFirst({
+    where: { id: parseInt(linkPagoId), socioId: socio.id },
+  })
+  if (!linkPago) throw new AppError('Link de pago no encontrado', 404)
+
+  // Ya estaba procesado
+  if (linkPago.estado === 'PAGADO') {
+    return res.json({ success: true, data: { pagado: true, yaExistia: true } })
+  }
+
+  // Consultar estado del pago directamente en MP
+  const { accessToken } = await getMpConfig(req.db)
+  if (!accessToken) throw new AppError('MercadoPago no configurado', 503)
+
+  // Buscar el payment_id: puede venir en la query de MP como query param al redirect
+  const { paymentId, paymentStatus } = req.body
+
+  if (!paymentId) {
+    // Sin paymentId no podemos verificar, devolvemos estado actual
+    return res.json({ success: true, data: { pagado: false, estado: linkPago.estado } })
+  }
+
+  const payment = await obtenerPago(String(paymentId), accessToken)
+
+  if (payment.status !== 'approved') {
+    await req.db.linkPago.update({
+      where: { id: linkPago.id },
+      data: {
+        estado: payment.status === 'rejected' ? 'RECHAZADO' : 'PENDIENTE',
+        paymentId: String(payment.id),
+        paymentStatus: payment.status,
+      },
+    })
+    return res.json({ success: true, data: { pagado: false, estado: payment.status } })
+  }
+
+  // Pago aprobado — procesar igual que el webhook
+  const { enviarReciboPago } = await import('../services/email.js')
+  const { createTenantPrisma } = await import('../lib/tenantPrisma.js')
+
+  await req.db.linkPago.update({
+    where: { id: linkPago.id },
+    data: {
+      estado: 'PAGADO',
+      paymentId: String(payment.id),
+      paymentStatus: payment.status,
+      paymentDetail: payment.payment_method_id || null,
+      fechaPago: new Date(),
+    },
+  })
+
+  const cargosIds = JSON.parse(linkPago.cargosIds || '[]')
+  if (Array.isArray(cargosIds) && cargosIds.length > 0) {
+    const medioPago = await req.db.medioPago.findFirst({
+      where: {
+        OR: [
+          { codigo: { contains: 'MERCADOPAGO', mode: 'insensitive' } },
+          { nombre: { contains: 'MercadoPago', mode: 'insensitive' } },
+        ],
+      },
+    })
+
+    let pagoCompleto = null
+    for (let intento = 0; intento < 3; intento++) {
+      try {
+        pagoCompleto = await req.db.$transaction(async (tx) => {
+          const rows = await tx.$queryRaw`
+            SELECT COALESCE(MAX(CAST(numero AS INTEGER)), 0)::int AS max_num
+            FROM pagos WHERE tenant_id = ${req.tenantId} AND numero ~ '^[0-9]+$'
+          `
+          const numero = String(Number(rows?.[0]?.max_num || 0) + 1).padStart(8, '0')
+
+          const pago = await tx.pago.create({
+            data: {
+              numero,
+              socioId: linkPago.socioId,
+              montoTotal: parseFloat(payment.transaction_amount),
+              montoRecibido: parseFloat(payment.transaction_amount),
+              medioPagoId: medioPago?.id || null,
+              cajaId: linkPago.cajaId || null,
+              nroOperacion: String(payment.id),
+              fechaOperacion: payment.date_approved ? new Date(payment.date_approved) : new Date(),
+              comprobanteNro: String(payment.id),
+              comprobanteTipo: 'MERCADOPAGO',
+              linkPagoId: linkPago.id,
+              origen: 'PORTAL_SOCIO',
+              observaciones: `Pago online MercadoPago - ${payment.payment_method_id || 'N/A'}`,
+              registradoPor: 1,
+              estado: 'CONFIRMADO',
+            },
+          })
+
+          await tx.cargo.updateMany({
+            where: { id: { in: cargosIds } },
+            data: { estado: 'PAGADO', fechaPago: new Date(), pagoId: pago.id },
+          })
+
+          if (linkPago.cajaId) {
+            await tx.caja.update({
+              where: { id: linkPago.cajaId },
+              data: { saldoActual: { increment: parseFloat(payment.transaction_amount) } },
+            })
+          }
+
+          return tx.pago.findFirst({
+            where: { id: pago.id },
+            include: {
+              socio: { select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true } },
+              medioPago: { select: { id: true, nombre: true } },
+              cargos: {
+                include: {
+                  periodo: { select: { nombre: true } },
+                  categoriaActividad: { select: { nombre: true, actividad: { select: { nombre: true } } } },
+                },
+              },
+            },
+          })
+        })
+        break
+      } catch (err) {
+        const esConflicto = err?.code === 'P2002' && err?.meta?.target?.includes('numero')
+        if (!esConflicto || intento === 2) throw err
+        await new Promise(r => setTimeout(r, 20 + Math.floor(Math.random() * 60)))
+      }
+    }
+
+    if (pagoCompleto) {
+      console.log(`[MP Verificación] Pago ${pagoCompleto.numero} registrado para socio ${socio.id}`)
+      enviarReciboPago(pagoCompleto, req.db).catch(err => {
+        console.error('[MP Verificación] Error enviando recibo:', err)
+      })
+    }
+  }
+
+  res.json({ success: true, data: { pagado: true } })
+}))
+
 // POST /api/socio/:tokenPortal/cuotas/:cuotaId/generar-link-pago - Generar link de pago
 router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(async (req, res) => {
   const { tokenPortal, cuotaId } = req.params
@@ -1631,7 +1780,7 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
         name: socio.apellidoNombre,
       },
       notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago?ref=${linkPago.id}`,
-      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito`,
+      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito&ref=${linkPago.id}`,
       failureUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=error`,
       pendingUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=pendiente`,
     })
@@ -1762,7 +1911,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
         name: socio.apellidoNombre,
       },
       notificationUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/pagos/webhook/mercadopago?ref=${linkPago.id}`,
-      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito`,
+      successUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=exito&ref=${linkPago.id}`,
       failureUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=error`,
       pendingUrl: `${baseUrl}/portal-socio/${tokenPortal}?pago=pendiente`,
     })

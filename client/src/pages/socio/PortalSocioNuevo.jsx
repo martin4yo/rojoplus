@@ -101,43 +101,56 @@ export default function PortalSocioNuevo() {
   useEffect(() => {
     const pagoStatus = searchParams.get('pago')
     const seccion = searchParams.get('seccion')
+    const refId = searchParams.get('ref')
+    const paymentId = searchParams.get('payment_id')
 
-    if (pagoStatus) {
-      // Limpiar el query param
-      setSearchParams({})
+    if (!pagoStatus) return
 
-      // Navegar a la sección correcta
-      if (seccion === 'eventos') {
-        setActiveTab('eventos')
-      } else if (seccion === 'pagos') {
-        setActiveTab('pagos')
-      }
+    setSearchParams({})
 
-      // Mostrar mensaje según el resultado
-      if (pagoStatus === 'exito') {
+    if (seccion === 'eventos') setActiveTab('eventos')
+    else setActiveTab('pagos')
+
+    if (pagoStatus === 'exito') {
+      // Verificar y procesar el pago directamente con MP
+      const verificar = async () => {
+        if (refId && paymentId) {
+          try {
+            await api.post(`/socio/${tokenPortal}/cuotas/verificar-pago-mp`, {
+              linkPagoId: parseInt(refId),
+              paymentId,
+            })
+          } catch (err) {
+            console.warn('[MP] Verificación falló:', err.message)
+          }
+        }
+        await cargarDatosSocio()
         showModal({
           type: 'success',
-          title: seccion === 'eventos' ? 'Compra exitosa' : 'Pago exitoso',
+          title: seccion === 'eventos' ? 'Compra exitosa' : '¡Pago exitoso!',
           message: seccion === 'eventos'
-            ? 'Tu compra de entradas ha sido procesada correctamente. Recibirás las entradas por email en breve.'
-            : 'Tu pago ha sido procesado correctamente. En breve se verá reflejado en tu cuenta.',
-          onConfirm: () => {
-            cargarDatosSocio() // Recargar datos
-          }
-        })
-      } else if (pagoStatus === 'error') {
-        showModal({
-          type: 'error',
-          title: 'Pago fallido',
-          message: 'Hubo un problema al procesar tu pago. Por favor intenta nuevamente.'
-        })
-      } else if (pagoStatus === 'pendiente') {
-        showModal({
-          type: 'warning',
-          title: 'Pago pendiente',
-          message: 'Tu pago está siendo procesado. Te notificaremos cuando se confirme.'
+            ? 'Tu compra de entradas fue procesada. Recibirás las entradas por email en breve.'
+            : 'Tu pago fue procesado correctamente. Las cuotas ya están acreditadas en tu cuenta.',
+          confirmText: 'Continuar',
         })
       }
+      verificar()
+    } else if (pagoStatus === 'error') {
+      showModal({
+        type: 'error',
+        title: 'Pago fallido',
+        message: 'Hubo un problema al procesar tu pago. Por favor intentá nuevamente.',
+        confirmText: 'Continuar',
+        hideCancelButton: true,
+      })
+    } else if (pagoStatus === 'pendiente') {
+      showModal({
+        type: 'warning',
+        title: 'Pago pendiente',
+        message: 'Tu pago está siendo procesado. Te notificaremos cuando se confirme.',
+        confirmText: 'Continuar',
+        hideCancelButton: true,
+      })
     }
   }, [searchParams])
 
