@@ -1239,10 +1239,12 @@ export async function generarReciboPagoPDF(pago, adminNombre = '', configMap = {
       doc.fillColor('#111827').font('Helvetica').fontSize(7.5)
 
       cargos.forEach(c => {
+        const actividadDesc = c.categoriaActividad
+          ? [c.categoriaActividad.actividad?.nombre, c.categoriaActividad.nombre].filter(Boolean).join(' - ')
+          : null
         const concepto = [
           c.periodo?.nombre,
-          c.conceptoTesoreria?.nombre || c.descripcion || 'Cuota',
-          c.categoriaActividad ? `${c.categoriaActividad.actividad?.nombre || ''} ${c.categoriaActividad.nombre || ''}`.trim() : null
+          c.conceptoTesoreria?.nombre || actividadDesc || c.descripcion || 'Cuota',
         ].filter(Boolean).join(' - ')
         const monto = `$ ${Number(c.montoTotal || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
 
