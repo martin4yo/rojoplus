@@ -7,6 +7,7 @@ import { getMpConfig } from '../lib/mercadoPagoConfig.js'
 import { enviarReciboPago, enviarConfirmacionReserva } from '../services/email.js'
 import { generarAsientoAutomatico } from './asientos.js'
 import { v4 as uuidv4 } from 'uuid'
+import { procesarPagoCuotasMP } from '../services/pagosMPService.js'
 
 const router = Router()
 
@@ -352,97 +353,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
 
     // ── Cuotas (caso principal) ──────────────────────────────────────────────
     } else {
-      const cargosIds = Array.isArray(datosCompra) ? datosCompra : []
-      if (cargosIds.length === 0) {
-        console.warn('[MercadoPago] cargosIds vacío en LinkPago:', linkPago.id)
-        return res.status(200).json({ success: true })
-      }
-
-      const medioPago = await db.medioPago.findFirst({
-        where: {
-          OR: [
-            { codigo: { contains: 'MERCADOPAGO', mode: 'insensitive' } },
-            { nombre: { contains: 'MercadoPago', mode: 'insensitive' } },
-          ],
-        },
-      })
-
-      let pagoCompleto = null
-      for (let intento = 0; intento < 3; intento++) {
-        try {
-          pagoCompleto = await db.$transaction(async (tx) => {
-            const numero = await generarNumeroPago(tx, linkPago.tenantId)
-
-            const pago = await tx.pago.create({
-              data: {
-                numero,
-                socioId: linkPago.socioId,
-                montoTotal: parseFloat(payment.transaction_amount),
-                montoRecibido: parseFloat(payment.transaction_amount),
-                medioPagoId: medioPago?.id || null,
-                cajaId: linkPago.cajaId || null,
-                nroOperacion: payment.id.toString(),
-                fechaOperacion: payment.date_approved ? new Date(payment.date_approved) : new Date(),
-                comprobanteNro: payment.id.toString(),
-                comprobanteTipo: 'MERCADOPAGO',
-                linkPagoId: linkPago.id,
-                origen: 'PORTAL_SOCIO',
-                observaciones: `Pago online MercadoPago - ${payment.payment_method_id || 'N/A'}`,
-                registradoPor: 1,
-                estado: 'CONFIRMADO',
-              },
-            })
-
-            await tx.cargo.updateMany({
-              where: { id: { in: cargosIds } },
-              data: {
-                estado: 'PAGADO',
-                fechaPago: new Date(),
-                pagoId: pago.id,
-              },
-            })
-
-            if (linkPago.cajaId) {
-              await tx.caja.update({
-                where: { id: linkPago.cajaId },
-                data: { saldoActual: { increment: parseFloat(payment.transaction_amount) } },
-              })
-            }
-
-            return tx.pago.findFirst({
-              where: { id: pago.id },
-              include: {
-                socio: {
-                  select: { id: true, nroSocio: true, apellidoNombre: true, documento: true, email: true },
-                },
-                medioPago: { select: { id: true, nombre: true } },
-                cargos: {
-                  include: {
-                    periodo: { select: { nombre: true } },
-                    categoriaActividad: {
-                      select: { nombre: true, actividad: { select: { nombre: true } } },
-                    },
-                  },
-                },
-              },
-            })
-          })
-          break
-        } catch (err) {
-          const esConflictoNumero = err?.code === 'P2002'
-            && Array.isArray(err?.meta?.target)
-            && err.meta.target.includes('numero')
-          if (!esConflictoNumero || intento === 2) throw err
-          await new Promise(r => setTimeout(r, 20 + Math.floor(Math.random() * 60)))
-        }
-      }
-
-      if (pagoCompleto) {
-        console.log('[MercadoPago] Pago registrado:', { id: pagoCompleto.id, numero: pagoCompleto.numero, cargos: cargosIds.length })
-        enviarReciboPago(pagoCompleto, db).catch(err => {
-          console.error('[MercadoPago] Error enviando recibo por email:', err)
-        })
-      }
+      await procesarPagoCuotasMP(db, linkPago.tenantId, linkPago, payment)
     }
 
     res.status(200).json({ success: true })
