@@ -19,9 +19,6 @@ import PublicLayout from './pages/public/Layout/PublicLayout'
 import AdminLayout from './components/AdminLayout'
 import SuperAdminLayout from './components/SuperAdminLayout'
 
-// Configuración global — Mercado Pago
-const ConfiguracionMercadoPago = lazy(() => import('./pages/admin/configuracion/MercadoPago'))
-
 // Tienda Online — Admin
 const TiendaConfiguracion = lazy(() => import('./pages/admin/tienda/Configuracion'))
 const TiendaEstados = lazy(() => import('./pages/admin/tienda/Estados'))
@@ -448,7 +445,7 @@ function App() {
                   <Route path="reportes/socios-por-actividad" element={<AdminReporteSociosActividad />} />
                   <Route path="configuracion" element={<AdminTablasAuxiliares />} />
                   <Route path="configuracion/pagos" element={<AdminConfiguracionPagos />} />
-                  <Route path="configuracion/pagos/mercadopago" element={<ConfiguracionMercadoPago />} />
+                  <Route path="configuracion/pagos/mercadopago" element={<Navigate to="/admin/configuracion/pagos" replace />} />
                   <Route path="configuracion/autoridades" element={<AdminAutoridades />} />
                   <Route path="configuracion/centros-costo" element={<CentrosCostoLista />} />
                   <Route path="configuracion/fiscal" element={<ConfiguracionFiscal />} />

@@ -29,8 +29,9 @@ export async function getMpConfig(db) {
   const publicKey = map.MP_PUBLIC_KEY || process.env.MERCADOPAGO_PUBLIC_KEY || ''
   const modoTest = map.MP_MODO_TEST === 'true'
     || (accessToken.startsWith('TEST-') ? true : false)
+  const nombreComercio = map.MP_NOMBRE_COMERCIO || ''
 
-  return { accessToken, publicKey, modoTest }
+  return { accessToken, publicKey, modoTest, nombreComercio }
 }
 
 /**

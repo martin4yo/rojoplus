@@ -5,7 +5,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { enviarMagicLinkSocio } from '../services/email.js'
 import { enviarLinkPortal, obtenerTelefonoSocio } from '../services/whatsappService.js'
 import { crearPreferenciaPago } from '../services/mercadopago.js'
-import { getMpAccessToken } from '../lib/mercadoPagoConfig.js'
+import { getMpConfig } from '../lib/mercadoPagoConfig.js'
 import { tokenizarTarjeta as paywayTokenizar } from '../services/paywayService.js'
 import { generatePDF } from '../services/pdfGenerator.js'
 import { generarPDFUnaEntrada } from './eventos.js'
@@ -1612,9 +1612,12 @@ router.post('/:tokenPortal/cuotas/:cuotaId/generar-link-pago', asyncHandler(asyn
           : `${cargo.periodo.nombre}/${cargo.periodo.anio}`)
       : ''
 
+    const { accessToken: mpToken, nombreComercio } = await getMpConfig(req.db)
+    if (!mpToken) throw Object.assign(new Error('Mercado Pago no está configurado para este tenant. Andá a Configuración → Pagos → Mercado Pago.'), { status: 503 })
+
     const preferencia = await crearPreferenciaPago({
-      accessToken: await getMpAccessToken(req.db),
-      tenantNombre: req.tenant?.nombre,
+      accessToken: mpToken,
+      tenantNombre: nombreComercio || req.tenant?.nombre,
       storeId: cajaMP?.mpStoreId,
       posId: cajaMP?.mpPosId,
       cajaId: cajaMP?.id,
@@ -1661,6 +1664,7 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
 
   const socio = await req.db.socio.findFirst({
     where: { tokenPortal },
+    include: { miembrosFamilia: { select: { id: true } } },
   })
 
   if (!socio) {
@@ -1671,12 +1675,17 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
     throw new AppError('Debe seleccionar al menos una cuota', 400, 'NO_CUOTAS')
   }
 
+  const esTitular = !socio.titularFamiliaId
+  const socioIdsAutorizados = esTitular && socio.miembrosFamilia?.length > 0
+    ? [socio.id, ...socio.miembrosFamilia.map(m => m.id)]
+    : [socio.id]
+
   const cargos = await req.db.cargo.findMany({
     where: {
       id: {
         in: cuotasIds.map(id => parseInt(id)),
       },
-      socioId: socio.id,
+      socioId: { in: socioIdsAutorizados },
       estado: {
         in: ['PENDIENTE', 'VENCIDO'],
       },
@@ -1727,9 +1736,12 @@ router.post('/:tokenPortal/cuotas/pagar-multiples', asyncHandler(async (req, res
     // Integración con MercadoPago
     const baseUrl = getTenantFrontendUrl(req.tenant)
 
+    const { accessToken: mpToken2, nombreComercio: nombreComercio2 } = await getMpConfig(req.db)
+    if (!mpToken2) throw Object.assign(new Error('Mercado Pago no está configurado para este tenant. Andá a Configuración → Pagos → Mercado Pago.'), { status: 503 })
+
     const preferencia = await crearPreferenciaPago({
-      accessToken: await getMpAccessToken(req.db),
-      tenantNombre: req.tenant?.nombre,
+      accessToken: mpToken2,
+      tenantNombre: nombreComercio2 || req.tenant?.nombre,
       storeId: cajaMP?.mpStoreId,
       posId: cajaMP?.mpPosId,
       cajaId: cajaMP?.id,

@@ -434,7 +434,7 @@ router.put('/tienda/configuracion', authAdmin, asyncHandler(async (req, res) => 
 // CONFIGURACIÓN GLOBAL DE MERCADO PAGO (no es de tienda — es del tenant)
 // ===========================================================================
 
-router.get('/pagos/mercadopago', authAdmin, asyncHandler(async (req, res) => {
+router.get('/configuracion/mercadopago', authAdmin, asyncHandler(async (req, res) => {
   const params = await req.db.configuracion.findMany({
     where: { modulo: 'PAGOS' },
     select: { clave: true, valor: true },
@@ -444,6 +444,7 @@ router.get('/pagos/mercadopago', authAdmin, asyncHandler(async (req, res) => {
   const publicKey = map.MP_PUBLIC_KEY || ''
   const modoTest = map.MP_MODO_TEST === 'true' || (accessToken.startsWith('TEST-'))
   const cajaDefaultId = map.MP_CAJA_DEFAULT_ID ? parseInt(map.MP_CAJA_DEFAULT_ID) : null
+  const nombreComercio = map.MP_NOMBRE_COMERCIO || ''
 
   // No exponemos el token completo, solo prefijo + últimos chars
   const tokenMasked = accessToken
@@ -467,12 +468,13 @@ router.get('/pagos/mercadopago', authAdmin, asyncHandler(async (req, res) => {
       publicKey, // public key se puede mostrar entera (no es secreto)
       tieneFallbackEnv: !!process.env.MERCADOPAGO_ACCESS_TOKEN,
       cajaDefaultId,
+      nombreComercio,
       cajas,
     },
   })
 }))
 
-router.put('/pagos/mercadopago', authAdmin, asyncHandler(async (req, res) => {
+router.put('/configuracion/mercadopago', authAdmin, asyncHandler(async (req, res) => {
   const { accessToken, publicKey, modoTest } = req.body || {}
 
   // accessToken: si viene string vacío → borrar; si viene null/undefined → no tocar; sino → guardar
@@ -501,6 +503,14 @@ router.put('/pagos/mercadopago', authAdmin, asyncHandler(async (req, res) => {
       where: { tenantId_clave: { tenantId: req.tenantId, clave: 'MP_MODO_TEST' } },
       update: { valor: modoTest ? 'true' : 'false' },
       create: { clave: 'MP_MODO_TEST', valor: modoTest ? 'true' : 'false', modulo: 'PAGOS', tenantId: req.tenantId },
+    })
+  }
+
+  if (req.body?.nombreComercio !== undefined) {
+    await req.db.configuracion.upsert({
+      where: { tenantId_clave: { tenantId: req.tenantId, clave: 'MP_NOMBRE_COMERCIO' } },
+      update: { valor: String(req.body.nombreComercio || '').trim() },
+      create: { clave: 'MP_NOMBRE_COMERCIO', valor: String(req.body.nombreComercio || '').trim(), modulo: 'PAGOS', tenantId: req.tenantId },
     })
   }
 
