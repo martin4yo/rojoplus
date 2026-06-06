@@ -39,7 +39,7 @@ export default function ConceptoModal({ isOpen, onClose, onCreated, tipoDefault 
     try {
       // Usar flat=true para obtener lista plana en lugar de árbol jerárquico
       const res = await api.getFull('/admin/cuentas-contables?esImputable=true&activo=true&flat=true')
-      setCuentasContables(res.data || [])
+      setCuentasContables((res.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando cuentas contables:', err)
     }
@@ -182,7 +182,7 @@ export default function ConceptoModal({ isOpen, onClose, onCreated, tipoDefault 
               >
                 <option value="">Sin asignar</option>
                 {cuentasFiltradas.map(c => (
-                  <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </div>

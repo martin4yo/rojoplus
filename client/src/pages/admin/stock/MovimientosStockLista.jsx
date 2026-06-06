@@ -43,7 +43,7 @@ export default function MovimientosStockLista() {
   async function cargarProductos() {
     try {
       const res = await api.getFull('/admin/productos?activo=true&limit=1000')
-      setProductos(res.data || [])
+      setProductos((res.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando productos:', err)
     }
@@ -124,7 +124,7 @@ export default function MovimientosStockLista() {
             >
               <option value="">Todos los productos</option>
               {productos.map(p => (
-                <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
+                <option key={p.id} value={p.id}>{p.nombre}</option>
               ))}
             </select>
           </div>

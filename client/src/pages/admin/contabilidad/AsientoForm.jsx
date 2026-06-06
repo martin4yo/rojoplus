@@ -36,7 +36,7 @@ export default function AsientoForm() {
   async function cargarCuentas() {
     try {
       const res = await api.getFull('/admin/cuentas-contables?esImputable=true&activo=true&flat=true')
-      setCuentas(res.data || [])
+      setCuentas((res.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando cuentas:', err)
     }
@@ -279,7 +279,7 @@ export default function AsientoForm() {
                         <option value="">Seleccionar cuenta...</option>
                         {cuentas.map(c => (
                           <option key={c.id} value={c.id}>
-                            {c.codigo} - {c.nombre}
+                            {c.nombre}
                           </option>
                         ))}
                       </select>

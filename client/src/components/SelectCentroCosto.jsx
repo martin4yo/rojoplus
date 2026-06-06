@@ -36,7 +36,7 @@ export default function SelectCentroCosto({
     try {
       setLoading(true)
       const data = await api.get('/admin/centros-costo?activo=true')
-      setCentrosCosto(data?.data || data || [])
+      setCentrosCosto((data?.data || data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando centros de costo:', err)
       setError('Error al cargar centros de costo')
@@ -82,7 +82,7 @@ export default function SelectCentroCosto({
           {showEmpty && <option value="">{emptyLabel}</option>}
           {centrosCosto.map(cc => (
             <option key={cc.id} value={cc.id}>
-              {cc.codigo} - {cc.nombre}
+              {cc.nombre}
             </option>
           ))}
         </>

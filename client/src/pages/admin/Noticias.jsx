@@ -372,7 +372,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
   const fetchActividades = async () => {
     try {
       const data = await api.get('/admin/actividades?activo=true')
-      setActividades(data || [])
+      setActividades((data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando actividades:', err)
     }
@@ -381,7 +381,7 @@ function FormNoticia({ noticia, onClose, onSave }) {
   const fetchCategorias = async (actividadId) => {
     try {
       const data = await api.get(`/admin/actividades/${actividadId}`)
-      setCategorias(data?.categorias || [])
+      setCategorias((data?.categorias || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando categorías:', err)
       setCategorias([])

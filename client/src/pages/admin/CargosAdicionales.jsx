@@ -749,16 +749,16 @@ export default function CargosAdicionales() {
   const [filtroActividadId, setFiltroActividadId] = useState('')
 
   useEffect(() => {
-    api.getFull('/admin/conceptos-tesoreria?limit=200').then(r => setConceptosDB(r?.data || r || []))
-    api.getFull('/admin/actividades?limit=100').then(r => setActividades(r?.data || r || []))
-    api.get('/admin/categorias-cargo').then(r => setCategoriasCargo(r || [])).catch(() => {})
-    api.get('/admin/estados-socio?activo=true').then(r => setEstadosSocio(r || []))
+    api.getFull('/admin/conceptos-tesoreria?limit=200').then(r => setConceptosDB((r?.data || r || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))))
+    api.getFull('/admin/actividades?limit=100').then(r => setActividades((r?.data || r || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))))
+    api.get('/admin/categorias-cargo').then(r => setCategoriasCargo((r || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))).catch(() => {})
+    api.get('/admin/estados-socio?activo=true').then(r => setEstadosSocio((r || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))))
   }, [])
 
   useEffect(() => {
     if (filtroActividadId) {
       api.getFull(`/admin/categorias-actividad?actividadId=${filtroActividadId}&limit=100`)
-        .then(r => setCategoriasActividad(r?.data || r || []))
+        .then(r => setCategoriasActividad((r?.data || r || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))))
     } else {
       setCategoriasActividad([])
     }

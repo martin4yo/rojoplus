@@ -69,8 +69,8 @@ export default function BuffetProductos() {
     try {
       const data = await api.get('/admin/conceptos-tesoreria?activo=true')
       const conceptos = data || []
-      setConceptosCompra(conceptos.filter(c => c.tipo === 'EGRESO' || c.tipo === 'AMBOS'))
-      setConceptosVenta(conceptos.filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS'))
+      setConceptosCompra(conceptos.filter(c => c.tipo === 'EGRESO' || c.tipo === 'AMBOS').sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setConceptosVenta(conceptos.filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS').sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando conceptos:', err)
     }
@@ -87,7 +87,7 @@ export default function BuffetProductos() {
       setProductos(prodRes.data || prodRes || [])
       setCategorias(catRes.data || catRes || [])
       setCategoriasStock(catStockRes.data || catStockRes || [])
-      setProductosStock(stockRes.data || stockRes || [])
+      setProductosStock((stockRes.data || stockRes || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando datos:', err)
     } finally {
@@ -831,7 +831,7 @@ export default function BuffetProductos() {
                       >
                         <option value="">Seleccionar...</option>
                         {conceptosCompra.map(c => (
-                          <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                          <option key={c.id} value={c.id}>{c.nombre}</option>
                         ))}
                       </select>
                     </div>
@@ -845,7 +845,7 @@ export default function BuffetProductos() {
                       >
                         <option value="">Seleccionar...</option>
                         {conceptosVenta.map(c => (
-                          <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                          <option key={c.id} value={c.id}>{c.nombre}</option>
                         ))}
                       </select>
                     </div>
@@ -865,7 +865,7 @@ export default function BuffetProductos() {
                       <option value="">Seleccionar producto...</option>
                       {productosStockDisponibles.map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.codigo} - {p.nombre} {p.precioVenta ? `($${Number(p.precioVenta).toLocaleString()})` : ''}
+                          {p.nombre} {p.precioVenta ? `($${Number(p.precioVenta).toLocaleString()})` : ''}
                         </option>
                       ))}
                     </select>

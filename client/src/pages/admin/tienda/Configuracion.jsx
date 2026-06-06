@@ -41,7 +41,7 @@ export default function Configuracion() {
       const map = {}
       for (const r of cfg.raw || []) map[r.clave] = r.valor
       setValores(map)
-      setCajas(Array.isArray(cajasData) ? cajasData : (cajasData?.data || []))
+      setCajas((Array.isArray(cajasData) ? cajasData : (cajasData?.data || [])).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
       setMediosPago(Array.isArray(mpData) ? mpData : (mpData?.data || []))
     } catch (err) {
       toast.error('No se pudo cargar la configuración')
@@ -107,7 +107,7 @@ export default function Configuracion() {
                 >
                   <option value="">— Seleccionar caja —</option>
                   {cajas.map(c => (
-                    <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
                 </select>
               ) : campo.clave === 'TIENDA_MEDIO_PAGO_MP_ID' ? (

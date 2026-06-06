@@ -190,9 +190,9 @@ function AcreditarSaldoModal({ isOpen, onClose, socioId, socioNombre, onCreated 
         api.get('/admin/medios-pago?activo=true'),
         api.getFull('/admin/cuentas-contables?flat=true&esImputable=true&activo=true'),
       ])
-      setCajas(cajasData || [])
-      setMediosPago((mediosData || []).filter(m => m.paraCaja !== false))
-      setCuentas(cuentasData?.data || [])
+      setCajas((cajasData || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setMediosPago((mediosData || []).filter(m => m.paraCaja !== false).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setCuentas((cuentasData?.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       setError('Error cargando datos: ' + err.message)
     }
@@ -325,7 +325,7 @@ function AcreditarSaldoModal({ isOpen, onClose, socioId, socioNombre, onCreated 
                 <label className="block text-xs text-gray-500 mb-1">Cuenta contable *</label>
                 <select value={cuentaContableId} onChange={(e) => setCuentaContableId(e.target.value)} className="input-field w-full text-sm">
                   <option value="">Seleccioná cuenta</option>
-                  {cuentas.map(c => <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>)}
+                  {cuentas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               </div>
             </div>

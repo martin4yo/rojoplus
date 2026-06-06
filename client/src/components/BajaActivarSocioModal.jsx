@@ -58,7 +58,7 @@ export default function BajaActivarSocioModal({ socio, modo, isOpen, onClose, on
         setPropagarFamilia(resumenData.esTitular === true)
         if (esBaja && estadosLista) {
           const lista = Array.isArray(estadosLista) ? estadosLista : []
-          setEstadosBaja(lista.filter(e => e.esSocioActivo === false))
+          setEstadosBaja(lista.filter(e => e.esSocioActivo === false).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
         }
       })
       .catch(() => toast.error('No se pudo cargar el resumen del grupo familiar'))

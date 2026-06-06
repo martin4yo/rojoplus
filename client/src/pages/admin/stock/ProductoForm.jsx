@@ -70,8 +70,8 @@ export default function ProductoForm() {
         api.getFull('/admin/categorias-producto?activo=true'),
         api.getFull('/admin/conceptos-tesoreria?activo=true')
       ])
-      setCategorias(catRes.data || [])
-      setConceptos(concRes.data || [])
+      setCategorias((catRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setConceptos((concRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando datos auxiliares:', err)
     }
@@ -473,7 +473,7 @@ export default function ProductoForm() {
                     >
                       <option value="">Seleccionar concepto...</option>
                       {conceptosCompra.map(c => (
-                        <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">Para facturas de compra</p>
@@ -489,7 +489,7 @@ export default function ProductoForm() {
                     >
                       <option value="">Seleccionar concepto...</option>
                       {conceptosVenta.map(c => (
-                        <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">Para facturas de venta</p>

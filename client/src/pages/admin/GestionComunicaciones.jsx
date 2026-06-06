@@ -79,7 +79,7 @@ export default function GestionComunicaciones() {
   useEffect(() => {
     cargarCampanas()
     cargarTemplates()
-    api.getFull('/admin/actividades?limit=100').then(r => setActividades(r?.data || r || []))
+    api.getFull('/admin/actividades?limit=100').then(r => setActividades((r?.data || r || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))))
   }, [page, tipo, estado])
 
   const cargarTemplates = async () => {
@@ -98,7 +98,7 @@ export default function GestionComunicaciones() {
     }))
     if (actividadId) {
       const cats = await api.getFull(`/admin/categorias-actividad?actividadId=${actividadId}&limit=100`)
-      setCategoriasActividad(cats?.data || cats || [])
+      setCategoriasActividad((cats?.data || cats || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } else {
       setCategoriasActividad([])
     }

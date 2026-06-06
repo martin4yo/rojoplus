@@ -88,11 +88,11 @@ export default function MovimientoCajaForm() {
         api.getFull('/admin/conceptos-tesoreria'),
         api.getFull('/admin/medios-pago')
       ])
-      const cajasData = cajasRes.data || []
+      const cajasData = (cajasRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))
       setCajas(cajasData)
-      setCuentasContables((cuentasRes.data || []).filter(c => c.esImputable))
-      setConceptos(conceptosRes.data || [])
-      setMediosPago((mediosRes.data || []).filter(m => m.paraCaja && m.activo))
+      setCuentasContables((cuentasRes.data || []).filter(c => c.esImputable).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setConceptos((conceptosRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setMediosPago((mediosRes.data || []).filter(m => m.paraCaja && m.activo).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
 
       // Si hay cajaId en la URL, poblar solo el centro de costo de la caja (la cuenta contable la da el concepto)
       if (cajaIdParam) {
@@ -759,7 +759,7 @@ export default function MovimientoCajaForm() {
                               >
                                 <option value="">Seleccionar...</option>
                                 {conceptosFiltrados.map(c => (
-                                  <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                                  <option key={c.id} value={c.id}>{c.nombre}</option>
                                 ))}
                               </select>
                               {item.cuentaContableLabel && (

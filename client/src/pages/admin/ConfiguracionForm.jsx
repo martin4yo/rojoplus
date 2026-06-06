@@ -99,7 +99,7 @@ export default function ConfiguracionForm() {
       cargarConceptosTesoreria()
     }
     if (tabla === 'medios-pago') {
-      api.get('/admin/cajas').then(r => setCajas((r || []).filter(c => c.paraCaja)))
+      api.get('/admin/cajas').then(r => setCajas((r || []).filter(c => c.paraCaja).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))))
     }
     if (tabla === 'conceptos-tesoreria') {
       cargarCuentasContables()
@@ -112,7 +112,7 @@ export default function ConfiguracionForm() {
   async function cargarConceptosTesoreria() {
     try {
       const data = await api.get('/admin/conceptos-tesoreria?activo=true')
-      setConceptosTesoreria(data || [])
+      setConceptosTesoreria((data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando conceptos:', err)
     }
@@ -121,7 +121,7 @@ export default function ConfiguracionForm() {
   async function cargarCuentasContables() {
     try {
       const res = await api.getFull('/admin/cuentas-contables?flat=true&esImputable=true&activo=true')
-      setCuentasContables(res.data || [])
+      setCuentasContables((res.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando cuentas contables:', err)
     }
@@ -518,7 +518,7 @@ export default function ConfiguracionForm() {
                         return true
                       })
                       .map(c => (
-                        <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
                       ))}
                   </select>
                 </div>

@@ -59,7 +59,7 @@ export default function EventoForm({ eventoId, onClose, isModal = false }) {
 
       // Cargar conceptos de tesorería
       const conceptosData = await api.get('/admin/conceptos-tesoreria?activo=true')
-      setConceptosTesoreria(conceptosData || [])
+      setConceptosTesoreria((conceptosData || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
 
       // Cargar centros de costo
       const centrosData = await api.get('/admin/centros-costo?activo=true')
@@ -442,7 +442,7 @@ export default function EventoForm({ eventoId, onClose, isModal = false }) {
                 <option value="">Seleccionar concepto...</option>
                 {conceptosTesoreria.map(concepto => (
                   <option key={concepto.id} value={concepto.id}>
-                    {concepto.codigo} - {concepto.nombre}
+                    {concepto.nombre}
                   </option>
                 ))}
               </select>
@@ -465,7 +465,7 @@ export default function EventoForm({ eventoId, onClose, isModal = false }) {
                 <option value="">-- Seleccionar --</option>
                 {centrosCosto.map(centro => (
                   <option key={centro.id} value={centro.id}>
-                    {centro.codigo} - {centro.nombre}
+                    {centro.nombre}
                   </option>
                 ))}
               </select>

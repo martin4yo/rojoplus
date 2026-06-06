@@ -1166,7 +1166,7 @@ export default function TablasAuxiliares() {
                       .filter(c => c.activo && c.tipo === 'INGRESO')
                       .map(concepto => (
                         <option key={concepto.id} value={concepto.id}>
-                          {concepto.codigo} - {concepto.nombre}
+                          {concepto.nombre}
                         </option>
                       ))
                     }

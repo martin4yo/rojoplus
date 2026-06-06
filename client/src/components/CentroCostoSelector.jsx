@@ -42,7 +42,7 @@ export default function CentroCostoSelector({
       if (tipo) params.set('tipo', tipo)
 
       const response = await api.get(`/admin/centros-costo?${params}`)
-      setCentros(Array.isArray(response) ? response : (response?.data || []))
+      setCentros((Array.isArray(response) ? response : (response?.data || [])).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando centros de costo:', err)
       setCentros([])

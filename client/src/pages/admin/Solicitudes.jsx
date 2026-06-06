@@ -52,8 +52,8 @@ export default function Solicitudes() {
       ])
       setSolicitudes(solicitudes?.data || [])
       setStats(stats?.data || {})
-      setTiposSocio(tipos?.data || [])
-      setCategoriasSocio(categorias?.data || [])
+      setTiposSocio((tipos?.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setCategoriasSocio((categorias?.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (error) {
       console.error('Error cargando datos:', error)
       toast.error('Error al cargar las solicitudes')

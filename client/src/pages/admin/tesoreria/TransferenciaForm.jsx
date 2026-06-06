@@ -45,10 +45,10 @@ export default function TransferenciaForm() {
         api.getFull('/admin/cuentas-contables?flat=true'),
         api.getFull('/admin/conceptos-tesoreria?activo=true'),
       ])
-      const cajasData = cajasRes.data || []
+      const cajasData = (cajasRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))
       setCajas(cajasData)
-      setCuentasContables((cuentasRes.data || []).filter(c => c.esImputable))
-      setConceptos(conceptosRes.data || [])
+      setCuentasContables((cuentasRes.data || []).filter(c => c.esImputable).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setConceptos((conceptosRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
 
       // Si viene origenId en URL, poblar datos contables de la caja origen
       if (origenIdParam) {
@@ -360,7 +360,7 @@ export default function TransferenciaForm() {
               >
                 <option value="">Seleccionar concepto...</option>
                 {conceptos.map(c => (
-                  <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </div>
@@ -445,7 +445,7 @@ export default function TransferenciaForm() {
                 >
                   <option value="">Seleccionar cuenta...</option>
                   {cuentasContables.map(c => (
-                    <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
                 </select>
               </div>
@@ -459,7 +459,7 @@ export default function TransferenciaForm() {
                 >
                   <option value="">Seleccionar cuenta...</option>
                   {cuentasContables.map(c => (
-                    <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
                 </select>
               </div>

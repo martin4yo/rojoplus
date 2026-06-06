@@ -64,8 +64,8 @@ export default function CajaForm() {
         api.getFull('/admin/centros-costo?activo=true'),
         api.getFull('/admin/medios-pago?activo=true')
       ])
-      setCuentasContables(cuentasRes.data || [])
-      setCentrosCosto(centrosRes.data || centrosRes || [])
+      setCuentasContables((cuentasRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setCentrosCosto((centrosRes.data || centrosRes || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
       setMediosPago(mediosRes.data || mediosRes || [])
 
       // Si es nueva caja, inicializar con todos los medios de pago activos
@@ -280,7 +280,7 @@ export default function CajaForm() {
                 <option value="">-- Sin cuenta contable --</option>
                 {cuentasContables.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.codigo} - {c.nombre}
+                    {c.nombre}
                   </option>
                 ))}
               </select>
@@ -302,7 +302,7 @@ export default function CajaForm() {
                 <option value="">-- Seleccionar --</option>
                 {centrosCosto.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.codigo} - {c.nombre}
+                    {c.nombre}
                   </option>
                 ))}
               </select>

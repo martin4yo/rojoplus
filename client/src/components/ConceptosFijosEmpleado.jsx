@@ -35,7 +35,7 @@ export default function ConceptosFijosEmpleado({ entidadId, sueldoBasico }) {
         api.getFull('/admin/conceptos-liquidacion?activo=true')
       ])
       setConceptos(Array.isArray(conceptosData) ? conceptosData : [])
-      setCatalogo(catalogoData?.data || catalogoData || [])
+      setCatalogo((catalogoData?.data || catalogoData || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando conceptos del empleado:', err)
     } finally {

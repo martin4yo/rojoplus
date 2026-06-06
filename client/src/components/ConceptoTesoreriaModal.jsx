@@ -35,7 +35,7 @@ export default function ConceptoTesoreriaModal({ isOpen, onClose, onCreated, tip
   async function cargarCuentas() {
     try {
       const res = await api.getFull('/admin/cuentas-contables?flat=true')
-      setCuentasContables((res.data || []).filter(c => c.esImputable))
+      setCuentasContables((res.data || []).filter(c => c.esImputable).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch {
       // silencioso — el selector quedará vacío
     }
@@ -133,7 +133,7 @@ export default function ConceptoTesoreriaModal({ isOpen, onClose, onCreated, tip
             >
               <option value="">Seleccionar cuenta...</option>
               {cuentasContables.map(c => (
-                <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </select>
           </div>

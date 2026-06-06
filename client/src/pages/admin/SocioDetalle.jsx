@@ -511,8 +511,8 @@ export default function SocioDetalle() {
         api.getFull('/admin/conceptos-tesoreria'),
         api.getFull('/admin/centros-costo?activo=true').catch(() => ({ data: [] })),
       ])
-      setConceptosCargo(conceptosRes.data || [])
-      setCentrosCostoCargo(centrosRes.data || [])
+      setConceptosCargo((conceptosRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setCentrosCostoCargo((centrosRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch {
       setConceptosCargo([])
       setCentrosCostoCargo([])
@@ -1982,7 +1982,7 @@ export default function SocioDetalle() {
               >
                 <option value="">Seleccionar concepto...</option>
                 {conceptosCargo.map(c => (
-                  <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
               <button
@@ -2009,7 +2009,7 @@ export default function SocioDetalle() {
             >
               <option value="">Seleccionar centro de costo...</option>
               {centrosCostoCargo.map(cc => (
-                <option key={cc.id} value={cc.id}>{cc.codigo} - {cc.nombre}</option>
+                <option key={cc.id} value={cc.id}>{cc.nombre}</option>
               ))}
             </select>
           </div>

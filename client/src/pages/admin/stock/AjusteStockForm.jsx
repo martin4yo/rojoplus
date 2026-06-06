@@ -56,7 +56,7 @@ export default function AjusteStockForm() {
   async function cargarProductos() {
     try {
       const res = await api.getFull('/admin/productos?activo=true&limit=1000')
-      setProductos(res.data || [])
+      setProductos((res.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       setError('Error cargando productos')
     } finally {
@@ -205,7 +205,7 @@ export default function AjusteStockForm() {
               >
                 <option value="">Seleccionar producto...</option>
                 {productos.map(p => (
-                  <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
               </select>
             </div>

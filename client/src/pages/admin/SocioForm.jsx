@@ -174,28 +174,28 @@ export default function SocioForm() {
     // Cargar cada dato de forma independiente para que un error no afecte a los demás
     try {
       const tiposData = await api.get('/admin/tipos-socio?activo=true')
-      setTiposSocio(Array.isArray(tiposData) ? tiposData : [])
+      setTiposSocio((Array.isArray(tiposData) ? tiposData : []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando tipos de socio:', err)
     }
 
     try {
       const categoriasData = await api.get('/admin/categorias-socio?activo=true')
-      setCategoriasSocio(Array.isArray(categoriasData) ? categoriasData : [])
+      setCategoriasSocio((Array.isArray(categoriasData) ? categoriasData : []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando categorías de socio:', err)
     }
 
     try {
       const estadosData = await api.get('/admin/estados-socio?activo=true')
-      setEstadosSocio(Array.isArray(estadosData) ? estadosData : [])
+      setEstadosSocio((Array.isArray(estadosData) ? estadosData : []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando estados de socio:', err)
     }
 
     try {
       const cobradoresData = await api.get('/admin/cobradores')
-      setCobradores(Array.isArray(cobradoresData) ? cobradoresData : [])
+      setCobradores((Array.isArray(cobradoresData) ? cobradoresData : []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando cobradores:', err)
     }

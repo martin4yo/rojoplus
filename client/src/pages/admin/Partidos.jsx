@@ -88,7 +88,7 @@ export default function Partidos() {
   const fetchActividades = async () => {
     try {
       const data = await api.get('/admin/actividades?activo=true')
-      setActividades(data || [])
+      setActividades((data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando actividades:', err)
     }
@@ -101,7 +101,7 @@ export default function Partidos() {
     }
     try {
       const data = await api.get(`/admin/actividades/${actividadId}`)
-      setCategorias(data?.categorias || [])
+      setCategorias((data?.categorias || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando categorías:', err)
     }

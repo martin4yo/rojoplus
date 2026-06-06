@@ -28,7 +28,7 @@ export default function MotivosBajaSelector({ value, onChange }) {
       const lista = Array.isArray(data) ? data : []
       // Solo estados que representan baja (no permiten ingreso)
       const deBaja = lista.filter(e => !e.permiteIngresoMolinete)
-      setEstados(deBaja)
+      setEstados(deBaja.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
     } catch (err) {
       console.error('Error cargando estados de socio:', err)
     } finally {

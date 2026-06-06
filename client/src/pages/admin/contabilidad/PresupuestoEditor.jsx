@@ -48,8 +48,8 @@ export default function PresupuestoEditor() {
       ])
 
       setPresupuesto(presRes.data)
-      setCuentas(cuentasRes.data || [])
-      setConceptos(conceptosRes.data || [])
+      setCuentas((cuentasRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
+      setConceptos((conceptosRes.data || []).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
 
       // Convertir lineas a filas agrupadas
       const filasMap = {}
@@ -540,11 +540,11 @@ export default function PresupuestoEditor() {
                     cuentas
                       .filter(c => c.esImputable)
                       .map(c => (
-                        <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
                       ))
                   ) : (
                     conceptos.map(c => (
-                      <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))
                   )}
                 </select>

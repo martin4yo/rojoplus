@@ -38,7 +38,7 @@ export default function ActividadForm() {
   async function cargarDatos() {
     try {
       const conceptosData = await api.get('/admin/conceptos-tesoreria?activo=true').catch(() => [])
-      setConceptos((conceptosData || []).filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS'))
+      setConceptos((conceptosData || []).filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS').sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
 
       if (isEdit) {
         const data = await api.get(`/admin/actividades/${id}`)
@@ -219,7 +219,7 @@ export default function ActividadForm() {
           >
             <option value="">Usar concepto por defecto</option>
             {conceptos.map(c => (
-              <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.nombre}` : c.nombre}</option>
+              <option key={c.id} value={c.id}>{c.nombre}</option>
             ))}
           </select>
           <p className="text-xs text-gray-500 mt-1">
