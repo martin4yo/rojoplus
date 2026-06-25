@@ -9,7 +9,7 @@ import { useNotificacionBuffet } from '../../../contexts/NotificacionBuffetConte
 import NotificacionBuffet from '../../../components/buffet/NotificacionBuffet'
 import Modal from '../../../components/Modal'
 import { useConfirm } from '../../../hooks/useConfirm'
-import ChatWidget from '../../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetEstadoMesas() {
@@ -691,7 +691,7 @@ export default function BuffetEstadoMesas() {
       <ConfirmDialog />
 
       {/* Axio - Chat Widget para Camareros */}
-      <ChatWidget role="camarero" position="bottom-right" />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ role: "camarero" }} />
     </div>
   )
 }

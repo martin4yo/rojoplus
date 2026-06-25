@@ -15,7 +15,7 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
 import PageHeader from '../../../components/PageHeader'
-import ChatWidget from '../../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 import TicketPreview from '../../../components/buffet/TicketPreview'
 
@@ -940,7 +940,7 @@ export default function BuffetDashboard() {
       </div>
 
       {/* Axio - Chat Widget para Camareros */}
-      <ChatWidget role="camarero" position="bottom-right" />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ role: "camarero" }} />
 
 
       {ticketPreview && (

@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import GestionPedido from '../../../components/buffet/GestionPedido'
 import ClienteSelector from '../../../components/buffet/ClienteSelector'
-import ChatWidget from '../../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetBarra() {
@@ -219,7 +219,7 @@ export default function BuffetBarra() {
       )}
 
       {/* Axio - Chat Widget para Camareros */}
-      <ChatWidget role="camarero" position="bottom-right" />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ role: "camarero" }} />
     </div>
   )
 }

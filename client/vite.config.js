@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  resolve: {
+    // Permite que paquetes locales (file: symlinks) resuelvan sus deps
+    // desde el node_modules del proyecto host en lugar del directorio real.
+    preserveSymlinks: true,
+  },
   plugins: [
     react(),
     VitePWA({

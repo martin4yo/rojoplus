@@ -4784,8 +4784,21 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         ? cuota.categoriaActividad.conceptoTesoreria.nombre
         : conceptoPorDefecto.nombre
 
+      const grupoConceptoTesoreriaId = (cuota.categoriaActividad?.conceptoTesoreria?.activo)
+        ? cuota.categoriaActividad.conceptoTesoreria.id
+        : conceptoPorDefecto.id
+      const grupoCtaContableId = (cuota.categoriaActividad?.conceptoTesoreria?.activo)
+        ? (cuota.categoriaActividad.conceptoTesoreria.cuentaContableId ?? conceptoPorDefecto.cuentaContableId ?? caja.cuentaContableId)
+        : (conceptoPorDefecto.cuentaContableId ?? caja.cuentaContableId)
+
       if (!gruposPorCC[ccEfectivo]) {
-        gruposPorCC[ccEfectivo] = { centroCostoId: ccEfectivo, monto: 0, conceptoNombre }
+        gruposPorCC[ccEfectivo] = {
+          centroCostoId: ccEfectivo,
+          monto: 0,
+          conceptoNombre,
+          conceptoTesoreriaId: grupoConceptoTesoreriaId,
+          cuentaContableId: grupoCtaContableId,
+        }
       }
       gruposPorCC[ccEfectivo].monto += montoEfectivo
     }
@@ -4804,7 +4817,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     for (const grupo of Object.values(gruposPorCC)) {
       const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
       siguienteMov++
-      await tx.movimientoCaja.create({
+      const movCajaCreado = await tx.movimientoCaja.create({
         data: {
           numero: numeroMov,
           cajaId: caja.id,
@@ -4821,6 +4834,20 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
           conciliado: !caja.requiereConciliacion,
         }
       })
+      if (grupo.cuentaContableId) {
+        await tx.itemMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: movCajaCreado.id,
+            conceptoTesoreriaId: grupo.conceptoTesoreriaId,
+            cuentaContableId: grupo.cuentaContableId,
+            centroCostoId: grupo.centroCostoId,
+            monto: grupo.monto,
+            descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
+            orden: 0,
+          }
+        })
+      }
     }
 
     // Obtener pago con relaciones para respuesta (findFirst para mantenerse dentro de la transacción)
@@ -6825,10 +6852,11 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
   // Parse cuotas IDs
   const cuotasIds = JSON.parse(pagoInformado.cuotasIds)
 
-  // Obtener cuotas con centro de costos
+  // Obtener cuotas con centro de costos y concepto
   const cuotas = await req.db.cargo.findMany({
     where: { id: { in: cuotasIds } },
     include: {
+      conceptoTesoreria: { select: { id: true, cuentaContableId: true } },
       categoriaActividad: {
         select: {
           actividad: {
@@ -6887,7 +6915,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
       const centroCostoId = cuota.categoriaActividad?.actividad?.centroCostoId || null
 
       // Crear movimiento de caja
-      await req.db.movimientoCaja.create({
+      const movCaja = await req.db.movimientoCaja.create({
         data: {
           fecha: new Date(),
           tipo: 'INGRESO',
@@ -6899,6 +6927,21 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
           centroCostoId,
         },
       })
+
+      if (cuota.conceptoTesoreria?.cuentaContableId) {
+        await req.db.itemMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: movCaja.id,
+            conceptoTesoreriaId: cuota.conceptoTesoreria.id,
+            cuentaContableId: cuota.conceptoTesoreria.cuentaContableId,
+            centroCostoId: centroCostoId ?? null,
+            monto: movCaja.monto,
+            descripcion: `Cobro cuota: ${cuota.descripcion}`,
+            orden: 0,
+          },
+        })
+      }
     })
   )
 

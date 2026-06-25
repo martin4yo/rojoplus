@@ -4,7 +4,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import ActionExecutor from '../services/actionExecutor.js'
 import { ROLES } from '../services/aiConstants.js'
 import { enviarFeedbackML } from '../services/axioMLService.js'
-import { callHub } from '../axio/hubClient.js'
+import { callHub, callHubConfirm } from '../axio/hubClient.js'
 import { getToolsForRole } from '../axio/tools/index.js'
 import multer from 'multer'
 import path from 'path'
@@ -179,7 +179,20 @@ router.post(
         toolsOnly: isSocio,
       })
 
-      // Tool-call → mapear a {accion, entidades} y delegar al ActionExecutor.
+      // Fase 5 — el hub detectó una operación de escritura y pide confirmación.
+      // Pasar el pending_action directo al widget (AxioChat lo renderiza).
+      if (hubResp?.pending_action) {
+        console.log(`⏳ [HUB←] pending_action=${hubResp.pending_action.operation} id=${hubResp.pending_action.action_id}`)
+        return res.status(200).json({
+          answer: hubResp.answer,
+          pending_action: hubResp.pending_action,
+          model: hubResp.model,
+          time_ms: hubResp.time_ms,
+          from_cache: false,
+        })
+      }
+
+      // Tool-call de lectura → ejecutar localmente con ActionExecutor.
       if (hubResp?.tool_call?.name) {
         const action = {
           accion: hubResp.tool_call.name,
@@ -190,30 +203,24 @@ router.post(
         const executionResult = await actionExecutor.executeAction(action, context)
         console.log(`🎬 [Action] ${action.accion} → success=${executionResult.success}`)
         console.log(`   message: ${(executionResult.message || '').slice(0, 200)}`)
-        return res.status(executionResult.success ? 200 : 400).json({
-          success: executionResult.success,
-          message: executionResult.message,
-          data: executionResult.data,
-          error: executionResult.error,
-          requiresUserAction: executionResult.requiresUserAction,
+        // Devolver en formato AxioChat (answer, no message)
+        return res.status(200).json({
+          answer: executionResult.message || (executionResult.success ? 'Listo.' : 'No pude ejecutar esa acción.'),
           model: hubResp.model,
           time_ms: hubResp.time_ms,
-          debug: process.env.NODE_ENV === 'development'
-            ? { action, hub: { model: hubResp.model, time_ms: hubResp.time_ms } }
-            : undefined,
+          from_cache: false,
+          hash_input: null,
         })
       }
 
-      // Capa 2.5 / Capa 3 → texto del hub directo al widget.
+      // Capa 2.5 / Capa 3 → respuesta de texto del hub.
       if (hubResp?.answer !== undefined) {
         const answerPreview = (hubResp.answer || '').replace(/\s+/g, ' ').slice(0, 300)
         console.log(`✅ [HUB←] answer model=${hubResp.model} time_ms=${hubResp.time_ms} from_cache=${hubResp.from_cache || false} len=${(hubResp.answer || '').length}`)
         console.log(`   preview: ${answerPreview}${(hubResp.answer || '').length > 300 ? '…' : ''}`)
         return res.status(200).json({
-          success: true,
-          message: hubResp.answer,
-          data: null,
-          hashInput: hubResp.hash_input || null,
+          answer: hubResp.answer,
+          hash_input: hubResp.hash_input || null,
           model: hubResp.model,
           time_ms: hubResp.time_ms,
           from_cache: hubResp.from_cache || false,
@@ -222,9 +229,10 @@ router.post(
 
       console.warn('⚠️  [HUB←] respuesta sin tool_call ni answer:', JSON.stringify(hubResp).slice(0, 300))
       return res.status(502).json({
-        success: false,
-        message: 'El hub no devolvió respuesta interpretable.',
-        error: 'HUB_EMPTY_RESPONSE',
+        answer: 'El asistente no devolvió respuesta. Intentá de nuevo.',
+        model: 'error',
+        time_ms: 0,
+        from_cache: false,
       })
     } catch (err) {
       console.error('Error consultando AXIO Hub:', err.message)
@@ -318,6 +326,52 @@ router.post(
     })
   })
 )
+
+// ==============================================================================
+// CONFIRM — Fase 5: confirmar/cancelar acción de escritura pendiente
+// ==============================================================================
+
+/**
+ * POST /api/chat/confirm
+ * El widget AxioChat llama este endpoint cuando el usuario confirma o cancela
+ * una acción de escritura pendiente (crear socio, generar cargo, etc.).
+ *
+ * Body: { action_id: string, confirmed: boolean }
+ * Proxea al hub /api/ml/action/confirm y devuelve { answer, model, ... }
+ * en formato AxioChat para que el widget lo renderice como mensaje.
+ */
+router.post('/confirm', asyncHandler(async (req, res) => {
+  const { action_id, confirmed } = req.body
+
+  if (!action_id || confirmed === undefined) {
+    return res.status(400).json({ answer: 'Parámetros inválidos.', model: 'error', time_ms: 0, from_cache: false })
+  }
+
+  console.log(`\n🔐 ===== CONFIRM ACTION =====`)
+  console.log(`action_id: ${action_id} confirmed: ${confirmed}`)
+
+  try {
+    const result = await callHubConfirm({ actionId: action_id, confirmed })
+
+    const message = result.message || (result.success ? 'Operación completada.' : 'Error al ejecutar la operación.')
+    console.log(`✅ confirm result: success=${result.success} message=${message.slice(0, 100)}`)
+
+    return res.status(200).json({
+      answer: message,
+      model: 'write-confirmed',
+      time_ms: 0,
+      from_cache: false,
+    })
+  } catch (err) {
+    console.error('Error en /confirm:', err.message)
+    return res.status(200).json({
+      answer: 'No pude confirmar la operación. Intentá de nuevo.',
+      model: 'error',
+      time_ms: 0,
+      from_cache: false,
+    })
+  }
+}))
 
 // ==============================================================================
 // FEEDBACK — 👍/👎 sobre respuestas del ML service

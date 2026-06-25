@@ -1109,11 +1109,59 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       })
     }
 
-    // Centro de costo fallback: primer item no anulado que tenga concepto de venta con CC
+    // Centro de costo y concepto: del primer item no anulado que tenga concepto de venta
     const ccItemsFallback = comanda.items
       .filter(i => i.estado !== 'ANULADO')
       .map(i => i.productoBuffet?.producto?.conceptoVenta?.centroCostoId)
       .find(cc => cc != null) ?? null
+    const conceptoVentaId = comanda.items
+      .filter(i => i.estado !== 'ANULADO')
+      .map(i => i.productoBuffet?.producto?.conceptoVenta?.id)
+      .find(id => id != null) ?? null
+
+    // Agrupar items por conceptoVenta para ItemMovimientoCaja
+    const itemsPorConceptoVenta = {}
+    for (const item of comanda.items) {
+      if (item.estado === 'ANULADO') continue
+      const cv = item.productoBuffet?.producto?.conceptoVenta
+      const key = cv?.id ?? 'sin-concepto'
+      if (!itemsPorConceptoVenta[key]) {
+        itemsPorConceptoVenta[key] = {
+          conceptoTesoreriaId: cv?.id ?? null,
+          cuentaContableId: cv?.cuentaContableId ?? null,
+          centroCostoId: cv?.centroCostoId ?? ccItemsFallback,
+          monto: 0,
+        }
+      }
+      itemsPorConceptoVenta[key].monto += Number(item.subtotal)
+    }
+    const gruposConcepto = Object.values(itemsPorConceptoVenta)
+    const totalConceptos = gruposConcepto.reduce((s, g) => s + g.monto, 0)
+
+    async function crearItemsBuffet(tx, movimientoId, montoMovimiento, caja) {
+      let montoAsignado = 0
+      for (let i = 0; i < gruposConcepto.length; i++) {
+        const g = gruposConcepto[i]
+        const esUltimo = i === gruposConcepto.length - 1
+        const montoItem = esUltimo
+          ? Math.round((montoMovimiento - montoAsignado) * 100) / 100
+          : Math.round(montoMovimiento * (g.monto / totalConceptos) * 100) / 100
+        if (montoItem <= 0) continue
+        montoAsignado += montoItem
+        await tx.itemMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: movimientoId,
+            conceptoTesoreriaId: g.conceptoTesoreriaId,
+            cuentaContableId: g.cuentaContableId || caja.cuentaContableId || cuentaContableFallback?.id,
+            centroCostoId: g.centroCostoId || caja.centroCostoId,
+            monto: montoItem,
+            descripcion: `Venta Buffet - Comanda ${comanda.numero}`,
+            orden: i,
+          }
+        })
+      }
+    }
 
     // Crear movimientos de caja
     const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0
@@ -1154,12 +1202,14 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             monto: parseFloat(pago.monto),
             medioPagoId: medioPago.id,
+            conceptoTesoreriaId: conceptoVentaId,
             concepto: `Venta Buffet - Comanda ${comanda.numero} - ${medioPago.nombre}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
             comandaId: parseInt(id),
             registradoPor: req.admin.id
           }
         })
+        await crearItemsBuffet(req.db, movimiento.id, parseFloat(pago.monto), caja)
 
         // Generar asiento contable automático
         // DEBE: cuenta del concepto del medio de pago (ej: Caja Efectivo, Banco, etc.)
@@ -1229,12 +1279,14 @@ router.post('/comandas/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           centroCostoId: caja.centroCostoId ?? ccItemsFallback,
           monto: totalFinal,
           medioPagoId: medioPago.id,
+          conceptoTesoreriaId: conceptoVentaId,
           concepto: `Venta Buffet - Comanda ${comanda.numero}${descuentoMonto > 0 ? ` (Desc. ${descuentoPorcentaje}%)` : ''}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
           comandaId: parseInt(id),
           registradoPor: req.admin.id
         }
       })
+      await crearItemsBuffet(req.db, movimiento.id, totalFinal, caja)
 
       // Generar asiento contable automático
       // DEBE: cuenta del concepto del medio de pago (ej: Caja Efectivo, Banco, etc.)

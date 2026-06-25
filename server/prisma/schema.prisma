@@ -149,6 +149,7 @@ model ConceptoTesoreria {
   mediosPago           MedioPago[]
   cargos               Cargo[]
   itemsMovimientoCaja  ItemMovimientoCaja[]
+  movimientosCaja      MovimientoCaja[]     @relation("MovimientoCajaConcepto")
 
   tenantId Int @map("tenant_id")
 
@@ -1125,8 +1126,7 @@ model Caja {
   movimientosContables  MovimientoContable[]
   pagos                 Pago[]
   pagoMedios            PagoMedioPago[]
-  transferenciasOrigen  TransferenciaCaja[]      @relation("CajaOrigen")
-  transferenciasDestino TransferenciaCaja[]      @relation("CajaDestino")
+  movimientosComoDestino MovimientoCaja[]         @relation("MovCajaDestino")
   roles                 CajaRol[]
   comprobantes          ComprobanteElectronico[]
   mediosPagoDefault     MedioPago[]              @relation("MedioPagoCajaDefault")
@@ -1140,31 +1140,6 @@ model Caja {
   @@map("cajas")
 }
 
-model TransferenciaCaja {
-  id            Int      @id @default(autoincrement())
-  numero        String
-  cajaOrigenId  Int      @map("caja_origen_id")
-  cajaDestinoId Int      @map("caja_destino_id")
-  monto         Decimal  @db.Decimal(12, 2)
-  concepto      String?
-  descripcion   String?  @db.Text
-  fecha         DateTime @default(now())
-  registradoPor Int      @map("registrado_por")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  cajaOrigen    Caja     @relation("CajaOrigen", fields: [cajaOrigenId], references: [id])
-  cajaDestino   Caja     @relation("CajaDestino", fields: [cajaDestinoId], references: [id])
-  registrador   Admin    @relation(fields: [registradoPor], references: [id])
-
-  tenantId Int @map("tenant_id")
-
-  @@unique([tenantId, numero])
-  @@index([cajaOrigenId])
-  @@index([cajaDestinoId])
-  @@index([fecha])
-  @@index([tenantId])
-  @@map("transferencias_caja")
-}
 
 model CuentaBancaria {
   id           Int     @id @default(autoincrement())
@@ -1304,12 +1279,15 @@ model MovimientoCaja {
   // pero afectan cajas distintas (ej: alquiler cobrado parte efectivo + parte transferencia).
   // Null = comprobante de una sola caja (caso habitual).
   grupoComprobante        String?                   @map("grupo_comprobante")
+  conceptoTesoreriaId     Int?                      @map("concepto_tesoreria_id")
   adjuntos                AdjuntoComprobante[]
   echeq                   ECheq?
   socio                   Socio?                    @relation(fields: [socioId], references: [id])
   entidad                 Entidad?                  @relation(fields: [entidadId], references: [id])
   caja                    Caja                      @relation(fields: [cajaId], references: [id])
+  cajaDestino             Caja?                     @relation("MovCajaDestino", fields: [cajaDestinoId], references: [id])
   centroCosto             CentroCosto?              @relation(fields: [centroCostoId], references: [id])
+  conceptoTesoreria       ConceptoTesoreria?        @relation("MovimientoCajaConcepto", fields: [conceptoTesoreriaId], references: [id])
   comanda                 Comanda?                  @relation(fields: [comandaId], references: [id])
   conciliacion            Conciliacion?             @relation(fields: [conciliacionId], references: [id])
   cuentaContable          CuentaContable            @relation(fields: [cuentaContableId], references: [id])
@@ -1620,7 +1598,6 @@ model Admin {
   entradasVendidas             Entrada[]                @relation("EntradaVendedor")
   ingresosValidados            IngresoEntrada[]         @relation("IngresoValidador")
   ventasEventoQRCreadas        VentaEventoQRPendiente[] @relation("VentaEventoQRCreador")
-  transferenciasRegistradas    TransferenciaCaja[]
   comprobantesEmitidos         ComprobanteElectronico[]
   gestionesCobranzaResponsable GestionCobranza[]        @relation("CobranzasResponsable")
   accionesCobranzaRealizadas   AccionCobranza[]         @relation("AccionesCobranza")
@@ -3425,6 +3402,7 @@ model ProductoBuffet {
   imagen           String?
   disponible       Boolean               @default(true)
   destacado        Boolean               @default(false)
+  publicarMenu     Boolean               @default(false) @map("publicar_menu")
   orden            Int                   @default(0)
   activo           Boolean               @default(true)
   createdAt        DateTime              @default(now()) @map("created_at")

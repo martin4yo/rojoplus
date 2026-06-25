@@ -152,7 +152,7 @@ export default function LoginSocio() {
                     Link seguro
                   </p>
                   <p className="text-sm" style={{ color: 'var(--color-text-secondary, var(--text-dim))' }}>
-                    Por seguridad, sólo funciona desde el dispositivo donde lo abras y dura 24 horas.
+                    Por seguridad, sólo funciona desde el dispositivo donde lo abras y dura 24 horas. Una vez que entrás, ese dispositivo queda recordado por 30 días: no vas a necesitar pedir el link de nuevo.
                   </p>
                 </div>
               </div>
@@ -326,7 +326,7 @@ export default function LoginSocio() {
               >
                 <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
                 <p>
-                  El link es exclusivo y válido por 24 horas. Sólo funciona desde el dispositivo donde lo abras.
+                  El link es exclusivo y válido por 24 horas. Sólo funciona desde el dispositivo donde lo abras. Después, ese dispositivo queda recordado por 30 días y entrás sin pedir el link otra vez.
                 </p>
               </div>
             </div>

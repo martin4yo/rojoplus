@@ -448,6 +448,7 @@ router.get('/menu-publico', async (req, res) => {
           where: {
             activo: true,
             disponible: true,
+            publicarMenu: true,
             tiposVenta: { has: 'BUFFET' }
           },
           orderBy: { orden: 'asc' },
@@ -492,6 +493,7 @@ router.get('/menu-publico/pdf', async (req, res) => {
           where: {
             activo: true,
             disponible: true,
+            publicarMenu: true,
             tiposVenta: { has: 'BUFFET' }
           },
           orderBy: { orden: 'asc' },

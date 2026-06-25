@@ -35,7 +35,7 @@ import {
 import { useModal } from '../../components/Modal'
 import PushNotificationBanner from '../../components/PushNotificationBanner'
 import InstallAppButton from '../../components/InstallAppButton'
-import ChatWidget from '../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 
 // Componentes de secciones
 import DashboardSocio from './sections/DashboardSocio'
@@ -513,7 +513,7 @@ export default function PortalSocioNuevo() {
       <InstallAppButton />
 
       {/* Axio - Chat Widget */}
-      <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ tokenPortal, role: "socio" }} />
     </div>
   )
 }

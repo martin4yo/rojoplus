@@ -64,7 +64,8 @@ async function obtenerMedioPagoDebito(tx) {
 
 async function aplicarPagoACargos({ tx, socioId, archivoId, monto, medioPagoId, caja, adminId, tenantId, descripcion }) {
   const cargos = await tx.cargo.findMany({
-    where: { socioId, incluidoEnDebitoId: archivoId, saldo: { gt: 0 } }
+    where: { socioId, incluidoEnDebitoId: archivoId, saldo: { gt: 0 } },
+    include: { conceptoTesoreria: true },
   })
   if (cargos.length === 0) return null
 
@@ -105,7 +106,7 @@ async function aplicarPagoACargos({ tx, socioId, archivoId, monto, medioPagoId, 
   const sig = ultimoMov ? (parseInt(ultimoMov.numero.split('-').pop()) || 0) + 1 : 1
   const nroMov = `${prefijo}${String(sig).padStart(5, '0')}`
 
-  await tx.movimientoCaja.create({
+  const movPW = await tx.movimientoCaja.create({
     data: {
       numero: nroMov,
       cajaId: caja.id,
@@ -122,6 +123,47 @@ async function aplicarPagoACargos({ tx, socioId, archivoId, monto, medioPagoId, 
       tenantId
     }
   })
+
+  // ItemMovimientoCaja — un ítem por concepto de cargo
+  const gruposPW = {}
+  for (const c of cargos) {
+    const key = c.conceptoTesoreriaId ?? 'sin'
+    if (!gruposPW[key]) {
+      gruposPW[key] = {
+        conceptoTesoreriaId: c.conceptoTesoreriaId,
+        cuentaContableId: c.conceptoTesoreria?.cuentaContableId ?? caja.cuentaContableId,
+        centroCostoId: c.centroCostoId ?? caja.centroCostoId ?? null,
+        monto: 0,
+      }
+    }
+    gruposPW[key].monto += Number(c.saldo)
+  }
+  const gruposPWArr = Object.values(gruposPW)
+  if (gruposPWArr.length > 0) {
+    const totalPW = gruposPWArr.reduce((s, g) => s + g.monto, 0)
+    let montoAsigPW = 0
+    for (let i = 0; i < gruposPWArr.length; i++) {
+      const g = gruposPWArr[i]
+      if (!g.cuentaContableId) continue
+      const esUltimo = i === gruposPWArr.length - 1
+      const montoItem = esUltimo
+        ? Math.round((monto - montoAsigPW) * 100) / 100
+        : Math.round(monto * (totalPW > 0 ? g.monto / totalPW : 1 / gruposPWArr.length) * 100) / 100
+      if (montoItem <= 0) continue
+      montoAsigPW += montoItem
+      await tx.itemMovimientoCaja.create({
+        data: {
+          movimientoCajaId: movPW.id,
+          conceptoTesoreriaId: g.conceptoTesoreriaId,
+          cuentaContableId: g.cuentaContableId,
+          centroCostoId: g.centroCostoId,
+          monto: montoItem,
+          descripcion,
+          orden: i,
+        },
+      })
+    }
+  }
 
   await tx.caja.update({ where: { id: caja.id }, data: { saldoActual: { increment: monto } } })
 

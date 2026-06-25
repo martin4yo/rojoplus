@@ -141,25 +141,21 @@ export default function MenuBuffet() {
         title="Buffet."
         subtitle="Lo que hay para comer y tomar hoy."
         compact
-      >
-        <button
-          onClick={descargarPDF}
-          className="group inline-flex items-center gap-3 px-5 py-3 transition-all"
-          style={{
-            background: 'var(--color-primary)',
-            color: 'var(--accent-fg, #fff)',
-            fontFamily: 'Geist Mono, monospace',
-            fontSize: 11,
-            textTransform: 'uppercase',
-            letterSpacing: '0.2em',
-            fontWeight: 600,
-          }}
-          title="Descargar menú en PDF"
-        >
-          <Download size={16} />
-          <span>Descargar PDF</span>
-        </button>
-      </PublicHero>
+        action={
+          <button
+            onClick={descargarPDF}
+            className="inline-flex items-center justify-center w-11 h-11 transition-all hover:opacity-90"
+            style={{
+              background: 'var(--color-primary)',
+              color: 'var(--accent-fg, #fff)',
+            }}
+            title="Descargar PDF"
+            aria-label="Descargar PDF"
+          >
+            <Download size={18} />
+          </button>
+        }
+      />
 
       {/* Estado de carga: mostrar spinner DEBAJO del hero (no reemplaza la página) */}
       {loading && (
@@ -174,25 +170,35 @@ export default function MenuBuffet() {
 
         {/* Mobile: Botón dropdown athletic */}
         <div className="md:hidden mb-4 relative">
+          {/* Etiqueta-guía: deja claro que es un selector */}
+          <div
+            className="font-mono uppercase tracking-[0.25em] mb-1.5"
+            style={{ fontSize: 10, color: 'var(--text-muted)' }}
+          >
+            Elegí una categoría
+          </div>
           <button
             onClick={() => setMenuMobileAbierto(!menuMobileAbierto)}
             className="w-full p-4 flex items-center justify-between transition-colors"
-            style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: `1px solid ${menuMobileAbierto ? 'var(--color-primary)' : 'var(--border)'}`,
+            }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               {categoriaSeleccionada && (
                 <>
                   {(() => {
                     const Icono = getIcono(categoriaSeleccionada.codigo)
-                    return <Icono size={18} style={{ color: 'var(--text-dim)' }} />
+                    return <Icono size={18} className="flex-shrink-0" style={{ color: 'var(--text-dim)' }} />
                   })()}
                   <span
-                    className="font-mono uppercase tracking-[0.18em] font-semibold"
+                    className="font-mono uppercase tracking-[0.18em] font-semibold truncate"
                     style={{ fontSize: 11, color: 'var(--color-text-primary, var(--text))' }}
                   >
                     {categoriaSeleccionada.nombre}
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.5" style={{
+                  <span className="text-[10px] px-1.5 py-0.5 flex-shrink-0" style={{
                     backgroundColor: 'var(--bg-app)', color: 'var(--text-muted)'
                   }}>
                     {categoriaSeleccionada.productos?.length || 0}
@@ -200,11 +206,19 @@ export default function MenuBuffet() {
                 </>
               )}
             </div>
-            <ChevronDown
-              size={18}
-              style={{ color: 'var(--text-muted)' }}
-              className={`transition-transform ${menuMobileAbierto ? 'rotate-180' : ''}`}
-            />
+            <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+              <span
+                className="font-mono uppercase tracking-[0.18em] font-semibold"
+                style={{ fontSize: 10, color: 'var(--color-primary)' }}
+              >
+                {menuMobileAbierto ? 'Cerrar' : 'Ver todas'}
+              </span>
+              <ChevronDown
+                size={18}
+                style={{ color: 'var(--color-primary)' }}
+                className={`transition-transform ${menuMobileAbierto ? 'rotate-180' : ''}`}
+              />
+            </div>
           </button>
 
           {/* Dropdown móvil */}

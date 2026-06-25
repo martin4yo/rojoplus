@@ -94,9 +94,13 @@ async function request(endpoint, options = {}, returnFullResponse = false) {
       if (response.status === 401) {
         handleInvalidToken()
       }
-      // Base de datos no disponible (503 o flag específico)
+      // Base de datos no disponible: SOLO con el flag explícito.
+      // Un 503 "pelado" puede ser un error de negocio legítimo (WhatsApp no
+      // disponible, Mercado Pago no configurado, push, etc.) y NO debe disparar
+      // el overlay global de "servidor caído" — eso tapaba el mensaje real.
+      // La caída real de DB/servidor llega como respuesta no-JSON (manejada
+      // arriba como SERVER_DOWN) o como error de red.
       if (
-        response.status === 503 ||
         data?.error === 'DATABASE_UNAVAILABLE' ||
         data?.code === 'DATABASE_UNAVAILABLE'
       ) {

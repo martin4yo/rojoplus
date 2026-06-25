@@ -68,6 +68,10 @@ export async function procesarPagoCuotasMP(db, tenantId, linkPago, payment, tena
         })
 
         // ── Marcar cargos como PAGADOS ────────────────────────────────────
+        const cargosMP = await tx.cargo.findMany({
+          where: { id: { in: cargosIds } },
+          include: { conceptoTesoreria: true },
+        })
         await tx.cargo.updateMany({
           where: { id: { in: cargosIds } },
           data: { estado: 'PAGADO', fechaPago: new Date(), pagoId: pago.id },
@@ -100,7 +104,7 @@ export async function procesarPagoCuotasMP(db, tenantId, linkPago, payment, tena
                 : 1
               const numeroMov = `${prefijo}${String(siguiente).padStart(5, '0')}`
 
-              await tx.movimientoCaja.create({
+              const movMP = await tx.movimientoCaja.create({
                 data: {
                   numero: numeroMov,
                   cajaId: caja.id,
@@ -116,6 +120,45 @@ export async function procesarPagoCuotasMP(db, tenantId, linkPago, payment, tena
                   conciliado: !caja.requiereConciliacion,
                 },
               })
+
+              // ItemMovimientoCaja — un ítem por concepto de cargo
+              const gruposMP = {}
+              for (const c of cargosMP) {
+                const key = c.conceptoTesoreriaId ?? 'sin'
+                if (!gruposMP[key]) {
+                  gruposMP[key] = {
+                    conceptoTesoreriaId: c.conceptoTesoreriaId,
+                    cuentaContableId: c.conceptoTesoreria?.cuentaContableId ?? caja.cuentaContableId,
+                    centroCostoId: c.centroCostoId ?? null,
+                    monto: 0,
+                  }
+                }
+                gruposMP[key].monto += Number(c.montoTotal)
+              }
+              const gruposMPArr = Object.values(gruposMP)
+              const totalMP = gruposMPArr.reduce((s, g) => s + g.monto, 0)
+              const montoTotal = parseFloat(payment.transaction_amount)
+              let montoAsigMP = 0
+              for (let i = 0; i < gruposMPArr.length; i++) {
+                const g = gruposMPArr[i]
+                const esUltimo = i === gruposMPArr.length - 1
+                const montoItem = esUltimo
+                  ? Math.round((montoTotal - montoAsigMP) * 100) / 100
+                  : Math.round(montoTotal * (totalMP > 0 ? g.monto / totalMP : 1 / gruposMPArr.length) * 100) / 100
+                if (montoItem <= 0) continue
+                montoAsigMP += montoItem
+                await tx.itemMovimientoCaja.create({
+                  data: {
+                    movimientoCajaId: movMP.id,
+                    conceptoTesoreriaId: g.conceptoTesoreriaId,
+                    cuentaContableId: g.cuentaContableId,
+                    centroCostoId: g.centroCostoId,
+                    monto: montoItem,
+                    descripcion: `Cobranza MercadoPago - Recibo ${numero}`,
+                    orden: i,
+                  }
+                })
+              }
             }
           }
         }

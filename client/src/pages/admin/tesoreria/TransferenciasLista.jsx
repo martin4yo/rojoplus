@@ -120,7 +120,7 @@ export default function TransferenciasLista() {
       label: 'Concepto',
       render: (row) => (
         <div>
-          {row.concepto?.nombre || '-'}
+          {row.concepto || '-'}
           {row.descripcion && (
             <p className="text-xs text-gray-400">{row.descripcion}</p>
           )}

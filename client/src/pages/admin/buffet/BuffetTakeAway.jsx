@@ -11,7 +11,7 @@ import { formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
 import Modal from '../../../components/Modal'
 import GestionPedido from '../../../components/buffet/GestionPedido'
-import ChatWidget from '../../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function BuffetTakeAway() {

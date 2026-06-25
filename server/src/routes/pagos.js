@@ -110,7 +110,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
         include: { cuentaContable: true },
       })
       if (cajaMercadoPago && conceptoReservas?.cuentaContableId) {
-        await db.movimientoCaja.create({
+        const movReservaLegacy = await db.movimientoCaja.create({
           data: {
             numero: `MOV-MP-${payment.id}`,
             cajaId: cajaMercadoPago.id,
@@ -121,6 +121,17 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
             registradoPor: 1,
             comprobanteNro: payment.id.toString(),
             comprobanteTipo: 'MERCADOPAGO',
+          },
+        })
+        await db.itemMovimientoCaja.create({
+          data: {
+            movimientoCajaId: movReservaLegacy.id,
+            conceptoTesoreriaId: conceptoReservas.id,
+            cuentaContableId: conceptoReservas.cuentaContableId,
+            centroCostoId: null,
+            monto: parseFloat(payment.transaction_amount),
+            descripcion: `Reserva MP - ${reserva.espacio.nombre}`,
+            orden: 0,
           },
         })
       }
@@ -191,12 +202,14 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
         const socio = await tx.socio.findUnique({ where: { id: linkPago.socioId } })
 
         let cuentaContableId = null
+        let conceptoTesoreriaIdEntradas = null
         if (evento.conceptoTesoreriaId) {
           const concepto = await tx.conceptoTesoreria.findUnique({
             where: { id: evento.conceptoTesoreriaId },
             include: { cuentaContable: true },
           })
           cuentaContableId = concepto?.cuentaContableId
+          conceptoTesoreriaIdEntradas = concepto?.id
         }
         if (!cuentaContableId) {
           const conceptoDefault = await tx.conceptoTesoreria.findFirst({
@@ -209,6 +222,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
             include: { cuentaContable: true },
           })
           cuentaContableId = conceptoDefault?.cuentaContableId
+          conceptoTesoreriaIdEntradas = conceptoDefault?.id
         }
 
         const cajaMercadoPago = await tx.caja.findFirst({
@@ -236,6 +250,20 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
             comprobanteTipo: 'MERCADOPAGO',
           },
         })
+
+        if (cuentaContableId) {
+          await tx.itemMovimientoCaja.create({
+            data: {
+              movimientoCajaId: movimientoCaja.id,
+              conceptoTesoreriaId: conceptoTesoreriaIdEntradas,
+              cuentaContableId,
+              centroCostoId: evento.centroCostoId,
+              monto: parseFloat(payment.transaction_amount),
+              descripcion: `Entradas MP - ${evento.nombre}`,
+              orden: 0,
+            },
+          })
+        }
 
         if (cajaMercadoPago.cuentaContableId && cuentaContableId) {
           await generarAsientoAutomatico(tx, {
@@ -334,7 +362,7 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
           include: { cuentaContable: true },
         })
         if (cajaMercadoPago && conceptoReservas?.cuentaContableId) {
-          await tx.movimientoCaja.create({
+          const movReservaLP = await tx.movimientoCaja.create({
             data: {
               numero: `MOV-MP-${payment.id}`,
               cajaId: cajaMercadoPago.id,
@@ -345,6 +373,17 @@ router.post('/webhook/mercadopago', asyncHandler(async (req, res) => {
               registradoPor: 1,
               comprobanteNro: payment.id.toString(),
               comprobanteTipo: 'MERCADOPAGO',
+            },
+          })
+          await tx.itemMovimientoCaja.create({
+            data: {
+              movimientoCajaId: movReservaLP.id,
+              conceptoTesoreriaId: conceptoReservas.id,
+              cuentaContableId: conceptoReservas.cuentaContableId,
+              centroCostoId: null,
+              monto: parseFloat(payment.transaction_amount),
+              descripcion: `Reserva MP - ${reserva.espacio.nombre}`,
+              orden: 0,
             },
           })
         }

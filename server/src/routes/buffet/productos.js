@@ -236,6 +236,7 @@ router.post('/productos/crear-completo', authAdmin, checkPermiso('BUFFET_CONFIG'
       tiposVenta,
       disponible,
       destacado,
+      publicarMenu,
       orden
     } = req.body
 
@@ -278,6 +279,7 @@ router.post('/productos/crear-completo', authAdmin, checkPermiso('BUFFET_CONFIG'
           tiposVenta: tiposVenta || ['BUFFET', 'KIOSCO'],
           disponible: disponible !== false,
           destacado: destacado || false,
+          publicarMenu: publicarMenu === true,
           orden: orden || 0
         },
         include: { categoriaMenu: true, producto: true }
@@ -299,7 +301,7 @@ router.post('/productos/crear-completo', authAdmin, checkPermiso('BUFFET_CONFIG'
  */
 router.post('/productos', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
-    const { productoId, categoriaMenuId, nombre, descripcion, codigoBarras, precio, imagen, tiposVenta, disponible, destacado, orden } = req.body
+    const { productoId, categoriaMenuId, nombre, descripcion, codigoBarras, precio, imagen, tiposVenta, disponible, destacado, publicarMenu, orden } = req.body
 
     const productoStock = await req.db.producto.findUnique({ where: { id: productoId } })
     if (!productoStock) {
@@ -323,6 +325,7 @@ router.post('/productos', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, 
         tiposVenta: tiposVenta || ['BUFFET', 'KIOSCO'],
         disponible: disponible !== false,
         destacado: destacado || false,
+        publicarMenu: publicarMenu === true,
         orden: orden || 0
       },
       include: { categoriaMenu: true, producto: true }
@@ -370,7 +373,7 @@ router.put('/productos/precios', authAdmin, checkPermiso('BUFFET_CONFIG'), async
 router.put('/productos/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
     const { id } = req.params
-    const { categoriaMenuId, nombre, descripcion, codigoBarras, precio, imagen, tiposVenta, disponible, destacado, orden, activo } = req.body
+    const { categoriaMenuId, nombre, descripcion, codigoBarras, precio, imagen, tiposVenta, disponible, destacado, publicarMenu, orden, activo } = req.body
 
     const producto = await req.db.productoBuffet.update({
       where: { id: parseInt(id) },
@@ -384,6 +387,7 @@ router.put('/productos/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (re
         tiposVenta: tiposVenta || undefined,
         disponible,
         destacado,
+        publicarMenu,
         orden,
         activo
       },
@@ -432,6 +436,27 @@ router.put('/productos/:id/disponibilidad', authAdmin, checkPermiso('BUFFET_MESA
   } catch (error) {
     console.error('Error al cambiar disponibilidad:', error)
     res.status(500).json({ success: false, error: 'Error al cambiar disponibilidad' })
+  }
+})
+
+/**
+ * PUT /productos/:id/publicar-menu
+ * Cambiar si el producto se publica en el menú público (independiente de disponible)
+ */
+router.put('/productos/:id/publicar-menu', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
+  try {
+    const { id } = req.params
+    const { publicarMenu } = req.body
+
+    const producto = await req.db.productoBuffet.update({
+      where: { id: parseInt(id) },
+      data: { publicarMenu }
+    })
+
+    res.json({ success: true, data: producto })
+  } catch (error) {
+    console.error('Error al cambiar publicación en menú:', error)
+    res.status(500).json({ success: false, error: 'Error al cambiar publicación en menú' })
   }
 })
 

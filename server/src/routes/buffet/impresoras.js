@@ -25,7 +25,7 @@ const puestosConectados = new Map() // puestoId -> { socketId, impresoras, ultim
  */
 router.get('/sectores', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
-    const sectores = await prisma.sectorBuffet.findMany({
+    const sectores = await req.db.sectorBuffet.findMany({
       orderBy: { orden: 'asc' },
       include: { impresoras: true }
     })
@@ -42,7 +42,7 @@ router.get('/sectores', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, re
  */
 router.get('/sectores/activos', authAdmin, checkPermiso('BUFFET_VER'), async (req, res) => {
   try {
-    const sectores = await prisma.sectorBuffet.findMany({
+    const sectores = await req.db.sectorBuffet.findMany({
       where: { activo: true },
       orderBy: { orden: 'asc' },
       include: {
@@ -66,7 +66,7 @@ router.post('/sectores', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, r
   try {
     const { codigo, nombre, icono, color, orden } = req.body
 
-    const sector = await prisma.sectorBuffet.create({
+    const sector = await req.db.sectorBuffet.create({
       data: { codigo: codigo.toUpperCase(), nombre, icono, color, orden: orden || 0 }
     })
 
@@ -89,7 +89,7 @@ router.put('/sectores/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req
     const { id } = req.params
     const { codigo, nombre, icono, color, orden, activo } = req.body
 
-    const sector = await prisma.sectorBuffet.update({
+    const sector = await req.db.sectorBuffet.update({
       where: { id: parseInt(id) },
       data: { codigo: codigo?.toUpperCase(), nombre, icono, color, orden, activo }
     })
@@ -109,12 +109,12 @@ router.delete('/sectores/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (
   try {
     const { id } = req.params
 
-    const impresoras = await prisma.impresoraTermica.count({ where: { sectorId: parseInt(id) } })
+    const impresoras = await req.db.impresoraTermica.count({ where: { sectorId: parseInt(id) } })
     if (impresoras > 0) {
       return res.status(400).json({ success: false, error: 'No se puede eliminar un sector con impresoras asociadas' })
     }
 
-    await prisma.sectorBuffet.delete({ where: { id: parseInt(id) } })
+    await req.db.sectorBuffet.delete({ where: { id: parseInt(id) } })
 
     res.json({ success: true, message: 'Sector eliminado' })
   } catch (error) {
@@ -133,7 +133,7 @@ router.delete('/sectores/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (
  */
 router.get('/impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
-    const impresoras = await prisma.impresoraTermica.findMany({
+    const impresoras = await req.db.impresoraTermica.findMany({
       orderBy: { nombre: 'asc' },
       include: {
         sector: true,
@@ -167,7 +167,7 @@ router.post('/impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req,
       return res.status(400).json({ success: false, error: 'Debe seleccionar un puesto para USB/CUPS' })
     }
 
-    const impresora = await prisma.impresoraTermica.create({
+    const impresora = await req.db.impresoraTermica.create({
       data: {
         nombre,
         sectorId: sectorId ? parseInt(sectorId) : null,
@@ -196,7 +196,7 @@ router.put('/impresoras/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (r
     const { id } = req.params
     const { nombre, sectorId, tipoConexion, ip, puerto, destino, puestoId, activo, imprimirComanda } = req.body
 
-    const impresora = await prisma.impresoraTermica.update({
+    const impresora = await req.db.impresoraTermica.update({
       where: { id: parseInt(id) },
       data: {
         nombre,
@@ -227,7 +227,7 @@ router.delete('/impresoras/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async
   try {
     const { id } = req.params
 
-    await prisma.impresoraTermica.delete({ where: { id: parseInt(id) } })
+    await req.db.impresoraTermica.delete({ where: { id: parseInt(id) } })
 
     res.json({ success: true, message: 'Impresora eliminada' })
   } catch (error) {
@@ -244,7 +244,7 @@ router.post('/impresoras/:id/test', authAdmin, checkPermiso('BUFFET_CONFIG'), as
   try {
     const { id } = req.params
 
-    const impresora = await prisma.impresoraTermica.findUnique({ where: { id: parseInt(id) } })
+    const impresora = await req.db.impresoraTermica.findUnique({ where: { id: parseInt(id) } })
     if (!impresora) {
       return res.status(404).json({ success: false, error: 'Impresora no encontrada' })
     }
@@ -315,12 +315,12 @@ router.get('/impresoras-tickets', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFF
     // Si no hay ninguna configurada, devolver todas las activas
     let impresoras
     if (impresoraIds.length === 0) {
-      impresoras = await prisma.impresoraTermica.findMany({
+      impresoras = await req.db.impresoraTermica.findMany({
         where: { activo: true },
         orderBy: { nombre: 'asc' }
       })
     } else {
-      impresoras = await prisma.impresoraTermica.findMany({
+      impresoras = await req.db.impresoraTermica.findMany({
         where: {
           id: { in: impresoraIds },
           activo: true
@@ -367,12 +367,12 @@ router.post('/imprimir-imagen', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET
     // Obtener impresora por defecto o la especificada
     let impresora
     if (impresoraId) {
-      impresora = await prisma.impresoraTermica.findUnique({
+      impresora = await req.db.impresoraTermica.findUnique({
         where: { id: parseInt(impresoraId) }
       })
     } else {
       // Buscar impresora por defecto (la primera activa)
-      impresora = await prisma.impresoraTermica.findFirst({
+      impresora = await req.db.impresoraTermica.findFirst({
         where: { activo: true },
         orderBy: { id: 'asc' }
       })
@@ -422,7 +422,7 @@ router.post('/imprimir-imagen', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET
  */
 router.get('/destinos-impresion', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req, res) => {
   try {
-    const destinos = await prisma.destinoImpresion.findMany({
+    const destinos = await req.db.destinoImpresion.findMany({
       include: {
         categoriaMenu: true,
         impresora: true
@@ -444,7 +444,7 @@ router.post('/destinos-impresion', authAdmin, checkPermiso('BUFFET_CONFIG'), asy
   try {
     const { categoriaMenuId, impresoraId } = req.body
 
-    const destino = await prisma.destinoImpresion.upsert({
+    const destino = await req.db.destinoImpresion.upsert({
       where: {
         categoriaMenuId_impresoraId: { categoriaMenuId, impresoraId }
       },
@@ -467,7 +467,7 @@ router.delete('/destinos-impresion/:id', authAdmin, checkPermiso('BUFFET_CONFIG'
   try {
     const { id } = req.params
 
-    await prisma.destinoImpresion.delete({ where: { id: parseInt(id) } })
+    await req.db.destinoImpresion.delete({ where: { id: parseInt(id) } })
 
     res.json({ success: true, message: 'Destino eliminado' })
   } catch (error) {
@@ -595,14 +595,14 @@ router.post('/imprimir-ticket-directo', authAdmin, checkPermiso('BUFFET_COBRAR',
     })
 
     if (config?.valor) {
-      impresora = await prisma.impresoraTermica.findUnique({
+      impresora = await req.db.impresoraTermica.findUnique({
         where: { id: parseInt(config.valor) }
       })
     }
 
     // Fallback: buscar impresora por sector
     if (!impresora) {
-      impresora = await prisma.impresoraTermica.findFirst({
+      impresora = await req.db.impresoraTermica.findFirst({
         where: {
           activo: true,
           OR: [

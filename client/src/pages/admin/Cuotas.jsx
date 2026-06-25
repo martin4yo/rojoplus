@@ -13,7 +13,7 @@ import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatte
 import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
 import { useConfirm } from '../../hooks/useConfirm'
-import ChatWidget from '../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function Cuotas() {
@@ -1999,7 +1999,7 @@ export default function Cuotas() {
       </Modal>
 
       {/* Axio - Chat Widget para Admins */}
-      <ChatWidget role="admin" position="bottom-right" />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ role: "admin" }} />
     </div>
   )
 }

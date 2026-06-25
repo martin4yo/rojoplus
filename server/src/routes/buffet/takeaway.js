@@ -930,11 +930,59 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
       })
     }
 
-    // Centro de costo fallback: primer item no anulado que tenga concepto de venta con CC
+    // Centro de costo y concepto: del primer item no anulado que tenga concepto de venta
     const ccItemsFallback = pedido.items
       .filter(i => i.estado !== 'ANULADO')
       .map(i => i.productoBuffet?.producto?.conceptoVenta?.centroCostoId)
       .find(cc => cc != null) ?? null
+    const conceptoVentaId = pedido.items
+      .filter(i => i.estado !== 'ANULADO')
+      .map(i => i.productoBuffet?.producto?.conceptoVenta?.id)
+      .find(id => id != null) ?? null
+
+    // Agrupar items por conceptoVenta para ItemMovimientoCaja
+    const itemsPorConceptoVenta = {}
+    for (const item of pedido.items) {
+      if (item.estado === 'ANULADO') continue
+      const cv = item.productoBuffet?.producto?.conceptoVenta
+      const key = cv?.id ?? 'sin-concepto'
+      if (!itemsPorConceptoVenta[key]) {
+        itemsPorConceptoVenta[key] = {
+          conceptoTesoreriaId: cv?.id ?? null,
+          cuentaContableId: cv?.cuentaContableId ?? null,
+          centroCostoId: cv?.centroCostoId ?? ccItemsFallback,
+          monto: 0,
+        }
+      }
+      itemsPorConceptoVenta[key].monto += Number(item.subtotal)
+    }
+    const gruposConcepto = Object.values(itemsPorConceptoVenta)
+    const totalConceptos = gruposConcepto.reduce((s, g) => s + g.monto, 0)
+
+    async function crearItemsTA(db, movimientoId, montoMovimiento, caja) {
+      let montoAsignado = 0
+      for (let i = 0; i < gruposConcepto.length; i++) {
+        const g = gruposConcepto[i]
+        const esUltimo = i === gruposConcepto.length - 1
+        const montoItem = esUltimo
+          ? Math.round((montoMovimiento - montoAsignado) * 100) / 100
+          : Math.round(montoMovimiento * (g.monto / totalConceptos) * 100) / 100
+        if (montoItem <= 0) continue
+        montoAsignado += montoItem
+        await db.itemMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: movimientoId,
+            conceptoTesoreriaId: g.conceptoTesoreriaId,
+            cuentaContableId: g.cuentaContableId || caja.cuentaContableId || cuentaContableFallback?.id,
+            centroCostoId: g.centroCostoId || caja.centroCostoId,
+            monto: montoItem,
+            descripcion: `Take Away - Pedido ${pedido.numero}`,
+            orden: i,
+          }
+        })
+      }
+    }
 
     const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0
     const movimientos = []
@@ -974,12 +1022,14 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
             centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             monto: parseFloat(pago.monto),
             medioPagoId: medioPago.id,
+            conceptoTesoreriaId: conceptoVentaId,
             concepto: `Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
             pedidoTakeAwayId: parseInt(id),
             registradoPor: req.admin.id
           }
         })
+        await crearItemsTA(req.db, movimiento.id, parseFloat(pago.monto), caja)
 
         // Generar asiento contable automático
         const cuentaDébeTAMulti = resolverCuentaCashId(medioPago, caja)
@@ -1048,12 +1098,14 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
           centroCostoId: caja.centroCostoId ?? ccItemsFallback,
           monto: totalFinal,
           medioPagoId: medioPago.id,
+          conceptoTesoreriaId: conceptoVentaId,
           concepto: `Take Away - Pedido ${pedido.numero} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
           pedidoTakeAwayId: parseInt(id),
           registradoPor: req.admin.id
         }
       })
+      await crearItemsTA(req.db, movimiento.id, totalFinal, caja)
 
       // Generar asiento contable automático
       const cuentaDebeTA = resolverCuentaCashId(medioPago, caja)

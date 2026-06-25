@@ -1412,7 +1412,7 @@ router.get('/proximo-numero/:tipo', asyncHandler(async (req, res) => {
 
   const prefijos = {
     'MC': 'MC', // MovimientoContable
-    'TC': 'TC', // TransferenciaCaja
+    'TC': 'TC', // Transferencia entre cajas
     'ENT': 'ENT' // Entidad
   }
 
@@ -1428,11 +1428,11 @@ router.get('/proximo-numero/:tipo', asyncHandler(async (req, res) => {
     })
     ultimoNumero = ultimo?.numero
   } else if (tipo === 'TC') {
-    const ultimo = await req.db.transferenciaCaja.findFirst({
-      where: { numero: { startsWith: `${prefijo}-${anio}-` } },
-      orderBy: { numero: 'desc' }
+    const ultimo = await req.db.movimientoCaja.findFirst({
+      where: { grupoComprobante: { startsWith: `TC-${anio}-` } },
+      orderBy: { grupoComprobante: 'desc' }
     })
-    ultimoNumero = ultimo?.numero
+    ultimoNumero = ultimo?.grupoComprobante
   } else if (tipo === 'ENT') {
     // Subtipo opcional para diferenciar prefijos: PROVEEDOR/CLIENTE/PERSONAL
     const subtipo = (req.query.subtipo || '').toUpperCase()

@@ -2652,7 +2652,7 @@ export default function TablasAuxiliares() {
                       textoKey: 'NOTIF_WA_PORTAL',
                       label: 'Link del portal',
                       desc: 'Al generar acceso al portal del socio',
-                      placeholder: '*{{nombre}}*, acá está tu acceso al portal del club:\n{{link}}\n\nEste link es personal y expira en 7 días.',
+                      placeholder: '*{{nombre}}*, acá está tu acceso al portal del club:\n{{link}}\n\nEste link es personal y expira en 24 horas. Si entrás desde tu celular, el dispositivo queda recordado y no vas a necesitar el link de nuevo.',
                       vars: '{{nombre}}, {{apellido}}, {{nroSocio}}, {{link}}',
                     },
                     {

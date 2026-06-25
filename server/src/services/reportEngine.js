@@ -545,6 +545,59 @@ export function getDefaultTemplate(queryKey) {
 </table>
 <div class="grand-total">Total inscripciones: {{data.summary.total}}</div>
 </body></html>`,
+
+    ingresos_egresos_por_concepto: `${BASE_STYLES}
+<style>
+  .ing { color: #15803d; }
+  .egr { color: #dc2626; }
+  .sal-pos { color: #15803d; font-weight: bold; }
+  .sal-neg { color: #dc2626; font-weight: bold; }
+  tfoot td { background: #1e3a8a !important; color: #fff; font-weight: bold; padding: 6px; }
+  tfoot .ing { color: #86efac; }
+  tfoot .egr { color: #fca5a5; }
+  tfoot .sal { color: #fde68a; font-weight: bold; }
+</style>
+<div class="header">
+  <div>
+    <div class="title">Ingresos y Egresos por Concepto</div>
+    <div class="subtitle">{{tenant.nombre}}</div>
+  </div>
+  <div class="meta">Generado: {{generatedAt}}<br>{{userName}}</div>
+</div>
+<div class="params">
+  {{#each paramLabels}}<span><strong>{{this.label}}:</strong> {{this.value}}</span> &nbsp;{{/each}}
+</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:80px">Código</th>
+      <th>Concepto</th>
+      <th class="r" style="width:120px">Ingresos</th>
+      <th class="r" style="width:120px">Egresos</th>
+      <th class="r" style="width:120px">Saldo</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.items}}
+    <tr>
+      <td style="font-family:monospace;font-size:8pt">{{codigoConcepto}}</td>
+      <td>{{descripcionConcepto}}</td>
+      <td class="r ing">{{#if ingreso}}{{formatCurrency ingreso}}{{else}}—{{/if}}</td>
+      <td class="r egr">{{#if egreso}}{{formatCurrency egreso}}{{else}}—{{/if}}</td>
+      <td class="r {{#if (gt saldo 0)}}sal-pos{{else}}{{#if (lt saldo 0)}}sal-neg{{/if}}{{/if}}">{{formatCurrency saldo}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="2">TOTAL — {{data.summary.cantConceptos}} conceptos</td>
+      <td class="r ing">{{formatCurrency data.summary.totalIngreso}}</td>
+      <td class="r egr">{{formatCurrency data.summary.totalEgreso}}</td>
+      <td class="r sal">{{formatCurrency data.summary.saldo}}</td>
+    </tr>
+  </tfoot>
+</table>
+</body></html>`,
   }
 
   templates.orden_trabajo = `<!DOCTYPE html><html><head><meta charset="utf-8">

@@ -97,7 +97,7 @@ export async function procesarPagoTienda(pago, tenantId) {
   const items = await globalPrisma.itemPedidoTienda.findMany({
     where: { pedidoTiendaId: pedidoTienda.id },
     include: {
-      productoVariante: { include: { producto: true } },
+      productoVariante: { include: { producto: { include: { conceptoVenta: true } } } },
     },
   })
 
@@ -188,6 +188,50 @@ export async function procesarPagoTienda(pago, tenantId) {
       where: { id: cajaId },
       data: { saldoActual: { increment: pedidoTienda.total } },
     })
+
+    // ItemMovimientoCaja — un ítem por conceptoVenta de los productos
+    const gruposTienda = {}
+    for (const it of items) {
+      const cv = it.productoVariante?.producto?.conceptoVenta
+      const key = cv?.id ?? 'sin'
+      if (!gruposTienda[key]) {
+        gruposTienda[key] = {
+          conceptoTesoreriaId: cv?.id ?? null,
+          cuentaContableId: cv?.cuentaContableId ?? cuentaContableId,
+          centroCostoId: cv?.centroCostoId ?? centroCostoId,
+          monto: 0,
+        }
+      }
+      gruposTienda[key].monto += Number(it.subtotal)
+    }
+    const gruposTiendaArr = Object.values(gruposTienda)
+    if (gruposTiendaArr.length > 0) {
+      const totalTienda = gruposTiendaArr.reduce((s, g) => s + g.monto, 0)
+      const montoTiendaTotal = Number(pedidoTienda.total)
+      let montoAsigTienda = 0
+      for (let i = 0; i < gruposTiendaArr.length; i++) {
+        const g = gruposTiendaArr[i]
+        if (!g.cuentaContableId) continue
+        const esUltimo = i === gruposTiendaArr.length - 1
+        const montoItem = esUltimo
+          ? Math.round((montoTiendaTotal - montoAsigTienda) * 100) / 100
+          : Math.round(montoTiendaTotal * (totalTienda > 0 ? g.monto / totalTienda : 1 / gruposTiendaArr.length) * 100) / 100
+        if (montoItem <= 0) continue
+        montoAsigTienda += montoItem
+        await tx.itemMovimientoCaja.create({
+          data: {
+            movimientoCajaId: movCaja.id,
+            conceptoTesoreriaId: g.conceptoTesoreriaId,
+            cuentaContableId: g.cuentaContableId,
+            centroCostoId: g.centroCostoId,
+            monto: montoItem,
+            descripcion: `Tienda online - Pedido ${pedidoTienda.numero}`,
+            orden: i,
+            tenantId,
+          },
+        })
+      }
+    }
 
     // Crear Pedido interno
     const numeroPed = `PED-${String(Date.now()).slice(-8)}-${String(pedidoTienda.id).padStart(4, '0')}`

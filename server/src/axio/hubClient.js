@@ -68,6 +68,7 @@ const HUB_TIMEOUT_MS = parseInt(process.env.AXIO_HUB_TIMEOUT_MS || '300000', 10)
  * @returns {Promise<Object>} Respuesta del hub. Forma posible:
  *   - { answer, model, time_ms, from_cache, hash_input }            (Capa 2.5/3)
  *   - { tool_call: {name, args}, model, time_ms }                   (Capa 2.6)
+ *   - { answer, pending_action: {action_id, summary, params, operation}, model } (Fase 5)
  */
 export async function callHub({ question, context, tenantId, tools, scopeHint, toolsOnly, systemPromptExtra }) {
   if (!HUB_API_KEY) {
@@ -103,6 +104,44 @@ export async function callHub({ question, context, tenantId, tools, scopeHint, t
     if (!response.ok) {
       const text = await response.text().catch(() => '')
       throw new Error(`Hub error ${response.status}: ${text || response.statusText}`)
+    }
+
+    return await response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+/**
+ * Confirma o cancela una acción de escritura pendiente (Fase 5).
+ *
+ * @param {Object} params
+ * @param {string} params.actionId   - ID devuelto en pending_action.action_id
+ * @param {boolean} params.confirmed - true = ejecutar, false = cancelar
+ * @returns {Promise<{success: boolean, message: string, rows_affected?: number}>}
+ */
+export async function callHubConfirm({ actionId, confirmed }) {
+  if (!HUB_API_KEY) {
+    throw new Error('AXIO_API_KEY no configurada en el servidor')
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+  try {
+    const response = await fetch(`${HUB_URL}/api/ml/action/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': HUB_API_KEY,
+      },
+      body: JSON.stringify({ action_id: actionId, confirmed }),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      throw new Error(`Hub confirm error ${response.status}: ${text || response.statusText}`)
     }
 
     return await response.json()

@@ -24,7 +24,7 @@ import StatusBadge from '../../components/StatusBadge'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
-import ChatWidget from '../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import { toast } from 'react-hot-toast'
 import MotivosBajaSelector from '../../components/MotivosBajaSelector'
 import { VARS_SOCIO } from '../../utils/templateVars'
@@ -568,7 +568,7 @@ export default function GestionRecupero() {
         </form>
       </Modal>
 
-      <ChatWidget />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ role: "admin" }} />
     </div>
   )
 }

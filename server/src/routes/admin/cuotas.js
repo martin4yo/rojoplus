@@ -1803,14 +1803,18 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         )
       }
 
-      const conceptoNombre =
-        (cuota.categoriaActividad?.conceptoTesoreria?.activo && cuota.categoriaActividad.conceptoTesoreria.nombre) ||
-        (cuota.categoriaActividad?.actividad?.conceptoTesoreria?.activo && cuota.categoriaActividad.actividad.conceptoTesoreria.nombre) ||
-        (cuota.conceptoTesoreria?.activo && cuota.conceptoTesoreria.nombre) ||
-        conceptoPorDefecto.nombre
+      const conceptoTesoreriaEfectivo =
+        (cuota.categoriaActividad?.conceptoTesoreria?.activo && cuota.categoriaActividad.conceptoTesoreria) ||
+        (cuota.categoriaActividad?.actividad?.conceptoTesoreria?.activo && cuota.categoriaActividad.actividad.conceptoTesoreria) ||
+        (cuota.conceptoTesoreria?.activo && cuota.conceptoTesoreria) ||
+        conceptoPorDefecto
+
+      const conceptoNombre = conceptoTesoreriaEfectivo?.nombre || conceptoPorDefecto.nombre
+      const conceptoTesoreriaId = conceptoTesoreriaEfectivo?.id || null
+      const cuentaContableId = conceptoTesoreriaEfectivo?.cuentaContableId || null
 
       if (!gruposPorCC[ccEfectivo]) {
-        gruposPorCC[ccEfectivo] = { centroCostoId: ccEfectivo, monto: 0, conceptoNombre }
+        gruposPorCC[ccEfectivo] = { centroCostoId: ccEfectivo, monto: 0, conceptoNombre, conceptoTesoreriaId, cuentaContableId }
       }
       gruposPorCC[ccEfectivo].monto += montoEfectivo
     }
@@ -1838,7 +1842,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
         if (montoMov <= 0) continue
         const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
         siguienteMov++
-        await tx.movimientoCaja.create({
+        const movCajaCreado = await tx.movimientoCaja.create({
           data: {
             numero: numeroMov,
             cajaId: split.cajaId,
@@ -1847,6 +1851,7 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
             fecha: new Date(),
             tipo: 'INGRESO',
             concepto: grupo.conceptoNombre,
+            conceptoTesoreriaId: grupo.conceptoTesoreriaId || null,
             monto: montoMov,
             descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
             pagoId: pago.id,
@@ -1855,6 +1860,20 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
             conciliado: !cajaActual.requiereConciliacion,
           }
         })
+        if (grupo.conceptoTesoreriaId && (grupo.cuentaContableId || cajaActual.cuentaContableId)) {
+          await tx.itemMovimientoCaja.create({
+            data: {
+              tenantId: req.tenantId,
+              movimientoCajaId: movCajaCreado.id,
+              conceptoTesoreriaId: grupo.conceptoTesoreriaId,
+              cuentaContableId: grupo.cuentaContableId || cajaActual.cuentaContableId,
+              centroCostoId: grupo.centroCostoId,
+              monto: montoMov,
+              descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
+              orden: 0,
+            }
+          })
+        }
       }
     }
 
@@ -2235,6 +2254,7 @@ router.post('/pagos/:id/anular', authAdmin, checkPermiso('CAJA_ANULAR'), asyncHa
           cuentaContableId: mov.cuentaContableId,
           centroCostoId: mov.centroCostoId,
           medioPagoId: mov.medioPagoId,
+          conceptoTesoreriaId: mov.conceptoTesoreriaId || null,
           socioId: mov.socioId,
           entidadId: mov.entidadId,
           pagoId: mov.pagoId,

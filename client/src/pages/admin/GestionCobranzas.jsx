@@ -21,7 +21,7 @@ import StatusBadge from '../../components/StatusBadge'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import usePagination from '../../hooks/usePagination'
 import api from '../../services/api'
-import ChatWidget from '../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function GestionCobranzas() {
@@ -456,7 +456,7 @@ export default function GestionCobranzas() {
         )}
       </div>
 
-      <ChatWidget />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ role: "admin" }} />
     </div>
   )
 }

@@ -1029,19 +1029,19 @@ router.post('/movimientos-caja/:id/anular', checkPermiso('CAJA_ANULAR'), asyncHa
 // TRANSFERENCIAS ENTRE CAJAS
 // =============================================================================
 
-// Generar numero de transferencia
+// Generar numero de transferencia (TC-YYYY-#####) buscando en grupoComprobante de movimientos
 async function generarNumeroTransferencia(db) {
   const anio = new Date().getFullYear()
   const prefijo = `TC-${anio}-`
 
-  const ultimo = await db.transferenciaCaja.findFirst({
-    where: { numero: { startsWith: prefijo } },
-    orderBy: { numero: 'desc' }
+  const ultimo = await db.movimientoCaja.findFirst({
+    where: { grupoComprobante: { startsWith: prefijo } },
+    orderBy: { grupoComprobante: 'desc' }
   })
 
   let siguiente = 1
-  if (ultimo) {
-    const partes = ultimo.numero.split('-')
+  if (ultimo?.grupoComprobante) {
+    const partes = ultimo.grupoComprobante.split('-')
     const ultimoNum = parseInt(partes[partes.length - 1]) || 0
     siguiente = ultimoNum + 1
   }
@@ -1049,29 +1049,31 @@ async function generarNumeroTransferencia(db) {
   return `${prefijo}${String(siguiente).padStart(5, '0')}`
 }
 
+// Helper: carga cajas permitidas del admin
+async function cajasPermitidasAdmin(adminId) {
+  const admin = await prisma.admin.findUnique({
+    where: { id: adminId },
+    include: { rol: { include: { cajas: { select: { cajaId: true } } } } }
+  })
+  if (!admin?.rol || admin.rol.esSuperAdmin || !admin.rol.cajas?.length) return null
+  return admin.rol.cajas.map(cr => cr.cajaId)
+}
+
 // GET /api/admin/transferencias - Listar transferencias
 router.get('/transferencias', asyncHandler(async (req, res) => {
   const { desde, hasta, page = 1, limit = 50 } = req.query
 
-  // Obtener cajas permitidas según rol del usuario
-  const admin = await prisma.admin.findUnique({
-    where: { id: req.admin.id },
-    include: {
-      rol: {
-        include: {
-          cajas: { select: { cajaId: true } }
-        }
-      }
-    }
-  })
+  const cajasPermitidas = await cajasPermitidasAdmin(req.admin.id)
 
-  const where = {}
+  const where = {
+    tipo: 'EGRESO',
+    cajaDestinoId: { not: null },
+    grupoComprobante: { startsWith: 'TC-' }
+  }
 
-  // Filtrar transferencias donde el usuario tenga acceso a alguna de las cajas
-  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
-    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
+  if (cajasPermitidas) {
     where.OR = [
-      { cajaOrigenId: { in: cajasPermitidas } },
+      { cajaId: { in: cajasPermitidas } },
       { cajaDestinoId: { in: cajasPermitidas } }
     ]
   }
@@ -1084,28 +1086,35 @@ router.get('/transferencias', asyncHandler(async (req, res) => {
 
   const skip = (parseInt(page) - 1) * parseInt(limit)
 
-  const [transferencias, total] = await Promise.all([
-    req.db.transferenciaCaja.findMany({
+  const [movimientos, total] = await Promise.all([
+    req.db.movimientoCaja.findMany({
       where,
       orderBy: { fecha: 'desc' },
       skip,
       take: parseInt(limit),
       include: {
-        cajaOrigen: { select: { id: true, codigo: true, nombre: true } },
+        caja: { select: { id: true, codigo: true, nombre: true } },
         cajaDestino: { select: { id: true, codigo: true, nombre: true } }
       }
     }),
-    req.db.transferenciaCaja.count({ where })
+    req.db.movimientoCaja.count({ where })
   ])
 
-  const transferenciasFormateadas = transferencias.map(t => ({
-    ...t,
-    monto: Number(t.monto)
+  const data = movimientos.map(m => ({
+    id: m.id,
+    numero: m.grupoComprobante,
+    fecha: m.fecha,
+    monto: Number(m.monto),
+    concepto: m.concepto,
+    descripcion: m.descripcion,
+    estado: m.anulado ? 'ANULADO' : 'ACTIVA',
+    cajaOrigen: m.caja,
+    cajaDestino: m.cajaDestino
   }))
 
   res.json({
     success: true,
-    data: transferenciasFormateadas,
+    data,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -1115,46 +1124,41 @@ router.get('/transferencias', asyncHandler(async (req, res) => {
   })
 }))
 
-// GET /api/admin/transferencias/:id - Detalle
+// GET /api/admin/transferencias/:id - Detalle (por id del movimiento EGRESO)
 router.get('/transferencias/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const transferencia = await req.db.transferenciaCaja.findUnique({
-    where: { id: parseInt(id) },
+  const mov = await req.db.movimientoCaja.findFirst({
+    where: { id: parseInt(id), tipo: 'EGRESO', cajaDestinoId: { not: null } },
     include: {
-      cajaOrigen: true,
+      caja: true,
       cajaDestino: true
     }
   })
 
-  if (!transferencia) {
+  if (!mov) {
     throw new AppError('Transferencia no encontrada', 404)
   }
 
-  // Verificar acceso del usuario a alguna de las cajas
-  const admin = await prisma.admin.findUnique({
-    where: { id: req.admin.id },
-    include: {
-      rol: {
-        include: {
-          cajas: { select: { cajaId: true } }
-        }
-      }
-    }
-  })
-
-  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
-    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
-    const tieneAcceso = cajasPermitidas.includes(transferencia.cajaOrigenId) ||
-                        cajasPermitidas.includes(transferencia.cajaDestinoId)
-    if (!tieneAcceso) {
-      throw new AppError('No tenés acceso a esta transferencia', 403)
-    }
+  const cajasPermitidas = await cajasPermitidasAdmin(req.admin.id)
+  if (cajasPermitidas) {
+    const tieneAcceso = cajasPermitidas.includes(mov.cajaId) || cajasPermitidas.includes(mov.cajaDestinoId)
+    if (!tieneAcceso) throw new AppError('No tenés acceso a esta transferencia', 403)
   }
 
   res.json({
     success: true,
-    data: { ...transferencia, monto: Number(transferencia.monto) }
+    data: {
+      id: mov.id,
+      numero: mov.grupoComprobante,
+      fecha: mov.fecha,
+      monto: Number(mov.monto),
+      concepto: mov.concepto,
+      descripcion: mov.descripcion,
+      estado: mov.anulado ? 'ANULADO' : 'ACTIVA',
+      cajaOrigen: mov.caja,
+      cajaDestino: mov.cajaDestino
+    }
   })
 }))
 
@@ -1188,52 +1192,24 @@ router.post('/transferencias', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(as
     throw new AppError('El monto debe ser mayor a cero', 400)
   }
 
-  // Verificar cajas
   const [cajaOrigen, cajaDestino] = await Promise.all([
     req.db.caja.findUnique({ where: { id: parseInt(cajaOrigenId) }, include: { cuentaContable: true } }),
     req.db.caja.findUnique({ where: { id: parseInt(cajaDestinoId) }, include: { cuentaContable: true } })
   ])
 
-  if (!cajaOrigen) {
-    throw new AppError('Caja origen no encontrada', 404)
-  }
-  if (!cajaDestino) {
-    throw new AppError('Caja destino no encontrada', 404)
-  }
-  if (!cajaOrigen.activo) {
-    throw new AppError('La caja origen no esta activa', 400)
-  }
-  if (!cajaDestino.activo) {
-    throw new AppError('La caja destino no esta activa', 400)
+  if (!cajaOrigen) throw new AppError('Caja origen no encontrada', 404)
+  if (!cajaDestino) throw new AppError('Caja destino no encontrada', 404)
+  if (!cajaOrigen.activo) throw new AppError('La caja origen no esta activa', 400)
+  if (!cajaDestino.activo) throw new AppError('La caja destino no esta activa', 400)
+
+  const cajasPermitidas = await cajasPermitidasAdmin(req.admin.id)
+  if (cajasPermitidas) {
+    if (!cajasPermitidas.includes(parseInt(cajaOrigenId))) throw new AppError('No tenés acceso a la caja origen', 403)
+    if (!cajasPermitidas.includes(parseInt(cajaDestinoId))) throw new AppError('No tenés acceso a la caja destino', 403)
   }
 
-  // Verificar acceso del usuario a ambas cajas
-  const admin = await prisma.admin.findUnique({
-    where: { id: req.admin.id },
-    include: {
-      rol: {
-        include: {
-          cajas: { select: { cajaId: true } }
-        }
-      }
-    }
-  })
-
-  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
-    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
-    if (!cajasPermitidas.includes(parseInt(cajaOrigenId))) {
-      throw new AppError('No tenés acceso a la caja origen', 403)
-    }
-    if (!cajasPermitidas.includes(parseInt(cajaDestinoId))) {
-      throw new AppError('No tenés acceso a la caja destino', 403)
-    }
-  }
-
-  // Resolver medioPago código → ID
   const medioPagoRecord = await req.db.medioPago.findFirst({ where: { codigo: medioPago, activo: true } })
-  if (!medioPagoRecord) {
-    throw new AppError(`Medio de pago '${medioPago}' no encontrado`, 400)
-  }
+  if (!medioPagoRecord) throw new AppError(`Medio de pago '${medioPago}' no encontrado`, 400)
   const medioPagoId = medioPagoRecord.id
 
   // Verificar saldo suficiente por medio de pago
@@ -1253,56 +1229,28 @@ router.post('/transferencias', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(as
     }
   }
 
-  // Resolver cuentas contables: usar las enviadas o las de las cajas como fallback
-  const cuentaOrigenId = cuentaContableOrigenId
-    ? parseInt(cuentaContableOrigenId)
-    : cajaOrigen.cuentaContableId
-  const cuentaDestinoId = cuentaContableDestinoId
-    ? parseInt(cuentaContableDestinoId)
-    : cajaDestino.cuentaContableId
+  const cuentaOrigenId = cuentaContableOrigenId ? parseInt(cuentaContableOrigenId) : cajaOrigen.cuentaContableId
+  const cuentaDestinoId = cuentaContableDestinoId ? parseInt(cuentaContableDestinoId) : cajaDestino.cuentaContableId
 
-  if (!cuentaOrigenId) {
-    throw new AppError('La caja origen no tiene cuenta contable configurada', 400)
-  }
-  if (!cuentaDestinoId) {
-    throw new AppError('La caja destino no tiene cuenta contable configurada',400)
-  }
+  if (!cuentaOrigenId) throw new AppError('La caja origen no tiene cuenta contable configurada', 400)
+  if (!cuentaDestinoId) throw new AppError('La caja destino no tiene cuenta contable configurada', 400)
 
-
-  // Cargar códigos de cuentas para el asiento
   const [cuentaOrigen, cuentaDestino] = await Promise.all([
     req.db.cuentaContable.findUnique({ where: { id: cuentaOrigenId } }),
     req.db.cuentaContable.findUnique({ where: { id: cuentaDestinoId } }),
   ])
 
-  // Crear transferencia y movimientos
   const numero = await generarNumeroTransferencia(req.db)
   const numeroMovOrigen = await generarNumeroMovimiento(req.db)
   const numeroMovDestino = `MV-${new Date().getFullYear()}-${String(parseInt(numeroMovOrigen.split('-')[2]) + 1).padStart(5, '0')}`
   const conceptoTexto = concepto || 'Transferencia entre cajas'
+  const fechaTransferencia = new Date()
 
-  const resultado = await req.db.transferenciaCaja.create({
-    data: {
-      numero,
-      cajaOrigenId: parseInt(cajaOrigenId),
-      cajaDestinoId: parseInt(cajaDestinoId),
-      fecha: new Date(),
-      monto: montoNum,
-      concepto: conceptoTexto,
-      descripcion: descripcion || null,
-      registradoPor: req.admin.id
-    },
-    include: {
-      cajaOrigen: { select: { id: true, codigo: true, nombre: true } },
-      cajaDestino: { select: { id: true, codigo: true, nombre: true } }
-    }
-  })
-
-  await req.db.movimientoCaja.create({
+  const movEgreso = await req.db.movimientoCaja.create({
     data: {
       numero: numeroMovOrigen,
       cajaId: parseInt(cajaOrigenId),
-      fecha: new Date(),
+      fecha: fechaTransferencia,
       tipo: 'EGRESO',
       monto: montoNum,
       medioPagoId,
@@ -1311,15 +1259,16 @@ router.post('/transferencias', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(as
       concepto: `Transferencia a ${cajaDestino.nombre}`,
       descripcion: descripcion || null,
       cajaDestinoId: parseInt(cajaDestinoId),
+      grupoComprobante: numero,
       registradoPor: req.admin.id
     }
   })
 
-  await req.db.movimientoCaja.create({
+  const movIngreso = await req.db.movimientoCaja.create({
     data: {
       numero: numeroMovDestino,
       cajaId: parseInt(cajaDestinoId),
-      fecha: new Date(),
+      fecha: fechaTransferencia,
       tipo: 'INGRESO',
       monto: montoNum,
       medioPagoId,
@@ -1327,24 +1276,25 @@ router.post('/transferencias', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(as
       centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       concepto: `Transferencia desde ${cajaOrigen.nombre}`,
       descripcion: descripcion || null,
+      grupoComprobante: numero,
       registradoPor: req.admin.id
     }
   })
 
-  await req.db.caja.update({
-    where: { id: parseInt(cajaOrigenId) },
-    data: { saldoActual: { decrement: montoNum } }
-  })
-
-  await req.db.caja.update({
-    where: { id: parseInt(cajaDestinoId) },
-    data: { saldoActual: { increment: montoNum } }
-  })
+  await req.db.caja.update({ where: { id: parseInt(cajaOrigenId) }, data: { saldoActual: { decrement: montoNum } } })
+  await req.db.caja.update({ where: { id: parseInt(cajaDestinoId) }, data: { saldoActual: { increment: montoNum } } })
 
   // Generar asiento contable — D: caja destino (activo aumenta) / H: caja origen (activo disminuye)
   try {
     await crearAsientoTransferencia(req.db, {
-      transferencia: resultado,
+      transferencia: {
+        id: movEgreso.id,
+        numero,
+        monto: montoNum,
+        fecha: fechaTransferencia,
+        cajaOrigen,
+        cajaDestino,
+      },
       cuentaOrigen,
       cuentaDestino,
       centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
@@ -1352,8 +1302,11 @@ router.post('/transferencias', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(as
       registradoPor: req.admin.id,
     })
   } catch (err) {
-    // Revertir todo
-    await req.db.transferenciaCaja.update({ where: { id: resultado.id }, data: { estado: 'ANULADO' } })
+    // Revertir movimientos y saldos
+    await req.db.movimientoCaja.updateMany({
+      where: { grupoComprobante: numero },
+      data: { anulado: true, estado: 'ANULADO', fechaAnulacion: new Date(), anuladoPor: req.admin.id }
+    })
     await req.db.caja.update({ where: { id: parseInt(cajaOrigenId) }, data: { saldoActual: { increment: montoNum } } })
     await req.db.caja.update({ where: { id: parseInt(cajaDestinoId) }, data: { saldoActual: { decrement: montoNum } } })
     throw new AppError(`No se pudo generar el asiento contable: ${err.message}`, 400)
@@ -1361,76 +1314,56 @@ router.post('/transferencias', checkPermiso('CAJA_MOVIMIENTOS'), asyncHandler(as
 
   res.status(201).json({
     success: true,
-    data: { ...resultado, monto: Number(resultado.monto) }
+    data: {
+      id: movEgreso.id,
+      numero,
+      fecha: fechaTransferencia,
+      monto: montoNum,
+      concepto: conceptoTexto,
+      descripcion: descripcion || null,
+      estado: 'ACTIVA',
+      cajaOrigen: { id: cajaOrigen.id, codigo: cajaOrigen.codigo, nombre: cajaOrigen.nombre },
+      cajaDestino: { id: cajaDestino.id, codigo: cajaDestino.codigo, nombre: cajaDestino.nombre }
+    }
   })
 }))
 
-// POST /api/admin/transferencias/:id/anular - Anular transferencia
+// POST /api/admin/transferencias/:id/anular - Anular transferencia (id = movimiento EGRESO)
 router.post('/transferencias/:id/anular', checkPermiso('CAJA_ANULAR'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const transferencia = await req.db.transferenciaCaja.findUnique({
-    where: { id: parseInt(id) },
-    include: {
-      cajaOrigen: true,
-      cajaDestino: true
-    }
+  const movEgreso = await req.db.movimientoCaja.findFirst({
+    where: { id: parseInt(id), tipo: 'EGRESO', cajaDestinoId: { not: null } },
+    include: { cajaDestino: true }
   })
 
-  if (!transferencia) {
-    throw new AppError('Transferencia no encontrada', 404)
+  if (!movEgreso) throw new AppError('Transferencia no encontrada', 404)
+
+  const cajasPermitidas = await cajasPermitidasAdmin(req.admin.id)
+  if (cajasPermitidas) {
+    const tieneAcceso = cajasPermitidas.includes(movEgreso.cajaId) || cajasPermitidas.includes(movEgreso.cajaDestinoId)
+    if (!tieneAcceso) throw new AppError('No tenés acceso a esta transferencia', 403)
   }
 
-  // Verificar acceso del usuario a alguna de las cajas
-  const admin = await prisma.admin.findUnique({
-    where: { id: req.admin.id },
-    include: {
-      rol: {
-        include: {
-          cajas: { select: { cajaId: true } }
-        }
-      }
-    }
-  })
+  if (movEgreso.anulado) throw new AppError('La transferencia ya esta anulada', 400)
 
-  if (admin?.rol && !admin.rol.esSuperAdmin && admin.rol.cajas?.length > 0) {
-    const cajasPermitidas = admin.rol.cajas.map(cr => cr.cajaId)
-    const tieneAcceso = cajasPermitidas.includes(transferencia.cajaOrigenId) ||
-                        cajasPermitidas.includes(transferencia.cajaDestinoId)
-    if (!tieneAcceso) {
-      throw new AppError('No tenés acceso a esta transferencia', 403)
-    }
-  }
-
-  if (transferencia.estado === 'ANULADO') {
-    throw new AppError('La transferencia ya esta anulada', 400)
-  }
-
-  // Verificar que caja destino tenga saldo suficiente para revertir
-  const montoNum = Number(transferencia.monto)
-  const { valido: validoReverso } = validarLimiteEgreso(transferencia.cajaDestino, Number(transferencia.cajaDestino.saldoActual), montoNum)
+  const montoNum = Number(movEgreso.monto)
+  const { valido: validoReverso } = validarLimiteEgreso(movEgreso.cajaDestino, Number(movEgreso.cajaDestino.saldoActual), montoNum)
   if (!validoReverso) {
     throw new AppError(
-      mensajeSaldoInsuficiente({ caja: transferencia.cajaDestino, disponible: Number(transferencia.cajaDestino.saldoActual), requerido: montoNum, contexto: 'Reverso transferencia' }),
+      mensajeSaldoInsuficiente({ caja: movEgreso.cajaDestino, disponible: Number(movEgreso.cajaDestino.saldoActual), requerido: montoNum, contexto: 'Reverso transferencia' }),
       400
     )
   }
 
-  // Anular y revertir saldos
-  await req.db.transferenciaCaja.update({
-    where: { id: parseInt(id) },
-    data: { estado: 'ANULADO' }
+  // Anular ambos movimientos del grupo y revertir saldos
+  await req.db.movimientoCaja.updateMany({
+    where: { grupoComprobante: movEgreso.grupoComprobante },
+    data: { anulado: true, estado: 'ANULADO', fechaAnulacion: new Date(), anuladoPor: req.admin.id }
   })
 
-  await req.db.caja.update({
-    where: { id: transferencia.cajaOrigenId },
-    data: { saldoActual: { increment: montoNum } }
-  })
-
-  await req.db.caja.update({
-    where: { id: transferencia.cajaDestinoId },
-    data: { saldoActual: { decrement: montoNum } }
-  })
+  await req.db.caja.update({ where: { id: movEgreso.cajaId }, data: { saldoActual: { increment: montoNum } } })
+  await req.db.caja.update({ where: { id: movEgreso.cajaDestinoId }, data: { saldoActual: { decrement: montoNum } } })
 
   res.json({ success: true, message: 'Transferencia anulada correctamente' })
 }))
@@ -1831,24 +1764,10 @@ router.post('/pendientes-conciliar/transferir', checkPermiso('CAJA_MOVIMIENTOS')
     }
   }
 
-  // Crear transferencia
+  // Crear transferencia (acreditación de conciliación)
   const numero = await generarNumeroTransferencia(req.db)
   const numeroMovOrigen = await generarNumeroMovimiento(req.db)
   const numeroMovDestino = `MV-${new Date().getFullYear()}-${String(parseInt(numeroMovOrigen.split('-')[2]) + 1).padStart(5, '0')}`
-
-  const resultado = await req.db.transferenciaCaja.create({
-    data: {
-      numero,
-      cajaOrigenId: parseInt(cajaOrigenId),
-      cajaDestinoId: parseInt(cajaDestinoId),
-      fecha: new Date(),
-      monto: montoTotal,
-      concepto: concepto || 'Acreditación de valores conciliados',
-      descripcion: `Transferencia de ${movimientos.length} movimientos conciliados`,
-      estado: 'CONFIRMADO',
-      registradoPor: req.admin.id
-    }
-  })
 
   await req.db.movimientoCaja.create({
     data: {
@@ -1861,6 +1780,7 @@ router.post('/pendientes-conciliar/transferir', checkPermiso('CAJA_MOVIMIENTOS')
       concepto: `Transferencia a ${cajaDestino.nombre}`,
       descripcion: `Acreditación ${numero}`,
       cajaDestinoId: parseInt(cajaDestinoId),
+      grupoComprobante: numero,
       registradoPor: req.admin.id,
       conciliado: true
     }
@@ -1876,6 +1796,7 @@ router.post('/pendientes-conciliar/transferir', checkPermiso('CAJA_MOVIMIENTOS')
       cuentaContableId: cajaOrigen.cuentaContableId || cajaDestino.cuentaContableId,
       concepto: `Acreditación desde ${cajaOrigen.nombre}`,
       descripcion: `Acreditación ${numero}`,
+      grupoComprobante: numero,
       registradoPor: req.admin.id,
       conciliado: !cajaDestino.requiereConciliacion
     }

@@ -140,6 +140,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
   const cuotas = await req.db.cargo.findMany({
     where: { id: { in: cuotasIds } },
     include: {
+      conceptoTesoreria: { select: { id: true, cuentaContableId: true } },
       categoriaActividad: {
         select: {
           actividad: {
@@ -198,7 +199,7 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
       const centroCostoId = cuota.categoriaActividad?.actividad?.centroCostoId || null
 
       // Crear movimiento de caja
-      await req.db.movimientoCaja.create({
+      const movCaja = await req.db.movimientoCaja.create({
         data: {
           fecha: new Date(),
           tipo: 'INGRESO',
@@ -210,6 +211,21 @@ router.post('/pagos-informados/:id/confirmar', authAdmin, asyncHandler(async (re
           centroCostoId,
         },
       })
+
+      if (cuota.conceptoTesoreria?.cuentaContableId) {
+        await req.db.itemMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: movCaja.id,
+            conceptoTesoreriaId: cuota.conceptoTesoreria.id,
+            cuentaContableId: cuota.conceptoTesoreria.cuentaContableId,
+            centroCostoId: centroCostoId ?? null,
+            monto: movCaja.monto,
+            descripcion: `Cobro cuota: ${cuota.descripcion}`,
+            orden: 0,
+          },
+        })
+      }
     })
   )
 

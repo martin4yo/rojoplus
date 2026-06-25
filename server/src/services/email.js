@@ -556,6 +556,7 @@ ${bloqueCodigo}
             <strong>🔒 Seguridad:</strong><br>
             • Este link es válido por 24 horas<br>
             • Solo funciona desde el dispositivo donde lo abras<br>
+            • Una vez que entrás, ese dispositivo queda recordado por 30 días y no necesitás el link de nuevo<br>
             • Si no solicitaste este acceso, ignorá este email
           </p>
         </div>

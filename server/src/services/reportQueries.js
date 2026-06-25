@@ -929,6 +929,120 @@ const QUERY_DEFINITIONS = [
       }
     },
   },
+  {
+    key: 'ingresos_egresos_por_concepto',
+    label: 'Ingresos y Egresos por Concepto',
+    category: 'finanzas',
+    description: 'Totales de ingresos y egresos agrupados por concepto de tesorería, con filtros por período, concepto y centro de costos',
+    defaultParams: async (db, tenantId) => {
+      if (!db || !tenantId) {
+        return [
+          { name: 'fechaDesde', label: 'Desde', type: 'date', required: true, defaultValue: '' },
+          { name: 'fechaHasta', label: 'Hasta', type: 'date', required: true, defaultValue: '' },
+          { name: 'conceptoIds', label: 'Concepto', type: 'multiselect', required: false, defaultValue: [], options: [] },
+          { name: 'centroCostoIds', label: 'Centro de Costos', type: 'multiselect', required: false, defaultValue: [], options: [] },
+        ]
+      }
+      const [conceptos, centrosCosto] = await Promise.all([
+        db.conceptoTesoreria.findMany({
+          where: { tenantId, activo: true },
+          select: { id: true, codigo: true, nombre: true },
+          orderBy: [{ codigo: 'asc' }],
+        }),
+        db.centroCosto.findMany({
+          where: { tenantId, activo: true },
+          select: { id: true, codigo: true, nombre: true },
+          orderBy: { nombre: 'asc' },
+        }),
+      ])
+      return [
+        { name: 'fechaDesde', label: 'Desde', type: 'date', required: true, defaultValue: '' },
+        { name: 'fechaHasta', label: 'Hasta', type: 'date', required: true, defaultValue: '' },
+        { name: 'conceptoIds', label: 'Concepto', type: 'multiselect', required: false, defaultValue: [],
+          options: conceptos.map(c => ({ value: String(c.id), label: `${c.codigo} — ${c.nombre}` })) },
+        { name: 'centroCostoIds', label: 'Centro de Costos', type: 'multiselect', required: false, defaultValue: [],
+          options: centrosCosto.map(c => ({ value: String(c.id), label: c.nombre })) },
+      ]
+    },
+    run: async (db, tenantId, params) => {
+      const toIntArr = (v) => {
+        if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) return []
+        const arr = Array.isArray(v) ? v : String(v).split(',')
+        return arr.map(x => parseInt(x)).filter(n => Number.isFinite(n))
+      }
+
+      const conceptoIds = toIntArr(params.conceptoIds)
+      const centroCostoIds = toIntArr(params.centroCostoIds)
+
+      // Cargar todos los conceptos de tesorería para lookup de código por nombre
+      const conceptosTesoreria = await db.conceptoTesoreria.findMany({
+        where: { tenantId },
+        select: { id: true, codigo: true, nombre: true },
+      })
+      const conceptoByNombre = new Map(
+        conceptosTesoreria.map(c => [c.nombre.toLowerCase().trim(), c])
+      )
+
+      // Si hay filtro por concepto, filtrar por conceptoTesoreriaId
+      const where = { tenantId, anulado: false }
+      if (params.fechaDesde || params.fechaHasta) {
+        where.fecha = {}
+        if (params.fechaDesde) where.fecha.gte = new Date(params.fechaDesde)
+        if (params.fechaHasta) where.fecha.lte = new Date(params.fechaHasta + 'T23:59:59')
+      }
+      if (centroCostoIds.length === 1) where.centroCostoId = centroCostoIds[0]
+      else if (centroCostoIds.length > 1) where.centroCostoId = { in: centroCostoIds }
+      if (conceptoIds.length === 1) where.conceptoTesoreriaId = conceptoIds[0]
+      else if (conceptoIds.length > 1) where.conceptoTesoreriaId = { in: conceptoIds }
+
+      const movimientos = await db.movimientoCaja.findMany({
+        where,
+        select: { tipo: true, monto: true, concepto: true, conceptoTesoreriaId: true },
+      })
+
+      // Agrupar: por conceptoTesoreriaId cuando existe, por texto como fallback
+      const conceptoById = new Map(conceptosTesoreria.map(c => [c.id, c]))
+      const map = new Map()
+      for (const m of movimientos) {
+        let key, codigo, descripcion
+        if (m.conceptoTesoreriaId) {
+          key = `id:${m.conceptoTesoreriaId}`
+          const ct = conceptoById.get(m.conceptoTesoreriaId)
+          codigo = ct?.codigo || '—'
+          descripcion = ct?.nombre || m.concepto || '(sin concepto)'
+        } else {
+          key = `txt:${m.concepto || ''}`
+          const ct = conceptoByNombre.get((m.concepto || '').toLowerCase().trim())
+          codigo = ct?.codigo || '—'
+          descripcion = m.concepto || '(sin concepto)'
+        }
+        if (!map.has(key)) {
+          map.set(key, { codigoConcepto: codigo, descripcionConcepto: descripcion, ingreso: 0, egreso: 0 })
+        }
+        const entry = map.get(key)
+        const monto = Number(m.monto) || 0
+        if (m.tipo === 'INGRESO') entry.ingreso += monto
+        else if (m.tipo === 'EGRESO') entry.egreso += monto
+      }
+
+      const items = [...map.values()]
+        .sort((a, b) => a.codigoConcepto.localeCompare(b.codigoConcepto))
+        .map(i => ({ ...i, saldo: i.ingreso - i.egreso }))
+
+      const totalIngreso = items.reduce((acc, i) => acc + i.ingreso, 0)
+      const totalEgreso = items.reduce((acc, i) => acc + i.egreso, 0)
+
+      return {
+        items,
+        summary: {
+          totalIngreso,
+          totalEgreso,
+          saldo: totalIngreso - totalEgreso,
+          cantConceptos: items.length,
+        },
+      }
+    },
+  },
 ]
 
 export async function listQueryDefinitions(db = null, tenantId = null) {

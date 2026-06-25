@@ -187,10 +187,56 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
       })
     }
 
-    // Centro de costo fallback: primer producto con concepto de venta que tenga CC
+    // Centro de costo y concepto: del primer producto con concepto de venta
     const ccItemsFallback = productosVenta
       .map(p => p.productoBuffet?.producto?.conceptoVenta?.centroCostoId)
       .find(cc => cc != null) ?? null
+    const conceptoVentaId = productosVenta
+      .map(p => p.productoBuffet?.producto?.conceptoVenta?.id)
+      .find(id => id != null) ?? null
+
+    // Agrupar productos por conceptoVenta para ItemMovimientoCaja
+    const itemsPorConceptoVenta = {}
+    for (const p of productosVenta) {
+      const cv = p.productoBuffet?.producto?.conceptoVenta
+      const key = cv?.id ?? 'sin-concepto'
+      if (!itemsPorConceptoVenta[key]) {
+        itemsPorConceptoVenta[key] = {
+          conceptoTesoreriaId: cv?.id ?? null,
+          cuentaContableId: cv?.cuentaContableId ?? cuentaContable?.id ?? null,
+          centroCostoId: cv?.centroCostoId ?? ccItemsFallback,
+          monto: 0,
+        }
+      }
+      itemsPorConceptoVenta[key].monto += Number(p.subtotal)
+    }
+    const gruposConcepto = Object.values(itemsPorConceptoVenta)
+    const totalConceptos = gruposConcepto.reduce((s, g) => s + g.monto, 0)
+
+    async function crearItemsKi(db, movimientoId, montoMovimiento, caja) {
+      let montoAsignado = 0
+      for (let i = 0; i < gruposConcepto.length; i++) {
+        const g = gruposConcepto[i]
+        const esUltimo = i === gruposConcepto.length - 1
+        const montoItem = esUltimo
+          ? Math.round((montoMovimiento - montoAsignado) * 100) / 100
+          : Math.round(montoMovimiento * (g.monto / totalConceptos) * 100) / 100
+        if (montoItem <= 0) continue
+        montoAsignado += montoItem
+        await db.itemMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: movimientoId,
+            conceptoTesoreriaId: g.conceptoTesoreriaId,
+            cuentaContableId: g.cuentaContableId || caja.cuentaContableId || cuentaContable?.id,
+            centroCostoId: g.centroCostoId || caja.centroCostoId,
+            monto: montoItem,
+            descripcion: `Kiosco - ${detalleItems.join(', ')}`,
+            orden: i,
+          }
+        })
+      }
+    }
 
     const usaPagosMultiples = pagosParciales && Array.isArray(pagosParciales) && pagosParciales.length > 0
     const movimientos = []
@@ -230,11 +276,13 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
             centroCostoId: caja.centroCostoId ?? ccItemsFallback,
             monto: parseFloat(pago.monto),
             medioPagoId: medioPago.id,
+            conceptoTesoreriaId: conceptoVentaId,
             concepto: `Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
             descripcion: observaciones,
             registradoPor: req.admin.id
           }
         })
+        await crearItemsKi(req.db, movimiento.id, parseFloat(pago.monto), caja)
 
         // Generar asiento contable automático
         const cuentaDebeKiMulti = resolverCuentaCashId(medioPago, caja)
@@ -287,11 +335,13 @@ router.post('/kiosco/venta', authAdmin, checkPermiso('BUFFET_KIOSCO'), async (re
           centroCostoId: caja.centroCostoId ?? ccItemsFallback,
           monto: totalFinal,
           medioPagoId: medioPago.id,
+          conceptoTesoreriaId: conceptoVentaId,
           concepto: `Kiosco - ${detalleItems.join(', ')} - ${medioPago.nombre}${propinaMonto > 0 ? ` + Propina` : ''}`,
           descripcion: observaciones,
           registradoPor: req.admin.id
         }
       })
+      await crearItemsKi(req.db, movimiento.id, totalFinal, caja)
 
       // Generar asiento contable automático
       const cuentaDebeKi = resolverCuentaCashId(medioPago, caja)

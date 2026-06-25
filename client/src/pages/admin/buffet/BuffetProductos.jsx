@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit, Trash2, Image, Search, Check, X, Package, Upload, Settings, LayoutGrid, List } from 'lucide-react'
+import { Plus, Edit, Trash2, Image, Search, Check, X, Package, Upload, Settings, LayoutGrid, List, Globe } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../../services/api'
 import { tienePermiso, PERMISOS } from '../../../services/permisos'
@@ -51,6 +51,7 @@ export default function BuffetProductos() {
     tiposVenta: ['BUFFET', 'KIOSCO'], // Array con ambos por defecto
     disponible: true,
     destacado: false,
+    publicarMenu: false,
     orden: 0,
     // Para vincular producto existente
     productoId: ''
@@ -110,6 +111,7 @@ export default function BuffetProductos() {
         tiposVenta: producto.tiposVenta || ['BUFFET', 'KIOSCO'],
         disponible: producto.disponible,
         destacado: producto.destacado,
+        publicarMenu: producto.publicarMenu || false,
         orden: producto.orden || 0,
         productoId: producto.productoId
       })
@@ -130,6 +132,7 @@ export default function BuffetProductos() {
         tiposVenta: ['BUFFET', 'KIOSCO'],
         disponible: true,
         destacado: false,
+        publicarMenu: false,
         orden: 0,
         productoId: ''
       })
@@ -191,6 +194,7 @@ export default function BuffetProductos() {
           tiposVenta: formData.tiposVenta,
           disponible: formData.disponible,
           destacado: formData.destacado,
+          publicarMenu: formData.publicarMenu,
           orden: parseInt(formData.orden) || 0
         })
         toast.success('Producto actualizado')
@@ -214,6 +218,7 @@ export default function BuffetProductos() {
             tiposVenta: formData.tiposVenta,
             disponible: formData.disponible,
             destacado: formData.destacado,
+            publicarMenu: formData.publicarMenu,
             orden: parseInt(formData.orden) || 0
           })
           toast.success('Producto creado')
@@ -230,6 +235,7 @@ export default function BuffetProductos() {
             tiposVenta: formData.tiposVenta,
             disponible: formData.disponible,
             destacado: formData.destacado,
+            publicarMenu: formData.publicarMenu,
             orden: parseInt(formData.orden) || 0
           })
           toast.success('Producto agregado al menú')
@@ -270,6 +276,19 @@ export default function BuffetProductos() {
     } catch (err) {
       console.error('Error actualizando disponibilidad:', err)
       toast.error('Error al actualizar disponibilidad')
+    }
+  }
+
+  async function togglePublicarMenu(producto) {
+    try {
+      await api.put(`/admin/buffet/productos/${producto.id}/publicar-menu`, {
+        publicarMenu: !producto.publicarMenu
+      })
+      toast.success(producto.publicarMenu ? 'Producto oculto del menú público' : 'Producto publicado en el menú público')
+      cargarDatos()
+    } catch (err) {
+      console.error('Error actualizando publicación en menú:', err)
+      toast.error('Error al actualizar publicación en menú')
     }
   }
 
@@ -411,6 +430,26 @@ export default function BuffetProductos() {
             <span className={`px-2 py-0.5 rounded text-xs font-medium inline-flex items-center gap-1 ${prod.disponible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
               {prod.disponible ? <Check size={12} /> : <X size={12} />}
               {prod.disponible ? 'Disponible' : 'No disponible'}
+            </span>
+          )}
+          {/* Switch publicar en menú público */}
+          {tienePermiso(PERMISOS.BUFFET_CONFIG) ? (
+            <label className="relative inline-flex items-center cursor-pointer" title="Mostrar este producto en el menú público del buffet">
+              <input
+                type="checkbox"
+                checked={prod.publicarMenu}
+                onChange={() => togglePublicarMenu(prod)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+              <span className="ml-2 text-sm font-medium text-gray-700 inline-flex items-center gap-1">
+                <Globe size={13} className={prod.publicarMenu ? 'text-sky-600' : 'text-gray-400'} />
+                {prod.publicarMenu ? 'En menú público' : 'Oculto del menú'}
+              </span>
+            </label>
+          ) : prod.publicarMenu && (
+            <span className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded text-xs font-medium inline-flex items-center gap-1">
+              <Globe size={12} /> En menú público
             </span>
           )}
           {prod.destacado && (
@@ -661,6 +700,23 @@ export default function BuffetProductos() {
                     <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
                     <span className="ml-2 text-xs font-medium text-gray-700">
                       {prod.disponible ? 'Disponible' : 'No disponible'}
+                    </span>
+                  </label>
+                )}
+
+                {/* Switch publicar en menú público */}
+                {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
+                  <label className="relative inline-flex items-center cursor-pointer" title="Mostrar este producto en el menú público del buffet">
+                    <input
+                      type="checkbox"
+                      checked={prod.publicarMenu}
+                      onChange={() => togglePublicarMenu(prod)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+                    <span className="ml-2 text-xs font-medium text-gray-700 inline-flex items-center gap-1">
+                      <Globe size={12} className={prod.publicarMenu ? 'text-sky-600' : 'text-gray-400'} />
+                      {prod.publicarMenu ? 'En menú público' : 'Oculto del menú'}
                     </span>
                   </label>
                 )}
@@ -1034,6 +1090,23 @@ export default function BuffetProductos() {
                       </label>
                     </div>
                   </div>
+                </div>
+
+                {/* Publicar en menú público */}
+                <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.publicarMenu}
+                      onChange={e => setFormData({ ...formData, publicarMenu: e.target.checked })}
+                      className="rounded text-sky-600 focus:ring-sky-500"
+                    />
+                    <Globe size={16} className="text-sky-600" />
+                    <span className="text-sm font-medium text-sky-800">Publicar en menú público</span>
+                  </label>
+                  <p className="text-xs text-sky-700/70 mt-1 ml-6">
+                    Si está activo, el producto se muestra en la carta pública del buffet (independiente de "Disponible").
+                  </p>
                 </div>
               </form>
             </div>

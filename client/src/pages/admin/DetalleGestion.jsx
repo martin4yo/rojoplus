@@ -25,7 +25,7 @@ import { PlanPagosModal } from '../../components/PlanPagosModal'
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters'
 import api from '../../services/api'
 import { useConfirm } from '../../hooks/useConfirm'
-import ChatWidget from '../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function DetalleGestion() {
@@ -863,7 +863,7 @@ export default function DetalleGestion() {
       )}
 
       <ConfirmDialog />
-      <ChatWidget />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ role: "admin" }} />
     </div>
   )
 }

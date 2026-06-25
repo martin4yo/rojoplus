@@ -16,7 +16,7 @@ import { useConfirm } from '../../hooks/useConfirm'
 import api from '../../services/api'
 import { tienePermiso, PERMISOS } from '../../services/permisos'
 import { usePagination } from '../../hooks/usePagination'
-import ChatWidget from '../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { useTenant } from '../../contexts/TenantContext'
 import { formatCurrency } from '../../utils/formatters'
@@ -904,7 +904,7 @@ export default function AdminSocios() {
       <ConfirmDialog />
 
       {/* Axio - Chat Widget para Admins */}
-      <ChatWidget role="admin" position="bottom-right" />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ role: "admin" }} />
     </div>
   )
 }

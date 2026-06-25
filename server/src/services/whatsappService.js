@@ -487,7 +487,7 @@ const TEMPLATES_DEFAULT = {
   NOTIF_WA_PAGO:        '*{{nombre}}*, registramos tu pago de *{{monto}}*. Gracias!',
   NOTIF_WA_VENCIMIENTO: '*{{nombre}}*, tu cuota de *{{monto}}* vence el *{{vencimiento}}*.\nPagá online: {{linkPago}}',
   NOTIF_WA_MORA:        '*{{nombre}}*, tenés cuotas vencidas por un total de *{{total}}*.\nRegularizá desde el portal: {{linkPago}}',
-  NOTIF_WA_PORTAL:      '*{{nombre}}*, acá está tu acceso al portal del club:\n{{link}}\n\nEste link es personal y expira en 7 días.',
+  NOTIF_WA_PORTAL:      '*{{nombre}}*, acá está tu acceso al portal del club:\n{{link}}\n\nEste link es personal y expira en 24 horas. Si entrás desde tu celular, el dispositivo queda recordado y no vas a necesitar el link de nuevo.',
 }
 
 /**

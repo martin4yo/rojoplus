@@ -883,6 +883,20 @@ router.post('/:id/vender', authAdmin, checkPermiso('EVENTOS_VENDER'), async (req
         }
       })
 
+      // ItemMovimientoCaja para venta de entradas
+      await tx.itemMovimientoCaja.create({
+        data: {
+          tenantId: req.tenantId,
+          movimientoCajaId: movimientoCaja.id,
+          conceptoTesoreriaId: conceptoTesoreriaId || null,
+          cuentaContableId,
+          centroCostoId: centroCostoId || null,
+          monto: total,
+          descripcion: `Venta Entradas - ${evento.nombre}`,
+          orden: 0,
+        }
+      })
+
       // 1.1 Crear Asiento Contable
       // Obtener la caja y su cuenta contable (para el DEBE)
       const caja = await tx.caja.findUnique({
@@ -1141,6 +1155,53 @@ router.post('/venta-kiosco', authAdmin, checkPermiso('BUFFET_COBRAR'), async (re
           registradoPor: req.admin.id
         }
       })
+
+      // ItemMovimientoCaja — agrupar por conceptoTesoreria del evento
+      const gruposKiosco = {}
+      for (const r of resultados) {
+        const key = r.evento.conceptoTesoreriaId ?? 'sin'
+        if (!gruposKiosco[key]) {
+          gruposKiosco[key] = {
+            conceptoTesoreriaId: r.evento.conceptoTesoreriaId || null,
+            centroCostoId: r.evento.centroCostoId ?? ccEvento,
+            monto: 0,
+          }
+        }
+        gruposKiosco[key].monto += r.total
+      }
+      const ctIdsKi = Object.values(gruposKiosco).map(g => g.conceptoTesoreriaId).filter(Boolean)
+      const ctMapKi = {}
+      if (ctIdsKi.length > 0) {
+        const cts = await tx.conceptoTesoreria.findMany({
+          where: { id: { in: ctIdsKi } },
+          select: { id: true, cuentaContableId: true }
+        })
+        for (const ct of cts) ctMapKi[ct.id] = ct.cuentaContableId
+      }
+      const gruposKioscoArr = Object.values(gruposKiosco)
+      let montoAsigKi = 0
+      for (let i = 0; i < gruposKioscoArr.length; i++) {
+        const g = gruposKioscoArr[i]
+        const esUltimo = i === gruposKioscoArr.length - 1
+        const montoItem = esUltimo
+          ? Math.round((totalGeneral - montoAsigKi) * 100) / 100
+          : Math.round(totalGeneral * (g.monto / totalGeneral) * 100) / 100
+        if (montoItem <= 0) continue
+        montoAsigKi += montoItem
+        const ccIdKi = g.conceptoTesoreriaId ? (ctMapKi[g.conceptoTesoreriaId] ?? cuentaContable.id) : cuentaContable.id
+        await tx.itemMovimientoCaja.create({
+          data: {
+            tenantId: req.tenantId,
+            movimientoCajaId: movimientoCaja.id,
+            conceptoTesoreriaId: g.conceptoTesoreriaId,
+            cuentaContableId: ccIdKi,
+            centroCostoId: g.centroCostoId || null,
+            monto: montoItem,
+            descripcion: 'Venta Entradas Kiosco',
+            orden: i,
+          }
+        })
+      }
 
       // Crear Asiento Contable
       const caja = cajaKiosco

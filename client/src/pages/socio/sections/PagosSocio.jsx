@@ -19,7 +19,7 @@ import {
 import { useModal } from '../../../components/Modal'
 import { formatDate, formatCurrency } from '../../../utils/formatters'
 import StatusBadge from '../../../components/StatusBadge'
-import ChatWidget from '../../../components/chat/ChatWidget'
+import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensajesNoLeidos = 0, onNavigate, pagarCargoId = null, onPagarHandled }) {
@@ -1049,7 +1049,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
       {ModalComponent}
 
       {/* Axio - Chat Widget */}
-      <ChatWidget tokenPortal={tokenPortal} role="socio" position="bottom-right" />
+      <AxioChat endpoint="/api/chat" title="AXIO" extraBody={{ tokenPortal, role: "socio" }} />
     </div>
   )
 }

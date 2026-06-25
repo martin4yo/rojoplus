@@ -802,7 +802,8 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
             socioId: resultado.socioId,
             incluidoEnDebitoId: parseInt(id),
             saldo: { gt: 0 }
-          }
+          },
+          include: { conceptoTesoreria: true }
         })
 
         if (cargos.length > 0) {
@@ -853,7 +854,7 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
           }
           const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
 
-          await tx.movimientoCaja.create({
+          const movDA = await tx.movimientoCaja.create({
             data: {
               numero: numeroMov,
               cajaId: caja.id,
@@ -861,15 +862,53 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
               fecha: new Date(),
               tipo: 'INGRESO',
               concepto: 'Débito Automático',
+              conceptoTesoreriaId: cargos[0]?.conceptoTesoreriaId || null,
               monto: resultado.importe,
               descripcion: `Débito automático - Socio #${resultado.socioId} - ${archivo.numero}`,
               pagoId: pago.id,
               registradoPor: req.admin.id,
               centroCostoId: caja.centroCostoId ?? null,
-              // Si la caja requiere conciliación, queda pendiente de acreditar
               conciliado: !caja.requiereConciliacion
             }
           })
+
+          // ItemMovimientoCaja — un ítem por concepto de cargo
+          const gruposDA = {}
+          for (const c of cargos) {
+            const key = c.conceptoTesoreriaId ?? 'sin'
+            if (!gruposDA[key]) {
+              gruposDA[key] = {
+                conceptoTesoreriaId: c.conceptoTesoreriaId,
+                cuentaContableId: c.conceptoTesoreria?.cuentaContableId ?? caja.cuentaContableId,
+                centroCostoId: c.centroCostoId ?? caja.centroCostoId ?? null,
+                monto: 0,
+              }
+            }
+            gruposDA[key].monto += Number(c.saldo)
+          }
+          const gruposDAArr = Object.values(gruposDA)
+          const totalDA = gruposDAArr.reduce((s, g) => s + g.monto, 0)
+          let montoAsigDA = 0
+          for (let i = 0; i < gruposDAArr.length; i++) {
+            const g = gruposDAArr[i]
+            const esUltimo = i === gruposDAArr.length - 1
+            const montoItem = esUltimo
+              ? Math.round((resultado.importe - montoAsigDA) * 100) / 100
+              : Math.round(resultado.importe * (totalDA > 0 ? g.monto / totalDA : 1 / gruposDAArr.length) * 100) / 100
+            if (montoItem <= 0) continue
+            montoAsigDA += montoItem
+            await tx.itemMovimientoCaja.create({
+              data: {
+                movimientoCajaId: movDA.id,
+                conceptoTesoreriaId: g.conceptoTesoreriaId,
+                cuentaContableId: g.cuentaContableId,
+                centroCostoId: g.centroCostoId,
+                monto: montoItem,
+                descripcion: `Débito automático - Socio #${resultado.socioId} - ${archivo.numero}`,
+                orden: i,
+              }
+            })
+          }
 
           // Actualizar saldo de caja
           await tx.caja.update({
@@ -1748,7 +1787,8 @@ router.post('/archivos/:id/importar-respuesta-banco', authAdmin, asyncHandler(as
 
       if (res.estado === 'COBRADO') {
         const cargos = await tx.cargo.findMany({
-          where: { socioId: res.socioId, incluidoEnDebitoId: parseInt(id), saldo: { gt: 0 } }
+          where: { socioId: res.socioId, incluidoEnDebitoId: parseInt(id), saldo: { gt: 0 } },
+          include: { conceptoTesoreria: true }
         })
 
         if (cargos.length > 0) {
@@ -1794,7 +1834,7 @@ router.post('/archivos/:id/importar-respuesta-banco', authAdmin, asyncHandler(as
             : 1
           const numeroMov = `${prefijoMov}${String(siguienteMov).padStart(5, '0')}`
 
-          await tx.movimientoCaja.create({
+          const movDB = await tx.movimientoCaja.create({
             data: {
               numero: numeroMov,
               cajaId: caja.id,
@@ -1802,6 +1842,7 @@ router.post('/archivos/:id/importar-respuesta-banco', authAdmin, asyncHandler(as
               fecha: new Date(),
               tipo: 'INGRESO',
               concepto: 'Débito Bancario',
+              conceptoTesoreriaId: cargos[0]?.conceptoTesoreriaId || null,
               monto: res.importe,
               descripcion: `Débito bancario ${banco} - Socio #${res.socioId} - ${archivo.numero}`,
               pagoId: pago.id,
@@ -1811,6 +1852,45 @@ router.post('/archivos/:id/importar-respuesta-banco', authAdmin, asyncHandler(as
               tenantId: req.tenantId
             }
           })
+
+          // ItemMovimientoCaja — un ítem por concepto de cargo
+          const gruposDB = {}
+          for (const c of cargos) {
+            const key = c.conceptoTesoreriaId ?? 'sin'
+            if (!gruposDB[key]) {
+              gruposDB[key] = {
+                conceptoTesoreriaId: c.conceptoTesoreriaId,
+                cuentaContableId: c.conceptoTesoreria?.cuentaContableId ?? caja.cuentaContableId,
+                centroCostoId: c.centroCostoId ?? caja.centroCostoId ?? null,
+                monto: 0,
+              }
+            }
+            gruposDB[key].monto += Number(c.saldo)
+          }
+          const gruposDBArr = Object.values(gruposDB)
+          const totalDB = gruposDBArr.reduce((s, g) => s + g.monto, 0)
+          let montoAsigDB = 0
+          for (let i = 0; i < gruposDBArr.length; i++) {
+            const g = gruposDBArr[i]
+            const esUltimo = i === gruposDBArr.length - 1
+            const montoItem = esUltimo
+              ? Math.round((res.importe - montoAsigDB) * 100) / 100
+              : Math.round(res.importe * (totalDB > 0 ? g.monto / totalDB : 1 / gruposDBArr.length) * 100) / 100
+            if (montoItem <= 0) continue
+            montoAsigDB += montoItem
+            await tx.itemMovimientoCaja.create({
+              data: {
+                tenantId: req.tenantId,
+                movimientoCajaId: movDB.id,
+                conceptoTesoreriaId: g.conceptoTesoreriaId,
+                cuentaContableId: g.cuentaContableId,
+                centroCostoId: g.centroCostoId,
+                monto: montoItem,
+                descripcion: `Débito bancario ${banco} - Socio #${res.socioId} - ${archivo.numero}`,
+                orden: i,
+              }
+            })
+          }
 
           await tx.caja.update({
             where: { id: caja.id },
