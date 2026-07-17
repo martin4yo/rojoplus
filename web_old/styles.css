@@ -6,49 +6,34 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  /* Paleta Axioma — amarillo + púrpuras + navy */
-  --bg:        #F7F5FB;     /* lavanda muy claro */
-  --bg-2:      #EFEAF6;     /* sección alterna */
-  --bg-dark:   #0F0A1E;     /* navy-púrpura oscuro */
-  --bg-deep:   #241141;     /* púrpura profundo */
+  /* Paleta */
+  --bg:        #F4F1EB;     /* fondo cálido tipo papel */
+  --bg-dark:   #0A0A0B;     /* hero/secciones oscuras */
   --bg-surface:#FFFFFF;
-  --ink:       #241436;     /* texto principal (tinta púrpura) */
-  --ink-soft:  #574A66;     /* texto secundario */
-  --ink-mute:  #8E85A0;     /* metadata, eyebrows */
-  --line:      rgba(53,33,81,0.12);
-  --line-strong: rgba(53,33,81,0.24);
+  --ink:       #14120E;     /* texto principal */
+  --ink-soft:  #4B4942;     /* texto secundario */
+  --ink-mute:  #8C887E;     /* metadata, eyebrows */
+  --line:      rgba(20,18,14,0.10);
+  --line-strong: rgba(20,18,14,0.22);
 
-  /* Acento estructural — púrpura Axioma */
-  --accent:        #7C5CA6;
-  --accent-bright: #6b5b95;
-  --accent-glow:   rgba(124,92,166,0.30);
-
-  /* Highlight — amarillo Axioma (CTA, destaques) */
-  --gold:        #F8D820;
-  --gold-bright: #f5c600;
-  --gold-ink:    #2A1B45;   /* texto sobre amarillo */
-  --gold-glow:   rgba(248,216,32,0.45);
+  /* Acento — azul Clubix Sport (tenant clubix-sport) */
+  --accent:        #3B9FF3;
+  --accent-bright: #2589E6;
+  --accent-glow:   rgba(59,159,243,0.28);
 
   /* Cuando estamos sobre fondo oscuro */
   --on-dark:       #FFFFFF;
-  --on-dark-soft:  rgba(255,255,255,0.72);
-  --on-dark-mute:  rgba(255,255,255,0.45);
-  --on-dark-line:  rgba(255,255,255,0.12);
+  --on-dark-soft:  rgba(255,255,255,0.65);
+  --on-dark-mute:  rgba(255,255,255,0.40);
+  --on-dark-line:  rgba(255,255,255,0.10);
 
-  /* Tipografía Axioma */
+  /* Tipografía */
   --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-display: 'Montserrat', 'Inter', sans-serif;
-  --font-mono:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-
-  /* Radios / sombras suaves */
-  --radius:      18px;
-  --radius-sm:   12px;
-  --radius-pill: 999px;
-  --shadow-soft: 0 10px 30px -12px rgba(53,33,81,0.22), 0 4px 10px -6px rgba(53,33,81,0.12);
-  --shadow-lift: 0 24px 48px -18px rgba(53,33,81,0.30), 0 8px 18px -10px rgba(53,33,81,0.16);
+  --font-display: 'Anton', 'Inter', sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', Menlo, monospace;
 
   /* Layout */
-  --container-w: 1200px;
+  --container-w: 1280px;
   --gutter: clamp(20px, 4vw, 48px);
 }
 
@@ -1520,147 +1505,3 @@ section { padding: clamp(80px, 10vw, 140px) 0; }
   color: var(--ink-soft);
   font-weight: 300;
 }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   SKIN AXIOMA — re-brand sobre la estructura de Clubix
-   Montserrat italic · amarillo #F8D820 + púrpuras · redondeado + sombras suaves
-   Se apoya en los tokens de :root; overrides al final para ganar en cascada.
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ─── Tipografía display: Montserrat heavy italic ───────────────────────── */
-.font-display,
-.hero h1, .section-header h2, .rojo-ia-text h2, .cta h2, .contact-info h2,
-.feature-card h3, .pillar-head h3, .benefit-item h3, .audience-card h3,
-.wa-feature h4, .pricing-header h3, .amount, .contact-block__body h4,
-.integra-step__t, .stat-number, .benefit-number, .ai-callout strong,
-.whatsapp-chat__avatar {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-/* Los titulares gigantes en 900 */
-.hero h1, .section-header h2, .rojo-ia-text h2, .cta h2, .contact-info h2,
-.stat-number, .benefit-number, .amount { font-weight: 900; }
-
-/* Titulares de tarjeta: sin mayúsculas (más amigable, entran palabras largas) */
-.feature-card h3, .pillar-head h3, .benefit-item h3, .audience-card h3,
-.wa-feature h4, .pricing-header h3, .contact-block__body h4, .integra-step__t {
-  text-transform: none;
-}
-
-/* Reajuste de tamaños (Montserrat es más ancha que Anton) */
-.hero h1 { font-size: clamp(40px, 7vw, 104px); line-height: 0.98; }
-.section-header h2, .rojo-ia-text h2 { font-size: clamp(30px, 4.4vw, 62px); line-height: 1.02; }
-.cta h2 { font-size: clamp(36px, 5.5vw, 78px); }
-.contact-info h2 { font-size: clamp(34px, 4.5vw, 60px); }
-.feature-card h3 { font-size: 21px; line-height: 1.12; }
-.pillar-head h3 { font-size: clamp(24px, 3vw, 40px); line-height: 1.04; }
-
-/* ─── Botones: amarillo pill (primario) / púrpura (secundario) ──────────── */
-.btn, .btn-primary, .btn-secondary, .btn-outline {
-  border-radius: var(--radius-pill);
-  font-family: var(--font-sans);
-  font-weight: 700;
-  text-transform: none;
-  letter-spacing: 0.01em;
-  font-size: 14px;
-  gap: 10px;
-}
-.btn-primary { background: var(--gold); color: var(--gold-ink);
-  box-shadow: 0 10px 26px -10px var(--gold-glow); }
-.btn-primary:hover { background: var(--gold-bright); color: var(--gold-ink);
-  transform: translateY(-2px) scale(1.03); box-shadow: 0 16px 34px -8px var(--gold-glow); }
-.nav-links > a.btn-primary, .nav-links > a.btn-primary:hover { color: var(--gold-ink); }
-.btn-secondary { border-color: var(--accent); color: var(--accent); }
-.btn-secondary:hover { background: var(--accent); color: #fff; }
-.btn-secondary.on-dark { border-color: rgba(255,255,255,0.55); color: #fff; }
-.btn-secondary.on-dark:hover { background: #fff; color: var(--ink); }
-.btn-outline { border-color: var(--accent); color: var(--accent); }
-.btn-outline:hover { background: var(--accent); color: #fff; }
-
-/* ─── Eyebrows: línea dorada sobre oscuro ───────────────────────────────── */
-.eyebrow.on-dark::before, .cta .eyebrow::before,
-.whatsapp-ia .features-eyebrow::before, .rojo-ia .eyebrow::before { background: var(--gold); }
-
-/* ─── Tarjetas: separadas, redondeadas, sombra suave, hover lift ────────── */
-.features-grid, .benefits-grid, .audience-grid { border: 0; gap: 22px; }
-.integra-flow { border: 0; gap: 16px; }
-
-.feature-card, .audience-card, .integra-step, .benefit-item {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
-  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
-}
-.feature-card:hover, .audience-card:hover {
-  transform: translateY(-6px) scale(1.02);
-  box-shadow: var(--shadow-lift);
-  background: var(--bg-surface);
-}
-.benefit-item:hover { transform: translateY(-4px); box-shadow: var(--shadow-lift); }
-.benefit-item, .benefit-item:nth-child(2n) { border-right: 1px solid var(--line); }
-.feature-card__num, .integra-step__k, .benefit-number, .pillar-head .features-eyebrow,
-.feature-icon-line { color: var(--accent); }
-.feature-card__num { font-weight: 700; }
-
-/* Tags redondeados */
-.mod-tag, .replace-tag { border-radius: var(--radius-pill); border-color: var(--line-strong); }
-.replace-tag s { text-decoration-color: var(--gold); }
-
-/* Tarjeta destacada: gradiente púrpura Axioma */
-.feature-card.is-feat {
-  background: linear-gradient(150deg, #3A2260 0%, #241141 100%);
-  border-color: rgba(255,255,255,0.14);
-}
-.feature-card.is-feat:hover { background: linear-gradient(150deg, #452a72 0%, #2b1550 100%); }
-.feature-card.is-feat .feature-card__num { color: var(--gold); }
-.feature-card.is-feat .mod-tag { color: var(--on-dark-soft); border-color: var(--on-dark-line); }
-
-/* ─── Secciones oscuras: gradientes púrpura-navy ────────────────────────── */
-.rojo-ia, .whatsapp-ia { background: linear-gradient(165deg, #170D30 0%, #0F0A1E 55%, #241141 100%); }
-.cta { background: linear-gradient(150deg, #241141 0%, #0F0A1E 100%); }
-.footer { background: #0B0718; }
-
-/* Hero: overlay púrpura + glow dorado tipo "sol" ------------------------- */
-.hero::after { background: var(--gold); opacity: 0.16; }
-.hero-overlay {
-  background:
-    linear-gradient(180deg, rgba(15,10,30,0.50) 0%, rgba(15,10,30,0.92) 100%),
-    linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px);
-  background-size: 100% 100%, 80px 80px, 80px 80px;
-}
-.hero h1 .accent { color: var(--gold); }
-.hero-indicator__bar > span { background: var(--gold); }
-
-/* ─── Axio IA: acentos dorados sobre el navy ────────────────────────────── */
-.rojo-ia-text .subtitle { color: var(--gold); }
-.ai-features li svg { color: var(--gold); }
-.ai-circle { border-color: var(--gold); }
-.ai-callout { border-left-color: var(--gold); }
-.ai-callout-mark { border-color: var(--gold); color: var(--gold); }
-
-/* ─── WhatsApp mock: avatar dorado ──────────────────────────────────────── */
-.whatsapp-chat { border-radius: var(--radius); }
-.whatsapp-chat__avatar { background: var(--gold); color: var(--gold-ink); }
-
-/* ─── Pricing: cards redondeadas, destacada púrpura, badge dorado ───────── */
-.pricing-card { border-radius: var(--radius); box-shadow: var(--shadow-soft); }
-.pricing-card:hover { border-color: var(--accent); transform: translateY(-6px) scale(1.01);
-  box-shadow: var(--shadow-lift); }
-.pricing-card.featured {
-  background: linear-gradient(155deg, #3A2260 0%, #241141 100%);
-  border-color: transparent;
-}
-.pricing-card.featured .price-desc { color: var(--on-dark-mute); }
-.badge-popular { background: var(--gold); color: var(--gold-ink);
-  border-radius: 0 var(--radius) 0 var(--radius); }
-.pricing-features li::before { background: var(--accent); }
-.pricing-card.featured .pricing-features li::before { background: var(--gold); }
-
-/* ─── Formulario e inputs redondeados ───────────────────────────────────── */
-.contact-form { border-radius: var(--radius); box-shadow: var(--shadow-soft); }
-.form-group input, .form-group textarea, .form-group select { border-radius: var(--radius-sm); }
-.form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent); }
