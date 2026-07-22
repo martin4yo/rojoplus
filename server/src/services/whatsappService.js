@@ -512,11 +512,14 @@ const _CLAVES_REQUIEREN_LINK = new Set([
  */
 async function resolverTemplate(db, clave, variables) {
   const config = await db.configuracion.findFirst({ where: { clave } }).catch(() => null)
+  const isCustom = !!config?.valor
   const template = config?.valor || TEMPLATES_DEFAULT[clave] || ''
   const usaLink = /\{\{(link|linkPago|linkPortal)\}\}/.test(template)
   let rendered = template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? '')
 
-  if (_CLAVES_REQUIEREN_LINK.has(clave) && !usaLink) {
+  // Solo auto-append el link en el template default; si el tenant configuró
+  // su propio texto, se respeta tal cual (puede intencionalmente omitir el link).
+  if (!isCustom && _CLAVES_REQUIEREN_LINK.has(clave) && !usaLink) {
     const link = variables.linkPago || variables.linkPortal || variables.link
     if (link) {
       rendered = `${rendered.trimEnd()}\n\nPortal: ${link}`

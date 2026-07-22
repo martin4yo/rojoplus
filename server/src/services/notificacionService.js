@@ -928,72 +928,130 @@ export async function verificarCuotasVencidasHoy() {
   }
 }
 
+// Días para considerar "deuda reciente": el período más reciente impago del grupo
+// debe haber vencido dentro de esta ventana. ~60 días cubre el último período
+// facturado (cuotas mensuales). Configurable vía env MOROSIDAD_DIAS_RECIENTE.
+const MOROSIDAD_DIAS_RECIENTE = parseInt(process.env.MOROSIDAD_DIAS_RECIENTE || '60', 10)
+
 /**
- * Verificar socios con morosidad (cuotas vencidas hace más de 15 días)
+ * Analiza la morosidad de un grupo familiar contando períodos consecutivos
+ * impagos a partir del más reciente vencido.
+ *
+ * Un "período impago" = el grupo tiene al menos una cuota PENDIENTE vencida en ese
+ * período. Recorremos los períodos vencidos de más nuevo a más viejo y contamos
+ * cuántos consecutivos están impagos hasta toparnos con uno pago (corta la racha).
+ *
+ * @param {number[]} socioIds - IDs del grupo (titular + miembros)
+ * @returns {Promise<{streak:number, ultimoImpagoVenc:Date|null}>}
+ *   streak           = cantidad de períodos consecutivos impagos desde el actual
+ *   ultimoImpagoVenc = fecha de vencimiento del período impago más reciente
+ */
+async function analizarMorosidadGrupo(socioIds) {
+  const ahora = new Date()
+  const cargos = await prisma.cargo.findMany({
+    where: {
+      socioId: { in: socioIds },
+      periodoId: { not: null },
+      estado: { in: ['PENDIENTE', 'PAGADO'] },
+      fechaVencimiento: { lt: ahora }, // solo períodos ya vencidos
+    },
+    select: {
+      estado: true,
+      fechaVencimiento: true,
+      periodo: { select: { anio: true, mes: true } },
+    },
+  })
+
+  // Consolidar por período: impago si hay alguna PENDIENTE
+  const porPeriodo = new Map()
+  for (const c of cargos) {
+    if (!c.periodo) continue
+    const key = c.periodo.anio * 100 + c.periodo.mes
+    const e = porPeriodo.get(key) || { key, unpaid: false, venc: null }
+    if (c.estado === 'PENDIENTE') {
+      e.unpaid = true
+      if (!e.venc || c.fechaVencimiento > e.venc) e.venc = c.fechaVencimiento
+    }
+    porPeriodo.set(key, e)
+  }
+
+  const periodos = [...porPeriodo.values()].sort((a, b) => b.key - a.key)
+  let streak = 0
+  let ultimoImpagoVenc = null
+  for (const p of periodos) {
+    if (!p.unpaid) break // período pago corta la racha
+    streak++
+    if (streak === 1) ultimoImpagoVenc = p.venc // el más reciente
+  }
+  return { streak, ultimoImpagoVenc }
+}
+
+/**
+ * Verificar socios con morosidad TEMPRANA.
+ *
+ * Criterio: titulares (o socios únicos) que deben 1 o 2 períodos consecutivos
+ * contados a partir del período más reciente vencido (recupero temprano), y cuya
+ * deuda más reciente es reciente (último impago vencido dentro de MOROSIDAD_DIAS_RECIENTE).
+ * Esto excluye automáticamente a los morosos crónicos (3+ períodos) y a ex-socios
+ * que arrastran deuda vieja. Se excluyen fallecidos. Anti-spam: 1 aviso / 15 días.
  */
 export async function verificarMorosidad() {
   try {
+    const ahora = new Date()
     const hace15Dias = new Date()
     hace15Dias.setDate(hace15Dias.getDate() - 15)
+    const corteReciente = new Date()
+    corteReciente.setDate(corteReciente.getDate() - MOROSIDAD_DIAS_RECIENTE)
 
     const pausados = await getTenantsBloqueadosPorCron('MOROSIDAD_RECORDATORIO')
-    // Buscar SOLO titulares (o socios únicos) cuyo grupo tenga cuotas vencidas hace más de 15 días.
-    // Excluimos miembros de grupo familiar para no notificar al titular varias veces.
-    const sociosConMorosidad = await prisma.socio.findMany({
+
+    // Candidatos: titulares/socios únicos (no fallecidos) con AL MENOS una cuota
+    // PENDIENTE vencida RECIENTE (propia o de un miembro). El recorte fino de
+    // "1-2 períodos consecutivos" se hace luego en analizarMorosidadGrupo.
+    const cuotaRecienteVencida = {
+      some: { estado: 'PENDIENTE', fechaVencimiento: { gte: corteReciente, lt: ahora } },
+    }
+    const candidatos = await prisma.socio.findMany({
       where: {
-        estadoSocioRel: { esSocioActivo: true },
-        titularFamiliaId: null, // solo titulares o socios únicos
+        titularFamiliaId: null,
+        NOT: { estadoSocioRel: { codigo: 'BAJA_POR_FALLECIMIENTO' } },
         OR: [
-          {
-            cargos: {
-              some: {
-                estado: 'PENDIENTE',
-                fechaVencimiento: { lt: hace15Dias },
-              },
-            },
-          },
-          {
-            miembrosFamilia: {
-              some: {
-                cargos: {
-                  some: {
-                    estado: 'PENDIENTE',
-                    fechaVencimiento: { lt: hace15Dias },
-                  },
-                },
-              },
-            },
-          },
+          { cargos: cuotaRecienteVencida },
+          { miembrosFamilia: { some: { cargos: cuotaRecienteVencida } } },
         ],
         ...(pausados.length > 0 ? { tenantId: { notIn: pausados } } : {}),
       },
-      select: { id: true },
+      select: { id: true, miembrosFamilia: { select: { id: true } } },
     })
 
-    console.log(`🔍 Encontrados ${sociosConMorosidad.length} titulares con morosidad`)
+    let programadas = 0
+    for (const titular of candidatos) {
+      const groupIds = [titular.id, ...titular.miembrosFamilia.map((m) => m.id)]
+      const { streak, ultimoImpagoVenc } = await analizarMorosidadGrupo(groupIds)
 
-    for (const socio of sociosConMorosidad) {
-      // Verificar que no se haya notificado en los últimos 15 días
+      // Solo 1 o 2 períodos consecutivos impagos desde el más reciente...
+      if (streak < 1 || streak > 2) continue
+      // ...y que esa deuda sea reciente (no un ex-socio con deuda vieja de 1-2 cuotas)
+      if (!ultimoImpagoVenc || ultimoImpagoVenc < corteReciente) continue
+
+      // Anti-spam: no re-notificar dentro de los últimos 15 días
       const ultimaNotificacion = await prisma.notificacionLog.findFirst({
         where: {
           eventType: 'MOROSIDAD',
-          socioId: socio.id,
+          socioId: titular.id,
           enviado: true,
-          fechaEnvio: {
-            gte: hace15Dias,
-          },
+          fechaEnvio: { gte: hace15Dias },
         },
-        orderBy: {
-          fechaEnvio: 'desc',
-        },
+        orderBy: { fechaEnvio: 'desc' },
       })
+      if (ultimaNotificacion) continue
 
-      if (!ultimaNotificacion) {
-        await notificarMorosidad(socio.id)
-      }
+      await notificarMorosidad(titular.id)
+      programadas++
     }
 
-    return sociosConMorosidad.length
+    console.log(`🔍 Morosidad temprana: ${candidatos.length} candidatos → ${programadas} notificaciones programadas`)
+    return programadas
   } catch (error) {
     console.error('Error verificando morosidad:', error.message)
     throw error
