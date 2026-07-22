@@ -1,0 +1,474 @@
+<title>Clubix — Medición de esfuerzo de desarrollo</title>
+<style>
+  :root {
+    --paper:    #F3F5F7;
+    --surface:  #FFFFFF;
+    --ink:      #161A20;
+    --ink-2:    #59636E;
+    --ink-3:    #8A939D;
+    --rule:     #D2D8DE;
+    --rule-soft:#E4E9ED;
+    --mass:     #3A4550;
+    --accent:   #0E6B84;
+    --accent-soft: #D9EAF0;
+    --hot:      #A6412A;
+    --hot-soft: #F2E0DB;
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+    --measure: 68ch;
+    --gutter: 15ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:    #0F1317;
+      --surface:  #161B21;
+      --ink:      #E4E9ED;
+      --ink-2:    #99A3AD;
+      --ink-3:    #6B757F;
+      --rule:     #2B333B;
+      --rule-soft:#20272E;
+      --mass:     #7C8894;
+      --accent:   #4FBAD6;
+      --accent-soft: #12303A;
+      --hot:      #E08A6C;
+      --hot-soft: #38221B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:    #0F1317;
+    --surface:  #161B21;
+    --ink:      #E4E9ED;
+    --ink-2:    #99A3AD;
+    --ink-3:    #6B757F;
+    --rule:     #2B333B;
+    --rule-soft:#20272E;
+    --mass:     #7C8894;
+    --accent:   #4FBAD6;
+    --accent-soft: #12303A;
+    --hot:      #E08A6C;
+    --hot-soft: #38221B;
+  }
+  :root[data-theme="light"] {
+    --paper:    #F3F5F7;
+    --surface:  #FFFFFF;
+    --ink:      #161A20;
+    --ink-2:    #59636E;
+    --ink-3:    #8A939D;
+    --rule:     #D2D8DE;
+    --rule-soft:#E4E9ED;
+    --mass:     #3A4550;
+    --accent:   #0E6B84;
+    --accent-soft: #D9EAF0;
+    --hot:      #A6412A;
+    --hot-soft: #F2E0DB;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 96ch;
+    margin: 0 auto;
+    padding: clamp(2rem, 6vw, 5rem) clamp(1.15rem, 4vw, 3rem) 6rem;
+  }
+
+  /* ---- banda: gutter de procedencia + columna principal ---- */
+  .band {
+    display: grid;
+    grid-template-columns: var(--gutter) minmax(0, 1fr);
+    gap: 0 2.5rem;
+    padding: 2.75rem 0;
+    border-top: 1px solid var(--rule);
+    align-items: start;
+  }
+  .band:first-of-type { border-top: 0; }
+
+  .src {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    line-height: 1.5;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-top: 0.45rem;
+  }
+  .src b { display: block; color: var(--ink-2); font-weight: 600; }
+
+  .col { display: flex; flex-direction: column; gap: 1.15rem; min-width: 0; }
+
+  @media (max-width: 760px) {
+    .band { grid-template-columns: 1fr; gap: 0.9rem; }
+    .src { padding-top: 0; }
+  }
+
+  /* ---- tipografía ---- */
+  h1, h2, h3 { font-family: var(--mono); font-weight: 600; text-wrap: balance; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5vw, 3.05rem);
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+    margin: 0;
+  }
+  h2 {
+    font-size: clamp(1.1rem, 2.4vw, 1.35rem);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  h3 {
+    font-size: 0.82rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    margin: 0;
+  }
+  p { margin: 0; max-width: var(--measure); }
+  .lede { font-size: 1.06rem; color: var(--ink-2); max-width: 60ch; }
+  .fine { font-size: 0.875rem; color: var(--ink-2); }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---- encabezado ---- */
+  .masthead { padding-bottom: 2.5rem; display: flex; flex-direction: column; gap: 1.1rem; }
+  .stamp {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem;
+    font-family: var(--mono); font-size: 0.72rem;
+    letter-spacing: 0.04em; color: var(--ink-3);
+    border-top: 1px solid var(--rule); padding-top: 0.9rem;
+  }
+  .stamp span { white-space: nowrap; }
+  .stamp b { color: var(--ink-2); font-weight: 600; }
+
+  /* ---- comparación héroe ---- */
+  .compare { display: flex; flex-direction: column; gap: 1.6rem; }
+  .cmp-row { display: flex; flex-direction: column; gap: 0.4rem; }
+  .cmp-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+  }
+  .cmp-label { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.05em; color: var(--ink-2); }
+  .cmp-val {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: clamp(1.35rem, 3.6vw, 1.9rem); font-weight: 600;
+    letter-spacing: -0.03em; line-height: 1;
+  }
+  .cmp-val small { font-size: 0.5em; font-weight: 400; letter-spacing: 0.04em; color: var(--ink-3); margin-left: 0.35rem; }
+  .cmp-track { height: 15px; background: var(--rule-soft); border-radius: 1px; overflow: hidden; }
+  .cmp-fill { height: 100%; border-radius: 1px; }
+  .fill-mass { background: var(--mass); width: 100%; }
+  .fill-real { background: var(--accent); width: 3.6%; min-width: 4px; }
+
+  .ratio {
+    display: flex; align-items: baseline; gap: 0.7rem;
+    border-left: 3px solid var(--accent); padding-left: 1rem; margin-top: 0.3rem;
+  }
+  .ratio-num {
+    font-family: var(--mono); font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 600; letter-spacing: -0.045em; color: var(--accent); line-height: 1;
+  }
+  .ratio-txt { font-size: 0.9rem; color: var(--ink-2); max-width: 34ch; }
+
+  /* ---- tablas ---- */
+  .scroll { overflow-x: auto; margin-inline: -0.25rem; padding-inline: 0.25rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
+  caption {
+    caption-side: top; text-align: left;
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-3);
+    padding-bottom: 0.65rem;
+  }
+  th {
+    text-align: left; font-family: var(--mono); font-weight: 600;
+    font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-2); padding: 0 0.7rem 0.55rem 0;
+    border-bottom: 1px solid var(--rule); white-space: nowrap;
+  }
+  td {
+    padding: 0.55rem 0.7rem 0.55rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: baseline;
+  }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child, th:first-child { padding-left: 0; }
+  .r { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tfoot td {
+    border-top: 2px solid var(--rule); border-bottom: 0;
+    font-weight: 600; padding-top: 0.7rem;
+  }
+  tbody tr.total td { font-weight: 600; border-top: 1px solid var(--rule); }
+
+  /* barra dentro de la tabla de módulos */
+  .barcell { width: 34%; min-width: 110px; }
+  .bar { height: 8px; background: var(--accent); border-radius: 1px; }
+  .bar-b { background: var(--mass); }
+
+  /* chips de complejidad */
+  .chip {
+    display: inline-block; font-family: var(--mono);
+    font-size: 0.66rem; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 0.14rem 0.45rem; border-radius: 2px; white-space: nowrap;
+  }
+  .c-max { background: var(--hot-soft);    color: var(--hot); }
+  .c-alt { background: var(--accent-soft); color: var(--accent); }
+  .c-med { background: var(--rule-soft);   color: var(--ink-2); }
+  .c-baj { color: var(--ink-3); }
+
+  /* ---- cifras sueltas ---- */
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.4rem 2rem; }
+  .fact { display: flex; flex-direction: column; gap: 0.15rem; }
+  .fact dt { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .fact dd {
+    margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 1.5rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1;
+  }
+  .fact dd em { font-style: normal; font-size: 0.62rem; letter-spacing: 0.04em; color: var(--ink-3); font-weight: 400; }
+
+  /* ---- advertencias ---- */
+  .caveats { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.85rem; max-width: var(--measure); }
+  .caveats li { padding-left: 1.3rem; position: relative; font-size: 0.9rem; color: var(--ink-2); }
+  .caveats li::before {
+    content: "—"; position: absolute; left: 0; top: 0;
+    font-family: var(--mono); color: var(--hot);
+  }
+  .caveats strong { color: var(--ink); font-weight: 600; }
+
+  /* ---- cierre ---- */
+  .pull {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    padding: 1.6rem 1.8rem;
+    font-size: 1.02rem;
+    line-height: 1.6;
+    max-width: var(--measure);
+  }
+  .pull .num { font-weight: 600; }
+
+  .colophon {
+    border-top: 1px solid var(--rule); margin-top: 3rem; padding-top: 1.2rem;
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.05em;
+    color: var(--ink-3); line-height: 1.7;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>
+
+<div class="sheet">
+
+  <header class="masthead">
+    <p class="eyebrow">Medición de esfuerzo de desarrollo</p>
+    <h1>Clubix</h1>
+    <p class="lede">Qué costaría construir este sistema por la vía tradicional, cuánto llevó realmente, y qué tan confiable es cada una de esas dos cifras.</p>
+    <div class="stamp">
+      <span><b>Período</b> 17 ene 2026 – 16 jul 2026</span>
+      <span><b>Commits</b> 457</span>
+      <span><b>Días activos</b> 75</span>
+      <span><b>Código</b> ~250.000 líneas</span>
+      <span><b>Modelos de datos</b> 177</span>
+    </div>
+  </header>
+
+  <!-- ================= TESIS ================= -->
+  <section class="band">
+    <div class="src"><b>Comparación</b>Estimación paramétrica vs. historial de git</div>
+    <div class="col">
+      <h2>Dos cifras a la misma escala</h2>
+      <div class="compare">
+
+        <div class="cmp-row">
+          <div class="cmp-head">
+            <span class="cmp-label">Desarrollo tradicional equivalente</span>
+            <span class="cmp-val">~10.900 <small>horas-hombre</small></span>
+          </div>
+          <div class="cmp-track"><div class="cmp-fill fill-mass"></div></div>
+          <p class="fine">Equivale a un equipo de 4–5 personas durante cerca de dos años.</p>
+        </div>
+
+        <div class="cmp-row">
+          <div class="cmp-head">
+            <span class="cmp-label">Tiempo real invertido, con asistencia de IA</span>
+            <span class="cmp-val">~400 <small>horas</small></span>
+          </div>
+          <div class="cmp-track"><div class="cmp-fill fill-real"></div></div>
+          <p class="fine">Una persona, 75 días activos repartidos en seis meses.</p>
+        </div>
+
+      </div>
+
+      <div class="ratio">
+        <span class="ratio-num">25×</span>
+        <span class="ratio-txt">Factor de aceleración entre ambas cifras. Es el resultado, no el punto de partida: las dos se midieron por separado.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAMAÑO ================= -->
+  <section class="band">
+    <div class="src"><b>Fuente</b>Recuento directo de archivos en el repositorio</div>
+    <div class="col">
+      <h2>Tamaño real del sistema</h2>
+      <div class="scroll">
+        <table>
+          <caption>Código productivo por área</caption>
+          <thead>
+            <tr><th>Área</th><th class="r">Líneas</th><th class="r">Archivos</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Frontend — <span class="num">client/src</span></td><td class="r">136.220</td><td class="r">353</td></tr>
+            <tr><td>Backend — <span class="num">server/src</span></td><td class="r">102.215</td><td class="r">200</td></tr>
+            <tr><td>Modelo de datos — <span class="num">prisma</span></td><td class="r">9.835</td><td class="r">27</td></tr>
+            <tr><td>Sitio corporativo y documentación</td><td class="r">13.293</td><td class="r">14</td></tr>
+          </tbody>
+          <tfoot>
+            <tr><td>Total</td><td class="r">~250.000</td><td class="r">~590</td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="fine">El esquema de datos define <span class="num">177</span> modelos, la medida más directa de la amplitud funcional del sistema.</p>
+    </div>
+  </section>
+
+  <!-- ================= MÓDULOS ================= -->
+  <section class="band">
+    <div class="src"><b>Método</b>Líneas por módulo ajustadas por complejidad técnica</div>
+    <div class="col">
+      <h2>Estimación módulo por módulo</h2>
+      <p class="fine">Horas-hombre de desarrollo tradicional: análisis, interfaz, backend, pruebas y correcciones. No son las horas que llevó realmente — esas se miden más abajo.</p>
+      <div class="scroll">
+        <table>
+          <caption>22 módulos, ordenados por esfuerzo estimado</caption>
+          <thead>
+            <tr>
+              <th>Módulo</th>
+              <th class="r">Líneas</th>
+              <th>Complejidad</th>
+              <th class="barcell">Horas estimadas</th>
+              <th class="r">h</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Financiero — Tesorería, Caja, Contabilidad, Centros de Costo, Liquidaciones, Conciliación</td><td class="r">36.000</td><td><span class="chip c-alt">Alta</span></td><td class="barcell"><div class="bar" style="width:100%"></div></td><td class="r">1.800</td></tr>
+            <tr><td>Infraestructura transversal — esquema, componentes, sockets, scripts</td><td class="r">20.000</td><td><span class="chip c-alt">Alta</span></td><td class="barcell"><div class="bar" style="width:55.6%"></div></td><td class="r">1.000</td></tr>
+            <tr><td>Buffet, Kiosco, TakeAway y punto de venta con impresión térmica</td><td class="r">20.000</td><td><span class="chip c-alt">Alta</span></td><td class="barcell"><div class="bar" style="width:61.1%"></div></td><td class="r">1.100</td></tr>
+            <tr><td>Cuotas, Cobranzas, Recupero y Morosidad</td><td class="r">13.900</td><td><span class="chip c-alt">Alta</span></td><td class="barcell"><div class="bar" style="width:42.8%"></div></td><td class="r">770</td></tr>
+            <tr><td>Portal del Socio (PWA)</td><td class="r">16.400</td><td><span class="chip c-med">Media</span></td><td class="barcell"><div class="bar" style="width:36.1%"></div></td><td class="r">650</td></tr>
+            <tr><td>Deportes, Entrenadores, Partidos y Seguimiento médico</td><td class="r">15.000</td><td><span class="chip c-med">Media</span></td><td class="barcell"><div class="bar" style="width:33.3%"></div></td><td class="r">600</td></tr>
+            <tr><td>Sitio institucional, contenidos y publicidad</td><td class="r">14.700</td><td><span class="chip c-baj">Baja-Media</span></td><td class="barcell"><div class="bar" style="width:27.8%"></div></td><td class="r">500</td></tr>
+            <tr><td>Débito Automático y pasarelas de pago</td><td class="r">6.500</td><td><span class="chip c-max">Muy alta</span></td><td class="barcell"><div class="bar" style="width:30%"></div></td><td class="r">540</td></tr>
+            <tr><td>Socios, Padrón, Grupos familiares y Pases de categoría</td><td class="r">11.400</td><td><span class="chip c-med">Media</span></td><td class="barcell"><div class="bar" style="width:28.9%"></div></td><td class="r">520</td></tr>
+            <tr><td>Comunicaciones — Email, WhatsApp, Push, colas y plantillas</td><td class="r">8.300</td><td><span class="chip c-alt">Alta</span></td><td class="barcell"><div class="bar" style="width:25.6%"></div></td><td class="r">460</td></tr>
+            <tr><td>Multi-Tenant, Super-Admin y registro público</td><td class="r">4.500</td><td><span class="chip c-max">Muy alta</span></td><td class="barcell"><div class="bar" style="width:25%"></div></td><td class="r">450</td></tr>
+            <tr><td>Configuración, Tablas auxiliares, Entidades e Importación</td><td class="r">12.000</td><td><span class="chip c-baj">Baja</span></td><td class="barcell"><div class="bar" style="width:22.2%"></div></td><td class="r">400</td></tr>
+            <tr><td>Reportes, Dashboard Ejecutivo y motor de PDF</td><td class="r">8.000</td><td><span class="chip c-alt">Media-Alta</span></td><td class="barcell"><div class="bar" style="width:22.2%"></div></td><td class="r">400</td></tr>
+            <tr><td>Permisos, Roles, Usuarios, Menú y Gobernanza</td><td class="r">6.500</td><td><span class="chip c-med">Media</span></td><td class="barcell"><div class="bar" style="width:18.1%"></div></td><td class="r">325</td></tr>
+            <tr><td>Control de Accesos</td><td class="r">4.700</td><td><span class="chip c-med">Media</span></td><td class="barcell"><div class="bar" style="width:13.1%"></div></td><td class="r">235</td></tr>
+            <tr><td>Eventos</td><td class="r">5.600</td><td><span class="chip c-med">Media</span></td><td class="barcell"><div class="bar" style="width:12.5%"></div></td><td class="r">225</td></tr>
+            <tr><td>Facturación Electrónica AFIP — WSAA, WSFE, QR</td><td class="r">2.200</td><td><span class="chip c-max">Muy alta</span></td><td class="barcell"><div class="bar" style="width:12.2%"></div></td><td class="r">220</td></tr>
+            <tr><td>Tienda / comercio electrónico</td><td class="r">3.800</td><td><span class="chip c-med">Media</span></td><td class="barcell"><div class="bar" style="width:10.6%"></div></td><td class="r">190</td></tr>
+            <tr><td>Análisis con IA y ejecución de acciones</td><td class="r">2.100</td><td><span class="chip c-alt">Alta</span></td><td class="barcell"><div class="bar" style="width:7.8%"></div></td><td class="r">140</td></tr>
+            <tr><td>Stock</td><td class="r">3.300</td><td><span class="chip c-baj">Baja-Media</span></td><td class="barcell"><div class="bar" style="width:7.2%"></div></td><td class="r">130</td></tr>
+            <tr><td>Reservas</td><td class="r">2.900</td><td><span class="chip c-baj">Baja-Media</span></td><td class="barcell"><div class="bar" style="width:6.4%"></div></td><td class="r">115</td></tr>
+            <tr><td>Comercios y beneficios</td><td class="r">2.200</td><td><span class="chip c-baj">Baja</span></td><td class="barcell"><div class="bar" style="width:5%"></div></td><td class="r">90</td></tr>
+            <tr class="total"><td>Subtotal desarrollo</td><td class="r"></td><td></td><td class="barcell"></td><td class="r">10.900</td></tr>
+            <tr><td>QA, gestión de proyecto y despliegue (+20%)</td><td class="r"></td><td></td><td class="barcell"></td><td class="r">2.100</td></tr>
+          </tbody>
+          <tfoot>
+            <tr><td>Total de proyecto</td><td class="r"></td><td></td><td class="barcell"></td><td class="r">~13.000</td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="fine"><strong>Rango honesto: 9.000 – 13.000 horas-hombre.</strong> Alrededor de seis años-persona de trabajo.</p>
+    </div>
+  </section>
+
+  <!-- ================= TIEMPO REAL ================= -->
+  <section class="band">
+    <div class="src"><b>Fuente</b>Marcas de tiempo de los 457 commits</div>
+    <div class="col">
+      <h2>El tiempo que llevó realmente</h2>
+      <p class="fine">Ninguna métrica sola da la respuesta, así que se calcularon cuatro y el valor real queda acotado entre el piso y el techo.</p>
+      <div class="scroll">
+        <table>
+          <caption>Cuatro formas de medir el mismo período</caption>
+          <thead>
+            <tr><th>Método</th><th class="r">Horas</th><th class="barcell">Escala</th><th>Qué mide</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Actividad densa — cortes de 60 min</td><td class="r">147</td><td class="barcell"><div class="bar bar-b" style="width:31%"></div></td><td class="fine">Piso absoluto: solo ráfagas de commits</td></tr>
+            <tr><td>Sesiones — cortes de 120 min</td><td class="r">168</td><td class="barcell"><div class="bar bar-b" style="width:35%"></div></td><td class="fine">Piso realista</td></tr>
+            <tr><td>Sesiones largas — cortes de 240 min</td><td class="r">225</td><td class="barcell"><div class="bar bar-b" style="width:47%"></div></td><td class="fine">Incluye jornadas continuas</td></tr>
+            <tr><td>Ventana diaria — primer a último commit</td><td class="r">475</td><td class="barcell"><div class="bar bar-b" style="width:100%"></div></td><td class="fine">Techo: 6,3 h/día × 75 días, con pausas</td></tr>
+            <tr class="total"><td>Estimación adoptada</td><td class="r">350–450</td><td class="barcell"><div class="bar" style="width:84%"></div></td><td class="fine">Suma análisis, pruebas manuales y revisión</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ASISTENCIA IA ================= -->
+  <section class="band">
+    <div class="src"><b>Fuente</b>Metadatos de autoría y estadísticas de cambio</div>
+    <div class="col">
+      <h2>Qué parte se construyó con asistencia de IA</h2>
+      <dl class="facts">
+        <div class="fact"><dt>Commits con co-autoría explícita</dt><dd>163 <em>de 457 — 36%</em></dd></div>
+        <div class="fact"><dt>Continuidad</dt><dd>6 <em>meses, de punta a punta</em></dd></div>
+        <div class="fact"><dt>Líneas agregadas en total</dt><dd>505.625</dd></div>
+        <div class="fact"><dt>Líneas descartadas</dt><dd>138.065</dd></div>
+        <div class="fact"><dt>Promedio por commit</dt><dd>1.124 <em>inserciones</em></dd></div>
+      </dl>
+      <p>El dato que más habla del método es el primero contra el tercero: se escribieron <span class="num">505.625</span> líneas para un sistema que hoy tiene <span class="num">250.000</span>. El sistema entero se escribió y descartó una vez de más.</p>
+      <p class="fine">En un proyecto tradicional eso sería tiempo perdido y carísimo. Acá fue el mecanismo para llegar al diseño correcto: iterar salió barato. Los commits grandes lo confirman — bloques funcionales completos de 50.000 líneas, no ediciones incrementales.</p>
+    </div>
+  </section>
+
+  <!-- ================= ADVERTENCIAS ================= -->
+  <section class="band">
+    <div class="src"><b>Límites</b>Leer antes de usar estas cifras</div>
+    <div class="col">
+      <h2>Qué no dicen estos números</h2>
+      <ul class="caveats">
+        <li>Las horas por módulo salen de líneas de código ajustadas por complejidad, <strong>no de registros de trabajo reales</strong>. El total es confiable en orden de magnitud; cada fila individual tiene un margen de error cercano al <strong>±40%</strong>.</li>
+        <li>El 36% de commits con co-autoría es <strong>el piso, no la cifra</strong>. Solo detecta los commits donde quedó la marca; el trabajo asistido registrado a mano es indistinguible en el historial. No hay forma de medir qué proporción de líneas escribió cada parte.</li>
+        <li><strong>No hay testing automatizado.</strong> En la estimación tradicional eso serían 1.500–2.500 horas adicionales, que no están incluidas porque el trabajo no está hecho.</li>
+        <li><strong>No hay despliegue productivo</strong> — Multi-Tenant Fase 7 sigue pendiente, junto con Payway y el débito bancario por banco. Los módulos incompletos se contaron solo por lo que ya existe.</li>
+        <li>El código transversal se contabilizó aparte. Si se reparte entre los módulos, cada uno sube alrededor de un 10%.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= CIERRE ================= -->
+  <section class="band">
+    <div class="src"><b>Síntesis</b>Versión corta</div>
+    <div class="col">
+      <h2>Resumen</h2>
+      <p class="pull">Clubix son <span class="num">~250.000</span> líneas y <span class="num">177</span> modelos de datos, con un esfuerzo equivalente de <span class="num">9.000–13.000</span> horas-hombre en desarrollo tradicional: cuatro o cinco personas durante unos dos años. Se construyó en <span class="num">6</span> meses por una persona con asistencia de IA, en <span class="num">~400</span> horas de trabajo efectivo. Queda pendiente el testing automatizado y el despliegue productivo.</p>
+    </div>
+  </section>
+
+  <p class="colophon">
+    Documento generado a partir del repositorio Clubix — 457 commits entre el 17 de enero y el 16 de julio de 2026.<br>
+    Cifras de tamaño y actividad medidas directamente sobre el código y el historial. Las horas son estimaciones derivadas, no registros de tiempo.
+  </p>
+
+</div>
