@@ -54,6 +54,10 @@ const GLOBAL_MODELS = new Set([
   'MenuItem',
   'MenuItemRol',
   'Rubro',
+  // Catálogo de procesadores de débito: define el formato del registro,
+  // igual para todos los clubes. Los datos del club viven en
+  // ConfiguracionDebito, que sí es por tenant.
+  'ProcesadorDebito',
 ]);
 
 /**

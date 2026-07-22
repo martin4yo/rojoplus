@@ -2582,7 +2582,7 @@ router.post('/:tokenPortal/debito-automatico/solicitar', asyncHandler(async (req
     let paywayUltimos4 = ultimos4
     try {
       const configPayway = await req.db.configuracionDebito.findFirst({
-        where: { tenantId: req.tenantId, plataforma: 'PAYWAY', activo: true }
+        where: { tenantId: req.tenantId, procesador: { plataforma: 'PAYWAY' }, activo: true }
       })
       if (configPayway?.apiKey) {
         const tokenResult = await paywayTokenizar({

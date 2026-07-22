@@ -22,7 +22,7 @@ async function obtenerConfigPayway(db, configuracionId, tenantId) {
     where: {
       id: parseInt(configuracionId),
       tenantId,
-      plataforma: 'PAYWAY'
+      procesador: { plataforma: 'PAYWAY' }
     }
   })
   if (!config) throw new Error('Configuración Payway no encontrada')
@@ -433,7 +433,7 @@ router.post('/webhook', asyncHandler(async (req, res) => {
 
   // Buscar configuración por site_id (codigoComercio) en cualquier tenant
   const config = await req.db.configuracionDebito.findFirst({
-    where: { codigoComercio: String(siteId), plataforma: 'PAYWAY' }
+    where: { codigoComercio: String(siteId), procesador: { plataforma: 'PAYWAY' } }
   })
 
   if (!config) {
@@ -506,7 +506,8 @@ router.get('/pago/:paywayId', authAdmin, asyncHandler(async (req, res) => {
 
 router.get('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
   const configs = await req.db.configuracionDebito.findMany({
-    where: { tenantId: req.tenantId, plataforma: 'PAYWAY', activo: true }
+    where: { tenantId: req.tenantId, procesador: { plataforma: 'PAYWAY' }, activo: true },
+    include: { procesador: true }
   })
   res.json({ success: true, data: configs })
 }))

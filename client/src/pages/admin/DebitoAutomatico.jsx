@@ -66,21 +66,23 @@ export default function DebitoAutomatico() {
 
   // Estado para Modal Nuevo Procesador
   const [showNuevoProcesador, setShowNuevoProcesador] = useState(false)
+  // Catálogo global de procesadores (formato del registro; compartido entre tenants)
+  const [procesadores, setProcesadores] = useState([])
   const [formProcesador, setFormProcesador] = useState({
-    codigo: '',
-    nombre: '',
-    tipo: 'TARJETA_CREDITO',
-    plataforma: 'PRISMA',
-    formatoArchivo: 'FIXED',
+    procesadorId: '',
     codigoEmpresa: '',
     codigoComercio: '',
     nombreEmpresa: '',
-    cuitEmpresa: ''
+    cuitEmpresa: '',
+    apiKey: '',
+    apiSecret: '',
+    ambiente: 'PRODUCCION'
   })
   const [savingProcesador, setSavingProcesador] = useState(false)
 
   useEffect(() => {
     cargarConfiguraciones()
+    cargarProcesadores()
     cargarEstadisticas()
     cargarAdhesiones()
     cargarConfigsPayway()
@@ -114,9 +116,18 @@ export default function DebitoAutomatico() {
     }
   }
 
+  async function cargarProcesadores() {
+    try {
+      const data = await api.get('/admin/debito/procesadores')
+      setProcesadores(Array.isArray(data) ? data : (data?.data || []))
+    } catch (err) {
+      console.error('Error cargando procesadores:', err)
+    }
+  }
+
   async function guardarProcesador() {
-    if (!formProcesador.codigo || !formProcesador.nombre) {
-      setError('Código y nombre son requeridos')
+    if (!formProcesador.procesadorId) {
+      setError('Debe seleccionar un procesador')
       return
     }
     setSavingProcesador(true)
@@ -125,19 +136,18 @@ export default function DebitoAutomatico() {
       await api.post('/admin/debito/configuraciones', formProcesador)
       setShowNuevoProcesador(false)
       setFormProcesador({
-        codigo: '',
-        nombre: '',
-        tipo: 'TARJETA_CREDITO',
-        plataforma: 'PRISMA',
-        formatoArchivo: 'FIXED',
+        procesadorId: '',
         codigoEmpresa: '',
         codigoComercio: '',
         nombreEmpresa: '',
-        cuitEmpresa: ''
+        cuitEmpresa: '',
+        apiKey: '',
+        apiSecret: '',
+        ambiente: 'PRODUCCION'
       })
       cargarConfiguraciones()
     } catch (err) {
-      setError(err.message || 'Error al guardar procesador')
+      setError(err.message || 'Error al guardar configuración')
     } finally {
       setSavingProcesador(false)
     }
@@ -712,7 +722,7 @@ export default function DebitoAutomatico() {
                     className="input-field"
                   >
                     {configuraciones.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                      <option key={c.id} value={c.id}>{c.procesador?.nombre}</option>
                     ))}
                   </select>
                 </div>
@@ -1134,7 +1144,7 @@ export default function DebitoAutomatico() {
                         <option value="">Seleccionar...</option>
                         {configsPayway.map(c => (
                           <option key={c.id} value={c.id}>
-                            {c.nombre} — site_id: {c.codigoComercio}
+                            {c.procesador?.nombre} — site_id: {c.codigoComercio}
                             {c.ambiente === 'SANDBOX' ? ' (Sandbox)' : ''}
                           </option>
                         ))}
@@ -1467,9 +1477,9 @@ export default function DebitoAutomatico() {
                   <div key={config.id} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-medium text-gray-900">{config.nombre}</h4>
+                        <h4 className="font-medium text-gray-900">{config.procesador?.nombre}</h4>
                         <p className="text-sm text-gray-500 mt-1">
-                          Código: {config.codigo} | Tipo: {config.tipo} | Formato: {config.formatoArchivo}
+                          Código: {config.procesador?.codigo} | Tipo: {config.procesador?.tipo} | Formato: {config.procesador?.formatoArchivo}
                         </p>
                         {config.codigoEmpresa && (
                           <p className="text-sm text-gray-500">
@@ -1608,78 +1618,41 @@ export default function DebitoAutomatico() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">Nuevo Procesador de Débito</h3>
+              <h3 className="font-bold text-gray-900">Nueva Configuración de Débito</h3>
               <button onClick={() => setShowNuevoProcesador(false)} className="text-gray-400 hover:text-gray-600">
                 <XCircle className="w-6 h-6" />
               </button>
             </div>
 
             <div className="p-4 overflow-y-auto flex-1 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Código *</label>
-                  <input
-                    type="text"
-                    value={formProcesador.codigo}
-                    onChange={e => setFormProcesador({ ...formProcesador, codigo: e.target.value.toUpperCase() })}
-                    className="input-field w-full"
-                    placeholder="Ej: PRISMA_VISA"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                  <input
-                    type="text"
-                    value={formProcesador.nombre}
-                    onChange={e => setFormProcesador({ ...formProcesador, nombre: e.target.value })}
-                    className="input-field w-full"
-                    placeholder="Ej: Prisma VISA Crédito"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                  <select
-                    value={formProcesador.tipo}
-                    onChange={e => setFormProcesador({ ...formProcesador, tipo: e.target.value })}
-                    className="input-field w-full"
-                  >
-                    <option value="TARJETA_CREDITO">Tarjeta Crédito</option>
-                    <option value="TARJETA_DEBITO">Tarjeta Débito</option>
-                    <option value="DEBITO_BANCARIO">Débito Bancario</option>
-                    <option value="CBU">CBU / Cuenta Bancaria</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
-                  <select
-                    value={formProcesador.plataforma}
-                    onChange={e => setFormProcesador({ ...formProcesador, plataforma: e.target.value })}
-                    className="input-field w-full"
-                  >
-                    <option value="PRISMA">Prisma</option>
-                    <option value="PAYWAY">Payway</option>
-                    <option value="MERCADOPAGO">MercadoPago</option>
-                    <option value="BANCO">Banco (Débito Directo)</option>
-                    <option value="OTRO">Otro</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Procesador *</label>
+                <select
+                  value={formProcesador.procesadorId}
+                  onChange={e => setFormProcesador({ ...formProcesador, procesadorId: e.target.value })}
+                  className="input-field w-full"
+                >
+                  <option value="">Seleccioná un procesador…</option>
+                  {procesadores.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} ({p.plataforma} · {p.formatoArchivo})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  El formato del archivo lo define el procesador. Acá cargás los datos de tu club.
+                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Formato de Archivo</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
                 <select
-                  value={formProcesador.formatoArchivo}
-                  onChange={e => setFormProcesador({ ...formProcesador, formatoArchivo: e.target.value })}
+                  value={formProcesador.ambiente}
+                  onChange={e => setFormProcesador({ ...formProcesador, ambiente: e.target.value })}
                   className="input-field w-full"
                 >
-                  <option value="FIXED">Posiciones Fijas (FIXED)</option>
-                  <option value="CSV">CSV (separado por comas)</option>
-                  <option value="TXT">TXT (separado por pipes)</option>
-                  <option value="JSON">JSON</option>
-                  <option value="XML">XML</option>
+                  <option value="PRODUCCION">Producción</option>
+                  <option value="TEST">Test / Homologación</option>
                 </select>
               </div>
 

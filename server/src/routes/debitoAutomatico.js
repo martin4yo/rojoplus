@@ -1,6 +1,4 @@
 import { Router } from 'express'
-import { Prisma } from '@prisma/client'
-import prisma from '../lib/prisma.js'
 import { authAdmin } from '../middleware/auth.js'
 import { enviarReciboPago } from '../services/email.js'
 import { notificarPago, obtenerTelefonoSocio } from '../services/whatsappService.js'
@@ -97,11 +95,21 @@ export async function enviarNotificacionesRecibo(pagosIds, db) {
 // CONFIGURACIONES DE DÉBITO
 // ============================================
 
-// GET /api/admin/debito/configuraciones - Listar configuraciones
+// GET /api/admin/debito/procesadores - Catálogo global de procesadores
+router.get('/procesadores', authAdmin, asyncHandler(async (req, res) => {
+  const procesadores = await req.db.procesadorDebito.findMany({
+    where: { activo: true },
+    orderBy: { nombre: 'asc' }
+  })
+  res.json({ success: true, data: procesadores })
+}))
+
+// GET /api/admin/debito/configuraciones - Listar configuraciones del club
 router.get('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
   const configuraciones = await req.db.configuracionDebito.findMany({
-    orderBy: { nombre: 'asc' },
+    orderBy: { procesador: { nombre: 'asc' } },
     include: {
+      procesador: true,
       _count: {
         select: { archivos: true }
       }
@@ -111,66 +119,56 @@ router.get('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
   res.json({ success: true, data: configuraciones })
 }))
 
-// POST /api/admin/debito/configuraciones - Crear configuración
+// POST /api/admin/debito/configuraciones - Crear configuración del club
 router.post('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
   const {
-    codigo,
-    nombre,
-    tipo,
-    plataforma,
-    formatoArchivo,
-    separador,
-    encoding,
-    configuracionCampos,
-    templateCabecera,
-    templatePie,
+    procesadorId,
     codigoEmpresa,
     codigoComercio,
     nombreEmpresa,
     cuitEmpresa,
-    apiUrl,
     apiKey,
     apiSecret,
     ambiente
   } = req.body
 
   // Validar campos requeridos
-  if (!codigo || !nombre) {
+  if (!procesadorId) {
     return res.status(400).json({
       success: false,
-      error: 'Código y nombre son requeridos'
+      error: 'Debe seleccionar un procesador'
     })
   }
 
-  // Verificar que no exista un procesador con el mismo código
-  const existente = await req.db.configuracionDebito.findUnique({
-    where: { codigo }
+  // El procesador debe existir en el catálogo global
+  const procesador = await req.db.procesadorDebito.findUnique({
+    where: { id: parseInt(procesadorId) }
+  })
+  if (!procesador) {
+    return res.status(400).json({ success: false, error: 'Procesador inexistente' })
+  }
+
+  // Un club no puede tener dos configuraciones para el mismo procesador
+  // (único compuesto tenantId + procesadorId; el tenantId lo inyecta la
+  // extensión de Prisma en findFirst/findMany).
+  const existente = await req.db.configuracionDebito.findFirst({
+    where: { procesadorId: parseInt(procesadorId) }
   })
 
   if (existente) {
     return res.status(400).json({
       success: false,
-      error: 'Ya existe un procesador con ese código'
+      error: 'Ya existe una configuración para ese procesador'
     })
   }
 
   const configuracion = await req.db.configuracionDebito.create({
     data: {
-      codigo,
-      nombre,
-      tipo,
-      plataforma,
-      formatoArchivo,
-      separador,
-      encoding,
-      configuracionCampos,
-      templateCabecera,
-      templatePie,
+      procesadorId: parseInt(procesadorId),
       codigoEmpresa,
       codigoComercio,
       nombreEmpresa,
       cuitEmpresa,
-      apiUrl,
       apiKey,
       apiSecret,
       ambiente
@@ -183,11 +181,14 @@ router.post('/configuraciones', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/debito/configuraciones/:id - Actualizar configuración
 router.put('/configuraciones/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const data = req.body
+  const { codigoEmpresa, codigoComercio, nombreEmpresa, cuitEmpresa,
+          apiKey, apiSecret, ambiente, activo } = req.body
 
+  // Sólo campos del club: el formato del registro vive en ProcesadorDebito.
   const configuracion = await req.db.configuracionDebito.update({
     where: { id: parseInt(id) },
-    data
+    data: { codigoEmpresa, codigoComercio, nombreEmpresa, cuitEmpresa,
+            apiKey, apiSecret, ambiente, activo }
   })
 
   res.json({ success: true, data: configuracion })
@@ -197,8 +198,8 @@ router.put('/configuraciones/:id', authAdmin, asyncHandler(async (req, res) => {
 router.delete('/configuraciones/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  // Verificar que no tenga archivos asociados
-  const archivos = await prisma.archivoDebito.count({
+  // Verificar que no tenga archivos asociados (scoped por tenant)
+  const archivos = await req.db.archivoDebito.count({
     where: { configuracionId: parseInt(id) }
   })
 
@@ -345,7 +346,7 @@ router.get('/archivos', authAdmin, asyncHandler(async (req, res) => {
   if (estado) where.estado = estado
 
   const [archivos, total] = await Promise.all([
-    prisma.archivoDebito.findMany({
+    req.db.archivoDebito.findMany({
       where,
       include: {
         configuracion: {
@@ -362,12 +363,12 @@ router.get('/archivos', authAdmin, asyncHandler(async (req, res) => {
       skip: (parseInt(page) - 1) * parseInt(limit),
       take: parseInt(limit)
     }),
-    prisma.archivoDebito.count({ where })
+    req.db.archivoDebito.count({ where })
   ])
 
   // Obtener estadísticas de cada archivo
   const archivosConStats = await Promise.all(archivos.map(async (archivo) => {
-    const stats = await prisma.detalleDebito.groupBy({
+    const stats = await req.db.detalleDebito.groupBy({
       by: ['estado'],
       where: { archivoId: archivo.id },
       _count: true,
@@ -467,7 +468,7 @@ router.post('/archivos/generar', authAdmin, asyncHandler(async (req, res) => {
   else nombreBase = 'DEBITO'
 
   // Generar número de archivo
-  const ultimoArchivo = await prisma.archivoDebito.findFirst({
+  const ultimoArchivo = await req.db.archivoDebito.findFirst({
     where: {
       periodoAnio: parseInt(periodoAnio),
       periodoMes: parseInt(periodoMes)
@@ -575,7 +576,7 @@ router.post('/archivos/generar', authAdmin, asyncHandler(async (req, res) => {
 router.get('/archivos/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const archivo = await prisma.archivoDebito.findUnique({
+  const archivo = await req.db.archivoDebito.findUnique({
     where: { id: parseInt(id) },
     include: {
       configuracion: true,
@@ -615,7 +616,7 @@ router.get('/archivos/:id', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Estadísticas
-  const stats = await prisma.detalleDebito.groupBy({
+  const stats = await req.db.detalleDebito.groupBy({
     by: ['estado'],
     where: { archivoId: parseInt(id) },
     _count: true,
@@ -639,7 +640,7 @@ router.get('/archivos/:id', authAdmin, asyncHandler(async (req, res) => {
 router.get('/archivos/:id/descargar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const archivo = await prisma.archivoDebito.findUnique({
+  const archivo = await req.db.archivoDebito.findUnique({
     where: { id: parseInt(id) },
     include: {
       configuracion: true,
@@ -693,7 +694,7 @@ router.get('/archivos/:id/descargar', authAdmin, asyncHandler(async (req, res) =
 router.put('/archivos/:id/enviar', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const archivo = await prisma.archivoDebito.update({
+  const archivo = await req.db.archivoDebito.update({
     where: { id: parseInt(id) },
     data: {
       estado: 'ENVIADO',
@@ -717,7 +718,7 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
     return res.status(400).json({ error: 'Se requiere el contenido del archivo' })
   }
 
-  const archivo = await prisma.archivoDebito.findUnique({
+  const archivo = await req.db.archivoDebito.findUnique({
     where: { id: parseInt(id) },
     include: {
       configuracion: true,
@@ -753,7 +754,7 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
   const resultados = parsearRespuestaPrisma(tipoResp, contenido, archivo.detalles)
 
   // Generar número de importación
-  const ultimaImportacion = await prisma.importacionCobranza.findFirst({
+  const ultimaImportacion = await req.db.importacionCobranza.findFirst({
     orderBy: { numero: 'desc' }
   })
 
@@ -1042,7 +1043,7 @@ router.post('/archivos/:id/reintentar-rechazados', authAdmin, asyncHandler(async
   const { id } = req.params
   const { detalleIds } = req.body // Opcional: IDs específicos a reintentar
 
-  const archivo = await prisma.archivoDebito.findUnique({
+  const archivo = await req.db.archivoDebito.findUnique({
     where: { id: parseInt(id) },
     include: {
       configuracion: true,
@@ -1170,7 +1171,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Archivos por estado
-  const archivosPorEstado = await prisma.archivoDebito.groupBy({
+  const archivosPorEstado = await req.db.archivoDebito.groupBy({
     by: ['estado'],
     where: { periodoAnio: anioActual },
     _count: true,
@@ -1178,7 +1179,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Detalles por estado (del año)
-  const detallesPorEstado = await prisma.detalleDebito.groupBy({
+  const detallesPorEstado = await req.db.detalleDebito.groupBy({
     by: ['estado'],
     where: {
       archivo: { periodoAnio: anioActual }
@@ -1188,7 +1189,7 @@ router.get('/estadisticas', authAdmin, asyncHandler(async (req, res) => {
   })
 
   // Rechazos por código (top 10)
-  const rechazosPorCodigo = await prisma.detalleDebito.groupBy({
+  const rechazosPorCodigo = await req.db.detalleDebito.groupBy({
     by: ['codigoRechazo', 'motivoRechazo'],
     where: {
       estado: 'RECHAZADO',
@@ -2116,7 +2117,7 @@ router.put('/adhesiones/:socioId/aprobar', authAdmin, asyncHandler(async (req, r
     ? { tipo: 'TARJETA', marca: socio.tarjetaMarca, ultimos4: socio.tarjetaUltimos4 }
     : { tipo: 'CBU', banco: socio.bancoDebito }
 
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       tabla: 'socio',
       registroId: parseInt(socioId),
@@ -2164,7 +2165,7 @@ router.put('/adhesiones/:socioId/rechazar', authAdmin, asyncHandler(async (req, 
   })
 
   // Registrar en audit log
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       tabla: 'socio',
       registroId: parseInt(socioId),
@@ -2191,7 +2192,7 @@ router.put('/adhesiones/:socioId/desactivar', authAdmin, asyncHandler(async (req
   })
 
   // Registrar en audit log
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       tabla: 'socio',
       registroId: parseInt(socioId),

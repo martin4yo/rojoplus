@@ -953,34 +953,56 @@ model AplicacionSaldo {
   @@map("aplicaciones_saldo")
 }
 
-model ConfiguracionDebito {
-  id                  Int             @id @default(autoincrement())
-  codigo              String
+/// Catálogo GLOBAL de procesadores de débito (REDLINK, Payway, Prisma...).
+/// Define el diseño del registro: formato de archivo, separador, campos y
+/// templates. Lo determina el procesador, no el club, así que se comparte
+/// entre todos los tenants. Sin tenantId a propósito — ver GLOBAL_MODELS
+/// en server/src/lib/tenantPrisma.js.
+model ProcesadorDebito {
+  id                  Int      @id @default(autoincrement())
+  codigo              String   @unique
   nombre              String
   tipo                String
   plataforma          String?
-  formatoArchivo      String          @map("formato_archivo")
-  separador           String?         @default(",")
-  encoding            String?         @default("UTF-8")
-  configuracionCampos String?         @map("configuracion_campos")
-  templateCabecera    String?         @map("template_cabecera")
-  templatePie         String?         @map("template_pie")
-  codigoEmpresa       String?         @map("codigo_empresa")
-  codigoComercio      String?         @map("codigo_comercio")
-  nombreEmpresa       String?         @map("nombre_empresa")
-  cuitEmpresa         String?         @map("cuit_empresa")
-  apiUrl              String?         @map("api_url")
-  apiKey              String?         @map("api_key")
-  apiSecret           String?         @map("api_secret")
-  ambiente            String?         @default("PRODUCCION")
-  activo              Boolean         @default(true)
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
-  archivos            ArchivoDebito[]
+  formatoArchivo      String   @map("formato_archivo")
+  separador           String?  @default(",")
+  encoding            String?  @default("UTF-8")
+  configuracionCampos String?  @map("configuracion_campos")
+  templateCabecera    String?  @map("template_cabecera")
+  templatePie         String?  @map("template_pie")
+  apiUrl              String?  @map("api_url")
+  activo              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  configuraciones ConfiguracionDebito[]
+
+  @@map("procesadores_debito")
+}
+
+/// Datos del CLUB para operar contra un procesador: identificación ante el
+/// procesador y credenciales. Es por tenant y no debe compartirse nunca.
+model ConfiguracionDebito {
+  id            Int     @id @default(autoincrement())
+  procesadorId  Int     @map("procesador_id")
+  codigoEmpresa String? @map("codigo_empresa")
+  codigoComercio String? @map("codigo_comercio")
+  nombreEmpresa String? @map("nombre_empresa")
+  cuitEmpresa   String? @map("cuit_empresa")
+  apiKey        String? @map("api_key")
+  apiSecret     String? @map("api_secret")
+  ambiente      String? @default("PRODUCCION")
+  activo        Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  procesador ProcesadorDebito @relation(fields: [procesadorId], references: [id])
+  archivos   ArchivoDebito[]
 
   tenantId Int @map("tenant_id")
 
-  @@unique([tenantId, codigo])
+  @@unique([tenantId, procesadorId])
   @@index([tenantId])
   @@map("configuracion_debito")
 }
