@@ -16,7 +16,7 @@ ESTADO_PROYECTO.md           # ⭐ Estado actualizado con pendientes detallados
 
 **Completados (100%):** Socios, Cuotas, Cobranzas, Recupero, Comunicaciones, Portal Socio (PWA), Deportes, Financiero, Débito Automático (Prisma), Conciliación Bancaria, Sitio Institucional, Permisos/Roles, Buffet MVP, Control de Accesos, Centro de Costos, Eventos, Facturación Electrónica, Branding, Multi-Tenant (Fases 1-6), Super-Admin Panel, Registro Público Club.
 
-**Pendientes:** Payway (35.10-14), Débito Bancario por banco (35.15-20), Testing automatizado, Deploy (Multi-Tenant Fase 7), bcrypt en `/register`.
+**Pendientes:** Débito Bancario por banco (35.17-20: Santander/Provincia), Deploy del split de débito a prod, Deploy productivo (Multi-Tenant Fase 7), ampliar Testing automatizado. **Ver `ESTADO_PROYECTO.md` para el detalle actualizado.** (Payway 35.10-14 ya está hecho.)
 
 ## Multi-Tenant — Rutas sin tenant (TENANT_FREE_ROUTES)
 ```javascript
