@@ -1,5 +1,6 @@
 import cron from 'node-cron'
 import prisma from '../lib/prisma.js'
+import { tenantsBloqueadosPorCron } from '../lib/cronsCatalogo.js'
 import {
   procesarNotificacionesPendientes,
   verificarCuotasProximasVencer,
@@ -120,12 +121,16 @@ const sugerirPasajesCron = cron.schedule('0 8 1 12 *', async () => {
     // Fecha de referencia: 1 de enero del próximo año
     const fechaRef = new Date(new Date().getFullYear() + 1, 0, 1)
 
+    // Excluir tenants que tienen el cron desactivado (master pause o flag individual)
+    const off = await tenantsBloqueadosPorCron(prisma, 'PASAJES_SUGERENCIA')
+
     // Obtener inscripciones activas no exceptuadas
     const inscripciones = await prisma.inscripcion.findMany({
       where: {
         estado: 'ACTIVA',
         fechaFin: null,
         exceptuadoPasaje: false,
+        ...(off.length ? { tenantId: { notIn: off } } : {}),
       },
       include: {
         socio: { select: { id: true, fechaNacimiento: true, apellidoNombre: true } },
@@ -176,12 +181,16 @@ async function enviarRecordatoriosReservas() {
   const mananaFin = new Date(manana)
   mananaFin.setHours(23, 59, 59, 999)
 
+  // Excluir tenants que tienen el cron desactivado (master pause o flag individual)
+  const off = await tenantsBloqueadosPorCron(prisma, 'RESERVAS_RECORDATORIO')
+
   // email es campo requerido en el schema → no se puede filtrar por null.
   // Traemos todas las confirmadas de mañana y elegimos el canal por reserva.
   const reservas = await prisma.reservaEspacio.findMany({
     where: {
       fecha: { gte: manana, lte: mananaFin },
       estado: 'CONFIRMADA',
+      ...(off.length ? { tenantId: { notIn: off } } : {}),
     },
     include: {
       espacio: { select: { nombre: true } },
@@ -228,13 +237,17 @@ async function cerrarReservasPasadas() {
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
 
+  // Excluir tenants que tienen el cron desactivado (master pause o flag individual)
+  const off = await tenantsBloqueadosPorCron(prisma, 'RESERVAS_CIERRE')
+  const tf = off.length ? { tenantId: { notIn: off } } : {}
+
   const [completadas, noShow] = await Promise.all([
     prisma.reservaEspacio.updateMany({
-      where: { estado: 'CONFIRMADA', fecha: { lt: hoy } },
+      where: { estado: 'CONFIRMADA', fecha: { lt: hoy }, ...tf },
       data: { estado: 'COMPLETADA' },
     }),
     prisma.reservaEspacio.updateMany({
-      where: { estado: 'PENDIENTE_PAGO', fecha: { lt: hoy } },
+      where: { estado: 'PENDIENTE_PAGO', fecha: { lt: hoy }, ...tf },
       data: { estado: 'NO_SHOW' },
     }),
   ])

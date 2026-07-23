@@ -77,6 +77,30 @@ export const CRONS_CATALOGO = [
     configKey: 'MOROSIDAD_NOTIFICACION_BLOQUEO_ACTIVO', // legacy
     defaultActivo: false,
   },
+  {
+    key: 'RESERVAS_RECORDATORIO',
+    label: 'Recordatorio de reservas',
+    descripcion: 'Aviso (email/WhatsApp) a quien tiene una reserva confirmada para mañana.',
+    horario: 'Diario · 8:00 AM',
+    configKey: 'CRON_RESERVAS_RECORDATORIO_ACTIVO',
+    defaultActivo: true,
+  },
+  {
+    key: 'RESERVAS_CIERRE',
+    label: 'Cierre de reservas pasadas',
+    descripcion: 'Marca como COMPLETADA / NO_SHOW las reservas cuya fecha ya pasó.',
+    horario: 'Diario · 0:30',
+    configKey: 'CRON_RESERVAS_CIERRE_ACTIVO',
+    defaultActivo: true,
+  },
+  {
+    key: 'PASAJES_SUGERENCIA',
+    label: 'Sugerencia de pasajes de categoría',
+    descripcion: 'Detecta socios fuera de rango de edad para sugerir pase de categoría.',
+    horario: '1-dic · 8:00 AM',
+    configKey: 'CRON_PASAJES_SUGERENCIA_ACTIVO',
+    defaultActivo: true,
+  },
 ]
 
 /**
