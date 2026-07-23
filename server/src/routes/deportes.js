@@ -1615,7 +1615,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
         if (suscripcion) {
           // Importar servicio de webPush dinámicamente
           const webPush = await import('../services/webPush.js')
-          await webPush.enviarNotificacionPush(suscripcion, {
+          await webPush.enviarNotificacionPush(socio.id, {
             title: `Convocatoria: ${actividad} vs ${partido.rival}`,
             body: `${fechaPartido} - ${partido.hora}hs (${condicionTexto})`,
             icon: '/images/icon-192.png',
@@ -1625,7 +1625,7 @@ router.post('/partidos/:id/notificar-convocados', asyncHandler(async (req, res) 
               tipo: 'convocatoria',
               partidoId: partido.id
             }
-          })
+          }, req.tenantId)
           updateData.notificadoPush = true
           updateData.fechaNotifPush = ahora
           resultados.push.enviados++

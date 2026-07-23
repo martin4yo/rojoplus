@@ -282,11 +282,12 @@ export async function notificarNuevaComanda(comanda, items) {
   try {
     // Agrupar items por destino de impresión
     const itemsPorDestino = {}
+    const tidComanda = comanda.tenantId ?? comanda.mesa?.tenantId
 
     for (const item of items) {
-      // Buscar el destino de impresión de la categoría
-      const producto = await prisma.productoBuffet.findUnique({
-        where: { id: item.productoBuffetId },
+      // Buscar el destino de impresión (scopeado por el tenant de la comanda)
+      const producto = await prisma.productoBuffet.findFirst({
+        where: { id: item.productoBuffetId, ...(tidComanda ? { tenantId: tidComanda } : {}) },
         include: {
           categoriaMenu: {
             include: {

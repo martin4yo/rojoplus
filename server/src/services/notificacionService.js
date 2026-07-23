@@ -421,7 +421,7 @@ export async function procesarNotificacionesPendientes() {
           if (notif.socioId) {
             try {
               const pushPayload = getPushPayloadForEvent(notif.eventType, notif)
-              if (pushPayload) await enviarNotificacionPush(notif.socioId, pushPayload)
+              if (pushPayload) await enviarNotificacionPush(notif.socioId, pushPayload, notif.tenantId)
             } catch (pushError) {
               console.log(`Push notification no enviada para ${notif.socioId}: ${pushError.message}`)
             }

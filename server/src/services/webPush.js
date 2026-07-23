@@ -23,16 +23,20 @@ if (vapidPublicKey && vapidPrivateKey) {
  * @param {string} payload.url - URL a abrir al hacer click (opcional)
  * @param {string} payload.tag - Tag para agrupar notificaciones (opcional)
  */
-export async function enviarNotificacionPush(socioId, payload) {
+export async function enviarNotificacionPush(socioId, payload, tenantId = null) {
   if (!vapidPublicKey || !vapidPrivateKey) {
     console.warn('Push notifications deshabilitadas - VAPID keys no configuradas')
     return { success: false, error: 'VAPID keys no configuradas' }
   }
 
   try {
+    // Scoping por tenant cuando el caller lo provee (defensa multi-tenant:
+    // evita mandar push al socio de otro tenant con un socioId ajeno).
+    const scopeTenant = tenantId ? { tenantId } : {}
+
     // Verificar si el socio tiene push notifications habilitadas
-    const socio = await prisma.socio.findUnique({
-      where: { id: socioId },
+    const socio = await prisma.socio.findFirst({
+      where: { id: socioId, ...scopeTenant },
       select: { notificarPush: true }
     })
 
@@ -44,7 +48,8 @@ export async function enviarNotificacionPush(socioId, payload) {
     const subscriptions = await prisma.pushSubscription.findMany({
       where: {
         socioId,
-        activa: true
+        activa: true,
+        ...scopeTenant
       }
     })
 
@@ -112,9 +117,9 @@ export async function enviarNotificacionPush(socioId, payload) {
  * @param {number[]} socioIds - IDs de los socios
  * @param {object} payload - Contenido de la notificación
  */
-export async function enviarNotificacionPushMasiva(socioIds, payload) {
+export async function enviarNotificacionPushMasiva(socioIds, payload, tenantId = null) {
   const results = await Promise.allSettled(
-    socioIds.map(socioId => enviarNotificacionPush(socioId, payload))
+    socioIds.map(socioId => enviarNotificacionPush(socioId, payload, tenantId))
   )
 
   const exitosos = results.filter(r => r.status === 'fulfilled' && r.value.success).length
