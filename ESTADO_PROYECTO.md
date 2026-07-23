@@ -31,6 +31,7 @@ Stack: React + Vite + Tailwind · Node + Express + Prisma + Socket.io · Postgre
 | Multi-Tenant (Fases 1–6) | Super-Admin Panel, Registro Público de Club |
 | ROJO IA — Asistente | actionExecutor (con stubs pendientes, ver abajo) |
 | Gestión de Crons | Catálogo + switches por tenant (master pause `CRONS_PAUSADOS` + flag individual) |
+| Aislamiento multi-tenant | **Auditado y endurecido (2026-07-23)**: rutas (`req.db`), facturación AFIP, `webPush`/`socketService`. Ver notas abajo. |
 
 ---
 
@@ -48,7 +49,7 @@ Stack: React + Vite + Tailwind · Node + Express + Prisma + Socket.io · Postgre
 
 ### Calidad
 - [ ] **Ampliar testing** — hay 4 tests (`accesos`, `auth`, `cuotas`, `tenant`); cobertura parcial.
-- [ ] Verificar hashing en registro público `/register` (el login admin ya usa bcrypt).
+- [x] ~~Verificar hashing en `/register`~~ — verificado: usa `bcrypt.hash(pw, 12)` (`super-admin/tenants.js:427`).
 
 ---
 
@@ -79,7 +80,15 @@ Stack: React + Vite + Tailwind · Node + Express + Prisma + Socket.io · Postgre
 
 ## 📌 Notas de la última sesión (2026-07-22/23)
 
-- Split del modelo de débito (`ProcesadorDebito` global + `ConfiguracionDebito` por tenant) — aplicado y commiteado en dev, **pendiente prod**.
-- Incidente y recuperación de la base de producción (truncate accidental → PITR con pgBackRest). Lección: `DELETE` acotado, nunca `TRUNCATE CASCADE`.
-- Crons de reservas/pasajes agregados al catálogo (UI) + ahora respetan el pausado.
+**Seguridad — auditoría y cierre de fugas de aislamiento multi-tenant (commits `f18ace2`, `fe0deb1`, `c61420e`):**
+- Rutas (24 archivos): usaban el cliente Prisma **global** (import `prisma` y `req.prisma`, que apunta al global) en vez de `req.db` → un tenant podía leer/modificar datos de otro por id. Convertido a `req.db`; helpers de `importacion`/`enviarImpresion` refactorizados para recibir `db`; filtro `tenant_id` manual en un `$queryRaw`.
+- **Facturación AFIP** (fiscal, la más grave): `resolverConexionAfip`/`getConfiguracionFiscal` buscaban la conexión AFIP sin tenant → se podía facturar con el CUIT/certificado de otro tenant. Se threadeó `req.db` por toda la cadena.
+- `webPush` y `socketService` scopeados por tenant.
+- **Auditados sin cambios** (uso legítimo del global): jobs/crons, `email`, `inboxService`. Falsos positivos descartados: modelos globales (Admin/Rol/…), auth por token de portal, `notificacionBuffet.create` (ya con tenantId).
+
+**Otros:**
+- Split del modelo de débito (`ProcesadorDebito` global + `ConfiguracionDebito` por tenant) — aplicado y commiteado en dev, **pendiente prod** (commit `acb13af`).
+- Incidente y recuperación de la base de producción (truncate accidental → PITR con pgBackRest). Backup verificado sano en timeline 3. Lección: `DELETE` acotado, nunca `TRUNCATE CASCADE`.
+- Crons de reservas/pasajes agregados al catálogo (UI) + ahora respetan el pausado (`97d9adf`).
 - Morosidad temprana por streak de períodos impagos.
+- Este `ESTADO_PROYECTO.md` recreado como fuente de verdad (`92a55dc`).
