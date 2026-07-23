@@ -78,7 +78,7 @@ router.post('/regenerar-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRA
 
         if (comprobante) {
           const { getConfiguracionFiscal } = await import('../../services/afipWSAAService.js')
-          const config = await getConfiguracionFiscal()
+          const config = await getConfiguracionFiscal(req.db)
 
           const qrUrl = generateQRData({
             cuit: config.cuit,
@@ -157,7 +157,7 @@ router.post('/regenerar-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRA
 
       if (comprobante) {
         const { getConfiguracionFiscal } = await import('../../services/afipWSAAService.js')
-        const config = await getConfiguracionFiscal()
+        const config = await getConfiguracionFiscal(req.db)
 
         const qrUrl = generateQRData({
           cuit: config.cuit,
@@ -262,7 +262,7 @@ router.get('/preview-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRAR',
       // Si hay comprobante fiscal, obtener datos de empresa y QR
       if (comprobante) {
         const { getConfiguracionFiscal } = await import('../../services/afipWSAAService.js')
-        const config = await getConfiguracionFiscal()
+        const config = await getConfiguracionFiscal(req.db)
 
         const qrUrl = generateQRData({
           cuit: config.cuit,
@@ -354,7 +354,7 @@ router.get('/preview-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRAR',
       // Si hay comprobante fiscal, obtener datos de empresa y QR
       if (comprobante) {
         const { getConfiguracionFiscal } = await import('../../services/afipWSAAService.js')
-        const config = await getConfiguracionFiscal()
+        const config = await getConfiguracionFiscal(req.db)
 
         const qrUrl = generateQRData({
           cuit: config.cuit,

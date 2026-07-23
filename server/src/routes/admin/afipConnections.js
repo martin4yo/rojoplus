@@ -188,11 +188,11 @@ router.post('/afip-connections/:id/test', authAdmin, checkPermiso('FACTURACION_C
       // WSAA
       try {
         invalidateTicket({ connectionId: id })
-        const ta = await getTicketAcceso({ connectionId: id })
+        const ta = await getTicketAcceso(req.db, { connectionId: id })
         pasos.push({ paso: 'WSAA', estado: 'ok', detalle: `TA expira ${ta.expirationTime}` })
 
         // WSFE Dummy
-        const status = await getServerStatus({ afipConnectionId: id })
+        const status = await getServerStatus(req.db, { afipConnectionId: id })
         pasos.push({ paso: 'WSFE', estado: 'ok', detalle: `App:${status.appServer} Db:${status.dbServer} Auth:${status.authServer}` })
 
         success = true

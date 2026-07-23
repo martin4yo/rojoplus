@@ -186,7 +186,7 @@ router.post('/test-conexion', checkPermiso('FACTURACION_CONFIG'), async (req, re
 
     let ta
     try {
-      ta = await getTicketAcceso()
+      ta = await getTicketAcceso(req.db)
       pasos[1].estado = 'ok'
       pasos[1].detalle = `TA obtenido, expira: ${ta.expirationTime.toLocaleString()}`
     } catch (error) {
@@ -200,7 +200,7 @@ router.post('/test-conexion', checkPermiso('FACTURACION_CONFIG'), async (req, re
     pasos.push({ paso: 'Conectar con WSFE', estado: 'ejecutando' })
 
     try {
-      const status = await getServerStatus()
+      const status = await getServerStatus(req.db)
       pasos[2].estado = 'ok'
       pasos[2].detalle = `AppServer: ${status.appServer}, DbServer: ${status.dbServer}`
     } catch (error) {
@@ -230,7 +230,7 @@ router.post('/test-conexion', checkPermiso('FACTURACION_CONFIG'), async (req, re
  * Obtener estado del servidor AFIP
  */
 router.get('/estado-servidor', asyncHandler(async (req, res) => {
-  const status = await getServerStatus()
+  const status = await getServerStatus(req.db)
   res.json({ success: true, data: status })
 }))
 
@@ -246,6 +246,7 @@ router.get('/ultimo-numero/:puntoVenta/:tipo', asyncHandler(async (req, res) => 
   const { puntoVenta, tipo } = req.params
 
   const ultimoNumero = await getLastAuthorizedNumber(
+    req.db,
     parseInt(puntoVenta),
     parseInt(tipo)
   )
@@ -282,7 +283,7 @@ router.post('/emitir', checkPermiso('FACTURACION_EMITIR'), asyncHandler(async (r
     throw new AppError('Punto de venta, tipo de comprobante e items son requeridos', 400)
   }
 
-  const config = await getConfiguracionFiscal()
+  const config = await getConfiguracionFiscal(req.db)
 
   // Calcular totales
   let subtotal = 0
@@ -314,11 +315,11 @@ router.post('/emitir', checkPermiso('FACTURACION_EMITIR'), asyncHandler(async (r
   const total = subtotal + iva
 
   // Obtener siguiente número de comprobante
-  const ultimoNumero = await getLastAuthorizedNumber(puntoVenta, tipoComprobante)
+  const ultimoNumero = await getLastAuthorizedNumber(req.db, puntoVenta, tipoComprobante)
   const numeroComprobante = ultimoNumero + 1
 
   // Solicitar CAE a AFIP
-  const resultado = await requestCAE({
+  const resultado = await requestCAE(req.db, {
     puntoVenta,
     tipoComprobante,
     numeroComprobante,
@@ -491,7 +492,7 @@ router.get('/comprobantes/:id', asyncHandler(async (req, res) => {
   // Generar QR si tiene CAE
   let qrUrl = null
   if (canGenerateQR({ cae: comprobante.cae, cuit: null })) {
-    const config = await getConfiguracionFiscal()
+    const config = await getConfiguracionFiscal(req.db)
     qrUrl = generateQRData({
       cuit: config.cuit,
       tipoComprobante: comprobante.tipoAfip,
@@ -536,7 +537,7 @@ router.get('/comprobantes/:id/ticket', asyncHandler(async (req, res) => {
     throw new AppError('Comprobante no encontrado', 404)
   }
 
-  const config = await getConfiguracionFiscal()
+  const config = await getConfiguracionFiscal(req.db)
 
   // Preparar items del ticket
   const items = comprobante.comanda?.items?.map(item => ({

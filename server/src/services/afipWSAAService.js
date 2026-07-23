@@ -190,10 +190,10 @@ async function leerCertConFallback(absolutePath) {
  * @param {number} [opts.connectionId]  - Id de AfipConnection específica
  * @returns {Object} { id, cuit, certificadoPath, clavePrivadaPath, environment, wsaaUrl, wsfeUrl, cacheKey }
  */
-export async function resolverConexionAfip({ connectionId } = {}) {
+export async function resolverConexionAfip(db, { connectionId } = {}) {
   // 1. Si viene id explícito, usar esa AfipConnection
   if (connectionId) {
-    const conn = await prisma.afipConnection.findUnique({ where: { id: parseInt(connectionId) } })
+    const conn = await db.afipConnection.findFirst({ where: { id: parseInt(connectionId) } })
     if (!conn) throw new AppError('Conexión AFIP no encontrada', 404)
     if (!conn.activo) throw new AppError('Conexión AFIP inactiva', 400)
     return {
@@ -209,9 +209,9 @@ export async function resolverConexionAfip({ connectionId } = {}) {
   }
 
   // 2. Si no, buscar AfipConnection default activa
-  const conn = await prisma.afipConnection.findFirst({
+  const conn = await db.afipConnection.findFirst({
     where: { activo: true, esDefault: true },
-  }) || await prisma.afipConnection.findFirst({ where: { activo: true } })
+  }) || await db.afipConnection.findFirst({ where: { activo: true } })
 
   if (conn) {
     return {
@@ -227,7 +227,7 @@ export async function resolverConexionAfip({ connectionId } = {}) {
   }
 
   // 3. Fallback legacy: ConfiguracionFiscal (un solo registro por tenant)
-  const config = await prisma.configuracionFiscal.findFirst({ where: { activo: true } })
+  const config = await db.configuracionFiscal.findFirst({ where: { activo: true } })
   if (!config) {
     throw new AppError('Configuración AFIP no encontrada (sin AfipConnection ni ConfiguracionFiscal activa)', 404)
   }
@@ -246,8 +246,8 @@ export async function resolverConexionAfip({ connectionId } = {}) {
 /**
  * Obtiene un TA válido para una conexión AFIP (cache por connectionId).
  */
-export async function getTicketAcceso({ connectionId } = {}) {
-  const conn = await resolverConexionAfip({ connectionId })
+export async function getTicketAcceso(db, { connectionId } = {}) {
+  const conn = await resolverConexionAfip(db, { connectionId })
 
   // Cache check (margen 5 min)
   const now = new Date()
@@ -309,11 +309,11 @@ export function invalidateTicket({ connectionId } = {}) {
  * para retro-compatibilidad: el resultado incluye cuit/certificadoPath/
  * clavePrivadaPath/modoProduccion del flujo viejo.
  */
-export async function getConfiguracionFiscal({ connectionId } = {}) {
-  const config = await prisma.configuracionFiscal.findFirst({ where: { activo: true } })
+export async function getConfiguracionFiscal(db, { connectionId } = {}) {
+  const config = await db.configuracionFiscal.findFirst({ where: { activo: true } })
   // Si hay AfipConnection, mergear cert/cuit/ambiente desde ahí
   try {
-    const conn = await resolverConexionAfip({ connectionId })
+    const conn = await resolverConexionAfip(db, { connectionId })
     return {
       // Datos del club (si los hay)
       ...(config || {}),

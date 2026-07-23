@@ -17,10 +17,10 @@ function resolverWsfeUrl(conn) {
  * @param {Object} [opts]
  * @param {number} [opts.afipConnectionId] - Id de AfipConnection a usar (sino default)
  */
-export async function getLastAuthorizedNumber(puntoVenta, tipoComprobante, { afipConnectionId } = {}) {
+export async function getLastAuthorizedNumber(db, puntoVenta, tipoComprobante, { afipConnectionId } = {}) {
   try {
-    const conn = await resolverConexionAfip({ connectionId: afipConnectionId })
-    const ta = await getTicketAcceso({ connectionId: afipConnectionId })
+    const conn = await resolverConexionAfip(db, { connectionId: afipConnectionId })
+    const ta = await getTicketAcceso(db, { connectionId: afipConnectionId })
     const wsfeUrl = resolverWsfeUrl(conn)
 
     const client = await soap.createClientAsync(wsfeUrl)
@@ -70,10 +70,10 @@ export async function getLastAuthorizedNumber(puntoVenta, tipoComprobante, { afi
  * @param {number} voucherData.total - Total del comprobante
  * @param {Array} voucherData.items - Items del comprobante
  */
-export async function requestCAE(voucherData) {
+export async function requestCAE(db, voucherData) {
   try {
-    const conn = await resolverConexionAfip({ connectionId: voucherData.afipConnectionId })
-    const ta = await getTicketAcceso({ connectionId: voucherData.afipConnectionId })
+    const conn = await resolverConexionAfip(db, { connectionId: voucherData.afipConnectionId })
+    const ta = await getTicketAcceso(db, { connectionId: voucherData.afipConnectionId })
     const wsfeUrl = resolverWsfeUrl(conn)
     const client = await soap.createClientAsync(wsfeUrl)
 
@@ -223,9 +223,9 @@ export async function requestCAE(voucherData) {
 /**
  * Consulta estado del servidor AFIP (para testing)
  */
-export async function getServerStatus({ afipConnectionId } = {}) {
+export async function getServerStatus(db, { afipConnectionId } = {}) {
   try {
-    const conn = await resolverConexionAfip({ connectionId: afipConnectionId })
+    const conn = await resolverConexionAfip(db, { connectionId: afipConnectionId })
     const wsfeUrl = resolverWsfeUrl(conn)
 
     const client = await soap.createClientAsync(wsfeUrl)

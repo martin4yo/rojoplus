@@ -1176,12 +1176,12 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         const { generateQRData } = await import('../../services/afipQRService.js')
         const { renderTicketFiscal, toBase64 } = await import('../../services/ticketService.js')
 
-        const config = await getConfiguracionFiscal()
+        const config = await getConfiguracionFiscal(req.db)
         const cajaUsada = await req.db.caja.findUnique({ where: { id: cajaId || movimientos[0]?.cajaId } })
         const puntoVenta = cajaUsada?.puntoVentaAfip || 1
         const tipoAfip = tipoComprobante || 11
 
-        const ultimoNumero = await getLastAuthorizedNumber(puntoVenta, tipoAfip)
+        const ultimoNumero = await getLastAuthorizedNumber(req.db, puntoVenta, tipoAfip)
         const numeroComprobante = ultimoNumero + 1
 
         const itemsFactura = pedido.items.map(item => ({
@@ -1196,7 +1196,7 @@ router.post('/takeaway/:id/cobrar', authAdmin, checkPermiso('BUFFET_COBRAR'), as
         const subtotalNeto = tipoAfip === 11 ? totalFinal : itemsFactura.reduce((sum, i) => sum + (i.subtotal - i.ivaAmount), 0)
         const ivaTotal = tipoAfip === 11 ? 0 : itemsFactura.reduce((sum, i) => sum + i.ivaAmount, 0)
 
-        const resultadoCAE = await requestCAE({
+        const resultadoCAE = await requestCAE(req.db, {
           puntoVenta,
           tipoComprobante: tipoAfip,
           numeroComprobante,

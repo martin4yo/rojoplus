@@ -93,13 +93,13 @@ export async function emitirCAEParaFactura({
   const tipoAfip = determinarTipoFactura(condIvaEmisor, cliente?.condicionIva)
 
   // Último número y siguiente
-  const ultimoNumero = await getLastAuthorizedNumber(puntoVenta, tipoAfip, { afipConnectionId })
+  const ultimoNumero = await getLastAuthorizedNumber(db, puntoVenta, tipoAfip, { afipConnectionId })
   const numeroComprobante = ultimoNumero + 1
 
   const fecha = new Date()
 
   // Pedir CAE
-  const resultadoCAE = await requestCAE({
+  const resultadoCAE = await requestCAE(db, {
     afipConnectionId,
     puntoVenta,
     tipoComprobante: tipoAfip,
@@ -248,9 +248,9 @@ export async function emitirCAENotaCredito({
   }
 
   // CUIT del emisor (se necesita para comprobantesAsociados)
-  const conn = await resolverConexionAfip({ connectionId: connId })
+  const conn = await resolverConexionAfip(db, { connectionId: connId })
 
-  const ultimoNumero = await getLastAuthorizedNumber(puntoVenta, tipoAfipNC, { afipConnectionId: connId })
+  const ultimoNumero = await getLastAuthorizedNumber(db, puntoVenta, tipoAfipNC, { afipConnectionId: connId })
   const numero = ultimoNumero + 1
   const fecha = new Date()
 
@@ -291,7 +291,7 @@ export async function emitirCAENotaCredito({
     }]
   }
 
-  const resultadoCAE = await requestCAE(requestArgs)
+  const resultadoCAE = await requestCAE(db, requestArgs)
 
   if (!resultadoCAE?.cae) {
     throw new Error('AFIP no devolvió CAE para la NC: ' + (resultadoCAE?.observaciones || 'sin detalle'))
@@ -386,9 +386,9 @@ export async function emitirCAENotaDebito({
     puntoVenta = parseInt(puntoVentaNumero)
   }
 
-  const conn = await resolverConexionAfip({ connectionId: connId })
+  const conn = await resolverConexionAfip(db, { connectionId: connId })
 
-  const ultimoNumero = await getLastAuthorizedNumber(puntoVenta, tipoAfipND, { afipConnectionId: connId })
+  const ultimoNumero = await getLastAuthorizedNumber(db, puntoVenta, tipoAfipND, { afipConnectionId: connId })
   const numero = ultimoNumero + 1
   const fecha = new Date()
 
@@ -429,7 +429,7 @@ export async function emitirCAENotaDebito({
     }]
   }
 
-  const resultadoCAE = await requestCAE(requestArgs)
+  const resultadoCAE = await requestCAE(db, requestArgs)
 
   if (!resultadoCAE?.cae) {
     throw new Error('AFIP no devolvió CAE para la ND: ' + (resultadoCAE?.observaciones || 'sin detalle'))
