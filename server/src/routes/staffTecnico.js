@@ -81,7 +81,7 @@ router.get('/', checkPermiso('STAFF_TECNICO_VER'), asyncHandler(async (req, res)
     ]
   }
 
-  const staff = await prisma.staffTecnico.findMany({
+  const staff = await req.db.staffTecnico.findMany({
     where,
     include: {
       actividad: {
@@ -122,7 +122,7 @@ router.get('/', checkPermiso('STAFF_TECNICO_VER'), asyncHandler(async (req, res)
 router.get('/:id', checkPermiso('STAFF_TECNICO_VER'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const staff = await prisma.staffTecnico.findUnique({
+  const staff = await req.db.staffTecnico.findUnique({
     where: { id: parseInt(id) },
     include: {
       actividad: {
@@ -195,7 +195,7 @@ router.post('/', checkPermiso('STAFF_TECNICO_CREAR'), asyncHandler(async (req, r
 
   // Validar que existe la categoría (si se especifica)
   if (categoriaActividadId) {
-    const categoria = await prisma.categoriaActividad.findUnique({
+    const categoria = await req.db.categoriaActividad.findUnique({
       where: { id: parseInt(categoriaActividadId) }
     })
     if (!categoria) {
@@ -217,7 +217,7 @@ router.post('/', checkPermiso('STAFF_TECNICO_CREAR'), asyncHandler(async (req, r
     throw new AppError(`Rol inválido. Debe ser uno de: ${rolesValidos.join(', ')}`, 400)
   }
 
-  const staff = await prisma.staffTecnico.create({
+  const staff = await req.db.staffTecnico.create({
     data: {
       actividadId: actividadId ? parseInt(actividadId) : null,
       categoriaActividadId: categoriaActividadId ? parseInt(categoriaActividadId) : null,
@@ -267,7 +267,7 @@ router.put('/:id', checkPermiso('STAFF_TECNICO_EDITAR'), asyncHandler(async (req
     activo
   } = req.body
 
-  const existente = await prisma.staffTecnico.findUnique({
+  const existente = await req.db.staffTecnico.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -291,7 +291,7 @@ router.put('/:id', checkPermiso('STAFF_TECNICO_EDITAR'), asyncHandler(async (req
     }
   }
 
-  const staff = await prisma.staffTecnico.update({
+  const staff = await req.db.staffTecnico.update({
     where: { id: parseInt(id) },
     data: {
       actividadId: actividadId !== undefined ? (actividadId ? parseInt(actividadId) : null) : undefined,
@@ -330,7 +330,7 @@ router.put('/:id', checkPermiso('STAFF_TECNICO_EDITAR'), asyncHandler(async (req
 router.delete('/:id', checkPermiso('STAFF_TECNICO_ELIMINAR'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const existente = await prisma.staffTecnico.findUnique({
+  const existente = await req.db.staffTecnico.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -339,7 +339,7 @@ router.delete('/:id', checkPermiso('STAFF_TECNICO_ELIMINAR'), asyncHandler(async
   }
 
   // Soft delete (marcar como inactivo)
-  await prisma.staffTecnico.update({
+  await req.db.staffTecnico.update({
     where: { id: parseInt(id) },
     data: { activo: false }
   })

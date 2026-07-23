@@ -271,7 +271,7 @@ router.post('/impresoras/:id/test', authAdmin, checkPermiso('BUFFET_CONFIG'), as
     const testDataBase64 = testData.toString('base64')
 
     // Enviar a la impresora
-    const resultado = await enviarImpresion(parseInt(id), testDataBase64, 'TEST')
+    const resultado = await enviarImpresion(req.db, parseInt(id), testDataBase64, 'TEST')
 
     if (resultado.success) {
       res.json({ success: true, message: 'Test de impresión enviado. Verifica la impresora.' })
@@ -622,7 +622,7 @@ router.post('/imprimir-ticket-directo', authAdmin, checkPermiso('BUFFET_COBRAR',
     }
 
     // Enviar directamente a la impresora
-    const resultado = await enviarImpresion(impresora.id, ticketBase64, tipoTicket || 'FISCAL')
+    const resultado = await enviarImpresion(req.db, impresora.id, ticketBase64, tipoTicket || 'FISCAL')
 
     if (resultado.success) {
       res.json({
@@ -650,9 +650,9 @@ router.post('/imprimir-ticket-directo', authAdmin, checkPermiso('BUFFET_COBRAR',
  * @param {string} datosBase64 - Datos ESC/POS en base64
  * @param {string} tipo - Tipo de ticket (COMANDA, CUENTA, FISCAL)
  */
-export async function enviarImpresion(impresoraId, datosBase64, tipo = 'TICKET') {
+export async function enviarImpresion(db, impresoraId, datosBase64, tipo = 'TICKET') {
   try {
-    const impresora = await prisma.impresoraTermica.findUnique({
+    const impresora = await db.impresoraTermica.findFirst({
       where: { id: impresoraId },
       include: { sector: true }
     })

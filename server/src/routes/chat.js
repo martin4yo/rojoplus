@@ -152,7 +152,7 @@ router.post(
 
     console.log(`Usuario: ${context.userName} (${context.role})`)
 
-    const actionExecutor = new ActionExecutor(req.prisma)
+    const actionExecutor = new ActionExecutor(req.db)
 
     try {
       const tools = getToolsForRole(context.role)

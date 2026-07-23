@@ -185,7 +185,7 @@ router.get('/asistencia', asyncHandler(async (req, res) => {
   }
 
   // Obtener entrenamientos con asistencias
-  const entrenamientos = await prisma.entrenamiento.findMany({
+  const entrenamientos = await req.db.entrenamiento.findMany({
     where: whereEntrenamiento,
     include: {
       categoriaActividad: {
@@ -466,7 +466,7 @@ router.get('/goleadores', asyncHandler(async (req, res) => {
     wherePartido.categoriaActividadId = parseInt(categoriaActividadId)
   }
 
-  const estadisticas = await prisma.estadisticaPartido.groupBy({
+  const estadisticas = await req.db.estadisticaPartido.groupBy({
     by: ['socioId'],
     where: {
       partido: wherePartido
@@ -538,7 +538,7 @@ router.get('/asistidores', asyncHandler(async (req, res) => {
     wherePartido.categoriaActividadId = parseInt(categoriaActividadId)
   }
 
-  const estadisticas = await prisma.estadisticaPartido.groupBy({
+  const estadisticas = await req.db.estadisticaPartido.groupBy({
     by: ['socioId'],
     where: {
       partido: wherePartido
@@ -605,7 +605,7 @@ router.get('/jugador/:socioId', asyncHandler(async (req, res) => {
   }
 
   // Estadísticas de partidos
-  const estadisticasPartidos = await prisma.estadisticaPartido.findMany({
+  const estadisticasPartidos = await req.db.estadisticaPartido.findMany({
     where: {
       socioId: parseInt(socioId),
       partido: wherePartido

@@ -35,7 +35,7 @@ router.get('/:token/push/vapid-key', async (req, res) => {
 router.post('/:token/push/subscribe', async (req, res) => {
   const { token } = req.params
   const { endpoint, keys } = req.body
-  const prisma = req.prisma
+  const prisma = req.db
 
   try {
     // Validar datos
@@ -62,13 +62,13 @@ router.post('/:token/push/subscribe', async (req, res) => {
     }
 
     // Verificar si ya existe esta suscripción
-    const existente = await prisma.pushSubscription.findFirst({
+    const existente = await req.db.pushSubscription.findFirst({
       where: { endpoint }
     })
 
     if (existente) {
       // Actualizar la suscripción existente
-      await prisma.pushSubscription.update({
+      await req.db.pushSubscription.update({
         where: { id: existente.id },
         data: {
           socioId: socio.id,
@@ -88,7 +88,7 @@ router.post('/:token/push/subscribe', async (req, res) => {
     }
 
     // Crear nueva suscripción
-    const subscription = await prisma.pushSubscription.create({
+    const subscription = await req.db.pushSubscription.create({
       data: {
         socioId: socio.id,
         endpoint,
@@ -123,7 +123,7 @@ router.post('/:token/push/subscribe', async (req, res) => {
 router.delete('/:token/push/unsubscribe', async (req, res) => {
   const { token } = req.params
   const { endpoint } = req.body
-  const prisma = req.prisma
+  const prisma = req.db
 
   try {
     // Buscar socio por token
@@ -140,7 +140,7 @@ router.delete('/:token/push/unsubscribe', async (req, res) => {
 
     if (endpoint) {
       // Desactivar suscripción específica
-      await prisma.pushSubscription.updateMany({
+      await req.db.pushSubscription.updateMany({
         where: {
           socioId: socio.id,
           endpoint
@@ -149,7 +149,7 @@ router.delete('/:token/push/unsubscribe', async (req, res) => {
       })
     } else {
       // Desactivar todas las suscripciones del socio
-      await prisma.pushSubscription.updateMany({
+      await req.db.pushSubscription.updateMany({
         where: { socioId: socio.id },
         data: { activa: false }
       })
@@ -171,7 +171,7 @@ router.delete('/:token/push/unsubscribe', async (req, res) => {
  */
 router.get('/:token/push/status', async (req, res) => {
   const { token } = req.params
-  const prisma = req.prisma
+  const prisma = req.db
 
   try {
     // Buscar socio por token
@@ -223,7 +223,7 @@ router.get('/:token/push/status', async (req, res) => {
 router.put('/:token/push/toggle', async (req, res) => {
   const { token } = req.params
   const { habilitado } = req.body
-  const prisma = req.prisma
+  const prisma = req.db
 
   try {
     // Buscar socio por token
@@ -246,7 +246,7 @@ router.put('/:token/push/toggle', async (req, res) => {
 
     // Si deshabilita, desactivar todas las suscripciones
     if (!habilitado) {
-      await prisma.pushSubscription.updateMany({
+      await req.db.pushSubscription.updateMany({
         where: { socioId: socio.id },
         data: { activa: false }
       })

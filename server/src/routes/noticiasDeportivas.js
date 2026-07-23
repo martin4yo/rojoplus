@@ -203,7 +203,7 @@ router.post('/', checkPermiso('NOTICIAS_DEPORTIVAS_CREAR'), asyncHandler(async (
 
   // Validar que existe la categoría (si se especifica)
   if (categoriaId) {
-    const categoria = await prisma.categoriaActividad.findUnique({
+    const categoria = await req.db.categoriaActividad.findUnique({
       where: { id: parseInt(categoriaId) }
     })
     if (!categoria) {

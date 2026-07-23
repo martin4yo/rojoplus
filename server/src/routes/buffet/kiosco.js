@@ -78,7 +78,7 @@ async function imprimirComandaKiosco(db, items, observaciones) {
       LF(); LF(); LF()
       cmd(ESC, 0x64, 3) // cut
       const base64Data = Buffer.from(buffer).toString('base64')
-      await enviarImpresion(impresoraId, base64Data, 'COMANDA')
+      await enviarImpresion(db, impresoraId, base64Data, 'COMANDA')
     }
   } catch (err) {
     console.error('[Kiosco Comanda] Error:', err)

@@ -21,7 +21,7 @@ const router = express.Router()
  */
 router.get('/kds/sectores', authAdmin, async (req, res) => {
   try {
-    const sectores = await prisma.sectorBuffet.findMany({
+    const sectores = await req.db.sectorBuffet.findMany({
       where: { activo: true },
       orderBy: { orden: 'asc' },
       select: { id: true, codigo: true, nombre: true, icono: true, color: true }
@@ -249,7 +249,7 @@ router.put('/kds/items/:id/entregar', authAdmin, async (req, res) => {
         data: { estado: 'ENTREGADO' }
       })
     } else {
-      await prisma.itemPedidoTakeAway.update({
+      await req.db.itemPedidoTakeAway.update({
         where: { id: parseInt(id) },
         data: { estado: 'ENTREGADO' }
       })
@@ -277,7 +277,7 @@ router.put('/kds/items/:id/preparando', authAdmin, async (req, res) => {
         data: { estado: 'EN_PREPARACION' }
       })
     } else {
-      await prisma.itemPedidoTakeAway.update({
+      await req.db.itemPedidoTakeAway.update({
         where: { id: parseInt(id) },
         data: { estado: 'EN_PREPARACION' }
       })
@@ -311,7 +311,7 @@ router.put('/kds/items/:id/listo', authAdmin, async (req, res) => {
 
       await notificarItemListo(item, item.comanda)
     } else {
-      await prisma.itemPedidoTakeAway.update({
+      await req.db.itemPedidoTakeAway.update({
         where: { id: parseInt(id) },
         data: { estado: 'LISTO' }
       })
@@ -386,7 +386,7 @@ router.put('/kds/items/:id/revertir', authAdmin, async (req, res) => {
       })
     } else {
       // TakeAway
-      const item = await prisma.itemPedidoTakeAway.findUnique({
+      const item = await req.db.itemPedidoTakeAway.findUnique({
         where: { id: parseInt(id) },
         include: {
           productoBuffet: {
@@ -426,7 +426,7 @@ router.put('/kds/items/:id/revertir', authAdmin, async (req, res) => {
 
       updateData.estado = nuevoEstado
 
-      await prisma.itemPedidoTakeAway.update({
+      await req.db.itemPedidoTakeAway.update({
         where: { id: parseInt(id) },
         data: updateData
       })
@@ -449,7 +449,7 @@ router.put('/kds/items/:id/revertir', authAdmin, async (req, res) => {
  */
 router.get('/cocina/pendientes', authAdmin, checkPermiso('BUFFET_COCINA'), async (req, res) => {
   try {
-    const destinosCocina = await prisma.destinoImpresion.findMany({
+    const destinosCocina = await req.db.destinoImpresion.findMany({
       where: { impresora: { tipo: 'COCINA', activo: true } },
       select: { categoriaMenuId: true }
     })
@@ -530,7 +530,7 @@ router.put('/cocina/items/:id/preparando', authAdmin, checkPermiso('BUFFET_COCIN
         data: { estado: 'EN_PREPARACION' }
       })
     } else {
-      await prisma.itemPedidoTakeAway.update({
+      await req.db.itemPedidoTakeAway.update({
         where: { id: parseInt(id) },
         data: { estado: 'EN_PREPARACION' }
       })
@@ -577,7 +577,7 @@ router.put('/cocina/items/:id/listo', authAdmin, checkPermiso('BUFFET_COCINA'), 
         })
       }
     } else {
-      await prisma.itemPedidoTakeAway.update({
+      await req.db.itemPedidoTakeAway.update({
         where: { id: parseInt(id) },
         data: { estado: 'LISTO' }
       })
@@ -600,7 +600,7 @@ router.put('/cocina/items/:id/listo', authAdmin, checkPermiso('BUFFET_COCINA'), 
  */
 router.get('/barra/pendientes', authAdmin, checkPermiso('BUFFET_BARRA'), async (req, res) => {
   try {
-    const destinosBarra = await prisma.destinoImpresion.findMany({
+    const destinosBarra = await req.db.destinoImpresion.findMany({
       where: { impresora: { tipo: 'BARRA', activo: true } },
       select: { categoriaMenuId: true }
     })
@@ -681,7 +681,7 @@ router.put('/barra/items/:id/preparando', authAdmin, checkPermiso('BUFFET_BARRA'
         data: { estado: 'EN_PREPARACION' }
       })
     } else {
-      await prisma.itemPedidoTakeAway.update({
+      await req.db.itemPedidoTakeAway.update({
         where: { id: parseInt(id) },
         data: { estado: 'EN_PREPARACION' }
       })
@@ -715,7 +715,7 @@ router.put('/barra/items/:id/listo', authAdmin, checkPermiso('BUFFET_BARRA'), as
 
       await notificarItemListo(item, item.comanda)
     } else {
-      await prisma.itemPedidoTakeAway.update({
+      await req.db.itemPedidoTakeAway.update({
         where: { id: parseInt(id) },
         data: { estado: 'LISTO' }
       })

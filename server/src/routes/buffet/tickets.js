@@ -72,7 +72,7 @@ router.post('/regenerar-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRA
           socio: comanda.socio
         }
       } else {
-        const comprobante = await prisma.comprobanteElectronico.findFirst({
+        const comprobante = await req.db.comprobanteElectronico.findFirst({
           where: { comandaId: parseInt(id) }
         })
 
@@ -130,7 +130,7 @@ router.post('/regenerar-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRA
         }
       }
     } else if (tipo === 'takeaway') {
-      const pedido = await prisma.pedidoTakeAway.findUnique({
+      const pedido = await req.db.pedidoTakeAway.findUnique({
         where: { id: parseInt(id) },
         include: {
           items: {
@@ -151,7 +151,7 @@ router.post('/regenerar-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRA
         subtotal: parseFloat(item.subtotal)
       }))
 
-      const comprobante = await prisma.comprobanteElectronico.findFirst({
+      const comprobante = await req.db.comprobanteElectronico.findFirst({
         where: { pedidoTakeawayId: parseInt(id) }
       })
 
@@ -255,7 +255,7 @@ router.get('/preview-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRAR',
         subtotal: parseFloat(item.subtotal)
       }))
 
-      const comprobante = await prisma.comprobanteElectronico.findFirst({
+      const comprobante = await req.db.comprobanteElectronico.findFirst({
         where: { comandaId: parseInt(id) }
       })
 
@@ -325,7 +325,7 @@ router.get('/preview-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRAR',
         }
       }
     } else if (tipo === 'takeaway') {
-      const pedido = await prisma.pedidoTakeAway.findUnique({
+      const pedido = await req.db.pedidoTakeAway.findUnique({
         where: { id: parseInt(id) },
         include: {
           items: {
@@ -347,7 +347,7 @@ router.get('/preview-ticket/:tipo/:id', authAdmin, checkPermiso('BUFFET_COBRAR',
         subtotal: parseFloat(item.subtotal)
       }))
 
-      const comprobante = await prisma.comprobanteElectronico.findFirst({
+      const comprobante = await req.db.comprobanteElectronico.findFirst({
         where: { pedidoTakeawayId: parseInt(id) }
       })
 
@@ -757,7 +757,7 @@ router.get('/config-impresoras', authAdmin, checkPermiso('BUFFET_CONFIG'), async
       }
     })
 
-    const impresoras = await prisma.impresoraTermica.findMany({
+    const impresoras = await req.db.impresoraTermica.findMany({
       where: { activo: true },
       include: { sector: true },
       orderBy: { nombre: 'asc' }
@@ -845,7 +845,7 @@ router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async 
     let impresora = null
 
     if (impresoraId) {
-      impresora = await prisma.impresoraTermica.findUnique({
+      impresora = await req.db.impresoraTermica.findUnique({
         where: { id: parseInt(impresoraId) }
       })
     } else {
@@ -863,14 +863,14 @@ router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async 
       })
 
       if (config?.valor) {
-        impresora = await prisma.impresoraTermica.findUnique({
+        impresora = await req.db.impresoraTermica.findUnique({
           where: { id: parseInt(config.valor) }
         })
       }
 
       // Fallback: buscar impresora por sector o sin sector
       if (!impresora) {
-        impresora = await prisma.impresoraTermica.findFirst({
+        impresora = await req.db.impresoraTermica.findFirst({
           where: {
             activo: true,
             OR: [
@@ -908,7 +908,7 @@ router.post('/imprimir-ticket', authAdmin, checkPermiso('BUFFET_COBRAR'), async 
     const ticketBase64 = Buffer.from(ticketData, 'binary').toString('base64')
 
     // Enviar a impresora
-    const resultado = await enviarImpresion(impresora.id, ticketBase64, ticket.tipo || 'TICKET')
+    const resultado = await enviarImpresion(req.db, impresora.id, ticketBase64, ticket.tipo || 'TICKET')
 
     if (resultado.success) {
       res.json({

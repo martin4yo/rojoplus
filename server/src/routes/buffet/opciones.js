@@ -26,7 +26,7 @@ router.get('/productos/:productoId/grupos-opciones', authAdmin, checkPermiso('BU
   try {
     const { productoId } = req.params
 
-    const grupos = await prisma.grupoOpcionProducto.findMany({
+    const grupos = await req.db.grupoOpcionProducto.findMany({
       where: {
         productoBuffetId: parseInt(productoId),
         activo: true
@@ -60,7 +60,7 @@ router.post('/productos/:productoId/grupos-opciones', authAdmin, checkPermiso('B
       return res.status(400).json({ success: false, error: 'El nombre es obligatorio' })
     }
 
-    const grupo = await prisma.grupoOpcionProducto.create({
+    const grupo = await req.db.grupoOpcionProducto.create({
       data: {
         productoBuffetId: parseInt(productoId),
         nombre,
@@ -90,7 +90,7 @@ router.put('/grupos-opciones/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), asy
     const { id } = req.params
     const { nombre, descripcion, tipo, obligatorio, minSelecciones, maxSelecciones, orden, activo } = req.body
 
-    const grupo = await prisma.grupoOpcionProducto.update({
+    const grupo = await req.db.grupoOpcionProducto.update({
       where: { id: parseInt(id) },
       data: {
         nombre,
@@ -120,7 +120,7 @@ router.delete('/grupos-opciones/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), 
   try {
     const { id } = req.params
 
-    await prisma.grupoOpcionProducto.delete({ where: { id: parseInt(id) } })
+    await req.db.grupoOpcionProducto.delete({ where: { id: parseInt(id) } })
 
     res.json({ success: true, message: 'Grupo de opciones eliminado' })
   } catch (error) {
@@ -146,7 +146,7 @@ router.post('/grupos-opciones/:grupoId/opciones', authAdmin, checkPermiso('BUFFE
       return res.status(400).json({ success: false, error: 'El nombre es obligatorio' })
     }
 
-    const opcion = await prisma.opcionProducto.create({
+    const opcion = await req.db.opcionProducto.create({
       data: {
         grupoId: parseInt(grupoId),
         nombre,
@@ -179,7 +179,7 @@ router.post('/grupos-opciones/:grupoId/opciones/bulk', authAdmin, checkPermiso('
 
     const creadas = await req.db.$transaction(
       opciones.map((op, index) =>
-        prisma.opcionProducto.create({
+        req.db.opcionProducto.create({
           data: {
             grupoId: parseInt(grupoId),
             nombre: op.nombre,
@@ -208,7 +208,7 @@ router.put('/opciones/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (req
     const { id } = req.params
     const { nombre, descripcion, precioAdicional, disponible, orden, activo } = req.body
 
-    const opcion = await prisma.opcionProducto.update({
+    const opcion = await req.db.opcionProducto.update({
       where: { id: parseInt(id) },
       data: {
         nombre,
@@ -235,7 +235,7 @@ router.delete('/opciones/:id', authAdmin, checkPermiso('BUFFET_CONFIG'), async (
   try {
     const { id } = req.params
 
-    await prisma.opcionProducto.delete({ where: { id: parseInt(id) } })
+    await req.db.opcionProducto.delete({ where: { id: parseInt(id) } })
 
     res.json({ success: true, message: 'Opción eliminada' })
   } catch (error) {
@@ -253,7 +253,7 @@ router.put('/opciones/:id/disponibilidad', authAdmin, checkPermiso('BUFFET_MESAS
     const { id } = req.params
     const { disponible } = req.body
 
-    const opcion = await prisma.opcionProducto.update({
+    const opcion = await req.db.opcionProducto.update({
       where: { id: parseInt(id) },
       data: { disponible }
     })

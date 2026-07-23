@@ -110,7 +110,7 @@ router.get('/reportes/cobranza', authAdmin, asyncHandler(async (req, res) => {
   })
   let totalRecargoPendiente = 0
   for (const cuota of cuotasPendientesConRecargo) {
-    const recargo = await calcularRecargoCargo(req.prisma, cuota)
+    const recargo = await calcularRecargoCargo(req.db, cuota)
     totalRecargoPendiente += recargo.recargo
   }
 
@@ -412,7 +412,7 @@ router.get('/reportes/cobranza/morosos', authAdmin, asyncHandler(async (req, res
   const hoy = new Date()
   const cuotasConRecargo = []
   for (const cuota of cuotasPendientes) {
-    const recargo = await calcularRecargoCargo(req.prisma, cuota)
+    const recargo = await calcularRecargoCargo(req.db, cuota)
     cuotasConRecargo.push({
       ...cuota,
       recargo: recargo.recargo,

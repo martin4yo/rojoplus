@@ -24,7 +24,7 @@ function calcularEdad(fechaNacimiento, fechaReferencia = new Date()) {
 // GET /revisar - Revisar socios que necesitan pasaje de categoría
 router.get('/revisar', authAdmin, async (req, res) => {
   try {
-    const prisma = req.prisma
+    const prisma = req.db
     const { actividadId, fechaReferencia } = req.query
 
     // Fecha de referencia para calcular edades (por defecto: inicio del próximo año)
@@ -69,7 +69,7 @@ router.get('/revisar', authAdmin, async (req, res) => {
     })
 
     // Obtener todas las categorías ordenadas por edad
-    const categorias = await prisma.categoriaActividad.findMany({
+    const categorias = await req.db.categoriaActividad.findMany({
       where: { activo: true },
       include: {
         actividad: { select: { id: true, nombre: true } }
@@ -215,7 +215,7 @@ router.get('/revisar', authAdmin, async (req, res) => {
 // POST /ejecutar - Ejecutar pasajes de categoría seleccionados
 router.post('/ejecutar', authAdmin, async (req, res) => {
   try {
-    const prisma = req.prisma
+    const prisma = req.db
     const { pasajes, fechaEfectiva } = req.body
 
     // pasajes = [{ inscripcionId, categoriaDestinoId }, ...]
@@ -346,7 +346,7 @@ router.post('/ejecutar', authAdmin, async (req, res) => {
 // GET /historial - Ver historial de pasajes
 router.get('/historial', authAdmin, async (req, res) => {
   try {
-    const prisma = req.prisma
+    const prisma = req.db
     const { actividadId, desde, hasta, page = 1, limit = 50 } = req.query
 
     const where = {
@@ -411,7 +411,7 @@ router.get('/historial', authAdmin, async (req, res) => {
 // GET /estadisticas - Estadísticas de pasajes
 router.get('/estadisticas', authAdmin, async (req, res) => {
   try {
-    const prisma = req.prisma
+    const prisma = req.db
     const { anio } = req.query
     const year = anio ? parseInt(anio) : new Date().getFullYear()
 
@@ -444,7 +444,7 @@ router.get('/estadisticas', authAdmin, async (req, res) => {
 
     // Obtener nombres de categorías
     const categoriasIds = pasajesPorActividad.map(p => p.categoriaActividadId)
-    const categorias = await prisma.categoriaActividad.findMany({
+    const categorias = await req.db.categoriaActividad.findMany({
       where: { id: { in: categoriasIds } },
       include: { actividad: { select: { nombre: true } } }
     })
@@ -459,12 +459,14 @@ router.get('/estadisticas', authAdmin, async (req, res) => {
     })
 
     // Pasajes por mes
+    // $queryRaw NO pasa por la extensión de tenant → filtrar tenant_id a mano
     const pasajesPorMes = await prisma.$queryRaw`
       SELECT
         EXTRACT(MONTH FROM fecha_fin) as mes,
         COUNT(*) as cantidad
       FROM inscripciones
       WHERE motivo_fin = 'PASAJE_CATEGORIA'
+        AND tenant_id = ${req.tenantId}
         AND fecha_fin >= ${inicioAnio}
         AND fecha_fin <= ${finAnio}
       GROUP BY EXTRACT(MONTH FROM fecha_fin)
@@ -493,7 +495,7 @@ router.get('/estadisticas', authAdmin, async (req, res) => {
 // POST /exceptuar/:inscripcionId - Marcar/desmarcar excepción de pasaje automático
 router.post('/exceptuar/:inscripcionId', authAdmin, async (req, res) => {
   try {
-    const prisma = req.prisma
+    const prisma = req.db
     const { inscripcionId } = req.params
     const { exceptuar, motivo } = req.body
 
@@ -525,7 +527,7 @@ router.post('/exceptuar/:inscripcionId', authAdmin, async (req, res) => {
 // GET /excepciones - Listar inscripciones exceptuadas
 router.get('/excepciones', authAdmin, async (req, res) => {
   try {
-    const prisma = req.prisma
+    const prisma = req.db
     const { actividadId } = req.query
 
     const where = {

@@ -186,7 +186,7 @@ router.post('/productos', authAdmin, checkPermiso('BUFFET_PRODUCTOS'), upload.si
     }
 
     // Validar y procesar registros
-    const resultado = await procesarImportacion(registros, sobreescribir)
+    const resultado = await procesarImportacion(req.db, registros, sobreescribir)
 
     return res.json({
       success: true,
@@ -241,14 +241,14 @@ async function parsearExcel(buffer) {
 /**
  * Procesar importación de productos
  */
-async function procesarImportacion(registros, sobreescribir) {
+async function procesarImportacion(db, registros, sobreescribir) {
   const errores = []
   const advertencias = []
   const exitosos = []
   const omitidos = []
 
   // Cargar categorías de menú para validación
-  const categoriasMenu = await prisma.categoriaMenu.findMany({
+  const categoriasMenu = await db.categoriaMenu.findMany({
     where: { activo: true }
   })
   const mapaCategoriasMenu = new Map(
@@ -276,7 +276,7 @@ async function procesarImportacion(registros, sobreescribir) {
       const datosNormalizados = normalizarDatos(registro, mapaCategoriasMenu)
 
       // Verificar si existe el producto
-      const productoExistente = await prisma.producto.findUnique({
+      const productoExistente = await db.producto.findFirst({
         where: { codigo: datosNormalizados.codigo },
         include: { productoBuffet: true }
       })
@@ -294,7 +294,7 @@ async function procesarImportacion(registros, sobreescribir) {
       // Crear o actualizar producto
       if (productoExistente && sobreescribir) {
         // Actualizar
-        await actualizarProducto(productoExistente, datosNormalizados)
+        await actualizarProducto(db, productoExistente, datosNormalizados)
         exitosos.push({
           fila,
           codigo: datosNormalizados.codigo,
@@ -303,7 +303,7 @@ async function procesarImportacion(registros, sobreescribir) {
         })
       } else {
         // Crear nuevo
-        await crearProducto(datosNormalizados)
+        await crearProducto(db, datosNormalizados)
         exitosos.push({
           fila,
           codigo: datosNormalizados.codigo,
@@ -448,8 +448,8 @@ function normalizarDatos(registro, mapaCategoriasMenu) {
 /**
  * Crear producto nuevo
  */
-async function crearProducto(datos) {
-  return await req.db.$transaction(async (tx) => {
+async function crearProducto(db, datos) {
+  return await db.$transaction(async (tx) => {
     // 1. Crear producto en tabla general
     const producto = await tx.producto.create({
       data: {
@@ -485,8 +485,8 @@ async function crearProducto(datos) {
 /**
  * Actualizar producto existente
  */
-async function actualizarProducto(productoExistente, datos) {
-  return await req.db.$transaction(async (tx) => {
+async function actualizarProducto(db, productoExistente, datos) {
+  return await db.$transaction(async (tx) => {
     // 1. Actualizar producto general
     await tx.producto.update({
       where: { id: productoExistente.id },
@@ -541,7 +541,7 @@ async function actualizarProducto(productoExistente, datos) {
  */
 router.get('/categorias-menu', authAdmin, async (req, res) => {
   try {
-    const categorias = await prisma.categoriaMenu.findMany({
+    const categorias = await req.db.categoriaMenu.findMany({
       where: { activo: true },
       select: {
         codigo: true,

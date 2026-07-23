@@ -32,7 +32,7 @@ router.get('/', checkPermiso('REGLAMENTO_VER'), asyncHandler(async (req, res) =>
     where.requiereAceptacion = requiereAceptacion === 'true'
   }
 
-  const articulos = await prisma.articuloReglamento.findMany({
+  const articulos = await req.db.articuloReglamento.findMany({
     where,
     include: {
       _count: {
@@ -70,7 +70,7 @@ router.get('/', checkPermiso('REGLAMENTO_VER'), asyncHandler(async (req, res) =>
 router.get('/:id', checkPermiso('REGLAMENTO_VER'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const articulo = await prisma.articuloReglamento.findUnique({
+  const articulo = await req.db.articuloReglamento.findUnique({
     where: { id: parseInt(id) },
     include: {
       _count: {
@@ -129,14 +129,14 @@ router.post('/', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(async (req, res
   // Si no se especifica orden, poner al final de la sección
   let ordenFinal = orden
   if (ordenFinal === undefined) {
-    const ultimo = await prisma.articuloReglamento.findFirst({
+    const ultimo = await req.db.articuloReglamento.findFirst({
       where: { seccion },
       orderBy: { orden: 'desc' }
     })
     ordenFinal = (ultimo?.orden || 0) + 1
   }
 
-  const articulo = await prisma.articuloReglamento.create({
+  const articulo = await req.db.articuloReglamento.create({
     data: {
       seccion,
       titulo,
@@ -170,7 +170,7 @@ router.put('/:id', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(async (req, r
     activo
   } = req.body
 
-  const existente = await prisma.articuloReglamento.findUnique({
+  const existente = await req.db.articuloReglamento.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -192,7 +192,7 @@ router.put('/:id', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(async (req, r
     ? existente.version + 1
     : existente.version
 
-  const articulo = await prisma.articuloReglamento.update({
+  const articulo = await req.db.articuloReglamento.update({
     where: { id: parseInt(id) },
     data: {
       seccion: seccion || existente.seccion,
@@ -222,7 +222,7 @@ router.put('/:id', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(async (req, r
 router.delete('/:id', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const existente = await prisma.articuloReglamento.findUnique({
+  const existente = await req.db.articuloReglamento.findUnique({
     where: { id: parseInt(id) },
     include: {
       _count: {
@@ -239,7 +239,7 @@ router.delete('/:id', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(async (req
 
   if (existente._count.aceptaciones > 0) {
     // Soft delete si tiene aceptaciones
-    await prisma.articuloReglamento.update({
+    await req.db.articuloReglamento.update({
       where: { id: parseInt(id) },
       data: { activo: false }
     })
@@ -251,7 +251,7 @@ router.delete('/:id', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(async (req
   }
 
   // Eliminación física si no tiene aceptaciones
-  await prisma.articuloReglamento.delete({
+  await req.db.articuloReglamento.delete({
     where: { id: parseInt(id) }
   })
 
@@ -273,7 +273,7 @@ router.post('/:id/reordenar', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(as
     throw new AppError('Nuevo orden es requerido', 400)
   }
 
-  const articulo = await prisma.articuloReglamento.findUnique({
+  const articulo = await req.db.articuloReglamento.findUnique({
     where: { id: parseInt(id) }
   })
 
@@ -282,7 +282,7 @@ router.post('/:id/reordenar', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(as
   }
 
   // Actualizar orden
-  await prisma.articuloReglamento.update({
+  await req.db.articuloReglamento.update({
     where: { id: parseInt(id) },
     data: { orden: parseInt(nuevoOrden) }
   })
@@ -299,7 +299,7 @@ router.post('/:id/reordenar', checkPermiso('REGLAMENTO_EDITAR'), asyncHandler(as
  */
 router.get('/estadisticas/aceptacion', checkPermiso('REGLAMENTO_VER'), asyncHandler(async (req, res) => {
   // Total de artículos que requieren aceptación
-  const articulosConAceptacion = await prisma.articuloReglamento.findMany({
+  const articulosConAceptacion = await req.db.articuloReglamento.findMany({
     where: {
       activo: true,
       requiereAceptacion: true
@@ -331,7 +331,7 @@ router.get('/estadisticas/aceptacion', checkPermiso('REGLAMENTO_VER'), asyncHand
   }))
 
   // Aceptaciones recientes
-  const aceptacionesRecientes = await prisma.aceptacionReglamento.findMany({
+  const aceptacionesRecientes = await req.db.aceptacionReglamento.findMany({
     take: 20,
     orderBy: { fechaAceptacion: 'desc' },
     include: {
@@ -372,7 +372,7 @@ router.get('/socios-sin-aceptar', checkPermiso('REGLAMENTO_VER'), asyncHandler(a
   const { limit = 50, offset = 0 } = req.query
 
   // Obtener artículos que requieren aceptación
-  const articulosConAceptacion = await prisma.articuloReglamento.findMany({
+  const articulosConAceptacion = await req.db.articuloReglamento.findMany({
     where: {
       activo: true,
       requiereAceptacion: true

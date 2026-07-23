@@ -233,7 +233,7 @@ router.post('/presupuestos/:id/lineas', authAdmin, asyncHandler(async (req, res)
   }
 
   // Buscar si ya existe una linea para esa combinación
-  const existente = await prisma.lineaPresupuesto.findFirst({
+  const existente = await req.db.lineaPresupuesto.findFirst({
     where: {
       presupuestoId: parseInt(id),
       cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null,
@@ -245,7 +245,7 @@ router.post('/presupuestos/:id/lineas', authAdmin, asyncHandler(async (req, res)
   let linea
   if (existente) {
     // Actualizar
-    linea = await prisma.lineaPresupuesto.update({
+    linea = await req.db.lineaPresupuesto.update({
       where: { id: existente.id },
       data: {
         montoPresupuestado: parseFloat(montoPresupuestado),
@@ -258,7 +258,7 @@ router.post('/presupuestos/:id/lineas', authAdmin, asyncHandler(async (req, res)
     })
   } else {
     // Crear
-    linea = await prisma.lineaPresupuesto.create({
+    linea = await req.db.lineaPresupuesto.create({
       data: {
         presupuestoId: parseInt(id),
         cuentaContableId: cuentaContableId ? parseInt(cuentaContableId) : null,
@@ -362,7 +362,7 @@ router.delete('/presupuestos/:presupuestoId/lineas/:lineaId', authAdmin, asyncHa
     return res.status(400).json({ error: 'No se pueden modificar presupuestos cerrados' })
   }
 
-  await prisma.lineaPresupuesto.delete({
+  await req.db.lineaPresupuesto.delete({
     where: { id: parseInt(lineaId) }
   })
 

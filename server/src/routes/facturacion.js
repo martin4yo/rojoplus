@@ -340,7 +340,7 @@ router.post('/emitir', checkPermiso('FACTURACION_EMITIR'), asyncHandler(async (r
   }
 
   // Guardar comprobante en base de datos
-  const comprobante = await prisma.comprobanteElectronico.create({
+  const comprobante = await req.db.comprobanteElectronico.create({
     data: {
       tipo: tiposNombre[tipoComprobante] || 'FACTURA',
       tipoAfip: tipoComprobante,
@@ -441,7 +441,7 @@ router.get('/comprobantes', asyncHandler(async (req, res) => {
   if (cajaId) where.cajaId = parseInt(cajaId)
 
   const [comprobantes, total] = await Promise.all([
-    prisma.comprobanteElectronico.findMany({
+    req.db.comprobanteElectronico.findMany({
       where,
       orderBy: { fecha: 'desc' },
       take: parseInt(limit),
@@ -452,7 +452,7 @@ router.get('/comprobantes', asyncHandler(async (req, res) => {
         creadoPor: { select: { id: true, nombre: true, apellido: true } }
       }
     }),
-    prisma.comprobanteElectronico.count({ where })
+    req.db.comprobanteElectronico.count({ where })
   ])
 
   res.json({
@@ -471,7 +471,7 @@ router.get('/comprobantes', asyncHandler(async (req, res) => {
 router.get('/comprobantes/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const comprobante = await prisma.comprobanteElectronico.findUnique({
+  const comprobante = await req.db.comprobanteElectronico.findUnique({
     where: { id: parseInt(id) },
     include: {
       comanda: {
@@ -521,7 +521,7 @@ router.get('/comprobantes/:id', asyncHandler(async (req, res) => {
 router.get('/comprobantes/:id/ticket', asyncHandler(async (req, res) => {
   const { id } = req.params
 
-  const comprobante = await prisma.comprobanteElectronico.findUnique({
+  const comprobante = await req.db.comprobanteElectronico.findUnique({
     where: { id: parseInt(id) },
     include: {
       comanda: {

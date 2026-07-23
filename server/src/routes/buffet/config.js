@@ -132,7 +132,7 @@ router.get('/clientes/buscar', authAdmin, checkPermiso('BUFFET_COBRAR', 'BUFFET_
     })
 
     // Buscar entidades tipo CLIENTE
-    const entidades = await prisma.entidad.findMany({
+    const entidades = await req.db.entidad.findMany({
       where: {
         tipo: 'CLIENTE',
         OR: [

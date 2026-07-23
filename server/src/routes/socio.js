@@ -2288,7 +2288,7 @@ router.get('/:tokenPortal/pagos/:pagoId/pdf', asyncHandler(async (req, res) => {
   }
 
   // Generar PDF
-  const pdfBuffer = await generatePDF(req.prisma, 'RECIBO', pdfData)
+  const pdfBuffer = await generatePDF(req.db, 'RECIBO', pdfData)
 
   // Enviar PDF
   res.setHeader('Content-Type', 'application/pdf')

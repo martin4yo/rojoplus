@@ -171,7 +171,7 @@ async function imprimirComandaPorDestinos(db, comanda, items) {
       console.log(`[Print] Enviando a impresora ${data.impresora.nombre} (sector: ${data.sectorNombre})`)
       const ticketData = generarComandaESCPOS(comanda, data.items, data.sectorNombre)
       const base64Data = ticketData.toString('base64')
-      const resultado = await enviarImpresion(impresoraId, base64Data, 'COMANDA')
+      const resultado = await enviarImpresion(db, impresoraId, base64Data, 'COMANDA')
       console.log(`[Print] Resultado: ${JSON.stringify(resultado)}`)
     }
   } catch (error) {

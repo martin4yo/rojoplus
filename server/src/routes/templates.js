@@ -93,7 +93,7 @@ router.post('/email/:id/test', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Enviar email de prueba
-  const result = await sendTestEmail(req.prisma, template.eventType, email)
+  const result = await sendTestEmail(req.db, template.eventType, email)
 
   res.json({
     success: true,
@@ -182,7 +182,7 @@ router.post('/pdf/:id/test', authAdmin, asyncHandler(async (req, res) => {
   }
 
   // Generar PDF de prueba
-  const pdfBuffer = await generateTestPDF(req.prisma, template.tipo)
+  const pdfBuffer = await generateTestPDF(req.db, template.tipo)
 
   // Enviar como descarga
   res.setHeader('Content-Type', 'application/pdf')

@@ -547,7 +547,7 @@ router.post('/planes-pago', authAdmin, asyncHandler(async (req, res) => {
 
   // Calcular recargo para cada cuota
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
-    const recargoCalc = await calcularRecargoCargo(req.prisma, cuota)
+    const recargoCalc = await calcularRecargoCargo(req.db, cuota)
     return {
       ...cuota,
       recargoCalculado: recargoCalc.recargo,
@@ -692,7 +692,7 @@ router.post('/planes-pago/preview', authAdmin, asyncHandler(async (req, res) => 
 
   // Calcular recargos
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
-    const recargoCalc = await calcularRecargoCargo(req.prisma, cuota)
+    const recargoCalc = await calcularRecargoCargo(req.db, cuota)
     return {
       id: cuota.id,
       descripcion: cuota.periodo?.nombre || cuota.descripcion || `Cargo #${cuota.id}`,

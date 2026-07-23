@@ -24,7 +24,7 @@ router.get('/notificaciones', authAdmin, async (req, res) => {
     if (permisos.includes('BUFFET_BARRA')) destinos.push('BARRA')
     if (permisos.includes('BUFFET_COBRAR')) destinos.push('CAJA')
 
-    const notificaciones = await prisma.notificacionBuffet.findMany({
+    const notificaciones = await req.db.notificacionBuffet.findMany({
       where: {
         OR: [
           { paraUsuarioId: adminId },
@@ -55,7 +55,7 @@ router.post('/notificaciones/:id/vista', authAdmin, async (req, res) => {
     const { id } = req.params
     const adminId = req.admin.id
 
-    await prisma.notificacionVista.upsert({
+    await req.db.notificacionVista.upsert({
       where: {
         notificacionId_adminId: {
           notificacionId: parseInt(id),
@@ -90,7 +90,7 @@ router.post('/notificaciones/marcar-todas', authAdmin, async (req, res) => {
     if (permisos.includes('BUFFET_BARRA')) destinos.push('BARRA')
     if (permisos.includes('BUFFET_COBRAR')) destinos.push('CAJA')
 
-    const notificaciones = await prisma.notificacionBuffet.findMany({
+    const notificaciones = await req.db.notificacionBuffet.findMany({
       where: {
         OR: [
           { paraUsuarioId: adminId },
@@ -105,7 +105,7 @@ router.post('/notificaciones/marcar-todas', authAdmin, async (req, res) => {
     })
 
     if (notificaciones.length > 0) {
-      await prisma.notificacionVista.createMany({
+      await req.db.notificacionVista.createMany({
         data: notificaciones.map(n => ({
           notificacionId: n.id,
           adminId
@@ -135,7 +135,7 @@ router.get('/notificaciones/historial', authAdmin, async (req, res) => {
     if (permisos.includes('BUFFET_BARRA')) destinos.push('BARRA')
     if (permisos.includes('BUFFET_COBRAR')) destinos.push('CAJA')
 
-    const notificaciones = await prisma.notificacionBuffet.findMany({
+    const notificaciones = await req.db.notificacionBuffet.findMany({
       where: {
         OR: [
           { paraUsuarioId: adminId },

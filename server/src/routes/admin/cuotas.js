@@ -602,8 +602,8 @@ router.get('/cuotas/cobranza/:socioId', authAdmin, asyncHandler(async (req, res)
   // Calcular recargo y descuento anticipado para cada cuota
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
     const [recargoCalc, descuentoCalc] = await Promise.all([
-      calcularRecargoCargo(req.prisma, cuota),
-      calcularDescuentoAnticipado(req.prisma, cuota),
+      calcularRecargoCargo(req.db, cuota),
+      calcularDescuentoAnticipado(req.db, cuota),
     ])
     const montoFinal = Number(cuota.montoTotal) + recargoCalc.recargo - descuentoCalc.descuento
     return {
@@ -1554,8 +1554,8 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
   // Calcular recargo y descuento anticipado para cada cuota
   const cuotas = await Promise.all(cuotasRaw.map(async (cuota) => {
     const [recargoCalc, descuentoCalc] = await Promise.all([
-      calcularRecargoCargo(req.prisma, cuota),
-      calcularDescuentoAnticipado(req.prisma, cuota),
+      calcularRecargoCargo(req.db, cuota),
+      calcularDescuentoAnticipado(req.db, cuota),
     ])
     return {
       ...cuota,
