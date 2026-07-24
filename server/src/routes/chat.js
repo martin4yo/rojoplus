@@ -347,29 +347,51 @@ router.post('/confirm', asyncHandler(async (req, res) => {
     return res.status(400).json({ answer: 'Parámetros inválidos.', model: 'error', time_ms: 0, from_cache: false })
   }
 
+  const { role, tokenPortal } = req.body
+
   console.log(`\n🔐 ===== CONFIRM ACTION =====`)
-  console.log(`action_id: ${action_id} confirmed: ${confirmed}`)
+  console.log(`action_id: ${action_id} confirmed: ${confirmed} role: ${role || (tokenPortal ? 'socio' : '?')}`)
 
   try {
     const result = await callHubConfirm({ actionId: action_id, confirmed })
 
-    const message = result.message || (result.success ? 'Operación completada.' : 'Error al ejecutar la operación.')
-    console.log(`✅ confirm result: success=${result.success} message=${message.slice(0, 100)}`)
+    // Modelo nuevo: el hub confirmó y DELEGA la ejecución. Ejecutamos el tool
+    // localmente contra la base de Clubix (misma vía que un tool-call de lectura).
+    if (result?.tool_call?.name) {
+      // Reconstruir el contexto de ejecución. Las write ops son de admin; se
+      // soporta socio por si a futuro tiene alguna. El tenant sale del request
+      // autenticado (req.db ya está scopeado), no del pending.
+      let context
+      if (tokenPortal) {
+        const socio = await req.db.socio.findFirst({
+          where: { tokenPortal },
+          include: { estadoSocioRel: { select: { nombre: true } } },
+        })
+        if (!socio) {
+          return res.status(200).json({ success: false, message: 'Sesión inválida. Recargá e intentá de nuevo.' })
+        }
+        context = { role: ROLES.SOCIO, tenantId: req.tenantId, userId: socio.id.toString(), socioId: socio.id, userName: socio.apellidoNombre, metadata: {} }
+      } else {
+        context = { role: role || ROLES.ADMIN, tenantId: req.tenantId, userId: 'admin-1', userName: 'Administrador', metadata: {} }
+      }
 
-    return res.status(200).json({
-      answer: message,
-      model: 'write-confirmed',
-      time_ms: 0,
-      from_cache: false,
-    })
+      const actionExecutor = new ActionExecutor(req.db)
+      const action = { accion: result.tool_call.name, entidades: result.tool_call.args || {} }
+      const exec = await actionExecutor.executeAction(action, context)
+      console.log(`🎬 [confirm→exec] ${action.accion} success=${exec.success}`)
+      return res.status(200).json({
+        success: exec.success,
+        message: exec.message || (exec.success ? 'Listo.' : 'No pude ejecutar la operación.'),
+      })
+    }
+
+    // Modelo legacy (hub ejecutó el SQL) o cancelación: el hub ya resolvió.
+    const message = result?.message || (result?.success ? 'Operación completada.' : 'Operación cancelada.')
+    console.log(`✅ confirm result: success=${result?.success} message=${message.slice(0, 100)}`)
+    return res.status(200).json({ success: result?.success ?? false, message })
   } catch (err) {
     console.error('Error en /confirm:', err.message)
-    return res.status(200).json({
-      answer: 'No pude confirmar la operación. Intentá de nuevo.',
-      model: 'error',
-      time_ms: 0,
-      from_cache: false,
-    })
+    return res.status(200).json({ success: false, message: 'No pude confirmar la operación. Intentá de nuevo.' })
   }
 }))
 

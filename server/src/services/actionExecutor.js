@@ -1,7 +1,14 @@
 import crypto from 'crypto'
 import prisma from '../lib/prisma.js'
-import { ACCIONES } from './aiConstants.js'
+import { ACCIONES, ROLES } from './aiConstants.js'
 import { getTenantFrontendUrl } from '../lib/tenantUrl.js'
+import {
+  crearSocio as crearSocioService,
+  cambiarEstadoSocio as cambiarEstadoSocioService,
+  actualizarTipoSocio as actualizarTipoSocioService,
+} from './socioService.js'
+import { crearCargo as crearCargoService } from './cargoService.js'
+import { inscribirActividad as inscribirActividadService } from './inscripcionService.js'
 
 /**
  * Action Executor Service
@@ -44,7 +51,11 @@ class ActionExecutor {
           return await this.misActividades(action.entidades, context)
 
         case ACCIONES.INSCRIBIR_ACTIVIDAD:
-          return await this.inscribirActividad(action.entidades, context)
+          // Colisión socio/admin: el socio se auto-inscribe (context.socioId);
+          // el admin inscribe a un tercero por nroSocio + centro de costo.
+          return context.role === ROLES.ADMIN
+            ? await this.inscribirActividadAdmin(action.entidades, context)
+            : await this.inscribirActividad(action.entidades, context)
 
         case ACCIONES.BAJA_ACTIVIDAD:
           return await this.bajaActividad(action.entidades, context)
@@ -108,6 +119,28 @@ class ActionExecutor {
         case ACCIONES.VENTAS_BUFFET:
           return await this.ventasBuffet(action.entidades, context)
 
+        case ACCIONES.LISTAR_CENTROS_COSTO:
+          return await this.listarCentrosCosto(action.entidades, context)
+
+        case ACCIONES.LISTAR_ESTADOS_SOCIO:
+          return await this.listarEstadosSocio(action.entidades, context)
+
+        case ACCIONES.LISTAR_TIPOS_SOCIO:
+          return await this.listarTiposSocio(action.entidades, context)
+
+        // ========== ACCIONES DE ADMIN — write ops (post-confirmación) ==========
+        case ACCIONES.CREAR_SOCIO:
+          return await this.crearSocio(action.entidades, context)
+
+        case ACCIONES.GENERAR_CARGO:
+          return await this.generarCargo(action.entidades, context)
+
+        case ACCIONES.CAMBIAR_ESTADO_SOCIO:
+          return await this.cambiarEstadoSocio(action.entidades, context)
+
+        case ACCIONES.ACTUALIZAR_TIPO_SOCIO:
+          return await this.actualizarTipoSocio(action.entidades, context)
+
         // ========== UNKNOWN ==========
         case ACCIONES.UNKNOWN:
         default:
@@ -125,6 +158,326 @@ class ActionExecutor {
         message: '😅 ¡Ups! Algo salió mal. ¿Podés intentar de nuevo?',
         error: error.message
       }
+    }
+  }
+
+  // =============================================================================
+  // ACCIONES DE ADMIN — write ops (ejecutan tras confirmación del hub)
+  // =============================================================================
+
+  /**
+   * Crea un socio con la MISMA lógica que el alta de admin (nroSocio, cuota
+   * social automática, auditoría) vía socioService. El hub ya validó los datos
+   * requeridos (nroSocio, apellidoNombre) y pidió confirmación.
+   */
+  async crearSocio(entidades, context) {
+    try {
+      // actorId: null — el chat admin aún no tiene auth de admin real (context.userId
+      // es un placeholder). creadoPor queda null; la auditoría marca origen CHAT.
+      const { socio, cuotaSocialGenerada } = await crearSocioService(
+        this.prisma, context.tenantId, entidades, { actorId: null, origen: 'CHAT' }
+      )
+
+      let message = `✅ Socio creado: *${socio.apellidoNombre}* (Nro ${socio.nroSocio})`
+      if (cuotaSocialGenerada) {
+        const monto = Number(cuotaSocialGenerada.montoTotal).toLocaleString('es-AR')
+        message += `\n💳 Cuota social generada: $${monto}`
+      }
+      return {
+        success: true,
+        message,
+        data: { socioId: socio.id, nroSocio: socio.nroSocio },
+      }
+    } catch (err) {
+      console.error('❌ Error creando socio:', err)
+      return {
+        success: false,
+        message: `❌ No pude crear el socio: ${err.message}`,
+      }
+    }
+  }
+
+  /**
+   * Resuelve una opción de catálogo por nombre/código (case-insensitive). Si no
+   * matchea, devuelve un mensaje con la lista para que el admin elija. Reutilizado
+   * por las write ops que necesitan un dato de catálogo (estado, tipo, categoría).
+   */
+  async _resolverOMostrarLista(modelName, input, where, titulo) {
+    const model = this.prisma[modelName]
+    const q = (input || '').trim()
+    const match = q
+      ? await model.findFirst({
+          where: {
+            ...where,
+            OR: [
+              { nombre: { equals: q, mode: 'insensitive' } },
+              { codigo: { equals: q, mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true, nombre: true },
+        })
+      : null
+    if (match) return { match }
+    const lista = await model.findMany({
+      where, select: { nombre: true }, orderBy: { nombre: 'asc' }, take: 25,
+    })
+    const opciones = lista.map((c, i) => `${i + 1}. ${c.nombre}`).join('\n')
+    return { listMessage: `${titulo}\n\n${opciones}` }
+  }
+
+  async listarEstadosSocio() {
+    const lista = await this.prisma.estadoSocio.findMany({
+      select: { nombre: true }, orderBy: { nombre: 'asc' }, take: 30,
+    })
+    if (!lista.length) return { success: false, message: 'No hay estados de socio configurados.' }
+    return { success: true, message: `📋 *Estados de socio:*\n\n${lista.map((e, i) => `${i + 1}. ${e.nombre}`).join('\n')}` }
+  }
+
+  async listarTiposSocio() {
+    const lista = await this.prisma.tipoSocio.findMany({
+      select: { nombre: true }, orderBy: { nombre: 'asc' }, take: 30,
+    })
+    if (!lista.length) return { success: false, message: 'No hay tipos de socio configurados.' }
+    return { success: true, message: `📋 *Tipos de socio:*\n\n${lista.map((t, i) => `${i + 1}. ${t.nombre}`).join('\n')}` }
+  }
+
+  /**
+   * Cambia el estado de un socio (identificado por nroSocio). Resuelve el estado
+   * por nombre; si no matchea, muestra la lista. Setea/limpia baja según el estado.
+   */
+  async cambiarEstadoSocio(entidades, context) {
+    try {
+      const socio = await this.prisma.socio.findFirst({
+        where: { nroSocio: String(entidades.nroSocio) },
+        select: { id: true, nroSocio: true, apellidoNombre: true },
+      })
+      if (!socio) return { success: false, message: `❌ No encontré ningún socio con el número ${entidades.nroSocio}.` }
+
+      const r = await this._resolverOMostrarLista(
+        'estadoSocio', entidades.estado, {}, `No encontré el estado "${entidades.estado || ''}". Elegí uno:`)
+      if (!r.match) return { success: false, message: `${r.listMessage}\n\nDecime el nombre y cambio el estado.` }
+
+      const { socio: upd, estado } = await cambiarEstadoSocioService(
+        this.prisma, context.tenantId,
+        { socioId: socio.id, estadoSocioId: r.match.id, motivo: entidades.motivo },
+        { actorId: null })
+
+      return {
+        success: true,
+        message: `✅ Estado de *${upd.apellidoNombre}* (Nro ${upd.nroSocio}) → *${estado.nombre}*`,
+        data: { socioId: upd.id },
+      }
+    } catch (err) {
+      console.error('❌ Error cambiando estado:', err)
+      return { success: false, message: `❌ No pude cambiar el estado: ${err.message}` }
+    }
+  }
+
+  /**
+   * Actualiza tipo y/o categoría de un socio (por nroSocio). Resuelve tipo y
+   * categoría por nombre; si alguno no matchea, muestra la lista correspondiente.
+   */
+  async actualizarTipoSocio(entidades, context) {
+    try {
+      const socio = await this.prisma.socio.findFirst({
+        where: { nroSocio: String(entidades.nroSocio) },
+        select: { id: true, nroSocio: true, apellidoNombre: true },
+      })
+      if (!socio) return { success: false, message: `❌ No encontré ningún socio con el número ${entidades.nroSocio}.` }
+
+      if (!entidades.tipoSocio && !entidades.categoria) {
+        return { success: false, message: '¿Qué querés cambiar: el tipo de socio, la categoría, o ambos? Decime el nombre.' }
+      }
+
+      let tipoSocioRelId = null, categoriaSocioId = null
+      const cambios = []
+      if (entidades.tipoSocio) {
+        const r = await this._resolverOMostrarLista(
+          'tipoSocio', entidades.tipoSocio, {}, `No encontré el tipo de socio "${entidades.tipoSocio}". Elegí uno:`)
+        if (!r.match) return { success: false, message: r.listMessage }
+        tipoSocioRelId = r.match.id
+        cambios.push(`tipo → ${r.match.nombre}`)
+      }
+      if (entidades.categoria) {
+        const r = await this._resolverOMostrarLista(
+          'categoriaSocio', entidades.categoria, {}, `No encontré la categoría "${entidades.categoria}". Elegí una:`)
+        if (!r.match) return { success: false, message: r.listMessage }
+        categoriaSocioId = r.match.id
+        cambios.push(`categoría → ${r.match.nombre}`)
+      }
+
+      const { socio: upd } = await actualizarTipoSocioService(
+        this.prisma, context.tenantId,
+        { socioId: socio.id, tipoSocioRelId, categoriaSocioId },
+        { actorId: null })
+
+      return {
+        success: true,
+        message: `✅ Socio *${upd.apellidoNombre}* (Nro ${upd.nroSocio}): ${cambios.join(', ')}`,
+        data: { socioId: upd.id },
+      }
+    } catch (err) {
+      console.error('❌ Error actualizando tipo/categoría:', err)
+      return { success: false, message: `❌ No pude actualizar: ${err.message}` }
+    }
+  }
+
+  /**
+   * Lista los centros de costo activos para que el admin elija (usado antes de
+   * generar un cargo / inscribir). Lectura, sin confirmación.
+   */
+  async listarCentrosCosto() {
+    const lista = await this.prisma.centroCosto.findMany({
+      where: { activo: true },
+      select: { nombre: true },
+      orderBy: { orden: 'asc' },
+      take: 30,
+    })
+    if (lista.length === 0) {
+      return { success: false, message: 'No hay centros de costo activos configurados.' }
+    }
+    const opciones = lista.map((c, i) => `${i + 1}. ${c.nombre}`).join('\n')
+    return { success: true, message: `🏷️ *Centros de costo disponibles:*\n\n${opciones}` }
+  }
+
+  /**
+   * Genera un cargo manual. Identifica al socio por nroSocio y al centro de costo
+   * por nombre (si no matchea, muestra la lista para que el admin elija). El hub
+   * ya validó nroSocio/monto/centroCosto y pidió confirmación.
+   */
+  async generarCargo(entidades, context) {
+    try {
+      // Socio por número
+      const socio = await this.prisma.socio.findFirst({
+        where: { nroSocio: String(entidades.nroSocio) },
+        select: { id: true, nroSocio: true, apellidoNombre: true },
+      })
+      if (!socio) {
+        return { success: false, message: `❌ No encontré ningún socio con el número ${entidades.nroSocio}.` }
+      }
+
+      // Centro de costo por nombre (o código). Si no matchea, mostrar la lista.
+      const ccInput = (entidades.centroCosto || '').trim()
+      const centro = ccInput
+        ? await this.prisma.centroCosto.findFirst({
+            where: {
+              activo: true,
+              OR: [
+                { nombre: { equals: ccInput, mode: 'insensitive' } },
+                { codigo: { equals: ccInput, mode: 'insensitive' } },
+              ],
+            },
+            select: { id: true, nombre: true },
+          })
+        : null
+      if (!centro) {
+        const lista = await this.prisma.centroCosto.findMany({
+          where: { activo: true }, select: { nombre: true }, orderBy: { orden: 'asc' }, take: 20,
+        })
+        const opciones = lista.map((c, i) => `${i + 1}. ${c.nombre}`).join('\n')
+        return {
+          success: false,
+          message: `No encontré el centro de costo "${ccInput}". Elegí uno:\n\n${opciones}\n\nDecime el nombre y genero el cargo.`,
+        }
+      }
+
+      const cargo = await crearCargoService(this.prisma, context.tenantId, {
+        socioId: socio.id,
+        centroCostoId: centro.id,
+        montoOriginal: entidades.montoOriginal,
+        descripcion: entidades.descripcion,
+        categoria: entidades.categoria,
+        fechaVencimiento: entidades.fechaVencimiento,
+      }, { actorId: null })
+
+      const monto = Number(cargo.montoTotal).toLocaleString('es-AR')
+      return {
+        success: true,
+        message: `✅ Cargo generado para *${socio.apellidoNombre}* (Nro ${socio.nroSocio})\n💵 ${cargo.descripcion || cargo.categoria}: $${monto}\n🏷️ Centro de costo: ${centro.nombre}`,
+        data: { cargoId: cargo.id, montoTotal: Number(cargo.montoTotal) },
+      }
+    } catch (err) {
+      console.error('❌ Error generando cargo:', err)
+      return { success: false, message: `❌ No pude generar el cargo: ${err.message}` }
+    }
+  }
+
+  /**
+   * Inscribe a un socio (identificado por nroSocio) en una actividad (por nombre)
+   * vía inscripcionService, con la MISMA lógica que el alta de admin (valida socio
+   * activo/edad/cupo, genera la cuota de actividad). Resuelve la actividad y el
+   * centro de costo por nombre; si alguno no matchea, muestra la lista para elegir.
+   */
+  async inscribirActividadAdmin(entidades, context) {
+    try {
+      // Socio por número
+      const socio = await this.prisma.socio.findFirst({
+        where: { nroSocio: String(entidades.nroSocio) },
+        select: { id: true, nroSocio: true, apellidoNombre: true },
+      })
+      if (!socio) {
+        return { success: false, message: `❌ No encontré ningún socio con el número ${entidades.nroSocio}.` }
+      }
+
+      // Categoría de actividad por nombre de actividad (+ categoría/turno opcional)
+      const actInput = (entidades.actividad || '').trim()
+      const categoria = actInput
+        ? await this.prisma.categoriaActividad.findFirst({
+            where: {
+              activo: true,
+              actividad: { nombre: { contains: actInput, mode: 'insensitive' } },
+              ...(entidades.categoria ? { nombre: { contains: entidades.categoria.trim(), mode: 'insensitive' } } : {}),
+            },
+            include: { actividad: { select: { nombre: true } } },
+          })
+        : null
+      if (!categoria) {
+        const disponibles = await this.prisma.categoriaActividad.findMany({
+          where: { activo: true },
+          include: { actividad: { select: { nombre: true } } },
+          orderBy: [{ actividad: { nombre: 'asc' } }, { nombre: 'asc' }],
+          take: 25,
+        })
+        if (!disponibles.length) {
+          return { success: false, message: 'No hay actividades activas configuradas.' }
+        }
+        const opciones = disponibles.map((c, i) => `${i + 1}. ${c.actividad?.nombre || ''} - ${c.nombre}`).join('\n')
+        return {
+          success: false,
+          message: `No encontré la actividad "${actInput}". Elegí una:\n\n${opciones}\n\nDecime el nombre (y la categoría/turno si hace falta) y hago la inscripción.`,
+        }
+      }
+
+      // Centro de costo por nombre (o código). Si no matchea, mostrar la lista.
+      const cc = await this._resolverOMostrarLista(
+        'centroCosto', entidades.centroCosto, { activo: true },
+        `No encontré el centro de costo "${entidades.centroCosto || ''}". Elegí uno:`)
+      if (!cc.match) return { success: false, message: `${cc.listMessage}\n\nDecime el nombre y hago la inscripción.` }
+
+      const { inscripcion, cargoGenerado } = await inscribirActividadService(
+        this.prisma, context.tenantId,
+        {
+          socioId: socio.id,
+          categoriaActividadId: categoria.id,
+          centroCostoId: cc.match.id,
+          fechaInicio: entidades.fechaInicio,
+        },
+        { actorId: null, origen: 'CHAT' })
+
+      const actNombre = `${categoria.actividad?.nombre || ''} - ${categoria.nombre}`
+      let message = `✅ *${socio.apellidoNombre}* (Nro ${socio.nroSocio}) inscripto en *${actNombre}*\n🏷️ Centro de costo: ${cc.match.nombre}`
+      if (cargoGenerado) {
+        const monto = Number(cargoGenerado.montoTotal).toLocaleString('es-AR')
+        message += `\n💳 Cuota de actividad generada: $${monto}`
+      }
+      return {
+        success: true,
+        message,
+        data: { inscripcionId: inscripcion.id, cargoId: cargoGenerado?.id || null },
+      }
+    } catch (err) {
+      console.error('❌ Error inscribiendo en actividad:', err)
+      return { success: false, message: `❌ No pude inscribir al socio: ${err.message}` }
     }
   }
 

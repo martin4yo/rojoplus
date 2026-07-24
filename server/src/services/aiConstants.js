@@ -43,6 +43,15 @@ export const ACCIONES = {
   ESTADISTICAS_SOCIOS: 'estadisticas_socios',
   VENTAS_BUFFET: 'ventas_buffet',
   CREAR_CUOTA: 'crear_cuota',
+  LISTAR_CENTROS_COSTO: 'listar_centros_costo',
+  LISTAR_ESTADOS_SOCIO: 'listar_estados_socio',
+  LISTAR_TIPOS_SOCIO: 'listar_tipos_socio',
+
+  // Admins — write operations (el hub pide confirmación y delega la ejecución acá)
+  CREAR_SOCIO: 'crear_socio',
+  ACTUALIZAR_TIPO_SOCIO: 'actualizar_tipo_socio',
+  CAMBIAR_ESTADO_SOCIO: 'cambiar_estado_socio',
+  GENERAR_CARGO: 'generar_cargo',
 
   // General
   UNKNOWN: 'unknown',

@@ -75,9 +75,38 @@ export const ADMIN_TOOLS = [
     },
   },
 
-  // ── Fase 5: write operations con confirmación ──────────────────────────────
+  // Lecturas auxiliares: listas de opciones para elegir por nombre (el admin no
+  // conoce IDs). Las usan las write ops cuando falta un dato de catálogo.
+  {
+    name: 'listar_centros_costo',
+    description:
+      'Listar los centros de costo activos del club. Usar cuando el admin pregunta ' +
+      'qué centros de costo hay, o cuando necesita elegir uno para generar un cargo ' +
+      'o inscribir en una actividad y no sabe el nombre.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'listar_estados_socio',
+    description:
+      'Listar los estados de socio posibles (Activo, Suspendido, Baja, etc.). Usar ' +
+      'cuando el admin va a cambiar el estado de un socio y no sabe el nombre exacto.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'listar_tipos_socio',
+    description:
+      'Listar los tipos de socio del club. Usar cuando el admin va a cambiar el tipo ' +
+      'de un socio y no sabe el nombre exacto.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+
+  // ── Write operations: el hub pide confirmación y delega la ejecución acá ────
+  // `write: true` → el hub valida los datos requeridos (slot-filling), pide
+  // confirmación y, al confirmar, devuelve el tool_call para que ActionExecutor
+  // lo ejecute contra la base de Clubix. Cero SQL de negocio en el hub.
   {
     name: 'crear_socio',
+    write: true,
     description:
       'Crear un nuevo socio en el club. Usar cuando el admin dice: "creá el socio", ' +
       '"dar de alta a", "registrá a", "nuevo socio", "agregá socio". ' +
@@ -123,6 +152,7 @@ export const ADMIN_TOOLS = [
   },
   {
     name: 'actualizar_tipo_socio',
+    write: true,
     description:
       'Actualizar el tipo y/o categoría de un socio existente. Usar cuando el admin dice: ' +
       '"cambiá el tipo de socio", "actualizá la categoría", "pasá al socio X a tipo Y". ' +
@@ -132,23 +162,15 @@ export const ADMIN_TOOLS = [
       properties: {
         nroSocio: {
           type: 'string',
-          description: 'Número de socio a actualizar.',
+          description: 'Número del socio a actualizar.',
         },
-        tipoSocioRelId: {
-          type: 'number',
-          description: 'ID del nuevo tipo de socio (opcional si se cambia solo categoría).',
-        },
-        tipoSocioNombre: {
+        tipoSocio: {
           type: 'string',
-          description: 'Nombre del tipo para mostrar en la confirmación (opcional).',
+          description: 'Nombre del nuevo tipo de socio. Si el admin no lo sabe, usá listar_tipos_socio.',
         },
-        categoriaSocioId: {
-          type: 'number',
-          description: 'ID de la nueva categoría (opcional si se cambia solo tipo).',
-        },
-        categoriaNombre: {
+        categoria: {
           type: 'string',
-          description: 'Nombre de la categoría para la confirmación (opcional).',
+          description: 'Nombre de la nueva categoría de socio (opcional; se puede cambiar solo el tipo).',
         },
       },
       required: ['nroSocio'],
@@ -156,8 +178,9 @@ export const ADMIN_TOOLS = [
   },
   {
     name: 'cambiar_estado_socio',
+    write: true,
     description:
-      'Cambiar el estado de un socio (activo, inactivo, suspendido, etc.). ' +
+      'Cambiar el estado de un socio (activo, inactivo, suspendido, baja, etc.). ' +
       'Usar cuando el admin dice: "suspendé al socio", "activá al socio", ' +
       '"cambiá el estado", "darlo de baja", "dar de alta". ' +
       'Se identifica al socio por su número.',
@@ -166,22 +189,23 @@ export const ADMIN_TOOLS = [
       properties: {
         nroSocio: {
           type: 'string',
-          description: 'Número de socio.',
+          description: 'Número del socio.',
         },
-        estadoSocioId: {
-          type: 'number',
-          description: 'ID del nuevo estado del socio.',
-        },
-        estadoNombre: {
+        estado: {
           type: 'string',
-          description: 'Nombre del estado para mostrar en la confirmación (ej: "Activo", "Suspendido").',
+          description: 'Nombre del nuevo estado (ej: "Activo", "Suspendido", "Baja"). Si el admin no lo sabe, usá listar_estados_socio.',
+        },
+        motivo: {
+          type: 'string',
+          description: 'Motivo del cambio (opcional; se registra como motivo de baja si el estado da de baja al socio).',
         },
       },
-      required: ['nroSocio', 'estadoSocioId'],
+      required: ['nroSocio', 'estado'],
     },
   },
   {
     name: 'generar_cargo',
+    write: true,
     description:
       'Generar un cargo/deuda manual para un socio. Usar cuando el admin dice: ' +
       '"generá un cargo", "cobrá a", "aplicá un cobro", "cargar deuda", ' +
@@ -189,17 +213,17 @@ export const ADMIN_TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        socioId: {
-          type: 'number',
-          description: 'ID interno del socio (no el nroSocio).',
+        nroSocio: {
+          type: 'string',
+          description: 'Número del socio al que se le genera el cargo.',
         },
         montoOriginal: {
           type: 'number',
-          description: 'Monto base del cargo en pesos.',
+          description: 'Monto del cargo en pesos.',
         },
-        montoTotal: {
-          type: 'number',
-          description: 'Monto total a cobrar (igual a montoOriginal si no hay recargos).',
+        centroCosto: {
+          type: 'string',
+          description: 'Nombre del centro de costo al que imputar el cargo. Si el admin no lo sabe, usá primero listar_centros_costo para mostrarle las opciones.',
         },
         descripcion: {
           type: 'string',
@@ -211,43 +235,45 @@ export const ADMIN_TOOLS = [
         },
         categoria: {
           type: 'string',
-          description: 'Categoría del cargo: CUOTA_SOCIAL, ACTIVIDAD, PRODUCTO, SERVICIO. Default: CUOTA_SOCIAL.',
+          description: 'Categoría del cargo: CUOTA_SOCIAL, CUOTA_ACTIVIDAD, PRODUCTO, SERVICIO. Default: CUOTA_ACTIVIDAD.',
         },
       },
-      required: ['socioId', 'montoOriginal'],
+      required: ['nroSocio', 'montoOriginal', 'centroCosto'],
     },
   },
   {
     name: 'inscribir_actividad',
+    write: true,
     description:
       'Inscribir a un socio en una actividad o disciplina. Usar cuando el admin dice: ' +
       '"inscribí al socio en", "anotá a X en", "registrar inscripción", ' +
-      '"dar de alta en actividad". Requiere ID del socio e ID de la categoría de actividad.',
+      '"dar de alta en actividad". Se identifica al socio por su número y la ' +
+      'actividad por su nombre. Genera automáticamente la cuota de la actividad.',
     inputSchema: {
       type: 'object',
       properties: {
-        socioId: {
-          type: 'number',
-          description: 'ID interno del socio.',
-        },
-        categoriaActividadId: {
-          type: 'number',
-          description: 'ID de la categoría de actividad (disciplina/turno específico).',
-        },
-        categoriaActividadNombre: {
+        nroSocio: {
           type: 'string',
-          description: 'Nombre de la actividad para la confirmación (ej: "Tenis - Mañana").',
+          description: 'Número del socio a inscribir.',
+        },
+        actividad: {
+          type: 'string',
+          description: 'Nombre de la actividad o disciplina (ej: "Tenis", "Natación"). Si el admin no lo sabe, usá listar_actividades.',
+        },
+        categoria: {
+          type: 'string',
+          description: 'Nombre de la categoría/turno de la actividad (ej: "Mañana", "Infantil"). Opcional; ayuda a desambiguar cuando la actividad tiene varias.',
+        },
+        centroCosto: {
+          type: 'string',
+          description: 'Nombre del centro de costo al que imputar la cuota de la actividad (obligatorio). Si el admin no lo sabe, usá primero listar_centros_costo.',
         },
         fechaInicio: {
           type: 'string',
-          description: 'Fecha de inicio de la inscripción ISO 8601 (ej: "2025-01-15").',
-        },
-        fechaFin: {
-          type: 'string',
-          description: 'Fecha de fin (opcional, si es temporal).',
+          description: 'Fecha de inicio de la inscripción ISO 8601 (ej: "2025-01-15"). Opcional; default hoy.',
         },
       },
-      required: ['socioId', 'categoriaActividadId', 'fechaInicio'],
+      required: ['nroSocio', 'actividad', 'centroCosto'],
     },
   },
 ]
