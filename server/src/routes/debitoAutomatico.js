@@ -350,7 +350,12 @@ router.get('/archivos', authAdmin, asyncHandler(async (req, res) => {
       where,
       include: {
         configuracion: {
-          select: { nombre: true, codigo: true }
+          // nombre/codigo viven en ProcesadorDebito desde el split del modelo
+          // de débito (ProcesadorDebito global + ConfiguracionDebito por tenant).
+          select: {
+            nombreEmpresa: true,
+            procesador: { select: { nombre: true, codigo: true } }
+          }
         },
         _count: {
           select: {
@@ -579,7 +584,8 @@ router.get('/archivos/:id', authAdmin, asyncHandler(async (req, res) => {
   const archivo = await req.db.archivoDebito.findUnique({
     where: { id: parseInt(id) },
     include: {
-      configuracion: true,
+      // El nombre/código a mostrar salen del procesador, no de la configuración
+      configuracion: { include: { procesador: { select: { nombre: true, codigo: true } } } },
       detalles: {
         include: {
           socio: {
@@ -643,7 +649,8 @@ router.get('/archivos/:id/descargar', authAdmin, asyncHandler(async (req, res) =
   const archivo = await req.db.archivoDebito.findUnique({
     where: { id: parseInt(id) },
     include: {
-      configuracion: true,
+      // El nombre/código a mostrar salen del procesador, no de la configuración
+      configuracion: { include: { procesador: { select: { nombre: true, codigo: true } } } },
       detalles: {
         include: {
           socio: {
@@ -721,7 +728,8 @@ router.post('/archivos/:id/importar-respuesta', authAdmin, asyncHandler(async (r
   const archivo = await req.db.archivoDebito.findUnique({
     where: { id: parseInt(id) },
     include: {
-      configuracion: true,
+      // El nombre/código a mostrar salen del procesador, no de la configuración
+      configuracion: { include: { procesador: { select: { nombre: true, codigo: true } } } },
       detalles: {
         include: {
           socio: {
@@ -1046,7 +1054,8 @@ router.post('/archivos/:id/reintentar-rechazados', authAdmin, asyncHandler(async
   const archivo = await req.db.archivoDebito.findUnique({
     where: { id: parseInt(id) },
     include: {
-      configuracion: true,
+      // El nombre/código a mostrar salen del procesador, no de la configuración
+      configuracion: { include: { procesador: { select: { nombre: true, codigo: true } } } },
       detalles: {
         where: {
           estado: 'RECHAZADO',
@@ -1730,7 +1739,8 @@ router.post('/archivos/:id/importar-respuesta-banco', authAdmin, asyncHandler(as
   const archivo = await req.db.archivoDebito.findFirst({
     where: { id: parseInt(id), tenantId: req.tenantId },
     include: {
-      configuracion: true,
+      // El nombre/código a mostrar salen del procesador, no de la configuración
+      configuracion: { include: { procesador: { select: { nombre: true, codigo: true } } } },
       detalles: {
         include: {
           socio: { select: { id: true, nroSocio: true } }

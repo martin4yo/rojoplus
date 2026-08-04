@@ -930,7 +930,7 @@ export default function DebitoAutomatico() {
                           </div>
 
                           <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
-                            <span>{archivo.configuracion?.nombre}</span>
+                            <span>{archivo.configuracion?.procesador?.nombre}</span>
                             <span>•</span>
                             <span>{String(archivo.periodoMes).padStart(2, '0')}/{archivo.periodoAnio}</span>
                             <span>•</span>
@@ -1522,7 +1522,7 @@ export default function DebitoAutomatico() {
               <div>
                 <h3 className="font-bold text-gray-900">{archivoSeleccionado.numero}</h3>
                 <p className="text-sm text-gray-500">
-                  {archivoSeleccionado.configuracion?.nombre} - {archivoSeleccionado.cantidadRegistros} registros
+                  {archivoSeleccionado.configuracion?.procesador?.nombre} - {archivoSeleccionado.cantidadRegistros} registros
                 </p>
               </div>
               <button onClick={() => setShowDetalleModal(false)} className="text-gray-400 hover:text-gray-600">
