@@ -162,30 +162,31 @@ export default function NovedadesLiquidacion() {
         )}
       </div>
 
-      {/* Filtros período */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
+      {/* Filtros de período + totales, todo en una sola fila. flex-nowrap para que
+          no se parta; si la pantalla es muy angosta scrollea en horizontal. */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 flex flex-nowrap items-center gap-4 overflow-x-auto">
+        <div className="flex items-center gap-2 shrink-0">
           <Calendar className="w-4 h-4 text-gray-500" />
           <span className="text-sm font-medium text-gray-700">Período:</span>
         </div>
         <select
           value={mes}
           onChange={(e) => setMes(parseInt(e.target.value))}
-          className="input-field"
+          className="input-field w-auto shrink-0"
         >
           {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
         </select>
         <select
           value={anio}
           onChange={(e) => setAnio(parseInt(e.target.value))}
-          className="input-field"
+          className="input-field w-auto shrink-0"
         >
           {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
 
-        <div className="flex-1" />
+        <div className="flex-1 min-w-4" />
 
-        <div className="flex gap-6 text-sm">
+        <div className="flex gap-6 text-sm shrink-0 whitespace-nowrap">
           <div>
             <span className="text-gray-500">Novedades: </span>
             <span className="font-semibold text-gray-800">{totales.cantidad}</span>
