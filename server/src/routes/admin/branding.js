@@ -1,7 +1,38 @@
 import { Router } from 'express'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 import { asyncHandler } from '../../middleware/errorHandler.js'
+import { authAdmin } from '../../middleware/auth.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const router = Router()
+
+// Imágenes del hero subidas por el club. Mismo directorio que usa el panel
+// super-admin para logos/hero, servido estáticamente desde /uploads.
+const uploadDirTenants = path.join(__dirname, '../../../uploads/tenants')
+if (!fs.existsSync(uploadDirTenants)) {
+  fs.mkdirSync(uploadDirTenants, { recursive: true })
+}
+
+const uploadHero = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDirTenants),
+    // El tenantId va en el nombre para que un club no pueda pisar los archivos
+    // de otro, y el timestamp para que convivan varias imágenes del carousel.
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.jpg'
+      cb(null, `tenant-${req.tenantId}-hero-${Date.now()}${ext}`)
+    }
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true)
+    else cb(new Error('Solo se permiten imágenes'))
+  }
+})
 
 /**
  * GET /api/admin/branding
@@ -159,6 +190,33 @@ router.put('/hero-images', asyncHandler(async (req, res) => {
   })
   res.json({ success: true, images })
 }))
+
+/**
+ * POST /api/admin/branding/hero-upload
+ * Subir una imagen para el carousel del hero.
+ * Devuelve la URL; agregarla al carousel es un PUT /hero-images aparte, así
+ * el guardado del listado sigue teniendo un único camino.
+ * Body: multipart/form-data con el campo `imagen`
+ */
+router.post(
+  '/hero-upload',
+  authAdmin,
+  (req, res, next) => {
+    uploadHero.single('imagen')(req, res, (err) => {
+      if (!err) return next()
+      const mensaje = err.code === 'LIMIT_FILE_SIZE'
+        ? 'La imagen supera el límite de 5 MB'
+        : err.message
+      res.status(400).json({ error: mensaje })
+    })
+  },
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se recibió ningún archivo' })
+    }
+    res.json({ success: true, url: `/uploads/tenants/${req.file.filename}` })
+  })
+)
 
 /**
  * GET /api/admin/branding/fecha-fundacion

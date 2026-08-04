@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Palette, Upload, RotateCcw, Save, Plus, Trash2, Images, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
@@ -15,6 +15,8 @@ export default function Branding() {
   const [changed, setChanged] = useState(false)
   const [heroImages, setHeroImages] = useState([])
   const [heroChanged, setHeroChanged] = useState(false)
+  const [subiendoHero, setSubiendoHero] = useState(false)
+  const heroFileRef = useRef()
   const [fechaFundacion, setFechaFundacion] = useState('')
   const [fechaChanged, setFechaChanged] = useState(false)
 
@@ -124,6 +126,27 @@ export default function Branding() {
     setHeroChanged(true)
   }
 
+  // Sube el archivo, lo agrega al final del carousel y guarda el listado en
+  // el mismo paso: subir una imagen y que no quede guardada confunde.
+  async function subirHeroImage(file) {
+    if (!file) return
+    try {
+      setSubiendoHero(true)
+      const formData = new FormData()
+      formData.append('imagen', file)
+      const res = await api.postFormData('/admin/branding/hero-upload', formData)
+      const nuevas = [...heroImages.filter(Boolean), res.url]
+      await api.put('/admin/branding/hero-images', { images: nuevas })
+      setHeroImages(nuevas)
+      setHeroChanged(false)
+      toast.success('Imagen subida y agregada al carousel')
+    } catch (error) {
+      toast.error('Error subiendo imagen: ' + error.message)
+    } finally {
+      setSubiendoHero(false)
+    }
+  }
+
   function updateHeroImage(idx, val) {
     setHeroImages(prev => prev.map((img, i) => i === idx ? val : img))
     setHeroChanged(true)
@@ -207,7 +230,7 @@ export default function Branding() {
           <Images className="w-5 h-5" /> Imágenes del Hero (Carousel)
         </h2>
         <p className="text-sm text-gray-500 mb-4">
-          Agregá las URLs de las imágenes que rotarán en el banner principal del sitio público. Se avanza automáticamente cada 5 segundos.
+          Subí fotos propias o pegá las URLs de las imágenes que rotarán en el banner principal del sitio público. Se avanza automáticamente cada 6 segundos.
         </p>
 
         <div className="space-y-3 mb-4">
@@ -236,11 +259,28 @@ export default function Branding() {
         </div>
 
         <div className="flex gap-2">
+          <input
+            ref={heroFileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => {
+              subirHeroImage(e.target.files[0])
+              e.target.value = ''
+            }}
+          />
+          <button
+            onClick={() => heroFileRef.current.click()}
+            disabled={subiendoHero}
+            className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center gap-1"
+          >
+            <Upload className="w-4 h-4" /> {subiendoHero ? 'Subiendo...' : 'Subir imagen'}
+          </button>
           <button
             onClick={agregarHeroImage}
             className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
           >
-            <Plus className="w-4 h-4" /> Agregar imagen
+            <Plus className="w-4 h-4" /> Pegar URL
           </button>
           <button
             onClick={guardarHeroImages}

@@ -1924,6 +1924,14 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
     })
     if (!pagoFinal) throw new Error('No se pudo recuperar el pago creado')
     return pagoFinal
+      }, {
+        // El default de Prisma son 5s y esta transacción encadena ~15-20
+        // round-trips (un create por cuota, por split y por centro de costo,
+        // más el findFirst final con includes profundos). Con varias cuotas,
+        // o si otra transacción tiene tomado el lock de la caja, 5s se queda
+        // corto y el cobro falla entero con P2028.
+        timeout: 20000,
+        maxWait: 10000,
       })
       break
     } catch (err) {
