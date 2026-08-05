@@ -41,10 +41,12 @@ export default function HorariosRecurrentes() {
   const [eliminando, setEliminando] = useState(false)
 
   // Form
+  // diasSemana es un array: al crear se puede tildar más de un día y se genera
+  // un horario por cada uno (el modelo guarda un día por registro).
   const [form, setForm] = useState({
     categoriaActividadId: '',
     espacioId: '',
-    diaSemana: '',
+    diasSemana: [],
     horaInicio: '18:00',
     horaFin: '19:30'
   })
@@ -117,7 +119,7 @@ export default function HorariosRecurrentes() {
       setForm({
         categoriaActividadId: String(horario.categoriaActividadId),
         espacioId: horario.espacioId ? String(horario.espacioId) : '',
-        diaSemana: String(horario.diaSemana),
+        diasSemana: [horario.diaSemana],
         horaInicio: horario.horaInicio,
         horaFin: horario.horaFin
       })
@@ -126,12 +128,22 @@ export default function HorariosRecurrentes() {
       setForm({
         categoriaActividadId: '',
         espacioId: '',
-        diaSemana: '',
+        diasSemana: [],
         horaInicio: '18:00',
         horaFin: '19:30'
       })
     }
     setModalAbierto(true)
+  }
+
+  // Al editar sólo se puede cambiar el día del registro; al crear se acumulan.
+  function toggleDia(valor) {
+    setForm((f) => {
+      if (horarioEditando) return { ...f, diasSemana: [valor] }
+      return f.diasSemana.includes(valor)
+        ? { ...f, diasSemana: f.diasSemana.filter((d) => d !== valor) }
+        : { ...f, diasSemana: [...f.diasSemana, valor] }
+    })
   }
 
   async function toggleEspacioObligatorio() {
@@ -157,8 +169,8 @@ export default function HorariosRecurrentes() {
     e.preventDefault()
     setError(null)
 
-    if (!form.categoriaActividadId || form.diaSemana === '' || !form.horaInicio || !form.horaFin) {
-      setError('Categoria, dia, hora inicio y hora fin son requeridos')
+    if (!form.categoriaActividadId || form.diasSemana.length === 0 || !form.horaInicio || !form.horaFin) {
+      setError('Categoria, al menos un dia, hora inicio y hora fin son requeridos')
       return
     }
     if (espacioObligatorio && !form.espacioId) {
@@ -168,23 +180,42 @@ export default function HorariosRecurrentes() {
 
     setGuardando(true)
     try {
-      const datos = {
+      const base = {
         categoriaActividadId: parseInt(form.categoriaActividadId),
         espacioId: form.espacioId ? parseInt(form.espacioId) : null,
-        diaSemana: parseInt(form.diaSemana),
         horaInicio: form.horaInicio,
         horaFin: form.horaFin
       }
 
       if (horarioEditando) {
-        await api.put(`/admin/horarios-recurrentes/${horarioEditando.id}`, datos)
+        await api.put(`/admin/horarios-recurrentes/${horarioEditando.id}`, { ...base, diaSemana: form.diasSemana[0] })
         setSuccess('Horario actualizado correctamente')
+        setModalAbierto(false)
       } else {
-        await api.post('/admin/horarios-recurrentes', datos)
-        setSuccess('Horario creado correctamente')
+        // Un POST por día. El backend valida superposición por espacio y día,
+        // así que puede fallar alguno y crearse el resto: informamos ambos.
+        const creados = []
+        const fallidos = []
+        const dias = [...form.diasSemana].sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+        for (const dia of dias) {
+          const nombreDia = DIAS_SEMANA.find((d) => d.value === dia)?.label || dia
+          try {
+            await api.post('/admin/horarios-recurrentes', { ...base, diaSemana: dia })
+            creados.push(nombreDia)
+          } catch (err) {
+            fallidos.push(`${nombreDia}: ${err.message || 'error'}`)
+          }
+        }
+        if (creados.length) {
+          setSuccess(`${creados.length} horario${creados.length > 1 ? 's creados' : ' creado'}: ${creados.join(', ')}`)
+        }
+        if (fallidos.length) {
+          setError(`No se pudo crear ${fallidos.length === 1 ? 'el día' : 'los días'} — ${fallidos.join(' · ')}`)
+        }
+        // Si algo falló dejamos el modal abierto para corregir sin recargar todo
+        if (!fallidos.length) setModalAbierto(false)
       }
 
-      setModalAbierto(false)
       cargarHorarios()
     } catch (err) {
       setError(err.message || 'Error al guardar')
@@ -395,18 +426,34 @@ export default function HorariosRecurrentes() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Dia de la semana *</label>
-            <select
-              value={form.diaSemana}
-              onChange={(e) => setForm({ ...form, diaSemana: e.target.value })}
-              className="input-field w-full"
-              required
-            >
-              <option value="">Seleccionar dia...</option>
-              {DIAS_SEMANA.map((dia) => (
-                <option key={dia.value} value={dia.value}>{dia.label}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {horarioEditando ? 'Dia de la semana *' : 'Dias de la semana *'}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {DIAS_SEMANA.map((dia) => {
+                const activo = form.diasSemana.includes(dia.value)
+                return (
+                  <button
+                    key={dia.value}
+                    type="button"
+                    onClick={() => toggleDia(dia.value)}
+                    aria-pressed={activo}
+                    className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
+                      activo
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {dia.label}
+                  </button>
+                )
+              })}
+            </div>
+            {!horarioEditando && (
+              <p className="mt-1 text-xs text-gray-500">
+                Podés marcar varios días: se crea un horario por cada uno con la misma categoría, espacio y horario.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -221,8 +221,9 @@ export default function ReportesDeportivos() {
     }
     setBuscando(true)
     try {
-      const res = await api.get(`/admin/socios?search=${encodeURIComponent(texto)}&limit=10`)
-      setSociosEncontrados(res.data || [])
+      // El endpoint filtra por `q` y responde { socios, pagination }
+      const res = await api.get(`/admin/socios?q=${encodeURIComponent(texto)}&limit=10`)
+      setSociosEncontrados(res?.socios || [])
     } catch (err) {
       console.error('Error buscando socios:', err)
     } finally {

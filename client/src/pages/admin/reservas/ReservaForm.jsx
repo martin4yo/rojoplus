@@ -23,6 +23,8 @@ export default function ReservaForm({ espacios = [], onClose }) {
   const [busquedaSocio, setBusquedaSocio] = useState('')
   const [socioEncontrado, setSocioEncontrado] = useState(null)
   const [buscandoSocio, setBuscandoSocio] = useState(false)
+  const [resultadosSocio, setResultadosSocio] = useState([])
+  const [mostrarListaSocios, setMostrarListaSocios] = useState(false)
   const [form, setForm] = useState({
     nombre: '', apellido: '', email: '', telefono: '', dni: '',
     metodoPago: 'EFECTIVO', observaciones: '',
@@ -52,39 +54,65 @@ export default function ReservaForm({ espacios = [], onClose }) {
     }
   }
 
-  async function buscarSocio() {
-    if (!busquedaSocio.trim()) return
-    setBuscandoSocio(true)
-    try {
-      const data = await api.get(`/admin/socios?search=${encodeURIComponent(busquedaSocio)}&limit=5`)
-      const socios = data?.socios || data || []
-      if (socios.length === 1) {
-        seleccionarSocio(socios[0])
-      } else if (socios.length > 1) {
-        // Tomar el primero que coincida
-        seleccionarSocio(socios[0])
-        toast(`Se encontraron ${socios.length} socios. Mostrando el primero.`)
-      } else {
-        toast.error('Socio no encontrado')
-      }
-    } catch {
-      toast.error('Error al buscar socio')
-    } finally {
-      setBuscandoSocio(false)
+  // Busca mientras se tipea (con debounce) y muestra la lista para elegir.
+  // Antes autoseleccionaba el primer resultado, que con nombres repetidos daba
+  // el socio equivocado sin que se notara.
+  useEffect(() => {
+    if (!esSocio) return
+    const termino = busquedaSocio.trim()
+    if (termino.length < 2 || socioEncontrado) {
+      setResultadosSocio([])
+      setMostrarListaSocios(false)
+      return
     }
-  }
+    let cancelado = false
+    setBuscandoSocio(true)
+    const t = setTimeout(async () => {
+      try {
+        // El endpoint filtra por `q` (admin.js). Con `search` ignoraba el filtro
+        // y devolvía la primera página completa: de ahí que "buscar" trajera
+        // siempre el mismo socio.
+        const data = await api.get(`/admin/socios?q=${encodeURIComponent(termino)}&limit=10`)
+        if (cancelado) return
+        const socios = data?.socios || data || []
+        setResultadosSocio(socios)
+        setMostrarListaSocios(true)
+      } catch {
+        if (!cancelado) {
+          setResultadosSocio([])
+          toast.error('Error al buscar socio')
+        }
+      } finally {
+        if (!cancelado) setBuscandoSocio(false)
+      }
+    }, 300)
+    return () => { cancelado = true; clearTimeout(t) }
+  }, [busquedaSocio, esSocio, socioEncontrado])
 
   function seleccionarSocio(socio) {
+    // El listado devuelve `apellidoNombre` ("Apellido, Nombre") y no los campos
+    // sueltos, así que los derivamos para completar el formulario.
+    const [apellidoSep, nombreSep] = String(socio.apellidoNombre || '').split(',')
     setSocioEncontrado(socio)
     setEsSocio(true)
+    setMostrarListaSocios(false)
+    setResultadosSocio([])
+    setBusquedaSocio(socio.apellidoNombre || `${socio.apellido || ''}, ${socio.nombre || ''}`)
     setForm(f => ({
       ...f,
-      nombre: socio.nombre || '',
-      apellido: socio.apellido || '',
+      nombre: socio.nombre || (nombreSep || '').trim(),
+      apellido: socio.apellido || (apellidoSep || '').trim(),
       email: socio.email || '',
       telefono: socio.celular || socio.telefono || '',
-      dni: socio.dni || '',
+      dni: socio.documento || socio.dni || '',
     }))
+  }
+
+  function limpiarSocio() {
+    setSocioEncontrado(null)
+    setBusquedaSocio('')
+    setResultadosSocio([])
+    setMostrarListaSocios(false)
   }
 
   async function guardar() {
@@ -273,25 +301,67 @@ export default function ReservaForm({ espacios = [], onClose }) {
               {esSocio && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Buscar socio</label>
-                  <div className="flex gap-2">
-                    <input
-                      value={busquedaSocio}
-                      onChange={e => setBusquedaSocio(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && buscarSocio()}
-                      placeholder="Nombre, apellido o nro socio..."
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <button
-                      onClick={buscarSocio}
-                      disabled={buscandoSocio}
-                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
-                    >
-                      {buscandoSocio ? <LoadingSpinner size="sm" /> : <Search size={16} />}
-                    </button>
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          value={busquedaSocio}
+                          onChange={e => {
+                            if (socioEncontrado) setSocioEncontrado(null)
+                            setBusquedaSocio(e.target.value)
+                          }}
+                          onFocus={() => resultadosSocio.length && setMostrarListaSocios(true)}
+                          // onMouseDown de la lista corre antes que el blur, pero
+                          // igual demoramos el cierre para no perder el click.
+                          onBlur={() => setTimeout(() => setMostrarListaSocios(false), 150)}
+                          placeholder="Nombre, apellido, documento o nro socio..."
+                          className="w-full border border-gray-200 rounded-lg pl-3 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+                          {buscandoSocio ? <LoadingSpinner size="sm" /> : <Search size={16} />}
+                        </div>
+                      </div>
+                      {socioEncontrado && (
+                        <button
+                          type="button"
+                          onClick={limpiarSocio}
+                          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-sm"
+                        >
+                          Cambiar
+                        </button>
+                      )}
+                    </div>
+
+                    {mostrarListaSocios && !socioEncontrado && (
+                      <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                        {resultadosSocio.length === 0 ? (
+                          <div className="px-3 py-2.5 text-sm text-gray-500">
+                            {buscandoSocio ? 'Buscando...' : 'Sin resultados'}
+                          </div>
+                        ) : (
+                          resultadosSocio.map(s => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onMouseDown={() => seleccionarSocio(s)}
+                              className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                            >
+                              <div className="text-sm text-gray-800">
+                                {s.apellidoNombre || `${s.apellido || ''}, ${s.nombre || ''}`}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Nro {s.nroSocio}{s.documento ? ` · DNI ${s.documento}` : ''}
+                                {s.estadoSocioRel?.nombre ? ` · ${s.estadoSocioRel.nombre}` : ''}
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                   {socioEncontrado && (
                     <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                      ✓ {socioEncontrado.apellido}, {socioEncontrado.nombre} — Nro {socioEncontrado.nroSocio}
+                      ✓ {socioEncontrado.apellidoNombre || `${socioEncontrado.apellido}, ${socioEncontrado.nombre}`} — Nro {socioEncontrado.nroSocio}
                     </div>
                   )}
                 </div>
