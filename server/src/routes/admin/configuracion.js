@@ -1748,8 +1748,48 @@ router.post('/sistema/crons/:cronKey/test', authAdmin, asyncHandler(async (req, 
       })
   }
 
+  // 1b) Aplicar los MISMOS filtros por socio que aplican los crons reales.
+  //     Sin esto el boton de prueba enviaba a gente que el cron nunca hubiese
+  //     contactado: ignoraba notificarMorosidad, notifEmail y notifWhatsapp.
+  const CRONS_MOROSIDAD = new Set(['MOROSIDAD_RECORDATORIO', 'VIGENCIA_NOTIFICACION'])
+  const omitidos = []
+
+  if (CRONS_MOROSIDAD.has(cronKey)) {
+    registros = registros.filter(r => {
+      if (r.socio?.notificarMorosidad === false) {
+        omitidos.push({
+          socioId: r.socio.id,
+          nroSocio: r.socio.nroSocio,
+          nombre: r.socio.apellidoNombre,
+          motivo: 'Tiene desactivados los avisos de morosidad',
+        })
+        return false
+      }
+      return true
+    })
+  }
+
+  // Sin ningun canal habilitado no hay nada que enviarle
+  registros = registros.filter(r => {
+    const puedeEmail = enviarEmail_ && r.socio?.notifEmail !== false
+    const puedeWa = enviarWA_ && r.socio?.notifWhatsapp !== false
+    if (!puedeEmail && !puedeWa) {
+      omitidos.push({
+        socioId: r.socio.id,
+        nroSocio: r.socio.nroSocio,
+        nombre: r.socio.apellidoNombre,
+        motivo: 'Tiene deshabilitados los canales seleccionados',
+      })
+      return false
+    }
+    return true
+  })
+
   if (registros.length === 0) {
-    return res.json({ success: true, data: { enviados: [], total: 0, mensaje: 'No se encontraron socios afectados por este cron en este momento.' } })
+    const mensaje = omitidos.length > 0
+      ? `Se encontraron ${omitidos.length} socio(s) alcanzados por el cron, pero ninguno tiene habilitada la recepción por los canales elegidos.`
+      : 'No se encontraron socios afectados por este cron en este momento.'
+    return res.json({ success: true, data: { enviados: [], omitidos, total: 0, mensaje } })
   }
 
   // 2) Enviar a cada uno
@@ -1764,7 +1804,9 @@ router.post('/sistema/crons/:cronKey/test', authAdmin, asyncHandler(async (req, 
     }
     if (enviarEmail_) {
       item.email.intentado = true
-      if (!r.socio.email) {
+      if (r.socio.notifEmail === false) {
+        item.email.motivo = 'Canal email deshabilitado por el socio'
+      } else if (!r.socio.email) {
         item.email.motivo = 'Sin email'
       } else {
         try {
@@ -1778,7 +1820,9 @@ router.post('/sistema/crons/:cronKey/test', authAdmin, asyncHandler(async (req, 
     if (enviarWA_) {
       item.whatsapp.intentado = true
       const tel = obtenerTelefonoSocio(r.socio)
-      if (!tel) {
+      if (r.socio.notifWhatsapp === false) {
+        item.whatsapp.motivo = 'Canal WhatsApp deshabilitado por el socio'
+      } else if (!tel) {
         item.whatsapp.motivo = 'Sin teléfono'
       } else {
         try {
@@ -1793,7 +1837,7 @@ router.post('/sistema/crons/:cronKey/test', authAdmin, asyncHandler(async (req, 
     enviados.push(item)
   }
 
-  res.json({ success: true, data: { total: enviados.length, enviados } })
+  res.json({ success: true, data: { total: enviados.length, enviados, omitidos } })
 }))
 
 export default router

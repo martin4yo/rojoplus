@@ -2972,6 +2972,26 @@ export default function TablasAuxiliares() {
                   </div>
                 </>
               )}
+
+              {/* Socios que el cron alcanzaba pero quedaron afuera por sus
+                  preferencias de notificación. Mostrarlos evita el "no envió
+                  nada y no sé por qué". */}
+              {cronTestModal.resultado.omitidos?.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-50 border-b text-xs uppercase text-gray-500">
+                    Omitidos por preferencias del socio ({cronTestModal.resultado.omitidos.length})
+                  </div>
+                  <ul className="divide-y max-h-48 overflow-y-auto">
+                    {cronTestModal.resultado.omitidos.map(o => (
+                      <li key={o.socioId} className="px-3 py-2 text-sm flex items-center justify-between gap-3">
+                        <span className="text-gray-700">#{o.nroSocio} {o.nombre}</span>
+                        <span className="text-xs text-gray-500 text-right">{o.motivo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="secondary" onClick={() => setCronTestModal(prev => ({ ...prev, resultado: null }))}>
                   Volver
