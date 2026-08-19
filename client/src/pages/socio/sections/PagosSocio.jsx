@@ -22,6 +22,12 @@ import StatusBadge from '../../../components/StatusBadge'
 import { AxioChat } from '@axio/chat'
 import LoadingSpinner from '../../../components/LoadingSpinner'
 
+// La solapa de cuenta corriente queda oculta para el socio: los saldos que
+// muestra no son confiables y hay que revisar el cálculo antes de volver a
+// exponerlo. El código y el endpoint quedan intactos; poner esto en true para
+// reactivarla.
+const MOSTRAR_CUENTA_CORRIENTE = false
+
 export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensajesNoLeidos = 0, onNavigate, pagarCargoId = null, onPagarHandled }) {
   const esMiembroFamilia = !!socio?.titularFamiliaId
   const titularNombre = socio?.titularFamilia?.apellidoNombre || socio?.grupoFamiliar?.titular?.apellidoNombre
@@ -55,7 +61,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
   }, [tokenPortal])
 
   useEffect(() => {
-    if (tab === 'cuenta-corriente' && !cuentaCorriente) {
+    if (MOSTRAR_CUENTA_CORRIENTE && tab === 'cuenta-corriente' && !cuentaCorriente) {
       cargarCuentaCorriente()
     }
   }, [tab])
@@ -405,16 +411,22 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
           tone={mensajesNoLeidos > 0 ? 'warning' : 'muted'}
           icon={CheckCircleIcon}
           number="04"
+          destacado={mensajesNoLeidos > 0}
           onClick={mensajesNoLeidos > 0 ? () => onNavigate?.('mensajes') : null}
         />
       </div>
 
       {/* Tabs athletic */}
-      <div className="grid grid-cols-3 gap-px" style={{ backgroundColor: 'var(--border)' }}>
+      <div
+        className={`grid gap-px ${MOSTRAR_CUENTA_CORRIENTE ? 'grid-cols-3' : 'grid-cols-2'}`}
+        style={{ backgroundColor: 'var(--border)' }}
+      >
         {[
           { id: 'pendientes', label: 'Pendientes', count: cuotas.length, icon: ClockIcon },
           { id: 'historial', label: 'Historial', count: historial.length, icon: CheckCircleIcon },
-          { id: 'cuenta-corriente', label: 'Cuenta corriente', count: null, icon: TableCellsIcon },
+          ...(MOSTRAR_CUENTA_CORRIENTE
+            ? [{ id: 'cuenta-corriente', label: 'Cuenta corriente', count: null, icon: TableCellsIcon }]
+            : []),
         ].map(({ id, label, count, icon: Icon }) => {
           const activo = tab === id
           return (
@@ -924,7 +936,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
         </div>
       )}
 
-      {tab === 'cuenta-corriente' && (
+      {MOSTRAR_CUENTA_CORRIENTE && tab === 'cuenta-corriente' && (
         <div className="space-y-4">
           {loading ? (
             <LoadingSpinner />
@@ -1054,7 +1066,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
   )
 }
 
-function PagoStatCard({ label, value, tone, icon: Icon, number, onClick }) {
+function PagoStatCard({ label, value, tone, icon: Icon, number, onClick, destacado = false }) {
   const toneColor = {
     success: 'var(--success)',
     warning: 'var(--warning)',
@@ -1065,20 +1077,40 @@ function PagoStatCard({ label, value, tone, icon: Icon, number, onClick }) {
 
   const Component = onClick ? 'button' : 'div'
 
+  // Estado destacado: la tarjeta se despega del resto con fondo teñido y una
+  // barra de acento a la izquierda, para que el socio no pase por alto que
+  // tiene avisos sin leer.
+  const fondo = destacado
+    ? `color-mix(in srgb, ${toneColor} 10%, var(--bg-surface))`
+    : 'var(--bg-surface)'
+
   return (
     <Component
       onClick={onClick}
-      className={`p-5 flex flex-col gap-3 text-left ${onClick ? 'hover:bg-[var(--bg-surface-hi)] transition-colors cursor-pointer' : ''}`}
-      style={{ backgroundColor: 'var(--bg-surface)' }}
+      className={`p-5 flex flex-col gap-3 text-left relative ${onClick ? 'hover:bg-[var(--bg-surface-hi)] transition-colors cursor-pointer' : ''}`}
+      style={{
+        backgroundColor: fondo,
+        ...(destacado ? { boxShadow: `inset 4px 0 0 ${toneColor}` } : {}),
+      }}
     >
       <div className="flex items-center justify-between">
         <Icon className="h-6 w-6" style={{ color: toneColor }} />
-        <span className="font-mono text-[10px] tracking-[0.25em]" style={{ color: 'var(--text-muted)' }}>
+        <span className="font-mono text-[10px] tracking-[0.25em] flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+          {destacado && (
+            <span
+              className="inline-block h-2 w-2 rounded-full animate-pulse"
+              style={{ backgroundColor: toneColor }}
+              aria-hidden="true"
+            />
+          )}
           {number}
         </span>
       </div>
       <div>
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: 'var(--text-muted)' }}>
+        <p
+          className="font-mono text-[10px] uppercase tracking-[0.2em] mb-1"
+          style={{ color: destacado ? toneColor : 'var(--text-muted)' }}
+        >
           {label}
         </p>
         <p className="font-display-sport" style={{ fontSize: 22, lineHeight: 1, color: toneColor }}>
