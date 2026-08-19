@@ -241,10 +241,15 @@ export async function recalcularTenant(prisma, tenantId, { origen = 'CRON', usua
 
 /**
  * Recalcula vigencia de UNA familia específica. Útil después de un pago.
- * Si la familia ya no tiene cuotas vencidas y está en BLOQUEADO → pasa a AL_DIA.
- * Si tiene cuotas vencidas y NO está en BLOQUEADO → pasa a BLOQUEADO.
+ * Si la familia ya no está en mora y está en BLOQUEADO → pasa a AL_DIA.
+ * Si está en mora y NO está en BLOQUEADO → pasa a BLOQUEADO.
+ *
+ * Usa el MISMO criterio que el cron (`getFamiliasConMorosidad`): la familia
+ * está en mora cuando algún miembro acumula >= MOROSIDAD_MIN_CUOTAS_VENCIDAS
+ * períodos distintos vencidos. Los cargos sin `periodoId` (manuales /
+ * extraordinarios) no cuentan para el umbral.
  */
-export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { origen = 'API', usuarioId = null, fechaCorte = new Date(), diasGracia = null } = {}) {
+export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { origen = 'API', usuarioId = null, fechaCorte = new Date(), diasGracia = null, minCuotasVencidas = null } = {}) {
   const estados = await getEstadosVigencia(prisma, tenantId)
   if (!estados.bloqueado || !estados.alDia) {
     return { skip: 'Tenant no tiene EstadoSocio con rolVigencia configurado' }
@@ -267,18 +272,29 @@ export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { orig
   const miembrosIds = miembros.map(m => m.id)
 
   const gracia = diasGracia ?? await getDiasGracia(prisma, tenantId)
+  const minCuotas = minCuotasVencidas ?? await getMinCuotasVencidas(prisma, tenantId)
   const cutoff = aplicarDiasGracia(fechaCorte, gracia)
-  const tieneVencidas = await prisma.cargo.count({
+  const cargosVencidos = await prisma.cargo.findMany({
     where: {
       tenantId,
       socioId: { in: miembrosIds },
       estado: 'PENDIENTE',
       fechaVencimiento: { lt: cutoff },
+      periodoId: { not: null },
     },
+    select: { socioId: true, periodoId: true },
   })
+  // Agrupar por miembro: socioId -> Set<periodoId>. La familia está en mora si
+  // algún miembro llega al umbral por sí solo (igual que en el cron).
+  const periodosPorSocio = new Map()
+  for (const c of cargosVencidos) {
+    if (!periodosPorSocio.has(c.socioId)) periodosPorSocio.set(c.socioId, new Set())
+    periodosPorSocio.get(c.socioId).add(c.periodoId)
+  }
+  const familiaMorosa = [...periodosPorSocio.values()].some(periodos => periodos.size >= minCuotas)
 
   let bloqueados = 0, reactivados = 0
-  if (tieneVencidas > 0) {
+  if (familiaMorosa) {
     // Bloquear: miembros activos que NO están ya bloqueados.
     // Se excluyen los que tienen esSocioActivo=false (BAJA por otro motivo) para
     // no sobreescribir su estado original.
@@ -314,5 +330,5 @@ export async function recalcularFamiliaDeSocio(prisma, tenantId, socioId, { orig
     }
   }
 
-  return { bloqueados, reactivados, tieneVencidas, miembros: miembros.length }
+  return { bloqueados, reactivados, familiaMorosa, minCuotas, miembros: miembros.length }
 }
