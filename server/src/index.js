@@ -16,6 +16,7 @@ import rubrosRoutes from './routes/rubros.js'
 import comerciosRoutes from './routes/comercios.js'
 import comercioRoutes from './routes/comercio.js'
 import adminRoutes from './routes/admin/index.js'
+import ogPreviewRoutes from './routes/ogPreview.js'
 import socioRoutes from './routes/socio.js'
 import entrenadorRoutes from './routes/entrenador.js'
 import pagosRoutes from './routes/pagos.js'
@@ -173,6 +174,12 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 // Servir archivos públicos (plantillas, etc)
 app.use('/public', express.static(path.join(__dirname, '../public')))
+
+// Vista previa por tenant para crawlers de redes (WhatsApp, Facebook...).
+// nginx desvía acá solo a los bots; los navegadores reciben el index.html
+// estático. Va antes de extractTenant a propósito: resuelve el tenant por su
+// cuenta y no debe fallar con 400 cuando el host no corresponde a ninguno.
+app.use(ogPreviewRoutes)
 
 // Pasar prisma a las rutas (fallback para req.db si no está configurado)
 app.use((req, res, next) => {
