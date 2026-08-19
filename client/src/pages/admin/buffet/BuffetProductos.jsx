@@ -432,30 +432,46 @@ export default function BuffetProductos() {
               {prod.disponible ? 'Disponible' : 'No disponible'}
             </span>
           )}
-          {/* Switch publicar en menú público */}
-          {tienePermiso(PERMISOS.BUFFET_CONFIG) ? (
-            <label className="relative inline-flex items-center cursor-pointer" title="Mostrar este producto en el menú público del buffet">
-              <input
-                type="checkbox"
-                checked={prod.publicarMenu}
-                onChange={() => togglePublicarMenu(prod)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-              <span className="ml-2 text-sm font-medium text-gray-700 inline-flex items-center gap-1">
-                <Globe size={13} className={prod.publicarMenu ? 'text-sky-600' : 'text-gray-400'} />
-                {prod.publicarMenu ? 'En menú público' : 'Oculto del menú'}
-              </span>
-            </label>
-          ) : prod.publicarMenu && (
-            <span className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded text-xs font-medium inline-flex items-center gap-1">
-              <Globe size={12} /> En menú público
-            </span>
-          )}
           {prod.destacado && (
             <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">Destacado</span>
           )}
         </div>
+      )
+    },
+    {
+      // Columna aparte a propósito: se confundía con el switch de "Disponible"
+      // cuando ambos vivían apilados en la misma celda.
+      key: 'publicarMenu',
+      label: 'Menú público',
+      sortable: false,
+      className: 'border-l border-gray-200',
+      cellClassName: 'border-l border-gray-200',
+      render: (prod) => (
+        tienePermiso(PERMISOS.BUFFET_CONFIG) ? (
+          <label
+            className={`inline-flex items-center gap-2 cursor-pointer rounded-lg border px-2 py-1.5 transition-colors ${
+              prod.publicarMenu ? 'border-sky-200 bg-sky-50 hover:bg-sky-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+            }`}
+            title="Mostrar este producto en la carta pública del buffet"
+          >
+            <input
+              type="checkbox"
+              checked={prod.publicarMenu}
+              onChange={() => togglePublicarMenu(prod)}
+              className="rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
+            />
+            <Globe size={14} className={prod.publicarMenu ? 'text-sky-600' : 'text-gray-400'} />
+            <span className={`text-sm font-medium whitespace-nowrap ${prod.publicarMenu ? 'text-sky-800' : 'text-gray-500'}`}>
+              {prod.publicarMenu ? 'Publicado' : 'Oculto'}
+            </span>
+          </label>
+        ) : prod.publicarMenu ? (
+          <span className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded text-xs font-medium inline-flex items-center gap-1">
+            <Globe size={12} /> Publicado
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">Oculto</span>
+        )
       )
     },
     {
@@ -704,19 +720,24 @@ export default function BuffetProductos() {
                   </label>
                 )}
 
-                {/* Switch publicar en menú público */}
+                {/* Publicar en menú público: control distinto al de disponibilidad
+                    a propósito — dos switches iguales pegados se confundían. */}
                 {tienePermiso(PERMISOS.BUFFET_CONFIG) && (
-                  <label className="relative inline-flex items-center cursor-pointer" title="Mostrar este producto en el menú público del buffet">
+                  <label
+                    className={`flex items-center gap-2 cursor-pointer rounded-lg border px-2 py-1.5 mt-2 transition-colors ${
+                      prod.publicarMenu ? 'border-sky-200 bg-sky-50 hover:bg-sky-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    }`}
+                    title="Mostrar este producto en la carta pública del buffet"
+                  >
                     <input
                       type="checkbox"
                       checked={prod.publicarMenu}
                       onChange={() => togglePublicarMenu(prod)}
-                      className="sr-only peer"
+                      className="rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
                     />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
-                    <span className="ml-2 text-xs font-medium text-gray-700 inline-flex items-center gap-1">
-                      <Globe size={12} className={prod.publicarMenu ? 'text-sky-600' : 'text-gray-400'} />
-                      {prod.publicarMenu ? 'En menú público' : 'Oculto del menú'}
+                    <Globe size={13} className={prod.publicarMenu ? 'text-sky-600' : 'text-gray-400'} />
+                    <span className={`text-xs font-medium ${prod.publicarMenu ? 'text-sky-800' : 'text-gray-500'}`}>
+                      {prod.publicarMenu ? 'Publicado en el menú' : 'Oculto del menú'}
                     </span>
                   </label>
                 )}
