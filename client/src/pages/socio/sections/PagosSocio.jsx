@@ -375,7 +375,7 @@ export default function PagosSocio({ socio, tokenPortal, onPagoRealizado, mensaj
       {/* Header athletic */}
       <div>
         <div className="pub-eyebrow mb-3" style={{ color: 'var(--text-dim)' }}>
-          Cuenta corriente
+          Cuotas y pagos
         </div>
         <h1 className="font-display-sport" style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 0.96, color: 'var(--text)' }}>
           Mis <span style={{ color: 'var(--color-primary)' }}>pagos</span>
