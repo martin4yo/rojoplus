@@ -946,9 +946,9 @@ const MOROSIDAD_DIAS_RECIENTE = parseInt(process.env.MOROSIDAD_DIAS_RECIENTE || 
  *   streak           = cantidad de períodos consecutivos impagos desde el actual
  *   ultimoImpagoVenc = fecha de vencimiento del período impago más reciente
  */
-async function analizarMorosidadGrupo(socioIds) {
+async function analizarMorosidadGrupo(db, socioIds) {
   const ahora = new Date()
-  const cargos = await prisma.cargo.findMany({
+  const cargos = await db.cargo.findMany({
     where: {
       socioId: { in: socioIds },
       periodoId: { not: null },
@@ -995,62 +995,93 @@ async function analizarMorosidadGrupo(socioIds) {
  * Esto excluye automáticamente a los morosos crónicos (3+ períodos) y a ex-socios
  * que arrastran deuda vieja. Se excluyen fallecidos. Anti-spam: 1 aviso / 15 días.
  */
+export async function seleccionarMorosidadTemprana(db, { limit = null, extraWhere = {} } = {}) {
+  const ahora = new Date()
+  const hace15Dias = new Date()
+  hace15Dias.setDate(hace15Dias.getDate() - 15)
+  const corteReciente = new Date()
+  corteReciente.setDate(corteReciente.getDate() - MOROSIDAD_DIAS_RECIENTE)
+
+  // Candidatos: titulares/socios únicos (no fallecidos) con AL MENOS una cuota
+  // PENDIENTE vencida RECIENTE (propia o de un miembro). El recorte fino de
+  // "1-2 períodos consecutivos" se hace luego en analizarMorosidadGrupo.
+  const cuotaRecienteVencida = {
+    some: { estado: 'PENDIENTE', fechaVencimiento: { gte: corteReciente, lt: ahora } },
+  }
+  const candidatos = await db.socio.findMany({
+    where: {
+      titularFamiliaId: null,
+      NOT: { estadoSocioRel: { codigo: 'BAJA_POR_FALLECIMIENTO' } },
+      OR: [
+        { cargos: cuotaRecienteVencida },
+        { miembrosFamilia: { some: { cargos: cuotaRecienteVencida } } },
+      ],
+      ...extraWhere,
+    },
+    select: {
+      id: true, nroSocio: true, apellidoNombre: true, email: true, celular: true,
+      notificarMorosidad: true, notifEmail: true, notifWhatsapp: true,
+      miembrosFamilia: { select: { id: true } },
+    },
+  })
+
+  const elegidos = []
+  const descartados = []
+  for (const titular of candidatos) {
+    if (limit != null && elegidos.length >= limit) break
+
+    const groupIds = [titular.id, ...titular.miembrosFamilia.map((m) => m.id)]
+    const { streak, ultimoImpagoVenc } = await analizarMorosidadGrupo(db, groupIds)
+
+    // Solo 1 o 2 períodos consecutivos impagos desde el más reciente...
+    if (streak < 1 || streak > 2) continue
+    // ...y que esa deuda sea reciente (no un ex-socio con deuda vieja de 1-2 cuotas)
+    if (!ultimoImpagoVenc || ultimoImpagoVenc < corteReciente) continue
+
+    // Anti-spam: no re-notificar dentro de los últimos 15 días
+    const ultimaNotificacion = await db.notificacionLog.findFirst({
+      where: {
+        eventType: 'MOROSIDAD',
+        socioId: titular.id,
+        enviado: true,
+        fechaEnvio: { gte: hace15Dias },
+      },
+      orderBy: { fechaEnvio: 'desc' },
+    })
+    if (ultimaNotificacion) {
+      descartados.push({ titular, motivo: 'Ya fue notificado en los últimos 15 días' })
+      continue
+    }
+
+    if (titular.notificarMorosidad === false) {
+      descartados.push({ titular, motivo: 'Tiene desactivados los avisos de morosidad' })
+      continue
+    }
+
+    elegidos.push({ titular, groupIds, streak, ultimoImpagoVenc })
+  }
+
+  return { elegidos, descartados, totalCandidatos: candidatos.length }
+}
+
+/**
+ * Cron de morosidad temprana. La selección vive en seleccionarMorosidadTemprana
+ * para que el botón "Ejecutar ahora" use exactamente el mismo criterio.
+ */
 export async function verificarMorosidad() {
   try {
-    const ahora = new Date()
-    const hace15Dias = new Date()
-    hace15Dias.setDate(hace15Dias.getDate() - 15)
-    const corteReciente = new Date()
-    corteReciente.setDate(corteReciente.getDate() - MOROSIDAD_DIAS_RECIENTE)
-
     const pausados = await getTenantsBloqueadosPorCron('MOROSIDAD_RECORDATORIO')
-
-    // Candidatos: titulares/socios únicos (no fallecidos) con AL MENOS una cuota
-    // PENDIENTE vencida RECIENTE (propia o de un miembro). El recorte fino de
-    // "1-2 períodos consecutivos" se hace luego en analizarMorosidadGrupo.
-    const cuotaRecienteVencida = {
-      some: { estado: 'PENDIENTE', fechaVencimiento: { gte: corteReciente, lt: ahora } },
-    }
-    const candidatos = await prisma.socio.findMany({
-      where: {
-        titularFamiliaId: null,
-        NOT: { estadoSocioRel: { codigo: 'BAJA_POR_FALLECIMIENTO' } },
-        OR: [
-          { cargos: cuotaRecienteVencida },
-          { miembrosFamilia: { some: { cargos: cuotaRecienteVencida } } },
-        ],
-        ...(pausados.length > 0 ? { tenantId: { notIn: pausados } } : {}),
-      },
-      select: { id: true, miembrosFamilia: { select: { id: true } } },
+    const { elegidos, totalCandidatos } = await seleccionarMorosidadTemprana(prisma, {
+      extraWhere: pausados.length > 0 ? { tenantId: { notIn: pausados } } : {},
     })
 
     let programadas = 0
-    for (const titular of candidatos) {
-      const groupIds = [titular.id, ...titular.miembrosFamilia.map((m) => m.id)]
-      const { streak, ultimoImpagoVenc } = await analizarMorosidadGrupo(groupIds)
-
-      // Solo 1 o 2 períodos consecutivos impagos desde el más reciente...
-      if (streak < 1 || streak > 2) continue
-      // ...y que esa deuda sea reciente (no un ex-socio con deuda vieja de 1-2 cuotas)
-      if (!ultimoImpagoVenc || ultimoImpagoVenc < corteReciente) continue
-
-      // Anti-spam: no re-notificar dentro de los últimos 15 días
-      const ultimaNotificacion = await prisma.notificacionLog.findFirst({
-        where: {
-          eventType: 'MOROSIDAD',
-          socioId: titular.id,
-          enviado: true,
-          fechaEnvio: { gte: hace15Dias },
-        },
-        orderBy: { fechaEnvio: 'desc' },
-      })
-      if (ultimaNotificacion) continue
-
+    for (const { titular } of elegidos) {
       await notificarMorosidad(titular.id)
       programadas++
     }
 
-    console.log(`🔍 Morosidad temprana: ${candidatos.length} candidatos → ${programadas} notificaciones programadas`)
+    console.log(`🔍 Morosidad temprana: ${totalCandidatos} candidatos → ${programadas} notificaciones programadas`)
     return programadas
   } catch (error) {
     console.error('Error verificando morosidad:', error.message)
@@ -1780,6 +1811,7 @@ export default {
   notificarCuotaProximaVencer,
   notificarCuotaVencida,
   notificarMorosidad,
+  seleccionarMorosidadTemprana,
   notificarInscripcionConfirmada,
   notificarBienvenida,
   verificarCuotasProximasVencer,

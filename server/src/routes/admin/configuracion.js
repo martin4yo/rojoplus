@@ -1683,26 +1683,76 @@ router.post('/sistema/crons/:cronKey/test', authAdmin, asyncHandler(async (req, 
       break
     }
     case 'MOROSIDAD_RECORDATORIO': {
-      const hace15 = new Date(); hace15.setDate(hace15.getDate() - 15)
-      const socios = await req.db.socio.findMany({
+      // Ejecuta el MISMO camino que el cron: misma seleccion
+      // (seleccionarMorosidadTemprana) y mismo notificador (notificarMorosidad,
+      // que arma el mensaje con las plantillas reales y respeta los canales).
+      // Antes esto reimplementaba criterio y mensaje, con lo cual la prueba no
+      // representaba lo que el cron iba a hacer.
+      const { seleccionarMorosidadTemprana, notificarMorosidad, procesarNotificacionesPendientes } =
+        await import('../../services/notificacionService.js')
+
+      const desde = new Date()
+      const sel = await seleccionarMorosidadTemprana(req.db, { limit: max })
+
+      const omitidosSel = sel.descartados.map(d => ({
+        socioId: d.titular.id,
+        nroSocio: d.titular.nroSocio,
+        nombre: d.titular.apellidoNombre,
+        motivo: d.motivo,
+      }))
+
+      if (sel.elegidos.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            enviados: [], omitidos: omitidosSel, total: 0,
+            mensaje: omitidosSel.length > 0
+              ? `${sel.totalCandidatos} candidato(s) evaluado(s): ninguno quedó elegible (ver omitidos).`
+              : `${sel.totalCandidatos} candidato(s) evaluado(s): ninguno cumple el criterio de morosidad temprana (1 o 2 períodos consecutivos impagos, deuda de los últimos 60 días).`,
+          },
+        })
+      }
+
+      for (const { titular } of sel.elegidos) {
+        await notificarMorosidad(titular.id)
+      }
+
+      // El cron deja los emails en cola (la procesa otro cron cada 10 min).
+      // Para que la prueba sea inmediata, se vacia la cola aca mismo.
+      await procesarNotificacionesPendientes()
+
+      const logs = await req.db.notificacionLog.findMany({
         where: {
-          estadoSocioRel: { esSocioActivo: true },
-          cargos: { some: { estado: 'PENDIENTE', fechaVencimiento: { lt: hace15 } } },
+          eventType: 'MOROSIDAD',
+          socioId: { in: sel.elegidos.map(e => e.titular.id) },
+          createdAt: { gte: desde },
         },
-        include: { cargos: { where: { estado: 'PENDIENTE', fechaVencimiento: { lt: new Date() } } } },
-        take: max,
       })
-      registros = socios.map(s => {
-        const total = s.cargos.reduce((sum, c) => sum + Number(c.montoTotal), 0)
+
+      const enviadosMora = sel.elegidos.map(({ titular }) => {
+        const delSocio = logs.filter(l => l.socioId === titular.id)
+        const logEmail = delSocio.find(l => l.tipo === 'EMAIL')
         return {
-          socio: s,
-          asunto: `Recordatorio: tenés cuotas vencidas`,
-          html: `<p>Hola ${s.apellidoNombre}, tenés ${s.cargos.length} cuota(s) vencida(s) por un total de $${total.toLocaleString('es-AR')}. Por favor regularizá tu situación.</p>`,
-          wa: `Hola ${s.apellidoNombre.split(',')[0]}, tenés ${s.cargos.length} cuota(s) vencida(s) por $${total.toLocaleString('es-AR')}. Regularizá tu situación.`,
+          socioId: titular.id,
+          nroSocio: titular.nroSocio,
+          nombre: titular.apellidoNombre,
+          email: logEmail
+            ? { intentado: true, ok: logEmail.enviado && !logEmail.error, motivo: logEmail.error || null }
+            : { intentado: true, ok: false, motivo: titular.notifEmail === false ? 'Canal email deshabilitado por el socio' : 'Sin email' },
+          whatsapp: titular.notifWhatsapp === false
+            ? { intentado: true, ok: false, motivo: 'Canal WhatsApp deshabilitado por el socio' }
+            : !titular.celular
+              ? { intentado: true, ok: false, motivo: 'Sin teléfono' }
+              : { intentado: true, ok: true, motivo: null },
         }
       })
-      break
+
+      return res.json({
+        success: true,
+        data: { total: enviadosMora.length, enviados: enviadosMora, omitidos: omitidosSel },
+      })
     }
+
     case 'CUMPLEANIOS': {
       const mes = hoy.getMonth() + 1
       const dia = hoy.getDate()
