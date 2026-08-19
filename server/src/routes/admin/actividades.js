@@ -73,7 +73,7 @@ router.get('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/admin/actividades - Crear actividad
 router.post('/actividades', authAdmin, asyncHandler(async (req, res) => {
-  const { codigo, nombre, descripcion, requiereAptaFisica, cuotaMensual, color, orden, conceptoTesoreriaId, imagen } = req.body
+  const { codigo, nombre, descripcion, requiereAptaFisica, cuotaMensual, color, orden, conceptoTesoreriaId, centroCostoId, imagen } = req.body
 
   if (!codigo || !nombre) {
     throw new AppError('Código y nombre son requeridos', 400, 'VALIDATION_ERROR')
@@ -92,6 +92,7 @@ router.post('/actividades', authAdmin, asyncHandler(async (req, res) => {
       color,
       orden: orden || 0,
       conceptoTesoreriaId: conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null,
+      centroCostoId: centroCostoId ? parseInt(centroCostoId) : null,
       imagen: imagen || null,
     },
   })
@@ -105,7 +106,7 @@ router.post('/actividades', authAdmin, asyncHandler(async (req, res) => {
 // PUT /api/admin/actividades/:id - Actualizar actividad
 router.put('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { codigo, nombre, descripcion, requiereAptaFisica, cuotaMensual, color, orden, activo, conceptoTesoreriaId, imagen } = req.body
+  const { codigo, nombre, descripcion, requiereAptaFisica, cuotaMensual, color, orden, activo, conceptoTesoreriaId, centroCostoId, imagen } = req.body
 
   const existente = await req.db.actividad.findUnique({ where: { id: parseInt(id) } })
   if (!existente) throw new AppError('Actividad no encontrada', 404, 'NOT_FOUND')
@@ -129,6 +130,9 @@ router.put('/actividades/:id', authAdmin, asyncHandler(async (req, res) => {
       conceptoTesoreriaId: conceptoTesoreriaId !== undefined
         ? (conceptoTesoreriaId ? parseInt(conceptoTesoreriaId) : null)
         : existente.conceptoTesoreriaId,
+      centroCostoId: centroCostoId !== undefined
+        ? (centroCostoId ? parseInt(centroCostoId) : null)
+        : existente.centroCostoId,
       imagen: imagen !== undefined ? imagen : existente.imagen,
     },
   })

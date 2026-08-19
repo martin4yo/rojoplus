@@ -18,6 +18,7 @@ export default function ActividadForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [conceptos, setConceptos] = useState([])
+  const [centros, setCentros] = useState([])
   const [form, setForm] = useState({
     codigo: '',
     nombre: '',
@@ -29,6 +30,7 @@ export default function ActividadForm() {
     activo: true,
     imagen: '',
     conceptoTesoreriaId: '',
+    centroCostoId: '',
   })
 
   useEffect(() => {
@@ -37,7 +39,11 @@ export default function ActividadForm() {
 
   async function cargarDatos() {
     try {
-      const conceptosData = await api.get('/admin/conceptos-tesoreria?activo=true').catch(() => [])
+      const [conceptosData, centrosData] = await Promise.all([
+        api.get('/admin/conceptos-tesoreria?activo=true').catch(() => []),
+        api.get('/admin/centros-costo?activo=true').catch(() => []),
+      ])
+      setCentros((centrosData || []).sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', 'es', { sensitivity: 'base' })))
       setConceptos((conceptosData || []).filter(c => c.tipo === 'INGRESO' || c.tipo === 'AMBOS').sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' })))
 
       if (isEdit) {
@@ -53,6 +59,7 @@ export default function ActividadForm() {
           activo: data.activo ?? true,
           imagen: data.imagen || '',
           conceptoTesoreriaId: data.conceptoTesoreriaId ? String(data.conceptoTesoreriaId) : '',
+          centroCostoId: data.centroCostoId ? String(data.centroCostoId) : '',
         })
       }
     } catch (err) {
@@ -81,6 +88,7 @@ export default function ActividadForm() {
         cuotaMensual: form.cuotaMensual ? parseFloat(form.cuotaMensual) : null,
         orden: parseInt(form.orden) || 0,
         conceptoTesoreriaId: form.conceptoTesoreriaId ? parseInt(form.conceptoTesoreriaId) : null,
+        centroCostoId: form.centroCostoId ? parseInt(form.centroCostoId) : null,
       }
 
       if (isEdit) {
@@ -223,7 +231,27 @@ export default function ActividadForm() {
             ))}
           </select>
           <p className="text-xs text-gray-500 mt-1">
-            Aplica a todas las categorías de esta actividad. Define el centro de costo donde se registran las cobranzas.
+            Aplica a todas las categorías de esta actividad. Define con qué concepto se registran las cobranzas.
+          </p>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Centro de Costo <span className="text-gray-400 text-xs">(opcional)</span>
+          </label>
+          <select
+            name="centroCostoId"
+            value={form.centroCostoId}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary"
+          >
+            <option value="">Sin centro de costo</option>
+            {centros.map(c => (
+              <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Imputa la actividad a un centro de costo. Sin esto, la actividad no aparece en el reporte de Rentabilidad por Centro de Costo.
           </p>
         </div>
 

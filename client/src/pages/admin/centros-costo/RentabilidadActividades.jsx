@@ -21,8 +21,9 @@ export default function RentabilidadActividades() {
 
   const cargarCentros = async () => {
     try {
-      const response = await api.get('/admin/centros-costo?activo=true')
-      setCentros(response.data || [])
+      // api.get ya devuelve el `data` de la respuesta: es el array, no {data:[...]}
+      const centrosData = await api.get('/admin/centros-costo?activo=true')
+      setCentros(centrosData || [])
     } catch (err) {
       console.error('Error:', err)
     }
