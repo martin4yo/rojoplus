@@ -106,8 +106,12 @@ router.get('/og-preview', async (req, res) => {
       html = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(nombre)}</title>`)
 
       if (imagen) {
-        html = setMeta(html, 'property', 'og:image', imagen)
-        html = setMeta(html, 'name', 'twitter:image', imagen)
+        // Se apunta al endpoint que sirve el logo redimensionado: los logos
+        // suelen ser PNG de 2000+ px y más de 1 MB, y WhatsApp no renderiza
+        // previews tan pesadas.
+        const imagenOg = `${proto}://${host}/api/og-image`
+        html = setMeta(html, 'property', 'og:image', imagenOg)
+        html = setMeta(html, 'name', 'twitter:image', imagenOg)
         // Las medidas fijas del index.html son del logo de Clubix y no aplican
         // al logo del club; dejarlas mal hace que WhatsApp recorte raro.
         html = html.replace(/\s*<meta\s+property=["']og:image:(width|height)["'][^>]*>/gi, '')
@@ -126,6 +130,63 @@ router.get('/og-preview', async (req, res) => {
     } catch {
       return res.status(500).send('')
     }
+  }
+})
+
+/**
+ * Logo del tenant redimensionado para vistas previas.
+ *
+ * Los logos que suben los clubes son PNG grandes (el de Sportivo Pilar mide
+ * 2430x2430 y pesa 1 MB). WhatsApp descarta las previews pesadas, asi que acá
+ * se reduce a 600 px y se pasa a JPEG sobre fondo blanco (las transparencias
+ * se ven mal en la tarjeta). El resultado se cachea en disco y se regenera
+ * solo si cambia el logo original.
+ *
+ * Si algo falla —canvas no disponible, formato raro— redirige al logo
+ * original: peor calidad de preview, pero nunca un 500.
+ */
+router.get('/api/og-image', async (req, res) => {
+  const host = req.get('X-Forwarded-Host') || req.get('host') || ''
+  let tenant = null
+  try {
+    tenant = await resolverTenant(host)
+    if (!tenant?.logoUrl) return res.status(404).end()
+
+    const rel = tenant.logoUrl.replace(/^\/uploads\//, '')
+    const origen = path.resolve(__dirname, '../../uploads', rel)
+    const statOrigen = fs.statSync(origen)
+
+    const dirCache = path.resolve(__dirname, '../../uploads/og')
+    const destino = path.join(dirCache, `tenant-${tenant.id}.jpg`)
+
+    let vigente = false
+    try {
+      vigente = fs.statSync(destino).mtimeMs >= statOrigen.mtimeMs
+    } catch { vigente = false }
+
+    if (!vigente) {
+      const { createCanvas, loadImage } = await import('canvas')
+      const img = await loadImage(origen)
+      const MAX = 600
+      const escala = Math.min(MAX / img.width, MAX / img.height, 1)
+      const w = Math.max(1, Math.round(img.width * escala))
+      const h = Math.max(1, Math.round(img.height * escala))
+      const lienzo = createCanvas(w, h)
+      const ctx = lienzo.getContext('2d')
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, w, h)
+      ctx.drawImage(img, 0, 0, w, h)
+      fs.mkdirSync(dirCache, { recursive: true })
+      fs.writeFileSync(destino, lienzo.toBuffer('image/jpeg', { quality: 0.85 }))
+    }
+
+    res.set('Content-Type', 'image/jpeg')
+    res.set('Cache-Control', 'public, max-age=86400')
+    return res.send(fs.readFileSync(destino))
+  } catch (err) {
+    console.error('[og-image] fallback al logo original:', err.message)
+    if (tenant?.logoUrl) return res.redirect(302, tenant.logoUrl)
+    return res.status(404).end()
   }
 })
 
