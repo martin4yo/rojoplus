@@ -6,6 +6,27 @@
 import { createTenantPrisma } from '../lib/tenantPrisma.js'
 
 /**
+ * Timeout duro para TODAS las llamadas a Evolution.
+ *
+ * Sin esto, si la API queda colgada —acepta la conexión TCP pero nunca
+ * responde, como pasó el 2026-08-19 cuando el proceso murió por OOM y siguió
+ * con el puerto abierto— el fetch espera el default de undici (300 s) y deja
+ * la request del usuario girando sin volver nunca.
+ */
+const WA_TIMEOUT_MS = parseInt(process.env.WHATSAPP_HTTP_TIMEOUT_MS || '15000', 10)
+
+async function waFetch(url, options = {}) {
+  try {
+    return await globalThis.fetch(url, { ...options, signal: AbortSignal.timeout(WA_TIMEOUT_MS) })
+  } catch (err) {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      throw new Error(`La API de WhatsApp no respondió en ${Math.round(WA_TIMEOUT_MS / 1000)}s`)
+    }
+    throw err
+  }
+}
+
+/**
  * Convierte Markdown estándar al subset que WhatsApp interpreta.
  *
  * WhatsApp soporta: *negrita*, _cursiva_, ~tachado~, ```código```.
@@ -201,7 +222,7 @@ export async function enviarWhatsAppImagen({ db, tenantId, telefono, imagenBase6
 
   try {
     const url = `${cfg.apiUrl}/message/sendMedia/${cfg.instance}`
-    const res = await fetch(url, {
+    const res = await waFetch(url, {
       method: 'POST',
       headers: {
         'apikey': cfg.apiKey,
@@ -259,7 +280,7 @@ export async function enviarWhatsAppDocumento({ db, tenantId, telefono, pdfBase6
 
   try {
     const url = `${cfg.apiUrl}/message/sendMedia/${cfg.instance}`
-    const res = await fetch(url, {
+    const res = await waFetch(url, {
       method: 'POST',
       headers: {
         'apikey': cfg.apiKey,
@@ -326,7 +347,7 @@ export async function enviarWhatsApp({ db, tenantId, telefono, texto, ignorarHor
 
   try {
     const url = `${cfg.apiUrl}/message/sendText/${cfg.instance}`
-    const res = await fetch(url, {
+    const res = await waFetch(url, {
       method: 'POST',
       headers: {
         'apikey': cfg.apiKey,
@@ -382,7 +403,7 @@ export async function verificarConexionWhatsApp(db) {
 
   try {
     const url = `${cfg.apiUrl}/instance/connectionState/${cfg.instance}`
-    const res = await fetch(url, {
+    const res = await waFetch(url, {
       headers: { 'apikey': cfg.apiKey }
     })
 
@@ -409,7 +430,7 @@ export async function configurarWebhookEvolution(db) {
 
   try {
     // Verificar si la instancia existe, crearla si no
-    const fetchRes = await fetch(`${cfg.apiUrl}/instance/fetchInstances`, {
+    const fetchRes = await waFetch(`${cfg.apiUrl}/instance/fetchInstances`, {
       headers: { 'apikey': cfg.apiKey },
     }).catch(() => null)
 
@@ -420,7 +441,7 @@ export async function configurarWebhookEvolution(db) {
 
       if (!existe) {
         console.log(`[WhatsApp] Instancia "${cfg.instance}" no encontrada, creando...`)
-        const createRes = await fetch(`${cfg.apiUrl}/instance/create`, {
+        const createRes = await waFetch(`${cfg.apiUrl}/instance/create`, {
           method: 'POST',
           headers: { 'apikey': cfg.apiKey, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -441,7 +462,7 @@ export async function configurarWebhookEvolution(db) {
 
     // Registrar webhook (Evolution API v2 requiere el wrapper { webhook: { ... } })
     const url = `${cfg.apiUrl}/webhook/set/${cfg.instance}`
-    const res = await fetch(url, {
+    const res = await waFetch(url, {
       method: 'POST',
       headers: {
         'apikey': cfg.apiKey,
