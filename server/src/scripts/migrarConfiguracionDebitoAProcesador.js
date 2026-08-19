@@ -4,9 +4,17 @@
  *
  * Se ejecuta DESPUÉS de `npx prisma db push`. La secuencia completa es:
  *   1. exportar configuracion_debito a JSON             (ver --json)
- *   2. TRUNCATE configuracion_debito                    (procesadorId es NOT NULL)
+ *   2. DELETE FROM configuracion_debito                 (procesadorId es NOT NULL)
  *   3. npx prisma db push
  *   4. node src/scripts/migrarConfiguracionDebitoAProcesador.js --json <ruta>
+ *
+ * ⚠️  NUNCA `TRUNCATE ... CASCADE` en el paso 2. El CASCADE es TRANSITIVO: sigue
+ * toda la cadena de foreign keys y vacía tablas enteras. El 2026-07-22 se corrió
+ * `TRUNCATE TABLE configuracion_debito RESTART IDENTITY CASCADE` en producción y
+ * se llevó puestas `cargos`, `notificaciones_log`, cobranzas y débito; hubo que
+ * recuperar con pgBackRest (PITR). Un `DELETE` plano es seguro: la única FK que
+ * apunta acá es `archivos_debito.configuracion_id`, y es ON DELETE RESTRICT —
+ * si algo la referenciara, el DELETE falla en vez de propagarse.
  *
  * Idempotente: los procesadores se crean con upsert por `codigo` y las
  * configuraciones con upsert por (tenantId, procesadorId).
