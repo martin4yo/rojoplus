@@ -114,9 +114,22 @@ node src/scripts/migrarConfiguracionDebitoAProcesador.js --json /tmp/configdebit
 
 ```bash
 cd /var/www/clubix/client && CX npm install && CX npm run build
-CX pm2 restart clubix-backend
+CX pm2 restart clubix-backend --update-env
 CX pm2 logs clubix-backend --lines 50 --nostream
 ```
+
+> **Usar siempre `--update-env`.** PM2 cachea el environment del arranque
+> original: sin ese flag, los cambios en `.env` no se aplican y el proceso sigue
+> con la configuración vieja. Se detectó en el deploy a dev-1 del 2026-08-19,
+> donde el cron de la cola de notificaciones seguía corriendo pese a tener
+> `DISABLE_ALL_CRONS=true` en el `.env` desde hacía días.
+
+> El backend tarda ~9 s en bindear el puerto. Un `curl` inmediato después del
+> restart da `000`; reintentar antes de dar el deploy por fallido.
+
+Si el commit no toca `client/` ni ningún `package.json`, el `npm install` y el
+build son innecesarios — verificarlo con:
+`git diff --name-only <tag>..HEAD -- client/ '*/package.json'`
 
 ## 7. Verificación
 
